@@ -36,6 +36,7 @@ export default function HallazgoDetalle() {
   const { id } = useParams<{ id: string }>();
   const { data: finding, isLoading } = useFindingByCode(id);
   const { data: relatedControls = [] } = useFindingRelatedControls(finding?.obligation_id);
+  const { data: actionPlans = [] } = useActionPlansByFinding(finding?.id);
 
   if (isLoading) {
     return (
@@ -80,6 +81,7 @@ export default function HallazgoDetalle() {
       <Tabs defaultValue="descripcion" className="mt-6">
         <TabsList>
           <TabsTrigger value="descripcion">Descripción</TabsTrigger>
+          <TabsTrigger value="acciones">Planes de acción ({actionPlans.length})</TabsTrigger>
           <TabsTrigger value="controles">Controles vinculados ({relatedControls.length})</TabsTrigger>
           <TabsTrigger value="vinculados">Objetos vinculados</TabsTrigger>
         </TabsList>
