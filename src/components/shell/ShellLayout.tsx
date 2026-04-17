@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TourPanel } from "@/components/tour/TourPanel";
 
 interface NavItem {
   label: string;
@@ -274,6 +275,7 @@ export function ShellLayout() {
           <Outlet />
         </main>
       </div>
+      <TourPanel />
     </div>
   );
 }
