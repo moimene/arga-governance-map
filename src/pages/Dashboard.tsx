@@ -72,11 +72,11 @@ export default function Dashboard() {
 
       {/* KPIs */}
       <div key={animKey} className="grid grid-cols-5 gap-4 animate-fade-in">
-        <KpiCard label="Entidades activas" value={data.entidades} icon={Building} tone="primary" to="/entidades" />
-        <KpiCard label="Mandatos próximos a vencer" value={data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
-        <KpiCard label="Políticas pendientes de revisión" value={data.politicasPendientes} icon={FileWarning} tone="warning" to="/politicas" />
-        <KpiCard label="Hallazgos abiertos" value={data.hallazgosAbiertos} icon={AlertTriangle} tone="critical" to="/hallazgos" />
-        <KpiCard label="Excepciones regulatorias activas" value={data.excepcionesActivas} icon={ShieldAlert} tone="critical" to="/obligaciones" />
+        <KpiCard label="Entidades activas" value={kpis?.entidades ?? data.entidades} icon={Building} tone="primary" to="/entidades" />
+        <KpiCard label="Mandatos próximos a vencer" value={kpis?.mandatosVencimiento ?? data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
+        <KpiCard label="Políticas pendientes de revisión" value={kpis?.politicasPendientes ?? data.politicasPendientes} icon={FileWarning} tone="warning" to="/politicas" />
+        <KpiCard label="Hallazgos abiertos" value={kpis?.hallazgosAbiertos ?? data.hallazgosAbiertos} icon={AlertTriangle} tone="critical" to="/hallazgos" />
+        <KpiCard label="Excepciones / Delegaciones caducadas" value={kpis?.delegacionesCaducadas ?? data.excepcionesActivas} icon={ShieldAlert} tone="critical" to="/delegaciones" />
       </div>
 
       {/* Mid row */}
@@ -84,18 +84,18 @@ export default function Dashboard() {
         {/* Alertas críticas */}
         <Card className={cn(
           "col-span-8 overflow-hidden",
-          data.alertas.length > 0 ? "border-l-4 border-l-destructive" : "border-l-4 border-l-status-active",
+          alerts.length > 0 ? "border-l-4 border-l-destructive" : "border-l-4 border-l-status-active",
         )}>
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className={cn("h-4 w-4", data.alertas.length > 0 ? "text-destructive" : "text-status-active")} />
+              <AlertTriangle className={cn("h-4 w-4", alerts.length > 0 ? "text-destructive" : "text-status-active")} />
               <h2 className="text-sm font-semibold">Alertas críticas</h2>
             </div>
-            {data.alertas.length > 0 && (
-              <Link to="/hallazgos" className="text-xs font-medium text-primary hover:underline">Ver todas</Link>
+            {alerts.length > 0 && (
+              <Link to="/notificaciones" className="text-xs font-medium text-primary hover:underline">Ver todas</Link>
             )}
           </div>
-          {data.alertas.length === 0 ? (
+          {alerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 bg-status-active-bg/50 px-5 py-12 text-center">
               <CheckCircle className="h-10 w-10 text-status-active" />
               <p className="text-sm font-medium text-foreground">No hay alertas críticas en este ámbito.</p>
@@ -103,18 +103,22 @@ export default function Dashboard() {
             </div>
           ) : (
             <ul key={animKey} className="divide-y divide-border animate-fade-in">
-              {data.alertas.map((a, i) => (
-                <li key={a.id + i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
-                  <Link to={a.to} className="flex flex-1 items-start gap-3">
-                    <span className={cn("mt-1 inline-block h-2 w-2 rounded-full", a.tone === "critical" ? "bg-destructive" : "bg-status-warning", i === 0 && a.tone === "critical" && "pulse-ring")} />
+              {alerts.map((a, i) => (
+                <li key={a.id} className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
+                  <button
+                    type="button"
+                    onClick={() => a.route && navigate(a.route)}
+                    className="flex flex-1 items-start gap-3 text-left"
+                  >
+                    <span className={cn("mt-1 inline-block h-2 w-2 rounded-full", alertDot(a.type), i === 0 && a.type === "error" && "pulse-ring")} />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-foreground">{a.id}</span>
-                        <StatusBadge label={a.label} tone={a.tone === "critical" ? "critical" : "warning"} pulse={i === 0 && a.tone === "critical"} />
+                        <StatusBadge label={alertLabel(a.type)} tone={alertTone(a.type)} pulse={i === 0 && a.type === "error"} />
                       </div>
-                      <p className="mt-1 text-sm text-foreground">{a.text}</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{a.title}</p>
+                      {a.body && <p className="mt-0.5 text-xs text-muted-foreground">{a.body}</p>}
                     </div>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -131,20 +135,23 @@ export default function Dashboard() {
             <Link to="/organos" className="text-xs font-medium text-primary hover:underline">Ver agenda</Link>
           </div>
           <ul>
-            {upcomingMeetings.map((m, i) => (
+            {meetings.length === 0 && (
+              <li className="px-5 py-6 text-center text-xs text-muted-foreground">Sin reuniones convocadas.</li>
+            )}
+            {meetings.map((m, i) => (
               <li
-                key={i}
+                key={m.id}
                 className={cn(
                   "border-b border-border last:border-0 px-5 py-3 hover:bg-accent/40",
-                  m.highlight && "border-l-4 border-l-primary bg-accent/40",
+                  i === 0 && "border-l-4 border-l-primary bg-accent/40",
                 )}
               >
-                <Link to={m.link ?? "/organos"} className="block">
+                <Link to={`/organos/${m.body_slug}`} className="block">
                   <div className="flex items-baseline justify-between">
-                    <span className="font-mono text-xs text-muted-foreground">{m.date}</span>
-                    <StatusBadge label={m.status} tone={m.status === "Convocada" ? "info" : "neutral"} />
+                    <span className="font-mono text-xs text-muted-foreground">{fmtMeetingDate(m.scheduled_start)}</span>
+                    <StatusBadge label={m.status} tone="info" />
                   </div>
-                  <div className="mt-1 text-sm font-medium text-foreground">{m.organ}</div>
+                  <div className="mt-1 text-sm font-medium text-foreground">{m.body_name}</div>
                 </Link>
               </li>
             ))}
