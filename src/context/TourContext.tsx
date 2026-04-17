@@ -1,16 +1,25 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
+export interface TourBadge {
+  label: string;
+  tone: "critical" | "warning" | "info" | "neutral" | "pending";
+}
+
 export interface TourStep {
+  module: string;
   route: string;
   title: string;
   description: string;
   bullets: string[];
+  badges?: TourBadge[];
+  highlightId?: string;
   available: boolean;
 }
 
 export const tourSteps: TourStep[] = [
   {
+    module: "Dashboard",
     route: "/",
     title: "Tu centro de control de gobernanza",
     description:
@@ -20,9 +29,15 @@ export const tourSteps: TourStep[] = [
       "Alertas críticas: el hallazgo HALL-008 requiere atención inmediata.",
       "Agenda: la reunión del CdA del 22/04 tiene 2 confirmaciones pendientes.",
     ],
+    badges: [
+      { label: "HALL-008 CRÍTICO", tone: "critical" },
+      { label: "OBL-DORA-003 SIN CONTROL", tone: "critical" },
+      { label: "CdA 22/04", tone: "info" },
+    ],
     available: true,
   },
   {
+    module: "Governance Map",
     route: "/governance-map",
     title: "La red de relaciones de tu gobierno corporativo",
     description:
@@ -32,9 +47,16 @@ export const tourSteps: TourStep[] = [
       "La arista roja punteada: OBL-DORA-003 no tiene control asignado.",
       "Haz clic en cualquier nodo para ver su panel de detalle.",
     ],
+    badges: [
+      { label: "Grafo interactivo", tone: "info" },
+      { label: "HALL-008 nodo rojo", tone: "critical" },
+      { label: "Arista SIN CONTROL", tone: "critical" },
+    ],
+    highlightId: "tour-map-canvas",
     available: true,
   },
   {
+    module: "Entidad",
     route: "/entidades/arga-seguros",
     title: "Cada entidad, una fuente única de verdad",
     description:
@@ -44,9 +66,16 @@ export const tourSteps: TourStep[] = [
       "Tab Relaciones: árbol societario con porcentajes de participación.",
       "Tab Normativa: las 25 políticas aplicables con sus estados.",
     ],
+    badges: [
+      { label: "ARGA Seguros S.A.", tone: "info" },
+      { label: "25 filiales", tone: "neutral" },
+      { label: "PR-008 pendiente", tone: "warning" },
+    ],
+    highlightId: "tour-entity-header",
     available: true,
   },
   {
+    module: "Órgano",
     route: "/organos/consejo-administracion",
     title: "El órgano de gobierno en tiempo real",
     description:
@@ -56,9 +85,16 @@ export const tourSteps: TourStep[] = [
       "Reunión 22/04/2026: PR-008 (DORA) en el punto 3 de la agenda — pendiente de aprobación del Consejo.",
       "Tab Reglamento: REG-001 aprobado por la Junta General el 15/01/2024 — texto íntegro en acordeón.",
     ],
+    badges: [
+      { label: "REG-001", tone: "neutral" },
+      { label: "4 mandatos ⚠️", tone: "warning" },
+      { label: "Reunión 22/04", tone: "info" },
+    ],
+    highlightId: "tour-organ-banner",
     available: true,
   },
   {
+    module: "Reunión",
     route: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
     title: "El expediente de reunión completo",
     description:
@@ -68,9 +104,15 @@ export const tourSteps: TourStep[] = [
       "Tab Participantes: 2 consejeros aún no han confirmado — quórum en riesgo si no confirman.",
       "Tabs Votaciones y Acuerdos vacías: se rellenan durante y tras la sesión.",
     ],
+    badges: [
+      { label: "PR-008 punto 3", tone: "warning" },
+      { label: "2 pendientes", tone: "warning" },
+      { label: "Acta inmutable", tone: "neutral" },
+    ],
     available: true,
   },
   {
+    module: "Política",
     route: "/politicas/PR-008",
     title: "La política como objeto vivo con ciclo de vida",
     description:
@@ -80,9 +122,16 @@ export const tourSteps: TourStep[] = [
       "Tab Aplicabilidad: 25 entidades del grupo con ARGA Turquía marcada con excepción vencida ⚠.",
       "Tab Obligaciones vinculadas: OBL-DORA-003 sin cobertura — el eslabón débil de la cadena.",
     ],
+    badges: [
+      { label: "PR-008", tone: "pending" },
+      { label: "OBL-DORA-003 SIN COBERTURA", tone: "critical" },
+      { label: "25 entidades", tone: "neutral" },
+    ],
+    highlightId: "tour-policy-stepper",
     available: true,
   },
   {
+    module: "Obligaciones",
     route: "/obligaciones",
     title: "La cadena norma → obligación → control → evidencia",
     description:
@@ -92,9 +141,16 @@ export const tourSteps: TourStep[] = [
       "Agrupación por marco normativo: DORA vs Solvencia II visualmente diferenciados.",
       "OBL-SOL-004 en remediación: CTR-004 tiene evidencias rechazadas — vinculado a HALL-001.",
     ],
+    badges: [
+      { label: "OBL-DORA-003", tone: "critical" },
+      { label: "CTR-004 DEFICIENTE", tone: "warning" },
+      { label: "10 obligaciones", tone: "info" },
+    ],
+    highlightId: "tour-obl-banner",
     available: true,
   },
   {
+    module: "Delegaciones",
     route: "/delegaciones",
     title: "El poder de actuar: quién, cuánto y hasta cuándo",
     description:
@@ -104,9 +160,15 @@ export const tourSteps: TourStep[] = [
       "Columna de vencimiento: D. Rodrigo Almeida y D. Ignacio Fuentes vencen en <90 días — acción preventiva en curso.",
       "Las delegaciones revocadas se conservan con su historial completo para el registro inmutable.",
     ],
+    badges: [
+      { label: "DEL-001 CADUCADA", tone: "critical" },
+      { label: "3 próximas a vencer", tone: "warning" },
+    ],
+    highlightId: "tour-deleg-row",
     available: true,
   },
   {
+    module: "Hallazgo",
     route: "/hallazgos/HALL-008",
     title: "El hallazgo: la señal de que algo requiere atención",
     description:
@@ -116,9 +178,15 @@ export const tourSteps: TourStep[] = [
       "Banner azul de independencia: Auditoría actúa con plena autonomía funcional.",
       "Tab Acciones: 4 acciones correctivas activas — D. Carmen Delgado y D. Álvaro Mendoza ya tienen tareas asignadas.",
     ],
+    badges: [
+      { label: "HALL-008 CRÍTICA", tone: "critical" },
+      { label: "4 acciones activas", tone: "warning" },
+    ],
+    highlightId: "tour-finding-badge",
     available: true,
   },
   {
+    module: "Conflictos",
     route: "/conflictos",
     title: "Integridad como proceso, no como declaración",
     description:
@@ -128,9 +196,15 @@ export const tourSteps: TourStep[] = [
       "Tab Attestations: 12/25 personas pendientes — la campaña cierra el 30/04/2026.",
       "Tab Operaciones vinculadas: OPV-003 bajo revisión de precio — D. Ricardo Vega se abstuvo.",
     ],
+    badges: [
+      { label: "CON-SIT-002 NO DECLARADO", tone: "critical" },
+      { label: "12 attestations pendientes", tone: "warning" },
+    ],
+    highlightId: "tour-conflict-row",
     available: true,
   },
   {
+    module: "SII",
     route: "/sii",
     title: "El canal de integridad: segregado por diseño",
     description:
@@ -140,6 +214,11 @@ export const tourSteps: TourStep[] = [
       "CASO-SII-001 correlacionado con HALL-008 — el sistema conecta investigaciones independientes sin exponer datos protegidos.",
       "Log de auditoría independiente: cada acceso queda registrado en un sistema separado.",
     ],
+    badges: [
+      { label: "CASO-SII-001 activo", tone: "pending" },
+      { label: "Log independiente", tone: "neutral" },
+    ],
+    highlightId: "tour-sii-header",
     available: true,
   },
 ];
@@ -149,10 +228,15 @@ interface TourContextValue {
   start: () => void;
   next: () => void;
   prev: () => void;
+  goTo: (s: number) => void;
   close: () => void;
   finish: () => void;
   total: number;
   completed: boolean;
+  /** Whether the user has navigated away from the current step's route. */
+  isFreelyExploring: (currentPath: string) => boolean;
+  /** Step matching the given path (1-based), or 0. */
+  stepForPath: (path: string) => number;
 }
 
 const TourContext = createContext<TourContextValue | undefined>(undefined);
@@ -177,7 +261,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const goTo = (s: number) => {
     setStep(s);
     if (s > 0 && s <= tourSteps.length) {
-      // Pre-confirm SII access if tour visits /sii so the modal doesn't block the flow
       if (tourSteps[s - 1].route.startsWith("/sii") && typeof window !== "undefined") {
         sessionStorage.setItem("sii_access_confirmed", "true");
       }
@@ -201,6 +284,17 @@ export function TourProvider({ children }: { children: ReactNode }) {
     goTo(1);
   };
 
+  const stepForPath = (path: string) => {
+    const idx = tourSteps.findIndex((s) => s.route === path);
+    return idx >= 0 ? idx + 1 : 0;
+  };
+
+  const isFreelyExploring = (currentPath: string) => {
+    if (step === 0) return false;
+    const expected = tourSteps[step - 1]?.route;
+    return expected !== currentPath;
+  };
+
   return (
     <TourContext.Provider
       value={{
@@ -210,8 +304,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
         start,
         next: () => goTo(Math.min(step + 1, tourSteps.length)),
         prev: () => goTo(Math.max(step - 1, 1)),
+        goTo,
         close: () => setStep(0),
         finish,
+        isFreelyExploring,
+        stepForPath,
       }}
     >
       {children}

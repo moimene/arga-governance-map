@@ -7,7 +7,8 @@ import { TourPanel } from "@/components/tour/TourPanel";
 export function AppLayout() {
   const { pathname } = useLocation();
   const isSii = pathname.startsWith("/sii");
-  const showFooter = !isSii;
+  const isLogin = pathname === "/login";
+  const showFooter = !isSii && !isLogin;
 
   return (
     <div className="flex min-h-screen w-full bg-background">

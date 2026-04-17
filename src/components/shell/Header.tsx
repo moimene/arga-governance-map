@@ -1,12 +1,15 @@
 import { CircleHelp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScopeSwitcher } from "./ScopeSwitcher";
+import { ScopeNotice } from "./ScopeNotice";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationsBell } from "./NotificationsBell";
 import { UserMenu } from "./UserMenu";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export function Header() {
+  const { pathname } = useLocation();
+  const showNotice = pathname !== "/";
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-card px-5">
       <Link to="/" className="flex items-center gap-1.5 text-[20px] leading-none">
@@ -15,6 +18,7 @@ export function Header() {
       </Link>
 
       <div className="ml-2"><ScopeSwitcher /></div>
+      {showNotice && <ScopeNotice />}
 
       <div className="ml-2"><GlobalSearch /></div>
 

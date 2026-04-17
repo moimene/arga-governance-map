@@ -119,4 +119,14 @@
 
   .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+
+  @keyframes tourHighlight {
+    0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    50%  { box-shadow: 0 0 0 12px hsl(var(--primary) / 0.2); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  }
+  .tour-highlight {
+    animation: tourHighlight 2s ease-out;
+    border-radius: 0.5rem;
+  }
 }
