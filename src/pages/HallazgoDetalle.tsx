@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadgeTip } from "@/components/StatusBadgeTip";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   useFindingByCode,
   useFindingRelatedControls,
+  useActionPlansByFinding,
   severityLabel,
   severityTone,
   findingStatusLabel,
