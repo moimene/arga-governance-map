@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { delegations } from "@/data/delegations";
-import { entities } from "@/data/entities";
+import { useDelegationsList, delegationStatusLabel, delegationStatusTone, formatDate } from "@/hooks/useDelegations";
 import { AlertTriangle, Ban, Clock, Key, Plus, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ const toneMap = {
   critical: { bg: "bg-destructive/10", text: "text-destructive", value: "text-destructive" },
   archived: { bg: "bg-muted", text: "text-muted-foreground", value: "text-muted-foreground" },
 } as const;
+
 function Kpi({ label, value, icon: Icon, tone }: { label: string; value: number; icon: typeof Key; tone: keyof typeof toneMap }) {
   const s = toneMap[tone];
   return (
@@ -31,28 +32,39 @@ function Kpi({ label, value, icon: Icon, tone }: { label: string; value: number;
   );
 }
 
-const statusOrder: Record<string, number> = { CADUCADA: 0, "PRÓXIMA VENCIMIENTO": 1, VIGENTE: 2, REVOCADA: 3 };
+const statusOrder: Record<string, number> = { "Caducada": 0, "Próxima a vencer": 1, "Próximo a vencer": 1, "Vigente": 2, "Revocada": 3 };
 
 export default function DelegacionesList() {
+  const { data: delegations = [], isLoading } = useDelegationsList();
   const [status, setStatus] = useState("all");
   const [entity, setEntity] = useState("all");
   const [search, setSearch] = useState("");
 
+  const entityOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    delegations.forEach((d) => {
+      if (d.entity_id && d.entity_name) seen.set(d.entity_id, d.entity_name);
+    });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [delegations]);
+
   const filtered = useMemo(() => delegations
     .filter((d) =>
       (status === "all" || d.status === status) &&
-      (entity === "all" || d.entityId === entity) &&
-      (search === "" || d.grantedTo.toLowerCase().includes(search.toLowerCase()) || d.code.toLowerCase().includes(search.toLowerCase()))
+      (entity === "all" || d.entity_id === entity) &&
+      (search === "" || (d.delegate_name ?? "").toLowerCase().includes(search.toLowerCase()) || d.code.toLowerCase().includes(search.toLowerCase()))
     )
-    .sort((a, b) => statusOrder[a.status] - statusOrder[b.status]),
-  [status, entity, search]);
+    .sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)),
+  [delegations, status, entity, search]);
 
   const kpis = {
-    vigente: delegations.filter((d) => d.status === "VIGENTE").length,
-    proxima: delegations.filter((d) => d.status === "PRÓXIMA VENCIMIENTO").length,
-    caducada: delegations.filter((d) => d.status === "CADUCADA").length,
-    revocada: delegations.filter((d) => d.status === "REVOCADA").length,
+    vigente: delegations.filter((d) => d.status === "Vigente").length,
+    proxima: delegations.filter((d) => d.status === "Próxima a vencer" || d.status === "Próximo a vencer").length,
+    caducada: delegations.filter((d) => d.status === "Caducada").length,
+    revocada: delegations.filter((d) => d.status === "Revocada").length,
   };
+
+  const expiredAlert = delegations.find((d) => d.status === "Caducada");
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -73,24 +85,28 @@ export default function DelegacionesList() {
         <Kpi label="Revocadas" value={kpis.revocada} icon={Ban} tone="archived" />
       </div>
 
-      <div className="mb-3 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="deleg-row">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
-        <div className="flex-1 text-sm">
-          <div className="font-semibold text-status-critical">1 delegación caducada sin revocación formal — D. Carlos Eduardo Vaz</div>
-          <div className="mt-1 text-xs text-status-critical/90">Posible riesgo jurídico para actos realizados tras el vencimiento.</div>
+      {expiredAlert && (
+        <div className="mb-3 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="deleg-row">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-critical">{kpis.caducada} delegación{kpis.caducada !== 1 ? "es" : ""} caducada{kpis.caducada !== 1 ? "s" : ""} sin revocación formal — {expiredAlert.delegate_name}</div>
+            <div className="mt-1 text-xs text-status-critical/90">Posible riesgo jurídico para actos realizados tras el vencimiento.</div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
+            <Link to={`/delegaciones/${expiredAlert.slug}`}>Ver delegación →</Link>
+          </Button>
         </div>
-        <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
-          <Link to="/delegaciones/carlos-vaz-latam">Ver delegación →</Link>
-        </Button>
-      </div>
+      )}
 
-      <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
-        <Clock className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
-        <div className="flex-1 text-sm">
-          <div className="font-semibold text-status-warning">3 delegaciones vencen en menos de 90 días</div>
-          <div className="mt-1 text-xs text-status-warning/90">Revisar y renovar antes de la fecha de caducidad.</div>
+      {kpis.proxima > 0 && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-warning">{kpis.proxima} delegación{kpis.proxima !== 1 ? "es" : ""} vence{kpis.proxima === 1 ? "" : "n"} en menos de 90 días</div>
+            <div className="mt-1 text-xs text-status-warning/90">Revisar y renovar antes de la fecha de caducidad.</div>
+          </div>
         </div>
-      </div>
+      )}
 
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-3 gap-3">
@@ -98,17 +114,17 @@ export default function DelegacionesList() {
             <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="VIGENTE">Vigente</SelectItem>
-              <SelectItem value="PRÓXIMA VENCIMIENTO">Próxima vencimiento</SelectItem>
-              <SelectItem value="CADUCADA">Caducada</SelectItem>
-              <SelectItem value="REVOCADA">Revocada</SelectItem>
+              <SelectItem value="Vigente">Vigente</SelectItem>
+              <SelectItem value="Próxima a vencer">Próxima vencimiento</SelectItem>
+              <SelectItem value="Caducada">Caducada</SelectItem>
+              <SelectItem value="Revocada">Revocada</SelectItem>
             </SelectContent>
           </Select>
           <Select value={entity} onValueChange={setEntity}>
             <SelectTrigger><SelectValue placeholder="Entidad" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las entidades</SelectItem>
-              {entities.map((e) => <SelectItem key={e.id} value={e.id}>{e.commonName}</SelectItem>)}
+              {entityOptions.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Input placeholder="Buscar titular o código..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -125,32 +141,36 @@ export default function DelegacionesList() {
               <TableHead>Ámbito</TableHead>
               <TableHead className="w-44">Estado</TableHead>
               <TableHead className="w-32">Vencimiento</TableHead>
-              <TableHead className="w-28">Hallazgo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((d) => {
-              const e = entities.find((x) => x.id === d.entityId);
-              const tone = d.status === "CADUCADA" ? "critical" : d.status === "PRÓXIMA VENCIMIENTO" ? "warning" : d.status === "REVOCADA" ? "archived" : "active";
-              const rowClass = d.status === "CADUCADA" ? "bg-status-critical-bg hover:bg-status-critical-bg" :
-                d.status === "PRÓXIMA VENCIMIENTO" ? "bg-status-warning-bg/60 hover:bg-status-warning-bg" :
-                d.status === "REVOCADA" ? "bg-muted/30 hover:bg-muted/40" : "";
+            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+              </TableRow>
+            ))}
+            {!isLoading && filtered.map((d) => {
+              const isCaducada = d.status === "Caducada";
+              const isProxima = d.status === "Próxima a vencer" || d.status === "Próximo a vencer";
+              const isRevocada = d.status === "Revocada";
+              const tone = delegationStatusTone(d.status);
+              const rowClass = isCaducada ? "bg-status-critical-bg hover:bg-status-critical-bg" :
+                isProxima ? "bg-status-warning-bg/60 hover:bg-status-warning-bg" :
+                isRevocada ? "bg-muted/30 hover:bg-muted/40" : "";
               return (
-                <TableRow key={d.id} className={cn(rowClass, d.status === "CADUCADA" && "tour-target")} data-tour={d.status === "CADUCADA" ? "deleg-row-vaz" : undefined}>
-                  <TableCell><Link to={`/delegaciones/${d.id}`} className="font-mono text-xs text-primary hover:underline">{d.code}</Link></TableCell>
-                  <TableCell><Link to={`/delegaciones/${d.id}`} className="text-sm font-medium hover:text-primary">{d.grantedTo}</Link></TableCell>
-                  <TableCell className="text-sm">{e?.commonName ?? d.entityId}</TableCell>
-                  <TableCell className="max-w-md text-xs text-muted-foreground line-clamp-2">{d.scope}</TableCell>
-                  <TableCell><StatusBadge label={d.status} tone={tone} /></TableCell>
-                  <TableCell className="font-mono text-xs">{d.expirationDate}</TableCell>
-                  <TableCell>
-                    {d.findingId ? (
-                      <Link to={`/hallazgos/${d.findingId}`} className="font-mono text-xs text-status-critical hover:underline">{d.findingId}</Link>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
-                  </TableCell>
+                <TableRow key={d.id} className={cn(rowClass, isCaducada && "tour-target")} data-tour={isCaducada ? "deleg-row-vaz" : undefined}>
+                  <TableCell><Link to={`/delegaciones/${d.slug}`} className="font-mono text-xs text-primary hover:underline">{d.code}</Link></TableCell>
+                  <TableCell><Link to={`/delegaciones/${d.slug}`} className="text-sm font-medium hover:text-primary">{d.delegate_name ?? "—"}</Link></TableCell>
+                  <TableCell className="text-sm">{d.entity_name ?? "—"}</TableCell>
+                  <TableCell className="max-w-md text-xs text-muted-foreground line-clamp-2">{d.scope ?? "—"}</TableCell>
+                  <TableCell><StatusBadge label={delegationStatusLabel(d.status)} tone={tone} /></TableCell>
+                  <TableCell className="font-mono text-xs">{formatDate(d.end_date)}</TableCell>
                 </TableRow>
               );
             })}
+            {!isLoading && filtered.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">Sin delegaciones que coincidan con los filtros.</TableCell></TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>
