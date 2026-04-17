@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ShellLayout } from "@/components/shell/ShellLayout";
 import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import Dashboard from "@/pages/Dashboard";
 import GovernanceMap from "@/pages/GovernanceMap";
 import EntidadesList from "@/pages/EntidadesList";
@@ -36,35 +38,43 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <ScopeProvider>
-          <TourProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route element={<ShellLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/governance-map" element={<GovernanceMap />} />
-                <Route path="/entidades" element={<EntidadesList />} />
-                <Route path="/entidades/:id" element={<EntidadDetalle />} />
-                <Route path="/organos" element={<OrganosList />} />
-                <Route path="/organos/:id" element={<OrganoDetalle />} />
-                <Route path="/organos/:id/reuniones/:meetingId" element={<ReunionDetalle />} />
-                <Route path="/politicas" element={<PoliticasList />} />
-                <Route path="/politicas/:id" element={<PoliticaDetalle />} />
-                <Route path="/obligaciones" element={<ObligacionesList />} />
-                <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
-                <Route path="/delegaciones" element={<DelegacionesList />} />
-                <Route path="/delegaciones/:slug" element={<DelegacionDetalle />} />
-                <Route path="/hallazgos" element={<HallazgosList />} />
-                <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
-                <Route path="/conflictos" element={<Conflictos />} />
-                <Route path="/sii" element={<SiiDashboard />} />
-                <Route path="/sii/:id" element={<SiiCaseDetalle />} />
-                <Route path="/documentacion" element={<Documentacion />} />
-                <Route path="/notificaciones" element={<Notificaciones />} />
-              </Route>
-            </Routes>
-          </TourProvider>
-        </ScopeProvider>
+        <AuthProvider>
+          <ScopeProvider>
+            <TourProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route
+                  element={
+                    <RequireAuth>
+                      <ShellLayout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/governance-map" element={<GovernanceMap />} />
+                  <Route path="/entidades" element={<EntidadesList />} />
+                  <Route path="/entidades/:id" element={<EntidadDetalle />} />
+                  <Route path="/organos" element={<OrganosList />} />
+                  <Route path="/organos/:id" element={<OrganoDetalle />} />
+                  <Route path="/organos/:id/reuniones/:meetingId" element={<ReunionDetalle />} />
+                  <Route path="/politicas" element={<PoliticasList />} />
+                  <Route path="/politicas/:id" element={<PoliticaDetalle />} />
+                  <Route path="/obligaciones" element={<ObligacionesList />} />
+                  <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
+                  <Route path="/delegaciones" element={<DelegacionesList />} />
+                  <Route path="/delegaciones/:slug" element={<DelegacionDetalle />} />
+                  <Route path="/hallazgos" element={<HallazgosList />} />
+                  <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
+                  <Route path="/conflictos" element={<Conflictos />} />
+                  <Route path="/sii" element={<SiiDashboard />} />
+                  <Route path="/sii/:id" element={<SiiCaseDetalle />} />
+                  <Route path="/documentacion" element={<Documentacion />} />
+                  <Route path="/notificaciones" element={<Notificaciones />} />
+                </Route>
+              </Routes>
+            </TourProvider>
+          </ScopeProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
