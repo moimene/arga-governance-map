@@ -15,12 +15,14 @@ import {
   Scale,
   Settings,
   ShieldCheck,
+  Sparkles,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
+import { useTour } from "@/context/TourContext";
 
 interface Item {
   label: string;
@@ -48,9 +50,12 @@ const sii: Item[] = [
   { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon, badge: { text: "2", tone: "warning" }, sii: true },
 ];
 
-const bottom: Item[] = [
-  { label: "Documentación", to: "/documentacion", icon: BookOpen },
+const adminItems: Item[] = [
   { label: "Administración", to: "/admin", icon: Settings },
+];
+
+const helpItems: Item[] = [
+  { label: "Documentación", to: "/documentacion", icon: BookOpen },
 ];
 
 const STORAGE_KEY = "sidebar_collapsed";
