@@ -11,13 +11,15 @@ import {
   AlertOctagon,
   ShieldCheck,
   ClipboardList,
-  Bot,
+  BookOpen,
+  Sparkles,
   Bell,
   Search,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TourPanel } from "@/components/tour/TourPanel";
+import { useTour } from "@/context/TourContext";
 
 interface NavItem {
   label: string;
@@ -41,7 +43,6 @@ const govItems: NavItem[] = [
 const moduleItems: NavItem[] = [
   { label: "GRC Compass", to: "/sii", icon: ShieldCheck, module: true },
   { label: "Secretaría", to: "/documentacion", icon: ClipboardList, module: true },
-  { label: "AI Governance", to: "/ai-governance", icon: Bot, module: true },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -56,7 +57,6 @@ const pageTitles: Record<string, string> = {
   "/conflictos": "Conflictos",
   "/sii": "GRC Compass",
   "/documentacion": "Secretaría",
-  "/ai-governance": "AI Governance",
 };
 
 function NavRow({ item }: { item: NavItem }) {
@@ -127,6 +127,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function ShellLayout() {
   const { pathname } = useLocation();
+  const { start: startTour, step, completed } = useTour();
+  const tourLabel = step > 0 ? "Continuar tour" : completed ? "Repetir tour" : "Iniciar tour";
   const title =
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(([k]) => k !== "/" && pathname.startsWith(k))?.[1] ??
@@ -189,6 +191,43 @@ export function ShellLayout() {
         <nav className="space-y-[1px]">
           {moduleItems.map((it) => <NavRow key={it.to} item={it} />)}
         </nav>
+
+        {/* Spacer empuja la sección de ayuda al final */}
+        <div className="flex-1" />
+
+        {/* Ayuda — Documentación + Relanzar tour */}
+        <div
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.15)",
+            paddingTop: 12,
+            marginTop: 12,
+          }}
+        >
+          <SectionLabel>Ayuda</SectionLabel>
+          <nav className="space-y-[1px] mb-2">
+            <NavRow item={{ label: "Documentación", to: "/documentacion", icon: BookOpen }} />
+          </nav>
+          <button
+            onClick={startTour}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#FFFFFF",
+              background: "var(--t-brand)",
+              border: "none",
+              borderRadius: 6,
+              padding: "8px 10px",
+              cursor: "pointer",
+            }}
+          >
+            <Sparkles size={14} />
+            <span className="truncate">{tourLabel}</span>
+          </button>
+        </div>
       </aside>
 
       {/* RIGHT COLUMN */}
