@@ -11,6 +11,11 @@ import GovernanceMap from "./pages/GovernanceMap";
 import EntidadesList from "./pages/EntidadesList";
 import EntidadDetalle from "./pages/EntidadDetalle";
 import Documentacion from "./pages/Documentacion";
+import OrganosList from "./pages/OrganosList";
+import OrganoDetalle from "./pages/OrganoDetalle";
+import ReunionDetalle from "./pages/ReunionDetalle";
+import PoliticasList from "./pages/PoliticasList";
+import PoliticaDetalle from "./pages/PoliticaDetalle";
 import { Admin, Dashboards, Esg, PlaceholderRoute, Sii } from "./pages/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -30,8 +35,11 @@ const App = () => (
                 <Route path="/governance-map" element={<GovernanceMap />} />
                 <Route path="/entidades" element={<EntidadesList />} />
                 <Route path="/entidades/:id" element={<EntidadDetalle />} />
-                <Route path="/organos" element={<PlaceholderRoute name="Órganos y Reuniones" />} />
-                <Route path="/politicas" element={<PlaceholderRoute name="Políticas y Normativa" />} />
+                <Route path="/organos" element={<OrganosList />} />
+                <Route path="/organos/:id" element={<OrganoDetalle />} />
+                <Route path="/organos/:id/reuniones/:meetingId" element={<ReunionDetalle />} />
+                <Route path="/politicas" element={<PoliticasList />} />
+                <Route path="/politicas/:code" element={<PoliticaDetalle />} />
                 <Route path="/obligaciones" element={<PlaceholderRoute name="Obligaciones y Controles" />} />
                 <Route path="/delegaciones" element={<PlaceholderRoute name="Delegaciones y Poderes" />} />
                 <Route path="/hallazgos" element={<PlaceholderRoute name="Hallazgos y Acciones" />} />
