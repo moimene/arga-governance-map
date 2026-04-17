@@ -7,7 +7,8 @@ import { ShellLayout } from "@/components/shell/ShellLayout";
 import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
-import { RequireAuth } from "@/components/RequireAuth";
+import { ProtectedShell } from "@/components/RequireAuth";
+import NotFound from "@/pages/NotFound";
 import Dashboard from "@/pages/Dashboard";
 import GovernanceMap from "@/pages/GovernanceMap";
 import EntidadesList from "@/pages/EntidadesList";
@@ -44,13 +45,7 @@ const App = () => (
             <TourProvider>
               <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route
-                  element={
-                    <RequireAuth>
-                      <ShellLayout />
-                    </RequireAuth>
-                  }
-                >
+                <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/governance-map" element={<GovernanceMap />} />
                   <Route path="/entidades" element={<EntidadesList />} />
@@ -74,6 +69,7 @@ const App = () => (
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
                 </Route>
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </TourProvider>
           </ScopeProvider>
