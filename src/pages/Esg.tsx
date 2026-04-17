@@ -1,10 +1,16 @@
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { esgEntities, esgEvolution, esgGroupScore, esgTargets, esgTotals } from "@/data/esg";
-import { Activity, Factory, Leaf, TrendingDown, TrendingUp, Zap, Minus, Target } from "lucide-react";
+import { socialAverages, socialEntities, socialTargets } from "@/data/esgSocial";
+import { findings } from "@/data/findings";
+import { conflicts } from "@/data/conflicts";
+import { delegations } from "@/data/delegations";
+import { Activity, AlertTriangle, Factory, GraduationCap, Leaf, Scale, ShieldAlert, TrendingDown, TrendingUp, Users, Zap, Minus, Target, FileWarning, Gavel } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   Bar,
   BarChart,
