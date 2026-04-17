@@ -16,6 +16,11 @@ import OrganoDetalle from "./pages/OrganoDetalle";
 import ReunionDetalle from "./pages/ReunionDetalle";
 import PoliticasList from "./pages/PoliticasList";
 import PoliticaDetalle from "./pages/PoliticaDetalle";
+import ObligacionesList from "./pages/ObligacionesList";
+import ObligacionDetalle from "./pages/ObligacionDetalle";
+import ControlDetalle from "./pages/ControlDetalle";
+import DelegacionesList from "./pages/DelegacionesList";
+import DelegacionDetalle from "./pages/DelegacionDetalle";
 import { Admin, Dashboards, Esg, PlaceholderRoute, Sii } from "./pages/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -40,8 +45,11 @@ const App = () => (
                 <Route path="/organos/:id/reuniones/:meetingId" element={<ReunionDetalle />} />
                 <Route path="/politicas" element={<PoliticasList />} />
                 <Route path="/politicas/:code" element={<PoliticaDetalle />} />
-                <Route path="/obligaciones" element={<PlaceholderRoute name="Obligaciones y Controles" />} />
-                <Route path="/delegaciones" element={<PlaceholderRoute name="Delegaciones y Poderes" />} />
+                <Route path="/obligaciones" element={<ObligacionesList />} />
+                <Route path="/obligaciones/controles/:id" element={<ControlDetalle />} />
+                <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
+                <Route path="/delegaciones" element={<DelegacionesList />} />
+                <Route path="/delegaciones/:id" element={<DelegacionDetalle />} />
                 <Route path="/hallazgos" element={<PlaceholderRoute name="Hallazgos y Acciones" />} />
                 <Route path="/hallazgos/:id" element={<PlaceholderRoute name="Detalle de Hallazgo" />} />
                 <Route path="/conflictos" element={<PlaceholderRoute name="Conflictos / Attestations" />} />
