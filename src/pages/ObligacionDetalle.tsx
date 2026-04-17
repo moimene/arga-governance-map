@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ObjectHeader } from "@/components/ObjectHeader";
+import { StatusBadgeTip } from "@/components/StatusBadgeTip";
 import { StatusBadge } from "@/components/StatusBadge";
 import { obligations } from "@/data/obligations";
 import { findings } from "@/data/findings";
@@ -37,7 +38,7 @@ export default function ObligacionDetalle() {
         title={obligation.title}
         badges={
           <>
-            <StatusBadge label={obligation.coverage} tone={noCoverage ? "critical" : obligation.status === "EXCEPCIÓN ACTIVA" || obligation.status === "EN REMEDIACIÓN" ? "warning" : "active"} pulse={noCoverage} />
+            <StatusBadgeTip label={obligation.coverage} tone={noCoverage ? "critical" : obligation.status === "EXCEPCIÓN ACTIVA" || obligation.status === "EN REMEDIACIÓN" ? "warning" : "active"} pulse={noCoverage} />
             <StatusBadge label={obligation.framework} tone="info" />
             <StatusBadge label={obligation.scope} tone="neutral" />
           </>
