@@ -21,7 +21,13 @@ import ObligacionDetalle from "./pages/ObligacionDetalle";
 import ControlDetalle from "./pages/ControlDetalle";
 import DelegacionesList from "./pages/DelegacionesList";
 import DelegacionDetalle from "./pages/DelegacionDetalle";
-import { Admin, Dashboards, Esg, PlaceholderRoute, Sii } from "./pages/Placeholders";
+import HallazgosList from "./pages/HallazgosList";
+import HallazgoDetalle from "./pages/HallazgoDetalle";
+import Conflictos from "./pages/Conflictos";
+import { SiiLayout } from "./pages/sii/SiiLayout";
+import SiiDashboard from "./pages/sii/SiiDashboard";
+import SiiCaseDetalle from "./pages/sii/SiiCaseDetalle";
+import { Admin, Dashboards, Esg, PlaceholderRoute } from "./pages/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -50,12 +56,15 @@ const App = () => (
                 <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
                 <Route path="/delegaciones" element={<DelegacionesList />} />
                 <Route path="/delegaciones/:id" element={<DelegacionDetalle />} />
-                <Route path="/hallazgos" element={<PlaceholderRoute name="Hallazgos y Acciones" />} />
-                <Route path="/hallazgos/:id" element={<PlaceholderRoute name="Detalle de Hallazgo" />} />
-                <Route path="/conflictos" element={<PlaceholderRoute name="Conflictos / Attestations" />} />
+                <Route path="/hallazgos" element={<HallazgosList />} />
+                <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
+                <Route path="/conflictos" element={<Conflictos />} />
                 <Route path="/esg" element={<Esg />} />
                 <Route path="/dashboards" element={<Dashboards />} />
-                <Route path="/sii" element={<Sii />} />
+                <Route path="/sii" element={<SiiLayout />}>
+                  <Route index element={<SiiDashboard />} />
+                  <Route path=":id" element={<SiiCaseDetalle />} />
+                </Route>
                 <Route path="/documentacion" element={<Documentacion />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />

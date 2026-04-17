@@ -6,13 +6,14 @@ import { TourPanel } from "@/components/tour/TourPanel";
 
 export function AppLayout() {
   const { pathname } = useLocation();
-  const showFooter = !pathname.startsWith("/sii");
+  const isSii = pathname.startsWith("/sii");
+  const showFooter = !isSii;
 
   return (
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header />
+        {!isSii && <Header />}
         <main className="flex-1 min-w-0">
           <Outlet />
         </main>
