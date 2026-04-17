@@ -82,8 +82,30 @@ export const tourSteps: TourStep[] = [
     ],
     available: true,
   },
-  { route: "/obligaciones", title: "Obligaciones y Controles", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
-  { route: "/delegaciones", title: "Delegaciones y Poderes", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
+  {
+    route: "/obligaciones",
+    title: "La cadena norma → obligación → control → evidencia",
+    description:
+      "TGMS no gestiona documentos, gestiona trazabilidad. Una política activa obligaciones, cada obligación tiene controles asignados, y cada control requiere evidencias validadas. Cuando un eslabón falta, el sistema lo detecta y genera un hallazgo.",
+    bullets: [
+      "Banner rojo: OBL-DORA-003 sin ningún control asignado — la cadena está rota.",
+      "Agrupación por marco normativo: DORA vs Solvencia II visualmente diferenciados.",
+      "OBL-SOL-004 en remediación: CTR-004 tiene evidencias rechazadas — vinculado a HALL-001.",
+    ],
+    available: true,
+  },
+  {
+    route: "/delegaciones",
+    title: "El poder de actuar: quién, cuánto y hasta cuándo",
+    description:
+      "Las delegaciones registran quién tiene poderes de representación, con qué límites y por cuánto tiempo. TGMS genera alertas automáticas T-90, T-60 y T-30 antes del vencimiento. Si no se actúa, el sistema registra la caducidad y crea un hallazgo.",
+    bullets: [
+      "Banner rojo: D. Carlos Vaz — delegación caducada sin revocación formal. Las 3 alertas previas fueron ignoradas.",
+      "Columna de vencimiento: D. Rodrigo Almeida y D. Ignacio Fuentes vencen en <90 días — acción preventiva en curso.",
+      "Las delegaciones revocadas se conservan con su historial completo para el registro inmutable.",
+    ],
+    available: true,
+  },
   { route: "/hallazgos", title: "Hallazgos y Acciones", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
   { route: "/conflictos", title: "Conflictos e Integridad", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
   { route: "/sii", title: "SII — Canal Interno", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
