@@ -2,80 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* TGMS Design System — Grupo ARGA Seguros
-   All colors HSL. Tokens map to the spec palette. */
+/* TGMS Platform — Design Tokens */
 
 @layer base {
   :root {
-    /* Base surfaces */
-    --background: 210 40% 98%;            /* #f8fafc */
-    --foreground: 222 47% 11%;            /* #0f172a */
+    /* TGMS brand tokens (raw spec) */
+    --t-brand: #E8112D;
+    --t-brand-hover: #C2001A;
+    --t-brand-bright: #FF4D5E;
+    --t-surface-subtle: #FFF0F2;
+    --t-sec-primary: #FFCDD2;
+    --t-surface-page: #F5F5F5;
+    --t-surface-card: #FFFFFF;
+    --t-surface-muted: #F0F0F0;
+    --t-text-primary: #1A1A1A;
+    --t-text-secondary: #6B6B6B;
+    --t-text-inverse: #FFFFFF;
+    --t-border-default: #E0E0E0;
+    --t-border-subtle: #EBEBEB;
+    --t-border-focus: #E8112D;
+    --t-status-success: #2E7D32;
+    --t-status-warning: #F57C00;
+    --t-status-error: #C62828;
+    --t-status-info: #1565C0;
+    --t-sidebar-bg: #E8112D;
+    --t-sidebar-fg: #FFFFFF;
+    --t-sidebar-active: rgba(255,255,255,0.20);
+    --t-sidebar-hover: rgba(255,255,255,0.12);
+    --t-sidebar-label: rgba(255,255,255,0.50);
+    --t-sidebar-scope-bg: rgba(255,255,255,0.12);
+
+    /* shadcn semantic tokens mapped to TGMS palette (HSL) */
+    --background: 0 0% 96%;            /* #F5F5F5 */
+    --foreground: 0 0% 10%;            /* #1A1A1A */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Brand */
-    --primary: 224 76% 48%;               /* #1d4ed8 */
+    --primary: 352 86% 49%;            /* #E8112D */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 226 71% 40%;         /* #1e40af */
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 0 0% 94%;             /* #F0F0F0 */
+    --secondary-foreground: 0 0% 10%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;      /* #64748b */
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 42%;      /* #6B6B6B */
 
-    --accent: 214 95% 93%;
-    --accent-foreground: 224 76% 48%;
+    --accent: 354 100% 97%;            /* #FFF0F2 */
+    --accent-foreground: 352 86% 49%;
 
-    --destructive: 0 72% 51%;             /* #dc2626 */
+    --destructive: 0 65% 47%;          /* #C62828 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;                /* #e2e8f0 */
-    --input: 214 32% 91%;
-    --ring: 224 76% 48%;
+    --border: 0 0% 88%;                /* #E0E0E0 */
+    --input: 0 0% 88%;
+    --ring: 352 86% 49%;
 
     --radius: 0.5rem;
 
-    /* Sidebar (dark) */
-    --sidebar-background: 217 33% 17%;    /* #1e293b */
-    --sidebar-foreground: 215 20% 73%;    /* #94a3b8 */
-    --sidebar-foreground-active: 0 0% 100%;
-    --sidebar-hover: 215 25% 27%;         /* #334155 */
-    --sidebar-active: 215 25% 27%;
-    --sidebar-border: 215 28% 22%;
-    --sidebar-muted: 215 19% 35%;         /* #475569 */
-
-    /* Status palette — pairs of solid + soft bg */
-    --status-active: 142 71% 36%;         /* #16a34a vigente */
-    --status-active-bg: 138 76% 96%;      /* #f0fdf4 */
-
-    --status-warning: 32 95% 44%;         /* #d97706 ámbar */
-    --status-warning-bg: 48 100% 96%;     /* #fffbeb */
-
-    --status-critical: 0 72% 51%;         /* #dc2626 */
-    --status-critical-bg: 0 86% 97%;      /* #fef2f2 */
-
-    --status-archived: 220 9% 46%;        /* #6b7280 */
-    --status-archived-bg: 220 14% 96%;    /* #f9fafb */
-
-    --status-pending: 239 84% 60%;        /* #4f46e5 índigo */
-    --status-pending-bg: 226 100% 97%;    /* #eef2ff */
-
-    --status-draft: 220 9% 46%;
-    --status-draft-bg: 220 14% 96%;
-
-    /* SII zone */
-    --sii-bg: 48 100% 96%;                /* #fffbeb */
-    --sii-border: 38 92% 50%;             /* #f59e0b */
-    --sii-foreground: 26 81% 17%;         /* #78350f */
-
-    /* Footer */
-    --footer-bg: 210 40% 96%;             /* #f1f5f9 */
-    --footer-foreground: 215 16% 47%;
+    --sidebar-background: 352 86% 49%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 352 86% 49%;
+    --sidebar-accent: 0 0% 100%;
+    --sidebar-accent-foreground: 352 86% 49%;
+    --sidebar-border: 0 0% 100%;
+    --sidebar-ring: 0 0% 100%;
   }
 }
 
@@ -84,49 +79,21 @@
 
   html, body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-  }
-
-  code, pre, .font-mono {
-    font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    background: var(--t-surface-page);
+    color: var(--t-text-primary);
+    @apply antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
 }
 
 @layer utilities {
-  .sii-zone {
-    background-color: hsl(var(--sii-bg));
-    border-left: 4px solid hsl(var(--sii-border));
-  }
-
-  .pulse-ring {
-    box-shadow: 0 0 0 0 hsl(var(--status-critical) / 0.6);
-    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  @keyframes pulse-ring {
-    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--status-critical) / 0.5); }
-    50%      { box-shadow: 0 0 0 6px hsl(var(--status-critical) / 0); }
-  }
-
   .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
-
-  @keyframes tourHighlight {
-    0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
-    50%  { box-shadow: 0 0 0 12px hsl(var(--primary) / 0.2); }
-    100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
-  }
-  .tour-highlight {
-    animation: tourHighlight 2s ease-out;
-    border-radius: 0.5rem;
-  }
 }
