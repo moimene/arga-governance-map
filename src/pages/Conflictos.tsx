@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -7,25 +7,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { conflicts, relatedPartyTransactions, attestations2026, type RelatedPartyTransaction } from "@/data/conflicts";
-import { people } from "@/data/people";
+import { useConflictsList, useAttestationsList } from "@/hooks/useConflicts";
+import { relatedPartyTransactions, type RelatedPartyTransaction } from "@/data/conflicts";
 import { Scale, ShieldAlert, CheckCircle, AlertTriangle, Bell, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ConflictosList() {
   const [selectedOpv, setSelectedOpv] = useState<RelatedPartyTransaction | null>(null);
+  const { data: conflicts = [], isLoading: loadingConflicts } = useConflictsList();
+  const { data: attestations = [], isLoading: loadingAtts } = useAttestationsList();
 
-  const completed = attestations2026.filter((a) => a.status === "COMPLETADA").length;
-  const pending = attestations2026.length - completed;
-  const progress = Math.round((completed / attestations2026.length) * 100);
+  const conflictKpis = useMemo(() => {
+    const permanentes = conflicts.filter((c) => c.conflict_type === "Permanente").length;
+    const situacionales = conflicts.filter((c) => c.conflict_type === "Situacional").length;
+    const noDeclarados = conflicts.filter((c) => c.status === "Pendiente" || c.status === "No declarado" || !!c.related_finding_id).length;
+    return { permanentes, situacionales, noDeclarados };
+  }, [conflicts]);
 
-  const personById = (id: string) => people.find((p) => p.id === id);
+  const completed = attestations.filter((a) => a.status === "Completada").length;
+  const total = attestations.length;
+  const pending = total - completed;
+  const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
-      <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Scale className="h-6 w-6 text-primary" />Conflictos, Operaciones Vinculadas y Attestations</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+        <Scale className="h-6 w-6 text-primary" />Conflictos, Operaciones Vinculadas y Attestations
+      </h1>
       <p className="mt-1 text-sm text-muted-foreground">Los tres vectores de integridad del Grupo ARGA Seguros.</p>
 
       <Tabs defaultValue="conflictos" className="mt-6">
@@ -38,9 +49,9 @@ export default function ConflictosList() {
         {/* === CONFLICTOS === */}
         <TabsContent value="conflictos" className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            <KpiCard label="Conflictos permanentes declarados" value={4} icon={CheckCircle} tone="success" />
-            <KpiCard label="Conflictos situacionales" value={1} icon={CheckCircle} tone="success" />
-            <KpiCard label="No declarados / En investigación" value={1} icon={ShieldAlert} tone="critical" />
+            <KpiCard label="Conflictos permanentes declarados" value={conflictKpis.permanentes} icon={CheckCircle} tone="success" />
+            <KpiCard label="Conflictos situacionales" value={conflictKpis.situacionales} icon={CheckCircle} tone="success" />
+            <KpiCard label="Pendientes / No declarados" value={conflictKpis.noDeclarados} icon={ShieldAlert} tone="critical" />
           </div>
 
           <Card className="overflow-hidden">
@@ -52,33 +63,42 @@ export default function ConflictosList() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Abstención</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...conflicts].sort((a) => a.findingId ? -1 : 1).map((c) => (
-                  <TableRow key={c.id} className={cn(c.findingId && "bg-status-critical-bg tour-target")} data-tour={c.findingId ? "conflict-row" : undefined}>
-                    <TableCell className="font-mono text-xs font-semibold">{c.id}</TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium">{c.person}</div>
-                      <div className="text-xs text-muted-foreground">{c.role}</div>
-                    </TableCell>
-                    <TableCell><StatusBadge label={c.type} tone={c.type === "PERMANENTE" ? "info" : "warning"} /></TableCell>
-                    <TableCell className="max-w-md text-sm">{c.description}</TableCell>
-                    <TableCell>
-                      {c.findingId ? (
-                        <Link to={`/hallazgos/${c.findingId}`}>
-                          <StatusBadge label={`NO DECLARADO — VER ${c.findingId}`} tone="critical" pulse />
-                        </Link>
-                      ) : c.status.includes("ABSTENCIÓN") ? (
-                        <StatusBadge label="ABSTENCIÓN REGISTRADA ✅" tone="active" />
-                      ) : (
-                        <StatusBadge label="DECLARADO Y GESTIONADO" tone="active" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{c.abstentionRequired ? "Sí" : "No"}</TableCell>
-                  </TableRow>
+                {loadingConflicts && Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                 ))}
+                {!loadingConflicts && conflicts.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">Sin conflictos registrados.</TableCell></TableRow>
+                )}
+                {!loadingConflicts && conflicts.map((c) => {
+                  const isPending = c.status === "Pendiente" || c.status === "No declarado";
+                  return (
+                    <TableRow key={c.id} className={cn(isPending && "bg-status-critical-bg tour-target")} data-tour={isPending ? "conflict-row" : undefined}>
+                      <TableCell className="font-mono text-xs font-semibold">{c.code}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">{c.person_name ?? "—"}</div>
+                        <div className="text-xs text-muted-foreground">{c.person_role ?? "—"}</div>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge label={c.conflict_type.toUpperCase()} tone={c.conflict_type === "Permanente" ? "info" : "warning"} />
+                      </TableCell>
+                      <TableCell className="max-w-md text-sm">{c.description}</TableCell>
+                      <TableCell>
+                        {c.finding_code ? (
+                          <Link to={`/hallazgos/${c.finding_code}`}>
+                            <StatusBadge label={`PENDIENTE — VER ${c.finding_code}`} tone="critical" pulse />
+                          </Link>
+                        ) : isPending ? (
+                          <StatusBadge label="PENDIENTE" tone="critical" pulse />
+                        ) : (
+                          <StatusBadge label={c.status.toUpperCase()} tone="active" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
@@ -146,22 +166,24 @@ export default function ConflictosList() {
 
         {/* === ATTESTATIONS === */}
         <TabsContent value="attestations" className="space-y-4">
-          <Card className="border-l-4 border-l-status-warning bg-status-warning-bg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
-              <p className="text-sm text-foreground">
-                <strong>{pending} consejeros y directivos</strong> no han completado la attestation anual 2026. Campaña lanzada el 01/04/2026 — fecha límite: 30/04/2026.
-              </p>
-            </div>
-          </Card>
+          {pending > 0 && (
+            <Card className="border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                <p className="text-sm text-foreground">
+                  <strong>{pending} consejeros y directivos</strong> no han completado la attestation anual. Campaña activa — completar antes de la fecha límite.
+                </p>
+              </div>
+            </Card>
+          )}
 
           <Card className="p-5">
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="font-semibold">Progreso de la campaña</span>
-              <span className="font-mono">{completed} / {attestations2026.length} completadas ({progress}%)</span>
+              <span className="font-mono">{completed} / {total} completadas ({progress}%)</span>
             </div>
             <Progress value={progress} className="h-3" />
-            <div className="mt-2 text-xs text-muted-foreground">{completed} completadas · {pending} pendientes · 0 vencidas</div>
+            <div className="mt-2 text-xs text-muted-foreground">{completed} completadas · {pending} pendientes</div>
           </Card>
 
           <div className="flex justify-end gap-2">
@@ -179,27 +201,26 @@ export default function ConflictosList() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Entidad</TableHead>
+                  <TableHead>Campaña</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Conflictos declarados</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attestations2026.map((a) => {
-                  const p = personById(a.personId);
-                  if (!p) return null;
+                {loadingAtts && Array.from({ length: 4 }).map((_, i) => (
+                  <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                ))}
+                {!loadingAtts && attestations.map((a) => {
+                  const isPending = a.status === "Pendiente";
                   return (
-                    <TableRow key={a.personId}>
-                      <TableCell className="text-sm font-medium">{p.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.role}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.entity}</TableCell>
+                    <TableRow key={a.id} className={cn(isPending && "bg-status-warning-bg/50")}>
+                      <TableCell className="text-sm font-medium">{a.person_name ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{a.person_role ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{a.campaign}</TableCell>
                       <TableCell>
-                        <StatusBadge label={a.status} tone={a.status === "COMPLETADA" ? "active" : "warning"} />
-                        {a.note && <div className="mt-1 text-xs italic text-muted-foreground">{a.note}</div>}
+                        <StatusBadge label={a.status.toUpperCase()} tone={a.status === "Completada" ? "active" : "warning"} />
                       </TableCell>
-                      <TableCell className="text-sm">{a.completedDate ?? "—"}</TableCell>
-                      <TableCell className="text-sm">{a.conflicts ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{a.completed_at ?? "—"}</TableCell>
                     </TableRow>
                   );
                 })}

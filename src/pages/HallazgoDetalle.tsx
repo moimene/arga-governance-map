@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadgeTip } from "@/components/StatusBadgeTip";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   useFindingByCode,
   useFindingRelatedControls,
+  useActionPlansByFinding,
   severityLabel,
   severityTone,
   findingStatusLabel,
@@ -34,6 +36,7 @@ export default function HallazgoDetalle() {
   const { id } = useParams<{ id: string }>();
   const { data: finding, isLoading } = useFindingByCode(id);
   const { data: relatedControls = [] } = useFindingRelatedControls(finding?.obligation_id);
+  const { data: actionPlans = [] } = useActionPlansByFinding(finding?.id);
 
   if (isLoading) {
     return (
@@ -78,6 +81,7 @@ export default function HallazgoDetalle() {
       <Tabs defaultValue="descripcion" className="mt-6">
         <TabsList>
           <TabsTrigger value="descripcion">Descripción</TabsTrigger>
+          <TabsTrigger value="acciones">Planes de acción ({actionPlans.length})</TabsTrigger>
           <TabsTrigger value="controles">Controles vinculados ({relatedControls.length})</TabsTrigger>
           <TabsTrigger value="vinculados">Objetos vinculados</TabsTrigger>
         </TabsList>
@@ -99,6 +103,37 @@ export default function HallazgoDetalle() {
               <Field label="Vence" value={formatDate(finding.due_date)} mono />
               {finding.closed_at && <Field label="Cerrado" value={formatDate(finding.closed_at)} mono />}
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="acciones">
+          <Card className="p-5">
+            {actionPlans.length === 0 && (
+              <div className="text-center text-sm text-muted-foreground py-6">Sin planes de acción registrados.</div>
+            )}
+            <ul className="space-y-4">
+              {actionPlans.map((p) => {
+                const pct = p.progress_pct ?? 0;
+                const tone = p.status === "Completado" ? "active" : p.status === "En progreso" ? "warning" : "neutral";
+                return (
+                  <li key={p.id} className="rounded-md border border-border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground">{p.title}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Responsable: {p.responsible_name ?? "—"} · Vence: {formatDate(p.due_date)}
+                        </div>
+                      </div>
+                      <StatusBadge label={p.status} tone={tone as any} />
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                      <Progress value={pct} className="h-2 flex-1" />
+                      <span className="font-mono text-xs text-muted-foreground w-10 text-right">{pct}%</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </Card>
         </TabsContent>
 
