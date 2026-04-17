@@ -13,12 +13,12 @@ import {
   ClipboardList,
   BookOpen,
   Sparkles,
-  Bell,
   Search,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TourPanel } from "@/components/tour/TourPanel";
+import { NotificationsBell } from "@/components/shell/NotificationsBell";
 import { useTour } from "@/context/TourContext";
 
 interface NavItem {
@@ -266,25 +266,7 @@ export function ShellLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="relative" aria-label="Notificaciones">
-              <Bell size={18} className="text-foreground" />
-              <span
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -6,
-                  background: "var(--t-brand)",
-                  color: "#FFFFFF",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  borderRadius: 999,
-                  padding: "1px 5px",
-                  lineHeight: 1.2,
-                }}
-              >
-                7
-              </span>
-            </button>
+            <NotificationsBell />
             <div
               style={{
                 width: 32,
