@@ -26,6 +26,7 @@ import HallazgoDetalle from "@/pages/HallazgoDetalle";
 import Conflictos from "@/pages/Conflictos";
 import SiiDashboard from "@/pages/sii/SiiDashboard";
 import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
+import { SiiLayout } from "@/pages/sii/SiiLayout";
 import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
@@ -66,8 +67,10 @@ const App = () => (
                   <Route path="/hallazgos" element={<HallazgosList />} />
                   <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
                   <Route path="/conflictos" element={<Conflictos />} />
-                  <Route path="/sii" element={<SiiDashboard />} />
-                  <Route path="/sii/:id" element={<SiiCaseDetalle />} />
+                  <Route element={<SiiLayout />}>
+                    <Route path="/sii" element={<SiiDashboard />} />
+                    <Route path="/sii/:id" element={<SiiCaseDetalle />} />
+                  </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
                 </Route>
