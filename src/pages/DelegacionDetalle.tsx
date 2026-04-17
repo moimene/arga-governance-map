@@ -2,50 +2,31 @@ import { Link, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { delegations, type DelegationHistoryEntry } from "@/data/delegations";
-import { entities } from "@/data/entities";
-import { AlertTriangle, AlertCircle, CheckCircle2, FileText, XOctagon } from "lucide-react";
+import { useDelegationBySlug, delegationStatusLabel, delegationStatusTone, formatDate } from "@/hooks/useDelegations";
+import { AlertTriangle, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
-function HistoryItem({ entry }: { entry: DelegationHistoryEntry }) {
-  const isAlert = entry.kind === "alert-unattended";
-  const isExpired = entry.kind === "expired";
-  const Icon = isExpired ? XOctagon : isAlert ? AlertCircle : CheckCircle2;
-  return (
-    <li className={cn(
-      "rounded-md border p-3",
-      isAlert && "border-status-warning/40 bg-status-warning-bg",
-      isExpired && "border-status-critical/40 bg-status-critical-bg",
-      !isAlert && !isExpired && "border-border bg-card"
-    )}>
-      <div className="flex items-start gap-3">
-        <Icon className={cn(
-          "mt-0.5 h-4 w-4 shrink-0",
-          isExpired && "text-status-critical",
-          isAlert && "text-status-warning",
-          !isAlert && !isExpired && "text-status-active"
-        )} />
-        <div className="min-w-0 flex-1">
-          <div className="font-mono text-xs text-muted-foreground">{entry.date}</div>
-          <div className={cn("mt-0.5 text-sm", isExpired && "font-semibold text-status-critical")}>{entry.event}</div>
-        </div>
-      </div>
-    </li>
-  );
-}
-
 export default function DelegacionDetalle() {
-  const { id } = useParams();
-  const d = delegations.find((x) => x.id === id);
+  const { slug } = useParams();
+  const { data: d, isLoading } = useDelegationBySlug(slug);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-[1440px] p-6 space-y-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
   if (!d) return <div className="p-6">Delegación no encontrada.</div>;
 
-  const entity = entities.find((e) => e.id === d.entityId);
-  const isCaducada = d.status === "CADUCADA";
-  const isProxima = d.status === "PRÓXIMA VENCIMIENTO";
-  const tone = isCaducada ? "critical" : isProxima ? "warning" : d.status === "REVOCADA" ? "archived" : "active";
+  const isCaducada = d.status === "Caducada";
+  const isProxima = d.status === "Próxima a vencer" || d.status === "Próximo a vencer";
+  const tone = delegationStatusTone(d.status);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -55,14 +36,14 @@ export default function DelegacionDetalle() {
           { label: "Delegaciones y Poderes", to: "/delegaciones" },
           { label: d.code },
         ]}
-        title={`Delegación — ${d.grantedTo}`}
+        title={`Delegación — ${d.delegate_name ?? d.code}`}
         badges={
           <>
-            <StatusBadge label={d.status} tone={tone} />
-            <StatusBadge label={entity?.commonName ?? d.entityId} tone="info" />
+            <StatusBadge label={delegationStatusLabel(d.status)} tone={tone} />
+            {d.entity_name && <StatusBadge label={d.entity_name} tone="info" />}
           </>
         }
-        metadata={`${d.code} · Otorgada: ${d.grantedDate} · ${isCaducada ? "Caducó" : "Vence"}: ${d.expirationDate} · Otorgante: ${d.grantedBy}`}
+        metadata={`${d.code} · Otorgada: ${formatDate(d.start_date)} · ${isCaducada ? "Caducó" : "Vence"}: ${formatDate(d.end_date)} · Otorgante: ${d.grantor_name ?? "—"}`}
         actions={
           <>
             <Button variant="outline" size="sm">Ver en mapa</Button>
@@ -78,15 +59,9 @@ export default function DelegacionDetalle() {
           <div className="flex-1 text-sm">
             <div className="font-semibold text-status-critical">Delegación caducada sin revocación formal</div>
             <div className="mt-1 text-xs text-status-critical/90">
-              Esta delegación caducó el {d.expirationDate} sin renovación ni revocación formal. Los actos realizados en nombre de {entity?.commonName} tras esa fecha podrían carecer de respaldo jurídico.
-              {d.findingId && <> Ver hallazgo {d.findingId} para el plan de remediación.</>}
+              Esta delegación caducó el {formatDate(d.end_date)} sin renovación ni revocación formal. Los actos realizados en nombre de {d.entity_name ?? "la entidad"} tras esa fecha podrían carecer de respaldo jurídico.
             </div>
           </div>
-          {d.findingId && (
-            <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
-              <Link to={`/hallazgos/${d.findingId}`}>Ver {d.findingId} →</Link>
-            </Button>
-          )}
         </div>
       )}
 
@@ -95,7 +70,7 @@ export default function DelegacionDetalle() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div className="flex-1 text-sm">
             <div className="font-semibold text-status-warning">Delegación próxima a vencer</div>
-            <div className="mt-1 text-xs text-status-warning/90">Esta delegación vence el {d.expirationDate}. Inicia el proceso de renovación.</div>
+            <div className="mt-1 text-xs text-status-warning/90">Esta delegación vence el {formatDate(d.end_date)}. Inicia el proceso de renovación.</div>
           </div>
         </div>
       )}
@@ -103,7 +78,7 @@ export default function DelegacionDetalle() {
       <Tabs defaultValue="detalle" className="mt-6">
         <TabsList>
           <TabsTrigger value="detalle">Detalle</TabsTrigger>
-          <TabsTrigger value="historial">Historial</TabsTrigger>
+          <TabsTrigger value="alertas">Alertas</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
         </TabsList>
 
@@ -111,43 +86,42 @@ export default function DelegacionDetalle() {
           <Card className="p-6">
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
               <Field label="Código" value={d.code} mono />
-              <Field label="Titular" value={d.grantedTo} />
-              <Field label="Entidad" value={entity?.legalName ?? d.entityId} />
-              <Field label="Otorgante" value={d.grantedBy} />
-              <Field label="Otorgada" value={d.grantedDate} mono />
-              <Field label={isCaducada ? "Caducó" : "Vence"} value={d.expirationDate} mono />
+              <Field label="Titular" value={d.delegate_name ?? "—"} />
+              <Field label="Entidad" value={d.entity_legal_name ?? d.entity_name ?? "—"} />
+              <Field label="Otorgante" value={d.grantor_name ?? "—"} />
+              <Field label="Otorgada" value={formatDate(d.start_date)} mono />
+              <Field label={isCaducada ? "Caducó" : "Vence"} value={formatDate(d.end_date)} mono />
               <div>
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">Estado</div>
-                <div className="mt-1"><StatusBadge label={d.status} tone={tone} /></div>
+                <div className="mt-1"><StatusBadge label={delegationStatusLabel(d.status)} tone={tone} /></div>
               </div>
-              {d.findingId && (
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Hallazgo vinculado</div>
-                  <div className="mt-1">
-                    <Link to={`/hallazgos/${d.findingId}`}><StatusBadge label={d.findingId} tone="critical" /></Link>
-                  </div>
-                </div>
-              )}
-              {d.revokedDate && <Field label="Fecha revocación" value={d.revokedDate} mono />}
-              {d.revokedReason && <Field label="Motivo revocación" value={d.revokedReason} />}
+              {d.delegation_type && <Field label="Tipo" value={d.delegation_type} />}
             </div>
           </Card>
 
-          {d.powers && d.powers.length > 0 && (
+          {d.scope && (
             <Card className="p-6">
-              <div className="mb-3 text-sm font-semibold">Poderes conferidos</div>
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
-                {d.powers.map((p) => <li key={p}>{p}</li>)}
-              </ul>
+              <div className="mb-2 text-sm font-semibold">Ámbito</div>
+              <p className="text-sm text-foreground">{d.scope}</p>
+            </Card>
+          )}
+
+          {d.limits && (
+            <Card className="p-6">
+              <div className="mb-2 text-sm font-semibold">Límites y restricciones</div>
+              <p className="text-sm text-foreground">{d.limits}</p>
             </Card>
           )}
         </TabsContent>
 
-        <TabsContent value="historial" className="mt-4">
+        <TabsContent value="alertas" className="mt-4">
           <Card className="p-6">
-            <ol className="space-y-2.5">
-              {d.history.map((e, i) => <HistoryItem key={i} entry={e} />)}
-            </ol>
+            <div className="mb-3 text-sm font-semibold">Alertas de vencimiento</div>
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <AlertChip label="T-90" sent={d.alert_t90} />
+              <AlertChip label="T-60" sent={d.alert_t60} />
+              <AlertChip label="T-30" sent={d.alert_t30} />
+            </div>
           </Card>
         </TabsContent>
 
@@ -168,6 +142,15 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
     <div>
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={cn("mt-1", mono ? "font-mono text-xs" : "text-sm")}>{value}</div>
+    </div>
+  );
+}
+
+function AlertChip({ label, sent }: { label: string; sent: boolean | null | undefined }) {
+  return (
+    <div className={cn("rounded-md border p-3", sent ? "border-status-warning/40 bg-status-warning-bg" : "border-border bg-card")}>
+      <div className="font-mono text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium">{sent ? "Enviada" : "No enviada"}</div>
     </div>
   );
 }

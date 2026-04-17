@@ -24,6 +24,7 @@ import DelegacionesList from "@/pages/DelegacionesList";
 import DelegacionDetalle from "@/pages/DelegacionDetalle";
 import HallazgosList from "@/pages/HallazgosList";
 import HallazgoDetalle from "@/pages/HallazgoDetalle";
+import ControlDetalle from "@/pages/ControlDetalle";
 import Conflictos from "@/pages/Conflictos";
 import SiiDashboard from "@/pages/sii/SiiDashboard";
 import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
@@ -56,6 +57,7 @@ const App = () => (
                   <Route path="/politicas" element={<PoliticasList />} />
                   <Route path="/politicas/:id" element={<PoliticaDetalle />} />
                   <Route path="/obligaciones" element={<ObligacionesList />} />
+                  <Route path="/obligaciones/controles/:code" element={<ControlDetalle />} />
                   <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
                   <Route path="/delegaciones" element={<DelegacionesList />} />
                   <Route path="/delegaciones/:slug" element={<DelegacionDetalle />} />

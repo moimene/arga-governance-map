@@ -1,21 +1,26 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { findings } from "@/data/findings";
+import { useFindingsList, severityLabel, severityTone, findingStatusLabel, originLabel, formatDate } from "@/hooks/useFindings";
 import { AlertOctagon, AlertTriangle, CheckCircle, ClipboardList, Clock, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const severityOrder: Record<string, number> = { "CRÍTICA": 0, "ALTA": 1, "MEDIA": 2, "BAJA": 3 };
-const severityTone = (s: string) => s === "CRÍTICA" ? "critical" : s === "ALTA" ? "critical" : s === "MEDIA" ? "warning" : "neutral";
+const severityOrder: Record<string, number> = { "Crítico": 0, "Alto": 1, "Medio": 2, "Bajo": 3 };
 
 export default function HallazgosList() {
-  const sorted = [...findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-  const open = findings.filter((f) => f.status !== "CERRADO").length;
-  const critical = findings.filter((f) => f.severity === "CRÍTICA").length;
-  const closed = findings.filter((f) => f.status === "CERRADO").length;
+  const { data: findings = [], isLoading } = useFindingsList();
+  const sorted = [...findings].sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9));
+  const open = findings.filter((f) => f.status !== "Cerrado").length;
+  const critical = findings.filter((f) => f.severity === "Crítico").length;
+  const closed = findings.filter((f) => f.status === "Cerrado").length;
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = findings.filter((f) => f.status !== "Cerrado" && f.due_date && f.due_date < today).length;
+
+  const criticalFinding = findings.find((f) => f.severity === "Crítico");
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -32,21 +37,23 @@ export default function HallazgosList() {
         <KpiCard label="Críticos" value={critical} icon={AlertOctagon} tone="critical" />
         <KpiCard label="Abiertos / En remediación" value={open} icon={AlertTriangle} tone="warning" />
         <KpiCard label="Cerrados" value={closed} icon={CheckCircle} tone="success" />
-        <KpiCard label="Vencidos" value={1} icon={Clock} tone="critical" />
+        <KpiCard label="Vencidos" value={overdue} icon={Clock} tone="critical" />
       </div>
 
-      <Card className="mt-6 overflow-hidden border-l-4 border-l-destructive bg-status-critical-bg">
-        <div className="flex items-center justify-between gap-4 p-4">
-          <div className="flex items-start gap-3">
-            <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-destructive pulse-ring rounded-full" />
-            <div>
-              <div className="text-sm font-semibold text-destructive">HALL-008 CRÍTICO — Conflicto de interés no declarado en ARGA Brasil</div>
-              <p className="mt-0.5 text-xs text-foreground/80">Bajo investigación de Auditoría Interna. 4 acciones correctivas activas.</p>
+      {criticalFinding && (
+        <Card className="mt-6 overflow-hidden border-l-4 border-l-destructive bg-status-critical-bg">
+          <div className="flex items-center justify-between gap-4 p-4">
+            <div className="flex items-start gap-3">
+              <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-destructive pulse-ring rounded-full" />
+              <div>
+                <div className="text-sm font-semibold text-destructive">{criticalFinding.code} CRÍTICO — {criticalFinding.title}</div>
+                <p className="mt-0.5 text-xs text-foreground/80">Bajo gestión activa. Responsable: {criticalFinding.owner_name ?? "—"}</p>
+              </div>
             </div>
+            <Button asChild size="sm" variant="destructive"><Link to={`/hallazgos/${criticalFinding.code}`}>Ver hallazgo →</Link></Button>
           </div>
-          <Button asChild size="sm" variant="destructive"><Link to="/hallazgos/HALL-008">Ver hallazgo →</Link></Button>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card className="mt-6 overflow-hidden">
         <Table>
@@ -63,20 +70,26 @@ export default function HallazgosList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((f) => (
-              <TableRow key={f.id} className={cn("cursor-pointer", f.severity === "CRÍTICA" && "bg-status-critical-bg")}>
+            {isLoading && Array.from({ length: 6 }).map((_, i) => (
+              <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+            ))}
+            {!isLoading && sorted.map((f) => (
+              <TableRow key={f.id} className={cn("cursor-pointer", f.severity === "Crítico" && "bg-status-critical-bg")}>
                 <TableCell className="font-mono text-xs font-semibold">
-                  <Link to={`/hallazgos/${f.id}`} className="text-primary hover:underline">{f.id}</Link>
+                  <Link to={`/hallazgos/${f.code}`} className="text-primary hover:underline">{f.code}</Link>
                 </TableCell>
                 <TableCell className="max-w-md text-sm">{f.title}</TableCell>
-                <TableCell><StatusBadge label={f.severity} tone={severityTone(f.severity) as any} pulse={f.severity === "CRÍTICA"} /></TableCell>
-                <TableCell><StatusBadge label={f.status} /></TableCell>
-                <TableCell className="text-sm">{f.entity}</TableCell>
-                <TableCell className="text-sm">{f.responsible}</TableCell>
-                <TableCell className="text-sm">{f.dueDate}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{f.origin}</TableCell>
+                <TableCell><StatusBadge label={severityLabel(f.severity)} tone={severityTone(f.severity)} pulse={f.severity === "Crítico"} /></TableCell>
+                <TableCell><StatusBadge label={findingStatusLabel(f.status)} /></TableCell>
+                <TableCell className="text-sm">{f.entity_name ?? "—"}</TableCell>
+                <TableCell className="text-sm">{f.owner_name ?? "—"}</TableCell>
+                <TableCell className="text-sm">{formatDate(f.due_date)}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{originLabel(f.origin)}</TableCell>
               </TableRow>
             ))}
+            {!isLoading && sorted.length === 0 && (
+              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Sin hallazgos registrados.</TableCell></TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>
