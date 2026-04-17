@@ -88,6 +88,38 @@ const initialEdges: Edge[] = [
     style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5 },
     labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
   },
+  // CTR-004 (deficient control attempted on OBL-DORA-003)
+  {
+    id: "e17", source: "obl-dora-003", target: "ctr-004", label: "control deficiente", type: "smoothstep",
+    style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.5, strokeDasharray: "4 3" },
+    labelStyle: { fill: "hsl(var(--status-warning))", fontWeight: 600 },
+  },
+  // DEL-001 caducada → Carlos Vaz, vinculada a ARGA LATAM
+  { id: "e18", source: "carlos-vaz", target: "del-001", label: "titular", type: "smoothstep" },
+  {
+    id: "e19", source: "del-001", target: "arga-latam", label: "CADUCADA ⚠", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 2, strokeDasharray: "6 4" },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 700 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--destructive))" },
+  },
+  // CON-SIT-002 ↔ HALL-008 ↔ André Barbosa
+  {
+    id: "e20", source: "con-sit-002", target: "andre-barbosa", label: "afecta", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5 },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
+  },
+  {
+    id: "e21", source: "hall-008", target: "con-sit-002", label: "origina", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5, strokeDasharray: "4 3" },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
+  },
+  // CASO-SII-001 correlacionado con HALL-008
+  {
+    id: "e22", source: "caso-sii-001", target: "hall-008", label: "correlaciona", type: "smoothstep",
+    style: { stroke: "hsl(var(--status-warning))", strokeWidth: 2, strokeDasharray: "8 4" },
+    labelStyle: { fill: "hsl(35 92% 33%)", fontWeight: 700 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--status-warning))" },
+  },
 ];
 
 const filterTypeLabels: Record<string, string> = {
