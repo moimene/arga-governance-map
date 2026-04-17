@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Building2, Eye, Lock, Network, ShieldCheck, User } from "lucide-react";
+import { Building2, Eye, KeyRound, Lock, Network, ShieldCheck, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,28 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+
+  const DEMO_EMAIL = "demo@arga-seguros.com";
+  const DEMO_PASSWORD = "TGMSdemo2026!";
+
+  const fillDemo = () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setMode("signin");
+  };
+
+  const loginAsDemo = async () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setSubmitting(true);
+    const { error } = await signIn(DEMO_EMAIL, DEMO_PASSWORD);
+    setSubmitting(false);
+    if (error) {
+      toast.error(`No se pudo entrar como demo: ${error.message}`);
+      return;
+    }
+    navigate("/");
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -132,6 +154,38 @@ export default function Login() {
             <Building2 className="h-4 w-4" />
             Acceder con SSO Corporativo
           </Button>
+
+          <div className="mt-6 rounded-lg border border-dashed border-border bg-muted/40 p-4">
+            <div className="flex items-start gap-2">
+              <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="flex-1 text-xs">
+                <div className="font-semibold text-foreground">Credenciales de prueba</div>
+                <div className="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                  <div>{DEMO_EMAIL}</div>
+                  <div>{DEMO_PASSWORD}</div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={fillDemo}
+                    disabled={submitting}
+                  >
+                    Rellenar formulario
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={loginAsDemo}
+                    disabled={submitting}
+                  >
+                    Acceder como demo
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
