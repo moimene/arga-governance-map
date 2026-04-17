@@ -1,22 +1,15 @@
 import { NavLink } from "react-router-dom";
 import {
   AlertOctagon,
-  AlertTriangle,
-  BarChart3,
   BookOpen,
-  Building,
+  Brain,
   ChevronLeft,
   ChevronRight,
-  FileText,
-  Key,
+  ClipboardList,
+  Compass,
   LayoutDashboard,
-  Leaf,
-  Network,
-  Scale,
   Settings,
-  ShieldCheck,
   Sparkles,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,16 +27,12 @@ interface Item {
 
 const top: Item[] = [
   { label: "Inicio", to: "/", icon: LayoutDashboard },
-  { label: "Governance Map", to: "/governance-map", icon: Network },
-  { label: "Entidades", to: "/entidades", icon: Building },
-  { label: "Órganos y Reuniones", to: "/organos", icon: Users },
-  { label: "Políticas y Normativa", to: "/politicas", icon: FileText },
-  { label: "Obligaciones y Controles", to: "/obligaciones", icon: ShieldCheck },
-  { label: "Delegaciones y Poderes", to: "/delegaciones", icon: Key },
-  { label: "Hallazgos y Acciones", to: "/hallazgos", icon: AlertTriangle, badge: { text: "10", tone: "critical" } },
-  { label: "Conflictos / Attestations", to: "/conflictos", icon: Scale },
-  { label: "ESG", to: "/esg", icon: Leaf },
-  { label: "Dashboards", to: "/dashboards", icon: BarChart3 },
+];
+
+const modules: Item[] = [
+  { label: "GRC Compass", to: "/grc", icon: Compass },
+  { label: "Secretaría", to: "/secretaria", icon: ClipboardList },
+  { label: "AIms", to: "/aims", icon: Brain },
 ];
 
 const sii: Item[] = [
