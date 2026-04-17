@@ -44,8 +44,13 @@ const initialNodes: Node<GovNodeData>[] = [
   { id: "pr-008",        type: "gov", position: { x: 800, y: 640 }, data: { label: "PR-008 — DORA", type: "policy", status: { label: "Pendiente", tone: "pending" } } },
   { id: "obl-dora-003",  type: "gov", position: { x: 800, y: 800 }, data: { label: "OBL-DORA-003 — Resiliencia operativa", type: "obligation", status: { label: "Sin control", tone: "critical" }, emphasized: true } },
   { id: "ghost-control", type: "gov", position: { x: 1060, y: 800 }, data: { label: "(Ningún control asignado)", type: "obligation", status: { label: "Vacío", tone: "critical" } } },
+  { id: "ctr-004",       type: "gov", position: { x: 540, y: 960 }, data: { label: "CTR-004 — Pruebas resiliencia TIC", type: "control", status: { label: "Deficiente", tone: "warning" } } },
   { id: "hall-008",      type: "gov", position: { x: 100, y: 320 }, data: { label: "HALL-008 — Conflicto interés Brasil", type: "finding", status: { label: "Crítico", tone: "critical" }, emphasized: true } },
   { id: "andre-barbosa", type: "gov", position: { x: 100, y: 480 }, data: { label: "D. André Barbosa", type: "person" } },
+  { id: "carlos-vaz",    type: "gov", position: { x: 360, y: 480 }, data: { label: "D. Carlos Eduardo Vaz", type: "person" } },
+  { id: "del-001",       type: "gov", position: { x: 360, y: 800 }, data: { label: "DEL-001 — Poderes LATAM", type: "delegation", status: { label: "Caducada", tone: "critical" }, emphasized: true } },
+  { id: "con-sit-002",   type: "gov", position: { x: 100, y: 800 }, data: { label: "CON-SIT-002 — No declarado", type: "finding", status: { label: "No declarado", tone: "critical" }, emphasized: true } },
+  { id: "caso-sii-001",  type: "gov", position: { x: 100, y: 960 }, data: { label: "CASO-SII-001 — Canal SII", type: "sii", status: { label: "Investigación", tone: "warning" }, emphasized: true } },
 ];
 
 const initialEdges: Edge[] = [
@@ -83,6 +88,38 @@ const initialEdges: Edge[] = [
     style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5 },
     labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
   },
+  // CTR-004 (deficient control attempted on OBL-DORA-003)
+  {
+    id: "e17", source: "obl-dora-003", target: "ctr-004", label: "control deficiente", type: "smoothstep",
+    style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.5, strokeDasharray: "4 3" },
+    labelStyle: { fill: "hsl(var(--status-warning))", fontWeight: 600 },
+  },
+  // DEL-001 caducada → Carlos Vaz, vinculada a ARGA LATAM
+  { id: "e18", source: "carlos-vaz", target: "del-001", label: "titular", type: "smoothstep" },
+  {
+    id: "e19", source: "del-001", target: "arga-latam", label: "CADUCADA ⚠", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 2, strokeDasharray: "6 4" },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 700 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--destructive))" },
+  },
+  // CON-SIT-002 ↔ HALL-008 ↔ André Barbosa
+  {
+    id: "e20", source: "con-sit-002", target: "andre-barbosa", label: "afecta", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5 },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
+  },
+  {
+    id: "e21", source: "hall-008", target: "con-sit-002", label: "origina", type: "smoothstep",
+    style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5, strokeDasharray: "4 3" },
+    labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
+  },
+  // CASO-SII-001 correlacionado con HALL-008
+  {
+    id: "e22", source: "caso-sii-001", target: "hall-008", label: "correlaciona", type: "smoothstep",
+    style: { stroke: "hsl(var(--status-warning))", strokeWidth: 2, strokeDasharray: "8 4" },
+    labelStyle: { fill: "hsl(35 92% 33%)", fontWeight: 700 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "hsl(var(--status-warning))" },
+  },
 ];
 
 const filterTypeLabels: Record<string, string> = {
@@ -92,6 +129,9 @@ const filterTypeLabels: Record<string, string> = {
   policy: "Política",
   obligation: "Obligación",
   finding: "Hallazgo",
+  control: "Control",
+  delegation: "Delegación",
+  sii: "Caso SII",
 };
 
 export default function GovernanceMap() {
@@ -202,6 +242,9 @@ export default function GovernanceMap() {
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fef3c7] border border-amber-300" />Política</div>
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#dcfce7] border border-green-300" />Obligación</div>
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fee2e2] border border-red-300" />Hallazgo</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#cffafe] border border-cyan-300" />Control</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#ffedd5] border border-orange-300" />Delegación</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fef3c7] border border-amber-500" />Caso SII</div>
           </div>
         </Card>
       </div>

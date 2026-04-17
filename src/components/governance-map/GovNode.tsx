@@ -1,8 +1,8 @@
 import { Handle, Position, NodeProps } from "@xyflow/react";
-import { Building, Users, User, FileText, Scale, AlertTriangle, type LucideIcon } from "lucide-react";
+import { Building, Users, User, FileText, Scale, AlertTriangle, ShieldCheck, KeyRound, Lock, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type GovNodeType = "entity" | "organ" | "person" | "policy" | "obligation" | "finding";
+export type GovNodeType = "entity" | "organ" | "person" | "policy" | "obligation" | "finding" | "control" | "delegation" | "sii";
 
 export interface GovNodeData extends Record<string, unknown> {
   label: string;
@@ -18,6 +18,9 @@ const typeStyles: Record<GovNodeType, { bg: string; border: string; icon: Lucide
   policy:     { bg: "bg-[#fef3c7]", border: "border-amber-300",  icon: FileText,       iconColor: "text-amber-700",  label: "Política" },
   obligation: { bg: "bg-[#dcfce7]", border: "border-green-300",  icon: Scale,          iconColor: "text-green-700",  label: "Obligación" },
   finding:    { bg: "bg-[#fee2e2]", border: "border-red-300",    icon: AlertTriangle,  iconColor: "text-red-700",    label: "Hallazgo" },
+  control:    { bg: "bg-[#cffafe]", border: "border-cyan-300",   icon: ShieldCheck,    iconColor: "text-cyan-700",   label: "Control" },
+  delegation: { bg: "bg-[#ffedd5]", border: "border-orange-300", icon: KeyRound,       iconColor: "text-orange-700", label: "Delegación" },
+  sii:        { bg: "bg-[#fef3c7]", border: "border-amber-500",  icon: Lock,           iconColor: "text-amber-800",  label: "Caso SII" },
 };
 
 const toneClasses = {
