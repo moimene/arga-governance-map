@@ -129,6 +129,9 @@ const filterTypeLabels: Record<string, string> = {
   policy: "Política",
   obligation: "Obligación",
   finding: "Hallazgo",
+  control: "Control",
+  delegation: "Delegación",
+  sii: "Caso SII",
 };
 
 export default function GovernanceMap() {
