@@ -46,8 +46,42 @@ export const tourSteps: TourStep[] = [
     ],
     available: true,
   },
-  { route: "/organos", title: "Órganos y Reuniones", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
-  { route: "/politicas", title: "Políticas y Normativa", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
+  {
+    route: "/organos/consejo-administracion",
+    title: "El órgano de gobierno en tiempo real",
+    description:
+      "La ficha de órgano centraliza composición, mandatos, calendario y el reglamento de régimen interno. Cada reunión tiene su propio expediente con agenda, materiales, votaciones y acta inmutable.",
+    bullets: [
+      "Banner ámbar: 4 mandatos vencidos o próximos a vencer — acción preventiva necesaria.",
+      "Reunión 22/04/2026: PR-008 (DORA) en el punto 3 de la agenda — pendiente de aprobación del Consejo.",
+      "Tab Reglamento: REG-001 aprobado por la Junta General el 15/01/2024 — texto íntegro en acordeón.",
+    ],
+    available: true,
+  },
+  {
+    route: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
+    title: "El expediente de reunión completo",
+    description:
+      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta firmada e inmutable. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
+    bullets: [
+      "Punto 3 de la agenda: PR-008 destaca en ámbar — es el punto crítico de esta sesión.",
+      "Tab Participantes: 2 consejeros aún no han confirmado — quórum en riesgo si no confirman.",
+      "Tabs Votaciones y Acuerdos vacías: se rellenan durante y tras la sesión.",
+    ],
+    available: true,
+  },
+  {
+    route: "/politicas/PR-008",
+    title: "La política como objeto vivo con ciclo de vida",
+    description:
+      "Una política en TGMS no es un PDF estático: tiene ciclo de vida completo con 7 estados, historial de versiones y trazabilidad directa a las obligaciones y controles que activa.",
+    bullets: [
+      "WorkflowStepper: PR-008 está en paso 5 de 7 — pendiente del CdA del 22/04/2026.",
+      "Tab Aplicabilidad: 25 entidades del grupo con ARGA Turquía marcada con excepción vencida ⚠.",
+      "Tab Obligaciones vinculadas: OBL-DORA-003 sin cobertura — el eslabón débil de la cadena.",
+    ],
+    available: true,
+  },
   { route: "/obligaciones", title: "Obligaciones y Controles", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
   { route: "/delegaciones", title: "Delegaciones y Poderes", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
   { route: "/hallazgos", title: "Hallazgos y Acciones", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
