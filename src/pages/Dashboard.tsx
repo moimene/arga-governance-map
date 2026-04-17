@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useTour } from "@/context/TourContext";
+import { useScope } from "@/context/ScopeContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
@@ -15,13 +17,22 @@ import {
   Activity,
   Network,
   ArrowRight,
+  CheckCircle,
 } from "lucide-react";
 import { upcomingMeetings, personalTasks, recentActivity } from "@/data/dashboard";
+import { scopeData } from "@/data/scopeData";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
   const { start, step, completed } = useTour();
+  const { scope } = useScope();
+  const data = scopeData[scope];
+
+  // Animate KPIs on scope change
+  const [animKey, setAnimKey] = useState(0);
+  useEffect(() => { setAnimKey((k) => k + 1); }, [scope]);
+
   const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
 
   return (
@@ -30,7 +41,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Buen día, Lucía</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Vista del Grupo ARGA — operación al {new Date().toLocaleDateString("es-ES")}.
+            Vista de <span className="font-medium text-foreground">{scope}</span> — operación al {new Date().toLocaleDateString("es-ES")}.
           </p>
         </div>
         <Button onClick={start} className="gap-2 shadow-sm">
@@ -40,85 +51,54 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-5 gap-4">
-        <KpiCard label="Entidades activas" value={25} icon={Building} tone="primary" to="/entidades" />
-        <KpiCard label="Mandatos próximos a vencer" value={7} icon={Clock} tone="warning" to="/organos" />
-        <KpiCard label="Políticas pendientes de revisión" value={4} icon={FileWarning} tone="warning" to="/politicas" />
-        <KpiCard label="Hallazgos abiertos" value={10} icon={AlertTriangle} tone="critical" to="/hallazgos" />
-        <KpiCard label="Excepciones regulatorias activas" value={2} icon={ShieldAlert} tone="critical" to="/obligaciones" />
+      <div key={animKey} className="grid grid-cols-5 gap-4 animate-fade-in">
+        <KpiCard label="Entidades activas" value={data.entidades} icon={Building} tone="primary" to="/entidades" />
+        <KpiCard label="Mandatos próximos a vencer" value={data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
+        <KpiCard label="Políticas pendientes de revisión" value={data.politicasPendientes} icon={FileWarning} tone="warning" to="/politicas" />
+        <KpiCard label="Hallazgos abiertos" value={data.hallazgosAbiertos} icon={AlertTriangle} tone="critical" to="/hallazgos" />
+        <KpiCard label="Excepciones regulatorias activas" value={data.excepcionesActivas} icon={ShieldAlert} tone="critical" to="/obligaciones" />
       </div>
 
       {/* Mid row */}
       <div className="mt-6 grid grid-cols-12 gap-6">
         {/* Alertas críticas */}
-        <Card className="col-span-8 overflow-hidden border-l-4 border-l-destructive">
+        <Card className={cn(
+          "col-span-8 overflow-hidden",
+          data.alertas.length > 0 ? "border-l-4 border-l-destructive" : "border-l-4 border-l-status-active",
+        )}>
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <AlertTriangle className={cn("h-4 w-4", data.alertas.length > 0 ? "text-destructive" : "text-status-active")} />
               <h2 className="text-sm font-semibold">Alertas críticas</h2>
             </div>
-            <Link to="/hallazgos" className="text-xs font-medium text-primary hover:underline">
-              Ver todas
-            </Link>
+            {data.alertas.length > 0 && (
+              <Link to="/hallazgos" className="text-xs font-medium text-primary hover:underline">Ver todas</Link>
+            )}
           </div>
-          <ul className="divide-y divide-border">
-            <li className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
-              <Link to="/hallazgos/HALL-008" className="flex flex-1 items-start gap-3">
-                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-destructive pulse-ring" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-foreground">HALL-008</span>
-                    <StatusBadge label="CRÍTICA" pulse />
-                  </div>
-                  <p className="mt-1 text-sm text-foreground">
-                    Conflicto de interés no declarado — inversión inmobiliaria ARGA Brasil
-                  </p>
-                </div>
-              </Link>
-            </li>
-            <li className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
-              <Link to="/hallazgos/HALL-003" className="flex flex-1 items-start gap-3">
-                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-destructive" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-foreground">HALL-003</span>
-                    <StatusBadge label="ALTA" />
-                  </div>
-                  <p className="mt-1 text-sm text-foreground">
-                    Delegación caducada — D. Carlos Eduardo Vaz (Director Regional LATAM)
-                  </p>
-                </div>
-              </Link>
-            </li>
-            <li className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
-              <Link to="/obligaciones" className="flex flex-1 items-start gap-3">
-                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-destructive" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-foreground">OBL-DORA-003</span>
-                    <StatusBadge label="SIN CONTROL" />
-                  </div>
-                  <p className="mt-1 text-sm text-foreground">
-                    Resiliencia operativa digital — sin control específico asignado
-                  </p>
-                </div>
-              </Link>
-            </li>
-            <li className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
-              <Link to="/hallazgos/HALL-010" className="flex flex-1 items-start gap-3">
-                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-status-warning" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-foreground">HALL-010</span>
-                    <StatusBadge label="EN REVISIÓN" tone="warning" />
-                  </div>
-                  <p className="mt-1 text-sm text-foreground">
-                    Excepción regulatoria de Turquía vencida — 22/04/2026
-                  </p>
-                </div>
-              </Link>
-            </li>
-          </ul>
+          {data.alertas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 bg-status-active-bg/50 px-5 py-12 text-center">
+              <CheckCircle className="h-10 w-10 text-status-active" />
+              <p className="text-sm font-medium text-foreground">No hay alertas críticas en este ámbito.</p>
+              <p className="text-xs text-muted-foreground">Operación nominal en {scope}.</p>
+            </div>
+          ) : (
+            <ul key={animKey} className="divide-y divide-border animate-fade-in">
+              {data.alertas.map((a, i) => (
+                <li key={a.id + i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-accent/40">
+                  <Link to={a.to} className="flex flex-1 items-start gap-3">
+                    <span className={cn("mt-1 inline-block h-2 w-2 rounded-full", a.tone === "critical" ? "bg-destructive" : "bg-status-warning", i === 0 && a.tone === "critical" && "pulse-ring")} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-foreground">{a.id}</span>
+                        <StatusBadge label={a.label} tone={a.tone === "critical" ? "critical" : "warning"} pulse={i === 0 && a.tone === "critical"} />
+                      </div>
+                      <p className="mt-1 text-sm text-foreground">{a.text}</p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         {/* Próximas reuniones */}
@@ -194,17 +174,14 @@ export default function Dashboard() {
           </div>
           <div className="px-4 py-5">
             <svg viewBox="0 0 240 200" className="w-full">
-              {/* edges */}
               <line x1="120" y1="40" x2="50" y2="130" stroke="hsl(var(--border))" strokeWidth="1.5" />
               <line x1="120" y1="40" x2="120" y2="130" stroke="hsl(var(--border))" strokeWidth="1.5" />
               <line x1="120" y1="40" x2="190" y2="130" stroke="hsl(var(--border))" strokeWidth="1.5" />
               <line x1="50" y1="155" x2="50" y2="175" stroke="hsl(var(--destructive))" strokeWidth="1.5" strokeDasharray="3 2" />
-              {/* root */}
               <g>
                 <rect x="70" y="20" width="100" height="36" rx="6" fill="hsl(var(--primary))" />
                 <text x="120" y="42" textAnchor="middle" fontSize="11" fontWeight="600" fill="white">ARGA Seguros</text>
               </g>
-              {/* children */}
               <g>
                 <rect x="15" y="130" width="70" height="28" rx="6" fill="hsl(var(--accent))" stroke="hsl(var(--primary)/0.3)" />
                 <text x="50" y="148" textAnchor="middle" fontSize="10" fill="hsl(var(--foreground))">España</text>
