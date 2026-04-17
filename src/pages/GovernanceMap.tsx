@@ -293,11 +293,28 @@ export default function GovernanceMap() {
                   </ul>
                 </section>
 
-                {selected.data.type === "entity" && (
-                  <Button asChild className="w-full gap-1.5">
-                    <Link to={`/entidades/${selected.id}`}>Ver ficha completa <ArrowRight className="h-4 w-4" /></Link>
-                  </Button>
-                )}
+                {(() => {
+                  const t = selected.data.type;
+                  const id = selected.id;
+                  const targetMap: Partial<Record<typeof t, string>> = {
+                    entity: `/entidades/${id}`,
+                    organ: `/organos/${id}`,
+                    policy: `/politicas/${id.toUpperCase()}`,
+                    obligation: id.startsWith("obl-") ? `/obligaciones/${id.toUpperCase()}` : undefined,
+                    finding: id.startsWith("hall-") ? `/hallazgos/${id.toUpperCase()}` : undefined,
+                    delegation: "/delegaciones/carlos-vaz-latam",
+                    control: "/obligaciones/controles/CTR-004",
+                    sii: `/sii/${id.toUpperCase()}`,
+                  };
+                  const href = targetMap[t];
+                  if (!href) return null;
+                  const label = t === "sii" ? "Acceder al caso (zona SII)" : "Ver ficha completa";
+                  return (
+                    <Button asChild className="w-full gap-1.5">
+                      <Link to={href}>{label} <ArrowRight className="h-4 w-4" /></Link>
+                    </Button>
+                  );
+                })()}
               </div>
             </>
           )}
