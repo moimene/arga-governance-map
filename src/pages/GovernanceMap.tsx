@@ -44,8 +44,13 @@ const initialNodes: Node<GovNodeData>[] = [
   { id: "pr-008",        type: "gov", position: { x: 800, y: 640 }, data: { label: "PR-008 — DORA", type: "policy", status: { label: "Pendiente", tone: "pending" } } },
   { id: "obl-dora-003",  type: "gov", position: { x: 800, y: 800 }, data: { label: "OBL-DORA-003 — Resiliencia operativa", type: "obligation", status: { label: "Sin control", tone: "critical" }, emphasized: true } },
   { id: "ghost-control", type: "gov", position: { x: 1060, y: 800 }, data: { label: "(Ningún control asignado)", type: "obligation", status: { label: "Vacío", tone: "critical" } } },
+  { id: "ctr-004",       type: "gov", position: { x: 540, y: 960 }, data: { label: "CTR-004 — Pruebas resiliencia TIC", type: "control", status: { label: "Deficiente", tone: "warning" } } },
   { id: "hall-008",      type: "gov", position: { x: 100, y: 320 }, data: { label: "HALL-008 — Conflicto interés Brasil", type: "finding", status: { label: "Crítico", tone: "critical" }, emphasized: true } },
   { id: "andre-barbosa", type: "gov", position: { x: 100, y: 480 }, data: { label: "D. André Barbosa", type: "person" } },
+  { id: "carlos-vaz",    type: "gov", position: { x: 360, y: 480 }, data: { label: "D. Carlos Eduardo Vaz", type: "person" } },
+  { id: "del-001",       type: "gov", position: { x: 360, y: 800 }, data: { label: "DEL-001 — Poderes LATAM", type: "delegation", status: { label: "Caducada", tone: "critical" }, emphasized: true } },
+  { id: "con-sit-002",   type: "gov", position: { x: 100, y: 800 }, data: { label: "CON-SIT-002 — No declarado", type: "finding", status: { label: "No declarado", tone: "critical" }, emphasized: true } },
+  { id: "caso-sii-001",  type: "gov", position: { x: 100, y: 960 }, data: { label: "CASO-SII-001 — Canal SII", type: "sii", status: { label: "Investigación", tone: "warning" }, emphasized: true } },
 ];
 
 const initialEdges: Edge[] = [
