@@ -4,31 +4,44 @@ import { toast } from "sonner";
 import { Building2, Eye, Lock, Network, ShieldCheck, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    login(email || "lucia.paredes@argaseguros.com");
+    if (!email || !password) {
+      toast.error("Introduce email y contraseña");
+      return;
+    }
+    setSubmitting(true);
+    const { error } =
+      mode === "signin"
+        ? await signIn(email, password)
+        : await signUp(email, password);
+    setSubmitting(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (mode === "signup") {
+      toast.success("Cuenta creada. Revisa tu email si la confirmación está activada.");
+    }
     navigate("/");
   };
 
   const sso = () => toast("SSO disponible en entorno de producción");
 
-  const directAccess = () => {
-    setEmail("lucia.paredes@argaseguros.com");
-    login("lucia.paredes@argaseguros.com");
-    navigate("/");
-  };
-
   return (
     <div className="grid min-h-screen w-full grid-cols-1 md:grid-cols-2">
-      {/* Left brand panel */}
       <div className="relative hidden flex-col justify-center bg-sidebar px-12 py-16 text-white md:flex">
         <div className="mx-auto max-w-sm">
           <div className="flex items-baseline gap-2">
@@ -53,17 +66,24 @@ export default function Login() {
           </div>
         </div>
         <div className="absolute bottom-6 left-12 text-[12px] text-sidebar-muted">
-          TGMS v1.0 · Entorno de demostración
+          TGMS v1.0 · Entorno seguro
         </div>
       </div>
 
-      {/* Right form panel */}
       <div className="flex items-center justify-center bg-card px-6 py-12">
         <div className="w-full max-w-sm">
           <h1 className="text-[28px] font-bold tracking-tight text-foreground">Bienvenido</h1>
           <p className="mt-1 text-sm text-muted-foreground">Accede a tu entorno de gobernanza</p>
 
-          <div className="my-6 h-px bg-border" />
+          <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")} className="mt-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Iniciar sesión</TabsTrigger>
+              <TabsTrigger value="signup">Crear cuenta</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="signin" className="mt-6" />
+            <TabsContent value="signup" className="mt-6" />
+          </Tabs>
 
           <form onSubmit={submit} className="space-y-4">
             <div>
@@ -78,6 +98,7 @@ export default function Login() {
                   placeholder="usuario@argaseguros.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -93,11 +114,13 @@ export default function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  minLength={6}
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full">
-              Acceder
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Procesando…" : mode === "signin" ? "Acceder" : "Crear cuenta"}
             </Button>
           </form>
 
@@ -109,18 +132,6 @@ export default function Login() {
             <Building2 className="h-4 w-4" />
             Acceder con SSO Corporativo
           </Button>
-
-          <div className="my-5 h-px bg-border" />
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={directAccess}
-              className="text-[13px] font-medium text-primary hover:underline"
-            >
-              Acceso directo (demo) →
-            </button>
-          </div>
         </div>
       </div>
     </div>
