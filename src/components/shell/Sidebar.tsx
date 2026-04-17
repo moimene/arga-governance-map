@@ -5,6 +5,8 @@ import {
   BarChart3,
   BookOpen,
   Building,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Key,
   LayoutDashboard,
@@ -51,15 +53,28 @@ const bottom: Item[] = [
   { label: "Administración", to: "/admin", icon: Settings },
 ];
 
+const STORAGE_KEY = "sidebar_collapsed";
+
 function useCollapsed() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [manual, setManual] = useState<boolean | null>(() => {
+    if (typeof window === "undefined") return null;
+    const v = window.localStorage.getItem(STORAGE_KEY);
+    return v === null ? null : v === "true";
+  });
+  const [auto, setAuto] = useState(false);
   useEffect(() => {
-    const onResize = () => setCollapsed(window.innerWidth < 1200);
+    const onResize = () => setAuto(window.innerWidth < 1200);
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  return collapsed;
+  const collapsed = manual ?? auto;
+  const toggle = () => {
+    const next = !collapsed;
+    setManual(next);
+    if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, String(next));
+  };
+  return { collapsed, toggle };
 }
 
 function ItemRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
@@ -104,15 +119,24 @@ function ItemRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
 }
 
 export function Sidebar() {
-  const collapsed = useCollapsed();
+  const { collapsed, toggle } = useCollapsed();
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+          "flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
           collapsed ? "w-16" : "w-[260px]",
         )}
       >
+        <div className={cn("flex items-center border-b border-sidebar-border px-2 py-2", collapsed ? "justify-center" : "justify-end")}>
+          <button
+            onClick={toggle}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground hover:bg-sidebar-hover"
+            aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 scrollbar-thin">
           {top.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
 
