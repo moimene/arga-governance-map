@@ -106,28 +106,67 @@ export const tourSteps: TourStep[] = [
     ],
     available: true,
   },
-  { route: "/hallazgos", title: "Hallazgos y Acciones", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
-  { route: "/conflictos", title: "Conflictos e Integridad", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
-  { route: "/sii", title: "SII — Canal Interno", description: "Próximamente — se habilita en la siguiente iteración del sistema.", bullets: [], available: false },
+  {
+    route: "/hallazgos/HALL-008",
+    title: "El hallazgo: la señal de que algo requiere atención",
+    description:
+      "Los hallazgos son el mecanismo de alerta del sistema de gobierno. Auditoría Interna los crea con independencia funcional. Cada hallazgo activa acciones correctivas con responsable, fecha y seguimiento. Solo Auditoría puede cerrarlo.",
+    bullets: [
+      "Badge CRÍTICA pulsante: este hallazgo tiene el máximo nivel de severidad del sistema.",
+      "Banner azul de independencia: Auditoría actúa con plena autonomía funcional.",
+      "Tab Acciones: 4 acciones correctivas activas — D. Carmen Delgado y D. Álvaro Mendoza ya tienen tareas asignadas.",
+    ],
+    available: true,
+  },
+  {
+    route: "/conflictos",
+    title: "Integridad como proceso, no como declaración",
+    description:
+      "TGMS gestiona los tres vectores de integridad: conflictos de interés declarados, operaciones con partes vinculadas y la campaña anual de attestations. Todo está cruzado: el conflicto no declarado de HALL-008 aparece aquí como la excepción que confirma la regla.",
+    bullets: [
+      "Tab Conflictos: 5 declarados y gestionados — 1 detectado sin declarar (CON-SIT-002 → HALL-008).",
+      "Tab Attestations: 12/25 personas pendientes — la campaña cierra el 30/04/2026.",
+      "Tab Operaciones vinculadas: OPV-003 bajo revisión de precio — D. Ricardo Vega se abstuvo.",
+    ],
+    available: true,
+  },
+  {
+    route: "/sii",
+    title: "El canal de integridad: segregado por diseño",
+    description:
+      "El Sistema Interno de Información no es una función dentro de TGMS — es un entorno técnico separado. El diseño visual diferenciado, el modal de acceso, los logs independientes y el cifrado de evidencias transmiten visualmente la segregación real que exige la Ley 2/2023.",
+    bullets: [
+      "Diseño diferenciado: fondo, header y colores propios — el usuario entiende que ha cambiado de entorno.",
+      "CASO-SII-001 correlacionado con HALL-008 — el sistema conecta investigaciones independientes sin exponer datos protegidos.",
+      "Log de auditoría independiente: cada acceso queda registrado en un sistema separado.",
+    ],
+    available: true,
+  },
 ];
 
 interface TourContextValue {
-  step: number; // 0 = inactive, 1..N = active step
+  step: number;
   start: () => void;
   next: () => void;
   prev: () => void;
   close: () => void;
+  finish: () => void;
   total: number;
+  completed: boolean;
 }
 
 const TourContext = createContext<TourContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "tgms.tour.step";
+const COMPLETED_KEY = "tgms.tour.completed";
 
 export function TourProvider({ children }: { children: ReactNode }) {
   const [step, setStep] = useState<number>(() => {
     const v = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
     return v ? Number(v) : 0;
+  });
+  const [completed, setCompleted] = useState<boolean>(() => {
+    return typeof window !== "undefined" && window.localStorage.getItem(COMPLETED_KEY) === "true";
   });
   const navigate = useNavigate();
 
@@ -138,8 +177,28 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const goTo = (s: number) => {
     setStep(s);
     if (s > 0 && s <= tourSteps.length) {
+      // Pre-confirm SII access if tour visits /sii so the modal doesn't block the flow
+      if (tourSteps[s - 1].route.startsWith("/sii") && typeof window !== "undefined") {
+        sessionStorage.setItem("sii_access_confirmed", "true");
+      }
       navigate(tourSteps[s - 1].route);
     }
+  };
+
+  const finish = () => {
+    setCompleted(true);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(COMPLETED_KEY, "true");
+      window.localStorage.setItem("tgms.tour.justFinished", "true");
+    }
+    setStep(0);
+    navigate("/documentacion");
+  };
+
+  const start = () => {
+    setCompleted(false);
+    if (typeof window !== "undefined") window.localStorage.setItem(COMPLETED_KEY, "false");
+    goTo(1);
   };
 
   return (
@@ -147,10 +206,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
       value={{
         step,
         total: tourSteps.length,
-        start: () => goTo(1),
+        completed,
+        start,
         next: () => goTo(Math.min(step + 1, tourSteps.length)),
         prev: () => goTo(Math.max(step - 1, 1)),
         close: () => setStep(0),
+        finish,
       }}
     >
       {children}

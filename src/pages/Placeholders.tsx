@@ -76,27 +76,6 @@ export function Admin() {
   );
 }
 
-export function Sii() {
-  return (
-    <div className="sii-zone min-h-[calc(100vh-3.5rem)] p-6">
-      <div className="mx-auto max-w-[1440px]">
-        <div className="mb-6 flex items-start gap-3 rounded-md border border-sii-border bg-card p-4">
-          <ShieldAlert className="h-5 w-5 shrink-0 text-sii-border" />
-          <div>
-            <h2 className="text-sm font-semibold text-sii-foreground">Zona restringida — Canal Interno de Denuncias</h2>
-            <p className="mt-0.5 text-xs text-sii-foreground/80">Acceso exclusivo a usuarios autorizados. Toda actividad queda registrada.</p>
-          </div>
-        </div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold text-sii-foreground"><AlertOctagon className="h-6 w-6" />SII — Canal Interno</h1>
-        <p className="mt-1 text-sm text-sii-foreground/70">Sistema Interno de Información — Ley 2/2023.</p>
-        <Card className="mt-6 p-10 text-center text-sm text-muted-foreground">
-          Módulo SII — se habilita en la siguiente iteración. Investigadora asignada: Dña. Elena Navarro Pons.
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 export function PlaceholderRoute({ name }: { name: string }) {
   return <Placeholder title={name} />;
 }

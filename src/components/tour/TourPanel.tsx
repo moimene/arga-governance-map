@@ -3,11 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useTour, tourSteps } from "@/context/TourContext";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
 
 export function TourPanel() {
-  const { step, total, next, prev, close } = useTour();
-  const navigate = useNavigate();
+  const { step, total, next, prev, close, finish } = useTour();
   if (step === 0) return null;
 
   const data = tourSteps[step - 1];
@@ -69,11 +67,8 @@ export function TourPanel() {
         {isLast ? (
           <Button
             size="sm"
-            className="gap-1"
-            onClick={() => {
-              close();
-              navigate("/documentacion");
-            }}
+            className="gap-1 bg-status-active text-white hover:bg-status-active/90"
+            onClick={finish}
           >
             <CheckCircle2 className="h-4 w-4" /> Finalizar tour
           </Button>

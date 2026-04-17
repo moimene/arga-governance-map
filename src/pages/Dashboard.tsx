@@ -21,11 +21,11 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  const { start, step } = useTour();
+  const { start, step, completed } = useTour();
+  const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
-      {/* Header row */}
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Buen día, Lucía</h1>
@@ -35,7 +35,7 @@ export default function Dashboard() {
         </div>
         <Button onClick={start} className="gap-2 shadow-sm">
           <Play className="h-4 w-4 fill-current" />
-          {step > 0 ? "Continuar tour" : "Iniciar Tour del Sistema"}
+          {label}
         </Button>
       </div>
 

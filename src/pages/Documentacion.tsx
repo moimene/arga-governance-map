@@ -12,6 +12,7 @@ import {
   FileText,
   Globe,
   HelpCircle,
+  CheckCircle,
   Key,
   Leaf,
   Link as LinkIcon,
@@ -86,9 +87,30 @@ const glosario = [
 
 export default function Documentacion() {
   const [active, setActive] = useState("que-es");
+  const [showCompleted, setShowCompleted] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("tgms.tour.justFinished") === "true");
+
+  const dismissCompleted = () => {
+    setShowCompleted(false);
+    if (typeof window !== "undefined") window.localStorage.removeItem("tgms.tour.justFinished");
+  };
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
+      {showCompleted && (
+        <Card className="mb-6 flex items-start gap-3 border-l-4 border-l-status-active bg-status-active-bg p-4">
+          <CheckCircle className="mt-0.5 h-6 w-6 shrink-0 text-status-active" />
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-status-active">Has completado el tour de TGMS</h3>
+            <p className="mt-1 text-sm text-foreground">
+              Has recorrido las 10 áreas del sistema: desde el Dashboard hasta el canal SII. Explora la documentación para conocer la filosofía del sistema y el marco regulatorio que lo sustenta.
+            </p>
+            <Link to="/" onClick={dismissCompleted} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-status-active hover:underline">
+              Volver al Dashboard <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <button onClick={dismissCompleted} className="text-status-active hover:underline text-xs">cerrar</button>
+        </Card>
+      )}
       <div className="grid grid-cols-12 gap-6">
         {/* Internal sidebar */}
         <aside className="col-span-3">
