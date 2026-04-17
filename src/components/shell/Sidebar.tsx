@@ -125,6 +125,22 @@ function ItemRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
 
 export function Sidebar() {
   const { collapsed, toggle } = useCollapsed();
+  const { start, step, completed } = useTour();
+  const tourLabel = step > 0 ? "Continuar tour" : completed ? "Repetir tour" : "Iniciar tour";
+
+  const replayBtn = (
+    <button
+      onClick={start}
+      className={cn(
+        "group relative flex w-full items-center gap-3 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20",
+        collapsed && "justify-center px-0",
+      )}
+    >
+      <Sparkles className="h-[18px] w-[18px] shrink-0" />
+      {!collapsed && <span className="flex-1 truncate text-left">{tourLabel}</span>}
+    </button>
+  );
+
   return (
     <TooltipProvider delayDuration={0}>
       <aside
@@ -142,6 +158,7 @@ export function Sidebar() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
+
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 scrollbar-thin">
           {top.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
 
@@ -149,8 +166,28 @@ export function Sidebar() {
           {sii.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
           <div className="my-2 mx-3 border-t border-sidebar-border" />
 
-          {bottom.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+          {adminItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
         </nav>
+
+        {/* Help & Onboarding — destacado, separado en la parte inferior */}
+        <div className="border-t border-sidebar-border bg-sidebar/60 px-2 py-3">
+          {!collapsed && (
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-primary/70">
+              Ayuda y Onboarding
+            </div>
+          )}
+          <div className="space-y-1">
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>{replayBtn}</TooltipTrigger>
+                <TooltipContent side="right">{tourLabel}</TooltipContent>
+              </Tooltip>
+            ) : (
+              replayBtn
+            )}
+            {helpItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+          </div>
+        </div>
 
         {!collapsed && (
           <div className="border-t border-sidebar-border px-4 py-3 text-[12px] text-sidebar-muted">
