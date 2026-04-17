@@ -77,47 +77,48 @@ export default function ControlDetalle() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {control.evidences.map((ev) => {
+                {control.evidences.flatMap((ev) => {
                   const rejected = ev.status === "RECHAZADA";
                   const isExpanded = expanded === ev.id;
-                  return (
-                    <>
-                      <TableRow
-                        key={ev.id}
-                        className={cn(rejected && "bg-status-critical-bg hover:bg-status-critical-bg cursor-pointer")}
-                        onClick={() => rejected && setExpanded(isExpanded ? null : ev.id)}
-                      >
-                        <TableCell className="font-mono text-xs">
-                          <div className="flex items-center gap-1">
-                            {rejected && (isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)}
-                            {ev.id}
+                  const rows = [
+                    <TableRow
+                      key={ev.id}
+                      className={cn(rejected && "bg-status-critical-bg hover:bg-status-critical-bg cursor-pointer")}
+                      onClick={() => rejected && setExpanded(isExpanded ? null : ev.id)}
+                    >
+                      <TableCell className="font-mono text-xs">
+                        <div className="flex items-center gap-1">
+                          {rejected && (isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)}
+                          {ev.id}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {ev.title}
+                        {rejected && ev.rejectionReason && (
+                          <div className="mt-1 line-clamp-2 text-xs text-status-critical/90">{ev.rejectionReason}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{ev.type}</TableCell>
+                      <TableCell className="text-sm">{ev.uploadedBy}</TableCell>
+                      <TableCell className="font-mono text-xs">{ev.uploadedDate}</TableCell>
+                      <TableCell><StatusBadge label={ev.status} tone={ev.status === "VALIDADA" ? "active" : ev.status === "RECHAZADA" || ev.status === "VENCIDA" ? "critical" : "warning"} /></TableCell>
+                    </TableRow>
+                  ];
+                  if (rejected && isExpanded) {
+                    rows.push(
+                      <TableRow key={`${ev.id}-detail`} className="bg-status-critical-bg/60 hover:bg-status-critical-bg/60">
+                        <TableCell colSpan={6} className="py-3">
+                          <div className="rounded-md border border-status-critical/30 bg-card p-4 text-sm">
+                            <div className="font-semibold text-status-critical">Motivo del rechazo</div>
+                            <p className="mt-1 text-foreground">
+                              Rechazada por {ev.validatedBy} (Auditoría Interna) el {ev.uploadedDate}. {ev.rejectionReason}
+                            </p>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {ev.title}
-                          {rejected && ev.rejectionReason && (
-                            <div className="mt-1 line-clamp-2 text-xs text-status-critical/90">{ev.rejectionReason}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{ev.type}</TableCell>
-                        <TableCell className="text-sm">{ev.uploadedBy}</TableCell>
-                        <TableCell className="font-mono text-xs">{ev.uploadedDate}</TableCell>
-                        <TableCell><StatusBadge label={ev.status} tone={ev.status === "VALIDADA" ? "active" : ev.status === "RECHAZADA" || ev.status === "VENCIDA" ? "critical" : "warning"} /></TableCell>
                       </TableRow>
-                      {rejected && isExpanded && (
-                        <TableRow key={`${ev.id}-detail`} className="bg-status-critical-bg/60 hover:bg-status-critical-bg/60">
-                          <TableCell colSpan={6} className="py-3">
-                            <div className="rounded-md border border-status-critical/30 bg-card p-4 text-sm">
-                              <div className="font-semibold text-status-critical">Motivo del rechazo</div>
-                              <p className="mt-1 text-foreground">
-                                Rechazada por {ev.validatedBy} (Auditoría Interna) el {ev.uploadedDate}. {ev.rejectionReason}
-                              </p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
-                  );
+                    );
+                  }
+                  return rows;
                 })}
               </TableBody>
             </Table>
