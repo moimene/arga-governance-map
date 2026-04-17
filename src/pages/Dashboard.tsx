@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { upcomingMeetings, personalTasks, recentActivity } from "@/data/dashboard";
 import { scopeData } from "@/data/scopeData";
+import { esgGroupScore, esgTotals } from "@/data/esg";
+import { socialAverages } from "@/data/esgSocial";
+import { Leaf } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
