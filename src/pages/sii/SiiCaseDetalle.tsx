@@ -5,30 +5,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { getSiiCaseById } from "@/data/sii";
-import { ChevronRight, Lock, Eye, ClipboardCheck } from "lucide-react";
+import { useSiiCaseById } from "@/hooks/useSii";
+import { ChevronRight, Lock, Eye, ClipboardCheck, Loader2 } from "lucide-react";
 
 export default function SiiCaseDetalle() {
   const { id } = useParams<{ id: string }>();
-  const c = id ? getSiiCaseById(id) : undefined;
+  const { data: c, isLoading } = useSiiCaseById(id);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-10 text-sii-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
   if (!c) return <div className="p-6 text-sii-foreground">Caso no encontrado.</div>;
+
+  const confidentialityLabel = (c.confidentiality ?? "").split("—")[0].trim() || "—";
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <nav className="mb-3 flex items-center gap-1 text-xs text-sii-foreground/70">
         <Link to="/sii" className="hover:text-sii-foreground">SII</Link>
         <ChevronRight className="h-3 w-3" />
-        <span className="text-sii-foreground">{c.id}</span>
+        <span className="text-sii-foreground">{c.display_id}</span>
       </nav>
 
       <Card className="border-sii-border p-6">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge label={c.status} tone="info" />
-          <StatusBadge label={c.confidentiality.split("—")[0].trim()} tone="warning" />
+          <StatusBadge label={c.status ?? "—"} tone="info" />
+          <StatusBadge label={confidentialityLabel} tone="warning" />
         </div>
-        <h1 className="mt-2 text-2xl font-semibold text-sii-foreground">{c.id} — {c.category}</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-sii-foreground">
+          {c.display_id} — {c.classification ?? c.category ?? ""}
+        </h1>
         <div className="mt-1 text-sm text-sii-foreground/80">
-          Recibido: {c.receivedDate} · Canal: {c.channel} · Investigadora: {c.investigator}
+          Recibido: {c.received_date ?? "—"} · Canal: {c.channel ?? "—"} · Investigadora: {c.investigator_name ?? "—"}
         </div>
       </Card>
 
@@ -44,22 +56,25 @@ export default function SiiCaseDetalle() {
         <TabsContent value="expediente">
           <Card className="space-y-4 p-6 text-sm">
             <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-muted-foreground">Recepción:</span> <strong>{c.receivedDate}</strong></div>
-              <div><span className="text-muted-foreground">Canal:</span> <strong>{c.channel}</strong></div>
-              <div><span className="text-muted-foreground">Categoría:</span> <strong>{c.category}</strong></div>
-              <div><span className="text-muted-foreground">Investigadora:</span> <strong>{c.investigator}</strong></div>
-              <div className="col-span-2"><span className="text-muted-foreground">Confidencialidad:</span> <strong>{c.confidentiality}</strong></div>
+              <div><span className="text-muted-foreground">Recepción:</span> <strong>{c.received_date ?? "—"}</strong></div>
+              <div><span className="text-muted-foreground">Canal:</span> <strong>{c.channel ?? "—"}</strong></div>
+              <div><span className="text-muted-foreground">Clasificación:</span> <strong>{c.classification ?? c.category ?? "—"}</strong></div>
+              <div><span className="text-muted-foreground">País:</span> <strong>{c.country ?? "—"}</strong></div>
+              <div><span className="text-muted-foreground">Investigadora:</span> <strong>{c.investigator_name ?? "—"}</strong></div>
+              <div className="col-span-2"><span className="text-muted-foreground">Confidencialidad:</span> <strong>{c.confidentiality ?? "—"}</strong></div>
             </div>
-            <div className="rounded-md bg-status-warning-bg p-4 text-sii-foreground">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide">Resumen</div>
-              <p>{c.summary}</p>
-            </div>
+            {c.summary && (
+              <div className="rounded-md bg-status-warning-bg p-4 text-sii-foreground">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide">Resumen</div>
+                <p>{c.summary}</p>
+              </div>
+            )}
             <p className="text-xs italic text-muted-foreground">La identidad del denunciante es desconocida (canal anónimo). Protección garantizada por Ley 2/2023.</p>
-            {c.relatedFinding && (
+            {c.related_finding && (
               <div className="flex items-center gap-2 text-sm">
                 <span>Correlación:</span>
-                <Link to={`/hallazgos/${c.relatedFinding}`}>
-                  <StatusBadge label={`${c.relatedFinding} correlacionado`} tone="critical" />
+                <Link to={`/hallazgos/${c.related_finding}`}>
+                  <StatusBadge label={`${c.related_finding} correlacionado`} tone="critical" />
                 </Link>
                 <span className="text-xs italic text-muted-foreground">(saliendo de zona SII)</span>
               </div>
@@ -69,20 +84,24 @@ export default function SiiCaseDetalle() {
 
         <TabsContent value="actuaciones">
           <Card className="p-5">
-            <ol className="space-y-4">
-              {c.actions.map((a, i) => (
-                <li key={i} className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <span className="h-2.5 w-2.5 rounded-full bg-sii-border" />
-                    {i < c.actions.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
-                  </div>
-                  <div className="flex-1 pb-3">
-                    <div className="text-sm font-medium text-foreground">{a.action}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{a.date} · {a.actor}</div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            {c.actions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin actuaciones registradas.</p>
+            ) : (
+              <ol className="space-y-4">
+                {c.actions.map((a, i) => (
+                  <li key={a.id} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <span className="h-2.5 w-2.5 rounded-full bg-sii-border" />
+                      {i < c.actions.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
+                    </div>
+                    <div className="flex-1 pb-3">
+                      <div className="text-sm font-medium text-foreground">{a.action}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{a.action_date ?? "—"} · {a.actor ?? "—"}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
           </Card>
         </TabsContent>
 
@@ -99,14 +118,21 @@ export default function SiiCaseDetalle() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {c.evidences.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                      Sin evidencias registradas.
+                    </TableCell>
+                  </TableRow>
+                )}
                 {c.evidences.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-mono text-xs font-semibold">{e.id}</TableCell>
                     <TableCell className="text-sm">{e.title}</TableCell>
-                    <TableCell className="text-sm">{e.type}</TableCell>
+                    <TableCell className="text-sm">{e.type ?? "—"}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 rounded-full border border-sii-border bg-status-warning-bg px-2 py-0.5 text-[11px] font-semibold uppercase text-sii-foreground">
-                        <Lock className="h-3 w-3" /> {e.status}
+                        <Lock className="h-3 w-3" /> {e.status ?? "CIFRADO"}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -127,13 +153,15 @@ export default function SiiCaseDetalle() {
         <TabsContent value="resolucion">
           <Card className="p-10 text-center">
             <ClipboardCheck className="mx-auto h-10 w-10 text-muted-foreground/50" />
-            {c.closedDate ? (
+            {c.closed_date ? (
               <>
-                <h3 className="mt-3 text-base font-semibold">Caso cerrado el {c.closedDate}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{c.closingReason}</p>
+                <h3 className="mt-3 text-base font-semibold">Caso cerrado el {c.closed_date}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{c.closing_reason}</p>
               </>
             ) : (
-              <p className="mt-3 text-sm text-muted-foreground">La resolución se registrará cuando la investigación concluya. Estado actual: <strong>{c.status}</strong>.</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                La resolución se registrará cuando la investigación concluya. Estado actual: <strong>{c.status ?? "—"}</strong>.
+              </p>
             )}
           </Card>
         </TabsContent>
@@ -141,11 +169,9 @@ export default function SiiCaseDetalle() {
         <TabsContent value="log">
           <Card className="p-5">
             <ol className="space-y-3 text-sm">
-              <li>10/04/2026 09:02 — Caso creado en sistema SII — Sistema SII</li>
-              <li>10/04/2026 09:02 — Caso asignado a Dña. Elena Navarro — Sistema SII</li>
-              <li>11/04/2026 10:15 — Acceso: Dña. Elena Navarro — consulta expediente</li>
-              <li>14/04/2026 16:20 — Acceso: Dña. Elena Navarro — añadida actuación</li>
-              <li>17/04/2026 09:00 — Acceso: Dña. Elena Navarro — consulta expediente</li>
+              {c.actions.map((a) => (
+                <li key={a.id}>{a.action_date ?? "—"} — {a.action} — {a.actor ?? "Sistema SII"}</li>
+              ))}
             </ol>
             <p className="mt-4 text-xs italic text-muted-foreground">
               Este log es independiente del log de auditoría del sistema principal TGMS. Los accesos a la zona SII se registran en un sistema separado para garantizar la independencia funcional.
