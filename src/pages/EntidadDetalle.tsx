@@ -5,14 +5,38 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadgeTip } from "@/components/StatusBadgeTip";
-import { entities, getChildren, getEntityById } from "@/data/entities";
-import { policies } from "@/data/policies";
-import { findings } from "@/data/findings";
+import {
+  useEntityBySlug,
+  useEntityChildren,
+  useEntityParent,
+  useEntityBodies,
+  useAllPolicies,
+  useEntityDelegations,
+  useEntityFindings,
+  formatJurisdiction,
+  formatMateriality,
+  formatEntityStatus,
+} from "@/hooks/useEntities";
 import { ChevronRight, Download, Edit3, Network } from "lucide-react";
 
+const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
+  const l = formatMateriality(m);
+  return l === "Crítica" ? "critical" : l === "Alta" ? "warning" : l === "Media" ? "info" : "neutral";
+};
+
 export default function EntidadDetalle() {
-  const { id = "arga-seguros" } = useParams();
-  const entity = getEntityById(id);
+  const { id } = useParams();
+  const { data: entity, isLoading } = useEntityBySlug(id);
+  const { data: children = [] } = useEntityChildren(entity?.id);
+  const { data: parent } = useEntityParent(entity?.parent_entity_id);
+  const { data: bodies = [] } = useEntityBodies(entity?.id);
+  const { data: policies = [] } = useAllPolicies();
+  const { data: delegations = [] } = useEntityDelegations(entity?.id);
+  const { data: entityFindings = [] } = useEntityFindings(entity?.id);
+
+  if (isLoading) {
+    return <div className="p-10 text-center text-muted-foreground">Cargando…</div>;
+  }
 
   if (!entity) {
     return (
@@ -22,9 +46,8 @@ export default function EntidadDetalle() {
     );
   }
 
-  const children = getChildren(entity.id);
-  const parent = entity.parentEntityId ? getEntityById(entity.parentEntityId) : null;
-  const entityFindings = findings.filter((f) => f.entity.toLowerCase().includes(entity.commonName.toLowerCase().split(" ").pop() ?? "") || f.entity === entity.commonName);
+  const materialityLabel = formatMateriality(entity.materiality);
+  const statusLabel = formatEntityStatus(entity.entity_status);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -34,7 +57,7 @@ export default function EntidadDetalle() {
         <ChevronRight className="h-3 w-3" />
         <Link to="/entidades" className="hover:text-foreground">Entidades</Link>
         <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">{entity.legalName}</span>
+        <span className="text-foreground">{entity.legal_name}</span>
       </nav>
 
       {/* Object header */}
@@ -42,18 +65,15 @@ export default function EntidadDetalle() {
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <StatusBadgeTip label={entity.status} />
-              <StatusBadgeTip
-                label={entity.materiality}
-                tone={entity.materiality === "Crítica" ? "critical" : entity.materiality === "Alta" ? "warning" : entity.materiality === "Media" ? "info" : "neutral"}
-              />
+              <StatusBadgeTip label={statusLabel} />
+              <StatusBadgeTip label={materialityLabel} tone={matTone(entity.materiality)} />
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{entity.legalName}</h1>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{entity.legal_name}</h1>
             <div className="mt-1 text-sm text-muted-foreground">
-              {entity.jurisdiction} · <span className="font-mono text-xs">{entity.registrationNumber}</span>
+              {formatJurisdiction(entity.jurisdiction)} · <span className="font-mono text-xs">{entity.registration_number ?? "—"}</span>
             </div>
             <div className="mt-3 text-sm">
-              Secretaría: <span className="font-medium text-foreground">{entity.secretary}</span>
+              Forma legal: <span className="font-medium text-foreground">{entity.legal_form ?? "—"}</span>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -80,19 +100,35 @@ export default function EntidadDetalle() {
         <TabsContent value="resumen" className="mt-4">
           <Card className="p-6">
             <dl className="grid grid-cols-2 gap-x-12 gap-y-4 text-sm">
-              <Field k="Denominación legal" v={entity.legalName} />
-              <Field k="Nombre común" v={entity.commonName} />
-              <Field k="Jurisdicción" v={entity.jurisdiction} />
-              <Field k="Forma legal" v={entity.legalForm} />
-              <Field k="Nº registro" v={<span className="font-mono text-xs">{entity.registrationNumber}</span>} />
-              <Field k="Entidad matriz" v={parent ? <Link to={`/entidades/${parent.id}`} className="text-primary hover:underline">{parent.commonName}</Link> : "— (top-level)"} />
-              <Field k="% Participación" v={entity.ownershipPercentage != null ? `${entity.ownershipPercentage}%` : "—"} />
-              <Field k="Materialidad" v={entity.materiality} />
-              <Field k="Estado" v={entity.status} />
-              <Field k="Idioma por defecto" v="Español" />
-              <Field k="Secretario owner" v={entity.secretary} />
-              <Field k="Fecha de constitución" v="15/03/1933" />
-              <div className="col-span-2"><Field k="Domicilio social" v="Paseo de Recoletos, 25 — 28004 Madrid" /></div>
+              <Field k="Denominación legal" v={entity.legal_name} />
+              <Field k="Nombre común" v={entity.common_name} />
+              <Field k="Jurisdicción" v={formatJurisdiction(entity.jurisdiction)} />
+              <Field k="Forma legal" v={entity.legal_form ?? "—"} />
+              <Field k="Nº registro" v={<span className="font-mono text-xs">{entity.registration_number ?? "—"}</span>} />
+              <Field k="Entidad matriz" v={parent ? <Link to={`/entidades/${parent.slug}`} className="text-primary hover:underline">{parent.common_name}</Link> : "— (top-level)"} />
+              <Field k="% Participación" v={entity.ownership_percentage != null ? `${entity.ownership_percentage}%` : "—"} />
+              <Field k="Materialidad" v={materialityLabel} />
+              <Field k="Estado" v={statusLabel} />
+              <Field k="Slug" v={<span className="font-mono text-xs">{entity.slug}</span>} />
+              <div className="col-span-2">
+                <Field k="Órganos vinculados" v={
+                  bodies.length === 0
+                    ? "—"
+                    : (
+                        <div className="flex flex-wrap gap-2">
+                          {bodies.map((b) => (
+                            <Link
+                              key={b.id}
+                              to={`/organos/${b.slug}`}
+                              className="rounded-md border border-border bg-accent/40 px-2 py-1 text-xs text-foreground hover:bg-accent"
+                            >
+                              {b.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )
+                } />
+              </div>
             </dl>
           </Card>
         </TabsContent>
@@ -110,12 +146,14 @@ export default function EntidadDetalle() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {children.map((c) => (
+                {children.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin filiales directas</TableCell></TableRow>
+                ) : children.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell><Link to={`/entidades/${c.id}`} className="font-medium text-foreground hover:text-primary hover:underline">{c.legalName}</Link></TableCell>
-                    <TableCell>{c.jurisdiction}</TableCell>
-                    <TableCell>{c.ownershipPercentage != null ? `${c.ownershipPercentage}%` : "—"}</TableCell>
-                    <TableCell><StatusBadge label={c.materiality} tone={c.materiality === "Crítica" ? "critical" : c.materiality === "Alta" ? "warning" : c.materiality === "Media" ? "info" : "neutral"} /></TableCell>
+                    <TableCell><Link to={`/entidades/${c.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">{c.legal_name}</Link></TableCell>
+                    <TableCell>{formatJurisdiction(c.jurisdiction)}</TableCell>
+                    <TableCell>{c.ownership_percentage != null ? `${c.ownership_percentage}%` : "—"}</TableCell>
+                    <TableCell><StatusBadge label={formatMateriality(c.materiality)} tone={matTone(c.materiality)} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -138,12 +176,12 @@ export default function EntidadDetalle() {
               </TableHeader>
               <TableBody>
                 {policies.map((p) => (
-                  <TableRow key={p.code}>
-                    <TableCell className="font-mono text-xs">{p.code}</TableCell>
+                  <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs">{p.policy_code}</TableCell>
                     <TableCell>{p.title}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.owner}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.owner_function ?? "—"}</TableCell>
                     <TableCell><StatusBadge label={p.status} /></TableCell>
-                    <TableCell className="font-mono text-xs">{p.nextReview ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">{p.next_review_date ?? "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -152,14 +190,40 @@ export default function EntidadDetalle() {
         </TabsContent>
 
         <TabsContent value="delegaciones" className="mt-4">
-          <Card className="p-8 text-center text-sm text-muted-foreground">
-            Delegaciones vigentes otorgadas por esta entidad — módulo Delegaciones se habilitará en la siguiente iteración.
+          <Card>
+            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Delegaciones ({delegations.length})</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-24">Código</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Inicio</TableHead>
+                  <TableHead>Fin</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {delegations.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Sin delegaciones asociadas</TableCell></TableRow>
+                ) : delegations.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-mono text-xs">
+                      <Link to={`/delegaciones/${d.slug}`} className="text-primary hover:underline">{d.code}</Link>
+                    </TableCell>
+                    <TableCell>{d.delegation_type}</TableCell>
+                    <TableCell className="font-mono text-xs">{d.start_date ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">{d.end_date ?? "—"}</TableCell>
+                    <TableCell><StatusBadge label={d.status} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
         </TabsContent>
 
         <TabsContent value="hallazgos" className="mt-4">
           <Card>
-            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Hallazgos vinculados</div>
+            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Hallazgos vinculados ({entityFindings.length})</div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -173,41 +237,25 @@ export default function EntidadDetalle() {
               <TableBody>
                 {entityFindings.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Sin hallazgos asociados</TableCell></TableRow>
-                ) : (
-                  entityFindings.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-mono text-xs">{f.id}</TableCell>
-                      <TableCell>{f.title}</TableCell>
-                      <TableCell><StatusBadge label={f.severity} /></TableCell>
-                      <TableCell><StatusBadge label={f.status} /></TableCell>
-                      <TableCell className="font-mono text-xs">{f.dueDate}</TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ) : entityFindings.map((f) => (
+                  <TableRow key={f.id}>
+                    <TableCell className="font-mono text-xs">
+                      <Link to={`/hallazgos/${f.code}`} className="text-primary hover:underline">{f.code}</Link>
+                    </TableCell>
+                    <TableCell>{f.title}</TableCell>
+                    <TableCell><StatusBadge label={f.severity} /></TableCell>
+                    <TableCell><StatusBadge label={f.status} /></TableCell>
+                    <TableCell className="font-mono text-xs">{f.due_date ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </Card>
         </TabsContent>
 
         <TabsContent value="auditoria" className="mt-4">
-          <Card className="p-6">
-            <ul className="space-y-4">
-              {[
-                { date: "15/03/2026", actor: "D. Antonio Ríos Valverde", action: "Aprobó nuevo Reglamento del Comité de Riesgos" },
-                { date: "10/03/2026", actor: "Dña. Lucía Paredes Vega", action: "Actualizó datos de Secretaría" },
-                { date: "20/02/2026", actor: "Sistema", action: "Sincronización con Registro Mercantil" },
-                { date: "01/01/2026", actor: "Dña. Lucía Paredes Vega", action: "Marcó la entidad como Materialidad Crítica" },
-              ].map((e, i) => (
-                <li key={i} className="flex items-start gap-4">
-                  <div className="font-mono text-xs text-muted-foreground w-24 shrink-0">{e.date}</div>
-                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  <div className="flex-1 text-sm">
-                    <div className="text-foreground">{e.action}</div>
-                    <div className="text-xs text-muted-foreground">por {e.actor}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            Trazabilidad de cambios — pendiente de habilitar.
           </Card>
         </TabsContent>
       </Tabs>
