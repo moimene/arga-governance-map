@@ -28,7 +28,7 @@ export function NotificationsBell() {
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="h-5 w-5 text-muted-foreground" />
@@ -50,7 +50,7 @@ export function NotificationsBell() {
             return (
               <button
                 key={n.id}
-                onClick={() => open(n)}
+                onClick={() => handleOpen(n)}
                 className={cn(
                   "flex w-full items-start gap-3 border-b border-border/60 px-4 py-3 text-left hover:bg-accent/50",
                   !n.read ? "bg-accent/20" : "bg-card",
