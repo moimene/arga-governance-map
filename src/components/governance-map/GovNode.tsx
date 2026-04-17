@@ -1,8 +1,8 @@
 import { Handle, Position, NodeProps } from "@xyflow/react";
-import { Building, Users, User, FileText, Scale, AlertTriangle, type LucideIcon } from "lucide-react";
+import { Building, Users, User, FileText, Scale, AlertTriangle, ShieldCheck, KeyRound, Lock, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type GovNodeType = "entity" | "organ" | "person" | "policy" | "obligation" | "finding";
+export type GovNodeType = "entity" | "organ" | "person" | "policy" | "obligation" | "finding" | "control" | "delegation" | "sii";
 
 export interface GovNodeData extends Record<string, unknown> {
   label: string;
