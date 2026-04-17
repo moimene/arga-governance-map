@@ -4,26 +4,29 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ShellLayout } from "@/components/shell/ShellLayout";
-import {
-  Dashboard,
-  GovernanceMap,
-  EntidadesList,
-  EntityDetail,
-  OrganosList,
-  OrganoDetail,
-  MeetingDetail,
-  PoliticasList,
-  PoliticaDetail,
-  ObligacionesList,
-  ObligacionDetail,
-  DelegacionesList,
-  DelegacionDetail,
-  HallazgosList,
-  HallazgoDetail,
-  Conflictos,
-  SII,
-  Documentacion,
-} from "@/pages/tgms/Placeholders";
+import { TourProvider } from "@/context/TourContext";
+import { ScopeProvider } from "@/context/ScopeContext";
+import Dashboard from "@/pages/Dashboard";
+import GovernanceMap from "@/pages/GovernanceMap";
+import EntidadesList from "@/pages/EntidadesList";
+import EntidadDetalle from "@/pages/EntidadDetalle";
+import OrganosList from "@/pages/OrganosList";
+import OrganoDetalle from "@/pages/OrganoDetalle";
+import ReunionDetalle from "@/pages/ReunionDetalle";
+import PoliticasList from "@/pages/PoliticasList";
+import PoliticaDetalle from "@/pages/PoliticaDetalle";
+import ObligacionesList from "@/pages/ObligacionesList";
+import ObligacionDetalle from "@/pages/ObligacionDetalle";
+import DelegacionesList from "@/pages/DelegacionesList";
+import DelegacionDetalle from "@/pages/DelegacionDetalle";
+import HallazgosList from "@/pages/HallazgosList";
+import HallazgoDetalle from "@/pages/HallazgoDetalle";
+import Conflictos from "@/pages/Conflictos";
+import SiiDashboard from "@/pages/sii/SiiDashboard";
+import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
+import Login from "@/pages/Login";
+import Documentacion from "@/pages/Documentacion";
+import Notificaciones from "@/pages/Notificaciones";
 
 const queryClient = new QueryClient();
 
@@ -33,28 +36,35 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route element={<ShellLayout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/governance-map" element={<GovernanceMap />} />
-            <Route path="/entidades" element={<EntidadesList />} />
-            <Route path="/entidades/:id" element={<EntityDetail />} />
-            <Route path="/organos" element={<OrganosList />} />
-            <Route path="/organos/:id" element={<OrganoDetail />} />
-            <Route path="/organos/:id/:meetingId" element={<MeetingDetail />} />
-            <Route path="/politicas" element={<PoliticasList />} />
-            <Route path="/politicas/:id" element={<PoliticaDetail />} />
-            <Route path="/obligaciones" element={<ObligacionesList />} />
-            <Route path="/obligaciones/:id" element={<ObligacionDetail />} />
-            <Route path="/delegaciones" element={<DelegacionesList />} />
-            <Route path="/delegaciones/:id" element={<DelegacionDetail />} />
-            <Route path="/hallazgos" element={<HallazgosList />} />
-            <Route path="/hallazgos/:id" element={<HallazgoDetail />} />
-            <Route path="/conflictos" element={<Conflictos />} />
-            <Route path="/sii" element={<SII />} />
-            <Route path="/documentacion" element={<Documentacion />} />
-          </Route>
-        </Routes>
+        <ScopeProvider>
+          <TourProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route element={<ShellLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/governance-map" element={<GovernanceMap />} />
+                <Route path="/entidades" element={<EntidadesList />} />
+                <Route path="/entidades/:id" element={<EntidadDetalle />} />
+                <Route path="/organos" element={<OrganosList />} />
+                <Route path="/organos/:id" element={<OrganoDetalle />} />
+                <Route path="/organos/:id/reuniones/:meetingId" element={<ReunionDetalle />} />
+                <Route path="/politicas" element={<PoliticasList />} />
+                <Route path="/politicas/:id" element={<PoliticaDetalle />} />
+                <Route path="/obligaciones" element={<ObligacionesList />} />
+                <Route path="/obligaciones/:id" element={<ObligacionDetalle />} />
+                <Route path="/delegaciones" element={<DelegacionesList />} />
+                <Route path="/delegaciones/:slug" element={<DelegacionDetalle />} />
+                <Route path="/hallazgos" element={<HallazgosList />} />
+                <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
+                <Route path="/conflictos" element={<Conflictos />} />
+                <Route path="/sii" element={<SiiDashboard />} />
+                <Route path="/sii/:id" element={<SiiCaseDetalle />} />
+                <Route path="/documentacion" element={<Documentacion />} />
+                <Route path="/notificaciones" element={<Notificaciones />} />
+              </Route>
+            </Routes>
+          </TourProvider>
+        </ScopeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
