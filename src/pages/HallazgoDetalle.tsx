@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadgeTip } from "@/components/StatusBadgeTip";
 import { WorkflowStepper } from "@/components/WorkflowStepper";
 import { Button } from "@/components/ui/button";
 import { findings } from "@/data/findings";
@@ -33,7 +34,7 @@ export default function HallazgoDetalle() {
         title={finding.title}
         badges={
           <>
-            <StatusBadge label={finding.severity} tone="critical" pulse={finding.severity === "CRÍTICA"} />
+            <span className="tour-target" data-tour="finding-badge"><StatusBadgeTip label={finding.severity} tone="critical" pulse={finding.severity === "CRÍTICA"} /></span>
             <StatusBadge label={finding.status} />
             <StatusBadge label={finding.origin} tone="neutral" />
           </>

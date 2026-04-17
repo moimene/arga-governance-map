@@ -87,7 +87,7 @@ export default function PoliticaDetalle() {
       />
 
       {isPR008 && (
-        <div className="mt-6">
+        <div className="mt-6 tour-target" data-tour="policy-stepper">
           <WorkflowStepper
             steps={WORKFLOW_STEPS}
             current={5}
