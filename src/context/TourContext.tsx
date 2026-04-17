@@ -221,6 +221,24 @@ export const tourSteps: TourStep[] = [
     highlightId: "tour-sii-header",
     available: true,
   },
+  {
+    module: "ESG",
+    route: "/esg",
+    title: "Sostenibilidad e impacto: las tres dimensiones ESG",
+    description:
+      "El módulo ESG agrega métricas Environmental, Social y Governance del Grupo en un solo cuadro de mando. Conecta los datos del propio sistema (hallazgos, conflictos, delegaciones caducadas) como indicadores objetivos de gobierno corporativo — no es una declaración, es una medición.",
+    bullets: [
+      "Pestaña Environmental: emisiones GEI Scope 1/2/3, evolución 2020–2024 y rating ESG por entidad.",
+      "Pestaña Social: diversidad de género en consejos (objetivo ≥40%), brecha salarial y formación en compliance por entidad.",
+      "Pestaña Governance: hallazgos críticos, conflictos no declarados y delegaciones caducadas con enlaces directos a su detalle.",
+    ],
+    badges: [
+      { label: "Score ESG 66", tone: "info" },
+      { label: "Net Zero 2050", tone: "neutral" },
+      { label: "DEL-001 caducada", tone: "critical" },
+    ],
+    available: true,
+  },
 ];
 
 interface TourContextValue {
