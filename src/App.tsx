@@ -32,6 +32,9 @@ import { SiiLayout } from "@/pages/sii/SiiLayout";
 import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
+import GrcDashboard from "@/pages/modules/GrcDashboard";
+import SecretariaDashboard from "@/pages/modules/SecretariaDashboard";
+import AimsDashboard from "@/pages/modules/AimsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +51,9 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/grc" element={<GrcDashboard />} />
+                  <Route path="/secretaria" element={<SecretariaDashboard />} />
+                  <Route path="/aims" element={<AimsDashboard />} />
                   <Route path="/governance-map" element={<GovernanceMap />} />
                   <Route path="/entidades" element={<EntidadesList />} />
                   <Route path="/entidades/:id" element={<EntidadDetalle />} />

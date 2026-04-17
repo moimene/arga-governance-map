@@ -151,6 +151,14 @@ export function Sidebar() {
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 scrollbar-thin">
           {top.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
 
+          {!collapsed && (
+            <div className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-widest text-sidebar-muted">
+              Módulos
+            </div>
+          )}
+          {collapsed && <div className="my-2 mx-3 border-t border-sidebar-border" />}
+          {modules.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+
           <div className="my-2 mx-3 border-t border-sidebar-border" />
           {sii.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
           <div className="my-2 mx-3 border-t border-sidebar-border" />
