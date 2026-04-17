@@ -310,9 +310,16 @@ export default function GovernanceMap() {
                   if (!href) return null;
                   const label = t === "sii" ? "Acceder al caso (zona SII)" : "Ver ficha completa";
                   return (
-                    <Button asChild className="w-full gap-1.5">
-                      <Link to={href}>{label} <ArrowRight className="h-4 w-4" /></Link>
-                    </Button>
+                    <div className="space-y-3">
+                      {t === "sii" && (
+                        <div className="rounded-md border border-status-warning/40 bg-status-warning-bg px-3 py-2 text-xs text-status-warning-foreground">
+                          ⚠ Al acceder se registrará en el log de auditoría independiente.
+                        </div>
+                      )}
+                      <Button asChild className="w-full gap-1.5">
+                        <Link to={href}>{label} <ArrowRight className="h-4 w-4" /></Link>
+                      </Button>
+                    </div>
                   );
                 })()}
               </div>
