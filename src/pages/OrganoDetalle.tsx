@@ -6,25 +6,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { getBodyById } from "@/data/bodies";
+import { useBodyBySlug, useBodyMandates, useBodyMeetings, formatDate, formatTime } from "@/hooks/useBodies";
 import { getRegulationById } from "@/data/regulations";
-import { cdaMembers, getMeetingsByBody } from "@/data/meetings";
-import { getEntityById } from "@/data/entities";
-import { people } from "@/data/people";
 import { AlertTriangle, CalendarPlus, Download, Network, Plus, UserPlus } from "lucide-react";
 
 export default function OrganoDetalle() {
-  const { id = "consejo-administracion" } = useParams();
-  const body = getBodyById(id);
+  const { id = "" } = useParams();
+  const { data: body, isLoading } = useBodyBySlug(id);
+  const { data: members = [] } = useBodyMandates(body?.id);
+  const { data: bodyMeetings = [] } = useBodyMeetings(body?.id);
+
+  if (isLoading) {
+    return <div className="p-10 text-center text-sm text-muted-foreground">Cargando…</div>;
+  }
   if (!body) {
     return <div className="p-10 text-center text-sm text-muted-foreground">Órgano no encontrado. <Link to="/organos" className="text-primary underline">Volver</Link></div>;
   }
-  const entity = getEntityById(body.entityId);
-  const regulation = body.regulationId ? getRegulationById(body.regulationId) : null;
-  const bodyMeetings = getMeetingsByBody(body.id);
-  const isCda = body.id === "consejo-administracion";
-  const members = isCda ? cdaMembers : [];
-  const alertCount = members.filter((m) => m.status !== "VIGENTE").length;
+  const entity: any = (body as any).entity ?? null;
+  const regulation = body.regulation_id ? getRegulationById(body.regulation_id) : null;
+  const alertCount = members.filter((m) => m.status && m.status !== "Activo" && m.status !== "VIGENTE").length;
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -35,13 +35,13 @@ export default function OrganoDetalle() {
           <>
             <StatusBadge label={body.status === "Activo" ? "ACTIVO" : "INACTIVO"} tone={body.status === "Activo" ? "active" : "neutral"} />
             <StatusBadge label="Grupo" tone="neutral" />
-            {entity && <StatusBadge label={entity.legalName} tone="info" />}
+            {entity && <StatusBadge label={entity.legal_name ?? entity.common_name} tone="info" />}
           </>
         }
         metadata={
-          <>Reglamento: <span className="font-mono text-xs">{body.regulationId ?? "—"}</span> · Quórum: {body.quorum} · Frecuencia: {body.frequency}</>
+          <>Reglamento: <span className="font-mono text-xs">{body.regulation_id ?? "—"}</span> · Quórum: {body.quorum ?? "—"} · Frecuencia: {body.frequency ?? "—"}</>
         }
-        owner={<>Secretaría: <span className="font-medium text-foreground">{body.secretary}</span></>}
+        owner={<>Secretaría: <span className="font-medium text-foreground">{body.secretary ?? "—"}</span></>}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5"><CalendarPlus className="h-3.5 w-3.5" />Nueva reunión</Button>
@@ -51,12 +51,12 @@ export default function OrganoDetalle() {
         }
       />
 
-      {isCda && alertCount > 0 && (
+      {alertCount > 0 && (
         <div className="mt-4 tour-target flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4" data-tour="organ-banner">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div className="flex-1">
             <div className="text-sm font-semibold text-status-warning">{alertCount} mandatos vencidos o próximos a vencer en este órgano</div>
-            <div className="mt-0.5 text-xs text-status-warning/80">Acción requerida antes del 30/04/2026.</div>
+            <div className="mt-0.5 text-xs text-status-warning/80">Acción requerida.</div>
           </div>
           <Button size="sm" variant="outline" className="border-status-warning/40 text-status-warning hover:bg-status-warning/10">Ver mandatos</Button>
         </div>
@@ -76,7 +76,7 @@ export default function OrganoDetalle() {
               <div className="text-sm font-semibold">Miembros ({members.length})</div>
               <Button size="sm" variant="outline" className="gap-1.5"><UserPlus className="h-3.5 w-3.5" />Añadir miembro</Button>
             </div>
-            {isCda ? (
+            {members.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -89,23 +89,20 @@ export default function OrganoDetalle() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {members.map((m) => {
-                    const p = people.find((x) => x.id === m.personId);
-                    return (
-                      <TableRow key={m.personId}>
-                        <TableCell className="font-medium">{p?.name}</TableCell>
-                        <TableCell className="text-sm">{m.role}</TableCell>
-                        <TableCell className="text-sm">{m.type}</TableCell>
-                        <TableCell className="font-mono text-xs">{m.mandateStart ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{m.mandateEnd ?? "—"}</TableCell>
-                        <TableCell><StatusBadge label={m.status} /></TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {members.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium">{m.full_name ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{m.role ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{m.type ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatDate(m.start_date)}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatDate(m.end_date)}</TableCell>
+                      <TableCell><StatusBadge label={m.status ?? "—"} /></TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-10 text-center text-sm text-muted-foreground">Composición disponible en módulo extendido.</div>
+              <div className="p-10 text-center text-sm text-muted-foreground">Sin miembros registrados.</div>
             )}
           </Card>
         </TabsContent>
@@ -123,19 +120,19 @@ export default function OrganoDetalle() {
                   <TableHead>Hora</TableHead>
                   <TableHead>Modalidad</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Acuerdos</TableHead>
                   <TableHead>Acta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bodyMeetings.map((m) => (
+                {bodyMeetings.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Sin reuniones</TableCell></TableRow>
+                ) : bodyMeetings.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell><Link to={`/organos/${body.id}/reuniones/${m.id}`} className="font-mono text-xs text-primary hover:underline">{m.date}</Link></TableCell>
-                    <TableCell className="font-mono text-xs">{m.time}</TableCell>
-                    <TableCell className="text-sm">{m.modality}</TableCell>
-                    <TableCell><StatusBadge label={m.status} /></TableCell>
-                    <TableCell className="text-sm">{m.agreements?.length ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{m.minutesStatus === "FIRMADA" ? <span className="text-status-active">Firmada</span> : "—"}</TableCell>
+                    <TableCell><Link to={`/organos/${body.slug}/reuniones/${m.slug}`} className="font-mono text-xs text-primary hover:underline">{formatDate(m.scheduled_start)}</Link></TableCell>
+                    <TableCell className="font-mono text-xs">{formatTime(m.scheduled_start)}</TableCell>
+                    <TableCell className="text-sm">{m.modality ?? "—"}</TableCell>
+                    <TableCell><StatusBadge label={m.status ?? "—"} /></TableCell>
+                    <TableCell className="text-sm">{m.minutes_status === "FIRMADA" ? <span className="text-status-active">Firmada</span> : "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -177,25 +174,7 @@ export default function OrganoDetalle() {
         </TabsContent>
 
         <TabsContent value="historial" className="mt-4">
-          <Card className="p-6">
-            <ul className="space-y-4">
-              {[
-                { date: "15/01/2024", actor: "Junta General", action: "REG-001 aprobado en versión 3.2" },
-                { date: "01/03/2024", actor: "Junta General", action: "Nombramiento Dña. Isabel Moreno como Consejera Dominical" },
-                { date: "01/09/2023", actor: "Junta General", action: "Inicio mandato D. Ricardo Vega como Consejero Ejecutivo" },
-                { date: "30/06/2025", actor: "Sistema", action: "Vencimiento mandato Dña. Carmen Delgado — sin renovación formal", alert: true },
-              ].map((e, i) => (
-                <li key={i} className="flex items-start gap-4">
-                  <div className="w-24 shrink-0 font-mono text-xs text-muted-foreground">{e.date}</div>
-                  <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${e.alert ? "bg-status-critical" : "bg-primary"}`} />
-                  <div className="flex-1 text-sm">
-                    <div className={e.alert ? "text-status-critical font-medium" : "text-foreground"}>{e.action}</div>
-                    <div className="text-xs text-muted-foreground">por {e.actor}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <Card className="p-10 text-center text-sm text-muted-foreground">Historial de auditoría disponible próximamente.</Card>
         </TabsContent>
       </Tabs>
     </div>
