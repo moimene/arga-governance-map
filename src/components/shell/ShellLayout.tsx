@@ -275,6 +275,7 @@ export function ShellLayout() {
           <Outlet />
         </main>
       </div>
+      <TourPanel />
     </div>
   );
 }
