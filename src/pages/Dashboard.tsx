@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
+import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
@@ -19,7 +21,7 @@ import {
   ArrowRight,
   CheckCircle,
 } from "lucide-react";
-import { upcomingMeetings, personalTasks, recentActivity } from "@/data/dashboard";
+import { personalTasks, recentActivity } from "@/data/dashboard";
 import { scopeData } from "@/data/scopeData";
 import { esgGroupScore, esgTotals } from "@/data/esg";
 import { socialAverages } from "@/data/esgSocial";
@@ -31,10 +33,25 @@ export default function Dashboard() {
   const { start, step, completed } = useTour();
   const { scope } = useScope();
   const data = scopeData[scope];
+  const navigate = useNavigate();
+
+  const { data: kpis } = useDashboardKpis();
+  const { data: alerts = [] } = useDashboardAlerts();
+  const { data: meetings = [] } = useUpcomingMeetings();
 
   // Animate KPIs on scope change
   const [animKey, setAnimKey] = useState(0);
   useEffect(() => { setAnimKey((k) => k + 1); }, [scope]);
+
+  const alertTone = (t: string): "critical" | "warning" =>
+    t === "error" ? "critical" : "warning";
+  const alertDot = (t: string) =>
+    t === "error" ? "bg-destructive" : t === "warning" ? "bg-status-warning" : "bg-primary";
+  const alertLabel = (t: string) =>
+    t === "error" ? "CRÍTICA" : t === "warning" ? "ALERTA" : "INFO";
+
+  const fmtMeetingDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
 
