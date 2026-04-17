@@ -132,7 +132,7 @@ export function Sidebar() {
     <button
       onClick={start}
       className={cn(
-        "group relative flex w-full items-center gap-3 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20",
+        "group relative flex w-full items-center gap-3 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover",
         collapsed && "justify-center px-0",
       )}
     >
@@ -172,7 +172,7 @@ export function Sidebar() {
         {/* Help & Onboarding — destacado, separado en la parte inferior */}
         <div className="border-t border-sidebar-border bg-sidebar/60 px-2 py-3">
           {!collapsed && (
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-primary/70">
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground-active/80">
               Ayuda y Onboarding
             </div>
           )}
