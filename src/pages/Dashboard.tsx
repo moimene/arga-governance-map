@@ -233,6 +233,40 @@ export default function Dashboard() {
           </ul>
         </Card>
       </div>
+
+      {/* ESG mini-summary */}
+      <div className="mt-6">
+        <Card className="overflow-hidden border-l-4 border-l-status-active">
+          <Link to="/esg" className="group flex items-center justify-between gap-6 px-5 py-4 hover:bg-accent/40">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-active/10">
+                <Leaf className="h-5 w-5 text-status-active" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground group-hover:underline">ESG — Sostenibilidad e Impacto</h2>
+                <p className="text-xs text-muted-foreground">Métricas Environmental, Social y Governance del Grupo.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-8">
+              <div className="text-right">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Score ESG</div>
+                <div className="text-2xl font-bold tabular-nums text-status-active">{esgGroupScore}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Scope 1+2 (tCO₂e)</div>
+                <div className="text-2xl font-bold tabular-nums text-status-warning">
+                  {(esgTotals.scope1 + esgTotals.scope2).toLocaleString("es-ES")}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mujeres en Consejos</div>
+                <div className="text-2xl font-bold tabular-nums text-primary">{socialAverages.boardWomenPct}%</div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+        </Card>
+      </div>
     </div>
   );
 }
