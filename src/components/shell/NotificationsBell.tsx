@@ -70,7 +70,15 @@ export function NotificationsBell() {
           <button onClick={markAll} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
             <CheckCheck className="h-3.5 w-3.5" /> Marcar todas como leídas
           </button>
-          <button className="text-xs font-medium text-muted-foreground hover:text-primary">Ver todas las notificaciones</button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              navigate("/notificaciones");
+            }}
+            className="text-xs font-medium text-muted-foreground hover:text-primary"
+          >
+            Ver todas las notificaciones
+          </button>
         </div>
       </PopoverContent>
     </Popover>
