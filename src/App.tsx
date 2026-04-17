@@ -30,7 +30,8 @@ import Conflictos from "./pages/Conflictos";
 import { SiiLayout } from "./pages/sii/SiiLayout";
 import SiiDashboard from "./pages/sii/SiiDashboard";
 import SiiCaseDetalle from "./pages/sii/SiiCaseDetalle";
-import { Admin, Dashboards, Esg } from "./pages/Placeholders";
+import { Admin, Dashboards } from "./pages/Placeholders";
+import Esg from "./pages/Esg";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
