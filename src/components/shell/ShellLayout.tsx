@@ -9,8 +9,9 @@ import {
   GitBranch,
   AlertTriangle,
   AlertOctagon,
-  ShieldCheck,
+  Compass,
   ClipboardList,
+  Brain,
   BookOpen,
   Sparkles,
   Search,
@@ -41,9 +42,12 @@ const govItems: NavItem[] = [
 ];
 
 const moduleItems: NavItem[] = [
-  { label: "GRC Compass", to: "/sii", icon: ShieldCheck, module: true },
-  { label: "Secretaría", to: "/documentacion", icon: ClipboardList, module: true },
+  { label: "GRC Compass", to: "/grc", icon: Compass, module: true },
+  { label: "Secretaría", to: "/secretaria", icon: ClipboardList, module: true },
+  { label: "AIms", to: "/aims", icon: Brain, module: true },
 ];
+
+const siiItem: NavItem = { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon };
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -55,8 +59,11 @@ const pageTitles: Record<string, string> = {
   "/delegaciones": "Delegaciones",
   "/hallazgos": "Hallazgos",
   "/conflictos": "Conflictos",
-  "/sii": "GRC Compass",
-  "/documentacion": "Secretaría",
+  "/grc": "GRC Compass",
+  "/secretaria": "Secretaría",
+  "/aims": "AIms",
+  "/sii": "SII — Canal Interno",
+  "/documentacion": "Documentación",
 };
 
 function NavRow({ item }: { item: NavItem }) {
@@ -188,8 +195,14 @@ export function ShellLayout() {
 
         {/* Módulos */}
         <SectionLabel>Módulos</SectionLabel>
-        <nav className="space-y-[1px]">
+        <nav className="space-y-[1px] mb-3">
           {moduleItems.map((it) => <NavRow key={it.to} item={it} />)}
+        </nav>
+
+        {/* SII — zona segregada */}
+        <SectionLabel>Canal interno</SectionLabel>
+        <nav className="space-y-[1px]">
+          <NavRow item={siiItem} />
         </nav>
 
         {/* Spacer empuja la sección de ayuda al final */}
