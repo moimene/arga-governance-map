@@ -55,7 +55,7 @@ export function SiiAccessGate({ children }: { children: React.ReactNode }) {
 
 export function SiiHeader() {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-sii-border bg-sii-foreground px-5 text-white">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-sii-border bg-sii-foreground px-5 text-white tour-target" data-tour="sii-header">
       <Shield className="h-5 w-5" />
       <div className="text-sm font-semibold">SII — Sistema Interno de Información · Canal de Denuncias Confidencial · Grupo ARGA Seguros</div>
       <div className="ml-auto inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-semibold">

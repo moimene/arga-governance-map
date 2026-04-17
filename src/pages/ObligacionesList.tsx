@@ -69,7 +69,7 @@ export default function ObligacionesList() {
         <Kpi label="Sin control asignado" value={kpis.sin} icon={XCircle} tone="critical" />
       </div>
 
-      <div className="mb-5 flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4">
+      <div className="mb-5 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="obl-banner">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
         <div className="flex-1 text-sm">
           <div className="font-semibold text-status-critical">OBL-DORA-003 no tiene ningún control asignado</div>

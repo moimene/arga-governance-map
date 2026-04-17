@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadgeTip } from "@/components/StatusBadgeTip";
 import { entities, getChildren, getEntityById } from "@/data/entities";
 import { policies } from "@/data/policies";
 import { findings } from "@/data/findings";
@@ -37,12 +38,12 @@ export default function EntidadDetalle() {
       </nav>
 
       {/* Object header */}
-      <Card className="p-6">
+      <Card className="p-6 tour-target" data-tour="entity-header">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <StatusBadge label={entity.status} />
-              <StatusBadge
+              <StatusBadgeTip label={entity.status} />
+              <StatusBadgeTip
                 label={entity.materiality}
                 tone={entity.materiality === "Crítica" ? "critical" : entity.materiality === "Alta" ? "warning" : entity.materiality === "Media" ? "info" : "neutral"}
               />
