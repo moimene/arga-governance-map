@@ -3,14 +3,23 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { KpiCard } from "@/components/KpiCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { siiCases } from "@/data/sii";
-import { AlertOctagon, Archive, FolderOpen } from "lucide-react";
+import { useSiiCasesList } from "@/hooks/useSii";
+import { AlertOctagon, Archive, FolderOpen, Loader2 } from "lucide-react";
 
 export default function SiiDashboard() {
-  const active = siiCases.filter((c) => !c.status.startsWith("CERRADO")).length;
-  const closed = siiCases.length - active;
+  const { data: cases = [], isLoading } = useSiiCasesList();
 
-  const toneFor = (s: string) => s.startsWith("EN INVESTIGACIÓN") ? "info" : s.startsWith("EN ANÁLISIS") ? "warning" : s.startsWith("CERRADO") ? "neutral" : "neutral";
+  const isClosed = (s: string | null) => !!s && s.toUpperCase().startsWith("CERRAD");
+  const active = cases.filter((c) => !isClosed(c.status)).length;
+  const closed = cases.length - active;
+
+  const toneFor = (s: string | null) => {
+    const v = (s ?? "").toUpperCase();
+    if (v.startsWith("EN INVESTIGAC")) return "info";
+    if (v.startsWith("EN ANÁLISIS") || v.startsWith("EN ANALISIS")) return "warning";
+    if (v.startsWith("CERRAD")) return "neutral";
+    return "neutral";
+  };
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -27,25 +36,45 @@ export default function SiiDashboard() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
+              <TableHead>Referencia</TableHead>
               <TableHead>Recibido</TableHead>
               <TableHead>Canal</TableHead>
-              <TableHead>Categoría</TableHead>
+              <TableHead>Clasificación</TableHead>
+              <TableHead>País</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Investigador</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {siiCases.map((c) => (
+            {isLoading && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading && cases.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  No hay casos registrados.
+                </TableCell>
+              </TableRow>
+            )}
+            {cases.map((c) => (
               <TableRow key={c.id} className="cursor-pointer">
                 <TableCell className="font-mono text-xs font-semibold">
-                  <Link to={`/sii/${c.id}`} className="text-sii-foreground hover:underline">{c.id}</Link>
+                  <Link to={`/sii/${c.display_id}`} className="text-sii-foreground hover:underline">
+                    {c.display_id}
+                  </Link>
                 </TableCell>
-                <TableCell className="text-sm">{c.receivedDate}</TableCell>
-                <TableCell className="text-sm">{c.channel}</TableCell>
-                <TableCell className="text-sm">{c.category}</TableCell>
-                <TableCell><StatusBadge label={c.status} tone={toneFor(c.status) as any} /></TableCell>
-                <TableCell className="text-sm">{c.investigator}</TableCell>
+                <TableCell className="text-sm">{c.received_date ?? "—"}</TableCell>
+                <TableCell className="text-sm">{c.channel ?? "—"}</TableCell>
+                <TableCell className="text-sm">{c.classification ?? c.category ?? "—"}</TableCell>
+                <TableCell className="text-sm">{c.country ?? "—"}</TableCell>
+                <TableCell>
+                  <StatusBadge label={c.status ?? "—"} tone={toneFor(c.status) as any} />
+                </TableCell>
+                <TableCell className="text-sm">{c.investigator_name ?? "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
