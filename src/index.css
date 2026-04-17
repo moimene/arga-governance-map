@@ -2,104 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* TGMS Design System — Grupo ARGA Seguros
+   All colors HSL. Tokens map to the spec palette. */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base surfaces */
+    --background: 210 40% 98%;            /* #f8fafc */
+    --foreground: 222 47% 11%;            /* #0f172a */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Brand */
+    --primary: 224 76% 48%;               /* #1d4ed8 */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 226 71% 40%;         /* #1e40af */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;      /* #64748b */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 214 95% 93%;
+    --accent-foreground: 224 76% 48%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;             /* #dc2626 */
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 32% 91%;                /* #e2e8f0 */
+    --input: 214 32% 91%;
+    --ring: 224 76% 48%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Sidebar (dark) */
+    --sidebar-background: 217 33% 17%;    /* #1e293b */
+    --sidebar-foreground: 215 20% 73%;    /* #94a3b8 */
+    --sidebar-foreground-active: 0 0% 100%;
+    --sidebar-hover: 215 25% 27%;         /* #334155 */
+    --sidebar-active: 215 25% 27%;
+    --sidebar-border: 215 28% 22%;
+    --sidebar-muted: 215 19% 35%;         /* #475569 */
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Status palette — pairs of solid + soft bg */
+    --status-active: 142 71% 36%;         /* #16a34a vigente */
+    --status-active-bg: 138 76% 96%;      /* #f0fdf4 */
 
-    --sidebar-primary: 240 5.9% 10%;
+    --status-warning: 32 95% 44%;         /* #d97706 ámbar */
+    --status-warning-bg: 48 100% 96%;     /* #fffbeb */
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --status-critical: 0 72% 51%;         /* #dc2626 */
+    --status-critical-bg: 0 86% 97%;      /* #fef2f2 */
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    --status-archived: 220 9% 46%;        /* #6b7280 */
+    --status-archived-bg: 220 14% 96%;    /* #f9fafb */
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --status-pending: 239 84% 60%;        /* #4f46e5 índigo */
+    --status-pending-bg: 226 100% 97%;    /* #eef2ff */
 
-    --sidebar-border: 220 13% 91%;
+    --status-draft: 220 9% 46%;
+    --status-draft-bg: 220 14% 96%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+    /* SII zone */
+    --sii-bg: 48 100% 96%;                /* #fffbeb */
+    --sii-border: 38 92% 50%;             /* #f59e0b */
+    --sii-foreground: 26 81% 17%;         /* #78350f */
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Footer */
+    --footer-bg: 210 40% 96%;             /* #f1f5f9 */
+    --footer-foreground: 215 16% 47%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+
+  html, body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .sii-zone {
+    background-color: hsl(var(--sii-bg));
+    border-left: 4px solid hsl(var(--sii-border));
+  }
+
+  .pulse-ring {
+    box-shadow: 0 0 0 0 hsl(var(--status-critical) / 0.6);
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--status-critical) / 0.5); }
+    50%      { box-shadow: 0 0 0 6px hsl(var(--status-critical) / 0); }
+  }
+
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 }
