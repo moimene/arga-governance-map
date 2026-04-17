@@ -158,3 +158,37 @@ export function useFindingRelatedControls(obligationId: string | null | undefine
     },
   });
 }
+
+export interface ActionPlanRow {
+  id: string;
+  finding_id: string;
+  title: string;
+  responsible_id: string | null;
+  due_date: string | null;
+  status: string;
+  progress_pct: number | null;
+}
+
+export interface ActionPlanFull extends ActionPlanRow {
+  responsible_name: string | null;
+}
+
+export function useActionPlansByFinding(findingId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["actionPlans", "byFinding", findingId],
+    enabled: !!findingId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("action_plans")
+        .select("*, responsible:responsible_id(full_name)")
+        .eq("finding_id", findingId!)
+        .order("due_date", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((r: any): ActionPlanFull => ({
+        ...r,
+        responsible_name: r.responsible?.full_name ?? null,
+      }));
+    },
+  });
+}
+
