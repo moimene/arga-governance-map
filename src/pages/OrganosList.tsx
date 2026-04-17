@@ -6,21 +6,26 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { bodies } from "@/data/bodies";
-import { entities, getEntityById } from "@/data/entities";
+import { useBodiesList, formatDate } from "@/hooks/useBodies";
+import { useEntitiesList } from "@/hooks/useEntities";
 import { AlertTriangle, Plus, Users } from "lucide-react";
 
 export default function OrganosList() {
   const [entityFilter, setEntityFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const { data: bodies = [], isLoading } = useBodiesList();
+  const { data: entities = [] } = useEntitiesList();
 
   const filtered = useMemo(() =>
     bodies.filter((b) =>
-      (entityFilter === "all" || b.entityId === entityFilter) &&
-      (typeFilter === "all" || b.type === typeFilter) &&
-      (statusFilter === "all" || b.status === statusFilter)
-    ), [entityFilter, typeFilter, statusFilter]);
+      (entityFilter === "all" || b.entity_id === entityFilter) &&
+      (typeFilter === "all" || b.body_type === typeFilter) &&
+      (statusFilter === "all" || b.status === statusFilter) &&
+      (!search || b.name?.toLowerCase().includes(search.toLowerCase()))
+    ), [bodies, entityFilter, typeFilter, statusFilter, search]);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -40,7 +45,7 @@ export default function OrganosList() {
             <SelectTrigger><SelectValue placeholder="Entidad" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las entidades</SelectItem>
-              {entities.map((e) => <SelectItem key={e.id} value={e.id}>{e.commonName}</SelectItem>)}
+              {entities.map((e) => <SelectItem key={e.id} value={e.id}>{e.common_name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -61,7 +66,7 @@ export default function OrganosList() {
               <SelectItem value="Inactivo">Inactivo</SelectItem>
             </SelectContent>
           </Select>
-          <Input placeholder="Buscar órgano..." />
+          <Input placeholder="Buscar órgano..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </Card>
 
@@ -80,23 +85,27 @@ export default function OrganosList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((b) => {
-              const ent = getEntityById(b.entityId);
+            {isLoading ? (
+              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Cargando…</TableCell></TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Sin órganos</TableCell></TableRow>
+            ) : filtered.map((b) => {
+              const alerts = b.alerts_count ?? 0;
               return (
                 <TableRow key={b.id} className="cursor-pointer">
                   <TableCell>
-                    <Link to={`/organos/${b.id}`} className="font-medium text-foreground hover:text-primary hover:underline">{b.name}</Link>
+                    <Link to={`/organos/${b.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">{b.name}</Link>
                   </TableCell>
-                  <TableCell className="text-sm">{ent?.commonName ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{b.type}</TableCell>
-                  <TableCell className="font-mono text-xs">{b.regulationId ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{b.frequency}</TableCell>
-                  <TableCell className="text-sm">{b.secretary}</TableCell>
-                  <TableCell className="font-mono text-xs">{b.nextMeetingDate ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{b.entity_name ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{b.body_type}</TableCell>
+                  <TableCell className="font-mono text-xs">{b.regulation_id ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{b.frequency ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{b.secretary ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{formatDate(b.next_meeting_date)}</TableCell>
                   <TableCell>
-                    {b.alertsCount ? (
+                    {alerts > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-status-warning/30 bg-status-warning-bg px-2 py-0.5 text-[11px] font-semibold text-status-warning">
-                        <AlertTriangle className="h-3 w-3" />{b.alertsCount} mandato{b.alertsCount > 1 ? "s" : ""}
+                        <AlertTriangle className="h-3 w-3" />{alerts} mandato{alerts > 1 ? "s" : ""}
                       </span>
                     ) : <StatusBadge label={b.status === "Activo" ? "VIGENTE" : "INACTIVA"} />}
                   </TableCell>
