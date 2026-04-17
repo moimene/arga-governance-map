@@ -242,6 +242,9 @@ export default function GovernanceMap() {
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fef3c7] border border-amber-300" />Política</div>
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#dcfce7] border border-green-300" />Obligación</div>
             <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fee2e2] border border-red-300" />Hallazgo</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#cffafe] border border-cyan-300" />Control</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#ffedd5] border border-orange-300" />Delegación</div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-[#fef3c7] border border-amber-500" />Caso SII</div>
           </div>
         </Card>
       </div>
