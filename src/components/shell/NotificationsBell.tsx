@@ -13,27 +13,18 @@ const dotMap = {
   info: "bg-primary",
 } as const;
 
-const routeMap: Record<number, string> = {
-  1: "/hallazgos/HALL-008",
-  2: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
-  3: "/politicas/PR-003",
-  4: "/delegaciones/carlos-vaz-latam",
-  5: "/hallazgos/HALL-010",
-  6: "/obligaciones/OBL-DORA-003",
-  7: "/conflictos",
-};
-
 export function NotificationsBell() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Notification[]>(initialNotifications);
+  const [open, setOpen] = useState(false);
   const unread = items.filter((n) => !n.read).length;
 
   const markAll = () => setItems((prev) => prev.map((n) => ({ ...n, read: true })));
 
-  const open = (n: Notification) => {
+  const handleOpen = (n: Notification) => {
     setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-    const route = routeMap[n.id];
-    if (route) navigate(route);
+    setOpen(false);
+    navigate(n.route);
   };
 
   return (
