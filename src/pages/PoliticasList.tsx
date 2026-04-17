@@ -5,25 +5,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { policies } from "@/data/policies";
+import { usePoliciesList, policyStatusLabel } from "@/hooks/usePoliciesObligations";
 import { AlertTriangle, FileText, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const fmtDate = (d: string | null) => {
+  if (!d) return null;
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+};
 
 export default function PoliticasList() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
+  const { data: policies = [], isLoading } = usePoliciesList();
+
   const filtered = useMemo(() =>
     policies.filter((p) =>
-      (typeFilter === "all" || p.type === typeFilter) &&
+      (typeFilter === "all" || p.policy_type === typeFilter) &&
       (statusFilter === "all" || p.status === statusFilter) &&
-      (search === "" || p.title.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
-    ), [typeFilter, statusFilter, search]);
+      (search === "" || p.title.toLowerCase().includes(search.toLowerCase()) || p.policy_code.toLowerCase().includes(search.toLowerCase()))
+    ), [policies, typeFilter, statusFilter, search]);
 
-  const types = Array.from(new Set(policies.map((p) => p.type)));
+  const types = Array.from(new Set(policies.map((p) => p.policy_type).filter(Boolean) as string[]));
   const statuses = Array.from(new Set(policies.map((p) => p.status)));
+
+  // Compute attention count: in review, approval pending, or past next_review_date
+  const today = new Date().toISOString().slice(0, 10);
+  const attention = policies.filter(
+    (p) => p.status === "In Review" || p.status === "Approval Pending" ||
+           (p.next_review_date && p.next_review_date <= today)
+  );
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -32,22 +48,30 @@ export default function PoliticasList() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <FileText className="h-6 w-6 text-primary" />Políticas y Normativa
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{policies.length} políticas y normas en el catálogo del grupo</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isLoading ? "Cargando…" : `${policies.length} políticas y normas en el catálogo del grupo`}
+          </p>
         </div>
         <Button className="gap-1.5"><Plus className="h-4 w-4" />Nueva política</Button>
       </div>
 
-      <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
-        <div className="flex-1 text-sm">
-          <div className="font-semibold text-status-warning">3 políticas requieren atención inmediata</div>
-          <div className="mt-1 text-xs text-status-warning/90">
-            <Link to="/politicas/PR-003" className="hover:underline">PR-003</Link> vence 30/04/2026 ·{" "}
-            <Link to="/politicas/PR-008" className="hover:underline">PR-008</Link> pendiente aprobación Consejo 22/04 ·{" "}
-            <Link to="/politicas/PR-021" className="hover:underline">PR-021</Link> en revisión
+      {attention.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-warning">{attention.length} políticas requieren atención inmediata</div>
+            <div className="mt-1 text-xs text-status-warning/90">
+              {attention.slice(0, 3).map((p, i) => (
+                <span key={p.policy_code}>
+                  {i > 0 && " · "}
+                  <Link to={`/politicas/${p.policy_code}`} className="hover:underline">{p.policy_code}</Link>
+                  {" "}({policyStatusLabel(p.status).toLowerCase()})
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-4 gap-3">
@@ -62,7 +86,7 @@ export default function PoliticasList() {
             <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {statuses.map((s) => <SelectItem key={s} value={s}>{policyStatusLabel(s)}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select defaultValue="grupo">
@@ -91,18 +115,23 @@ export default function PoliticasList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((p) => {
-              const isPr003 = p.code === "PR-003";
+            {isLoading && Array.from({ length: 6 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell colSpan={7}><Skeleton className="h-5 w-full" /></TableCell>
+              </TableRow>
+            ))}
+            {!isLoading && filtered.map((p) => {
+              const overdue = p.next_review_date && p.next_review_date <= today;
               return (
-                <TableRow key={p.code}>
-                  <TableCell><Link to={`/politicas/${p.code}`} className="font-mono text-xs text-primary hover:underline">{p.code}</Link></TableCell>
-                  <TableCell><Link to={`/politicas/${p.code}`} className="text-sm font-medium hover:text-primary">{p.title}</Link></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{p.type}</TableCell>
-                  <TableCell className="text-sm">{p.owner}</TableCell>
-                  <TableCell><StatusBadge label={p.status} /></TableCell>
-                  <TableCell className="font-mono text-xs">{p.effectiveDate ?? "—"}</TableCell>
-                  <TableCell className={cn("font-mono text-xs", isPr003 && "text-status-critical font-semibold")}>
-                    {p.nextReview ?? "—"}{isPr003 && " ⚠"}
+                <TableRow key={p.policy_code}>
+                  <TableCell><Link to={`/politicas/${p.policy_code}`} className="font-mono text-xs text-primary hover:underline">{p.policy_code}</Link></TableCell>
+                  <TableCell><Link to={`/politicas/${p.policy_code}`} className="text-sm font-medium hover:text-primary">{p.title}</Link></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{p.policy_type ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{p.owner_function ?? "—"}</TableCell>
+                  <TableCell><StatusBadge label={policyStatusLabel(p.status)} /></TableCell>
+                  <TableCell className="font-mono text-xs">{fmtDate(p.effective_date) ?? "—"}</TableCell>
+                  <TableCell className={cn("font-mono text-xs", overdue && "text-status-critical font-semibold")}>
+                    {fmtDate(p.next_review_date) ?? "—"}{overdue && " ⚠"}
                   </TableCell>
                 </TableRow>
               );

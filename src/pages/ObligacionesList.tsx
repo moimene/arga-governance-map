@@ -5,8 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { obligations } from "@/data/obligations";
+import {
+  useObligationsList,
+  useAllControlsByObligationIds,
+  controlStatusLabel,
+  controlStatusTone,
+  obligationCriticalityTone,
+  type ObligationWithPolicy,
+} from "@/hooks/usePoliciesObligations";
 import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,21 +43,49 @@ export default function ObligacionesList() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
 
-  const filtered = useMemo(() => obligations.filter((o) =>
-    (framework === "all" || o.framework.startsWith(framework)) &&
-    (status === "all" || o.status === status) &&
-    (search === "" || o.title.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase()))
-  ), [framework, status, search]);
+  const { data: obligations = [], isLoading } = useObligationsList();
+  const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
+  const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
 
-  const dora = filtered.filter((o) => o.framework.startsWith("DORA"));
-  const sol = filtered.filter((o) => o.framework.startsWith("Solvencia"));
+  const ctrlsByObl = useMemo(() => {
+    const m = new Map<string, typeof controls>();
+    for (const c of controls) {
+      if (!c.obligation_id) continue;
+      const arr = m.get(c.obligation_id) ?? [];
+      arr.push(c);
+      m.set(c.obligation_id, arr);
+    }
+    return m;
+  }, [controls]);
+
+  const obligationStatus = (o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
+    const cs = ctrlsByObl.get(o.id) ?? [];
+    if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
+    if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
+    if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
+    if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
+    return { label: "EN PROCESO", tone: "warning", pulse: false };
+  };
+
+  const filtered = useMemo(() => obligations.filter((o) => {
+    const st = obligationStatus(o);
+    return (framework === "all" || (o.source ?? "").toLowerCase().startsWith(framework.toLowerCase())) &&
+      (status === "all" || st.label === status) &&
+      (search === "" || o.title.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase()));
+  }), [obligations, ctrlsByObl, framework, status, search]);
+
+  const dora = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("dora"));
+  const sol = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("solv"));
+  const others = filtered.filter((o) => !dora.includes(o) && !sol.includes(o));
 
   const kpis = {
     total: obligations.length,
-    cubiertas: obligations.filter((o) => o.status === "CUBIERTA").length,
-    parcial: obligations.filter((o) => o.status === "EN REMEDIACIÓN" || o.status === "EXCEPCIÓN ACTIVA").length,
-    sin: obligations.filter((o) => o.status === "SIN CONTROL").length,
+    cubiertas: obligations.filter((o) => obligationStatus(o).label === "CUBIERTA").length,
+    parcial: obligations.filter((o) => ["EN REMEDIACIÓN", "EN PROCESO"].includes(obligationStatus(o).label)).length,
+    sin: obligations.filter((o) => obligationStatus(o).label === "SIN CONTROL").length,
   };
+
+  const sinControl = obligations.find((o) => obligationStatus(o).label === "SIN CONTROL");
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -69,16 +105,18 @@ export default function ObligacionesList() {
         <Kpi label="Sin control asignado" value={kpis.sin} icon={XCircle} tone="critical" />
       </div>
 
-      <div className="mb-5 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="obl-banner">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
-        <div className="flex-1 text-sm">
-          <div className="font-semibold text-status-critical">OBL-DORA-003 no tiene ningún control asignado</div>
-          <div className="mt-1 text-xs text-status-critical/90">Pruebas de resiliencia operativa (DORA Art. 24) — acción inmediata requerida.</div>
+      {sinControl && (
+        <div className="mb-5 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="obl-banner">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-critical">{sinControl.code} no tiene ningún control asignado</div>
+            <div className="mt-1 text-xs text-status-critical/90">{sinControl.title} — acción inmediata requerida.</div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
+            <Link to={`/obligaciones/${sinControl.code}`}>Ver obligación →</Link>
+          </Button>
         </div>
-        <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
-          <Link to="/obligaciones/OBL-DORA-003">Ver obligación →</Link>
-        </Button>
-      </div>
+      )}
 
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-3 gap-3">
@@ -87,7 +125,9 @@ export default function ObligacionesList() {
             <SelectContent>
               <SelectItem value="all">Todos los marcos</SelectItem>
               <SelectItem value="DORA">DORA</SelectItem>
-              <SelectItem value="Solvencia">Solvencia II</SelectItem>
+              <SelectItem value="Solv">Solvencia II</SelectItem>
+              <SelectItem value="GDPR">GDPR</SelectItem>
+              <SelectItem value="LGPD">LGPD</SelectItem>
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={setStatus}>
@@ -97,7 +137,7 @@ export default function ObligacionesList() {
               <SelectItem value="CUBIERTA">Cubierta</SelectItem>
               <SelectItem value="EN REMEDIACIÓN">En remediación</SelectItem>
               <SelectItem value="SIN CONTROL">Sin control</SelectItem>
-              <SelectItem value="EXCEPCIÓN ACTIVA">Excepción activa</SelectItem>
+              <SelectItem value="DEFICIENTE">Deficiente</SelectItem>
             </SelectContent>
           </Select>
           <Input placeholder="Buscar obligación..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -105,28 +145,46 @@ export default function ObligacionesList() {
       </Card>
 
       <Card className="overflow-hidden">
-        {dora.length > 0 && (
+        {isLoading && <div className="p-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>}
+        {!isLoading && dora.length > 0 && (
           <>
             <div className="border-b bg-accent/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
               DORA — Resiliencia Operativa Digital
             </div>
-            <ObligationTable rows={dora} />
+            <ObligationTable rows={dora} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
           </>
         )}
-        {sol.length > 0 && (
+        {!isLoading && sol.length > 0 && (
           <>
             <div className="border-y bg-status-warning-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-status-warning">
               Solvencia II
             </div>
-            <ObligationTable rows={sol} />
+            <ObligationTable rows={sol} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
           </>
+        )}
+        {!isLoading && others.length > 0 && (
+          <>
+            <div className="border-y bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Otros marcos
+            </div>
+            <ObligationTable rows={others} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
+          </>
+        )}
+        {!isLoading && filtered.length === 0 && (
+          <div className="p-8 text-center text-sm text-muted-foreground">No hay obligaciones que coincidan con los filtros.</div>
         )}
       </Card>
     </div>
   );
 }
 
-function ObligationTable({ rows }: { rows: typeof obligations }) {
+interface ObligationTableProps {
+  rows: ObligationWithPolicy[];
+  ctrlsByObl: Map<string, any[]>;
+  obligationStatus: (o: ObligationWithPolicy) => { label: string; tone: "active" | "warning" | "critical"; pulse: boolean };
+}
+
+function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -134,33 +192,42 @@ function ObligationTable({ rows }: { rows: typeof obligations }) {
           <TableHead className="w-32">Código</TableHead>
           <TableHead>Obligación</TableHead>
           <TableHead className="w-32">Marco</TableHead>
-          <TableHead className="w-40">Artículo</TableHead>
+          <TableHead className="w-32">Criticidad</TableHead>
           <TableHead className="w-28">Política</TableHead>
-          <TableHead className="w-32">Control</TableHead>
-          <TableHead className="w-44">Cobertura / Estado</TableHead>
+          <TableHead className="w-40">Control(es)</TableHead>
+          <TableHead className="w-44">Estado</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((o) => {
-          const noCoverage = o.status === "SIN CONTROL";
-          const remediation = o.status === "EN REMEDIACIÓN";
-          const exception = o.status === "EXCEPCIÓN ACTIVA";
+          const st = obligationStatus(o);
+          const noCoverage = st.label === "SIN CONTROL";
+          const warn = st.tone === "warning";
+          const cs = ctrlsByObl.get(o.id) ?? [];
           return (
-            <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg hover:bg-status-critical-bg", (remediation || exception) && "bg-status-warning-bg/60 hover:bg-status-warning-bg")}>
+            <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg hover:bg-status-critical-bg", warn && "bg-status-warning-bg/60 hover:bg-status-warning-bg")}>
               <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
               <TableCell><Link to={`/obligaciones/${o.code}`} className="text-sm font-medium hover:text-primary">{o.title}</Link></TableCell>
-              <TableCell className="text-xs text-muted-foreground">{o.framework}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{o.article}</TableCell>
-              <TableCell><Link to={`/politicas/${o.policyId}`} className="font-mono text-xs text-primary hover:underline">{o.policyId}</Link></TableCell>
+              <TableCell className="text-xs text-muted-foreground">{o.source ?? "—"}</TableCell>
+              <TableCell>{o.criticality && <StatusBadge label={o.criticality} tone={obligationCriticalityTone(o.criticality)} />}</TableCell>
               <TableCell>
-                {o.controlId ? (
-                  <Link to={`/obligaciones/controles/${o.controlId}`} className="font-mono text-xs text-primary hover:underline">{o.controlId}</Link>
-                ) : (
+                {o.policy_code ? (
+                  <Link to={`/politicas/${o.policy_code}`} className="font-mono text-xs text-primary hover:underline">{o.policy_code}</Link>
+                ) : <span className="text-xs text-muted-foreground">—</span>}
+              </TableCell>
+              <TableCell>
+                {cs.length === 0 ? (
                   <span className="font-mono text-xs text-muted-foreground">—</span>
+                ) : (
+                  <div className="flex flex-col gap-0.5">
+                    {cs.map((c) => (
+                      <Link key={c.id} to={`/obligaciones/controles/${c.code}`} className="font-mono text-xs text-primary hover:underline">{c.code}</Link>
+                    ))}
+                  </div>
                 )}
               </TableCell>
               <TableCell>
-                <StatusBadge label={o.coverage} pulse={noCoverage} tone={noCoverage ? "critical" : exception ? "warning" : remediation ? "warning" : "active"} />
+                <StatusBadge label={st.label} pulse={st.pulse} tone={st.tone} />
               </TableCell>
             </TableRow>
           );

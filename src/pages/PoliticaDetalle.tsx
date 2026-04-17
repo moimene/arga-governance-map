@@ -4,13 +4,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WorkflowStepper } from "@/components/WorkflowStepper";
-import { policies } from "@/data/policies";
 import { entities } from "@/data/entities";
-import { Check, Clock, Download, GitCompare, History } from "lucide-react";
+import {
+  usePolicyByCode,
+  usePolicyObligations,
+  useAllControlsByObligationIds,
+  policyStatusLabel,
+  policyStatusToStep,
+  controlStatusLabel,
+  controlStatusTone,
+} from "@/hooks/usePoliciesObligations";
+import { Check, Download, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 
 const PR008_SECTIONS = [
   { title: "Objeto y ámbito de aplicación", body: "La presente Política establece el marco de gestión de la resiliencia operativa digital del Grupo ARGA Seguros, en cumplimiento del Reglamento (UE) 2022/2554 (DORA). Es de aplicación a todas las entidades del Grupo y a sus proveedores TIC críticos." },
@@ -26,57 +36,64 @@ const PR008_SECTIONS = [
 const WORKFLOW_STEPS = [
   { label: "Borrador" },
   { label: "Revisión interna" },
-  { label: "Aprob. Comité Técnico" },
   { label: "Revisión jurídica" },
-  { label: "Pendiente Consejo" },
-  { label: "Aprobado por Consejo" },
+  { label: "Pendiente aprobación" },
+  { label: "Aprobada" },
   { label: "Vigente" },
+  { label: "Sustituida / Archivada" },
 ];
 
-const APPROVALS = [
-  { date: "15/09/2025", actor: "D. Roberto García Prieto", action: "Borrador inicial preparado por Tecnología", done: true },
-  { date: "15/11/2025", actor: "Equipo Tecnología", action: "Revisión interna completada — 12 comentarios resueltos", done: true },
-  { date: "20/01/2026", actor: "D. Roberto García Prieto", action: "Aprobado por Comité Técnico", done: true },
-  { date: "15/04/2026", actor: "D. Miguel Ortega Sánchez", action: "Revisión jurídica completada — texto consolidado", done: true },
-  { date: "Previsto 22/04/2026", actor: "D. Antonio Ríos Valverde", action: "Pendiente aprobación Consejo de Administración", done: false },
-];
-
-const VERSIONS = [
-  { v: "v0.1", status: "BORRADOR", date: "15/09/2025" },
-  { v: "v0.2", status: "EN REVISIÓN", date: "15/11/2025" },
-  { v: "v0.9", status: "PRE-DEFINITIVA", date: "20/01/2026" },
-  { v: "v1.0", status: "PENDIENTE APROBACIÓN", date: "15/04/2026", current: true },
-];
-
-const OBLIGACIONES = [
-  { id: "OBL-DORA-001", desc: "Registro de activos TIC críticos", control: "CTR-005", coverage: "COMPLETA", tone: "active" as const },
-  { id: "OBL-DORA-002", desc: "Clasificación proveedores TIC", control: "CTR-006 (EN REMEDIACIÓN)", coverage: "PARCIAL", tone: "warning" as const },
-  { id: "OBL-DORA-003", desc: "Pruebas de resiliencia operativa", control: "(ninguno)", coverage: "SIN COBERTURA", tone: "critical" as const },
-];
+const fmtDate = (d: string | null | undefined) => {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+};
 
 export default function PoliticaDetalle() {
-  const { code = "PR-008" } = useParams();
-  const policy = policies.find((p) => p.code === code);
+  const { id: code } = useParams();
+  const { data: policy, isLoading } = usePolicyByCode(code);
+  const { data: obligations = [] } = usePolicyObligations(policy?.id);
+  const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
+  const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-[1440px] space-y-4 p-6">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   if (!policy) {
     return <div className="p-10 text-center text-sm text-muted-foreground">Política no encontrada. <Link to="/politicas" className="text-primary underline">Volver</Link></div>;
   }
 
-  const isPR008 = policy.code === "PR-008";
+  const isPR008 = policy.policy_code === "PR-008";
+  const currentStep = policyStatusToStep(policy.status);
+  const stepCaption =
+    policy.status === "Approval Pending"
+      ? `Pendiente aprobación${policy.approval_body_name ? ` por ${policy.approval_body_name}` : ""}.`
+      : policy.status === "In Review" || policy.status === "Legal Review"
+      ? "Política en proceso de revisión."
+      : policy.status === "Published"
+      ? `Vigente desde ${fmtDate(policy.effective_date)}.`
+      : undefined;
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <ObjectHeader
-        crumbs={[{ label: "Inicio", to: "/" }, { label: "Políticas y Normativa", to: "/politicas" }, { label: policy.code }]}
+        crumbs={[{ label: "Inicio", to: "/" }, { label: "Políticas y Normativa", to: "/politicas" }, { label: policy.policy_code }]}
         title={policy.title}
         badges={
           <>
-            <StatusBadge label={policy.status} />
-            <StatusBadge label={policy.type} tone="neutral" />
-            <StatusBadge label={policy.scope} tone="info" />
+            <StatusBadge label={policyStatusLabel(policy.status)} />
+            {policy.policy_type && <StatusBadge label={policy.policy_type} tone="neutral" />}
+            {policy.scope_level && <StatusBadge label={policy.scope_level} tone="info" />}
           </>
         }
-        metadata={<>Código: <span className="font-mono text-xs">{policy.code}</span> · Propietario: {policy.owner} · Última modificación: 15/04/2026</>}
+        metadata={<>Código: <span className="font-mono text-xs">{policy.policy_code}</span> · Propietario: {policy.owner_function ?? "—"}{policy.approval_body_name ? ` · Aprobación: ${policy.approval_body_name}` : ""}</>}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5"><History className="h-3.5 w-3.5" />Ver historial</Button>
@@ -86,15 +103,13 @@ export default function PoliticaDetalle() {
         }
       />
 
-      {isPR008 && (
-        <div className="mt-6 tour-target" data-tour="policy-stepper">
-          <WorkflowStepper
-            steps={WORKFLOW_STEPS}
-            current={5}
-            caption="Pendiente de aprobación por el Consejo de Administración — próxima sesión: 22/04/2026."
-          />
-        </div>
-      )}
+      <div className="mt-6 tour-target" data-tour="policy-stepper">
+        <WorkflowStepper
+          steps={WORKFLOW_STEPS}
+          current={currentStep}
+          caption={stepCaption}
+        />
+      </div>
 
       <Tabs defaultValue="contenido" className="mt-6">
         <TabsList className="grid w-full max-w-2xl grid-cols-5">
@@ -163,19 +178,32 @@ export default function PoliticaDetalle() {
                   <TableHead className="w-32">Obligación</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Control asignado</TableHead>
-                  <TableHead className="w-40">Cobertura</TableHead>
+                  <TableHead className="w-40">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(isPR008 ? OBLIGACIONES : []).map((o) => (
-                  <TableRow key={o.id} className={cn(o.tone === "critical" && "bg-status-critical-bg")}>
-                    <TableCell><Link to="/obligaciones" className="font-mono text-xs text-primary hover:underline">{o.id}</Link></TableCell>
-                    <TableCell className="text-sm">{o.desc}</TableCell>
-                    <TableCell className="font-mono text-xs">{o.control}</TableCell>
-                    <TableCell><StatusBadge label={o.coverage} tone={o.tone} /></TableCell>
-                  </TableRow>
-                ))}
-                {!isPR008 && <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin obligaciones vinculadas registradas.</TableCell></TableRow>}
+                {obligations.length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin obligaciones vinculadas registradas.</TableCell></TableRow>
+                )}
+                {obligations.map((o) => {
+                  const obCtrls = controls.filter((c) => c.obligation_id === o.id);
+                  const noCoverage = obCtrls.length === 0;
+                  return (
+                    <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg")}>
+                      <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
+                      <TableCell className="text-sm">{o.title}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {obCtrls.length === 0 ? <span className="text-muted-foreground">(ninguno)</span> :
+                          obCtrls.map((c) => c.code).join(", ")}
+                      </TableCell>
+                      <TableCell>
+                        {noCoverage
+                          ? <StatusBadge label="SIN COBERTURA" tone="critical" />
+                          : <StatusBadge label={controlStatusLabel(obCtrls[0].status)} tone={controlStatusTone(obCtrls[0].status)} />}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
@@ -183,19 +211,12 @@ export default function PoliticaDetalle() {
 
         <TabsContent value="aprobaciones" className="mt-4">
           <Card className="p-6">
-            <ul className="space-y-4">
-              {(isPR008 ? APPROVALS : []).map((a, i) => (
-                <li key={i} className="flex items-start gap-4">
-                  <div className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full", a.done ? "bg-status-active text-white" : "bg-status-pending-bg text-status-pending border-2 border-status-pending")}>
-                    {a.done ? <Check className="h-4 w-4" /> : <Clock className="h-3.5 w-3.5" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className={cn("text-sm", a.done ? "text-foreground" : "font-semibold text-status-pending")}>{a.action}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{a.date} · {a.actor}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <p className="text-sm text-muted-foreground">
+              {policy.approval_body_name
+                ? `Órgano competente para la aprobación: ${policy.approval_body_name}.`
+                : "Órgano de aprobación no asignado."}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">Estado actual: <span className="font-semibold text-foreground">{policyStatusLabel(policy.status)}</span>.</p>
           </Card>
         </TabsContent>
 
@@ -211,17 +232,14 @@ export default function PoliticaDetalle() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(isPR008 ? VERSIONS : []).map((v) => (
-                  <TableRow key={v.v} className={cn(v.current && "bg-accent/40")}>
-                    <TableCell className="font-mono text-xs font-semibold">{v.v}{v.current && " (actual)"}</TableCell>
-                    <TableCell><StatusBadge label={v.status} /></TableCell>
-                    <TableCell className="font-mono text-xs">{v.date}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="h-7 px-2"><Download className="h-3.5 w-3.5" /></Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!isPR008 && <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Historial de versiones no disponible.</TableCell></TableRow>}
+                <TableRow className="bg-accent/40">
+                  <TableCell className="font-mono text-xs font-semibold">v{policy.current_version ?? 1} (actual)</TableCell>
+                  <TableCell><StatusBadge label={policyStatusLabel(policy.status)} /></TableCell>
+                  <TableCell className="font-mono text-xs">{fmtDate(policy.effective_date)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" className="h-7 px-2"><Download className="h-3.5 w-3.5" /></Button>
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </Card>

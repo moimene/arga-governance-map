@@ -2,30 +2,55 @@ import { Link, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ObjectHeader } from "@/components/ObjectHeader";
-import { StatusBadgeTip } from "@/components/StatusBadgeTip";
 import { StatusBadge } from "@/components/StatusBadge";
-import { obligations } from "@/data/obligations";
-import { findings } from "@/data/findings";
-import { entities } from "@/data/entities";
-import { policies } from "@/data/policies";
+import {
+  useObligationByCode,
+  useObligationControls,
+  useEvidencesByControlIds,
+  controlStatusLabel,
+  controlStatusTone,
+  evidenceStatusLabel,
+  evidenceStatusTone,
+  obligationCriticalityTone,
+} from "@/hooks/usePoliciesObligations";
 import { AlertTriangle, ShieldOff, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useMemo } from "react";
+
+const fmtDate = (d: string | null | undefined) => {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+};
 
 export default function ObligacionDetalle() {
   const { id } = useParams();
-  const obligation = obligations.find((o) => o.code === id);
+  const { data: obligation, isLoading } = useObligationByCode(id);
+  const { data: controls = [] } = useObligationControls(obligation?.id);
+  const controlIds = useMemo(() => controls.map((c) => c.id), [controls]);
+  const { data: evidences = [] } = useEvidencesByControlIds(controlIds);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-[1440px] space-y-4 p-6">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
   if (!obligation) return <div className="p-6">Obligación no encontrada.</div>;
 
-  const policy = policies.find((p) => p.code === obligation.policyId);
-  const linkedFindings = findings.filter((f) =>
-    (obligation.code === "OBL-DORA-003" && f.id === "HALL-009") ||
-    (obligation.code === "OBL-DORA-002" && f.id === "HALL-007") ||
-    (obligation.code === "OBL-SOL-004" && f.id === "HALL-001") ||
-    (obligation.code === "OBL-SOL-007" && f.id === "HALL-010")
-  );
-
-  const noCoverage = obligation.status === "SIN CONTROL";
+  const noCoverage = controls.length === 0;
+  const coverageLabel = noCoverage
+    ? "SIN COBERTURA"
+    : controls.some((c) => c.status === "Deficiente") ? "DEFICIENTE"
+    : controls.some((c) => c.status === "Parcial") ? "PARCIAL"
+    : "COMPLETA";
+  const coverageTone = noCoverage ? "critical" : coverageLabel === "COMPLETA" ? "active" : "warning";
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -38,12 +63,22 @@ export default function ObligacionDetalle() {
         title={obligation.title}
         badges={
           <>
-            <StatusBadgeTip label={obligation.coverage} tone={noCoverage ? "critical" : obligation.status === "EXCEPCIÓN ACTIVA" || obligation.status === "EN REMEDIACIÓN" ? "warning" : "active"} pulse={noCoverage} />
-            <StatusBadge label={obligation.framework} tone="info" />
-            <StatusBadge label={obligation.scope} tone="neutral" />
+            <StatusBadge label={coverageLabel} tone={coverageTone} pulse={noCoverage} />
+            {obligation.source && <StatusBadge label={obligation.source} tone="info" />}
+            {obligation.criticality && <StatusBadge label={obligation.criticality} tone={obligationCriticalityTone(obligation.criticality)} />}
           </>
         }
-        metadata={`Código: ${obligation.code} · Marco: ${obligation.framework} ${obligation.article} · Política: ${obligation.policyId}`}
+        metadata={
+          <>
+            Código: {obligation.code}
+            {obligation.policy_code && (
+              <> · Política: <Link to={`/politicas/${obligation.policy_code}`} className="text-primary hover:underline">{obligation.policy_code}</Link></>
+            )}
+            {obligation.country_scope && obligation.country_scope.length > 0 && (
+              <> · Ámbito: {obligation.country_scope.join(", ")}</>
+            )}
+          </>
+        }
       />
 
       {noCoverage && (
@@ -51,74 +86,49 @@ export default function ObligacionDetalle() {
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
           <div className="flex-1 text-sm">
             <div className="font-semibold text-status-critical">Sin cobertura de control</div>
-            <div className="mt-1 text-xs text-status-critical/90">Esta obligación no tiene ningún control asignado. Sin evidencia de ejecución de pruebas TLPT. Ver hallazgo HALL-009.</div>
+            <div className="mt-1 text-xs text-status-critical/90">Esta obligación no tiene ningún control asignado.</div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-status-critical/40 text-status-critical hover:bg-status-critical/5">
-            <Link to="/hallazgos/HALL-009">Ver HALL-009 →</Link>
-          </Button>
         </div>
       )}
 
       <Tabs defaultValue="descripcion" className="mt-6">
         <TabsList>
           <TabsTrigger value="descripcion">Descripción</TabsTrigger>
-          <TabsTrigger value="controles">Controles</TabsTrigger>
-          <TabsTrigger value="hallazgos">Hallazgos vinculados</TabsTrigger>
+          <TabsTrigger value="controles">Controles ({controls.length})</TabsTrigger>
+          <TabsTrigger value="evidencias">Evidencias ({evidences.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="descripcion" className="mt-4">
           <Card className="p-6 space-y-5">
             <p className="text-sm leading-relaxed text-foreground">
-              {obligation.code === "OBL-DORA-003"
-                ? "El Reglamento DORA (Art. 24) exige que las entidades financieras significativas realicen pruebas de penetración basadas en inteligencia de amenazas (TLPT) al menos cada 3 años. Grupo ARGA Seguros, como entidad significativa bajo DORA, debe demostrar haber ejecutado dichas pruebas con evidencia validada."
-                : `Obligación derivada del marco ${obligation.framework} (${obligation.article}). Vinculada a la política ${obligation.policyId}.`}
+              {obligation.title}. Obligación derivada del marco regulatorio {obligation.source ?? "—"}
+              {obligation.policy_title ? `, vinculada a la política «${obligation.policy_title}» (${obligation.policy_code}).` : "."}
             </p>
 
-            <div>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entidades afectadas</div>
-              <div className="flex flex-wrap gap-2">
-                {obligation.entityIds.map((eid) => {
-                  const e = entities.find((x) => x.id === eid);
-                  return e ? (
-                    <Link key={eid} to={`/entidades/${eid}`}>
-                      <StatusBadge label={e.commonName} tone="info" />
-                    </Link>
-                  ) : null;
-                })}
+            {obligation.country_scope && obligation.country_scope.length > 0 && (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ámbito geográfico</div>
+                <div className="flex flex-wrap gap-2">
+                  {obligation.country_scope.map((c) => (
+                    <StatusBadge key={c} label={c} tone="info" />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Política vinculada</div>
-              <div className="flex items-center gap-2">
-                <Link to={`/politicas/${obligation.policyId}`} className="text-sm font-medium text-primary hover:underline">
-                  {obligation.policyId} — {policy?.title}
+            {obligation.policy_code && (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Política vinculada</div>
+                <Link to={`/politicas/${obligation.policy_code}`} className="text-sm font-medium text-primary hover:underline">
+                  {obligation.policy_code} — {obligation.policy_title}
                 </Link>
-                {policy && <StatusBadge label={policy.status} />}
-              </div>
-            </div>
-
-            {obligation.code === "OBL-DORA-003" && (
-              <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                <span className="font-medium text-foreground">Fecha límite cumplimiento:</span>{" "}
-                <span className="text-status-critical font-semibold">31/12/2026 (primera ejecución requerida)</span>
               </div>
             )}
           </Card>
         </TabsContent>
 
-        <TabsContent value="controles" className="mt-4">
-          {obligation.controlId ? (
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Link to={`/obligaciones/controles/${obligation.controlId}`} className="font-mono text-sm text-primary hover:underline">{obligation.controlId}</Link>
-                  <div className="mt-1 text-sm text-muted-foreground">Control asignado a esta obligación</div>
-                </div>
-                <Button asChild variant="outline"><Link to={`/obligaciones/controles/${obligation.controlId}`}>Ver control →</Link></Button>
-              </div>
-            </Card>
-          ) : (
+        <TabsContent value="controles" className="mt-4 space-y-3">
+          {controls.length === 0 ? (
             <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
               <ShieldOff className="h-12 w-12 text-status-critical" />
               <div className="text-base font-semibold">No hay ningún control asignado a esta obligación</div>
@@ -127,29 +137,72 @@ export default function ObligacionDetalle() {
                 <Plus className="h-4 w-4" />Asignar control
               </Button>
             </Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-32">Código</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead className="w-32">Última prueba</TableHead>
+                    <TableHead className="w-32">Próxima prueba</TableHead>
+                    <TableHead className="w-40">Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {controls.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell><Link to={`/obligaciones/controles/${c.code}`} className="font-mono text-xs text-primary hover:underline">{c.code}</Link></TableCell>
+                      <TableCell className="text-sm font-medium">{c.name}</TableCell>
+                      <TableCell className="text-sm">{c.owner_name ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{fmtDate(c.last_test_date)}</TableCell>
+                      <TableCell className="font-mono text-xs">{fmtDate(c.next_test_date)}</TableCell>
+                      <TableCell><StatusBadge label={controlStatusLabel(c.status)} tone={controlStatusTone(c.status)} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
           )}
         </TabsContent>
 
-        <TabsContent value="hallazgos" className="mt-4 space-y-3">
-          {linkedFindings.length === 0 && (
-            <Card className="p-8 text-center text-sm text-muted-foreground">No hay hallazgos vinculados.</Card>
-          )}
-          {linkedFindings.map((f) => (
-            <Card key={f.id} className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-primary">{f.id}</span>
-                    <StatusBadge label={f.severity} tone={f.severity === "CRÍTICA" || f.severity === "ALTA" ? "critical" : "warning"} />
-                    <StatusBadge label={f.status} />
-                  </div>
-                  <div className="mt-2 text-sm font-medium">{f.title}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Responsable: {f.responsible} · Vence: {f.dueDate}</div>
-                </div>
-                <Button asChild variant="outline" size="sm"><Link to={`/hallazgos/${f.id}`}>Ver hallazgo →</Link></Button>
-              </div>
-            </Card>
-          ))}
+        <TabsContent value="evidencias" className="mt-4">
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-32">Control</TableHead>
+                  <TableHead>Título</TableHead>
+                  <TableHead className="w-32">Tipo</TableHead>
+                  <TableHead className="w-28">Fecha</TableHead>
+                  <TableHead className="w-44">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {evidences.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No hay evidencias cargadas.</TableCell></TableRow>
+                )}
+                {evidences.map((ev) => {
+                  const ctrl = controls.find((c) => c.id === ev.control_id);
+                  return (
+                    <TableRow key={ev.id}>
+                      <TableCell className="font-mono text-xs">{ctrl?.code ?? "—"}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {ev.title}
+                        {ev.status === "Rechazada" && ev.rejection_reason && (
+                          <div className="mt-1 line-clamp-2 text-xs text-status-critical/90">{ev.rejection_reason}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{ev.ev_type ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{fmtDate(ev.created_at.slice(0, 10))}</TableCell>
+                      <TableCell><StatusBadge label={evidenceStatusLabel(ev.status)} tone={evidenceStatusTone(ev.status)} /></TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
