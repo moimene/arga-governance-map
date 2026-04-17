@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Lock, Shield, Separator as Sep } from "lucide-react";
+import { Lock, Shield } from "lucide-react";
 
 const STORAGE_KEY = "sii_access_confirmed";
 
