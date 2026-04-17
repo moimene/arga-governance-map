@@ -6,22 +6,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { entities, getChildren } from "@/data/entities";
+import {
+  useEntitiesList,
+  formatJurisdiction,
+  formatMateriality,
+  formatEntityStatus,
+  type EntityWithParent,
+} from "@/hooks/useEntities";
 import { ChevronDown, ChevronRight, LayoutGrid, List, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Mode = "table" | "tree";
 
-function TreeNode({ id, depth }: { id: string; depth: number }) {
-  const e = entities.find((x) => x.id === id)!;
-  const children = getChildren(id);
+const materialityTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
+  const label = formatMateriality(m);
+  return label === "Crítica" ? "critical" : label === "Alta" ? "warning" : label === "Media" ? "info" : "neutral";
+};
+
+function TreeNode({
+  entity,
+  depth,
+  childrenByParent,
+}: {
+  entity: EntityWithParent;
+  depth: number;
+  childrenByParent: Map<string, EntityWithParent[]>;
+}) {
+  const children = childrenByParent.get(entity.id) ?? [];
   const [open, setOpen] = useState(depth < 1);
   return (
     <div>
       <div
-        className={cn(
-          "flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent",
-        )}
+        className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent")}
         style={{ paddingLeft: `${depth * 20 + 8}px` }}
       >
         {children.length > 0 ? (
@@ -31,13 +47,15 @@ function TreeNode({ id, depth }: { id: string; depth: number }) {
         ) : (
           <span className="w-3.5" />
         )}
-        <Link to={`/entidades/${e.id}`} className="flex-1 text-sm font-medium text-foreground hover:underline">
-          {e.commonName}
+        <Link to={`/entidades/${entity.slug}`} className="flex-1 text-sm font-medium text-foreground hover:underline">
+          {entity.common_name}
         </Link>
-        <span className="text-xs text-muted-foreground">{e.jurisdiction}</span>
-        <StatusBadge label={e.materiality} tone={e.materiality === "Crítica" ? "critical" : e.materiality === "Alta" ? "warning" : e.materiality === "Media" ? "info" : "neutral"} />
+        <span className="text-xs text-muted-foreground">{formatJurisdiction(entity.jurisdiction)}</span>
+        <StatusBadge label={formatMateriality(entity.materiality)} tone={materialityTone(entity.materiality)} />
       </div>
-      {open && children.map((c) => <TreeNode key={c.id} id={c.id} depth={depth + 1} />)}
+      {open && children.map((c) => (
+        <TreeNode key={c.id} entity={c} depth={depth + 1} childrenByParent={childrenByParent} />
+      ))}
     </div>
   );
 }
@@ -48,23 +66,43 @@ export default function EntidadesList() {
   const [jur, setJur] = useState("all");
   const [mat, setMat] = useState("all");
 
-  const jurisdictions = useMemo(() => Array.from(new Set(entities.map((e) => e.jurisdiction))).sort(), []);
+  const { data: entities = [], isLoading } = useEntitiesList();
+
+  const jurisdictions = useMemo(
+    () => Array.from(new Set(entities.map((e) => formatJurisdiction(e.jurisdiction)))).sort(),
+    [entities],
+  );
 
   const filtered = useMemo(() => {
     return entities.filter((e) => {
-      if (q && !(`${e.legalName} ${e.commonName}`.toLowerCase().includes(q.toLowerCase()))) return false;
-      if (jur !== "all" && e.jurisdiction !== jur) return false;
-      if (mat !== "all" && e.materiality !== mat) return false;
+      if (q && !`${e.legal_name} ${e.common_name}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (jur !== "all" && formatJurisdiction(e.jurisdiction) !== jur) return false;
+      if (mat !== "all" && formatMateriality(e.materiality) !== mat) return false;
       return true;
     });
-  }, [q, jur, mat]);
+  }, [entities, q, jur, mat]);
+
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, EntityWithParent[]>();
+    for (const e of entities) {
+      if (!e.parent_entity_id) continue;
+      const arr = m.get(e.parent_entity_id) ?? [];
+      arr.push(e);
+      m.set(e.parent_entity_id, arr);
+    }
+    return m;
+  }, [entities]);
+
+  const roots = useMemo(() => entities.filter((e) => !e.parent_entity_id), [entities]);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <div className="mb-4 flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Entidades del Grupo</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{entities.length} entidades en {jurisdictions.length} jurisdicciones</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {entities.length} entidades en {jurisdictions.length} jurisdicciones
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-md border border-border bg-card p-1">
           <Button variant={mode === "table" ? "secondary" : "ghost"} size="sm" onClick={() => setMode("table")} className="gap-1.5 h-8">
@@ -108,32 +146,40 @@ export default function EntidadesList() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Jurisdicción</TableHead>
                 <TableHead>Forma legal</TableHead>
+                <TableHead>Matriz</TableHead>
                 <TableHead>Materialidad</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Secretaría</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+              {isLoading && (
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">Cargando…</TableCell></TableRow>
+              )}
+              {!isLoading && filtered.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">Sin resultados</TableCell></TableRow>
+              )}
               {filtered.map((e) => (
                 <TableRow key={e.id} className="cursor-pointer">
                   <TableCell>
-                    <Link to={`/entidades/${e.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
-                      {e.legalName}
+                    <Link to={`/entidades/${e.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                      {e.legal_name}
                     </Link>
-                    <div className="text-xs text-muted-foreground">{e.commonName}</div>
+                    <div className="text-xs text-muted-foreground">{e.common_name}</div>
                   </TableCell>
-                  <TableCell>{e.jurisdiction}</TableCell>
-                  <TableCell><span className="font-mono text-xs">{e.legalForm}</span></TableCell>
-                  <TableCell><StatusBadge label={e.materiality} tone={e.materiality === "Crítica" ? "critical" : e.materiality === "Alta" ? "warning" : e.materiality === "Media" ? "info" : "neutral"} /></TableCell>
-                  <TableCell><StatusBadge label={e.status} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{e.secretary}</TableCell>
+                  <TableCell>{formatJurisdiction(e.jurisdiction)}</TableCell>
+                  <TableCell><span className="font-mono text-xs">{e.legal_form ?? "—"}</span></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{e.parent_name ?? "—"}</TableCell>
+                  <TableCell><StatusBadge label={formatMateriality(e.materiality)} tone={materialityTone(e.materiality)} /></TableCell>
+                  <TableCell><StatusBadge label={formatEntityStatus(e.entity_status)} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         ) : (
           <div className="rounded-md border border-border bg-card p-2">
-            <TreeNode id="arga-seguros" depth={0} />
+            {roots.map((r) => (
+              <TreeNode key={r.id} entity={r} depth={0} childrenByParent={childrenByParent} />
+            ))}
           </div>
         )}
       </Card>
