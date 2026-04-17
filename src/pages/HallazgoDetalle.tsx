@@ -106,6 +106,37 @@ export default function HallazgoDetalle() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="acciones">
+          <Card className="p-5">
+            {actionPlans.length === 0 && (
+              <div className="text-center text-sm text-muted-foreground py-6">Sin planes de acción registrados.</div>
+            )}
+            <ul className="space-y-4">
+              {actionPlans.map((p) => {
+                const pct = p.progress_pct ?? 0;
+                const tone = p.status === "Completado" ? "active" : p.status === "En progreso" ? "warning" : "neutral";
+                return (
+                  <li key={p.id} className="rounded-md border border-border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground">{p.title}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Responsable: {p.responsible_name ?? "—"} · Vence: {formatDate(p.due_date)}
+                        </div>
+                      </div>
+                      <StatusBadge label={p.status} tone={tone as any} />
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                      <Progress value={pct} className="h-2 flex-1" />
+                      <span className="font-mono text-xs text-muted-foreground w-10 text-right">{pct}%</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="controles">
           <Card className="overflow-hidden">
             <Table>
