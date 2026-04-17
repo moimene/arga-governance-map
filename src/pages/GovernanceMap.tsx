@@ -166,7 +166,7 @@ export default function GovernanceMap() {
       </div>
 
       {/* Map */}
-      <div className="relative flex-1 bg-secondary/40">
+      <div className="relative flex-1 bg-secondary/40 tour-target" data-tour="map-canvas">
         <ReactFlow
           nodes={filteredNodes}
           edges={filteredEdges}

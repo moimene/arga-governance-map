@@ -73,7 +73,7 @@ export default function DelegacionesList() {
         <Kpi label="Revocadas" value={kpis.revocada} icon={Ban} tone="archived" />
       </div>
 
-      <div className="mb-3 flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4">
+      <div className="mb-3 tour-target flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4" data-tour="deleg-row">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
         <div className="flex-1 text-sm">
           <div className="font-semibold text-status-critical">1 delegación caducada sin revocación formal — D. Carlos Eduardo Vaz</div>
@@ -136,7 +136,7 @@ export default function DelegacionesList() {
                 d.status === "PRÓXIMA VENCIMIENTO" ? "bg-status-warning-bg/60 hover:bg-status-warning-bg" :
                 d.status === "REVOCADA" ? "bg-muted/30 hover:bg-muted/40" : "";
               return (
-                <TableRow key={d.id} className={cn(rowClass)}>
+                <TableRow key={d.id} className={cn(rowClass, d.status === "CADUCADA" && "tour-target")} data-tour={d.status === "CADUCADA" ? "deleg-row-vaz" : undefined}>
                   <TableCell><Link to={`/delegaciones/${d.id}`} className="font-mono text-xs text-primary hover:underline">{d.code}</Link></TableCell>
                   <TableCell><Link to={`/delegaciones/${d.id}`} className="text-sm font-medium hover:text-primary">{d.grantedTo}</Link></TableCell>
                   <TableCell className="text-sm">{e?.commonName ?? d.entityId}</TableCell>

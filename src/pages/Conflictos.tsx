@@ -57,7 +57,7 @@ export default function ConflictosList() {
               </TableHeader>
               <TableBody>
                 {[...conflicts].sort((a) => a.findingId ? -1 : 1).map((c) => (
-                  <TableRow key={c.id} className={cn(c.findingId && "bg-status-critical-bg")}>
+                  <TableRow key={c.id} className={cn(c.findingId && "bg-status-critical-bg tour-target")} data-tour={c.findingId ? "conflict-row" : undefined}>
                     <TableCell className="font-mono text-xs font-semibold">{c.id}</TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{c.person}</div>

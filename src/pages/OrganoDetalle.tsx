@@ -52,7 +52,7 @@ export default function OrganoDetalle() {
       />
 
       {isCda && alertCount > 0 && (
-        <div className="mt-4 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+        <div className="mt-4 tour-target flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4" data-tour="organ-banner">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div className="flex-1">
             <div className="text-sm font-semibold text-status-warning">{alertCount} mandatos vencidos o próximos a vencer en este órgano</div>
