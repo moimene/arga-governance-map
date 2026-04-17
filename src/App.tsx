@@ -32,6 +32,7 @@ import SiiDashboard from "./pages/sii/SiiDashboard";
 import SiiCaseDetalle from "./pages/sii/SiiCaseDetalle";
 import { Admin, Dashboards } from "./pages/Placeholders";
 import Esg from "./pages/Esg";
+import Notificaciones from "./pages/Notificaciones";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ const App = () => (
                   <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
                   <Route path="/conflictos" element={<Conflictos />} />
                   <Route path="/esg" element={<Esg />} />
+                  <Route path="/notificaciones" element={<Notificaciones />} />
                   <Route path="/dashboards" element={<Dashboards />} />
                   <Route path="/sii" element={<SiiLayout />}>
                     <Route index element={<SiiDashboard />} />
