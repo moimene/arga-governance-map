@@ -34,6 +34,20 @@ import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
 import GrcDashboard from "@/pages/modules/GrcDashboard";
 import AimsDashboard from "@/pages/modules/AimsDashboard";
+import { GrcLayout } from "@/pages/grc/GrcLayout";
+import { ModuleShell } from "@/components/grc/ModuleShell";
+import { SectionRouter } from "@/components/grc/SectionRouter";
+import GrcDashboardPage from "@/pages/grc/Dashboard";
+import Risk360 from "@/pages/grc/Risk360";
+import PacksPage from "@/pages/grc/PacksPage";
+import PackDetalle from "@/pages/grc/PackDetalle";
+import IncidentesList from "@/pages/grc/IncidentesList";
+import IncidenteStepper from "@/pages/grc/IncidenteStepper";
+import IncidenteDetalle from "@/pages/grc/IncidenteDetalle";
+import MyWork from "@/pages/grc/MyWork";
+import Alertas from "@/pages/grc/Alertas";
+import Excepciones from "@/pages/grc/Excepciones";
+import ModuleDashboard from "@/pages/grc/ModuleDashboard";
 import { SecretariaLayout } from "@/pages/secretaria/SecretariaLayout";
 import SecretariaDashboard from "@/pages/secretaria/Dashboard";
 import ConvocatoriasList from "@/pages/secretaria/ConvocatoriasList";
@@ -70,7 +84,7 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/grc" element={<GrcDashboard />} />
+                  <Route path="/grc-old" element={<GrcDashboard />} />
                   <Route path="/aims" element={<AimsDashboard />} />
                   <Route path="/governance-map" element={<GovernanceMap />} />
                   <Route path="/entidades" element={<EntidadesList />} />
@@ -122,6 +136,30 @@ const App = () => (
                   <Route path="/secretaria/libros" element={<LibrosObligatorios />} />
                   <Route path="/secretaria/plantillas" element={<Plantillas />} />
                   <Route path="/secretaria/acuerdos/:id" element={<ExpedienteAcuerdo />} />
+                </Route>
+                {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
+                <Route
+                  element={
+                    <RequireAuth>
+                      <GrcLayout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route path="/grc"                      element={<GrcDashboardPage />} />
+                  <Route path="/grc/risk-360"             element={<Risk360 />} />
+                  <Route path="/grc/packs"                element={<PacksPage />} />
+                  <Route path="/grc/packs/:countryCode"   element={<PackDetalle />} />
+                  <Route path="/grc/incidentes"           element={<IncidentesList />} />
+                  <Route path="/grc/incidentes/nuevo"     element={<IncidenteStepper />} />
+                  <Route path="/grc/incidentes/:id"       element={<IncidenteDetalle />} />
+                  <Route path="/grc/mywork"               element={<MyWork />} />
+                  <Route path="/grc/alertas"              element={<Alertas />} />
+                  <Route path="/grc/excepciones"          element={<Excepciones />} />
+                  <Route path="/grc/m/:moduleId" element={<ModuleShell />}>
+                    <Route index element={<ModuleDashboard />} />
+                    <Route path="dashboard" element={<ModuleDashboard />} />
+                    <Route path=":section/:viewKey" element={<SectionRouter />} />
+                  </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -16,9 +16,10 @@ import {
   evidenceStatusTone,
   obligationCriticalityTone,
 } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, ShieldOff, Plus } from "lucide-react";
+import { AlertTriangle, ShieldOff, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
@@ -41,6 +42,8 @@ export default function ObligacionDetalle() {
       </div>
     );
   }
+
+  const navigate = useNavigate();
 
   if (!obligation) return <div className="p-6">Obligación no encontrada.</div>;
 
@@ -80,6 +83,19 @@ export default function ObligacionDetalle() {
           </>
         }
       />
+
+      {/* GRC cross-module link */}
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={() => navigate(`/grc/m/dora/operate/incidents?obligation=${obligation.code}`)}
+        >
+          <ShieldCheck className="h-4 w-4" />
+          Gestionar en GRC
+        </Button>
+      </div>
 
       {noCoverage && (
         <div className="mt-4 flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4">

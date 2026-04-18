@@ -1,0 +1,100 @@
+import { NavLink, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import * as icons from "lucide-react";
+import { Dot } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+const MODULE_LABEL: Record<string, string> = {
+  dora: "DORA / Resiliencia",
+  gdpr: "GDPR / Datos personales",
+  cyber: "Ciberseguridad",
+  audit: "Auditoría Interna",
+};
+
+const SECTION_LABEL: Record<string, string> = {
+  operate: "Operativa",
+  governance: "Gobierno",
+  config: "Configuración",
+};
+
+function useModuleNav(moduleId: string) {
+  return useQuery({
+    queryKey: ["grc", "module-nav", moduleId],
+    enabled: !!moduleId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("grc_module_nav")
+        .select("id, module_id, section, view_key, label, route, icon, display_order")
+        .eq("tenant_id", DEMO_TENANT)
+        .eq("module_id", moduleId)
+        .eq("is_enabled", true)
+        .order("section")
+        .order("display_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function ModuleSidebar() {
+  const { moduleId = "" } = useParams();
+  const { data: nav = [] } = useModuleNav(moduleId);
+
+  const grouped = nav.reduce((acc: any, item: any) => {
+    (acc[item.section] ??= []).push(item);
+    return acc;
+  }, {});
+
+  return (
+    <aside
+      className="w-[200px] shrink-0 border-r border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+    >
+      {/* Module title */}
+      <div className="px-4 py-3 border-b border-[var(--g-border-subtle)]">
+        <div className="text-[10px] uppercase tracking-wider text-[var(--g-text-secondary)] mb-0.5">
+          Módulo
+        </div>
+        <div className="text-sm font-bold text-[var(--g-brand-3308)]">
+          {MODULE_LABEL[moduleId] ?? moduleId}
+        </div>
+      </div>
+
+      {/* Nav sections */}
+      {(["operate", "governance", "config"] as const).map((section) => {
+        const items: any[] = grouped[section] ?? [];
+        if (items.length === 0) return null;
+        return (
+          <div key={section} className="py-1">
+            <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+              {SECTION_LABEL[section]}
+            </div>
+            {items.map((item: any) => {
+              const Icon: any = (icons as any)[item.icon] ?? Dot;
+              return (
+                <NavLink
+                  key={item.id}
+                  to={item.route}
+                  className={({ isActive }) =>
+                    cn(
+                      "mx-2 mb-0.5 flex items-center gap-2 px-3 py-2 text-[13px] transition-colors",
+                      isActive
+                        ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
+                        : "text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]/60"
+                    )
+                  }
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{item.label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
+        );
+      })}
+    </aside>
+  );
+}

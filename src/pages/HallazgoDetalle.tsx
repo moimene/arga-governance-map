@@ -21,7 +21,8 @@ import {
   formatDate,
 } from "@/hooks/useFindings";
 import { controlStatusLabel, controlStatusTone } from "@/hooks/usePoliciesObligations";
-import { Map, Upload, ExternalLink } from "lucide-react";
+import { Map, Upload, ExternalLink, Activity } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const workflowSteps = [
   { label: "Abierto" },
@@ -34,6 +35,7 @@ const workflowSteps = [
 
 export default function HallazgoDetalle() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: finding, isLoading } = useFindingByCode(id);
   const { data: relatedControls = [] } = useFindingRelatedControls(finding?.obligation_id);
   const { data: actionPlans = [] } = useActionPlansByFinding(finding?.id);
@@ -70,6 +72,9 @@ export default function HallazgoDetalle() {
           <>
             <Button variant="outline" size="sm" className="gap-1"><Map className="h-4 w-4" />Ver en mapa</Button>
             <Button variant="outline" size="sm" className="gap-1"><Upload className="h-4 w-4" />Cargar evidencia</Button>
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/grc/risk-360?finding=${finding.code}`)}>
+              <Activity className="h-4 w-4" />Ver riesgo GRC
+            </Button>
           </>
         }
       />
