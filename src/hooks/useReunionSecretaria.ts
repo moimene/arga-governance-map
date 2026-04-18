@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface MeetingSecretariaRow {
   id: string;
   slug: string | null;
@@ -51,6 +53,7 @@ export function useReunionesList() {
         .select(
           "*, governing_bodies(name, entities(common_name, jurisdiction)), meeting_resolutions(id)",
         )
+        .eq("tenant_id", DEMO_TENANT)
         .order("scheduled_start", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -76,6 +79,7 @@ export function useReunionById(id: string | undefined) {
           "*, governing_bodies(name, entities(common_name, jurisdiction, legal_form))",
         )
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -91,6 +95,7 @@ export function useReunionAttendees(meetingId: string | undefined) {
       const { data, error } = await supabase
         .from("meeting_attendees")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("meeting_id", meetingId!);
       if (error) throw error;
       return (data ?? []) as MeetingAttendee[];
@@ -106,6 +111,7 @@ export function useReunionResolutions(meetingId: string | undefined) {
       const { data, error } = await supabase
         .from("meeting_resolutions")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("meeting_id", meetingId!)
         .order("agenda_item_index", { ascending: true });
       if (error) throw error;

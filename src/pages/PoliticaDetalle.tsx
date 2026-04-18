@@ -59,15 +59,22 @@ export default function PoliticaDetalle() {
   const { data: obligations = [] } = usePolicyObligations(policy?.id);
   const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+  // NOTA: hasta que se cree una tabla de relación policy↔agreement (Ola 3),
+  // el vínculo se infiere por búsqueda de texto del policy_code en campos
+  // libres. Se aplica tenant scoping y se escapan metacaracteres de PostgREST
+  // (',', '.', '(', ')') en el code para evitar romper la expresión .or().
   const { data: policyAgreements = [] } = useQuery({
     queryKey: ["agreements", "policy", policy?.policy_code ?? "none"],
     enabled: !!policy?.policy_code,
     queryFn: async () => {
+      const code = String(policy.policy_code).replace(/[,().*]/g, " ").trim();
+      if (!code) return [];
       const { data, error } = await supabase
         .from("agreements")
         .select("id, agreement_kind, status, decision_date, proposal_text")
+        .eq("tenant_id", "00000000-0000-0000-0000-000000000001")
         .or(
-          `proposal_text.ilike.%${policy.policy_code}%,decision_text.ilike.%${policy.policy_code}%,statutory_basis.ilike.%${policy.policy_code}%`,
+          `proposal_text.ilike.%${code}%,decision_text.ilike.%${code}%,statutory_basis.ilike.%${code}%`,
         )
         .order("decision_date", { ascending: false })
         .limit(5);

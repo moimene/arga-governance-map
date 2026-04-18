@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface ActaRow {
   id: string;
   tenant_id: string;
@@ -41,6 +43,7 @@ export function useActasList() {
         .select(
           "*, meetings(meeting_type, governing_bodies(name, entities(common_name)))",
         )
+        .eq("tenant_id", DEMO_TENANT)
         .order("created_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as any[];
@@ -80,6 +83,7 @@ export function useActaById(id: string | undefined) {
           "*, meetings(meeting_type, scheduled_start, governing_bodies(name, entities(common_name, jurisdiction)))",
         )
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -95,6 +99,7 @@ export function useCertificationsByMinute(minuteId: string | undefined) {
       const { data, error } = await supabase
         .from("certifications")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("minute_id", minuteId!)
         .order("created_at", { ascending: false });
       if (error) throw error;

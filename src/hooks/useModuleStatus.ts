@@ -40,11 +40,12 @@ export function useModuleStatus() {
         siiRes,
       ] = await Promise.all([
         // Secretaría: convocatorias EMITIDAS este mes
+        // OJO: la columna real es `estado`, no `status`.
         supabase
           .from("convocatorias")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", DEMO_TENANT)
-          .eq("status", "EMITIDA")
+          .eq("estado", "EMITIDA")
           .gte("created_at", startOfMonth),
 
         // Secretaría: acuerdos pendientes de inscripción

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 /** Normaliza la forma societaria de `entities.legal_form` al vocabulario
  *  canónico usado en `jurisdiction_rule_sets.company_form`. */
 function normalizeCompanyForm(legalForm?: string | null): string | null {
@@ -71,6 +73,7 @@ export function useAgreement(agreementId?: string) {
         .select(
           "*, entities(common_name, jurisdiction, legal_form), governing_bodies(name, body_type)",
         )
+        .eq("tenant_id", DEMO_TENANT)
         .eq("id", agreementId!)
         .maybeSingle();
       if (error) throw error;
@@ -96,6 +99,7 @@ export function useAgreementCompliance(agreementId?: string) {
       const { data: agreement, error: aErr } = await supabase
         .from("agreements")
         .select("*, entities(jurisdiction, legal_form)")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("id", agreementId!)
         .maybeSingle();
       if (aErr) throw aErr;
@@ -112,6 +116,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data } = await supabase
           .from("jurisdiction_rule_sets")
           .select("*")
+          .eq("tenant_id", DEMO_TENANT)
           .eq("jurisdiction", jurisdiction)
           .eq("company_form", companyForm)
           .eq("is_active", true)
@@ -133,6 +138,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: meeting } = await supabase
           .from("meetings")
           .select("*")
+          .eq("tenant_id", DEMO_TENANT)
           .eq("id", a.parent_meeting_id)
           .maybeSingle();
 
@@ -146,6 +152,7 @@ export function useAgreementCompliance(agreementId?: string) {
           const { data: convs } = await supabase
             .from("convocatorias")
             .select("fecha_emision, fecha_1, urgente, junta_universal")
+            .eq("tenant_id", DEMO_TENANT)
             .eq("body_id", m.body_id)
             .eq("fecha_1", meetingDateISO)
             .order("fecha_emision", { ascending: false })
@@ -195,6 +202,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: res } = await supabase
           .from("meeting_resolutions")
           .select("status")
+          .eq("tenant_id", DEMO_TENANT)
           .eq("agreement_id", a.id);
         if (!res || res.length === 0) {
           majority_compliant = true;
@@ -210,6 +218,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: conflicts } = await supabase
           .from("conflicts_of_interest")
           .select("id, status")
+          .eq("tenant_id", DEMO_TENANT)
           .eq("related_meeting_id", a.parent_meeting_id);
         if (conflicts && conflicts.length > 0) {
           conflict_handled = conflicts.every(
@@ -227,6 +236,7 @@ export function useAgreementCompliance(agreementId?: string) {
           .select(
             "status, requires_unanimity, votes_for, votes_against, abstentions",
           )
+          .eq("tenant_id", DEMO_TENANT)
           .eq("id", a.no_session_resolution_id)
           .maybeSingle();
         const n: any = nsr;
@@ -253,6 +263,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: dec } = await supabase
           .from("unipersonal_decisions")
           .select("status")
+          .eq("tenant_id", DEMO_TENANT)
           .eq("id", a.unipersonal_decision_id)
           .maybeSingle();
         const d: any = dec;
@@ -339,6 +350,7 @@ export function useAgreementsByEntity(entityId?: string) {
       const { data, error } = await supabase
         .from("agreements")
         .select("*, governing_bodies(name, body_type)")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("entity_id", entityId!)
         .order("created_at", { ascending: false });
       if (error) throw error;

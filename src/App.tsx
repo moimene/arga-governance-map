@@ -128,6 +128,7 @@ const App = () => (
                   <Route path="/secretaria/convocatorias/nueva" element={<ConvocatoriasStepper />} />
                   <Route path="/secretaria/convocatorias/:id" element={<ConvocatoriaDetalle />} />
                   <Route path="/secretaria/reuniones" element={<ReunionesLista />} />
+                  <Route path="/secretaria/reuniones/nueva" element={<ReunionStepper />} />
                   <Route path="/secretaria/reuniones/:id" element={<ReunionStepper />} />
                   <Route path="/secretaria/actas" element={<ActasLista />} />
                   <Route path="/secretaria/actas/:id" element={<ActaDetalle />} />

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface NoSessionResolutionRow {
   id: string;
   tenant_id: string;
@@ -27,6 +29,7 @@ export function useAcuerdosSinSesionList() {
       const { data, error } = await supabase
         .from("no_session_resolutions")
         .select("*, governing_bodies(name, entities(common_name))")
+        .eq("tenant_id", DEMO_TENANT)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((r: any) => ({
@@ -47,6 +50,7 @@ export function useAcuerdoSinSesionById(id: string | undefined) {
         .from("no_session_resolutions")
         .select("*, governing_bodies(name, entities(common_name, jurisdiction))")
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       return data;

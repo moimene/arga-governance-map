@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface JurisdictionRuleSet {
   id: string;
   tenant_id: string;
@@ -46,6 +48,7 @@ export function useJurisdiccionRules() {
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .order("jurisdiction", { ascending: true });
       if (error) throw error;
       return (data ?? []) as JurisdictionRuleSet[];
@@ -62,6 +65,7 @@ export function useEntityRules(jurisdictionCode?: string, companyForm?: string) 
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("jurisdiction", jurisdictionCode!)
         .eq("company_form", companyForm!)
         .eq("is_active", true);

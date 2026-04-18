@@ -41,6 +41,7 @@ export function useAiIncidentsBySystem(systemId: string | undefined) {
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("system_id", systemId)
         .order("reported_at", { ascending: false });
       if (error) throw error;

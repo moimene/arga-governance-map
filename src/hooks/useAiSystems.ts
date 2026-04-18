@@ -43,6 +43,7 @@ export function useAiSystemById(id: string | undefined) {
       const { data, error } = await supabase
         .from("ai_systems")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("id", id)
         .single();
       if (error) throw error;

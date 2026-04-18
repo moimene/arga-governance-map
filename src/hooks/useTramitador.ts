@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface FilingRow {
   id: string;
   tenant_id: string;
@@ -31,6 +33,7 @@ export function useTramitacionesList() {
       const { data, error } = await supabase
         .from("registry_filings")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .order("presentation_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as FilingRow[];
@@ -47,6 +50,7 @@ export function useTramitacionById(id: string | undefined) {
         .from("registry_filings")
         .select("*, deeds(notary, deed_date, status, content)")
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       return data;

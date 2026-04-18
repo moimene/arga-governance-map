@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface ConvocatoriaRow {
   id: string;
   tenant_id: string;
@@ -48,6 +50,7 @@ export function useConvocatoriasList() {
         .select(
           "*, governing_bodies(name, body_type, entities(common_name, jurisdiction, legal_form))",
         )
+        .eq("tenant_id", DEMO_TENANT)
         .order("fecha_1", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((c: any) => ({
@@ -72,6 +75,7 @@ export function useConvocatoriaById(id: string | undefined) {
           "*, governing_bodies(name, body_type, entities(common_name, jurisdiction, legal_form))",
         )
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
@@ -95,6 +99,7 @@ export function useConvocatoriaAttachments(convocatoriaId: string | undefined) {
       const { data, error } = await supabase
         .from("attachments")
         .select("*")
+        .eq("tenant_id", DEMO_TENANT)
         .eq("convocatoria_id", convocatoriaId!)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;

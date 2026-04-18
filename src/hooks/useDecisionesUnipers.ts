@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
 export interface UnipersonalDecisionRow {
   id: string;
   tenant_id: string;
@@ -27,6 +29,7 @@ export function useDecisionesUnipersList() {
         .select(
           "*, entities(common_name, jurisdiction), persons:decided_by_id(full_name)",
         )
+        .eq("tenant_id", DEMO_TENANT)
         .order("decision_date", { ascending: false });
       if (error) throw error;
       return (data ?? []).map((d: any) => ({
@@ -48,6 +51,7 @@ export function useDecisionUnipersById(id: string | undefined) {
         .from("unipersonal_decisions")
         .select("*, entities(common_name, jurisdiction, legal_form), persons:decided_by_id(full_name)")
         .eq("id", id!)
+        .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
       return data;
