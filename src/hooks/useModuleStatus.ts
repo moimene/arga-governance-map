@@ -48,11 +48,13 @@ export function useModuleStatus() {
           .gte("created_at", startOfMonth),
 
         // Secretaría: acuerdos pendientes de inscripción
+        // Solo inscribibles en estados pre-registrales (no cuenta PUBLISHED/REGISTERED ni DRAFT/PROPOSED)
         supabase
           .from("agreements")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", DEMO_TENANT)
-          .in("status", ["ADOPTED", "CERTIFIED"]),
+          .eq("inscribable", true)
+          .in("status", ["ADOPTED", "CERTIFIED", "INSTRUMENTED", "FILED", "REJECTED_REGISTRY"]),
 
         // GRC: incidentes DORA abiertos
         supabase

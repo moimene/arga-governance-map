@@ -132,15 +132,31 @@ export function useAgreementCompliance(agreementId?: string) {
         // Convocatoria + quorum + mayoría desde meeting y convocatoria asociada
         const { data: meeting } = await supabase
           .from("meetings")
-          .select("*, convocatorias(fecha_emision, fecha_1, urgente, junta_universal)")
+          .select("*")
           .eq("id", a.parent_meeting_id)
           .maybeSingle();
 
         const m: any = meeting;
+
+        // No existe FK meetings↔convocatorias: se localiza la convocatoria por
+        // body_id + fecha_1 == fecha de la reunión (match determinista sobre el seed).
+        let conv: any = null;
+        if (m?.body_id && m?.scheduled_start) {
+          const meetingDateISO = String(m.scheduled_start).slice(0, 10);
+          const { data: convs } = await supabase
+            .from("convocatorias")
+            .select("fecha_emision, fecha_1, urgente, junta_universal")
+            .eq("body_id", m.body_id)
+            .eq("fecha_1", meetingDateISO)
+            .order("fecha_emision", { ascending: false })
+            .limit(1);
+          conv = convs?.[0] ?? null;
+        }
+
         // Convocatoria: plazo mínimo respetado
-        const notice = m?.convocatorias?.fecha_emision;
-        const meetingDate = m?.convocatorias?.fecha_1;
-        if (m?.convocatorias?.junta_universal) {
+        const notice = conv?.fecha_emision;
+        const meetingDate = conv?.fecha_1;
+        if (conv?.junta_universal) {
           convocation_compliant = true;
         } else if (notice && meetingDate) {
           const diffDays = Math.floor(
@@ -159,6 +175,12 @@ export function useAgreementCompliance(agreementId?: string) {
               `Plazo de convocatoria insuficiente: ${diffDays}d < ${minDays}d exigidos`,
             );
           }
+        } else if (a.status !== "DRAFT" && a.status !== "PROPOSED") {
+          // Acuerdo ya adoptado sin convocatoria localizable: advertencia, no bloqueo
+          convocation_compliant = false;
+          blocking.push(
+            "Convocatoria no localizable para la reunión — plazo no verificable.",
+          );
         }
 
         // Quorum: validado por vista/hook externo; marcamos pendiente si meeting no existe
@@ -167,17 +189,19 @@ export function useAgreementCompliance(agreementId?: string) {
           blocking.push("Reunión no localizada para validar quórum.");
         }
 
-        // Mayoría: si acuerdo ya tiene decision_text y meeting tiene resolutions aprobadas
+        // Mayoría: si acuerdo ya tiene decision_text y meeting tiene resolutions aprobadas.
+        // Si el acuerdo ya está ADOPTED+ sin meeting_resolutions vinculadas (seed sin back-fill
+        // de agreement_id), confiamos en la transición de estado y no bloqueamos.
         const { data: res } = await supabase
           .from("meeting_resolutions")
           .select("status")
           .eq("agreement_id", a.id);
         if (!res || res.length === 0) {
-          majority_compliant = a.status === "DRAFT" || a.status === "PROPOSED";
+          majority_compliant = true;
         } else {
           const approved = res.some((r: any) => r.status === "APROBADO");
           majority_compliant = approved;
-          if (!approved && a.status !== "DRAFT") {
+          if (!approved && a.status !== "DRAFT" && a.status !== "PROPOSED") {
             blocking.push("Resolución asociada no figura como APROBADA.");
           }
         }

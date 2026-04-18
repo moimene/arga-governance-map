@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface JurisdictionRuleSet {
   id: string;
   tenant_id: string;
-  jurisdiction_code: string;
+  jurisdiction: string;
   company_form: string;
   body_type: string | null;
   rule_set_version: string;

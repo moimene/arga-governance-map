@@ -39,16 +39,31 @@ export function useActasList() {
       const { data, error } = await supabase
         .from("minutes")
         .select(
-          "*, meetings(meeting_type, governing_bodies(name, entities(common_name))), meeting_resolutions:meetings(meeting_resolutions(id))",
+          "*, meetings(meeting_type, governing_bodies(name, entities(common_name)))",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((m: any) => ({
+      const rows = (data ?? []) as any[];
+
+      // Count resolutions per meeting in a single query
+      const meetingIds = rows.map((m) => m.meeting_id).filter(Boolean);
+      const counts = new Map<string, number>();
+      if (meetingIds.length > 0) {
+        const { data: resRows } = await supabase
+          .from("meeting_resolutions")
+          .select("meeting_id")
+          .in("meeting_id", meetingIds);
+        for (const r of (resRows ?? []) as { meeting_id: string }[]) {
+          counts.set(r.meeting_id, (counts.get(r.meeting_id) ?? 0) + 1);
+        }
+      }
+
+      return rows.map((m) => ({
         ...m,
         meeting_type: m.meetings?.meeting_type ?? null,
         body_name: m.meetings?.governing_bodies?.name ?? null,
         entity_name: m.meetings?.governing_bodies?.entities?.common_name ?? null,
-        resolutions_count: 0,
+        resolutions_count: counts.get(m.meeting_id) ?? 0,
       }));
     },
   });
