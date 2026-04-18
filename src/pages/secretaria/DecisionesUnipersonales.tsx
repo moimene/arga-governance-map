@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2 } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
@@ -13,9 +14,19 @@ const TYPE_TONE: Record<string, string> = {
   ADMINISTRADOR_UNICO: "bg-[var(--g-sec-300)] text-[var(--g-text-inverse)]",
 };
 
+const SELECT_CLASS =
+  "rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]";
+
 export default function DecisionesUnipersonales() {
   const navigate = useNavigate();
   const { data, isLoading } = useDecisionesUnipersList();
+
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+
+  const filtered = (data ?? []).filter((item) => {
+    if (filterStatus !== "ALL" && item.status !== filterStatus) return false;
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -30,6 +41,30 @@ export default function DecisionesUnipersonales() {
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
           Adopción formal de decisiones cuando no hay órgano colegiado.
         </p>
+      </div>
+
+      {/* Filtros */}
+      <div className="mb-4 flex items-center gap-3">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className={SELECT_CLASS}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ALL">Todos los estados</option>
+          <option value="BORRADOR">Borrador</option>
+          <option value="FIRMADA">Firmada</option>
+          <option value="ANULADA">Anulada</option>
+        </select>
+        {filterStatus !== "ALL" && (
+          <button
+            type="button"
+            onClick={() => setFilterStatus("ALL")}
+            className="text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div
@@ -51,10 +86,10 @@ export default function DecisionesUnipersonales() {
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Cargando…</td></tr>
-            ) : !data || data.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Sin decisiones.</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Sin decisiones para los filtros seleccionados.</td></tr>
             ) : (
-              data.map((d) => (
+              filtered.map((d) => (
                 <tr
                   key={d.id}
                   onClick={() => navigate(`/secretaria/decisiones-unipersonales/${d.id}`)}

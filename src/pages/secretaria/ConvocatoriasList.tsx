@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Plus } from "lucide-react";
 import { useConvocatoriasList } from "@/hooks/useConvocatorias";
@@ -9,9 +10,21 @@ const ESTADO_TONE: Record<string, string> = {
   CANCELADA: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
+const SELECT_CLASS =
+  "rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]";
+
 export default function ConvocatoriasList() {
   const navigate = useNavigate();
   const { data, isLoading } = useConvocatoriasList();
+
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterJurisdiction, setFilterJurisdiction] = useState<string>("ALL");
+
+  const filtered = (data ?? []).filter((item) => {
+    if (filterStatus !== "ALL" && item.estado !== filterStatus) return false;
+    if (filterJurisdiction !== "ALL" && item.jurisdiction !== filterJurisdiction) return false;
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -37,6 +50,43 @@ export default function ConvocatoriasList() {
           <Plus className="h-4 w-4" />
           Nueva convocatoria
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="mb-4 flex items-center gap-3">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className={SELECT_CLASS}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ALL">Todos los estados</option>
+          <option value="BORRADOR">Borrador</option>
+          <option value="CONVOCADA">Convocada</option>
+          <option value="CELEBRADA">Celebrada</option>
+          <option value="CANCELADA">Cancelada</option>
+        </select>
+        <select
+          value={filterJurisdiction}
+          onChange={(e) => setFilterJurisdiction(e.target.value)}
+          className={SELECT_CLASS}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ALL">Todas las jurisdicciones</option>
+          <option value="ES">ES — España</option>
+          <option value="BR">BR — Brasil</option>
+          <option value="MX">MX — México</option>
+          <option value="PT">PT — Portugal</option>
+        </select>
+        {(filterStatus !== "ALL" || filterJurisdiction !== "ALL") && (
+          <button
+            type="button"
+            onClick={() => { setFilterStatus("ALL"); setFilterJurisdiction("ALL"); }}
+            className="text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div
@@ -76,17 +126,17 @@ export default function ConvocatoriasList() {
                   Cargando…
                 </td>
               </tr>
-            ) : !data || data.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td
                   colSpan={6}
                   className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]"
                 >
-                  Sin convocatorias.
+                  Sin convocatorias para los filtros seleccionados.
                 </td>
               </tr>
             ) : (
-              data.map((c) => (
+              filtered.map((c) => (
                 <tr
                   key={c.id}
                   onClick={() => navigate(`/secretaria/convocatorias/${c.id}`)}

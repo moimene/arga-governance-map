@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Plus } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
@@ -10,9 +11,26 @@ const STATUS_TONE: Record<string, string> = {
   BORRADOR:   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
 };
 
+const SELECT_CLASS =
+  "rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]";
+
 export default function ReunionesLista() {
   const navigate = useNavigate();
   const { data, isLoading } = useReunionesList();
+
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterBody, setFilterBody] = useState<string>("ALL");
+
+  // Obtener lista de órganos únicos para el selector
+  const bodyOptions = Array.from(
+    new Map((data ?? []).map((m) => [m.body_id, m.body_name ?? m.body_id])).entries()
+  );
+
+  const filtered = (data ?? []).filter((item) => {
+    if (filterStatus !== "ALL" && item.status !== filterStatus) return false;
+    if (filterBody !== "ALL" && item.body_id !== filterBody) return false;
+    return true;
+  });
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -38,6 +56,43 @@ export default function ReunionesLista() {
           <Plus className="h-4 w-4" />
           Nueva reunión
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="mb-4 flex items-center gap-3">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className={SELECT_CLASS}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ALL">Todos los estados</option>
+          <option value="BORRADOR">Borrador</option>
+          <option value="PROGRAMADA">Programada</option>
+          <option value="EN_CURSO">En curso</option>
+          <option value="CELEBRADA">Celebrada</option>
+          <option value="CANCELADA">Cancelada</option>
+        </select>
+        <select
+          value={filterBody}
+          onChange={(e) => setFilterBody(e.target.value)}
+          className={SELECT_CLASS}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ALL">Todos los órganos</option>
+          {bodyOptions.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+        {(filterStatus !== "ALL" || filterBody !== "ALL") && (
+          <button
+            type="button"
+            onClick={() => { setFilterStatus("ALL"); setFilterBody("ALL"); }}
+            className="text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div
@@ -74,14 +129,14 @@ export default function ReunionesLista() {
                   Cargando…
                 </td>
               </tr>
-            ) : !data || data.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Sin reuniones.
+                  Sin reuniones para los filtros seleccionados.
                 </td>
               </tr>
             ) : (
-              data.map((m) => (
+              filtered.map((m) => (
                 <tr
                   key={m.id}
                   onClick={() => navigate(`/secretaria/reuniones/${m.id}`)}
