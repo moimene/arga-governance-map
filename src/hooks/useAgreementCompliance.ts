@@ -117,15 +117,15 @@ export function useAgreementCompliance(agreementId?: string) {
         // Convocatoria + quorum + mayoría desde meeting y convocatoria asociada
         const { data: meeting } = await supabase
           .from("meetings")
-          .select("*, convocatorias(notice_date, fecha_1, urgent, universal)")
+          .select("*, convocatorias(fecha_emision, fecha_1, urgente, junta_universal)")
           .eq("id", a.parent_meeting_id)
           .maybeSingle();
 
         const m: any = meeting;
         // Convocatoria: plazo mínimo respetado
-        const notice = m?.convocatorias?.notice_date;
+        const notice = m?.convocatorias?.fecha_emision;
         const meetingDate = m?.convocatorias?.fecha_1;
-        if (m?.convocatorias?.universal) {
+        if (m?.convocatorias?.junta_universal) {
           convocation_compliant = true;
         } else if (notice && meetingDate) {
           const diffDays = Math.floor(
@@ -155,7 +155,7 @@ export function useAgreementCompliance(agreementId?: string) {
         // Mayoría: si acuerdo ya tiene decision_text y meeting tiene resolutions aprobadas
         const { data: res } = await supabase
           .from("meeting_resolutions")
-          .select("status, votes_for, votes_against, abstentions")
+          .select("status")
           .eq("agreement_id", a.id);
         if (!res || res.length === 0) {
           majority_compliant = a.status === "DRAFT" || a.status === "PROPOSED";
@@ -167,11 +167,11 @@ export function useAgreementCompliance(agreementId?: string) {
           }
         }
 
-        // Conflictos: buscamos conflict_notifications ligadas a la reunión
+        // Conflictos de interés ligados a la reunión
         const { data: conflicts } = await supabase
-          .from("conflicts")
+          .from("conflicts_of_interest")
           .select("id, status")
-          .eq("meeting_id", a.parent_meeting_id);
+          .eq("related_meeting_id", a.parent_meeting_id);
         if (conflicts && conflicts.length > 0) {
           conflict_handled = conflicts.every(
             (c: any) => c.status === "RESUELTO" || c.status === "NOTIFICADO",
@@ -186,7 +186,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: nsr } = await supabase
           .from("no_session_resolutions")
           .select(
-            "status, requires_unanimity, votes_for, votes_against, abstentions, total_voters",
+            "status, requires_unanimity, votes_for, votes_against, abstentions",
           )
           .eq("id", a.no_session_resolution_id)
           .maybeSingle();
@@ -195,8 +195,7 @@ export function useAgreementCompliance(agreementId?: string) {
           majority_compliant = false;
           blocking.push("Resolución sin sesión no localizada.");
         } else if (n.requires_unanimity) {
-          const unanimous =
-            n.votes_against === 0 && n.abstentions === 0 && n.votes_for === n.total_voters;
+          const unanimous = n.votes_against === 0 && n.abstentions === 0;
           majority_compliant = unanimous;
           if (!unanimous && n.status === "APROBADO") {
             blocking.push("Acuerdo requiere unanimidad y no se ha alcanzado.");
