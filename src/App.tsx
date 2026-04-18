@@ -68,6 +68,12 @@ import LibrosObligatorios from "@/pages/secretaria/LibrosObligatorios";
 import Plantillas from "@/pages/secretaria/Plantillas";
 import ExpedienteAcuerdo from "@/pages/secretaria/ExpedienteAcuerdo";
 import { RequireAuth } from "@/components/RequireAuth";
+import { AiLayout } from "@/pages/ai-governance/AiLayout";
+import AiDashboard from "@/pages/ai-governance/Dashboard";
+import Sistemas from "@/pages/ai-governance/Sistemas";
+import SistemaDetalle from "@/pages/ai-governance/SistemaDetalle";
+import Evaluaciones from "@/pages/ai-governance/Evaluaciones";
+import AiIncidentes from "@/pages/ai-governance/Incidentes";
 
 const queryClient = new QueryClient();
 
@@ -160,6 +166,20 @@ const App = () => (
                     <Route path="dashboard" element={<ModuleDashboard />} />
                     <Route path=":section/:viewKey" element={<SectionRouter />} />
                   </Route>
+                </Route>
+                {/* Módulo Garrigues AI Governance — layout propio (sidebar verde) */}
+                <Route
+                  element={
+                    <RequireAuth>
+                      <AiLayout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route path="/ai-governance"              element={<AiDashboard />} />
+                  <Route path="/ai-governance/sistemas"     element={<Sistemas />} />
+                  <Route path="/ai-governance/sistemas/:id" element={<SistemaDetalle />} />
+                  <Route path="/ai-governance/evaluaciones" element={<Evaluaciones />} />
+                  <Route path="/ai-governance/incidentes"   element={<AiIncidentes />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
