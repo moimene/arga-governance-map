@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { checkNoticePeriodByType } from "@/hooks/useJurisdiccionRules";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",            hint: "Seleccionar tipo de reunión y órgano convocante" },
@@ -12,9 +13,36 @@ const STEPS = [
   { n: 7, label: "Revisión y emisión",        hint: "Verificación de compliance y cierre" },
 ];
 
+// Datos de formulario demo — en producción vendrían del estado del stepper
+const DEMO_FORM = {
+  meeting_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), // +10 días desde hoy
+  jurisdiction: "ES",
+  meeting_type: "ORDINARIA" as "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL",
+};
+
 export default function ConvocatoriasStepper() {
   const navigate = useNavigate();
   const [current, setCurrent] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Calcular si el plazo está cumplido (solo relevante en paso 7)
+  const noticeOk = checkNoticePeriodByType({
+    meetingDate: DEMO_FORM.meeting_date,
+    jurisdiction: DEMO_FORM.jurisdiction,
+    convocationType: DEMO_FORM.meeting_type,
+  });
+
+  function handleEmitir() {
+    if (!noticeOk || isSubmitting) return;
+    setIsSubmitting(true);
+    // En producción: llamada a Supabase para crear/actualizar la convocatoria
+    setTimeout(() => {
+      setIsSubmitting(false);
+      navigate("/secretaria/convocatorias");
+    }, 1000);
+  }
+
+  const isLastStep = current === STEPS.length;
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
@@ -93,8 +121,9 @@ export default function ConvocatoriasStepper() {
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             <p className="text-sm text-[var(--g-text-primary)]">
-              Formulario del paso {current} — implementación pendiente. En el demo se usan las
-              convocatorias ya sembradas (CONV-001, CONV-002, CONV-003).
+              {isLastStep
+                ? "Revisa los datos de la convocatoria antes de emitirla. El sistema validará el plazo mínimo según la jurisdicción seleccionada."
+                : `Formulario del paso ${current} — implementación pendiente. En el demo se usan las convocatorias ya sembradas (CONV-001, CONV-002, CONV-003).`}
             </p>
           </div>
 
@@ -108,16 +137,36 @@ export default function ConvocatoriasStepper() {
             >
               Anterior
             </button>
-            <button
-              type="button"
-              onClick={() => setCurrent((n) => Math.min(STEPS.length, n + 1))}
-              disabled={current === STEPS.length}
-              className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-40"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              Siguiente
-              <ChevronRight className="h-4 w-4" />
-            </button>
+
+            {isLastStep ? (
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  type="button"
+                  disabled={!noticeOk || isSubmitting}
+                  onClick={handleEmitir}
+                  aria-busy={isSubmitting}
+                  className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {isSubmitting ? "Emitiendo…" : "Emitir convocatoria"}
+                </button>
+                {!noticeOk && (
+                  <p className="text-xs text-[var(--status-error)]">
+                    El plazo mínimo de convocatoria no está cumplido para la jurisdicción seleccionada.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCurrent((n) => Math.min(STEPS.length, n + 1))}
+                className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

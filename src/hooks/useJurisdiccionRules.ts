@@ -174,6 +174,31 @@ export function checkNoticePeriod(
 }
 
 /**
+ * Check if notice period is compliant using hardcoded minimum days per
+ * jurisdiction + convocation type (no rule set required — for ConvocatoriasStepper).
+ * Returns true if the meeting date is far enough in the future.
+ */
+export function checkNoticePeriodByType(params: {
+  meetingDate: string;       // ISO date
+  jurisdiction: string;      // 'ES' | 'BR' | 'MX' | 'PT'
+  convocationType: string;   // 'ORDINARIA' | 'EXTRAORDINARIA' | 'UNIVERSAL'
+}): boolean {
+  if (params.convocationType === "UNIVERSAL") return true; // no requiere plazo
+  const today = new Date();
+  const meeting = new Date(params.meetingDate);
+  const diffDays = Math.floor((meeting.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  const minDays: Record<string, Record<string, number>> = {
+    ES: { ORDINARIA: 15, EXTRAORDINARIA: 5 },
+    BR: { ORDINARIA: 8,  EXTRAORDINARIA: 3 },
+    MX: { ORDINARIA: 15, EXTRAORDINARIA: 8 },
+    PT: { ORDINARIA: 21, EXTRAORDINARIA: 8 },
+  };
+  const required = minDays[params.jurisdiction]?.[params.convocationType] ?? 15;
+  return diffDays >= required;
+}
+
+/**
  * Determine if a matter is inscribable (requires registry filing).
  */
 export function isInscribableMatter(
