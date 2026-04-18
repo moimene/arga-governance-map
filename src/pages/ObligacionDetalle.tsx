@@ -36,7 +36,8 @@ export default function ObligacionDetalle() {
   const controlIds = useMemo(() => controls.map((c) => c.id), [controls]);
   const { data: evidences = [] } = useEvidencesByControlIds(controlIds);
 
-  // Incidentes GRC vinculados por FK obligation_id (Ola 3 Gap 3).
+  // Incidentes GRC vinculados por FK obligation_id (GAP 3 — obligation_id → incidents).
+  const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
   type IncidentLinked = {
     id: string;
     code: string;
@@ -58,6 +59,7 @@ export default function ObligacionDetalle() {
         .from("incidents")
         .select("id, code, title, status, severity, incident_type, is_major_incident, regulatory_notification_required, detection_date, resolution_date")
         .eq("obligation_id", obligation!.id)
+        .eq("tenant_id", DEMO_TENANT)
         .order("detection_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as IncidentLinked[];
