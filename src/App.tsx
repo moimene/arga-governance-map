@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -34,46 +35,71 @@ import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
 import GrcDashboard from "@/pages/modules/GrcDashboard";
 import AimsDashboard from "@/pages/modules/AimsDashboard";
-import { GrcLayout } from "@/pages/grc/GrcLayout";
-import { ModuleShell } from "@/components/grc/ModuleShell";
-import { SectionRouter } from "@/components/grc/SectionRouter";
-import GrcDashboardPage from "@/pages/grc/Dashboard";
-import Risk360 from "@/pages/grc/Risk360";
-import PacksPage from "@/pages/grc/PacksPage";
-import PackDetalle from "@/pages/grc/PackDetalle";
-import IncidentesList from "@/pages/grc/IncidentesList";
-import IncidenteStepper from "@/pages/grc/IncidenteStepper";
-import IncidenteDetalle from "@/pages/grc/IncidenteDetalle";
-import MyWork from "@/pages/grc/MyWork";
-import Alertas from "@/pages/grc/Alertas";
-import Excepciones from "@/pages/grc/Excepciones";
-import ModuleDashboard from "@/pages/grc/ModuleDashboard";
-import { SecretariaLayout } from "@/pages/secretaria/SecretariaLayout";
-import SecretariaDashboard from "@/pages/secretaria/Dashboard";
-import ConvocatoriasList from "@/pages/secretaria/ConvocatoriasList";
-import ConvocatoriaDetalle from "@/pages/secretaria/ConvocatoriaDetalle";
-import ConvocatoriasStepper from "@/pages/secretaria/ConvocatoriasStepper";
-import ReunionesLista from "@/pages/secretaria/ReunionesLista";
-import ReunionStepper from "@/pages/secretaria/ReunionStepper";
-import ActasLista from "@/pages/secretaria/ActasLista";
-import ActaDetalle from "@/pages/secretaria/ActaDetalle";
-import TramitadorLista from "@/pages/secretaria/TramitadorLista";
-import TramitadorStepper from "@/pages/secretaria/TramitadorStepper";
-import AcuerdosSinSesion from "@/pages/secretaria/AcuerdosSinSesion";
-import AcuerdoSinSesionStepper from "@/pages/secretaria/AcuerdoSinSesionStepper";
-import AcuerdoSinSesionDetalle from "@/pages/secretaria/AcuerdoSinSesionDetalle";
-import DecisionesUnipersonales from "@/pages/secretaria/DecisionesUnipersonales";
-import DecisionDetalle from "@/pages/secretaria/DecisionDetalle";
-import LibrosObligatorios from "@/pages/secretaria/LibrosObligatorios";
-import Plantillas from "@/pages/secretaria/Plantillas";
-import ExpedienteAcuerdo from "@/pages/secretaria/ExpedienteAcuerdo";
 import { RequireAuth } from "@/components/RequireAuth";
-import { AiLayout } from "@/pages/ai-governance/AiLayout";
-import AiDashboard from "@/pages/ai-governance/Dashboard";
-import Sistemas from "@/pages/ai-governance/Sistemas";
-import SistemaDetalle from "@/pages/ai-governance/SistemaDetalle";
-import Evaluaciones from "@/pages/ai-governance/Evaluaciones";
-import AiIncidentes from "@/pages/ai-governance/Incidentes";
+
+// ── Módulo Garrigues: Secretaría (lazy) ─────────────────────────────────────
+const SecretariaLayout = lazy(() =>
+  import("@/pages/secretaria/SecretariaLayout").then((m) => ({ default: m.SecretariaLayout }))
+);
+const SecretariaDashboard = lazy(() => import("@/pages/secretaria/Dashboard"));
+const ConvocatoriasList = lazy(() => import("@/pages/secretaria/ConvocatoriasList"));
+const ConvocatoriaDetalle = lazy(() => import("@/pages/secretaria/ConvocatoriaDetalle"));
+const ConvocatoriasStepper = lazy(() => import("@/pages/secretaria/ConvocatoriasStepper"));
+const ReunionesLista = lazy(() => import("@/pages/secretaria/ReunionesLista"));
+const ReunionStepper = lazy(() => import("@/pages/secretaria/ReunionStepper"));
+const ActasLista = lazy(() => import("@/pages/secretaria/ActasLista"));
+const ActaDetalle = lazy(() => import("@/pages/secretaria/ActaDetalle"));
+const TramitadorLista = lazy(() => import("@/pages/secretaria/TramitadorLista"));
+const TramitadorStepper = lazy(() => import("@/pages/secretaria/TramitadorStepper"));
+const AcuerdosSinSesion = lazy(() => import("@/pages/secretaria/AcuerdosSinSesion"));
+const AcuerdoSinSesionStepper = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionStepper"));
+const AcuerdoSinSesionDetalle = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionDetalle"));
+const DecisionesUnipersonales = lazy(() => import("@/pages/secretaria/DecisionesUnipersonales"));
+const DecisionDetalle = lazy(() => import("@/pages/secretaria/DecisionDetalle"));
+const LibrosObligatorios = lazy(() => import("@/pages/secretaria/LibrosObligatorios"));
+const Plantillas = lazy(() => import("@/pages/secretaria/Plantillas"));
+const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerdo"));
+
+// ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
+const GrcLayout = lazy(() =>
+  import("@/pages/grc/GrcLayout").then((m) => ({ default: m.GrcLayout }))
+);
+const ModuleShell = lazy(() =>
+  import("@/components/grc/ModuleShell").then((m) => ({ default: m.ModuleShell }))
+);
+const SectionRouter = lazy(() =>
+  import("@/components/grc/SectionRouter").then((m) => ({ default: m.SectionRouter }))
+);
+const GrcDashboardPage = lazy(() => import("@/pages/grc/Dashboard"));
+const Risk360 = lazy(() => import("@/pages/grc/Risk360"));
+const PacksPage = lazy(() => import("@/pages/grc/PacksPage"));
+const PackDetalle = lazy(() => import("@/pages/grc/PackDetalle"));
+const IncidentesList = lazy(() => import("@/pages/grc/IncidentesList"));
+const IncidenteStepper = lazy(() => import("@/pages/grc/IncidenteStepper"));
+const IncidenteDetalle = lazy(() => import("@/pages/grc/IncidenteDetalle"));
+const MyWork = lazy(() => import("@/pages/grc/MyWork"));
+const Alertas = lazy(() => import("@/pages/grc/Alertas"));
+const Excepciones = lazy(() => import("@/pages/grc/Excepciones"));
+const ModuleDashboard = lazy(() => import("@/pages/grc/ModuleDashboard"));
+
+// ── Módulo Garrigues: AI Governance (lazy) ──────────────────────────────────
+const AiLayout = lazy(() =>
+  import("@/pages/ai-governance/AiLayout").then((m) => ({ default: m.AiLayout }))
+);
+const AiDashboard = lazy(() => import("@/pages/ai-governance/Dashboard"));
+const Sistemas = lazy(() => import("@/pages/ai-governance/Sistemas"));
+const SistemaDetalle = lazy(() => import("@/pages/ai-governance/SistemaDetalle"));
+const Evaluaciones = lazy(() => import("@/pages/ai-governance/Evaluaciones"));
+const AiIncidentes = lazy(() => import("@/pages/ai-governance/Incidentes"));
+
+// ── Fallback compartido para Suspense ────────────────────────────────────────
+function ModuleFallback() {
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-[var(--g-text-secondary)]">
+      Cargando...
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -119,68 +145,74 @@ const App = () => (
                 <Route
                   element={
                     <RequireAuth>
-                      <SecretariaLayout />
+                      <Suspense fallback={<ModuleFallback />}>
+                        <SecretariaLayout />
+                      </Suspense>
                     </RequireAuth>
                   }
                 >
-                  <Route path="/secretaria" element={<SecretariaDashboard />} />
-                  <Route path="/secretaria/convocatorias" element={<ConvocatoriasList />} />
-                  <Route path="/secretaria/convocatorias/nueva" element={<ConvocatoriasStepper />} />
-                  <Route path="/secretaria/convocatorias/:id" element={<ConvocatoriaDetalle />} />
-                  <Route path="/secretaria/reuniones" element={<ReunionesLista />} />
-                  <Route path="/secretaria/reuniones/nueva" element={<ReunionStepper />} />
-                  <Route path="/secretaria/reuniones/:id" element={<ReunionStepper />} />
-                  <Route path="/secretaria/actas" element={<ActasLista />} />
-                  <Route path="/secretaria/actas/:id" element={<ActaDetalle />} />
-                  <Route path="/secretaria/tramitador" element={<TramitadorLista />} />
-                  <Route path="/secretaria/tramitador/nuevo" element={<TramitadorStepper />} />
-                  <Route path="/secretaria/tramitador/:id" element={<TramitadorStepper />} />
-                  <Route path="/secretaria/acuerdos-sin-sesion" element={<AcuerdosSinSesion />} />
-                  <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<AcuerdoSinSesionStepper />} />
-                  <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<AcuerdoSinSesionDetalle />} />
-                  <Route path="/secretaria/decisiones-unipersonales" element={<DecisionesUnipersonales />} />
-                  <Route path="/secretaria/decisiones-unipersonales/:id" element={<DecisionDetalle />} />
-                  <Route path="/secretaria/libros" element={<LibrosObligatorios />} />
-                  <Route path="/secretaria/plantillas" element={<Plantillas />} />
-                  <Route path="/secretaria/acuerdos/:id" element={<ExpedienteAcuerdo />} />
+                  <Route path="/secretaria" element={<Suspense fallback={<ModuleFallback />}><SecretariaDashboard /></Suspense>} />
+                  <Route path="/secretaria/convocatorias" element={<Suspense fallback={<ModuleFallback />}><ConvocatoriasList /></Suspense>} />
+                  <Route path="/secretaria/convocatorias/nueva" element={<Suspense fallback={<ModuleFallback />}><ConvocatoriasStepper /></Suspense>} />
+                  <Route path="/secretaria/convocatorias/:id" element={<Suspense fallback={<ModuleFallback />}><ConvocatoriaDetalle /></Suspense>} />
+                  <Route path="/secretaria/reuniones" element={<Suspense fallback={<ModuleFallback />}><ReunionesLista /></Suspense>} />
+                  <Route path="/secretaria/reuniones/nueva" element={<Suspense fallback={<ModuleFallback />}><ReunionStepper /></Suspense>} />
+                  <Route path="/secretaria/reuniones/:id" element={<Suspense fallback={<ModuleFallback />}><ReunionStepper /></Suspense>} />
+                  <Route path="/secretaria/actas" element={<Suspense fallback={<ModuleFallback />}><ActasLista /></Suspense>} />
+                  <Route path="/secretaria/actas/:id" element={<Suspense fallback={<ModuleFallback />}><ActaDetalle /></Suspense>} />
+                  <Route path="/secretaria/tramitador" element={<Suspense fallback={<ModuleFallback />}><TramitadorLista /></Suspense>} />
+                  <Route path="/secretaria/tramitador/nuevo" element={<Suspense fallback={<ModuleFallback />}><TramitadorStepper /></Suspense>} />
+                  <Route path="/secretaria/tramitador/:id" element={<Suspense fallback={<ModuleFallback />}><TramitadorStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion" element={<Suspense fallback={<ModuleFallback />}><AcuerdosSinSesion /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionDetalle /></Suspense>} />
+                  <Route path="/secretaria/decisiones-unipersonales" element={<Suspense fallback={<ModuleFallback />}><DecisionesUnipersonales /></Suspense>} />
+                  <Route path="/secretaria/decisiones-unipersonales/:id" element={<Suspense fallback={<ModuleFallback />}><DecisionDetalle /></Suspense>} />
+                  <Route path="/secretaria/libros" element={<Suspense fallback={<ModuleFallback />}><LibrosObligatorios /></Suspense>} />
+                  <Route path="/secretaria/plantillas" element={<Suspense fallback={<ModuleFallback />}><Plantillas /></Suspense>} />
+                  <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
                 <Route
                   element={
                     <RequireAuth>
-                      <GrcLayout />
+                      <Suspense fallback={<ModuleFallback />}>
+                        <GrcLayout />
+                      </Suspense>
                     </RequireAuth>
                   }
                 >
-                  <Route path="/grc"                      element={<GrcDashboardPage />} />
-                  <Route path="/grc/risk-360"             element={<Risk360 />} />
-                  <Route path="/grc/packs"                element={<PacksPage />} />
-                  <Route path="/grc/packs/:countryCode"   element={<PackDetalle />} />
-                  <Route path="/grc/incidentes"           element={<IncidentesList />} />
-                  <Route path="/grc/incidentes/nuevo"     element={<IncidenteStepper />} />
-                  <Route path="/grc/incidentes/:id"       element={<IncidenteDetalle />} />
-                  <Route path="/grc/mywork"               element={<MyWork />} />
-                  <Route path="/grc/alertas"              element={<Alertas />} />
-                  <Route path="/grc/excepciones"          element={<Excepciones />} />
-                  <Route path="/grc/m/:moduleId" element={<ModuleShell />}>
-                    <Route index element={<ModuleDashboard />} />
-                    <Route path="dashboard" element={<ModuleDashboard />} />
-                    <Route path=":section/:viewKey" element={<SectionRouter />} />
+                  <Route path="/grc"                      element={<Suspense fallback={<ModuleFallback />}><GrcDashboardPage /></Suspense>} />
+                  <Route path="/grc/risk-360"             element={<Suspense fallback={<ModuleFallback />}><Risk360 /></Suspense>} />
+                  <Route path="/grc/packs"                element={<Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense>} />
+                  <Route path="/grc/packs/:countryCode"   element={<Suspense fallback={<ModuleFallback />}><PackDetalle /></Suspense>} />
+                  <Route path="/grc/incidentes"           element={<Suspense fallback={<ModuleFallback />}><IncidentesList /></Suspense>} />
+                  <Route path="/grc/incidentes/nuevo"     element={<Suspense fallback={<ModuleFallback />}><IncidenteStepper /></Suspense>} />
+                  <Route path="/grc/incidentes/:id"       element={<Suspense fallback={<ModuleFallback />}><IncidenteDetalle /></Suspense>} />
+                  <Route path="/grc/mywork"               element={<Suspense fallback={<ModuleFallback />}><MyWork /></Suspense>} />
+                  <Route path="/grc/alertas"              element={<Suspense fallback={<ModuleFallback />}><Alertas /></Suspense>} />
+                  <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
+                  <Route path="/grc/m/:moduleId" element={<Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense>}>
+                    <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
+                    <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
+                    <Route path=":section/:viewKey" element={<Suspense fallback={<ModuleFallback />}><SectionRouter /></Suspense>} />
                   </Route>
                 </Route>
                 {/* Módulo Garrigues AI Governance — layout propio (sidebar verde) */}
                 <Route
                   element={
                     <RequireAuth>
-                      <AiLayout />
+                      <Suspense fallback={<ModuleFallback />}>
+                        <AiLayout />
+                      </Suspense>
                     </RequireAuth>
                   }
                 >
-                  <Route path="/ai-governance"              element={<AiDashboard />} />
-                  <Route path="/ai-governance/sistemas"     element={<Sistemas />} />
-                  <Route path="/ai-governance/sistemas/:id" element={<SistemaDetalle />} />
-                  <Route path="/ai-governance/evaluaciones" element={<Evaluaciones />} />
-                  <Route path="/ai-governance/incidentes"   element={<AiIncidentes />} />
+                  <Route path="/ai-governance"              element={<Suspense fallback={<ModuleFallback />}><AiDashboard /></Suspense>} />
+                  <Route path="/ai-governance/sistemas"     element={<Suspense fallback={<ModuleFallback />}><Sistemas /></Suspense>} />
+                  <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
+                  <Route path="/ai-governance/evaluaciones" element={<Suspense fallback={<ModuleFallback />}><Evaluaciones /></Suspense>} />
+                  <Route path="/ai-governance/incidentes"   element={<Suspense fallback={<ModuleFallback />}><AiIncidentes /></Suspense>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
