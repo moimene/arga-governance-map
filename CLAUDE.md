@@ -273,51 +273,52 @@ src/hooks/useConflicts.ts
 src/hooks/useSii.ts
 ```
 
-### Fase 2 — EN CURSO: Módulo Secretaría Societaria (`/secretaria/*`)
+### Fase 2 — COMPLETADA (commit `9e6b7e5`): Módulo Secretaría Societaria (`/secretaria/*`)
 
-**Estrategia de ejecución: Opción C (híbrida)**
+T1→T14 completos: 15 tablas + `agreements` + triggers + seed, SecretariaLayout
+con tokens `--g-*`, Dashboard con KPIs, Convocatorias (lista + stepper 7 pasos),
+Reuniones (stepper 6 pasos crea agreements), Actas + Certificaciones vinculadas
+a `agreement_id`, Tramitador (stepper 5 pasos), Acuerdos sin sesión (tracker
+unanimidad), Decisiones unipersonales, Libros con alertas de legalización,
+Plantillas ES/PT/BR/MX, cross-module en OrganoDetalle + PoliticaDetalle,
+`useAgreementCompliance` (motor de validez), `ExpedienteAcuerdo` (timeline
+8 estados + compliance snapshot).
 
-#### Paso A — Ejecutar primero (plan v1, Tasks 1–3)
+### Fase 3 — COMPLETADA (commit `f6effd9`): GRC Compass (`/grc/*`)
 
-| Task | Estado | Descripción |
+Módulos implementados: DORA (Incidents, BCM, RTO), Cyber (Incidents, Vulnerabilities),
+Audit (Findings, ActionPlans), Packs país, Risk360, MyWork, ModuleDashboard,
+IncidenteDetalle/Stepper, Excepciones, Alertas, country packs.
+
+### Fase 4 — COMPLETADA (commit `1feac7b`): AI Governance (`/ai-governance/*`)
+
+### Fase 5 — COMPLETADA (commit `a084229`): Integración hub cross-module TGMS
+
+### Olas de remediación
+
+| Ola | Commit | Descripción |
 |---|---|---|
-| T1 | ❌ PENDIENTE | SQL: 15 tablas + 2 triggers + seed completo |
-| T2 | ❌ PENDIENTE | SecretariaLayout: tokens `--g-*` en index.css, sidebar verde, App.tsx routes |
-| T3 | ❌ PENDIENTE | useJurisdiccionRules + computeQuorumStatus + Dashboard con KPIs |
+| Ola 1 | `8fd44f1` | `fix(secretaria)`: motor de validez + KPI acuerdos pendientes |
+| Ola 2 | `e0d9d20` | `fix(hooks)`: tenant scoping + rutas/columnas alineadas |
+| Ola 3 | `c401d78` | `chore(types)`: elimina `@typescript-eslint/no-explicit-any` en hooks, componentes y páginas (core, grc, secretaria, sii). Exporta tipos `*DetailRow` desde hooks para que las páginas importen el shape real de Supabase. Smoke `tsc --noEmit && vite build` limpio. |
 
-#### Paso B — Actualizar spec/plan (incorporar `agreements`)
-
-Ver "Decisión arquitectónica pendiente" más abajo. Escribir plan v2 antes de T4+.
-
-#### Paso C — Ejecutar T1b + T4–T14 (plan v2)
-
-| Task | Estado | Descripción |
-|---|---|---|
-| T1b | ❌ PENDIENTE | SQL incremental: tabla `agreements` + ajustes |
-| T4 | ❌ PENDIENTE | Convocatorias: hook + lista + detalle + stepper 7 pasos |
-| T5 | ❌ PENDIENTE | Reuniones: hook + lista + stepper 6 pasos (crea agreements) |
-| T6 | ❌ PENDIENTE | Actas + Certificaciones (agreement_id) |
-| T7 | ❌ PENDIENTE | Tramitador: stepper 5 pasos, bifurcación notarial/electrónica |
-| T8 | ❌ PENDIENTE | Acuerdos sin sesión (crea agreements al cerrar votación) |
-| T9 | ❌ PENDIENTE | Decisiones unipersonales (crea agreements al firmar) |
-| T10 | ❌ PENDIENTE | Libros obligatorios con alertas de legalización |
-| T11 | ❌ PENDIENTE | Plantillas con versionado y locale |
-| T12 | ❌ PENDIENTE | Cross-module: OrganoDetalle + PoliticaDetalle |
-| T13 | ❌ PENDIENTE | useAgreementCompliance: motor de validez |
-| T14 | ❌ PENDIENTE | Vista "Expediente del acuerdo" |
+**Patrón de tipado establecido (Ola 3):**
+- Para queries con join PostgREST (`*, foreign(col)`): definir un tipo `Raw` local o exportado (`type Raw = Omit<Row, "flat_col"> & { foreign?: { col?: type | null } | null }`) y castear `(data ?? []) as Raw[]` en el boundary de la query.
+- Para `maybeSingle()`: castear `data as X | null`.
+- Para `DetailRow` (join más rico que list): exportar tipo `XxxDetailRow` desde el hook y que la página lo importe vía `import type`.
+- Para reduce: `reduce<Record<string, RowType[]>>((acc, item) => {...}, {})`.
+- Para errores: `catch (e) { const msg = e instanceof Error ? e.message : String(e); }`.
 
 **Documentos de referencia (rutas absolutas — NO están en este repo):**
 - Spec: `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/specs/2026-04-18-secretaria-societaria-design.md`
 - Plan v1 (T1–T12, con deuda UX): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation.md`
-- Plan v2 (T1–T14, UX corregida): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md` ← **POR CREAR**
+- Plan v2 (T1–T14, UX corregida): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md`
 
 ---
 
-## Decisión arquitectónica pendiente: `agreements` como agregado raíz
+## Arquitectura: `agreements` como agregado raíz (ya implementado en Fase 2)
 
-**IMPORTANTE — Incorporar antes de ejecutar T4+**
-
-### Nueva tabla `agreements`
+### Tabla `agreements`
 
 ```sql
 agreements (
