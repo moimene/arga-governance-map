@@ -32,7 +32,7 @@ const top: Item[] = [
 const modules: Item[] = [
   { label: "GRC Compass", to: "/grc", icon: Compass },
   { label: "Secretaría", to: "/secretaria", icon: ClipboardList },
-  { label: "AIms", to: "/aims", icon: Brain },
+  { label: "AI Governance", to: "/ai-governance", icon: Brain },
 ];
 
 const sii: Item[] = [

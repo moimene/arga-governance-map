@@ -18,11 +18,13 @@ import {
   controlStatusLabel,
   controlStatusTone,
 } from "@/hooks/usePoliciesObligations";
-import { Check, Download, FileCheck2, GitCompare, History } from "lucide-react";
+import { Brain, Check, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useAiSystemsList } from "@/hooks/useAiSystems";
+import { Link as RouterLink } from "react-router-dom";
 
 const PR008_SECTIONS = [
   { title: "Objeto y ámbito de aplicación", body: "La presente Política establece el marco de gestión de la resiliencia operativa digital del Grupo ARGA Seguros, en cumplimiento del Reglamento (UE) 2022/2554 (DORA). Es de aplicación a todas las entidades del Grupo y a sus proveedores TIC críticos." },
@@ -73,6 +75,19 @@ export default function PoliticaDetalle() {
       return (data ?? []) as any[];
     },
   });
+
+  // AI systems related to this policy (match by use_case or policy title)
+  const { data: allAiSystems = [] } = useAiSystemsList();
+  const relatedAiSystems = useMemo(() => {
+    if (!policy) return [];
+    const needle = policy.title?.toLowerCase() ?? "";
+    const code = (policy.policy_code ?? "").toLowerCase();
+    return allAiSystems.filter((s) => {
+      const uc = (s.use_case ?? "").toLowerCase();
+      const desc = (s.description ?? "").toLowerCase();
+      return uc.includes(code) || uc.includes(needle) || desc.includes(code);
+    });
+  }, [allAiSystems, policy]);
 
   if (isLoading) {
     return (
@@ -130,12 +145,20 @@ export default function PoliticaDetalle() {
       </div>
 
       <Tabs defaultValue="contenido" className="mt-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className="grid w-full max-w-3xl grid-cols-6">
           <TabsTrigger value="contenido">Contenido</TabsTrigger>
           <TabsTrigger value="aplicabilidad">Aplicabilidad</TabsTrigger>
           <TabsTrigger value="obligaciones">Obligaciones</TabsTrigger>
           <TabsTrigger value="aprobaciones">Aprobaciones</TabsTrigger>
           <TabsTrigger value="versiones">Versiones</TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-1">
+            <Brain className="h-3.5 w-3.5" />AI
+            {relatedAiSystems.length > 0 && (
+              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                {relatedAiSystems.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="contenido" className="mt-4">
@@ -293,6 +316,77 @@ export default function PoliticaDetalle() {
                 </TableRow>
               </TableBody>
             </Table>
+          </Card>
+        </TabsContent>
+        <TabsContent value="ai" className="mt-4">
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Sistemas IA relacionados</h3>
+              <span className="text-xs text-muted-foreground">
+                Sistemas cuyo caso de uso está vinculado a esta política
+              </span>
+            </div>
+            {relatedAiSystems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Brain className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">No se encontraron sistemas IA vinculados a esta política.</p>
+                <RouterLink to="/ai-governance/sistemas" className="mt-3 text-xs text-primary hover:underline flex items-center gap-1">
+                  <ExternalLink className="h-3 w-3" />Ver inventario completo
+                </RouterLink>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sistema</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Riesgo EU AI Act</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {relatedAiSystems.map((sys) => (
+                    <TableRow key={sys.id}>
+                      <TableCell>
+                        <div className="font-medium text-sm text-foreground">{sys.name}</div>
+                        <div className="text-xs text-muted-foreground">{sys.vendor}</div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{sys.system_type ?? "—"}</TableCell>
+                      <TableCell>
+                        {sys.risk_level && (
+                          <StatusBadge
+                            label={sys.risk_level}
+                            tone={
+                              sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
+                                ? "critical"
+                                : sys.risk_level === "Limitado"
+                                ? "warning"
+                                : "active"
+                            }
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          label={sys.status}
+                          tone={sys.status === "ACTIVO" ? "active" : sys.status === "EN_EVALUACION" ? "warning" : "neutral"}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RouterLink
+                          to={`/ai-governance/sistemas/${sys.id}`}
+                          className="text-xs text-primary hover:underline flex items-center justify-end gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />Ver ficha
+                        </RouterLink>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

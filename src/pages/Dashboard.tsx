@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
 import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
+import { useModuleStatus } from "@/hooks/useModuleStatus";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
@@ -20,6 +21,9 @@ import {
   Network,
   ArrowRight,
   CheckCircle,
+  Compass,
+  ClipboardList,
+  Brain,
 } from "lucide-react";
 import { personalTasks, recentActivity } from "@/data/dashboard";
 import { scopeData } from "@/data/scopeData";
@@ -38,6 +42,7 @@ export default function Dashboard() {
   const { data: kpis } = useDashboardKpis();
   const { data: alerts = [] } = useDashboardAlerts();
   const { data: meetings = [] } = useUpcomingMeetings();
+  const { data: moduleStatus } = useModuleStatus();
 
   // Animate KPIs on scope change
   const [animKey, setAnimKey] = useState(0);
@@ -256,6 +261,135 @@ export default function Dashboard() {
             ))}
           </ul>
         </Card>
+      </div>
+
+      {/* Estado de Módulos Garrigues — cross-module KPIs */}
+      <div className="mt-6">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Estado de Módulos</h2>
+          <span className="text-xs text-muted-foreground">Garrigues Platform</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Secretaría */}
+          <Link to="/secretaria">
+            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                  <ClipboardList className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:underline">Secretaría</span>
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-border">
+                <div className="px-4 py-3">
+                  <div className="text-lg font-bold tabular-nums text-foreground">
+                    {moduleStatus?.secretaria.convocatoriasEmitidas ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Convoc. emitidas</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.secretaria.acuerdosPendientes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                  )}>
+                    {moduleStatus?.secretaria.acuerdosPendientes ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Acuerdos pend.</div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          {/* GRC Compass */}
+          <Link to="/grc">
+            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                  <Compass className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:underline">GRC Compass</span>
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-border">
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.grc.incidentesDoraAbiertos ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                  )}>
+                    {moduleStatus?.grc.incidentesDoraAbiertos ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Incid. DORA abiert.</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                  )}>
+                    {moduleStatus?.grc.notificacionesUrgentes ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Notif. &lt;72h</div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          {/* AI Governance */}
+          <Link to="/ai-governance">
+            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                  <Brain className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:underline">AI Governance</span>
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-border">
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                  )}>
+                    {moduleStatus?.aiGovernance.altosNoAprobados ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Alto sin eval.</div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.aiGovernance.incidentesAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                  )}>
+                    {moduleStatus?.aiGovernance.incidentesAbiertos ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Incid. abiertos</div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          {/* SII */}
+          <Link to="/sii">
+            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-status-warning/10">
+                  <AlertTriangle className="h-4 w-4 text-status-warning" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:underline">SII</span>
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="grid grid-cols-1">
+                <div className="px-4 py-3">
+                  <div className={cn(
+                    "text-lg font-bold tabular-nums",
+                    (moduleStatus?.sii.casosAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                  )}>
+                    {moduleStatus?.sii.casosAbiertos ?? "—"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Casos abiertos</div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+        </div>
       </div>
 
       {/* ESG mini-summary */}

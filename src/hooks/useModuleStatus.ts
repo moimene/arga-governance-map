@@ -1,0 +1,124 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+export type ModuleStatus = {
+  secretaria: {
+    convocatoriasEmitidas: number;
+    acuerdosPendientes: number;
+  };
+  grc: {
+    incidentesDoraAbiertos: number;
+    notificacionesUrgentes: number;
+  };
+  aiGovernance: {
+    altosNoAprobados: number;
+    incidentesAbiertos: number;
+  };
+  sii: {
+    casosAbiertos: number;
+  };
+};
+
+export function useModuleStatus() {
+  return useQuery({
+    queryKey: ["module_status"],
+    queryFn: async (): Promise<ModuleStatus> => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const h72 = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+      const [
+        convRes,
+        acuerdosRes,
+        incidentesDoraRes,
+        notifRes,
+        aiSystemsRes,
+        aiAssessApprovedRes,
+        aiIncRes,
+        siiRes,
+      ] = await Promise.all([
+        // Secretaría: convocatorias EMITIDAS este mes
+        supabase
+          .from("convocatorias")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", DEMO_TENANT)
+          .eq("status", "EMITIDA")
+          .gte("created_at", startOfMonth),
+
+        // Secretaría: acuerdos pendientes de inscripción
+        supabase
+          .from("agreements")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", DEMO_TENANT)
+          .in("status", ["ADOPTED", "CERTIFIED"]),
+
+        // GRC: incidentes DORA abiertos
+        supabase
+          .from("incidents")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", DEMO_TENANT)
+          .ilike("module_id", "%dora%")
+          .in("status", ["OPEN", "ABIERTO", "IN_PROGRESS"]),
+
+        // GRC: notificaciones regulatorias con deadline < 72h
+        supabase
+          .from("regulatory_notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", DEMO_TENANT)
+          .lte("deadline", h72)
+          .gt("deadline", now.toISOString()),
+
+        // AI: sistemas con riesgo Alto
+        supabase
+          .from("ai_systems")
+          .select("id")
+          .eq("tenant_id", DEMO_TENANT)
+          .eq("risk_level", "Alto"),
+
+        // AI: evaluaciones aprobadas (para filtrar sistemas ya evaluados)
+        supabase
+          .from("ai_risk_assessments")
+          .select("system_id")
+          .eq("status", "APROBADO"),
+
+        // AI: incidentes abiertos
+        supabase
+          .from("ai_incidents")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", DEMO_TENANT)
+          .in("status", ["ABIERTO", "EN_INVESTIGACION"]),
+
+        // SII: casos abiertos
+        supabase
+          .from("sii_cases_view" as any)
+          .select("id", { count: "exact", head: true })
+          .in("status", ["OPEN", "ABIERTO", "PENDING"]),
+      ]);
+
+      const altoSysIds = new Set((aiSystemsRes.data ?? []).map((s: { id: string }) => s.id));
+      const approvedIds = new Set((aiAssessApprovedRes.data ?? []).map((a: { system_id: string }) => a.system_id));
+      const altosNoAprobados = [...altoSysIds].filter((id) => !approvedIds.has(id)).length;
+
+      return {
+        secretaria: {
+          convocatoriasEmitidas: convRes.count ?? 0,
+          acuerdosPendientes: acuerdosRes.count ?? 0,
+        },
+        grc: {
+          incidentesDoraAbiertos: incidentesDoraRes.count ?? 0,
+          notificacionesUrgentes: notifRes.count ?? 0,
+        },
+        aiGovernance: {
+          altosNoAprobados,
+          incidentesAbiertos: aiIncRes.count ?? 0,
+        },
+        sii: {
+          casosAbiertos: siiRes.count ?? 0,
+        },
+      };
+    },
+    staleTime: 60_000,
+  });
+}

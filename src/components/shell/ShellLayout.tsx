@@ -44,7 +44,7 @@ const govItems: NavItem[] = [
 const moduleItems: NavItem[] = [
   { label: "GRC Compass", to: "/grc", icon: Compass, module: true },
   { label: "Secretaría", to: "/secretaria", icon: ClipboardList, module: true },
-  { label: "AIms", to: "/aims", icon: Brain, module: true },
+  { label: "AI Governance", to: "/ai-governance", icon: Brain, module: true },
 ];
 
 const siiItem: NavItem = { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon };
@@ -61,7 +61,7 @@ const pageTitles: Record<string, string> = {
   "/conflictos": "Conflictos",
   "/grc": "GRC Compass",
   "/secretaria": "Secretaría",
-  "/aims": "AIms",
+  "/ai-governance": "AI Governance",
   "/sii": "SII — Canal Interno",
   "/documentacion": "Documentación",
 };

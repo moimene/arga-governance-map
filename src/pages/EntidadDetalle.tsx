@@ -17,7 +17,8 @@ import {
   formatMateriality,
   formatEntityStatus,
 } from "@/hooks/useEntities";
-import { ChevronRight, Download, Edit3, Network } from "lucide-react";
+import { Brain, ChevronRight, Download, Edit3, ExternalLink, Network } from "lucide-react";
+import { useAiSystemsList } from "@/hooks/useAiSystems";
 
 const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
   const l = formatMateriality(m);
@@ -33,6 +34,7 @@ export default function EntidadDetalle() {
   const { data: policies = [] } = useAllPolicies();
   const { data: delegations = [] } = useEntityDelegations(entity?.id);
   const { data: entityFindings = [] } = useEntityFindings(entity?.id);
+  const { data: allAiSystems = [] } = useAiSystemsList();
 
   if (isLoading) {
     return <div className="p-10 text-center text-muted-foreground">Cargando…</div>;
@@ -88,13 +90,16 @@ export default function EntidadDetalle() {
 
       {/* Tabs */}
       <Tabs defaultValue="resumen" className="mt-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-6">
+        <TabsList className="grid w-full max-w-4xl grid-cols-7">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="relaciones">Relaciones</TabsTrigger>
           <TabsTrigger value="normativa">Normativa</TabsTrigger>
           <TabsTrigger value="delegaciones">Delegaciones</TabsTrigger>
           <TabsTrigger value="hallazgos">Hallazgos</TabsTrigger>
           <TabsTrigger value="auditoria">Auditoría</TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-1">
+            <Brain className="h-3.5 w-3.5" />AI Gov
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-4">
@@ -256,6 +261,77 @@ export default function EntidadDetalle() {
         <TabsContent value="auditoria" className="mt-4">
           <Card className="p-8 text-center text-sm text-muted-foreground">
             Trazabilidad de cambios — pendiente de habilitar.
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="mt-4">
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Sistemas IA de esta entidad</h3>
+              <Link to="/ai-governance/sistemas" className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
+                <ExternalLink className="h-3 w-3" />Ver inventario completo
+              </Link>
+            </div>
+            {allAiSystems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Brain className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">No hay sistemas IA registrados en el inventario.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sistema</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Riesgo EU AI Act</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Ficha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allAiSystems.map((sys) => (
+                    <TableRow key={sys.id}>
+                      <TableCell>
+                        <div className="font-medium text-sm text-foreground">{sys.name}</div>
+                        <div className="text-xs text-muted-foreground">{sys.use_case}</div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{sys.system_type ?? "—"}</TableCell>
+                      <TableCell>
+                        {sys.risk_level && (
+                          <StatusBadge
+                            label={sys.risk_level}
+                            tone={
+                              sys.risk_level === "Alto" || sys.risk_level === "Inaceptable"
+                                ? "critical"
+                                : sys.risk_level === "Limitado"
+                                ? "warning"
+                                : "active"
+                            }
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{sys.vendor ?? "—"}</TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          label={sys.status}
+                          tone={sys.status === "ACTIVO" ? "active" : sys.status === "EN_EVALUACION" ? "warning" : "neutral"}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          to={`/ai-governance/sistemas/${sys.id}`}
+                          className="text-xs text-primary hover:underline flex items-center justify-end gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />Ver
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

@@ -75,6 +75,16 @@ export default function HallazgoDetalle() {
             <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/grc/risk-360?finding=${finding.code}`)}>
               <Activity className="h-4 w-4" />Ver riesgo GRC
             </Button>
+            {finding.origin === "AuditInterna" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                onClick={() => navigate("/grc/m/audit/operate/findings")}
+              >
+                <ExternalLink className="h-4 w-4" />Ver en GRC Audit
+              </Button>
+            )}
           </>
         }
       />
