@@ -1,6 +1,43 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus } from "lucide-react";
 import { useConvocatoriaById, useConvocatoriaAttachments } from "@/hooks/useConvocatorias";
+
+function generateIcs(convocatoria: {
+  title: string;
+  meeting_date: string;
+  start_time?: string | null;
+  location?: string | null;
+  body_name?: string | null;
+}): string {
+  const dt = new Date(convocatoria.meeting_date);
+  const dateStr = dt.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const uid = `convocatoria-${Date.now()}@arga-seguros.com`;
+  const summary = convocatoria.title ?? "Reunión " + (convocatoria.body_name ?? "");
+
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//TGMS//Secretaría Societaria//ES",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${dateStr}`,
+    `DTSTART:${dateStr}`,
+    `SUMMARY:${summary}`,
+    convocatoria.location ? `LOCATION:${convocatoria.location}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean).join("\r\n");
+}
+
+function downloadIcs(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function ConvocatoriaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -35,18 +72,38 @@ export default function ConvocatoriaDetalle() {
         Volver al listado
       </button>
 
-      <div className="mb-6">
-        <div className="text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          Convocatoria · {conv.estado}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            Convocatoria · {conv.estado}
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            {conv.body_name ?? "Órgano"}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
+            {conv.entity_name ?? "—"}
+            {conv.jurisdiction ? ` · ${conv.jurisdiction}` : ""}
+            {conv.legal_form ? ` · ${conv.legal_form}` : ""}
+          </p>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          {conv.body_name ?? "Órgano"}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          {conv.entity_name ?? "—"}
-          {conv.jurisdiction ? ` · ${conv.jurisdiction}` : ""}
-          {conv.legal_form ? ` · ${conv.legal_form}` : ""}
-        </p>
+        {conv.fecha_1 ? (
+          <button
+            type="button"
+            onClick={() => {
+              const ics = generateIcs({
+                title: `${conv.body_name ?? "Reunión"} — ${conv.entity_name ?? ""}`,
+                meeting_date: conv.fecha_1!,
+                location: null,
+                body_name: conv.body_name,
+              });
+              downloadIcs(ics, `convocatoria-${conv.id}.ics`);
+            }}
+            className="inline-flex shrink-0 items-center gap-2 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Añadir a calendario
+          </button>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
