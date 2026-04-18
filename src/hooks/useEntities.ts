@@ -91,7 +91,8 @@ export function useEntitiesList() {
         .select("*, parent:parent_entity_id(common_name)")
         .order("common_name", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((e: any) => ({
+      type Raw = EntityRow & { parent?: { common_name?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((e) => ({
         ...e,
         parent_name: e.parent?.common_name ?? null,
       }));

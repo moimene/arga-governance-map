@@ -6,6 +6,33 @@ import { Link } from "react-router-dom";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type RegNotRow = {
+  id: string;
+  authority: string;
+  notification_type: string;
+  notification_deadline: string | null;
+  status: string;
+  incident_id: string | null;
+  incidents?: { code?: string | null; title?: string | null } | null;
+};
+
+type BcmPlanRow = {
+  id: string;
+  plan_code: string;
+  plan_type: string | null;
+  next_test_date: string | null;
+  test_result: string | null;
+};
+
+type ExceptionRow = {
+  id: string;
+  code: string;
+  status: string;
+  expires_at: string | null;
+  obligation_id: string | null;
+  obligations?: { code?: string | null; title?: string | null } | null;
+};
+
 function useAlerts() {
   return useQuery({
     queryKey: ["grc", "alertas"],
@@ -33,9 +60,9 @@ function useAlerts() {
       ]);
 
       return {
-        regNots: regNots.data ?? [],
-        bcmTests: bcmPlans.data ?? [],
-        exceptions: excs.data ?? [],
+        regNots: (regNots.data ?? []) as RegNotRow[],
+        bcmTests: (bcmPlans.data ?? []) as BcmPlanRow[],
+        exceptions: (excs.data ?? []) as ExceptionRow[],
       };
     },
   });
@@ -104,7 +131,7 @@ export default function Alertas() {
             Sin notificaciones pendientes.
           </div>
         ) : (
-          data?.regNots.map((n: any) => {
+          data?.regNots.map((n) => {
             const dl = deadlineLabel(n.notification_deadline);
             const isVencida = dl === "VENCIDA";
             return (
@@ -142,7 +169,7 @@ export default function Alertas() {
             Sin tests BCM próximos.
           </div>
         ) : (
-          data?.bcmTests.map((p: any) => (
+          data?.bcmTests.map((p) => (
             <div key={p.id} className="px-5 py-3 flex items-center gap-3 text-sm">
               <span className="font-medium text-[var(--g-text-primary)]">{p.plan_code}</span>
               <span
@@ -173,7 +200,7 @@ export default function Alertas() {
             Sin excepciones pendientes.
           </div>
         ) : (
-          data?.exceptions.map((e: any) => (
+          data?.exceptions.map((e) => (
             <div key={e.id} className="px-5 py-3 flex items-center gap-3 text-sm">
               <span className="font-mono text-xs text-[var(--g-text-secondary)] w-28 shrink-0">
                 {e.code}

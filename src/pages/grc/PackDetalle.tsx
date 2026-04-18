@@ -141,7 +141,7 @@ export default function PackDetalle() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {(pack.pack_rules ?? []).map((r: any) => (
+              {(pack.pack_rules ?? []).map((r) => (
                 <tr
                   key={r.framework_code}
                   className="hover:bg-[var(--g-surface-subtle)]/50 transition-colors"

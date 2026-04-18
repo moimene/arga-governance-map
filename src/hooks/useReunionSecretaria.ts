@@ -14,7 +14,7 @@ export interface MeetingSecretariaRow {
   status: string;
   president_id: string | null;
   secretary_id: string | null;
-  quorum_data: any;
+  quorum_data: Record<string, unknown> | null;
   location: string | null;
   confidentiality_level: string | null;
   body_name: string | null;
@@ -57,7 +57,14 @@ export function useReunionesList() {
         .order("scheduled_start", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []).map((m: any) => ({
+      type Raw = Omit<MeetingSecretariaRow, "body_name" | "entity_name" | "jurisdiction" | "resolutions_count"> & {
+        governing_bodies?: {
+          name?: string | null;
+          entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+        } | null;
+        meeting_resolutions?: { id: string }[] | null;
+      };
+      return ((data ?? []) as Raw[]).map((m) => ({
         ...m,
         body_name: m.governing_bodies?.name ?? null,
         entity_name: m.governing_bodies?.entities?.common_name ?? null,

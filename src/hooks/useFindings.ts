@@ -100,7 +100,13 @@ const SELECT = `
   obligation:obligation_id(code, title)
 `;
 
-const mapRow = (row: any): FindingFull => ({
+type FindingRaw = FindingRow & {
+  entity?: { common_name?: string | null; slug?: string | null } | null;
+  owner?: { full_name?: string | null } | null;
+  obligation?: { code?: string | null; title?: string | null } | null;
+};
+
+const mapRow = (row: FindingRaw): FindingFull => ({
   ...row,
   entity_name: row.entity?.common_name ?? null,
   entity_slug: row.entity?.slug ?? null,
@@ -118,7 +124,7 @@ export function useFindingsList() {
         .select(SELECT)
         .order("code");
       if (error) throw error;
-      return (data ?? []).map(mapRow);
+      return ((data ?? []) as FindingRaw[]).map(mapRow);
     },
   });
 }
@@ -134,7 +140,7 @@ export function useFindingByCode(code: string | undefined) {
         .eq("code", code!)
         .maybeSingle();
       if (error) throw error;
-      return data ? mapRow(data) : null;
+      return data ? mapRow(data as FindingRaw) : null;
     },
   });
 }
@@ -151,7 +157,14 @@ export function useFindingRelatedControls(obligationId: string | null | undefine
         .eq("obligation_id", obligationId!)
         .order("code");
       if (error) throw error;
-      return (data ?? []).map((c: any) => ({
+      type ControlRaw = {
+        id: string;
+        code: string;
+        name: string;
+        status: string | null;
+        owner?: { full_name?: string | null } | null;
+      };
+      return ((data ?? []) as ControlRaw[]).map((c) => ({
         ...c,
         owner_name: c.owner?.full_name ?? null,
       }));
@@ -184,7 +197,8 @@ export function useActionPlansByFinding(findingId: string | null | undefined) {
         .eq("finding_id", findingId!)
         .order("due_date", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((r: any): ActionPlanFull => ({
+      type ApRaw = ActionPlanRow & { responsible?: { full_name?: string | null } | null };
+      return ((data ?? []) as ApRaw[]).map((r): ActionPlanFull => ({
         ...r,
         responsible_name: r.responsible?.full_name ?? null,
       }));

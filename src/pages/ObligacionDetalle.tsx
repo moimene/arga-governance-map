@@ -16,10 +16,12 @@ import {
   evidenceStatusTone,
   obligationCriticalityTone,
 } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, ShieldOff, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ShieldOff, Plus, ShieldCheck, Siren, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
@@ -33,6 +35,37 @@ export default function ObligacionDetalle() {
   const { data: controls = [] } = useObligationControls(obligation?.id);
   const controlIds = useMemo(() => controls.map((c) => c.id), [controls]);
   const { data: evidences = [] } = useEvidencesByControlIds(controlIds);
+
+  // Incidentes GRC vinculados por FK obligation_id (Ola 3 Gap 3).
+  type IncidentLinked = {
+    id: string;
+    code: string;
+    title: string;
+    status: string;
+    severity: string | null;
+    incident_type: string | null;
+    is_major_incident: boolean;
+    regulatory_notification_required: boolean;
+    detection_date: string | null;
+    resolution_date: string | null;
+  };
+  const { data: linkedIncidents = [] } = useQuery<IncidentLinked[]>({
+    enabled: !!obligation?.id,
+    queryKey: ["incidents", "byObligation", obligation?.id ?? "none"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("incidents")
+        .select("id, code, title, status, severity, incident_type, is_major_incident, regulatory_notification_required, detection_date, resolution_date")
+        .eq("obligation_id", obligation!.id)
+        .order("detection_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as IncidentLinked[];
+    },
+  });
+  const openIncidents = linkedIncidents.filter(
+    (i) => i.status !== "Cerrado" && i.status !== "Resuelto",
+  ).length;
 
   if (isLoading) {
     return (
@@ -112,6 +145,15 @@ export default function ObligacionDetalle() {
           <TabsTrigger value="descripcion">Descripción</TabsTrigger>
           <TabsTrigger value="controles">Controles ({controls.length})</TabsTrigger>
           <TabsTrigger value="evidencias">Evidencias ({evidences.length})</TabsTrigger>
+          <TabsTrigger value="incidentes" className="flex items-center gap-1">
+            <Siren className="h-3.5 w-3.5" />
+            Incidentes ({linkedIncidents.length})
+            {openIncidents > 0 && (
+              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[9px] font-bold text-status-critical-foreground">
+                {openIncidents}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="descripcion" className="mt-4">
@@ -219,6 +261,85 @@ export default function ObligacionDetalle() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="incidentes" className="mt-4">
+          {linkedIncidents.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center gap-3 p-12 text-center">
+              <Siren className="h-10 w-10 text-muted-foreground" />
+              <div className="text-base font-semibold">No hay incidentes registrados para esta obligación</div>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Los incidentes GRC se vinculan vía <code className="font-mono">obligation_id</code> y aparecen aquí automáticamente.
+              </p>
+            </Card>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-32">Código</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-28">Severidad</TableHead>
+                    <TableHead className="w-36">Estado</TableHead>
+                    <TableHead className="w-32">Detección</TableHead>
+                    <TableHead className="w-40">Notificación BdE</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {linkedIncidents.map((inc) => (
+                    <TableRow key={inc.id}>
+                      <TableCell>
+                        <Link
+                          to={`/grc/m/dora/operate/incidents/${inc.id}`}
+                          className="font-mono text-xs text-primary hover:underline"
+                        >
+                          {inc.code}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {inc.title}
+                        {inc.is_major_incident && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-status-critical">
+                            <Clock className="h-3 w-3" /> Incidente grave — plazo 4h notificación
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {inc.severity && (
+                          <StatusBadge
+                            label={inc.severity}
+                            tone={inc.severity === "Crítico" ? "critical" : inc.severity === "Alto" ? "warning" : "neutral"}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          label={inc.status}
+                          tone={
+                            inc.status === "Cerrado" || inc.status === "Resuelto"
+                              ? "active"
+                              : inc.status === "En investigación"
+                              ? "warning"
+                              : "critical"
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {inc.detection_date ? fmtDate(inc.detection_date.slice(0, 10)) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {inc.regulatory_notification_required ? (
+                          <StatusBadge label="REQUERIDA" tone="critical" />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No aplica</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

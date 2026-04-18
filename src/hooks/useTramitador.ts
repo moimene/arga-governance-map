@@ -19,7 +19,7 @@ export interface FilingRow {
   conservatoria_ref: string | null;
   jucerja_ref: string | null;
   diario_oficial_ref: string | null;
-  defect_details: any;
+  defect_details: Record<string, unknown> | null;
   resolution_document_url: string | null;
   created_at: string;
   updated_at: string;

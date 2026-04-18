@@ -82,7 +82,14 @@ export function useUpcomingMeetings() {
         .order("scheduled_start", { ascending: true })
         .limit(5);
       if (error) throw error;
-      return (data ?? []).map((m: any) => ({
+      type Raw = {
+        id: string;
+        slug: string;
+        scheduled_start: string;
+        status: string;
+        governing_bodies?: { name?: string | null; slug?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((m) => ({
         id: m.id,
         slug: m.slug,
         scheduled_start: m.scheduled_start,

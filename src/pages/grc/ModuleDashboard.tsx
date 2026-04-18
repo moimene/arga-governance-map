@@ -4,6 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type ModuleNavRow = {
+  id: string;
+  module_id: string;
+  section: string;
+  label: string;
+  route: string;
+  display_order: number | null;
+};
+
 const MODULE_LABEL: Record<string, string> = {
   dora: "DORA / Resiliencia ICT",
   gdpr: "GDPR / Protección de datos",
@@ -25,7 +34,7 @@ function useModuleNav(moduleId: string) {
         .order("section")
         .order("display_order");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as ModuleNavRow[];
     },
   });
 }
@@ -40,7 +49,7 @@ export default function ModuleDashboard() {
   const { moduleId = "" } = useParams();
   const { data: nav = [] } = useModuleNav(moduleId);
 
-  const grouped = nav.reduce((acc: any, item: any) => {
+  const grouped = nav.reduce<Record<string, ModuleNavRow[]>>((acc, item) => {
     (acc[item.section] ??= []).push(item);
     return acc;
   }, {});
@@ -57,7 +66,7 @@ export default function ModuleDashboard() {
       </header>
 
       {(["operate", "governance", "config"] as const).map((section) => {
-        const items: any[] = grouped[section] ?? [];
+        const items: ModuleNavRow[] = grouped[section] ?? [];
         if (items.length === 0) return null;
         return (
           <div key={section}>
@@ -65,7 +74,7 @@ export default function ModuleDashboard() {
               {SECTION_LABEL[section]}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {items.map((item: any) => (
+              {items.map((item) => (
                 <Link
                   key={item.id}
                   to={item.route}

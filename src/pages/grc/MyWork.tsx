@@ -5,6 +5,26 @@ import { Briefcase } from "lucide-react";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type IncidentLite = {
+  code: string;
+  title: string;
+  status: string;
+  incident_type: string;
+};
+
+type ActionPlanLite = {
+  id: string;
+  title: string;
+  status: string;
+  progress_pct: number | null;
+  findings?: { code?: string | null } | null;
+};
+
+type ExceptionLite = {
+  code: string;
+  status: string;
+};
+
 function useMyWork() {
   return useQuery({
     queryKey: ["grc", "mywork"],
@@ -30,9 +50,9 @@ function useMyWork() {
       ]);
 
       return {
-        incidents: incidents.data ?? [],
-        plans: actionPlans.data ?? [],
-        exceptions: exceptions.data ?? [],
+        incidents: (incidents.data ?? []) as IncidentLite[],
+        plans: (actionPlans.data ?? []) as ActionPlanLite[],
+        exceptions: (exceptions.data ?? []) as ExceptionLite[],
       };
     },
   });
@@ -85,7 +105,7 @@ export default function MyWork() {
             Sin incidentes activos.
           </div>
         ) : (
-          data?.incidents.map((i: any) => (
+          data?.incidents.map((i) => (
             <div key={i.code} className="px-5 py-3 flex items-center gap-3 text-sm">
               <span className="font-mono text-xs text-[var(--g-text-secondary)] w-28 shrink-0">
                 {i.code}
@@ -110,7 +130,7 @@ export default function MyWork() {
             Sin planes de acción abiertos.
           </div>
         ) : (
-          data?.plans.map((p: any) => (
+          data?.plans.map((p) => (
             <div key={p.id} className="px-5 py-3 flex items-center gap-3 text-sm">
               <span className="flex-1 text-[var(--g-text-primary)]">
                 {p.title}
@@ -144,7 +164,7 @@ export default function MyWork() {
             Sin excepciones pendientes.
           </div>
         ) : (
-          data?.exceptions.map((e: any) => (
+          data?.exceptions.map((e) => (
             <div key={e.code} className="px-5 py-3 flex items-center gap-3 text-sm">
               <span className="font-mono text-xs text-[var(--g-text-secondary)] w-28 shrink-0">
                 {e.code}

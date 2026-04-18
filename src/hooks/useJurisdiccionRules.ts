@@ -14,8 +14,8 @@ export interface JurisdictionRuleSet {
   effective_to: string | null;
   rule_config: {
     notice_periods_days?: Record<string, number>;
-    quorum_rules?: Record<string, any>;
-    majority_rules?: Record<string, any>;
+    quorum_rules?: Record<string, number>;
+    majority_rules?: Record<string, number | string>;
     second_call?: { enabled: boolean; min_interval_hours?: number; reinforced?: boolean };
     inscribable_matters?: string[];
     publication_channels?: string[];

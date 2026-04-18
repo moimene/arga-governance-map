@@ -3,6 +3,27 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type BiaRow = {
+  id: string;
+  function_name: string;
+  is_critical: boolean | null;
+  rto_objective: number | null;
+  rpo_objective: number | null;
+  mtd_objective: number | null;
+  approved_at: string | null;
+};
+
+type BcmPlanRow = {
+  id: string;
+  plan_code: string;
+  plan_type: string;
+  bia_id: string | null;
+  last_test_date: string | null;
+  next_test_date: string | null;
+  test_result: string | null;
+  bcm_bia?: { function_name?: string | null } | null;
+};
+
 function useBcm() {
   return useQuery({
     queryKey: ["grc", "bcm"],
@@ -18,7 +39,10 @@ function useBcm() {
           .select("id, plan_code, plan_type, bia_id, last_test_date, next_test_date, test_result, bcm_bia:bia_id(function_name)")
           .eq("tenant_id", DEMO_TENANT),
       ]);
-      return { bia: bia.data ?? [], plans: plans.data ?? [] };
+      return {
+        bia: (bia.data ?? []) as BiaRow[],
+        plans: (plans.data ?? []) as BcmPlanRow[],
+      };
     },
   });
 }
@@ -59,7 +83,7 @@ export default function BCM() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {(data?.bia ?? []).map((b: any) => (
+              {(data?.bia ?? []).map((b) => (
                 <tr key={b.id} className="hover:bg-[var(--g-surface-subtle)]/50 transition-colors">
                   <td className="px-5 py-3 font-medium text-[var(--g-text-primary)]">{b.function_name}</td>
                   <td className="px-5 py-3">
@@ -107,7 +131,7 @@ export default function BCM() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {(data?.plans ?? []).map((p: any) => (
+              {(data?.plans ?? []).map((p) => (
                 <tr key={p.id} className="hover:bg-[var(--g-surface-subtle)]/50 transition-colors">
                   <td className="px-5 py-3 font-medium text-[var(--g-text-primary)]">{p.plan_code}</td>
                   <td className="px-5 py-3">
@@ -119,7 +143,7 @@ export default function BCM() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-[var(--g-text-secondary)]">
-                    {(p.bcm_bia as any)?.function_name ?? "—"}
+                    {p.bcm_bia?.function_name ?? "—"}
                   </td>
                   <td className="px-5 py-3 text-[var(--g-text-secondary)]">{p.last_test_date ?? "—"}</td>
                   <td className="px-5 py-3 text-[var(--g-text-secondary)]">{p.next_test_date ?? "—"}</td>

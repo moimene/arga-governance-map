@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Gavel, Plus } from "lucide-react";
-import { useTramitacionesList } from "@/hooks/useTramitador";
+import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -12,7 +12,7 @@ const STATUS_TONE: Record<string, string> = {
   DENEGADA:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
-function registryRef(f: any): string {
+function registryRef(f: FilingRow): string {
   return (
     f.borme_ref ??
     f.psm_ref ??

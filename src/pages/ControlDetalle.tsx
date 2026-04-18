@@ -30,7 +30,8 @@ export default function ControlDetalle() {
   }
   if (!control) return <div className="p-6">Control no encontrado.</div>;
 
-  const linkedFinding = relatedFindings[0] as any | undefined;
+  type RelatedFinding = { id: string; code: string; title: string; severity: string; status: string };
+  const linkedFinding = relatedFindings[0] as RelatedFinding | undefined;
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -161,7 +162,7 @@ export default function ControlDetalle() {
                 {relatedFindings.length === 0 && (
                   <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin hallazgos asociados a esta obligación.</TableCell></TableRow>
                 )}
-                {relatedFindings.map((f: any) => (
+                {(relatedFindings as RelatedFinding[]).map((f) => (
                   <TableRow key={f.id}>
                     <TableCell><Link to={`/hallazgos/${f.code}`} className="font-mono text-xs text-primary hover:underline">{f.code}</Link></TableCell>
                     <TableCell className="text-sm">{f.title}</TableCell>

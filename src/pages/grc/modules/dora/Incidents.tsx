@@ -17,7 +17,7 @@ export default function DoraIncidents() {
   const { data: all = [], isLoading } = useIncidents("DORA");
 
   const data = obligationFilter
-    ? all.filter((i: any) => (i.obligations as any)?.code === obligationFilter)
+    ? all.filter((i) => i.obligations?.code === obligationFilter)
     : all;
 
   return (
@@ -53,8 +53,8 @@ export default function DoraIncidents() {
       )}
 
       <div className="space-y-3">
-        {data.map((i: any) => {
-          const notif = (i.regulatory_notifications ?? []).find((n: any) => n.status === "Pendiente");
+        {data.map((i) => {
+          const notif = (i.regulatory_notifications ?? []).find((n) => n.status === "Pendiente");
           return (
             <div
               key={i.id}
@@ -89,10 +89,10 @@ export default function DoraIncidents() {
                 </div>
                 <div className="text-sm font-medium text-[var(--g-text-primary)]">{i.title}</div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-[var(--g-text-secondary)] flex-wrap">
-                  {(i.obligations as any)?.code && (
-                    <span>Obligación: {(i.obligations as any).code}</span>
+                  {i.obligations?.code && (
+                    <span>Obligación: {i.obligations.code}</span>
                   )}
-                  {i.regulatory_notifications?.map((n: any) => (
+                  {i.regulatory_notifications?.map((n) => (
                     <span
                       key={n.id}
                       className="inline-flex items-center px-2 py-0.5 border border-[var(--g-border-default)] text-[var(--g-text-secondary)] bg-transparent"

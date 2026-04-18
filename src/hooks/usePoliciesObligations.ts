@@ -153,7 +153,8 @@ export function usePoliciesList() {
         .select("*, approval_body:approval_body_id(name)")
         .order("policy_code");
       if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      type Raw = PolicyRow & { approval_body?: { name?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((row) => ({
         ...row,
         approval_body_name: row.approval_body?.name ?? null,
       })) as PolicyWithBody[];
@@ -173,7 +174,9 @@ export function usePolicyByCode(code: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      return { ...data, approval_body_name: (data as any).approval_body?.name ?? null } as PolicyWithBody;
+      type Raw = PolicyRow & { approval_body?: { name?: string | null } | null };
+      const row = data as Raw;
+      return { ...row, approval_body_name: row.approval_body?.name ?? null } as PolicyWithBody;
     },
   });
 }
@@ -203,7 +206,8 @@ export function useObligationsList() {
         .select("*, policy:policy_id(policy_code, title)")
         .order("code");
       if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      type Raw = ObligationRow & { policy?: { policy_code?: string | null; title?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((row) => ({
         ...row,
         policy_code: row.policy?.policy_code ?? null,
         policy_title: row.policy?.title ?? null,
@@ -224,10 +228,12 @@ export function useObligationByCode(code: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      type Raw = ObligationRow & { policy?: { policy_code?: string | null; title?: string | null } | null };
+      const row = data as Raw;
       return {
-        ...data,
-        policy_code: (data as any).policy?.policy_code ?? null,
-        policy_title: (data as any).policy?.title ?? null,
+        ...row,
+        policy_code: row.policy?.policy_code ?? null,
+        policy_title: row.policy?.title ?? null,
       } as ObligationWithPolicy;
     },
   });
@@ -244,7 +250,8 @@ export function useObligationControls(obligationId: string | undefined) {
         .eq("obligation_id", obligationId!)
         .order("code");
       if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      type Raw = ControlRow & { owner?: { full_name?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((row) => ({
         ...row,
         owner_name: row.owner?.full_name ?? null,
       })) as ControlWithOwner[];
@@ -262,7 +269,8 @@ export function useAllControlsByObligationIds(obligationIds: string[]) {
         .select("*, owner:owner_id(full_name)")
         .in("obligation_id", obligationIds);
       if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      type Raw = ControlRow & { owner?: { full_name?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((row) => ({
         ...row,
         owner_name: row.owner?.full_name ?? null,
       })) as ControlWithOwner[];

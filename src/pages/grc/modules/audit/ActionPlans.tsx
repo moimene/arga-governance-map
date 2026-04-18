@@ -2,6 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 
+type AuditActionPlanRow = {
+  id: string;
+  title: string;
+  status: string;
+  progress_pct: number | null;
+  due_date: string | null;
+  findings?: { code?: string | null; title?: string | null; origin?: string | null } | null;
+};
+
 function useAuditActionPlans() {
   return useQuery({
     queryKey: ["audit", "action-plans"],
@@ -13,7 +22,7 @@ function useAuditActionPlans() {
         .limit(20);
       if (error) throw error;
       // Filter to AuditInterna findings
-      return (data ?? []).filter((p: any) => p.findings?.origin === "AuditInterna");
+      return ((data ?? []) as AuditActionPlanRow[]).filter((p) => p.findings?.origin === "AuditInterna");
     },
   });
 }
@@ -47,7 +56,7 @@ export default function ActionPlans() {
       )}
 
       <div className="space-y-3">
-        {plans.map((p: any) => (
+        {plans.map((p) => (
           <div
             key={p.id}
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-4 flex items-center gap-4"

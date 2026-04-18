@@ -29,7 +29,7 @@ export interface CertificationRow {
   certifier_id: string | null;
   requires_qualified_signature: boolean;
   signature_status: string;
-  jurisdictional_requirements: any;
+  jurisdictional_requirements: Record<string, unknown> | null;
   created_at: string;
   agreement_id: string | null;
 }
@@ -46,7 +46,13 @@ export function useActasList() {
         .eq("tenant_id", DEMO_TENANT)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      const rows = (data ?? []) as any[];
+      type MinuteRaw = Omit<ActaRow, "meeting_type" | "body_name" | "entity_name" | "resolutions_count"> & {
+        meetings?: {
+          meeting_type?: string | null;
+          governing_bodies?: { name?: string | null; entities?: { common_name?: string | null } | null } | null;
+        } | null;
+      };
+      const rows = (data ?? []) as MinuteRaw[];
 
       // Count resolutions per meeting in a single query
       const meetingIds = rows.map((m) => m.meeting_id).filter(Boolean);
@@ -72,6 +78,17 @@ export function useActasList() {
   });
 }
 
+export type ActaDetailRow = Omit<ActaRow, "meeting_type" | "body_name" | "entity_name" | "resolutions_count"> & {
+  meetings?: {
+    meeting_type?: string | null;
+    scheduled_start?: string | null;
+    governing_bodies?: {
+      name?: string | null;
+      entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+    } | null;
+  } | null;
+};
+
 export function useActaById(id: string | undefined) {
   return useQuery({
     enabled: !!id,
@@ -86,7 +103,7 @@ export function useActaById(id: string | undefined) {
         .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as ActaDetailRow | null;
     },
   });
 }

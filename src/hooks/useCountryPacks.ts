@@ -3,6 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+export type PackRuleLite = {
+  framework_code: string;
+  effective_date: string | null;
+  local_adaptations?: string | null;
+};
+
+export type CountryPack = {
+  id: string;
+  country_code: string;
+  pack_name: string;
+  is_active: boolean | null;
+  active_modules: string[] | null;
+  pack_rules?: PackRuleLite[] | null;
+};
+
 export function useCountryPacks() {
   return useQuery({
     queryKey: ["grc", "packs"],
@@ -13,7 +28,7 @@ export function useCountryPacks() {
         .eq("tenant_id", DEMO_TENANT)
         .order("country_code");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as CountryPack[];
     },
   });
 }
@@ -50,7 +65,7 @@ export function useCountryPackDetail(countryCode: string) {
         .eq("status", "Pendiente");
 
       return {
-        pack,
+        pack: pack as CountryPack | null,
         kpis: {
           incidentsOpen: incidentsOpen ?? 0,
           risksHigh: risksHigh ?? 0,

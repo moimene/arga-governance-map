@@ -2,6 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 
+type AuditFindingActionPlan = {
+  id: string;
+  title: string;
+  status: string;
+  progress_pct: number | null;
+};
+
+type AuditFindingRow = {
+  id: string;
+  code: string;
+  title: string;
+  severity: string;
+  status: string;
+  origin: string | null;
+  due_date: string | null;
+  action_plans?: AuditFindingActionPlan[] | null;
+};
+
 function useAuditFindings() {
   return useQuery({
     queryKey: ["audit", "findings"],
@@ -12,7 +30,7 @@ function useAuditFindings() {
         .eq("origin", "AuditInterna")
         .order("code");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as AuditFindingRow[];
     },
   });
 }
@@ -49,10 +67,10 @@ export default function AuditFindings() {
       )}
 
       <div className="space-y-3">
-        {findings.map((f: any) => {
-          const plans: any[] = f.action_plans ?? [];
+        {findings.map((f) => {
+          const plans: AuditFindingActionPlan[] = f.action_plans ?? [];
           const avgProgress = plans.length
-            ? Math.round(plans.reduce((s: number, p: any) => s + (p.progress_pct ?? 0), 0) / plans.length)
+            ? Math.round(plans.reduce((s, p) => s + (p.progress_pct ?? 0), 0) / plans.length)
             : null;
 
           return (

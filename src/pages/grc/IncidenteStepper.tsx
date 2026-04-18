@@ -96,7 +96,7 @@ export default function IncidenteStepper() {
     status: "Abierto",
   });
 
-  const set = (k: keyof FormState, v: any) =>
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
 
   const canAdvance = (s: StepNum) => {
@@ -133,9 +133,10 @@ export default function IncidenteStepper() {
           ? `Incidente creado. Notificación ${authority} programada con deadline 72h.`
           : "Incidente creado correctamente."
       );
-      navigate(`/grc/incidentes/${(created as any).id}`);
-    } catch (e: any) {
-      toast.error(`Error al crear: ${e.message}`);
+      navigate(`/grc/incidentes/${(created as { id: string }).id}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Error al crear: ${msg}`);
     }
   };
 

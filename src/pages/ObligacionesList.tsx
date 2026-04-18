@@ -14,6 +14,7 @@ import {
   controlStatusTone,
   obligationCriticalityTone,
   type ObligationWithPolicy,
+  type ControlWithOwner,
 } from "@/hooks/usePoliciesObligations";
 import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -180,7 +181,7 @@ export default function ObligacionesList() {
 
 interface ObligationTableProps {
   rows: ObligationWithPolicy[];
-  ctrlsByObl: Map<string, any[]>;
+  ctrlsByObl: Map<string, ControlWithOwner[]>;
   obligationStatus: (o: ObligationWithPolicy) => { label: string; tone: "active" | "warning" | "critical"; pulse: boolean };
 }
 

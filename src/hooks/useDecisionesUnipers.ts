@@ -32,7 +32,11 @@ export function useDecisionesUnipersList() {
         .eq("tenant_id", DEMO_TENANT)
         .order("decision_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((d: any) => ({
+      type Raw = Omit<UnipersonalDecisionRow, "entity_name" | "jurisdiction" | "decider_name"> & {
+        entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+        persons?: { full_name?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((d) => ({
         ...d,
         entity_name: d.entities?.common_name ?? null,
         jurisdiction: d.entities?.jurisdiction ?? null,
@@ -41,6 +45,18 @@ export function useDecisionesUnipersList() {
     },
   });
 }
+
+export type UnipersonalDecisionDetailRow = Omit<
+  UnipersonalDecisionRow,
+  "entity_name" | "jurisdiction" | "decider_name"
+> & {
+  entities?: {
+    common_name?: string | null;
+    jurisdiction?: string | null;
+    legal_form?: string | null;
+  } | null;
+  persons?: { full_name?: string | null } | null;
+};
 
 export function useDecisionUnipersById(id: string | undefined) {
   return useQuery({
@@ -54,7 +70,7 @@ export function useDecisionUnipersById(id: string | undefined) {
         .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as UnipersonalDecisionDetailRow | null;
     },
   });
 }

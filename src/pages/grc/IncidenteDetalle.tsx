@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useIncident } from "@/hooks/useIncidents";
+import { useIncident, type RegulatoryNotificationLite } from "@/hooks/useIncidents";
 import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Send } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -106,7 +106,7 @@ export default function IncidenteDetalle() {
     );
   }
 
-  const regNots: any[] = incident.regulatory_notifications ?? [];
+  const regNots: RegulatoryNotificationLite[] = incident.regulatory_notifications ?? [];
   const pendingNots = regNots.filter((n) => n.status === "Pendiente");
 
   return (
@@ -238,10 +238,10 @@ export default function IncidenteDetalle() {
               <div className="pt-2 border-t border-[var(--g-border-subtle)]">
                 <div className="text-xs text-[var(--g-text-secondary)] mb-0.5">Obligación</div>
                 <Link
-                  to={`/obligaciones/${(incident.obligations as any).code}`}
+                  to={`/obligaciones/${incident.obligations.code ?? ""}`}
                   className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
                 >
-                  {(incident.obligations as any).code}
+                  {incident.obligations.code}
                 </Link>
               </div>
             )}

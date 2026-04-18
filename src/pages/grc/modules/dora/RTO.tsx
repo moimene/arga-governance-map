@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type BiaRow = {
+  id: string;
+  function_name: string;
+  is_critical: boolean | null;
+  rto_objective: number | null;
+  rpo_objective: number | null;
+  mtd_objective: number | null;
+};
+
 function useBia() {
   return useQuery({
     queryKey: ["grc", "bia"],
@@ -13,7 +22,7 @@ function useBia() {
         .eq("tenant_id", DEMO_TENANT)
         .order("function_name");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as BiaRow[];
     },
   });
 }
@@ -63,7 +72,7 @@ export default function RTO() {
       {isLoading && <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando…</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {bia.map((b: any) => (
+        {bia.map((b) => (
           <div
             key={b.id}
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"

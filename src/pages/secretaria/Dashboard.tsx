@@ -93,6 +93,31 @@ function useSecretariaKpis() {
   });
 }
 
+type ConvocatoriaAgendaRow = {
+  id: string;
+  estado: string;
+  fecha_1: string | null;
+  modalidad: string | null;
+  is_second_call: boolean | null;
+  body_id: string;
+  governing_bodies?: { name?: string | null } | null;
+};
+
+type FilingAgendaRow = {
+  id: string;
+  filing_number: string | null;
+  filing_via: string | null;
+  status: string;
+  presentation_date: string | null;
+};
+
+type NoSessionAgendaRow = {
+  id: string;
+  title: string | null;
+  status: string;
+  voting_deadline: string | null;
+};
+
 function useSecretariaAgenda() {
   return useQuery({
     queryKey: ["secretaria", "agenda"],
@@ -107,7 +132,7 @@ function useSecretariaAgenda() {
         .order("fecha_1", { ascending: true })
         .limit(5);
 
-      (convs ?? []).forEach((c: any) => {
+      ((convs ?? []) as ConvocatoriaAgendaRow[]).forEach((c) => {
         const bodyName = c.governing_bodies?.name ?? "Órgano";
         const conv2 = c.is_second_call ? " · 2ª conv" : "";
         items.push({
@@ -128,7 +153,7 @@ function useSecretariaAgenda() {
         .order("presentation_date", { ascending: false })
         .limit(5);
 
-      (filings ?? []).forEach((f: any) => {
+      ((filings ?? []) as FilingAgendaRow[]).forEach((f) => {
         items.push({
           id: f.id,
           tipo: "tramitacion",
@@ -147,7 +172,7 @@ function useSecretariaAgenda() {
         .order("voting_deadline", { ascending: true })
         .limit(3);
 
-      (asocs ?? []).forEach((a: any) => {
+      ((asocs ?? []) as NoSessionAgendaRow[]).forEach((a) => {
         items.push({
           id: a.id,
           tipo: "acuerdo_sin_sesion",

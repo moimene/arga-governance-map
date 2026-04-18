@@ -59,27 +59,43 @@ export default function PoliticaDetalle() {
   const { data: obligations = [] } = usePolicyObligations(policy?.id);
   const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
-  // NOTA: hasta que se cree una tabla de relación policy↔agreement (Ola 3),
-  // el vínculo se infiere por búsqueda de texto del policy_code en campos
-  // libres. Se aplica tenant scoping y se escapan metacaracteres de PostgREST
-  // (',', '.', '(', ')') en el code para evitar romper la expresión .or().
+  // Vínculo policy ↔ agreement vía tabla puente policy_agreements (Ola 3 F3).
+  // Incluye meeting (si adoption_mode=MEETING) para mostrar CdA 22/04/2026 explícitamente.
   const { data: policyAgreements = [] } = useQuery({
-    queryKey: ["agreements", "policy", policy?.policy_code ?? "none"],
-    enabled: !!policy?.policy_code,
+    queryKey: ["policy_agreements", policy?.id ?? "none"],
+    enabled: !!policy?.id,
+    staleTime: 60_000,
     queryFn: async () => {
-      const code = String(policy.policy_code).replace(/[,().*]/g, " ").trim();
-      if (!code) return [];
       const { data, error } = await supabase
-        .from("agreements")
-        .select("id, agreement_kind, status, decision_date, proposal_text")
-        .eq("tenant_id", "00000000-0000-0000-0000-000000000001")
-        .or(
-          `proposal_text.ilike.%${code}%,decision_text.ilike.%${code}%,statutory_basis.ilike.%${code}%`,
+        .from("policy_agreements")
+        .select(
+          "relationship_kind, agreements!inner(id, agreement_kind, status, decision_date, adoption_mode, parent_meeting_id, meetings:parent_meeting_id(slug, meeting_type, scheduled_start, governing_bodies(name)))",
         )
-        .order("decision_date", { ascending: false })
-        .limit(5);
+        .eq("policy_id", policy.id)
+        .order("decision_date", { ascending: false, foreignTable: "agreements" })
+        .limit(10);
       if (error) throw error;
-      return (data ?? []) as any[];
+      type MeetingShape = {
+        slug: string | null;
+        meeting_type: string | null;
+        scheduled_start: string | null;
+        governing_bodies?: { name?: string | null } | null;
+      } | null;
+      type AgreementShape = {
+        id: string;
+        agreement_kind: string;
+        status: string;
+        decision_date: string | null;
+        adoption_mode: string | null;
+        parent_meeting_id: string | null;
+        meetings?: MeetingShape;
+      };
+      type Row = { relationship_kind: string; agreements: AgreementShape };
+      return ((data ?? []) as unknown as Row[]).map((r) => ({
+        ...r.agreements,
+        relationship_kind: r.relationship_kind,
+        meeting: r.agreements.meetings ?? null,
+      }));
     },
   });
 
@@ -276,15 +292,39 @@ export default function PoliticaDetalle() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tipo</TableHead>
+                      <TableHead>Relación</TableHead>
+                      <TableHead>Adoptado en</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Expediente</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {policyAgreements.map((ag: any) => (
+                    {policyAgreements.map((ag) => (
                       <TableRow key={ag.id}>
                         <TableCell className="text-sm">{ag.agreement_kind}</TableCell>
+                        <TableCell className="text-xs"><StatusBadge label={ag.relationship_kind} tone="info" /></TableCell>
+                        <TableCell className="text-xs">
+                          {ag.meeting?.slug ? (
+                            <Link
+                              to={`/secretaria/reuniones/${ag.meeting.slug}`}
+                              className="text-primary hover:underline"
+                            >
+                              {ag.meeting.governing_bodies?.name ?? ag.meeting.meeting_type ?? "Reunión"}
+                              {ag.meeting.scheduled_start
+                                ? ` · ${fmtDate(ag.meeting.scheduled_start.slice(0, 10))}`
+                                : null}
+                            </Link>
+                          ) : ag.adoption_mode === "UNIPERSONAL_SOCIO" ? (
+                            "Decisión socio único"
+                          ) : ag.adoption_mode === "UNIPERSONAL_ADMIN" ? (
+                            "Decisión admin. único"
+                          ) : ag.adoption_mode === "NO_SESSION" ? (
+                            "Acuerdo sin sesión"
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{fmtDate(ag.decision_date)}</TableCell>
                         <TableCell><StatusBadge label={ag.status} /></TableCell>
                         <TableCell className="text-right">

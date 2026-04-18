@@ -48,12 +48,17 @@ export function useControlByCode(code: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      type Raw = ControlDetailRow & {
+        owner?: { full_name?: string | null } | null;
+        obligation?: { code?: string | null; title?: string | null; source?: string | null } | null;
+      };
+      const row = data as Raw;
       return {
-        ...data,
-        owner_name: (data as any).owner?.full_name ?? null,
-        obligation_code: (data as any).obligation?.code ?? null,
-        obligation_title: (data as any).obligation?.title ?? null,
-        obligation_source: (data as any).obligation?.source ?? null,
+        ...row,
+        owner_name: row.owner?.full_name ?? null,
+        obligation_code: row.obligation?.code ?? null,
+        obligation_title: row.obligation?.title ?? null,
+        obligation_source: row.obligation?.source ?? null,
       } as ControlDetailFull;
     },
   });
@@ -70,7 +75,8 @@ export function useControlEvidences(controlId: string | undefined) {
         .eq("control_id", controlId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((row: any) => ({
+      type Raw = EvidenceRow & { owner?: { full_name?: string | null } | null };
+      return ((data ?? []) as Raw[]).map((row) => ({
         ...row,
         owner_name: row.owner?.full_name ?? null,
       })) as EvidenceFull[];

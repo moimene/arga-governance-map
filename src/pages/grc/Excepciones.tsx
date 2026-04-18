@@ -4,6 +4,18 @@ import { FileWarning } from "lucide-react";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type ExceptionRow = {
+  id: string;
+  code: string;
+  status: string;
+  justification: string | null;
+  compensatory_controls: string | null;
+  requested_at: string | null;
+  expires_at: string | null;
+  obligation_id: string | null;
+  obligations?: { code?: string | null; title?: string | null } | null;
+};
+
 function useExceptions() {
   return useQuery({
     queryKey: ["grc", "excepciones"],
@@ -14,7 +26,7 @@ function useExceptions() {
         .eq("tenant_id", DEMO_TENANT)
         .order("requested_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as ExceptionRow[];
     },
   });
 }
@@ -88,7 +100,7 @@ export default function Excepciones() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {exceptions.map((e: any) => (
+              {exceptions.map((e) => (
                 <tr
                   key={e.id}
                   className="hover:bg-[var(--g-surface-subtle)]/50 transition-colors"

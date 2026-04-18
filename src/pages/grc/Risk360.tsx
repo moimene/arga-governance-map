@@ -1,4 +1,4 @@
-import { useRisks } from "@/hooks/useRisks";
+import { useRisks, type RiskRow } from "@/hooks/useRisks";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity } from "lucide-react";
 
@@ -23,14 +23,14 @@ export default function Risk360() {
   const { data: allRisks = [], isLoading } = useRisks();
 
   const risks = findingFilter
-    ? allRisks.filter((r: any) => r.findings?.code === findingFilter)
+    ? allRisks.filter((r) => r.findings?.code === findingFilter)
     : allRisks;
 
   // Construir matriz 5×5: filas = impacto 5..1, cols = probabilidad 1..5
-  const grid: any[][] = Array.from({ length: 5 }, () =>
-    Array.from({ length: 5 }, () => [])
+  const grid: RiskRow[][][] = Array.from({ length: 5 }, () =>
+    Array.from({ length: 5 }, () => [] as RiskRow[])
   );
-  risks.forEach((r: any) => {
+  risks.forEach((r) => {
     const p = Math.min(5, Math.max(1, r.probability ?? 1));
     const i = Math.min(5, Math.max(1, r.impact ?? 1));
     grid[5 - i][p - 1].push(r);
@@ -104,7 +104,7 @@ export default function Risk360() {
                         key={`cell-${ridx}-${cidx}`}
                         title={
                           hasRisks
-                            ? cell.map((r: any) => `${r.code}: ${r.title}`).join("\n")
+                            ? cell.map((r) => `${r.code}: ${r.title}`).join("\n")
                             : `Score ${score}`
                         }
                         className={`aspect-square flex items-center justify-center text-sm font-semibold transition-all ${
@@ -158,7 +158,7 @@ export default function Risk360() {
           )}
 
           <div className="space-y-2 overflow-y-auto max-h-[480px]">
-            {risks.map((r: any) => (
+            {risks.map((r) => (
               <div
                 key={r.id}
                 className="p-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-page)]"

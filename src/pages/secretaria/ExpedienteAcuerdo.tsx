@@ -68,7 +68,7 @@ export default function ExpedienteAcuerdo() {
     );
   }
 
-  const a: any = agreement;
+  const a = agreement;
   const statusIndex = TIMELINE.indexOf(a.status);
 
   return (

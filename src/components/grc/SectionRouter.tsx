@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { lazy, Suspense } from "react";
 
-const VIEWS: Record<string, React.LazyExoticComponent<any>> = {
+const VIEWS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   "dora/operate/incidents":    lazy(() => import("@/pages/grc/modules/dora/Incidents")),
   "dora/operate/bcm":          lazy(() => import("@/pages/grc/modules/dora/BCM")),
   "dora/operate/rto":          lazy(() => import("@/pages/grc/modules/dora/RTO")),

@@ -3,6 +3,37 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+export type RegulatoryNotificationLite = {
+  id: string;
+  authority: string;
+  status: string;
+  notification_deadline: string | null;
+  notification_type: string;
+  submitted_at: string | null;
+  reference_number: string | null;
+};
+
+export type IncidentWithJoins = {
+  id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  severity: string | null;
+  incident_type: string;
+  is_major_incident: boolean | null;
+  status: string;
+  country_code: string | null;
+  detection_date: string | null;
+  containment_date: string | null;
+  resolution_date: string | null;
+  obligation_id: string | null;
+  root_cause: string | null;
+  lessons_learned: string | null;
+  regulatory_notification_required: boolean | null;
+  obligations?: { code?: string | null; title?: string | null } | null;
+  regulatory_notifications?: RegulatoryNotificationLite[] | null;
+};
+
 export function useIncidents(incidentType?: string) {
   return useQuery({
     queryKey: ["grc", "incidents", incidentType ?? "all"],
@@ -21,7 +52,7 @@ export function useIncidents(incidentType?: string) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as IncidentWithJoins[];
     },
   });
 }
@@ -39,7 +70,7 @@ export function useIncident(id?: string) {
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as IncidentWithJoins | null;
     },
   });
 }

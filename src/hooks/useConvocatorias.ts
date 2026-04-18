@@ -53,7 +53,14 @@ export function useConvocatoriasList() {
         .eq("tenant_id", DEMO_TENANT)
         .order("fecha_1", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((c: any) => ({
+      type Raw = Omit<ConvocatoriaWithBody, "body_name" | "entity_name" | "jurisdiction" | "legal_form"> & {
+        governing_bodies?: {
+          name?: string | null;
+          body_type?: string | null;
+          entities?: { common_name?: string | null; jurisdiction?: string | null; legal_form?: string | null } | null;
+        } | null;
+      };
+      return ((data ?? []) as Raw[]).map((c) => ({
         ...c,
         body_name: c.governing_bodies?.name ?? null,
         entity_name: c.governing_bodies?.entities?.common_name ?? null,
@@ -79,7 +86,14 @@ export function useConvocatoriaById(id: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      const c: any = data;
+      type Raw = Omit<ConvocatoriaWithBody, "body_name" | "entity_name" | "jurisdiction" | "legal_form"> & {
+        governing_bodies?: {
+          name?: string | null;
+          body_type?: string | null;
+          entities?: { common_name?: string | null; jurisdiction?: string | null; legal_form?: string | null } | null;
+        } | null;
+      };
+      const c = data as Raw;
       return {
         ...c,
         body_name: c.governing_bodies?.name ?? null,

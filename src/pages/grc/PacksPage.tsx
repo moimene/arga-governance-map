@@ -24,7 +24,7 @@ export default function PacksPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {packs.map((p: any) => (
+        {packs.map((p) => (
           <Link key={p.id} to={`/grc/packs/${p.country_code}`}>
             <div
               className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 hover:border-[var(--g-brand-3308)] transition-all"
@@ -78,7 +78,7 @@ export default function PacksPage() {
                   Frameworks
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {(p.pack_rules ?? []).map((r: any) => (
+                  {(p.pack_rules ?? []).map((r) => (
                     <span
                       key={r.framework_code}
                       className="inline-flex items-center px-2 py-0.5 text-xs font-medium border border-[var(--g-border-default)] text-[var(--g-text-primary)] bg-transparent"

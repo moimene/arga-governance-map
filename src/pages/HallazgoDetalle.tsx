@@ -129,7 +129,8 @@ export default function HallazgoDetalle() {
             <ul className="space-y-4">
               {actionPlans.map((p) => {
                 const pct = p.progress_pct ?? 0;
-                const tone = p.status === "Completado" ? "active" : p.status === "En progreso" ? "warning" : "neutral";
+                const tone: "active" | "warning" | "neutral" =
+                  p.status === "Completado" ? "active" : p.status === "En progreso" ? "warning" : "neutral";
                 return (
                   <li key={p.id} className="rounded-md border border-border p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -139,7 +140,7 @@ export default function HallazgoDetalle() {
                           Responsable: {p.responsible_name ?? "—"} · Vence: {formatDate(p.due_date)}
                         </div>
                       </div>
-                      <StatusBadge label={p.status} tone={tone as any} />
+                      <StatusBadge label={p.status} tone={tone} />
                     </div>
                     <div className="mt-3 flex items-center gap-3">
                       <Progress value={pct} className="h-2 flex-1" />
@@ -167,7 +168,7 @@ export default function HallazgoDetalle() {
                 {relatedControls.length === 0 && (
                   <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin controles vinculados a la obligación de este hallazgo.</TableCell></TableRow>
                 )}
-                {relatedControls.map((c: any) => (
+                {(relatedControls as Array<{ id: string; code: string; name: string; status: string | null; owner_name: string | null }>).map((c) => (
                   <TableRow key={c.id}>
                     <TableCell><Link to={`/obligaciones/controles/${c.code}`} className="font-mono text-xs text-primary hover:underline">{c.code}</Link></TableCell>
                     <TableCell className="text-sm">{c.name}</TableCell>

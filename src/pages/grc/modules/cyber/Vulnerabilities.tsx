@@ -3,6 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type VulnerabilityRow = {
+  id: string;
+  cve_id: string | null;
+  title: string;
+  cvss_score: number | null;
+  severity: string;
+  asset_name: string | null;
+  status: string;
+  remediation_due: string | null;
+};
+
 function useVulnerabilities() {
   return useQuery({
     queryKey: ["grc", "vulnerabilities"],
@@ -13,7 +24,7 @@ function useVulnerabilities() {
         .eq("tenant_id", DEMO_TENANT)
         .order("cvss_score", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as VulnerabilityRow[];
     },
   });
 }
@@ -64,7 +75,7 @@ export default function Vulnerabilities() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {vulns.map((v: any) => (
+              {vulns.map((v) => (
                 <tr key={v.id} className="hover:bg-[var(--g-surface-subtle)]/50 transition-colors">
                   <td className="px-5 py-3 font-mono text-xs text-[var(--g-text-secondary)]">
                     {v.cve_id ?? "—"}

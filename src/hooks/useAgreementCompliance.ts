@@ -57,16 +57,38 @@ export interface AgreementFull {
   unipersonal_decision_id: string | null;
   no_session_resolution_id: string | null;
   statutory_basis: string | null;
-  compliance_snapshot: any;
+  compliance_snapshot: Record<string, unknown> | null;
   created_at: string;
   entities?: { common_name: string; jurisdiction: string; legal_form: string } | null;
   governing_bodies?: { name: string; body_type: string } | null;
 }
 
+/** Subconjunto de agreement con entidad anidada usado por el motor de compliance. */
+type AgreementWithEntity = AgreementFull & {
+  entities: { jurisdiction: string | null; legal_form: string | null } | null;
+};
+
+/** Subconjunto relevante de jurisdiction_rule_sets.rule_config (JSONB flexible). */
+type RuleConfig = {
+  notice_periods_days?: { ordinaria?: number; extraordinaria?: number };
+  inscribable_matters?: string[];
+  registry_filing_types?: string[];
+  publication_channels?: Record<string, string>;
+};
+type JurisdictionRule = { rule_config: RuleConfig } | null;
+
+type MeetingRow = { id: string; body_id: string | null; scheduled_start: string | null } | null;
+type ConvocatoriaRow = { fecha_emision: string | null; fecha_1: string | null; urgente: boolean | null; junta_universal: boolean | null };
+type ResolutionRow = { status: string };
+type ConflictRow = { id: string; status: string };
+type NoSessionRow = { status: string; requires_unanimity: boolean; votes_for: number; votes_against: number; abstentions: number } | null;
+type UnipersonalRow = { status: string } | null;
+
 export function useAgreement(agreementId?: string) {
   return useQuery({
     queryKey: ["agreement", agreementId ?? "none"],
     enabled: !!agreementId,
+    staleTime: 60_000,
     queryFn: async (): Promise<AgreementFull | null> => {
       const { data, error } = await supabase
         .from("agreements")
@@ -77,7 +99,7 @@ export function useAgreement(agreementId?: string) {
         .eq("id", agreementId!)
         .maybeSingle();
       if (error) throw error;
-      return (data as any) ?? null;
+      return (data as AgreementFull | null) ?? null;
     },
   });
 }
@@ -94,6 +116,7 @@ export function useAgreementCompliance(agreementId?: string) {
   return useQuery({
     queryKey: ["agreement_compliance", agreementId ?? "none"],
     enabled: !!agreementId,
+    staleTime: 60_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
       // 1. Acuerdo + entidad
       const { data: agreement, error: aErr } = await supabase
@@ -105,12 +128,12 @@ export function useAgreementCompliance(agreementId?: string) {
       if (aErr) throw aErr;
       if (!agreement) return null;
 
-      const a: any = agreement;
+      const a = agreement as unknown as AgreementWithEntity;
       const jurisdiction: string | null = a.entities?.jurisdiction ?? null;
       const legalForm: string | null = a.entities?.legal_form ?? null;
 
       // 2. Reglas jurisdiccionales
-      let rule: any = null;
+      let rule: JurisdictionRule = null;
       const companyForm = normalizeCompanyForm(legalForm);
       if (jurisdiction && companyForm) {
         const { data } = await supabase
@@ -121,9 +144,9 @@ export function useAgreementCompliance(agreementId?: string) {
           .eq("company_form", companyForm)
           .eq("is_active", true)
           .maybeSingle();
-        rule = data ?? null;
+        rule = (data as JurisdictionRule) ?? null;
       }
-      const cfg = rule?.rule_config ?? {};
+      const cfg: RuleConfig = rule?.rule_config ?? {};
 
       const blocking: string[] = [];
 
@@ -134,19 +157,34 @@ export function useAgreementCompliance(agreementId?: string) {
       let conflict_handled = true;
 
       if (a.adoption_mode === "MEETING" && a.parent_meeting_id) {
-        // Convocatoria + quorum + mayoría desde meeting y convocatoria asociada
-        const { data: meeting } = await supabase
-          .from("meetings")
-          .select("*")
-          .eq("tenant_id", DEMO_TENANT)
-          .eq("id", a.parent_meeting_id)
-          .maybeSingle();
+        // F9: meeting / meeting_resolutions / conflicts_of_interest son independientes
+        // entre sí — se lanzan en paralelo. `conv` depende de `meeting` y queda secuencial.
+        const [meetingRes, resolutionsRes, conflictsRes] = await Promise.all([
+          supabase
+            .from("meetings")
+            .select("*")
+            .eq("tenant_id", DEMO_TENANT)
+            .eq("id", a.parent_meeting_id)
+            .maybeSingle(),
+          supabase
+            .from("meeting_resolutions")
+            .select("status")
+            .eq("tenant_id", DEMO_TENANT)
+            .eq("agreement_id", a.id),
+          supabase
+            .from("conflicts_of_interest")
+            .select("id, status")
+            .eq("tenant_id", DEMO_TENANT)
+            .eq("related_meeting_id", a.parent_meeting_id),
+        ]);
 
-        const m: any = meeting;
+        const m = meetingRes.data as MeetingRow;
+        const res = (resolutionsRes.data ?? []) as ResolutionRow[];
+        const conflicts = (conflictsRes.data ?? []) as ConflictRow[];
 
         // No existe FK meetings↔convocatorias: se localiza la convocatoria por
         // body_id + fecha_1 == fecha de la reunión (match determinista sobre el seed).
-        let conv: any = null;
+        let conv: ConvocatoriaRow | null = null;
         if (m?.body_id && m?.scheduled_start) {
           const meetingDateISO = String(m.scheduled_start).slice(0, 10);
           const { data: convs } = await supabase
@@ -157,7 +195,7 @@ export function useAgreementCompliance(agreementId?: string) {
             .eq("fecha_1", meetingDateISO)
             .order("fecha_emision", { ascending: false })
             .limit(1);
-          conv = convs?.[0] ?? null;
+          conv = ((convs as ConvocatoriaRow[] | null)?.[0]) ?? null;
         }
 
         // Convocatoria: plazo mínimo respetado
@@ -199,15 +237,10 @@ export function useAgreementCompliance(agreementId?: string) {
         // Mayoría: si acuerdo ya tiene decision_text y meeting tiene resolutions aprobadas.
         // Si el acuerdo ya está ADOPTED+ sin meeting_resolutions vinculadas (seed sin back-fill
         // de agreement_id), confiamos en la transición de estado y no bloqueamos.
-        const { data: res } = await supabase
-          .from("meeting_resolutions")
-          .select("status")
-          .eq("tenant_id", DEMO_TENANT)
-          .eq("agreement_id", a.id);
         if (!res || res.length === 0) {
           majority_compliant = true;
         } else {
-          const approved = res.some((r: any) => r.status === "APROBADO");
+          const approved = res.some((r) => r.status === "APROBADO");
           majority_compliant = approved;
           if (!approved && a.status !== "DRAFT" && a.status !== "PROPOSED") {
             blocking.push("Resolución asociada no figura como APROBADA.");
@@ -215,14 +248,9 @@ export function useAgreementCompliance(agreementId?: string) {
         }
 
         // Conflictos de interés ligados a la reunión
-        const { data: conflicts } = await supabase
-          .from("conflicts_of_interest")
-          .select("id, status")
-          .eq("tenant_id", DEMO_TENANT)
-          .eq("related_meeting_id", a.parent_meeting_id);
         if (conflicts && conflicts.length > 0) {
           conflict_handled = conflicts.every(
-            (c: any) => c.status === "RESUELTO" || c.status === "NOTIFICADO",
+            (c) => c.status === "RESUELTO" || c.status === "NOTIFICADO",
           );
           if (!conflict_handled) {
             blocking.push("Existen conflictos de interés no resueltos en la reunión.");
@@ -239,7 +267,7 @@ export function useAgreementCompliance(agreementId?: string) {
           .eq("tenant_id", DEMO_TENANT)
           .eq("id", a.no_session_resolution_id)
           .maybeSingle();
-        const n: any = nsr;
+        const n = nsr as NoSessionRow;
         if (!n) {
           majority_compliant = false;
           blocking.push("Resolución sin sesión no localizada.");
@@ -266,7 +294,7 @@ export function useAgreementCompliance(agreementId?: string) {
           .eq("tenant_id", DEMO_TENANT)
           .eq("id", a.unipersonal_decision_id)
           .maybeSingle();
-        const d: any = dec;
+        const d = dec as UnipersonalRow;
         majority_compliant = d?.status === "FIRMADA" || a.status === "DRAFT";
         if (!majority_compliant) {
           blocking.push("Decisión unipersonal aún no firmada.");
@@ -297,7 +325,7 @@ export function useAgreementCompliance(agreementId?: string) {
       }
 
       // 5. Publicación
-      const publicationChannels: any = cfg.publication_channels ?? {};
+      const publicationChannels: Record<string, string> = cfg.publication_channels ?? {};
       const publication_required =
         a.agreement_kind === "AMPLIACION_CAPITAL" ||
         a.agreement_kind === "FUSION" ||
@@ -346,6 +374,7 @@ export function useAgreementsByEntity(entityId?: string) {
   return useQuery({
     queryKey: ["agreements", "entity", entityId ?? "none"],
     enabled: !!entityId,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agreements")
@@ -354,7 +383,7 @@ export function useAgreementsByEntity(entityId?: string) {
         .eq("entity_id", entityId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as any[];
+      return (data ?? []) as AgreementFull[];
     },
   });
 }

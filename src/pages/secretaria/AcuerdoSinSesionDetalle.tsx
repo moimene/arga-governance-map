@@ -22,7 +22,7 @@ export default function AcuerdoSinSesionDetalle() {
     );
   }
 
-  const r: any = data;
+  const r = data;
   const body = r.governing_bodies?.name ?? "Órgano";
   const entity = r.governing_bodies?.entities?.common_name ?? "—";
 

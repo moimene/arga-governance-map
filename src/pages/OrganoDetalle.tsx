@@ -7,11 +7,20 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useBodyBySlug, useBodyMandates, useBodyMeetings, formatDate, formatTime } from "@/hooks/useBodies";
-import { useConvocatoriasList } from "@/hooks/useConvocatorias";
+import { useConvocatoriasList, type ConvocatoriaWithBody } from "@/hooks/useConvocatorias";
 import { getRegulationById } from "@/data/regulations";
 import { AlertTriangle, CalendarPlus, Download, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+
+type BodyAgreement = {
+  id: string;
+  agreement_kind: string;
+  matter_class: string;
+  status: string;
+  decision_date: string | null;
+  proposal_text: string | null;
+};
 
 export default function OrganoDetalle() {
   const { id = "" } = useParams();
@@ -19,21 +28,22 @@ export default function OrganoDetalle() {
   const { data: members = [] } = useBodyMandates(body?.id);
   const { data: bodyMeetings = [] } = useBodyMeetings(body?.id);
   const { data: allConvocatorias = [] } = useConvocatoriasList();
-  const bodyConvocatorias = (allConvocatorias as any[]).filter(
-    (c) => c.body_id === (body as any)?.id,
-  ).slice(0, 5);
-  const { data: bodyAgreements = [] } = useQuery({
-    queryKey: ["agreements", "by-body", (body as any)?.id ?? "none"],
-    enabled: !!(body as any)?.id,
+  const bodyId = body?.id;
+  const bodyConvocatorias = (allConvocatorias as ConvocatoriaWithBody[])
+    .filter((c) => c.body_id === bodyId)
+    .slice(0, 5);
+  const { data: bodyAgreements = [] } = useQuery<BodyAgreement[]>({
+    queryKey: ["agreements", "by-body", bodyId ?? "none"],
+    enabled: !!bodyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agreements")
         .select("id, agreement_kind, matter_class, status, decision_date, proposal_text")
-        .eq("body_id", (body as any).id)
+        .eq("body_id", bodyId!)
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw error;
-      return (data ?? []) as any[];
+      return (data ?? []) as BodyAgreement[];
     },
   });
 
@@ -43,7 +53,7 @@ export default function OrganoDetalle() {
   if (!body) {
     return <div className="p-10 text-center text-sm text-muted-foreground">Órgano no encontrado. <Link to="/organos" className="text-primary underline">Volver</Link></div>;
   }
-  const entity: any = (body as any).entity ?? null;
+  const entity = (body as typeof body & { entity?: { common_name?: string; legal_name?: string | null } | null }).entity ?? null;
   const regulation = body.regulation_id ? getRegulationById(body.regulation_id) : null;
   const alertCount = members.filter((m) => m.status && m.status !== "Activo" && m.status !== "VIGENTE").length;
 
@@ -216,7 +226,7 @@ export default function OrganoDetalle() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bodyConvocatorias.map((c: any) => (
+                    {bodyConvocatorias.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>
                           <Link to={`/secretaria/convocatorias/${c.id}`} className="font-mono text-xs text-primary hover:underline">
@@ -251,7 +261,7 @@ export default function OrganoDetalle() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bodyAgreements.map((ag: any) => (
+                    {bodyAgreements.map((ag) => (
                       <TableRow key={ag.id}>
                         <TableCell className="text-sm">
                           <Link to={`/secretaria/acuerdos/${ag.id}`} className="text-primary hover:underline">

@@ -87,7 +87,7 @@ export default function IncidentesList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {incidents.map((i: any) => {
+              {incidents.map((i) => {
                 const notif = (i.regulatory_notifications ?? [])[0];
                 const dLabel = notif?.status === "Pendiente"
                   ? deadlineLabel(notif?.notification_deadline)

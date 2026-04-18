@@ -17,7 +17,7 @@ export interface BodyListRow {
   entity_name: string | null;
   entity_slug: string | null;
   member_count: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface BodyRow {
@@ -32,7 +32,7 @@ export interface BodyRow {
   secretary: string | null;
   status: string | null;
   next_meeting_date: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MandateRow {
@@ -46,7 +46,7 @@ export interface MandateRow {
   status: string | null;
   full_name: string | null;
   email: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MeetingRow {
@@ -62,7 +62,7 @@ export interface MeetingRow {
   secretary_id: string | null;
   president_name?: string | null;
   secretary_name?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AgendaItemRow {
@@ -74,7 +74,7 @@ export interface AgendaItemRow {
   status: string | null;
   related_object: string | null;
   notes: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export function useBodiesList() {
@@ -86,11 +86,15 @@ export function useBodiesList() {
         .select("*, entity:entity_id(common_name, slug), mandates(id, status)")
         .order("name", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((b: any) => ({
+      type BodyRaw = BodyListRow & {
+        entity?: { common_name?: string | null; slug?: string | null } | null;
+        mandates?: Array<{ id: string; status: string | null }> | null;
+      };
+      return ((data ?? []) as BodyRaw[]).map((b) => ({
         ...b,
         entity_name: b.entity?.common_name ?? null,
         entity_slug: b.entity?.slug ?? null,
-        member_count: (b.mandates ?? []).filter((m: any) => m.status === "Activo").length,
+        member_count: (b.mandates ?? []).filter((m) => m.status === "Activo").length,
       }));
     },
   });
@@ -107,7 +111,7 @@ export function useBodyBySlug(slug: string | undefined) {
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;
-      return (data as any) ?? null;
+      return (data as BodyRow | null) ?? null;
     },
   });
 }
@@ -123,7 +127,8 @@ export function useBodyMandates(bodyId: string | undefined) {
         .eq("body_id", bodyId!)
         .order("role", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((m: any) => ({
+      type MandateRaw = MandateRow & { person?: { full_name?: string | null; email?: string | null } | null };
+      return ((data ?? []) as MandateRaw[]).map((m) => ({
         ...m,
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,
@@ -160,7 +165,11 @@ export function useMeetingBySlug(meetingSlug: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      const m: any = data;
+      type MeetingRaw = MeetingRow & {
+        president?: { full_name?: string | null } | null;
+        secretary?: { full_name?: string | null } | null;
+      };
+      const m = data as MeetingRaw;
       return {
         ...m,
         president_name: m.president?.full_name ?? null,
@@ -197,7 +206,8 @@ export function useMeetingParticipants(bodyId: string | undefined) {
         .eq("body_id", bodyId!)
         .eq("status", "Activo");
       if (error) throw error;
-      return (data ?? []).map((m: any) => ({
+      type MandateRaw = MandateRow & { person?: { full_name?: string | null; email?: string | null } | null };
+      return ((data ?? []) as MandateRaw[]).map((m) => ({
         ...m,
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,

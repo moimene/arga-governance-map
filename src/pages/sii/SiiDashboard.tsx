@@ -13,7 +13,7 @@ export default function SiiDashboard() {
   const active = cases.filter((c) => !isClosed(c.status)).length;
   const closed = cases.length - active;
 
-  const toneFor = (s: string | null) => {
+  const toneFor = (s: string | null): "info" | "warning" | "neutral" => {
     const v = (s ?? "").toUpperCase();
     if (v.startsWith("EN INVESTIGAC")) return "info";
     if (v.startsWith("EN ANÁLISIS") || v.startsWith("EN ANALISIS")) return "warning";
@@ -72,7 +72,7 @@ export default function SiiDashboard() {
                 <TableCell className="text-sm">{c.classification ?? c.category ?? "—"}</TableCell>
                 <TableCell className="text-sm">{c.country ?? "—"}</TableCell>
                 <TableCell>
-                  <StatusBadge label={c.status ?? "—"} tone={toneFor(c.status) as any} />
+                  <StatusBadge label={c.status ?? "—"} tone={toneFor(c.status)} />
                 </TableCell>
                 <TableCell className="text-sm">{c.investigator_name ?? "—"}</TableCell>
               </TableRow>

@@ -51,7 +51,8 @@ async function fetchRolesByPersonIds(ids: string[]) {
     .in("person_id", ids)
     .eq("status", "Activo");
   const map = new Map<string, string>();
-  (data ?? []).forEach((m: any) => {
+  type MandateRoleRow = { person_id: string; role: string; status: string };
+  ((data ?? []) as MandateRoleRow[]).forEach((m) => {
     if (!map.has(m.person_id)) map.set(m.person_id, m.role);
   });
   return map;
@@ -66,9 +67,13 @@ export function useConflictsList() {
         .select("*, person:person_id(full_name), finding:related_finding_id(code)")
         .order("status", { ascending: false });
       if (error) throw error;
-      const rows = data ?? [];
-      const roles = await fetchRolesByPersonIds(rows.map((r: any) => r.person_id).filter(Boolean));
-      return rows.map((r: any): ConflictFull => ({
+      type ConflictRaw = ConflictRow & {
+        person?: { full_name?: string | null } | null;
+        finding?: { code?: string | null } | null;
+      };
+      const rows = (data ?? []) as ConflictRaw[];
+      const roles = await fetchRolesByPersonIds(rows.map((r) => r.person_id).filter(Boolean));
+      return rows.map((r): ConflictFull => ({
         ...r,
         person_name: r.person?.full_name ?? null,
         person_role: roles.get(r.person_id) ?? null,
@@ -88,14 +93,15 @@ export function useAttestationsList() {
         .select("*, person:person_id(full_name, email)")
         .order("status", { ascending: true }); // Pendiente < Completada alfabéticamente — invertimos abajo
       if (error) throw error;
-      const rows = data ?? [];
-      const roles = await fetchRolesByPersonIds(rows.map((r: any) => r.person_id).filter(Boolean));
+      type AttestationRaw = AttestationRow & { person?: { full_name?: string | null; email?: string | null } | null };
+      const rows = (data ?? []) as AttestationRaw[];
+      const roles = await fetchRolesByPersonIds(rows.map((r) => r.person_id).filter(Boolean));
       // Pendientes primero
-      rows.sort((a: any, b: any) => {
+      rows.sort((a, b) => {
         if (a.status === b.status) return 0;
         return a.status === "Pendiente" ? -1 : 1;
       });
-      return rows.map((r: any): AttestationFull => ({
+      return rows.map((r): AttestationFull => ({
         ...r,
         person_name: r.person?.full_name ?? null,
         person_email: r.person?.email ?? null,

@@ -94,8 +94,13 @@ export function useModuleStatus() {
           .in("status", ["ABIERTO", "EN_INVESTIGACION"]),
 
         // SII: casos abiertos
-        supabase
-          .from("sii_cases_view" as any)
+        // sii_cases_view no está en los tipos generados; cast controlado para usar PostgREST.
+        (supabase as unknown as { from: (t: string) => {
+          select: (c: string, o: { count: "exact"; head: true }) => {
+            in: (col: string, vals: string[]) => Promise<{ count: number | null; error: { message: string } | null }>;
+          };
+        } })
+          .from("sii_cases_view")
           .select("id", { count: "exact", head: true })
           .in("status", ["OPEN", "ABIERTO", "PENDING"]),
       ]);

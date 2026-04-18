@@ -30,7 +30,10 @@ export function useLibrosList() {
         .eq("tenant_id", DEMO_TENANT)
         .order("legalization_deadline", { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((b: any) => ({
+      type Raw = Omit<MandatoryBookRow, "entity_name" | "jurisdiction"> & {
+        entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((b) => ({
         ...b,
         entity_name: b.entities?.common_name ?? null,
         jurisdiction: b.entities?.jurisdiction ?? null,

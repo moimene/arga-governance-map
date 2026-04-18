@@ -64,7 +64,13 @@ const SELECT = `
   delegate:delegate_id(full_name)
 `;
 
-const mapRow = (row: any): DelegationFull => ({
+type DelegationRaw = DelegationRow & {
+  entity?: { common_name?: string | null; slug?: string | null; legal_name?: string | null } | null;
+  grantor?: { full_name?: string | null } | null;
+  delegate?: { full_name?: string | null } | null;
+};
+
+const mapRow = (row: DelegationRaw): DelegationFull => ({
   ...row,
   entity_name: row.entity?.common_name ?? null,
   entity_slug: row.entity?.slug ?? null,
@@ -82,7 +88,7 @@ export function useDelegationsList() {
         .select(SELECT)
         .order("code");
       if (error) throw error;
-      return (data ?? []).map(mapRow);
+      return ((data ?? []) as DelegationRaw[]).map(mapRow);
     },
   });
 }
@@ -98,7 +104,7 @@ export function useDelegationBySlug(slug: string | undefined) {
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;
-      return data ? mapRow(data) : null;
+      return data ? mapRow(data as DelegationRaw) : null;
     },
   });
 }

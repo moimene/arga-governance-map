@@ -2,10 +2,21 @@ import { NavLink, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import * as icons from "lucide-react";
-import { Dot } from "lucide-react";
+import { Dot, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+type NavItem = {
+  id: string;
+  module_id: string;
+  section: string;
+  view_key: string;
+  label: string;
+  route: string;
+  icon: string | null;
+  display_order: number | null;
+};
 
 const MODULE_LABEL: Record<string, string> = {
   dora: "DORA / Resiliencia",
@@ -43,7 +54,7 @@ export function ModuleSidebar() {
   const { moduleId = "" } = useParams();
   const { data: nav = [] } = useModuleNav(moduleId);
 
-  const grouped = nav.reduce((acc: any, item: any) => {
+  const grouped = (nav as NavItem[]).reduce<Record<string, NavItem[]>>((acc, item) => {
     (acc[item.section] ??= []).push(item);
     return acc;
   }, {});
@@ -64,15 +75,16 @@ export function ModuleSidebar() {
 
       {/* Nav sections */}
       {(["operate", "governance", "config"] as const).map((section) => {
-        const items: any[] = grouped[section] ?? [];
+        const items: NavItem[] = grouped[section] ?? [];
         if (items.length === 0) return null;
         return (
           <div key={section} className="py-1">
             <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
               {SECTION_LABEL[section]}
             </div>
-            {items.map((item: any) => {
-              const Icon: any = (icons as any)[item.icon] ?? Dot;
+            {items.map((item) => {
+              const Icon: LucideIcon =
+                (item.icon && (icons as unknown as Record<string, LucideIcon>)[item.icon]) ?? Dot;
               return (
                 <NavLink
                   key={item.id}

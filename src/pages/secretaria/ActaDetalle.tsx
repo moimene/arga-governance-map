@@ -23,7 +23,7 @@ export default function ActaDetalle() {
     );
   }
 
-  const m: any = acta;
+  const m = acta;
   const body = m.meetings?.governing_bodies?.name ?? "Órgano";
   const entity = m.meetings?.governing_bodies?.entities?.common_name ?? "—";
 

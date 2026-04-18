@@ -31,7 +31,7 @@ export default function CyberIncidents() {
       )}
 
       <div className="space-y-3">
-        {incidents.map((i: any) => (
+        {incidents.map((i) => (
           <div
             key={i.id}
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-4 flex items-start gap-3"

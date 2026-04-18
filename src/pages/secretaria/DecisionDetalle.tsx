@@ -21,7 +21,7 @@ export default function DecisionDetalle() {
       </div>
     );
   }
-  const d: any = data;
+  const d = data;
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">

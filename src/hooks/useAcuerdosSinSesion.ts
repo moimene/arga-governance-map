@@ -32,7 +32,10 @@ export function useAcuerdosSinSesionList() {
         .eq("tenant_id", DEMO_TENANT)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      type Raw = Omit<NoSessionResolutionRow, "body_name" | "entity_name"> & {
+        governing_bodies?: { name?: string | null; entities?: { common_name?: string | null } | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((r) => ({
         ...r,
         body_name: r.governing_bodies?.name ?? null,
         entity_name: r.governing_bodies?.entities?.common_name ?? null,
@@ -40,6 +43,13 @@ export function useAcuerdosSinSesionList() {
     },
   });
 }
+
+export type NoSessionResolutionDetailRow = Omit<NoSessionResolutionRow, "body_name" | "entity_name"> & {
+  governing_bodies?: {
+    name?: string | null;
+    entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+  } | null;
+};
 
 export function useAcuerdoSinSesionById(id: string | undefined) {
   return useQuery({
@@ -53,7 +63,7 @@ export function useAcuerdoSinSesionById(id: string | undefined) {
         .eq("tenant_id", DEMO_TENANT)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as NoSessionResolutionDetailRow | null;
     },
   });
 }
