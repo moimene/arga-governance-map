@@ -99,6 +99,30 @@ export default function PoliticaDetalle() {
     },
   });
 
+  // Acuerdos vinculados directamente por policy_id FK (GAP 2)
+  const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+  const { data: linkedAgreements = [] } = useQuery({
+    queryKey: ["policy-agreements-fk", policy?.id ?? "none"],
+    enabled: !!policy?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agreements")
+        .select("id, agreement_kind, status, decision_date, parent_meeting_id, meetings:parent_meeting_id(meeting_type, slug, scheduled_start)")
+        .eq("policy_id", policy!.id)
+        .eq("tenant_id", DEMO_TENANT);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        agreement_kind: string;
+        status: string;
+        decision_date: string | null;
+        parent_meeting_id: string | null;
+        meetings?: { meeting_type?: string | null; slug?: string | null; scheduled_start?: string | null } | null;
+      }>;
+    },
+  });
+
   // AI systems related to this policy (match by use_case or policy title)
   const { data: allAiSystems = [] } = useAiSystemsList();
   const relatedAiSystems = useMemo(() => {
@@ -281,6 +305,34 @@ export default function PoliticaDetalle() {
                 : "Órgano de aprobación no asignado."}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">Estado actual: <span className="font-semibold text-foreground">{policyStatusLabel(policy.status)}</span>.</p>
+
+            {linkedAgreements.length > 0 && (
+              <div className="mt-4 rounded-lg border border-[var(--g-border-subtle)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)] mb-2">
+                  Aprobada en sesión
+                </div>
+                {linkedAgreements.map((ag) => (
+                  <div key={ag.id} className="flex items-center gap-2 text-sm text-[var(--g-text-primary)]">
+                    <span className="font-medium">
+                      {ag.meetings?.meeting_type
+                        ? `Sesión ${ag.meetings.meeting_type}${ag.meetings.slug ? ` · ${ag.meetings.slug}` : ""}`
+                        : "Sesión CdA"}
+                    </span>
+                    {ag.decision_date && (
+                      <span className="text-[var(--g-text-secondary)]">
+                        · {new Date(ag.decision_date).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}
+                      </span>
+                    )}
+                    <span
+                      className="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {ag.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {policyAgreements.length > 0 && (
               <div className="mt-6 border-t border-border pt-4">
