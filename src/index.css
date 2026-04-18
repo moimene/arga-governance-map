@@ -71,6 +71,63 @@
     --sidebar-accent-foreground: 352 86% 49%;
     --sidebar-border: 0 0% 100%;
     --sidebar-ring: 0 0% 100%;
+
+    /* ── Garrigues Module Tokens (shared by /secretaria/*, /grc/*, /ai-governance/*) */
+    --g-brand-3308:   #004438;
+    --g-brand-bright: #009a77;
+    --g-sec-700:      #007362;
+    --g-sec-300:      #6dc1b0;
+    --g-sec-100:      #d8ece7;
+
+    --g-text-primary:   #4a4a49;
+    --g-text-secondary: #50564f;
+    --g-text-inverse:   #ffffff;
+    --g-link:           #004438;
+    --g-link-hover:     #007362;
+
+    --g-surface-page:   #f0f0f0;
+    --g-surface-card:   #ffffff;
+    --g-surface-subtle: #d8ece7;
+    --g-surface-muted:  hsl(60, 1%, 88%);
+
+    --g-border-default: #b7bfb0;
+    --g-border-subtle:  #b9babb;
+    --g-border-focus:   #004438;
+
+    --status-success: #009a77;
+    --status-warning: #878989;
+    --status-error:   hsl(0, 84%, 60%);
+    --status-info:    #596f7b;
+
+    --g-radius-none: 0px;
+    --g-radius-sm:   6px;
+    --g-radius-md:   8px;
+    --g-radius-lg:   10px;
+    --g-radius-xl:   16px;
+    --g-radius-full: 9999px;
+
+    --g-shadow-card:       0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+    --g-shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --g-shadow-dropdown:   0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --g-shadow-modal:      0 25px 50px -12px rgb(0 0 0 / 0.25);
+    --g-shadow-brand:      0 10px 30px -10px hsl(168 100% 13% / 0.3);
+
+    --g-transition-fast:   150ms ease;
+    --g-transition-normal: 200ms ease-out;
+    --g-transition-smooth: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Garrigues sidebar HSL tokens — active only inside /secretaria/*, /grc/*, /ai-governance/* */
+  .garrigues-module {
+    --sidebar-background:          168 100% 13%;
+    --sidebar-foreground:          0 0% 100%;
+    --sidebar-primary:             0 0% 100%;
+    --sidebar-primary-foreground:  168 100% 13%;
+    --sidebar-accent:              170 100% 23%;
+    --sidebar-accent-foreground:   0 0% 100%;
+    --sidebar-border:              170 100% 23%;
+    --sidebar-width:               280px;
+    --sidebar-width-collapsed:     56px;
   }
 }
 

@@ -18,9 +18,11 @@ import {
   controlStatusLabel,
   controlStatusTone,
 } from "@/hooks/usePoliciesObligations";
-import { Check, Download, GitCompare, History } from "lucide-react";
+import { Check, Download, FileCheck2, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const PR008_SECTIONS = [
   { title: "Objeto y ámbito de aplicación", body: "La presente Política establece el marco de gestión de la resiliencia operativa digital del Grupo ARGA Seguros, en cumplimiento del Reglamento (UE) 2022/2554 (DORA). Es de aplicación a todas las entidades del Grupo y a sus proveedores TIC críticos." },
@@ -55,6 +57,22 @@ export default function PoliticaDetalle() {
   const { data: obligations = [] } = usePolicyObligations(policy?.id);
   const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+  const { data: policyAgreements = [] } = useQuery({
+    queryKey: ["agreements", "policy", policy?.policy_code ?? "none"],
+    enabled: !!policy?.policy_code,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agreements")
+        .select("id, agreement_kind, status, decision_date, proposal_text")
+        .or(
+          `proposal_text.ilike.%${policy.policy_code}%,decision_text.ilike.%${policy.policy_code}%,statutory_basis.ilike.%${policy.policy_code}%`,
+        )
+        .order("decision_date", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
 
   if (isLoading) {
     return (
@@ -217,6 +235,39 @@ export default function PoliticaDetalle() {
                 : "Órgano de aprobación no asignado."}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">Estado actual: <span className="font-semibold text-foreground">{policyStatusLabel(policy.status)}</span>.</p>
+
+            {policyAgreements.length > 0 && (
+              <div className="mt-6 border-t border-border pt-4">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  Acuerdos societarios vinculados
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Expediente</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {policyAgreements.map((ag: any) => (
+                      <TableRow key={ag.id}>
+                        <TableCell className="text-sm">{ag.agreement_kind}</TableCell>
+                        <TableCell className="font-mono text-xs">{fmtDate(ag.decision_date)}</TableCell>
+                        <TableCell><StatusBadge label={ag.status} /></TableCell>
+                        <TableCell className="text-right">
+                          <Link to={`/secretaria/acuerdos/${ag.id}`} className="text-xs text-primary hover:underline">
+                            Ver expediente
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </Card>
         </TabsContent>
 

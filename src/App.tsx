@@ -33,8 +33,27 @@ import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
 import GrcDashboard from "@/pages/modules/GrcDashboard";
-import SecretariaDashboard from "@/pages/modules/SecretariaDashboard";
 import AimsDashboard from "@/pages/modules/AimsDashboard";
+import { SecretariaLayout } from "@/pages/secretaria/SecretariaLayout";
+import SecretariaDashboard from "@/pages/secretaria/Dashboard";
+import ConvocatoriasList from "@/pages/secretaria/ConvocatoriasList";
+import ConvocatoriaDetalle from "@/pages/secretaria/ConvocatoriaDetalle";
+import ConvocatoriasStepper from "@/pages/secretaria/ConvocatoriasStepper";
+import ReunionesLista from "@/pages/secretaria/ReunionesLista";
+import ReunionStepper from "@/pages/secretaria/ReunionStepper";
+import ActasLista from "@/pages/secretaria/ActasLista";
+import ActaDetalle from "@/pages/secretaria/ActaDetalle";
+import TramitadorLista from "@/pages/secretaria/TramitadorLista";
+import TramitadorStepper from "@/pages/secretaria/TramitadorStepper";
+import AcuerdosSinSesion from "@/pages/secretaria/AcuerdosSinSesion";
+import AcuerdoSinSesionStepper from "@/pages/secretaria/AcuerdoSinSesionStepper";
+import AcuerdoSinSesionDetalle from "@/pages/secretaria/AcuerdoSinSesionDetalle";
+import DecisionesUnipersonales from "@/pages/secretaria/DecisionesUnipersonales";
+import DecisionDetalle from "@/pages/secretaria/DecisionDetalle";
+import LibrosObligatorios from "@/pages/secretaria/LibrosObligatorios";
+import Plantillas from "@/pages/secretaria/Plantillas";
+import ExpedienteAcuerdo from "@/pages/secretaria/ExpedienteAcuerdo";
+import { RequireAuth } from "@/components/RequireAuth";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +71,6 @@ const App = () => (
                 <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/grc" element={<GrcDashboard />} />
-                  <Route path="/secretaria" element={<SecretariaDashboard />} />
                   <Route path="/aims" element={<AimsDashboard />} />
                   <Route path="/governance-map" element={<GovernanceMap />} />
                   <Route path="/entidades" element={<EntidadesList />} />
@@ -76,6 +94,34 @@ const App = () => (
                   </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
+                </Route>
+                {/* Módulo Garrigues Secretaría — layout propio (sidebar verde) */}
+                <Route
+                  element={
+                    <RequireAuth>
+                      <SecretariaLayout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route path="/secretaria" element={<SecretariaDashboard />} />
+                  <Route path="/secretaria/convocatorias" element={<ConvocatoriasList />} />
+                  <Route path="/secretaria/convocatorias/nueva" element={<ConvocatoriasStepper />} />
+                  <Route path="/secretaria/convocatorias/:id" element={<ConvocatoriaDetalle />} />
+                  <Route path="/secretaria/reuniones" element={<ReunionesLista />} />
+                  <Route path="/secretaria/reuniones/:id" element={<ReunionStepper />} />
+                  <Route path="/secretaria/actas" element={<ActasLista />} />
+                  <Route path="/secretaria/actas/:id" element={<ActaDetalle />} />
+                  <Route path="/secretaria/tramitador" element={<TramitadorLista />} />
+                  <Route path="/secretaria/tramitador/nuevo" element={<TramitadorStepper />} />
+                  <Route path="/secretaria/tramitador/:id" element={<TramitadorStepper />} />
+                  <Route path="/secretaria/acuerdos-sin-sesion" element={<AcuerdosSinSesion />} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<AcuerdoSinSesionStepper />} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<AcuerdoSinSesionDetalle />} />
+                  <Route path="/secretaria/decisiones-unipersonales" element={<DecisionesUnipersonales />} />
+                  <Route path="/secretaria/decisiones-unipersonales/:id" element={<DecisionDetalle />} />
+                  <Route path="/secretaria/libros" element={<LibrosObligatorios />} />
+                  <Route path="/secretaria/plantillas" element={<Plantillas />} />
+                  <Route path="/secretaria/acuerdos/:id" element={<ExpedienteAcuerdo />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

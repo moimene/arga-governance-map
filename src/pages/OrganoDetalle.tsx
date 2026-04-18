@@ -7,14 +7,35 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useBodyBySlug, useBodyMandates, useBodyMeetings, formatDate, formatTime } from "@/hooks/useBodies";
+import { useConvocatoriasList } from "@/hooks/useConvocatorias";
 import { getRegulationById } from "@/data/regulations";
-import { AlertTriangle, CalendarPlus, Download, Network, Plus, UserPlus } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Download, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 export default function OrganoDetalle() {
   const { id = "" } = useParams();
   const { data: body, isLoading } = useBodyBySlug(id);
   const { data: members = [] } = useBodyMandates(body?.id);
   const { data: bodyMeetings = [] } = useBodyMeetings(body?.id);
+  const { data: allConvocatorias = [] } = useConvocatoriasList();
+  const bodyConvocatorias = (allConvocatorias as any[]).filter(
+    (c) => c.body_id === (body as any)?.id,
+  ).slice(0, 5);
+  const { data: bodyAgreements = [] } = useQuery({
+    queryKey: ["agreements", "by-body", (body as any)?.id ?? "none"],
+    enabled: !!(body as any)?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agreements")
+        .select("id, agreement_kind, matter_class, status, decision_date, proposal_text")
+        .eq("body_id", (body as any).id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
 
   if (isLoading) {
     return <div className="p-10 text-center text-sm text-muted-foreground">Cargando…</div>;
@@ -63,10 +84,11 @@ export default function OrganoDetalle() {
       )}
 
       <Tabs defaultValue="composicion" className="mt-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="composicion">Composición</TabsTrigger>
           <TabsTrigger value="calendario">Calendario</TabsTrigger>
           <TabsTrigger value="reglamento">Reglamento</TabsTrigger>
+          <TabsTrigger value="secretaria">Secretaría</TabsTrigger>
           <TabsTrigger value="historial">Historial</TabsTrigger>
         </TabsList>
 
@@ -171,6 +193,81 @@ export default function OrganoDetalle() {
           ) : (
             <Card className="p-10 text-center text-sm text-muted-foreground">Este órgano no tiene reglamento formal asociado.</Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="secretaria" className="mt-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+                <div className="text-sm font-semibold">Últimas convocatorias</div>
+                <Button asChild size="sm" variant="outline" className="gap-1.5">
+                  <Link to="/secretaria/convocatorias"><FileCheck2 className="h-3.5 w-3.5" />Ver todas</Link>
+                </Button>
+              </div>
+              {bodyConvocatorias.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">Sin convocatorias registradas.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bodyConvocatorias.map((c: any) => (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          <Link to={`/secretaria/convocatorias/${c.id}`} className="font-mono text-xs text-primary hover:underline">
+                            {c.slug ?? c.id.slice(0, 8)}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{formatDate(c.fecha_1)}</TableCell>
+                        <TableCell><StatusBadge label={c.estado ?? "—"} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+            <Card>
+              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+                <div className="text-sm font-semibold">Acuerdos adoptados</div>
+                <Button asChild size="sm" variant="outline" className="gap-1.5">
+                  <Link to="/secretaria"><FileCheck2 className="h-3.5 w-3.5" />Secretaría</Link>
+                </Button>
+              </div>
+              {bodyAgreements.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">Sin acuerdos registrados.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Materia</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bodyAgreements.map((ag: any) => (
+                      <TableRow key={ag.id}>
+                        <TableCell className="text-sm">
+                          <Link to={`/secretaria/acuerdos/${ag.id}`} className="text-primary hover:underline">
+                            {ag.agreement_kind}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm">{ag.matter_class}</TableCell>
+                        <TableCell className="font-mono text-xs">{formatDate(ag.decision_date)}</TableCell>
+                        <TableCell><StatusBadge label={ag.status} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="historial" className="mt-4">
