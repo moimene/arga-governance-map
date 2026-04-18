@@ -30,11 +30,12 @@ export interface ConvocatoriaWithBody extends ConvocatoriaRow {
 
 export interface AttachmentRow {
   id: string;
-  ref_table: string;
-  ref_id: string;
+  tenant_id: string;
+  convocatoria_id: string;
+  agenda_item_index: number | null;
   file_name: string;
   file_url: string;
-  file_type: string | null;
+  file_hash: string | null;
   uploaded_at: string;
 }
 
@@ -94,8 +95,7 @@ export function useConvocatoriaAttachments(convocatoriaId: string | undefined) {
       const { data, error } = await supabase
         .from("attachments")
         .select("*")
-        .eq("ref_table", "convocatorias")
-        .eq("ref_id", convocatoriaId!)
+        .eq("convocatoria_id", convocatoriaId!)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AttachmentRow[];

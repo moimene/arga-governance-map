@@ -98,9 +98,11 @@ export default function ConvocatoriaDetalle() {
                     >
                       {a.file_name}
                     </a>
-                    <span className="ml-2 text-[11px] text-[var(--g-text-secondary)]">
-                      {a.file_type ?? ""}
-                    </span>
+                    {a.file_hash ? (
+                      <span className="ml-2 font-mono text-[11px] text-[var(--g-text-secondary)]">
+                        {a.file_hash.slice(0, 12)}…
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

@@ -46,14 +46,14 @@ export function useJurisdiccionRules() {
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
-        .order("jurisdiction_code", { ascending: true });
+        .order("jurisdiction", { ascending: true });
       if (error) throw error;
       return (data ?? []) as JurisdictionRuleSet[];
     },
   });
 }
 
-/** Applicable rule set(s) for an entity's jurisdiction + legal_form. */
+/** Applicable rule set(s) for an entity's jurisdiction + company_form. */
 export function useEntityRules(jurisdictionCode?: string, companyForm?: string) {
   return useQuery({
     enabled: !!jurisdictionCode && !!companyForm,
@@ -62,9 +62,9 @@ export function useEntityRules(jurisdictionCode?: string, companyForm?: string) 
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
-        .eq("jurisdiction_code", jurisdictionCode!)
+        .eq("jurisdiction", jurisdictionCode!)
         .eq("company_form", companyForm!)
-        .is("effective_to", null);
+        .eq("is_active", true);
       if (error) throw error;
       return (data ?? []) as JurisdictionRuleSet[];
     },

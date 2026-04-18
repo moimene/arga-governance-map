@@ -1,6 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Normaliza la forma societaria de `entities.legal_form` al vocabulario
+ *  canónico usado en `jurisdiction_rule_sets.company_form`. */
+function normalizeCompanyForm(legalForm?: string | null): string | null {
+  if (!legalForm) return null;
+  const lf = legalForm.trim().toUpperCase().replace(/\./g, "").replace(/\s+/g, "");
+  if (lf === "SA" || lf === "SAECV") return "SA";
+  if (lf === "SACV" || lf === "SADECV") return "SA_CV";
+  if (lf === "SL" || lf === "SRL") return "SRL";
+  if (lf === "LTDA") return "LTDA";
+  if (lf === "LDA") return "LDA";
+  return lf;
+}
+
 export type InstrumentRequired = "ESCRITURA" | "INSTANCIA" | "NINGUNO";
 
 export interface ComplianceResult {
@@ -94,12 +107,14 @@ export function useAgreementCompliance(agreementId?: string) {
 
       // 2. Reglas jurisdiccionales
       let rule: any = null;
-      if (jurisdiction && legalForm) {
+      const companyForm = normalizeCompanyForm(legalForm);
+      if (jurisdiction && companyForm) {
         const { data } = await supabase
           .from("jurisdiction_rule_sets")
           .select("*")
           .eq("jurisdiction", jurisdiction)
-          .eq("legal_form", legalForm)
+          .eq("company_form", companyForm)
+          .eq("is_active", true)
           .maybeSingle();
         rule = data ?? null;
       }
