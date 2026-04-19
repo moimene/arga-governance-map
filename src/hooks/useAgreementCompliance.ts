@@ -1,7 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  evaluarAcuerdoCompleto,
+  type RulePack,
+  type RuleParamOverride,
+  type AdoptionMode,
+  type TipoSocial,
+  type TipoOrgano,
+  type FormaAdministracion,
+  type MateriaClase,
+  type ComplianceResult as EngineComplianceResult,
+} from "@/lib/rules-engine";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Feature flag: activar para usar el Motor de Reglas LSC V2.
+ * Cuando false, se usa la lógica V1 inline (queries ad-hoc a Supabase).
+ * Cuando true, se usa evaluarAcuerdoCompleto() del motor puro.
+ */
+const ENGINE_V2 = true; // T20 — V2 motor de reglas activo definitivamente
 
 /** Normaliza la forma societaria de `entities.legal_form` al vocabulario
  *  canónico usado en `jurisdiction_rule_sets.company_form`. */
@@ -66,6 +84,8 @@ export interface AgreementFull {
 /** Subconjunto de agreement con entidad anidada usado por el motor de compliance. */
 type AgreementWithEntity = AgreementFull & {
   entities: { jurisdiction: string | null; legal_form: string | null } | null;
+  governing_bodies?: { name: string; body_type: string } | null;
+  entity_id: string | null;
 };
 
 /** Subconjunto relevante de jurisdiction_rule_sets.rule_config (JSONB flexible). */
@@ -104,6 +124,154 @@ export function useAgreement(agreementId?: string) {
   });
 }
 
+/** Mapea legal_form normalizado a TipoSocial del motor V2. */
+function toTipoSocial(companyForm: string | null): TipoSocial {
+  if (companyForm === "SA" || companyForm === "SA_CV") return "SA";
+  return "SL";
+}
+
+/** Mapea body_type del órgano al TipoOrgano del motor V2. */
+function toTipoOrgano(bodyType: string | null): TipoOrgano {
+  if (bodyType === "CONSEJO" || bodyType === "consejo_administracion") return "CONSEJO";
+  if (bodyType === "COMISION" || bodyType === "comision_delegada") return "COMISION_DELEGADA";
+  return "JUNTA_GENERAL";
+}
+
+/** Mapea matter_class del agreement al MateriaClase del motor V2. */
+function toMateriaClase(mc: string): MateriaClase {
+  if (mc === "ESTATUTARIA") return "ESTATUTARIA";
+  if (mc === "ESTRUCTURAL") return "ESTRUCTURAL";
+  return "ORDINARIA";
+}
+
+/**
+ * Ejecuta el motor V2 y mapea el resultado a ComplianceResult V1.
+ * Carga rule packs + overrides desde Supabase, ejecuta evaluarAcuerdoCompleto().
+ */
+async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
+  const companyForm = normalizeCompanyForm(a.entities?.legal_form);
+  const tipoSocial = toTipoSocial(companyForm);
+  const organoTipo = toTipoOrgano(a.governing_bodies?.body_type ?? null);
+
+  // Cargar rule packs activos
+  const { data: rpVersions } = await supabase
+    .from("rule_pack_versions")
+    .select("*, rule_packs!inner(materia, clase, organo_tipo)")
+    .eq("tenant_id", DEMO_TENANT)
+    .eq("status", "ACTIVE");
+
+  // Cargar overrides para la entidad
+  const { data: overridesRaw } = a.entity_id
+    ? await supabase
+        .from("rule_param_overrides")
+        .select("*")
+        .eq("tenant_id", DEMO_TENANT)
+        .eq("entity_id", a.entity_id)
+    : { data: [] };
+
+  // Buscar el rule pack de la materia del acuerdo
+  const matchingVersion = (rpVersions ?? []).find(
+    (v) => (v as any).rule_packs?.materia === a.agreement_kind
+  );
+
+  const packs: RulePack[] = matchingVersion
+    ? [(matchingVersion as any).params as RulePack]
+    : [];
+
+  const overrides: RuleParamOverride[] = (overridesRaw ?? []).map((o: any) => ({
+    id: o.id,
+    entity_id: o.entity_id,
+    materia: o.materia,
+    clave: o.clave,
+    valor: o.valor,
+    fuente: o.fuente,
+    referencia: o.referencia,
+  }));
+
+  // Cargar forma_administracion de la entidad
+  let formaAdministracion: FormaAdministracion = "CONSEJO";
+  if (a.entity_id) {
+    const { data: ent } = await supabase
+      .from("entities")
+      .select("forma_administracion, es_unipersonal")
+      .eq("id", a.entity_id)
+      .maybeSingle();
+    if (ent?.forma_administracion) {
+      formaAdministracion = ent.forma_administracion as FormaAdministracion;
+    }
+  }
+
+  const adoptionMode = a.adoption_mode as AdoptionMode;
+  const materiaClase = toMateriaClase(a.matter_class);
+
+  const result: EngineComplianceResult = evaluarAcuerdoCompleto(
+    adoptionMode,
+    packs,
+    overrides,
+    {
+      convocatoria: {
+        tipoSocial,
+        organoTipo,
+        adoptionMode,
+        fechaJunta: new Date().toISOString(),
+        esCotizada: false,
+        webInscrita: false,
+        primeraConvocatoria: true,
+        esJuntaUniversal: adoptionMode === "UNIVERSAL",
+        materias: [a.agreement_kind],
+      },
+      constitucion: {
+        tipoSocial,
+        organoTipo,
+        adoptionMode,
+        primeraConvocatoria: true,
+        materiaClase,
+        capitalConDerechoVoto: 0,
+        capitalPresenteRepresentado: 0,
+      },
+      votacion: {
+        tipoSocial,
+        organoTipo,
+        adoptionMode,
+        materiaClase,
+        materias: [a.agreement_kind],
+        votos: { favor: 0, contra: 0, abstenciones: 0, en_blanco: 0, capital_presente: 0, capital_total: 0 },
+      },
+      documentacion: {
+        adoptionMode,
+        materias: [a.agreement_kind],
+        documentosDisponibles: [],
+      },
+    }
+  );
+
+  // Mapear EngineComplianceResult → ComplianceResult V1
+  const convEtapa = result.etapas.find((e) => e.etapa === "convocatoria");
+  const quorumEtapa = result.etapas.find((e) => e.etapa === "constitucion");
+  const votEtapa = result.etapas.find((e) => e.etapa === "votacion");
+  const postEtapa = result.etapas.find((e) => e.etapa === "postAcuerdo");
+
+  const inscribable = postEtapa?.explain.some((e) => e.regla === "inscribible" && e.valor === "true") ?? a.inscribable;
+
+  return {
+    agreement_id: a.id,
+    agreement_kind: a.agreement_kind,
+    matter_class: a.matter_class,
+    adoption_mode: a.adoption_mode,
+    inscribable,
+    convocation_compliant: convEtapa?.ok ?? true,
+    quorum_compliant: quorumEtapa?.ok ?? true,
+    conflict_handled: true,
+    majority_compliant: votEtapa?.ok ?? true,
+    instrument_required: "NINGUNO",
+    registry_required: inscribable,
+    publication_required: false,
+    publication_channel: null,
+    blocking_issues: result.blocking_issues,
+    status: a.status,
+  };
+}
+
 /**
  * Deriva el cumplimiento societario del acuerdo a partir de:
  *  - agreements (matter_class, adoption_mode, required_quorum_code, required_majority_code)
@@ -118,10 +286,13 @@ export function useAgreementCompliance(agreementId?: string) {
     enabled: !!agreementId,
     staleTime: 60_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
-      // 1. Acuerdo + entidad
+      // 1. Acuerdo + entidad (V2 carga body_type adicional)
+      const selectCols = ENGINE_V2
+        ? "*, entities(jurisdiction, legal_form), governing_bodies(name, body_type)"
+        : "*, entities(jurisdiction, legal_form)";
       const { data: agreement, error: aErr } = await supabase
         .from("agreements")
-        .select("*, entities(jurisdiction, legal_form)")
+        .select(selectCols)
         .eq("tenant_id", DEMO_TENANT)
         .eq("id", agreementId!)
         .maybeSingle();
@@ -129,6 +300,13 @@ export function useAgreementCompliance(agreementId?: string) {
       if (!agreement) return null;
 
       const a = agreement as unknown as AgreementWithEntity;
+
+      // --- V2 path: motor de reglas LSC puro ---
+      if (ENGINE_V2) {
+        return evaluateV2(a);
+      }
+
+      // --- V1 path: lógica inline (legacy) ---
       const jurisdiction: string | null = a.entities?.jurisdiction ?? null;
       const legalForm: string | null = a.entities?.legal_form ?? null;
 

@@ -4,6 +4,66 @@ Guía para IA y desarrolladores que retoman este proyecto. Leer antes de tocar c
 
 ---
 
+## Contexto de trabajo — leer primero
+
+### Dos repositorios, roles distintos
+
+| Repo | Rol | Contiene |
+|---|---|---|
+| **`arga-governance-map`** (este repo) | **Código fuente** | App React/TypeScript, hooks, SQL, tests |
+| **`TGMS_mapfre_mockup`** | **Workspace de planificación** | Specs, planes, prompts Lovable, investigación de negocio |
+
+**Regla:** Todo desarrollo de código va en este repo. Los planes y specs viven en `TGMS_mapfre_mockup/docs/superpowers/`.
+
+### ARGA = MAPFRE (pseudónimo de negocio)
+"Grupo ARGA Seguros" es el nombre ficticio que representa a MAPFRE en el demostrador. Los órganos de gobierno de MAPFRE deben verse reflejados en él. **Nunca usar "MAPFRE" directamente en código, datos demo ni commits.** Todos los datos demo, seeds, personas, órganos y entidades deben ser coherentes con la estructura corporativa de ARGA.
+
+### Estructura corporativa ARGA (dato demo)
+- **ARGA Seguros S.A.** — SA **cotizada** (equivalente IBEX 35). El motor de reglas NO debe bloquear cotizadas (DL-2 resuelta: evalúa LSC + advertencias LMV).
+- **Fundación ARGA** → Cartera ARGA S.L.U. (100%) → 69.69% ARGA Seguros S.A. Free float 30.31%.
+- **CdA:** 15 miembros (9 Independientes + 5 Ejecutivos + 1 Dominical). Presidente, 2 Vicepresidentes, Coordinador Independiente.
+- **Pacto parasocial demo:** Fundación ARGA tiene derecho de veto en operaciones estructurales (fusión, escisión, disolución, venta activos >15% PN).
+- **Voto de calidad:** Habilitado en CdA y Comité Ejecutivo. Deshabilitado en comisiones delegadas (Auditoría, Riesgos, Nombramientos, Retribuciones).
+
+### Retribución consejeros ARGA (valores demo derivados del IAR 2025)
+- **No ejecutivos:** VP CdA 220K€, Coord. Independiente 220K€, Vocal 115K€ + complementos por comisión
+- **Ejecutivos RF:** Presidente 1.091K€, VP 535K€, CDG 535K€, DGA 456K€
+- **RVA:** 100% BN + ROE ±5%. 70% inmediato / 30% diferido 3 años
+- **ILP 2026-2028:** 50% cash + 50% acciones. TSR 30% + ROE 25% + RCGNV 25% + CSM 5% + ESG 15%
+- **Techo JGA:** 4M€/año para no ejecutivos
+- **Detalle completo:** `docs/superpowers/specs/2026-04-19-decisiones-legales-motor-lsc-resueltas.md` (DL-6)
+
+### Decisiones legales motor LSC — todas resueltas (2026-04-19)
+6 decisiones resueltas. Las de mayor urgencia: DL-2 (cotizadas: evaluar + advertir, no bloquear) y DL-4 (selección automática plantilla SA/SL). Detalle: `docs/superpowers/specs/2026-04-19-decisiones-legales-motor-lsc-resueltas.md`.
+
+### EAD Trust — QTSP y empresa tecnológica de Garrigues
+**EAD Trust es el propietario de la operación como QTSP** (Qualified Trust Service Provider) y también es la **empresa tecnológica del grupo Garrigues** (g-digital). Proporciona firma electrónica cualificada (QES), sellos electrónicos (QSeal), timestamps cualificados y notificación certificada (ERDS) a través de su Digital Trust API. Nunca referenciar proveedores de firma competidores — EAD Trust es el único QTSP del ecosistema.
+
+### Decisiones técnicas confirmadas
+- **SIEM:** Microsoft Sentinel (feed OTel vía Edge Function)
+- **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
+- **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
+
+### Módulos Garrigues — doble identidad
+
+Los módulos GRC Compass (`/grc/*`), Secretaría Societaria (`/secretaria/*`) y AI Governance (`/ai-governance/*`) son:
+1. **Dentro del demostrador TGMS**: módulos enchufables en el shell rojo, con identidad visual Garrigues (verde `#004438`)
+2. **Como producto Garrigues autónomo**: pueden funcionar sin el shell TGMS para clientes más pequeños
+
+En código, ambos modos están en este repo. La segregación a repos independientes por módulo es **trabajo futuro, no prioridad actual**.
+
+### Modelo comercial
+- Clientes grandes (tipo MAPFRE): shell TGMS completo + todos los módulos
+- Clientes medianos/pequeños: uno o varios módulos Garrigues sin shell TGMS
+
+### Prioridad actual: demo MAPFRE al máximo nivel funcional
+- ✅ Código y datos demo pulidos
+- ✅ Flujos UX completos y navegables
+- ❌ No segregar módulos a repos separados todavía
+- ❌ No construir infraestructura enterprise (RLS real, BYOK, WORM) — eso es fase posterior
+
+---
+
 ## Qué es este proyecto
 
 **TGMS Platform** — plataforma de gobernanza corporativa para grupos aseguradores multinacionales.

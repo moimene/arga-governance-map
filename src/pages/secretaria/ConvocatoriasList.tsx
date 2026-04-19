@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Plus } from "lucide-react";
+import { Bell, Plus, FolderOpen } from "lucide-react";
 import { useConvocatoriasList } from "@/hooks/useConvocatorias";
 
 const ESTADO_TONE: Record<string, string> = {
@@ -46,8 +46,9 @@ export default function ConvocatoriasList() {
           onClick={() => navigate("/secretaria/convocatorias/nueva")}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
+          aria-label="Crear nueva convocatoria"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
           Nueva convocatoria
         </button>
       </div>
@@ -90,10 +91,10 @@ export default function ConvocatoriasList() {
       </div>
 
       <div
-        className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        className="overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
-        <table className="w-full">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="bg-[var(--g-surface-subtle)]">
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -128,11 +129,16 @@ export default function ConvocatoriasList() {
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]"
-                >
-                  Sin convocatorias para los filtros seleccionados.
+                <td colSpan={6}>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                    <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
+                    <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                      Sin convocatorias para los filtros seleccionados.
+                    </p>
+                    <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
+                      Crea una nueva convocatoria para comenzar.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (

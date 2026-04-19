@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   FileCheck2,
@@ -10,8 +12,23 @@ import {
   Building2,
   Gavel,
   Megaphone,
+  ChevronDown,
+  ChevronUp,
+  Shield,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompliance";
+import { useQTSPVerification } from "@/hooks/useQTSPVerification";
+import { supabase } from "@/integrations/supabase/client";
+
+interface RuleEvaluationResult {
+  id: string;
+  etapa: string;
+  ok: boolean;
+  severity: "OK" | "WARNING" | "BLOCKING";
+  explain_json: Record<string, any> | null;
+  blocking_issues: string[] | null;
+  warnings: string[] | null;
+}
 
 const STATUS_TONE: Record<string, string> = {
   DRAFT:              "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -52,6 +69,20 @@ export default function ExpedienteAcuerdo() {
   const navigate = useNavigate();
   const { data: agreement, isLoading } = useAgreement(id);
   const { data: compliance } = useAgreementCompliance(id);
+  const { data: verification, isLoading: verificationLoading } = useQTSPVerification(id);
+
+  const { data: ruleEvaluations = [] } = useQuery({
+    queryKey: ["rule_evaluations", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rule_evaluation_results")
+        .select("*")
+        .eq("agreement_id", id);
+      if (error) throw error;
+      return (data ?? []) as RuleEvaluationResult[];
+    },
+    enabled: !!id,
+  });
 
   if (isLoading) {
     return (
@@ -104,6 +135,18 @@ export default function ExpedienteAcuerdo() {
           {a.entities?.common_name ?? "—"} · {a.entities?.jurisdiction ?? ""} ·{" "}
           {a.entities?.legal_form ?? ""} · {a.governing_bodies?.name ?? "—"}
         </p>
+        {/* Generar documento — visible when ADOPTED or later */}
+        {statusIndex >= TIMELINE.indexOf("ADOPTED") && (
+          <button
+            type="button"
+            onClick={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <FileSignature className="h-4 w-4" />
+            Generar documento
+          </button>
+        )}
       </div>
 
       {/* Timeline */}
@@ -253,6 +296,110 @@ export default function ExpedienteAcuerdo() {
               </p>
             </Card>
           ) : null}
+
+          {ruleEvaluations.length > 0 && (
+            <Card icon={<Scale className="h-4 w-4" />} title="Validación normativa">
+              <div className="space-y-2">
+                {(() => {
+                  const grouped = ruleEvaluations.reduce(
+                    (acc, r) => {
+                      if (!acc[r.etapa]) acc[r.etapa] = [];
+                      acc[r.etapa].push(r);
+                      return acc;
+                    },
+                    {} as Record<string, RuleEvaluationResult[]>
+                  );
+                  return Object.entries(grouped).map(([etapa, results]) => (
+                    <RuleValidationRow key={etapa} etapa={etapa} results={results} />
+                  ));
+                })()}
+              </div>
+            </Card>
+          )}
+
+          {/* Trust Center — Evidencias de confianza */}
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-[var(--g-brand-3308)]" />
+              <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Evidencias de confianza
+              </h3>
+              {verification?.ok && (
+                <span
+                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  Verificación OK
+                </span>
+              )}
+            </div>
+
+            {verificationLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-start gap-3 py-2">
+                    <div className="h-4 w-4 mt-0.5 rounded-full bg-[var(--g-surface-muted)] animate-pulse" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 w-1/3 bg-[var(--g-surface-muted)] animate-pulse" style={{ borderRadius: "var(--g-radius-sm)" }} />
+                      <div className="h-3 w-2/3 bg-[var(--g-surface-muted)] animate-pulse" style={{ borderRadius: "var(--g-radius-sm)" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : verification?.checks && verification.checks.length > 0 ? (
+              <div className="space-y-3">
+                {verification.checks.map((check, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 py-2 border-b border-[var(--g-border-subtle)] last:border-0"
+                  >
+                    {check.passed ? (
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-[var(--status-success)]" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 mt-0.5 text-[var(--status-error)]" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                        {check.label}
+                      </p>
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        {check.detail}
+                      </p>
+                    </div>
+                    {check.timestamp && (
+                      <span className="text-xs text-[var(--g-text-secondary)] whitespace-nowrap">
+                        {new Date(check.timestamp).toLocaleString("es-ES")}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--g-text-secondary)]">
+                No hay artefactos de confianza para verificar
+              </p>
+            )}
+
+            {verification?.errors && verification.errors.length > 0 && (
+              <div
+                className="mt-4 bg-[var(--status-error)]/10 border border-[var(--status-error)]/30 p-3 text-xs text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              >
+                <div className="flex items-center gap-1 font-semibold text-[var(--status-error)] mb-1">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Errores detectados
+                </div>
+                <ul className="list-inside list-disc space-y-0.5 ml-1">
+                  {verification.errors.map((error, i) => (
+                    <li key={i} className="text-[11px]">{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
         <aside className="space-y-6">
@@ -364,6 +511,89 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
       >
         {label}
       </span>
+    </div>
+  );
+}
+
+function RuleValidationRow({
+  etapa,
+  results,
+}: {
+  etapa: string;
+  results: RuleEvaluationResult[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const ok = results.every((r) => r.ok);
+  const severity = results.some((r) => r.severity === "BLOCKING")
+    ? "BLOCKING"
+    : results.some((r) => r.severity === "WARNING")
+    ? "WARNING"
+    : "OK";
+
+  return (
+    <div
+      className="border border-[var(--g-border-subtle)]"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
+      >
+        <div className="flex items-center gap-2">
+          {ok ? (
+            <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-[var(--status-error)]" />
+          )}
+          <span className="text-xs font-semibold text-[var(--g-text-primary)]">
+            {etapa}
+          </span>
+          <span
+            className={`inline-flex px-2 py-0.5 text-[10px] font-semibold ${
+              severity === "BLOCKING"
+                ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                : severity === "WARNING"
+                ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                : "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+            }`}
+            style={{ borderRadius: "var(--g-radius-full)" }}
+          >
+            {severity}
+          </span>
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-[var(--g-text-secondary)]" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-[var(--g-text-secondary)]" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="space-y-1 border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/30 p-3">
+          {results.map((r) => (
+            <div key={r.id} className="text-xs text-[var(--g-text-secondary)]">
+              {r.explain_json ? (
+                <>
+                  {typeof r.explain_json === "object" &&
+                    Object.entries(r.explain_json).map(([key, value]) => (
+                      <div key={key} className="ml-2">
+                        <span className="font-mono text-[10px]">{key}:</span>{" "}
+                        <span className="text-[var(--g-text-primary)]">
+                          {String(value)}
+                        </span>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <div className="text-[var(--g-text-primary)]">
+                  Sin detalles de evaluación
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

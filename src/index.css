@@ -154,3 +154,13 @@
   .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 }
+
+/* ── Board Pack print styles ─────────────────────────────────────────────── */
+@media print {
+  .print\:hidden { display: none !important; }
+  body { background: white; }
+  section { page-break-inside: avoid; }
+  h2 { page-break-after: avoid; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+}

@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vite/Vitest build timestamps
+*.timestamp-*.mjs
+
+# Claude Code
+.claude/
+
+# Working docs (no committable)
+docs/BORRADORES\ INTERMEDIOS/
+Plantillas_Oleada1_Revision_Legal.docx

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Users, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Users, Plus, FileText, FolderOpen } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
 
 const STATUS_TONE: Record<string, string> = {
@@ -96,10 +96,10 @@ export default function ReunionesLista() {
       </div>
 
       <div
-        className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        className="overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
-        <table className="w-full">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="bg-[var(--g-surface-subtle)]">
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -120,19 +120,30 @@ export default function ReunionesLista() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                 Estado
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+                Board Pack
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   Cargando…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Sin reuniones para los filtros seleccionados.
+                <td colSpan={7}>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                    <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
+                    <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                      Sin reuniones para los filtros seleccionados.
+                    </p>
+                    <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
+                      Programa una nueva reunión para comenzar.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -167,6 +178,18 @@ export default function ReunionesLista() {
                     >
                       {m.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    {(m.status === "CONVOCADA" || m.status === "CELEBRADA" || m.status === "EN_CURSO") && (
+                      <Link
+                        to={`/secretaria/reuniones/${m.id}/board-pack`}
+                        className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        Ver
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))

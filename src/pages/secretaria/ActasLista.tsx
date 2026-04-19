@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { FileSignature, Lock, Unlock } from "lucide-react";
+import { FileSignature, Lock, Unlock, FolderOpen } from "lucide-react";
 import { useActasList } from "@/hooks/useActas";
 
 export default function ActasLista() {
@@ -22,10 +22,10 @@ export default function ActasLista() {
       </div>
 
       <div
-        className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        className="overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
-        <table className="w-full">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="bg-[var(--g-surface-subtle)]">
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -54,8 +54,16 @@ export default function ActasLista() {
               </tr>
             ) : !data || data.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Sin actas.
+                <td colSpan={5}>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                    <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
+                    <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                      Sin actas registradas.
+                    </p>
+                    <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
+                      Las actas se generarán automáticamente al celebrar reuniones.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (

@@ -11,6 +11,8 @@ import {
   Clock,
   ScrollText,
   Building2,
+  Scale,
+  TrendingUp,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,6 +25,7 @@ interface KpiCounts {
   acuerdos_sin_sesion_votando: number;
   decisiones_unipersonales_borrador: number;
   libros_alerta: number;
+  acuerdos_compliance_pendiente: number;
 }
 
 interface AgendaItem {
@@ -43,7 +46,9 @@ function useSecretariaKpis() {
       const en7 = new Date(Date.now() + 7 * 86400000).toISOString();
       const en30 = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
 
-      const [conv, reun, actas, tram, tramSub, asoc, du, libros] = await Promise.all([
+      const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+      const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
         supabase
           .from("convocatorias")
           .select("id", { count: "exact", head: true })
@@ -77,6 +82,11 @@ function useSecretariaKpis() {
           .from("mandatory_books")
           .select("id", { count: "exact", head: true })
           .lte("legalization_deadline", en30),
+        supabase
+          .from("rule_evaluation_results")
+          .select("agreement_id", { count: "exact", head: true })
+          .eq("ok", false)
+          .eq("tenant_id", DEMO_TENANT),
       ]);
 
       return {
@@ -88,6 +98,7 @@ function useSecretariaKpis() {
         acuerdos_sin_sesion_votando: asoc.count ?? 0,
         decisiones_unipersonales_borrador: du.count ?? 0,
         libros_alerta: libros.count ?? 0,
+        acuerdos_compliance_pendiente: compliancePending.count ?? 0,
       };
     },
   });
@@ -328,10 +339,17 @@ export default function SecretariaDashboard() {
           tone={kpis && kpis.libros_alerta > 0 ? "error" : "neutral"}
           onClick={() => navigate("/secretaria/libros")}
         />
+        <KpiCard
+          icon={TrendingUp}
+          label="Métricas plantillas"
+          value="→"
+          sublabel="Seguimiento leading/lagging"
+          onClick={() => navigate("/secretaria/plantillas-tracker")}
+        />
       </div>
 
       {/* KPIs secundarios */}
-      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiCard
           icon={ScrollText}
           label="Acuerdos sin sesión · Votando"
@@ -352,6 +370,13 @@ export default function SecretariaDashboard() {
           value={kpiLoading ? "…" : kpis?.reuniones_semana ?? 0}
           tone="primary"
           onClick={() => navigate("/secretaria/reuniones")}
+        />
+        <KpiCard
+          icon={Scale}
+          label="Acuerdos pendientes compliance"
+          value={kpiLoading ? "…" : kpis?.acuerdos_compliance_pendiente ?? 0}
+          tone={kpis && kpis.acuerdos_compliance_pendiente > 0 ? "warning" : "neutral"}
+          onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
         />
       </div>
 

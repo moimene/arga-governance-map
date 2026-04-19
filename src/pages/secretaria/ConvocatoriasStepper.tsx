@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ChevronDown } from "lucide-react";
+import { evaluarConvocatoria } from "@/lib/rules-engine/convocatoria-engine";
+import type { ConvocatoriaInput } from "@/lib/rules-engine/types";
 import { checkNoticePeriodByType } from "@/hooks/useJurisdiccionRules";
 
 const STEPS = [
@@ -20,17 +22,37 @@ const DEMO_FORM = {
   meeting_type: "ORDINARIA" as "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL",
 };
 
+// Feature flag for engine V2
+const ENGINE_V2 = true;
+
 export default function ConvocatoriasStepper() {
   const navigate = useNavigate();
   const [current, setCurrent] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandExplain, setExpandExplain] = useState(false);
 
-  // Calcular si el plazo está cumplido (solo relevante en paso 7)
-  const noticeOk = checkNoticePeriodByType({
+  // V1 fallback
+  const noticeOkV1 = checkNoticePeriodByType({
     meetingDate: DEMO_FORM.meeting_date,
     jurisdiction: DEMO_FORM.jurisdiction,
     convocationType: DEMO_FORM.meeting_type,
   });
+
+  // V2 engine evaluation (with empty packs for demo)
+  const convocatoriaInput: ConvocatoriaInput = {
+    tipoSocial: "SA",
+    organoTipo: "JUNTA_GENERAL",
+    adoptionMode: "MEETING",
+    fechaJunta: DEMO_FORM.meeting_date,
+    esCotizada: false,
+    webInscrita: true,
+    primeraConvocatoria: true,
+    esJuntaUniversal: false,
+    materias: ["APROBACION_CUENTAS"],
+  };
+
+  const evaluacionV2 = ENGINE_V2 ? evaluarConvocatoria(convocatoriaInput, []) : null;
+  const noticeOk = ENGINE_V2 && evaluacionV2 ? evaluacionV2.ok : noticeOkV1;
 
   function handleEmitir() {
     if (!noticeOk || isSubmitting) return;
@@ -116,16 +138,126 @@ export default function ConvocatoriasStepper() {
             {STEPS[current - 1].hint}
           </p>
 
-          <div
-            className="mt-6 border-l-4 border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-4"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <p className="text-sm text-[var(--g-text-primary)]">
-              {isLastStep
-                ? "Revisa los datos de la convocatoria antes de emitirla. El sistema validará el plazo mínimo según la jurisdicción seleccionada."
-                : `Formulario del paso ${current} — implementación pendiente. En el demo se usan las convocatorias ya sembradas (CONV-001, CONV-002, CONV-003).`}
-            </p>
-          </div>
+          {/* Step 2: Motor V2 explain panel */}
+          {current === 2 && ENGINE_V2 && evaluacionV2 && (
+            <div
+              className="mt-6 border-l-4 border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-4"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Evaluación de antelación
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Motor de Reglas LSC v2
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex h-6 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--g-text-inverse)]`}
+                  style={{
+                    backgroundColor: evaluacionV2.ok
+                      ? "var(--status-success)"
+                      : "var(--status-error)",
+                  }}
+                >
+                  {evaluacionV2.ok ? "OK" : "ERROR"}
+                </span>
+              </div>
+
+              {/* Main rule */}
+              {evaluacionV2.explain[0] && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    {evaluacionV2.antelacionDiasRequerida} días de antelación requerida
+                  </p>
+                  <div className="flex gap-2 text-xs text-[var(--g-text-secondary)]">
+                    <span>📋 Fuente: {evaluacionV2.explain[0].fuente}</span>
+                    {evaluacionV2.explain[0].referencia && (
+                      <span>📝 {evaluacionV2.explain[0].referencia}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Documentos obligatorios checklist */}
+              {evaluacionV2.documentosObligatorios.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Documentos obligatorios
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {evaluacionV2.documentosObligatorios.map((doc) => (
+                      <label
+                        key={doc.id}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded"
+                          disabled
+                        />
+                        <span className="text-xs text-[var(--g-text-secondary)]">
+                          {doc.nombre}
+                          {doc.condicion && ` (${doc.condicion})`}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expand explain tree */}
+              <button
+                type="button"
+                onClick={() => setExpandExplain(!expandExplain)}
+                className="mt-3 flex items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
+              >
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    expandExplain ? "rotate-180" : ""
+                  }`}
+                />
+                {expandExplain ? "Ocultar detalles" : "Ver detalles de evaluación"}
+              </button>
+
+              {/* Expanded explain tree */}
+              {expandExplain && (
+                <div className="mt-3 space-y-2 border-t border-[var(--g-border-subtle)] pt-3">
+                  {evaluacionV2.explain.map((node, idx) => (
+                    <div
+                      key={idx}
+                      className="text-xs text-[var(--g-text-secondary)]"
+                    >
+                      <p className="font-medium text-[var(--g-text-primary)]">
+                        {node.regla}
+                      </p>
+                      <p>{node.mensaje}</p>
+                      {node.referencia && (
+                        <p className="text-[11px] text-[var(--g-text-secondary)]">
+                          {node.fuente}: {node.referencia}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Generic placeholder for other steps */}
+          {current !== 2 && (
+            <div
+              className="mt-6 border-l-4 border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-4"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="text-sm text-[var(--g-text-primary)]">
+                {isLastStep
+                  ? "Revisa los datos de la convocatoria antes de emitirla. El sistema validará el plazo mínimo según la jurisdicción seleccionada."
+                  : `Formulario del paso ${current} — implementación pendiente. En el demo se usan las convocatorias ya sembradas (CONV-001, CONV-002, CONV-003).`}
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 flex items-center justify-between">
             <button

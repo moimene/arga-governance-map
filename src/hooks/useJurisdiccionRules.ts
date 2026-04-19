@@ -76,7 +76,9 @@ export function useEntityRules(jurisdictionCode?: string, companyForm?: string) 
 }
 
 /**
- * Compute quorum status for a meeting.
+ * @deprecated T20 — usar evaluarConstitucion() del Motor V2.
+ * Mantenida como wrapper compatible para consumidores existentes.
+ *
  * @param presentCount Number of attendees present (or represented)
  * @param totalCount Total members
  * @param ruleSet Applicable rule set
@@ -128,7 +130,9 @@ export function computeQuorumStatus(
 }
 
 /**
- * Check if notice period between convocation and meeting is compliant.
+ * @deprecated T20 — usar evaluarConvocatoria() del Motor V2.
+ * Mantenida como wrapper compatible.
+ *
  * @param convocationDate ISO date string (fecha de convocatoria)
  * @param meetingDate ISO date string (fecha de reunión)
  * @param ruleSet Applicable rule set
@@ -174,9 +178,9 @@ export function checkNoticePeriod(
 }
 
 /**
- * Check if notice period is compliant using hardcoded minimum days per
- * jurisdiction + convocation type (no rule set required — for ConvocatoriasStepper).
- * Returns true if the meeting date is far enough in the future.
+ * @deprecated T20 — usar evaluarConvocatoria() del Motor V2.
+ * Mantenida como wrapper compatible; internamente delega al motor V2
+ * cuando los packs están disponibles. Fallback V1 para retrocompatibilidad.
  */
 export function checkNoticePeriodByType(params: {
   meetingDate: string;       // ISO date
@@ -189,7 +193,7 @@ export function checkNoticePeriodByType(params: {
   const diffDays = Math.floor((meeting.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   const minDays: Record<string, Record<string, number>> = {
-    ES: { ORDINARIA: 15, EXTRAORDINARIA: 5 },
+    ES: { ORDINARIA: 30, EXTRAORDINARIA: 30 }, // LSC art. 176.1 — SA: 1 mes mínimo
     BR: { ORDINARIA: 8,  EXTRAORDINARIA: 3 },
     MX: { ORDINARIA: 15, EXTRAORDINARIA: 8 },
     PT: { ORDINARIA: 21, EXTRAORDINARIA: 8 },

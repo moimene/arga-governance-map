@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
+import { evaluarConstitucion, evaluarMayoria } from "@/lib/rules-engine";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ const DEMO_VOTERS: VoterRow[] = [
 ];
 
 // ── Paso 5: Votaciones ───────────────────────────────────────────────────────
+
+const ENGINE_V2 = true; // V2 motor de reglas activo (T20 — switch definitivo)
 
 function VotacionesStep() {
   const [voters, setVoters] = useState<VoterRow[]>(DEMO_VOTERS);
@@ -152,6 +155,55 @@ function VotacionesStep() {
           </span>
         )}
       </div>
+
+      {/* V2 Motor de Reglas Explain Panel */}
+      {ENGINE_V2 && (
+        <div className="mt-6 space-y-4">
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+            style={{ borderRadius: "var(--g-radius-lg)" }}
+          >
+            <h3 className="mb-3 text-sm font-semibold text-[var(--g-text-primary)]">
+              Evaluación de Mayoría (V2)
+            </h3>
+            {(() => {
+              const result = evaluarMayoria({
+                favor,
+                contra,
+                abstencion,
+                total: voters.length,
+              });
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {result.ok ? (
+                      <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 text-[var(--status-error)]" />
+                    )}
+                    <span
+                      className={`inline-flex px-2.5 py-1 text-[11px] font-semibold ${
+                        result.ok
+                          ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                          : "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {result.ok ? "OK" : "RECHAZADO"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    <span className="font-mono">{result.formula}</span> — Fuente: LSC art. 201
+                  </p>
+                  <p className="text-xs text-[var(--g-text-primary)]">
+                    {result.message}
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

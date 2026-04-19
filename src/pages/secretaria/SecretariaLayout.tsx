@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Bell, BookOpen, FileSignature,
   Users, FileText, Library, ChevronLeft, Gavel,
-  ScrollText, Building2,
+  ScrollText, Building2, Layers, Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard",                to: "/secretaria",                          icon: LayoutDashboard, end: true },
+  { label: "Board Pack",               to: "/secretaria/board-pack/:id",           icon: Briefcase },
   { label: "Convocatorias",            to: "/secretaria/convocatorias",            icon: Bell },
   { label: "Reuniones",                to: "/secretaria/reuniones",                icon: Users },
   { label: "Actas",                    to: "/secretaria/actas",                    icon: FileSignature },
@@ -23,6 +24,7 @@ const navItems: NavItem[] = [
   { label: "Tramitador registral",     to: "/secretaria/tramitador",               icon: Gavel },
   { label: "Libros obligatorios",      to: "/secretaria/libros",                   icon: Library },
   { label: "Plantillas",               to: "/secretaria/plantillas",               icon: FileText },
+  { label: "Gestor plantillas",        to: "/secretaria/gestor-plantillas",        icon: Layers },
 ];
 
 export function SecretariaLayout() {

@@ -6,6 +6,7 @@ export interface PolicyRow {
   policy_code: string;
   title: string;
   policy_type: string | null;
+  normative_tier: string | null;
   scope_level: string | null;
   owner_function: string | null;
   approval_body_id: string | null;

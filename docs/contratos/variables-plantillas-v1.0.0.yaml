@@ -1,0 +1,848 @@
+# Contrato de Variables — Motor de Reglas LSC
+# Generado automáticamente por scripts/generate-variable-contract.ts
+# NO EDITAR MANUALMENTE — regenerar con: bun run scripts/generate-variable-contract.ts
+
+version: "1.0.0"
+fecha_generacion: "2026-04-19T09:12:59.267Z"
+fecha_congelacion: null  # Se rellena al congelar
+
+bloques:
+  MOTOR_REGLAS:
+    descripcion: "Tipos internos del motor de reglas"
+    tipos:
+      ReglaParametro:
+        campos:
+          valor:
+            tipo: "T"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+      ReglaConvocatoria:
+        campos:
+          antelacionDias:
+            tipo: "Record<TipoSocial, ReglaParametro<number>>"
+            requerido: true
+          canales:
+            tipo: "Record<TipoSocial, string[]>"
+            requerido: true
+          contenidoMinimo:
+            tipo: "string[]"
+            requerido: true
+          id:
+            tipo: "string"
+            requerido: true
+          nombre:
+            tipo: "string"
+            requerido: true
+          condicion:
+            tipo: "string"
+            requerido: false
+      ReglaConstitucion:
+        campos:
+          SA_1a:
+            tipo: "ReglaParametro<number>"
+            requerido: true
+          SA_2a:
+            tipo: "ReglaParametro<number>"
+            requerido: true
+          SL:
+            tipo: "ReglaParametro<number>"
+            requerido: true
+          CONSEJO:
+            tipo: "ReglaParametro<string>"
+            requerido: true
+      MajoritySpec:
+        campos:
+          formula:
+            tipo: "string"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+          umbral:
+            tipo: "number"
+            requerido: true
+          mayoriaAlternativa:
+            tipo: "string"
+            requerido: true
+      ReglaVotacion:
+        campos:
+          mayoria:
+            tipo: "Record<'SA' | 'SL' | 'CONSEJO', MajoritySpec>"
+            requerido: true
+          requerida:
+            tipo: "boolean"
+            requerido: true
+          ambito:
+            tipo: "'TODOS' | 'PRESENTES' | 'CLASE'"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+      ReglaDocumentacion:
+        campos:
+          id:
+            tipo: "string"
+            requerido: true
+          nombre:
+            tipo: "string"
+            requerido: true
+          condicion:
+            tipo: "string"
+            requerido: false
+      ReglaActa:
+        campos:
+          tipoActaPorModo:
+            tipo: "Partial<Record<AdoptionMode, TipoActa>>"
+            requerido: true
+          sesion:
+            tipo: "string[]"
+            requerido: true
+          consignacion:
+            tipo: "string[]"
+            requerido: true
+          acuerdoEscrito:
+            tipo: "string[]"
+            requerido: true
+      ReglaPlazosMateriales:
+        campos:
+          plazo_dias:
+            tipo: "number"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+      ReglaPostAcuerdo:
+        campos:
+          inscribible:
+            tipo: "boolean"
+            requerido: true
+          instrumentoRequerido:
+            tipo: "'ESCRITURA' | 'INSTANCIA' | 'NINGUNO'"
+            requerido: true
+          publicacionRequerida:
+            tipo: "boolean"
+            requerido: true
+          dias:
+            tipo: "number"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+      ReglaNoSession:
+        campos:
+          habilitado_por_estatutos:
+            tipo: "ReglaParametro<boolean>"
+            requerido: true
+          habilitado_por_reglamento:
+            tipo: "ReglaParametro<boolean>"
+            requerido: true
+          condicion_junta_sl:
+            tipo: "'UNANIMIDAD_CAPITAL'"
+            requerido: true
+          condicion_consejo:
+            tipo: "'MAYORIA_SIN_OPOSICION'"
+            requerido: true
+          ventana_minima_dias:
+            tipo: "ReglaParametro<number>"
+            requerido: true
+          ventana_fuente:
+            tipo: "Fuente"
+            requerido: true
+          silencio_equivale_a:
+            tipo: "'NADA' | 'OBJECION'"
+            requerido: true
+          cierre_anticipado:
+            tipo: "boolean"
+            requerido: true
+          contenido_minimo_propuesta:
+            tipo: "string[]"
+            requerido: true
+      RulePack:
+        campos:
+          id:
+            tipo: "string"
+            requerido: true
+          materia:
+            tipo: "string"
+            requerido: true
+          clase:
+            tipo: "MateriaClase"
+            requerido: true
+          organoTipo:
+            tipo: "TipoOrgano"
+            requerido: true
+          modosAdopcionPermitidos:
+            tipo: "AdoptionMode[]"
+            requerido: true
+          convocatoria:
+            tipo: "ReglaConvocatoria"
+            requerido: true
+          constitucion:
+            tipo: "ReglaConstitucion"
+            requerido: true
+          votacion:
+            tipo: "ReglaVotacion"
+            requerido: true
+          documentacion:
+            tipo: "ReglaDocumentacion"
+            requerido: true
+          acta:
+            tipo: "ReglaActa"
+            requerido: true
+          noSession:
+            tipo: "ReglaNoSession"
+            requerido: false
+          plazosMateriales:
+            tipo: "ReglaPlazosMateriales"
+            requerido: true
+          postAcuerdo:
+            tipo: "ReglaPostAcuerdo"
+            requerido: true
+      RuleParamOverride:
+        campos:
+          id:
+            tipo: "string"
+            requerido: true
+          entity_id:
+            tipo: "string"
+            requerido: true
+          materia:
+            tipo: "string"
+            requerido: true
+          clave:
+            tipo: "string"
+            requerido: true
+          valor:
+            tipo: "unknown"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+      ExplainNode:
+        campos:
+          regla:
+            tipo: "string"
+            requerido: true
+          fuente:
+            tipo: "Fuente"
+            requerido: true
+          referencia:
+            tipo: "string"
+            requerido: false
+          umbral:
+            tipo: "number | string"
+            requerido: false
+          valor:
+            tipo: "number | string"
+            requerido: false
+          resultado:
+            tipo: "EvalSeverity"
+            requerido: true
+          mensaje:
+            tipo: "string"
+            requerido: true
+          hijos:
+            tipo: "ExplainNode[]"
+            requerido: false
+      EvaluacionResult:
+        campos:
+          etapa:
+            tipo: "string"
+            requerido: true
+          ok:
+            tipo: "boolean"
+            requerido: true
+          severity:
+            tipo: "EvalSeverity"
+            requerido: true
+          explain:
+            tipo: "ExplainNode[]"
+            requerido: true
+          blocking_issues:
+            tipo: "string[]"
+            requerido: true
+          warnings:
+            tipo: "string[]"
+            requerido: true
+      ConflictoInteres:
+        campos:
+          mandate_id:
+            tipo: "string"
+            requerido: true
+          tipo:
+            tipo: "'EXCLUIR_QUORUM' | 'EXCLUIR_VOTO' | 'EXCLUIR_AMBOS'"
+            requerido: true
+          motivo:
+            tipo: "string"
+            requerido: true
+          capital_afectado:
+            tipo: "number"
+            requerido: true
+      DenominadorAjustado:
+        campos:
+          capital_total:
+            tipo: "number"
+            requerido: true
+          capital_excluido_quorum:
+            tipo: "number"
+            requerido: true
+          capital_excluido_voto:
+            tipo: "number"
+            requerido: true
+          capital_convocable:
+            tipo: "number"
+            requerido: true
+          capital_votante:
+            tipo: "number"
+            requerido: true
+          mandatos_excluidos:
+            tipo: "string[]"
+            requerido: true
+      NoSessionRespuesta:
+        campos:
+          person_id:
+            tipo: "string"
+            requerido: true
+          capital_participacion:
+            tipo: "number"
+            requerido: true
+          porcentaje_capital:
+            tipo: "number"
+            requerido: true
+          es_consejero:
+            tipo: "boolean"
+            requerido: true
+          sentido:
+            tipo: "SentidoRespuesta"
+            requerido: true
+          firma_qes_ref:
+            tipo: "string"
+            requerido: false
+          firma_qes_timestamp:
+            tipo: "string"
+            requerido: false
+          ocsp_status:
+            tipo: "string"
+            requerido: false
+      NoSessionNotificacion:
+        campos:
+          person_id:
+            tipo: "string"
+            requerido: true
+          canal:
+            tipo: "string"
+            requerido: true
+          evidencia_ref:
+            tipo: "string"
+            requerido: false
+          evidencia_hash:
+            tipo: "string"
+            requerido: false
+      ComplianceResult:
+        campos:
+          ok:
+            tipo: "boolean"
+            requerido: true
+          adoptionMode:
+            tipo: "AdoptionMode"
+            requerido: true
+          path:
+            tipo: "'A' | 'B' | 'C'"
+            requerido: true
+          etapas:
+            tipo: "EvaluacionResult[]"
+            requerido: true
+          explain:
+            tipo: "ExplainNode[]"
+            requerido: true
+          blocking_issues:
+            tipo: "string[]"
+            requerido: true
+          warnings:
+            tipo: "string[]"
+            requerido: true
+          snapshot_hash:
+            tipo: "string"
+            requerido: false
+          gate_hash:
+            tipo: "string"
+            requerido: false
+      PlantillaGateRule:
+        campos:
+          tipo:
+            tipo: "string"
+            requerido: true
+          adoption_mode:
+            tipo: "AdoptionMode"
+            requerido: false
+          organo_tipo:
+            tipo: "string"
+            requerido: false
+          exigencia:
+            tipo: "PlantillaExigencia"
+            requerido: true
+          fallback_tipo:
+            tipo: "string"
+            requerido: false
+          fallback_modo:
+            tipo: "AdoptionMode"
+            requerido: false
+      PlantillaGateConfig:
+        campos:
+          rules:
+            tipo: "PlantillaGateRule[]"
+            requerido: true
+      ReglaNoComputable:
+        campos:
+          id:
+            tipo: "string"
+            requerido: true
+          nombre:
+            tipo: "string"
+            requerido: true
+          condicion:
+            tipo: "string"
+            requerido: true
+          aplica:
+            tipo: "boolean"
+            requerido: true
+          status:
+            tipo: "BordeStatus"
+            requerido: true
+          severity:
+            tipo: "EvalSeverity"
+            requerido: true
+          resolucion:
+            tipo: "string"
+            requerido: false
+      PactosEvaluation:
+        campos:
+          tienePacktosRelevantes:
+            tipo: "boolean"
+            requerido: true
+          id:
+            tipo: "string"
+            requerido: true
+          tipo:
+            tipo: "string"
+            requerido: true
+          impacto:
+            tipo: "string"
+            requerido: true
+      Fuente:
+        campos: {}
+      TipoSocial:
+        campos: {}
+      TipoOrgano:
+        campos: {}
+      FormaAdministracion:
+        campos: {}
+      AdoptionMode:
+        campos: {}
+      TipoActa:
+        campos: {}
+      MateriaClase:
+        campos: {}
+      TipoProceso:
+        campos: {}
+      CondicionAdopcion:
+        campos: {}
+      SentidoRespuesta:
+        campos: {}
+      EvalSeverity:
+        campos: {}
+      PlantillaExigencia:
+        campos: {}
+      BordeStatus:
+        campos: {}
+
+  USUARIO:
+    descripcion: "Tipos de entrada del usuario"
+    tipos:
+      VotosInput:
+        campos:
+          favor:
+            tipo: "number"
+            requerido: true
+          contra:
+            tipo: "number"
+            requerido: true
+          abstenciones:
+            tipo: "number"
+            requerido: true
+          en_blanco:
+            tipo: "number"
+            requerido: true
+          capital_presente:
+            tipo: "number"
+            requerido: true
+          capital_total:
+            tipo: "number"
+            requerido: true
+          total_miembros:
+            tipo: "number"
+            requerido: false
+          miembros_presentes:
+            tipo: "number"
+            requerido: false
+      NoSessionInput:
+        campos:
+          tipoProceso:
+            tipo: "TipoProceso"
+            requerido: true
+          condicionAdopcion:
+            tipo: "CondicionAdopcion"
+            requerido: true
+          organoTipo:
+            tipo: "TipoOrgano"
+            requerido: true
+          tipoSocial:
+            tipo: "TipoSocial"
+            requerido: true
+          respuestas:
+            tipo: "NoSessionRespuesta[]"
+            requerido: true
+          notificaciones:
+            tipo: "NoSessionNotificacion[]"
+            requerido: true
+          totalDestinatarios:
+            tipo: "number"
+            requerido: true
+          totalCapitalSocial:
+            tipo: "number"
+            requerido: true
+          inicio:
+            tipo: "string"
+            requerido: true
+          fin:
+            tipo: "string"
+            requerido: true
+          ahora:
+            tipo: "string"
+            requerido: true
+      NoSessionOutput:
+        campos:
+          ok:
+            tipo: "boolean"
+            requerido: true
+          estado:
+            tipo: "'CERRADO_OK' | 'CERRADO_FAIL' | 'ABIERTO'"
+            requerido: true
+          gate:
+            tipo: "string"
+            requerido: true
+          ok:
+            tipo: "boolean"
+            requerido: true
+          severity:
+            tipo: "EvalSeverity"
+            requerido: true
+          explain:
+            tipo: "ExplainNode[]"
+            requerido: true
+      ConvocatoriaInput:
+        campos:
+          tipoSocial:
+            tipo: "TipoSocial"
+            requerido: true
+          organoTipo:
+            tipo: "TipoOrgano"
+            requerido: true
+          adoptionMode:
+            tipo: "AdoptionMode"
+            requerido: true
+          fechaJunta:
+            tipo: "string"
+            requerido: true
+          esCotizada:
+            tipo: "boolean"
+            requerido: true
+          webInscrita:
+            tipo: "boolean"
+            requerido: true
+          primeraConvocatoria:
+            tipo: "boolean"
+            requerido: true
+          esJuntaUniversal:
+            tipo: "boolean"
+            requerido: true
+          materias:
+            tipo: "string[]"
+            requerido: true
+      ConvocatoriaOutput:
+        campos:
+          fechaLimitePublicacion:
+            tipo: "string"
+            requerido: true
+          antelacionDiasRequerida:
+            tipo: "number"
+            requerido: true
+          canalesExigidos:
+            tipo: "string[]"
+            requerido: true
+          contenidoMinimo:
+            tipo: "string[]"
+            requerido: true
+          id:
+            tipo: "string"
+            requerido: true
+          nombre:
+            tipo: "string"
+            requerido: true
+          condicion:
+            tipo: "string"
+            requerido: false
+      ConstitucionInput:
+        campos:
+          tipoSocial:
+            tipo: "TipoSocial"
+            requerido: true
+          organoTipo:
+            tipo: "TipoOrgano"
+            requerido: true
+          adoptionMode:
+            tipo: "AdoptionMode"
+            requerido: true
+          primeraConvocatoria:
+            tipo: "boolean"
+            requerido: true
+          materiaClase:
+            tipo: "MateriaClase"
+            requerido: true
+          capitalConDerechoVoto:
+            tipo: "number"
+            requerido: true
+          capitalPresenteRepresentado:
+            tipo: "number"
+            requerido: true
+          asistentesPresentes:
+            tipo: "number"
+            requerido: false
+          totalMiembros:
+            tipo: "number"
+            requerido: false
+          conflictos:
+            tipo: "ConflictoInteres[]"
+            requerido: false
+      ConstitucionOutput:
+        campos:
+          quorumRequerido:
+            tipo: "number"
+            requerido: true
+          quorumPresente:
+            tipo: "number"
+            requerido: true
+          quorumCubierto:
+            tipo: "boolean"
+            requerido: true
+          denominadorAjustado:
+            tipo: "DenominadorAjustado"
+            requerido: false
+      VotacionInput:
+        campos:
+          tipoSocial:
+            tipo: "TipoSocial"
+            requerido: true
+          organoTipo:
+            tipo: "TipoOrgano"
+            requerido: true
+          adoptionMode:
+            tipo: "AdoptionMode"
+            requerido: true
+          materiaClase:
+            tipo: "MateriaClase"
+            requerido: true
+          materias:
+            tipo: "string[]"
+            requerido: true
+          votos:
+            tipo: "VotosInput"
+            requerido: true
+          conflictos:
+            tipo: "ConflictoInteres[]"
+            requerido: false
+          votoCalidadHabilitado:
+            tipo: "boolean"
+            requerido: false
+          esEmpate:
+            tipo: "boolean"
+            requerido: false
+          decisionFirmada:
+            tipo: "boolean"
+            requerido: false
+          noSessionInput:
+            tipo: "NoSessionInput"
+            requerido: false
+      VotacionOutput:
+        campos:
+          acuerdoProclamable:
+            tipo: "boolean"
+            requerido: true
+          mayoriaAlcanzada:
+            tipo: "boolean"
+            requerido: true
+          unanimidadRequerida:
+            tipo: "boolean"
+            requerido: false
+          unanimidadAlcanzada:
+            tipo: "boolean"
+            requerido: false
+          vetoAplicado:
+            tipo: "boolean"
+            requerido: false
+          votoCalidadUsado:
+            tipo: "boolean"
+            requerido: false
+          noSessionOutput:
+            tipo: "NoSessionOutput"
+            requerido: false
+      DocumentacionInput:
+        campos:
+          adoptionMode:
+            tipo: "AdoptionMode"
+            requerido: true
+          materias:
+            tipo: "string[]"
+            requerido: true
+          id:
+            tipo: "string"
+            requerido: true
+          disponible_desde:
+            tipo: "string"
+            requerido: false
+      DocumentacionOutput:
+        campos:
+          id:
+            tipo: "string"
+            requerido: true
+          nombre:
+            tipo: "string"
+            requerido: true
+
+  QTSP:
+    descripcion: "Tipos de integración QTSP"
+    tipos:
+      QTSPSealRequest:
+        campos:
+          hash:
+            tipo: "string"
+            requerido: true
+          seal_type:
+            tipo: "'QSEAL' | 'TSQ'"
+            requerido: true
+          payload_ref:
+            tipo: "string"
+            requerido: true
+      QTSPSealResponse:
+        campos:
+          seal_token:
+            tipo: "string"
+            requerido: true
+          timestamp:
+            tipo: "string"
+            requerido: true
+          issuer:
+            tipo: "string"
+            requerido: true
+          status:
+            tipo: "'SEALED' | 'ERROR'"
+            requerido: true
+      QTSPSignRequest:
+        campos:
+          document_hash:
+            tipo: "string"
+            requerido: true
+          signer_id:
+            tipo: "string"
+            requerido: true
+          signer_role:
+            tipo: "string"
+            requerido: true
+          document_type:
+            tipo: "string"
+            requerido: true
+      QTSPNotificationRequest:
+        campos:
+          recipient_id:
+            tipo: "string"
+            requerido: true
+          recipient_email:
+            tipo: "string"
+            requerido: true
+          subject:
+            tipo: "string"
+            requerido: true
+          body:
+            tipo: "string"
+            requerido: true
+          attachments:
+            tipo: "Array<{ name: string"
+            requerido: false
+      QTSPNotificationEvidence:
+        campos:
+          delivery_ref:
+            tipo: "string"
+            requerido: true
+          delivered_at:
+            tipo: "string"
+            requerido: true
+          hash:
+            tipo: "string"
+            requerido: true
+          tsq_token:
+            tipo: "string"
+            requerido: true
+          status:
+            tipo: "'DELIVERED' | 'FAILED' | 'PENDING'"
+            requerido: true
+      TrustVerificationRequest:
+        campos:
+          artifact_type:
+            tipo: "'QES' | 'QSEAL' | 'TSQ' | 'NOTIFICATION'"
+            requerido: true
+          artifact_ref:
+            tipo: "string"
+            requerido: true
+          expected_hash:
+            tipo: "string"
+            requerido: false
+      TrustVerificationResponse:
+        campos:
+          valid:
+            tipo: "boolean"
+            requerido: true
+          issuer:
+            tipo: "string"
+            requerido: true
+          timestamp:
+            tipo: "string"
+            requerido: true
+          ocsp_status:
+            tipo: "'GOOD' | 'REVOKED' | 'UNKNOWN'"
+            requerido: true
+          chain_valid:
+            tipo: "boolean"
+            requerido: true
+          details:
+            tipo: "string"
+            requerido: true

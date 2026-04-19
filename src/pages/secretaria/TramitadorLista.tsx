@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Gavel, Plus } from "lucide-react";
+import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 
 const STATUS_TONE: Record<string, string> = {
@@ -88,8 +88,16 @@ export default function TramitadorLista() {
               </tr>
             ) : !data || data.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Sin tramitaciones.
+                <td colSpan={5}>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                    <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
+                    <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                      Sin tramitaciones registradas.
+                    </p>
+                    <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
+                      Registra una nueva tramitación para comenzar.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (

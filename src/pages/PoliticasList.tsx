@@ -11,6 +11,13 @@ import { usePoliciesList, policyStatusLabel } from "@/hooks/usePoliciesObligatio
 import { AlertTriangle, FileText, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const TIER_CHIP: Record<string, string> = {
+  POLITICA:      "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
+  NORMA:         "bg-[var(--g-surface-muted)] text-[var(--g-text-primary)] border border-[var(--g-border-subtle)]",
+  PROCEDIMIENTO: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  DOCUMENTO:     "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
+};
+
 const fmtDate = (d: string | null) => {
   if (!d) return null;
   const [y, m, day] = d.split("-");
@@ -107,7 +114,8 @@ export default function PoliticasList() {
             <TableRow>
               <TableHead className="w-24">Código</TableHead>
               <TableHead>Título</TableHead>
-              <TableHead className="w-40">Tipo</TableHead>
+              <TableHead className="w-36">Tipo</TableHead>
+              <TableHead className="w-32">Nivel</TableHead>
               <TableHead>Propietario</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="w-32">Vigente desde</TableHead>
@@ -117,7 +125,7 @@ export default function PoliticasList() {
           <TableBody>
             {isLoading && Array.from({ length: 6 }).map((_, i) => (
               <TableRow key={i}>
-                <TableCell colSpan={7}><Skeleton className="h-5 w-full" /></TableCell>
+                <TableCell colSpan={8}><Skeleton className="h-5 w-full" /></TableCell>
               </TableRow>
             ))}
             {!isLoading && filtered.map((p) => {
@@ -127,6 +135,13 @@ export default function PoliticasList() {
                   <TableCell><Link to={`/politicas/${p.policy_code}`} className="font-mono text-xs text-primary hover:underline">{p.policy_code}</Link></TableCell>
                   <TableCell><Link to={`/politicas/${p.policy_code}`} className="text-sm font-medium hover:text-primary">{p.title}</Link></TableCell>
                   <TableCell className="text-sm text-muted-foreground">{p.policy_type ?? "—"}</TableCell>
+                  <TableCell>
+                    {p.normative_tier ? (
+                      <span className={cn("inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium", TIER_CHIP[p.normative_tier] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]")}>
+                        {p.normative_tier}
+                      </span>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell className="text-sm">{p.owner_function ?? "—"}</TableCell>
                   <TableCell><StatusBadge label={policyStatusLabel(p.status)} /></TableCell>
                   <TableCell className="font-mono text-xs">{fmtDate(p.effective_date) ?? "—"}</TableCell>

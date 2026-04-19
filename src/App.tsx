@@ -9,6 +9,7 @@ import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedShell } from "@/components/RequireAuth";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
 import Dashboard from "@/pages/Dashboard";
 import GovernanceMap from "@/pages/GovernanceMap";
@@ -53,12 +54,18 @@ const TramitadorLista = lazy(() => import("@/pages/secretaria/TramitadorLista"))
 const TramitadorStepper = lazy(() => import("@/pages/secretaria/TramitadorStepper"));
 const AcuerdosSinSesion = lazy(() => import("@/pages/secretaria/AcuerdosSinSesion"));
 const AcuerdoSinSesionStepper = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionStepper"));
+const ExpedienteSinSesionStepper = lazy(() => import("@/pages/secretaria/ExpedienteSinSesionStepper"));
 const AcuerdoSinSesionDetalle = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionDetalle"));
 const DecisionesUnipersonales = lazy(() => import("@/pages/secretaria/DecisionesUnipersonales"));
 const DecisionDetalle = lazy(() => import("@/pages/secretaria/DecisionDetalle"));
 const LibrosObligatorios = lazy(() => import("@/pages/secretaria/LibrosObligatorios"));
 const Plantillas = lazy(() => import("@/pages/secretaria/Plantillas"));
+const PlantillasTracker = lazy(() => import("@/pages/secretaria/PlantillasTracker"));
+const GestorPlantillas = lazy(() => import("@/pages/secretaria/GestorPlantillas"));
 const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerdo"));
+const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDocumentoStepper"));
+const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
+const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
 const GrcLayout = lazy(() =>
@@ -112,7 +119,8 @@ const App = () => (
         <AuthProvider>
           <ScopeProvider>
             <TourProvider>
-              <Routes>
+              <ErrorBoundary>
+                <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
@@ -165,12 +173,18 @@ const App = () => (
                   <Route path="/secretaria/tramitador/:id" element={<Suspense fallback={<ModuleFallback />}><TramitadorStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion" element={<Suspense fallback={<ModuleFallback />}><AcuerdosSinSesion /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/expediente" element={<Suspense fallback={<ModuleFallback />}><ExpedienteSinSesionStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionDetalle /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales" element={<Suspense fallback={<ModuleFallback />}><DecisionesUnipersonales /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales/:id" element={<Suspense fallback={<ModuleFallback />}><DecisionDetalle /></Suspense>} />
                   <Route path="/secretaria/libros" element={<Suspense fallback={<ModuleFallback />}><LibrosObligatorios /></Suspense>} />
                   <Route path="/secretaria/plantillas" element={<Suspense fallback={<ModuleFallback />}><Plantillas /></Suspense>} />
+                  <Route path="/secretaria/plantillas-tracker" element={<Suspense fallback={<ModuleFallback />}><PlantillasTracker /></Suspense>} />
+                  <Route path="/secretaria/gestor-plantillas" element={<Suspense fallback={<ModuleFallback />}><GestorPlantillas /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
+                  <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
+                  <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />
+                  <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
                 <Route
@@ -216,6 +230,7 @@ const App = () => (
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </ErrorBoundary>
             </TourProvider>
           </ScopeProvider>
         </AuthProvider>

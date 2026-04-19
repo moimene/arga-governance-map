@@ -59,6 +59,7 @@ export default function Excepciones() {
           aria-label="Solicitar excepción (próximamente)"
           className="inline-flex items-center gap-2 px-4 h-10 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] opacity-50 cursor-not-allowed"
           style={{ borderRadius: "var(--g-radius-md)" }}
+          aria-disabled="true"
         >
           + Solicitar excepción
         </button>
@@ -79,7 +80,7 @@ export default function Excepciones() {
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[750px]">
             <thead>
               <tr className="bg-[var(--g-surface-subtle)]">
                 <th className="px-5 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">
