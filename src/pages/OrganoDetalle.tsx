@@ -230,7 +230,7 @@ export default function OrganoDetalle() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <Link to={`/secretaria/convocatorias/${c.id}`} className="font-mono text-xs text-primary hover:underline">
-                            {c.slug ?? c.id.slice(0, 8)}
+                            {c.id.slice(0, 8)}
                           </Link>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{formatDate(c.fecha_1)}</TableCell>
