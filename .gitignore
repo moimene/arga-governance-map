@@ -32,3 +32,9 @@ dist-ssr
 # Working docs (no committable)
 docs/BORRADORES\ INTERMEDIOS/
 Plantillas_Oleada1_Revision_Legal.docx
+
+# Playwright auth state
+.auth/
+
+# Playwright report
+playwright-report/
