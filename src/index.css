@@ -155,12 +155,30 @@
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 }
 
-/* ── Board Pack print styles ─────────────────────────────────────────────── */
+/* ── Print / PDF export styles ───────────────────────────────────────────── */
 @media print {
   .print\:hidden { display: none !important; }
-  body { background: white; }
+
+  /* Hide sidebar and shell chrome */
+  aside,
+  nav { display: none !important; }
+
+  /* Full-width content */
+  .garrigues-module { display: block !important; }
+  .garrigues-module > aside { display: none !important; }
+
+  body { background: white; font-size: 11pt; }
   section { page-break-inside: avoid; }
-  h2 { page-break-after: avoid; }
-  table { page-break-inside: auto; }
+  h1 { font-size: 18pt; }
+  h2 { font-size: 13pt; page-break-after: avoid; }
+  h3 { font-size: 11pt; page-break-after: avoid; }
+  table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
   tr { page-break-inside: avoid; }
+  th, td { padding: 4pt 6pt; font-size: 9pt; }
+
+  @page {
+    size: A4;
+    margin: 15mm 12mm 15mm 12mm;
+  }
 }

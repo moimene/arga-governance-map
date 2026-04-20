@@ -10,6 +10,7 @@ import {
   Briefcase,
   Users,
   Calendar,
+  Printer,
 } from "lucide-react";
 import { useBoardPackData, type BoardPackData } from "@/hooks/useBoardPackData";
 import { cn } from "@/lib/utils";
@@ -465,9 +466,21 @@ export default function BoardPackPage() {
               Consejo de Administración — Informe ejecutivo
             </p>
           </div>
-          <p className="text-xs text-[var(--g-text-secondary)]">
-            Generado: {new Date(boardPackData.generatedAt).toLocaleDateString("es-ES")}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-[var(--g-text-secondary)]">
+              Generado: {new Date(boardPackData.generatedAt).toLocaleDateString("es-ES")}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="print:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              aria-label="Imprimir o exportar como PDF"
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir / PDF
+            </button>
+          </div>
         </div>
       </div>
 

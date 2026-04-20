@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,6 +16,9 @@ import {
   ChevronUp,
   Shield,
   Handshake,
+  UserCheck,
+  ClipboardCheck,
+  Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompliance";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
@@ -323,7 +326,10 @@ export default function ExpedienteAcuerdo() {
 
           <PactosParasocialesCard agreement={a} />
 
-
+          <ApprovalWorkflowCard
+            agreementId={a.id}
+            onNavigateGenerar={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+          />
 
           {/* Trust Center — Evidencias de confianza */}
           <div
@@ -787,6 +793,175 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
               <li key={i} className="text-[11px]">{issue}</li>
             ))}
           </ul>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Approval Workflow Card (E-D8) ──────────────────────────────────────────
+
+interface ApprovalStep {
+  id: string;
+  label: string;
+  role: string;
+  approvedAt: string | null;
+  approvedBy: string | null;
+}
+
+const DEMO_APPROVERS: Record<string, string> = {
+  SECRETARIO:    "Lucía Martín (Secretaria CdA)",
+  COMITE_LEGAL:  "Garrigues — Comité Legal",
+  PRESIDENTE:    "Antonio García (Presidente)",
+};
+
+function makeDefaultSteps(): ApprovalStep[] {
+  return [
+    { id: "SECRETARIO",   label: "Revisión Secretaría",         role: "SECRETARIO",   approvedAt: null, approvedBy: null },
+    { id: "COMITE_LEGAL", label: "Validación comité legal",     role: "COMITE_LEGAL", approvedAt: null, approvedBy: null },
+    { id: "PRESIDENTE",   label: "Aprobación Presidente",        role: "PRESIDENTE",   approvedAt: null, approvedBy: null },
+    { id: "QES_FIRMA",    label: "Firma QES cualificada",        role: "QES_FIRMA",    approvedAt: null, approvedBy: null },
+  ];
+}
+
+function ApprovalWorkflowCard({ agreementId, onNavigateGenerar }: { agreementId: string; onNavigateGenerar: () => void }) {
+  const storageKey = `approval-workflow-${agreementId}`;
+
+  const [steps, setSteps] = useState<ApprovalStep[]>(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? JSON.parse(stored) : makeDefaultSteps();
+    } catch {
+      return makeDefaultSteps();
+    }
+  });
+
+  const currentIdx = steps.findIndex((s) => s.approvedAt === null);
+  const allApproved = currentIdx === -1;
+
+  const approveStep = useCallback((idx: number) => {
+    if (idx === steps.length - 1) {
+      // QES step — navigate to document generator
+      onNavigateGenerar();
+      return;
+    }
+    const next = steps.map((s, i) =>
+      i === idx
+        ? { ...s, approvedAt: new Date().toISOString(), approvedBy: DEMO_APPROVERS[s.role] ?? s.role }
+        : s
+    );
+    setSteps(next);
+    localStorage.setItem(storageKey, JSON.stringify(next));
+  }, [steps, storageKey, onNavigateGenerar]);
+
+  const resetWorkflow = useCallback(() => {
+    const fresh = makeDefaultSteps();
+    setSteps(fresh);
+    localStorage.removeItem(storageKey);
+  }, [storageKey]);
+
+  const stepIcons = [UserCheck, ClipboardCheck, CheckCircle2, Lock];
+
+  return (
+    <Card icon={<ClipboardCheck className="h-4 w-4 text-[var(--g-brand-3308)]" />} title="Flujo de aprobación">
+      {allApproved ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--status-success)]">
+            <CheckCircle2 className="h-5 w-5" />
+            Acuerdo totalmente aprobado y firmado
+          </div>
+          <button
+            type="button"
+            onClick={resetWorkflow}
+            className="text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)] underline"
+          >
+            Reiniciar flujo (demo)
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {steps.map((step, i) => {
+            const StepIcon = stepIcons[i] ?? CheckCircle2;
+            const isActive = i === currentIdx;
+            const isDone = step.approvedAt !== null;
+            const isPending = !isDone && !isActive;
+
+            return (
+              <div
+                key={step.id}
+                className={`flex items-start gap-3 p-3 transition-colors ${
+                  isActive
+                    ? "bg-[var(--g-sec-100)] border border-[var(--g-brand-3308)]"
+                    : isDone
+                    ? "bg-[var(--status-success)]/5 border border-[var(--status-success)]/20"
+                    : "bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <StepIcon
+                  className={`mt-0.5 h-4 w-4 shrink-0 ${
+                    isDone
+                      ? "text-[var(--status-success)]"
+                      : isActive
+                      ? "text-[var(--g-brand-3308)]"
+                      : "text-[var(--g-text-secondary)]"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold ${isActive ? "text-[var(--g-brand-3308)]" : "text-[var(--g-text-primary)]"}`}>
+                      {step.label}
+                    </span>
+                    {isDone && (
+                      <span
+                        className="px-1.5 py-0.5 text-[9px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        APROBADO
+                      </span>
+                    )}
+                    {isPending && (
+                      <span
+                        className="px-1.5 py-0.5 text-[9px] font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        PENDIENTE
+                      </span>
+                    )}
+                  </div>
+                  {isDone && step.approvedAt && (
+                    <p className="text-[11px] text-[var(--g-text-secondary)] mt-0.5">
+                      {step.approvedBy} · {new Date(step.approvedAt).toLocaleString("es-ES")}
+                    </p>
+                  )}
+                  {isActive && (
+                    <button
+                      type="button"
+                      onClick={() => approveStep(i)}
+                      className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                        step.id === "QES_FIRMA"
+                          ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                          : "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      {step.id === "QES_FIRMA" ? (
+                        <>
+                          <Lock className="h-3 w-3" />
+                          Firmar con QES
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" />
+                          Aprobar
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </Card>
