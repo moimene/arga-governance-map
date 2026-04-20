@@ -5,6 +5,7 @@ import {
   ScrollText, Building2, Layers, Briefcase, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GlobalSearch } from "@/components/secretaria/GlobalSearch";
 
 interface NavItem {
   label: string;
@@ -48,6 +49,7 @@ export function SecretariaLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-3">
+          <GlobalSearch />
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
