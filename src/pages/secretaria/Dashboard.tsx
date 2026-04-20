@@ -13,8 +13,14 @@ import {
   Building2,
   Scale,
   TrendingUp,
+  ShieldAlert,
+  HandshakeIcon,
+  Calendar,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+const DEMO_ENTITY = "6d7ed736-f263-4531-a59d-c6ca0cd41602";
 
 interface KpiCounts {
   convocatorias_proximas: number;
@@ -38,6 +44,34 @@ interface AgendaItem {
   nav_to: string;
 }
 
+interface CrossModuleMetrics {
+  incidents_open: number;
+  findings_criticos: number;
+  policies_pendientes: number;
+  pactos_vigentes: number;
+}
+
+function useCrossModuleMetrics() {
+  return useQuery({
+    queryKey: ["secretaria", "cross_module"],
+    queryFn: async (): Promise<CrossModuleMetrics> => {
+      const [incidents, findings, policies, pactos] = await Promise.all([
+        supabase.from("incidents").select("id", { count: "exact", head: true }).eq("status", "Abierto"),
+        supabase.from("findings").select("id", { count: "exact", head: true }).in("severity", ["Alta", "Crítica"]).eq("status", "Abierto"),
+        supabase.from("policies").select("id", { count: "exact", head: true }).in("status", ["In Review", "Approval Pending"]),
+        supabase.from("pactos_parasociales").select("id", { count: "exact", head: true }).eq("tenant_id", DEMO_TENANT).eq("entity_id", DEMO_ENTITY).eq("estado", "VIGENTE"),
+      ]);
+      return {
+        incidents_open: incidents.count ?? 0,
+        findings_criticos: findings.count ?? 0,
+        policies_pendientes: policies.count ?? 0,
+        pactos_vigentes: pactos.count ?? 0,
+      };
+    },
+    staleTime: 60_000,
+  });
+}
+
 function useSecretariaKpis() {
   return useQuery({
     queryKey: ["secretaria", "kpis"],
@@ -45,8 +79,6 @@ function useSecretariaKpis() {
       const hoyIso = new Date().toISOString();
       const en7 = new Date(Date.now() + 7 * 86400000).toISOString();
       const en30 = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
-
-      const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
       const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
         supabase
@@ -284,6 +316,7 @@ export default function SecretariaDashboard() {
   const navigate = useNavigate();
   const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis();
   const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda();
+  const { data: crossModule } = useCrossModuleMetrics();
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -380,6 +413,40 @@ export default function SecretariaDashboard() {
         />
       </div>
 
+      {/* KPIs cross-módulo */}
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <KpiCard
+          icon={HandshakeIcon}
+          label="Pactos parasociales vigentes"
+          value={crossModule?.pactos_vigentes ?? "…"}
+          sublabel="Fundación ARGA · VIGENTE"
+          tone="primary"
+          onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+        />
+        <KpiCard
+          icon={ShieldAlert}
+          label="Incidencias GRC abiertas"
+          value={crossModule?.incidents_open ?? "…"}
+          tone={crossModule && crossModule.incidents_open > 0 ? "warning" : "neutral"}
+          onClick={() => navigate("/grc/incidents")}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          label="Hallazgos críticos"
+          value={crossModule?.findings_criticos ?? "…"}
+          tone={crossModule && crossModule.findings_criticos > 0 ? "error" : "neutral"}
+          onClick={() => navigate("/grc/findings")}
+        />
+        <KpiCard
+          icon={Calendar}
+          label="Calendario de vencimientos"
+          value="→"
+          sublabel="Ver todos los plazos"
+          tone="primary"
+          onClick={() => navigate("/secretaria/calendario")}
+        />
+      </div>
+
       {/* Agenda / Actividad reciente */}
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Próximos hitos */}
@@ -470,6 +537,30 @@ export default function SecretariaDashboard() {
                 kpis && kpis.libros_alerta > 0
                   ? `${kpis.libros_alerta} libro(s) con alerta`
                   : "Al día"
+              }
+            />
+            <div className="my-2 border-t border-[var(--g-border-subtle)]" />
+            <ComplianceRow
+              label="Pactos parasociales"
+              status={crossModule && crossModule.pactos_vigentes > 0 ? "OK" : "OK"}
+              note={`${crossModule?.pactos_vigentes ?? 0} vigente(s) — evaluación activa`}
+            />
+            <ComplianceRow
+              label="Incidencias GRC"
+              status={crossModule && crossModule.incidents_open > 0 ? "WARNING" : "OK"}
+              note={
+                crossModule && crossModule.incidents_open > 0
+                  ? `${crossModule.incidents_open} incidencia(s) abiertas`
+                  : "Sin incidencias abiertas"
+              }
+            />
+            <ComplianceRow
+              label="Políticas pendientes revisión"
+              status={crossModule && crossModule.policies_pendientes > 0 ? "WARNING" : "OK"}
+              note={
+                crossModule && crossModule.policies_pendientes > 0
+                  ? `${crossModule.policies_pendientes} política(s) en revisión`
+                  : "Todas aprobadas"
               }
             />
           </div>
