@@ -12,6 +12,8 @@ import type {
   EvalSeverity,
   MajoritySpec,
   ConflictoInteres,
+  CoAprobacionConfig,
+  SolidarioConfig,
 } from './types';
 import { evaluarMayoria } from './majority-evaluator';
 import { evaluarProcesoSinSesion } from './no-session-engine';
@@ -85,6 +87,78 @@ export function evaluarVotacion(
       warnings,
       acuerdoProclamable,
       mayoriaAlcanzada: false,
+    };
+  }
+
+  // CO_APROBACION — k-de-n admins signing without formal session
+  if (input.adoptionMode === 'CO_APROBACION') {
+    const coAprobConfig = (input as any).coAprobacionConfig as CoAprobacionConfig | undefined;
+    if (!coAprobConfig) {
+      return {
+        etapa: 'VOTACION',
+        ok: false,
+        severity: 'BLOCKING',
+        explain: [{
+          regla: 'Gate 0: CO_APROBACION sin config',
+          fuente: 'ESTATUTOS',
+          resultado: 'BLOCKING',
+          mensaje: 'Modo CO_APROBACION requiere coAprobacionConfig en el input',
+        }],
+        blocking_issues: ['co_aprobacion_config_missing'],
+        warnings: [],
+        acuerdoProclamable: false,
+        mayoriaAlcanzada: false,
+      };
+    }
+    const adminVigentes: string[] = (input as any).adminVigentes ?? [];
+    const fechaAcuerdo: string = (input as any).fechaAcuerdo ?? new Date().toISOString();
+    const result = evaluarCoAprobacion(coAprobConfig, adminVigentes, fechaAcuerdo);
+    return {
+      etapa: 'VOTACION',
+      ok: result.ok,
+      severity: result.severity,
+      explain: [result.explain],
+      blocking_issues: result.blocking_issues,
+      warnings: result.warnings,
+      acuerdoProclamable: result.ok,
+      mayoriaAlcanzada: result.ok,
+    };
+  }
+
+  // SOLIDARIO — individual solidario admin acting unilaterally
+  if (input.adoptionMode === 'SOLIDARIO') {
+    const solidarioConfig = (input as any).solidarioConfig as SolidarioConfig | undefined;
+    if (!solidarioConfig) {
+      return {
+        etapa: 'VOTACION',
+        ok: false,
+        severity: 'BLOCKING',
+        explain: [{
+          regla: 'Gate 0: SOLIDARIO sin config',
+          fuente: 'ESTATUTOS',
+          resultado: 'BLOCKING',
+          mensaje: 'Modo SOLIDARIO requiere solidarioConfig en el input',
+        }],
+        blocking_issues: ['solidario_config_missing'],
+        warnings: [],
+        acuerdoProclamable: false,
+        mayoriaAlcanzada: false,
+      };
+    }
+    const adminVigentes: string[] = (input as any).adminVigentes ?? [];
+    const materia: string = input.materias[0] ?? '';
+    const fechaAcuerdo: string = (input as any).fechaAcuerdo ?? new Date().toISOString();
+    const firmasPresentes: string[] | undefined = (input as any).firmasPresentes;
+    const result = evaluarSolidario(solidarioConfig, adminVigentes, materia, fechaAcuerdo, firmasPresentes);
+    return {
+      etapa: 'VOTACION',
+      ok: result.ok,
+      severity: result.severity,
+      explain: [result.explain],
+      blocking_issues: result.blocking_issues,
+      warnings: result.warnings,
+      acuerdoProclamable: result.ok,
+      mayoriaAlcanzada: result.ok,
     };
   }
 
@@ -363,4 +437,172 @@ export function evaluarVotacion(
     vetoAplicado: vetoAplicado || undefined,
     votoCalidadUsado: votoCalidadUsado || undefined,
   };
+}
+
+// ============================================================
+// CO_APROBACION evaluator
+// ============================================================
+
+export interface CoAprobacionResult {
+  ok: boolean;
+  severity: EvalSeverity;
+  explain: ExplainNode;
+  blocking_issues: string[];
+  warnings: string[];
+}
+
+export function evaluarCoAprobacion(
+  config: CoAprobacionConfig,
+  adminVigentes: string[],
+  _fechaAcuerdo: string
+): CoAprobacionResult {
+  const blockingIssues: string[] = [];
+  const warnings: string[] = [];
+
+  if (!config.estatutosPermitenSinSesion) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: estatutos',
+      fuente: 'ESTATUTOS',
+      resultado: 'BLOCKING',
+      mensaje: 'Los estatutos no permiten adopción sin sesión formal para este modo',
+    };
+    blockingIssues.push('co_aprobacion_no_permitida_estatutos');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
+  const firmasValidas = config.firmas.filter(f => adminVigentes.includes(f.adminId));
+
+  if (firmasValidas.length < config.k) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: firmas k-de-n',
+      fuente: 'ESTATUTOS',
+      resultado: 'BLOCKING',
+      mensaje: `Firmas insuficientes: ${firmasValidas.length} válidas de ${config.n} administradores. Se requieren ${config.k}.`,
+    };
+    blockingIssues.push('co_aprobacion_firmas_insuficientes');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
+  // Detectar firmas duplicadas
+  const uniqueSigners = new Set(firmasValidas.map(f => f.adminId));
+  if (uniqueSigners.size < firmasValidas.length) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: firmas duplicadas',
+      fuente: 'ESTATUTOS',
+      resultado: 'BLOCKING',
+      mensaje: 'Se detectaron firmas duplicadas del mismo administrador',
+    };
+    blockingIssues.push('co_aprobacion_firmas_duplicadas');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
+  // Validar ventana de consenso (parse "15d" → días)
+  const ventanaDays = parseInt(config.ventanaConsenso.replace('d', ''), 10);
+  if (!isNaN(ventanaDays) && firmasValidas.length > 1) {
+    const windowMs = ventanaDays * 24 * 60 * 60 * 1000;
+    const fechas = firmasValidas.map(f => new Date(f.fechaFirma).getTime());
+    const spread = Math.max(...fechas) - Math.min(...fechas);
+    if (spread > windowMs) {
+      const node: ExplainNode = {
+        regla: 'CO_APROBACION: ventana consenso',
+        fuente: 'ESTATUTOS',
+        resultado: 'BLOCKING',
+        mensaje: `Las firmas exceden la ventana de consenso de ${config.ventanaConsenso}`,
+      };
+      blockingIssues.push('co_aprobacion_ventana_excedida');
+      return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+    }
+  }
+
+  const node: ExplainNode = {
+    regla: 'CO_APROBACION: resultado',
+    fuente: 'ESTATUTOS',
+    resultado: 'OK',
+    mensaje: `${firmasValidas.length}/${config.n} administradores firmaron (k=${config.k} requeridos)`,
+  };
+  return { ok: true, severity: 'OK', explain: node, blocking_issues: blockingIssues, warnings };
+}
+
+// ============================================================
+// SOLIDARIO evaluator
+// ============================================================
+
+export interface SolidarioResult {
+  ok: boolean;
+  severity: EvalSeverity;
+  explain: ExplainNode;
+  blocking_issues: string[];
+  warnings: string[];
+}
+
+export function evaluarSolidario(
+  config: SolidarioConfig,
+  adminVigentes: string[],
+  materia: string,
+  fechaAcuerdo: string,
+  firmasPresentes?: string[]
+): SolidarioResult {
+  const blockingIssues: string[] = [];
+  const warnings: string[] = [];
+
+  if (!adminVigentes.includes(config.adminActuante)) {
+    const node: ExplainNode = {
+      regla: 'SOLIDARIO: administrador vigente',
+      fuente: 'LEY',
+      referencia: 'art. 233.1 LSC',
+      resultado: 'BLOCKING',
+      mensaje: `Administrador ${config.adminActuante} no está vigente a la fecha del acuerdo`,
+    };
+    blockingIssues.push('solidario_admin_no_vigente');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
+  const fecha = new Date(fechaAcuerdo).getTime();
+  const desde = new Date(config.vigenciaDesde).getTime();
+  const hasta = config.vigenciaHasta ? new Date(config.vigenciaHasta).getTime() : Infinity;
+
+  if (fecha < desde || fecha > hasta) {
+    const node: ExplainNode = {
+      regla: 'SOLIDARIO: vigencia',
+      fuente: 'LEY',
+      resultado: 'BLOCKING',
+      mensaje: `La actuación cae fuera del período de vigencia del administrador solidario`,
+    };
+    blockingIssues.push('solidario_fuera_de_vigencia');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
+  const restriccion = config.restriccionesEstatutarias.find(r => r.materia === materia);
+  if (restriccion && restriccion.requiereCofirma) {
+    if (!restriccion.cofirmantes || restriccion.cofirmantes.length === 0) {
+      const node: ExplainNode = {
+        regla: 'SOLIDARIO: cofirma requerida',
+        fuente: 'ESTATUTOS',
+        resultado: 'BLOCKING',
+        mensaje: `La materia "${materia}" requiere cofirma según estatutos pero no hay cofirmantes definidos`,
+      };
+      blockingIssues.push('solidario_cofirma_requerida_sin_definir');
+      return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+    }
+    const cofirmaPresente = restriccion.cofirmantes.some(c => firmasPresentes && firmasPresentes.includes(c));
+    if (!cofirmaPresente) {
+      const node: ExplainNode = {
+        regla: 'SOLIDARIO: cofirma ausente',
+        fuente: 'ESTATUTOS',
+        resultado: 'BLOCKING',
+        mensaje: `La materia "${materia}" requiere cofirma de ${restriccion.cofirmantes.join(' o ')}`,
+      };
+      blockingIssues.push('solidario_cofirma_ausente');
+      return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+    }
+  }
+
+  const node: ExplainNode = {
+    regla: 'SOLIDARIO: resultado',
+    fuente: 'LEY',
+    referencia: 'art. 233.1 LSC',
+    resultado: 'OK',
+    mensaje: `Administrador solidario ${config.adminActuante} autorizado para materia "${materia}"`,
+  };
+  return { ok: true, severity: 'OK', explain: node, blocking_issues: blockingIssues, warnings };
 }
