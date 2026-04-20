@@ -475,6 +475,39 @@ bloques:
         campos: {}
       BordeStatus:
         campos: {}
+      CoAprobacionConfig:
+        campos:
+          k:
+            tipo: "number"
+            requerido: true
+          n:
+            tipo: "number"
+            requerido: true
+          ventanaConsenso:
+            tipo: "string"
+            requerido: true
+          estatutosPermitenSinSesion:
+            tipo: "boolean"
+            requerido: true
+          firmas:
+            tipo: "Array<{ adminId: string; fechaFirma: string; hashDocumento: string }>"
+            requerido: true
+      SolidarioConfig:
+        campos:
+          adminActuante:
+            tipo: "string"
+            requerido: true
+          restriccionesEstatutarias:
+            tipo: "Array<{ materia: string; requiereCofirma: boolean; cofirmantes?: string[] }>"
+            requerido: true
+          vigenciaDesde:
+            tipo: "string"
+            requerido: true
+          vigenciaHasta:
+            tipo: "string"
+            requerido: false
+      ExecutionMode:
+        campos: {}
 
   USUARIO:
     descripcion: "Tipos de entrada del usuario"

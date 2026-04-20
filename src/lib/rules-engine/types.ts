@@ -7,7 +7,7 @@
 
 export type Fuente = 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO';
 
-export type TipoSocial = 'SA' | 'SL';
+export type TipoSocial = 'SA' | 'SL' | 'SLU' | 'SAU';
 
 export type TipoOrgano = 'JUNTA_GENERAL' | 'CONSEJO' | 'COMISION_DELEGADA';
 
@@ -22,7 +22,9 @@ export type AdoptionMode =
   | 'UNIVERSAL'
   | 'NO_SESSION'
   | 'UNIPERSONAL_SOCIO'
-  | 'UNIPERSONAL_ADMIN';
+  | 'UNIPERSONAL_ADMIN'
+  | 'CO_APROBACION'
+  | 'SOLIDARIO';
 
 export type TipoActa =
   | 'ACTA_JUNTA'
@@ -30,7 +32,8 @@ export type TipoActa =
   | 'ACTA_CONSIGNACION_SOCIO'
   | 'ACTA_CONSIGNACION_ADMIN'
   | 'ACTA_DECISION_CONJUNTA'
-  | 'ACTA_ACUERDO_ESCRITO';
+  | 'ACTA_ACUERDO_ESCRITO'
+  | 'ACTA_ORGANO_ADMIN';
 
 export type MateriaClase = 'ORDINARIA' | 'ESTATUTARIA' | 'ESTRUCTURAL';
 
@@ -172,6 +175,32 @@ export interface ReglaNoSession {
   contenido_minimo_propuesta: string[];
 }
 
+// --- CO_APROBACION / SOLIDARIO types ---
+
+export interface CoAprobacionConfig {
+  k: number;
+  n: number;
+  ventanaConsenso: string;  // e.g. "15d"
+  estatutosPermitenSinSesion: boolean;
+  firmas: Array<{ adminId: string; fechaFirma: string; hashDocumento: string }>;
+}
+
+export interface SolidarioConfig {
+  adminActuante: string;
+  restriccionesEstatutarias: Array<{
+    materia: string;
+    requiereCofirma: boolean;
+    cofirmantes?: string[];
+  }>;
+  vigenciaDesde: string;
+  vigenciaHasta?: string;
+}
+
+export type ExecutionMode =
+  | { tipo: 'SESION' }
+  | { tipo: 'CO_APROBACION'; config: CoAprobacionConfig }
+  | { tipo: 'SOLIDARIO'; config: SolidarioConfig };
+
 // --- RulePack (aggregate) ---
 
 export interface RulePack {
@@ -188,6 +217,7 @@ export interface RulePack {
   noSession?: ReglaNoSession;
   plazosMateriales: ReglaPlazosMateriales;
   postAcuerdo: ReglaPostAcuerdo;
+  reglaEspecifica?: Record<string, unknown>;  // v2.1
 }
 
 // --- Overrides ---
