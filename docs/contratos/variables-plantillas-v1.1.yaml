@@ -1,0 +1,340 @@
+# Contrato de Variables para Plantillas de Documentos v1.1
+# Motor de Reglas LSC — TGMS Platform
+# Versión: 1.1 (2026-04-20)
+# Fuente autoritativa: docs/legal-team/specs acuerdos/Especificacion_Tecnica_Motor_Reglas_LSC_v2_1.docx § 10
+#
+# Columnas:
+#   nombre: nombre de la variable Handlebars {{nombre}}
+#   fuente: sistema_bbdd | sistema_motor | secretario_manual | qtsp
+#   tipo: string | number | boolean | date | array
+#   requerido: true | false
+#   descripcion: descripción y ejemplo
+
+version: "1.1"
+fecha_creacion: "2026-04-20"
+total_variables: 49
+
+# ─── Fuentes: 12 sistema_bbdd + 12 sistema_motor + 18 secretario_manual + 7 qtsp ───
+
+variables:
+
+  # ── SISTEMA_BBDD (12) — auto-resueltas desde Supabase ────────────────────────
+
+  - nombre: empresa_nombre
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Denominación social completa. Ej: ARGA Seguros, S.A."
+
+  - nombre: empresa_tipo_social
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Tipo societario: SA | SL | SLU | SAU. Ej: SA"
+
+  - nombre: empresa_cif
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "CIF de la entidad. Ej: A-12345678"
+
+  - nombre: empresa_domicilio
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Domicilio social registrado. Ej: Calle Recoletos 37, 28004 Madrid"
+
+  - nombre: empresa_registro_mercantil
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: false
+    descripcion: "Datos de inscripción en el Registro Mercantil. Ej: T. 1234, F. 56, S. 8, H. M-78901"
+
+  - nombre: organo_nombre
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Nombre del órgano. Ej: Consejo de Administración"
+
+  - nombre: organo_tipo
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Tipo de órgano: JUNTA_GENERAL | CONSEJO | COMISION_DELEGADA"
+
+  - nombre: secretario_nombre
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Nombre completo del secretario firmante. Ej: Lucía Martín García"
+
+  - nombre: secretario_cargo
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: true
+    descripcion: "Cargo del secretario. Ej: Secretaria del Consejo de Administración"
+
+  - nombre: presidente_nombre
+    fuente: sistema_bbdd
+    tipo: string
+    requerido: false
+    descripcion: "Nombre completo del presidente del órgano. Ej: Carlos Rodríguez Pérez"
+
+  - nombre: capital_social
+    fuente: sistema_bbdd
+    tipo: number
+    requerido: false
+    descripcion: "Capital social total en euros. Ej: 100000000"
+
+  - nombre: numero_socios
+    fuente: sistema_bbdd
+    tipo: number
+    requerido: false
+    descripcion: "Número de socios o accionistas. Ej: 3"
+
+  # ── SISTEMA_MOTOR (12) — auto-resueltas por el motor LSC ─────────────────────
+
+  - nombre: adoption_mode
+    fuente: sistema_motor
+    tipo: string
+    requerido: true
+    descripcion: "Modo de adopción del acuerdo: MEETING | UNIVERSAL | NO_SESSION | UNIPERSONAL_SOCIO | UNIPERSONAL_ADMIN | CO_APROBACION | SOLIDARIO"
+
+  - nombre: materia_acuerdo
+    fuente: sistema_motor
+    tipo: string
+    requerido: true
+    descripcion: "Código de materia del acuerdo. Ej: APROBACION_CUENTAS"
+
+  - nombre: clase_materia
+    fuente: sistema_motor
+    tipo: string
+    requerido: true
+    descripcion: "Clase de la materia: ORDINARIA | ESTATUTARIA | ESTRUCTURAL"
+
+  - nombre: quorum_requerido_pct
+    fuente: sistema_motor
+    tipo: number
+    requerido: false
+    descripcion: "Quórum de constitución requerido como fracción. Ej: 0.25"
+
+  - nombre: mayoria_requerida_formula
+    fuente: sistema_motor
+    tipo: string
+    requerido: false
+    descripcion: "Fórmula de mayoría aplicada. Ej: favor > 0.5 * capital_presente"
+
+  - nombre: inscribible
+    fuente: sistema_motor
+    tipo: boolean
+    requerido: false
+    descripcion: "Indica si el acuerdo requiere inscripción registral"
+
+  - nombre: instrumento_requerido
+    fuente: sistema_motor
+    tipo: string
+    requerido: false
+    descripcion: "Instrumento de formalización: ESCRITURA | INSTANCIA | NINGUNO"
+
+  - nombre: plazo_inscripcion_dias
+    fuente: sistema_motor
+    tipo: number
+    requerido: false
+    descripcion: "Plazo para inscripción en días naturales. Ej: 30"
+
+  - nombre: compliance_ok
+    fuente: sistema_motor
+    tipo: boolean
+    requerido: false
+    descripcion: "Resultado global del motor de compliance: true | false"
+
+  - nombre: blocking_issues_count
+    fuente: sistema_motor
+    tipo: number
+    requerido: false
+    descripcion: "Número de issues bloqueantes. 0 = sin bloqueos"
+
+  - nombre: pactos_aplican
+    fuente: sistema_motor
+    tipo: boolean
+    requerido: false
+    descripcion: "Indica si algún pacto parasocial aplica al acuerdo"
+
+  - nombre: pactos_ok
+    fuente: sistema_motor
+    tipo: boolean
+    requerido: false
+    descripcion: "Resultado de la evaluación de pactos parasociales. null si no aplican"
+
+  # ── SECRETARIO_MANUAL (18) — rellenadas manualmente por el secretario ────────
+
+  - nombre: fecha_reunion
+    fuente: secretario_manual
+    tipo: date
+    requerido: true
+    descripcion: "Fecha de la reunión o fecha del acuerdo. Ej: 22 de abril de 2026"
+
+  - nombre: hora_inicio
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Hora de inicio de la sesión. Ej: 10:00 horas"
+
+  - nombre: hora_fin
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Hora de fin de la sesión. Ej: 13:30 horas"
+
+  - nombre: lugar_reunion
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Lugar de celebración. Ej: Sede social, sala de juntas, Madrid"
+
+  - nombre: numero_acta
+    fuente: secretario_manual
+    tipo: string
+    requerido: true
+    descripcion: "Número de acta correlativo. Ej: ACTA-CDA-2026-007"
+
+  - nombre: texto_propuesta
+    fuente: secretario_manual
+    tipo: string
+    requerido: true
+    descripcion: "Texto de la propuesta de acuerdo tal como fue presentada"
+
+  - nombre: texto_decision
+    fuente: secretario_manual
+    tipo: string
+    requerido: true
+    descripcion: "Texto del acuerdo adoptado, en forma imperativa"
+
+  - nombre: votos_favor
+    fuente: secretario_manual
+    tipo: number
+    requerido: false
+    descripcion: "Capital o número de votos a favor"
+
+  - nombre: votos_contra
+    fuente: secretario_manual
+    tipo: number
+    requerido: false
+    descripcion: "Capital o número de votos en contra"
+
+  - nombre: abstenciones
+    fuente: secretario_manual
+    tipo: number
+    requerido: false
+    descripcion: "Capital o número de abstenciones"
+
+  - nombre: asistentes_lista
+    fuente: secretario_manual
+    tipo: array
+    requerido: false
+    descripcion: "Lista de asistentes con nombre y cargo. Ej: [{nombre: 'Carlos Rodríguez', cargo: 'Presidente'}]"
+
+  - nombre: convocatoria_fecha
+    fuente: secretario_manual
+    tipo: date
+    requerido: false
+    descripcion: "Fecha en que se cursó la convocatoria. Ej: 7 de abril de 2026"
+
+  - nombre: convocatoria_medio
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Medio de convocatoria utilizado. Ej: correo electrónico certificado"
+
+  - nombre: referencia_legal
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Referencia legal aplicable al acuerdo. Ej: artículo 253 LSC"
+
+  - nombre: visto_bueno_presidente
+    fuente: secretario_manual
+    tipo: boolean
+    requerido: false
+    descripcion: "Indica si el presidente ha dado el visto bueno al acta"
+
+  - nombre: numero_acuerdo_co_aprobacion
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Número de acuerdo en proceso CO_APROBACION. Ej: CO-APRO-2026-003"
+
+  - nombre: admins_firmantes_co_aprobacion
+    fuente: secretario_manual
+    tipo: array
+    requerido: false
+    descripcion: "Lista de administradores firmantes en CO_APROBACION [{adminId, nombre, fechaFirma}]"
+
+  - nombre: admin_solidario_nombre
+    fuente: secretario_manual
+    tipo: string
+    requerido: false
+    descripcion: "Nombre del administrador solidario actuante en modo SOLIDARIO"
+
+  # ── QTSP (7) — resueltas desde EAD Trust Digital Trust API ───────────────────
+
+  - nombre: qes_seal_token
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Token de sello electrónico cualificado QES emitido por EAD Trust"
+
+  - nombre: qes_timestamp
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Timestamp cualificado de la firma QES. Ej: 2026-04-22T10:30:00Z"
+
+  - nombre: qes_issuer
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Entidad emisora del certificado QES. Ej: EAD Trust Qualified CA v2"
+
+  - nombre: tsq_token
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Token de sello de tiempo cualificado TSQ"
+
+  - nombre: erds_delivery_ref
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Referencia de entrega certificada ERDS de EAD Trust"
+
+  - nombre: erds_delivered_at
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Timestamp de entrega certificada ERDS. Ej: 2026-04-22T10:35:12Z"
+
+  - nombre: sha512_document_hash
+    fuente: qtsp
+    tipo: string
+    requerido: false
+    descripcion: "Hash SHA-512 del documento en archival storage. 128 hex chars"
+
+# ── Resumen ──────────────────────────────────────────────────────────────────
+
+resumen:
+  sistema_bbdd: 12
+  sistema_motor: 12
+  secretario_manual: 18
+  qtsp: 7
+  total: 49
+
+# ── Changelog ────────────────────────────────────────────────────────────────
+
+changelog:
+  - version: "1.0"
+    fecha: "2026-04-19"
+    descripcion: "Versión inicial — 18 variables base"
+  - version: "1.1"
+    fecha: "2026-04-20"
+    descripcion: "Expansión v2.1 — +31 variables (CO_APROBACION, SOLIDARIO, pactos, QTSP)"
