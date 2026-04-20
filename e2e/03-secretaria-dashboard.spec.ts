@@ -21,9 +21,9 @@ test.describe('Secretaría Dashboard', () => {
   });
 
   test('sidebar muestra los módulos de Secretaría', async ({ page }) => {
-    await expect(page.getByText('Convocatorias')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Reuniones')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Tramitador')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'Convocatorias' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'Reuniones' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'Tramitador' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('pactos vigentes aparece en cross-module metrics', async ({ page }) => {

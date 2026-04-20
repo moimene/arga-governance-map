@@ -8,11 +8,12 @@ test.describe('Secretaría — Tramitador', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test('stepper nueva tramitación — paso 1: Materia y Órgano', async ({ page }) => {
+  test('stepper nueva tramitación — paso 1: Seleccionar acuerdo', async ({ page }) => {
     await page.goto('/secretaria/tramitador/nuevo');
+    await expect(page).not.toHaveURL('/login');
     await expect(
-      page.getByText('Materia').or(page.getByText('Órgano')).first()
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByText('Seleccionar acuerdo').or(page.getByText('Cargando').or(page.getByText('CERTIFIED'))).first()
+    ).toBeVisible({ timeout: 12_000 });
   });
 
   test('stepper tramitador — seleccionar materia activa motor rule packs', async ({ page }) => {

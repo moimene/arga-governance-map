@@ -20,7 +20,7 @@ test.describe('TGMS Shell', () => {
 
   test('ruta /entidades/:id muestra detalle', async ({ page }) => {
     await page.goto('/entidades');
-    await page.getByText('ARGA').first().click();
+    await page.locator('a[href*="/entidades/"]').first().click();
     await expect(page.url()).toMatch(/\/entidades\/.+/);
   });
 

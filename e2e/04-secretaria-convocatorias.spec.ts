@@ -8,16 +8,17 @@ test.describe('Secretaría — Convocatorias', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test('detalle de convocatoria CONV-001 abre desde lista', async ({ page }) => {
+  test('detalle de convocatoria abre desde lista', async ({ page }) => {
     await page.goto('/secretaria/convocatorias');
-    await page.getByText('CONV-001').first().click();
+    await page.waitForTimeout(1500);
+    await page.locator('tbody tr').first().click();
     await expect(page.url()).toMatch(/\/secretaria\/convocatorias\/.+/);
   });
 
   test('stepper nueva convocatoria — paso 1 renderiza', async ({ page }) => {
     await page.goto('/secretaria/convocatorias/nueva');
     await expect(
-      page.getByText('Órgano').or(page.getByText('Tipo').or(page.getByText('paso')).first())
+      page.getByText('Tipo y órgano').or(page.getByText('Paso 1')).first()
     ).toBeVisible({ timeout: 10_000 });
   });
 

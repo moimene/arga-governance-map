@@ -9,7 +9,7 @@ setup('authenticate as demo user', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Acceder como demo' })).toBeVisible();
   await page.getByRole('button', { name: 'Acceder como demo' }).click();
   await page.waitForURL('/', { timeout: 20_000 });
-  await expect(page.getByText('ARGA')).toBeVisible();
+  await expect(page.getByText('ARGA').first()).toBeVisible();
   const authDir = path.join(process.cwd(), '.auth');
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
