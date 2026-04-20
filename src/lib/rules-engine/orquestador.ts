@@ -23,6 +23,7 @@ import { evaluarConvocatoria } from './convocatoria-engine';
 import { evaluarConstitucion } from './constitucion-engine';
 import { evaluarVotacion } from './votacion-engine';
 import { evaluarDocumentacion } from './documentacion-engine';
+import { evaluarPactosParasociales, type PactoParasocial, type PactosEvalInput, type PactosEvalOutput } from './pactos-engine';
 
 /**
  * Determina el modo de adopción basado en estructura y contexto.
@@ -163,6 +164,10 @@ export function evaluarAcuerdoCompleto(
     constitucion?: ConstitucionInput;
     votacion?: VotacionInput;
     documentacion?: DocumentacionInput;
+    pactos?: {
+      pactos: PactoParasocial[];
+      evalInput: PactosEvalInput;
+    };
   }
 ): ComplianceResult {
   const etapas: EvaluacionResult[] = [];
@@ -443,6 +448,37 @@ export function evaluarAcuerdoCompleto(
     }
   }
 
+  // ===== ETAPA POST-VOTACIÓN: PACTOS PARASOCIALES =====
+  // Evaluación paralela e independiente del resultado societario.
+  // Un acuerdo puede ser proclamable pero incumplir un pacto.
+  let pactosResult: PactosEvalOutput | undefined;
+
+  if (inputs.pactos && inputs.pactos.pactos.length > 0) {
+    pactosResult = evaluarPactosParasociales(
+      inputs.pactos.pactos,
+      inputs.pactos.evalInput
+    );
+
+    // Add pactos explain nodes
+    const pactosHeader: ExplainNode = {
+      regla: 'pactos_parasociales',
+      fuente: 'PACTO_PARASOCIAL',
+      resultado: pactosResult.pacto_ok ? 'OK' : 'BLOCKING',
+      mensaje: pactosResult.pacto_ok
+        ? `Pactos parasociales: ${pactosResult.pactos_aplicables} evaluados, todos cumplidos.`
+        : `PACTOS INCUMPLIDOS: ${pactosResult.pactos_incumplidos} de ${pactosResult.pactos_aplicables} pactos aplicables no se cumplen.`,
+      hijos: pactosResult.explain,
+    };
+    allExplain.push(pactosHeader);
+    allBlockingIssues.push(...pactosResult.blocking_issues);
+    allWarnings.push(...pactosResult.warnings);
+
+    // Pactos blocking → warning, NOT ok=false
+    // Reason: pactos are contractual obligations, not corporate validity.
+    // The agreement is still legally valid (proclamable), but breaches the pact.
+    // We surface it as blocking_issues for the UI to show, but don't flip ok.
+  }
+
   return {
     ok,
     adoptionMode,
@@ -451,5 +487,6 @@ export function evaluarAcuerdoCompleto(
     explain: allExplain,
     blocking_issues: allBlockingIssues,
     warnings: allWarnings,
+    pactosResult,
   };
 }

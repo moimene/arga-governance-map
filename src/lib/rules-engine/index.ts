@@ -12,6 +12,8 @@ export { evaluarProcesoSinSesion, evaluarVentana } from './no-session-engine';
 export { evaluarDocumentacion, evaluarActa } from './documentacion-engine';
 export { determinarAdoptionMode, componerPerfilSesion, evaluarAcuerdoCompleto } from './orquestador';
 export { evaluarBordesNoComputables } from './bordes-no-computables';
+export { evaluarPactosParasociales } from './pactos-engine';
+export type { PactoParasocial, PactosEvalInput, PactoEvalResult, PactosEvalOutput, TipoPacto } from './pactos-engine';
 export { evaluarPlantillaProtegida, calcularRulesetSnapshotId, GO_LIVE_CONFIG } from './plantillas-engine';
 export {
   firmarDocumentoQES,

@@ -15,9 +15,13 @@ import {
   ChevronDown,
   ChevronUp,
   Shield,
+  Handshake,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompliance";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
+import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
+import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RuleEvaluationResult {
@@ -317,6 +321,10 @@ export default function ExpedienteAcuerdo() {
             </Card>
           )}
 
+          <PactosParasocialesCard agreement={a} />
+
+
+
           {/* Trust Center — Evidencias de confianza */}
           <div
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
@@ -595,5 +603,192 @@ function RuleValidationRow({
         </div>
       )}
     </div>
+  );
+}
+
+interface AgreementRow {
+  id: string;
+  agreement_kind: string;
+  entity_id: string;
+  entities?: { common_name?: string };
+}
+
+function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
+  const { data: pactos = [] } = usePactosVigentes(agreement.entity_id);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  // Material mapping: agreement_kind → materias for evaluation
+  const MATERIA_MAP: Record<string, string[]> = {
+    FUSION: ["FUSION"],
+    ESCISION: ["ESCISION"],
+    DISOLUCION: ["DISOLUCION"],
+    TRANSFORMACION: ["TRANSFORMACION"],
+    AMPLIACION_CAPITAL: ["AMPLIACION_CAPITAL"],
+    EMISION_CONVERTIBLES: ["EMISION_CONVERTIBLES"],
+    OPERACION_VINCULADA: ["OPERACION_VINCULADA"],
+    MOD_ESTATUTOS: ["MOD_ESTATUTOS"],
+    APROBACION_CUENTAS: ["APROBACION_CUENTAS"],
+  };
+
+  if (pactos.length === 0) {
+    return (
+      <Card icon={<Handshake className="h-4 w-4" />} title="Pactos parasociales">
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          No hay pactos parasociales vigentes para esta entidad.
+        </p>
+      </Card>
+    );
+  }
+
+  // Prepare evaluation input
+  const evalInput: PactosEvalInput = {
+    materias: MATERIA_MAP[agreement.agreement_kind] ?? [agreement.agreement_kind],
+    capitalPresente: 100,
+    capitalTotal: 100,
+    votosFavor: 70,
+    votosContra: 30,
+    consentimientosPrevios: [],
+    vetoRenunciado: [],
+  };
+
+  // Run evaluation
+  const evalResult = evaluarPactosParasociales(pactos, evalInput);
+
+  // Color mapping for severity
+  const severityClass = (severity: string) => {
+    switch (severity) {
+      case "OK":
+        return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
+      case "WARNING":
+        return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+      case "BLOCKING":
+        return "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+      default:
+        return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+    }
+  };
+
+  const severityIcon = (severity: string) => {
+    switch (severity) {
+      case "OK":
+        return <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />;
+      case "WARNING":
+        return <AlertTriangle className="h-4 w-4 text-[var(--status-warning)]" />;
+      case "BLOCKING":
+        return <AlertTriangle className="h-4 w-4 text-[var(--status-error)]" />;
+      default:
+        return <Circle className="h-4 w-4 text-[var(--g-text-secondary)]" />;
+    }
+  };
+
+  return (
+    <Card icon={<Handshake className="h-4 w-4" />} title="Pactos parasociales">
+      <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+        <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Evaluados</div>
+          <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_evaluados}</div>
+        </div>
+        <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Aplicables</div>
+          <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_aplicables}</div>
+        </div>
+        <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Cumplidos</div>
+          <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_cumplidos}</div>
+        </div>
+      </div>
+
+      {evalResult.resultados.length > 0 && (
+        <div className="space-y-2">
+          {evalResult.resultados.map((result) => (
+            <div
+              key={result.pacto_id}
+              className="border border-[var(--g-border-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setExpanded(expanded === result.pacto_id ? null : result.pacto_id)
+                }
+                className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
+              >
+                <div className="flex items-center gap-2 flex-1">
+                  {severityIcon(result.severity)}
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-[var(--g-text-primary)]">
+                      {result.pacto_titulo}
+                    </p>
+                    <p className="text-[11px] text-[var(--g-text-secondary)]">
+                      {result.tipo}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex px-2 py-0.5 text-[10px] font-semibold ${severityClass(
+                        result.severity
+                      )}`}
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {result.severity}
+                    </span>
+                    {result.aplica && !result.cumple && (
+                      <span className="text-[10px] font-semibold text-[var(--status-error)]">
+                        INCUMPLE
+                      </span>
+                    )}
+                    {!result.aplica && (
+                      <span className="text-[10px] text-[var(--g-text-secondary)]">
+                        No aplica
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {expanded === result.pacto_id ? (
+                  <ChevronUp className="h-4 w-4 text-[var(--g-text-secondary)] ml-2" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-[var(--g-text-secondary)] ml-2" />
+                )}
+              </button>
+
+              {expanded === result.pacto_id && (
+                <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/30 p-3 space-y-2">
+                  <div className="text-sm text-[var(--g-text-primary)]">
+                    {result.explain.mensaje}
+                  </div>
+                  {result.explain.hijos && result.explain.hijos.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-[var(--g-border-subtle)] text-xs space-y-1">
+                      {result.explain.hijos.map((hijo, idx) => (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <span className="font-semibold text-[var(--g-text-primary)]">{hijo.regla}</span>
+                          <span className="text-[11px] text-[var(--g-text-secondary)]">{hijo.mensaje}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {evalResult.blocking_issues.length > 0 && (
+        <div
+          className="mt-4 bg-[var(--status-error)]/10 border border-[var(--status-error)]/30 p-3 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-sm)" }}
+        >
+          <div className="flex items-center gap-1 font-semibold text-[var(--status-error)] mb-1">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Incumplimientos detectados
+          </div>
+          <ul className="list-inside list-disc space-y-0.5 ml-1">
+            {evalResult.blocking_issues.map((issue, i) => (
+              <li key={i} className="text-[11px]">{issue}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }

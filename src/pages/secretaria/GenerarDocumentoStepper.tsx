@@ -26,7 +26,6 @@ import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
-import type { QTSPSignRequest } from "@/lib/rules-engine/types";
 import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { renderTemplate } from "@/lib/doc-gen/template-renderer";
 import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
@@ -148,30 +147,28 @@ export default function GenerarDocumentoStepper() {
   }, [selectedPlantilla, resolvedVars, capa3Values]);
 
   const handleSignQES = useCallback(async () => {
-    if (!contentHash) {
-      setSigningError("Hash de contenido no disponible");
+    if (!docxBuffer || !selectedPlantilla || !agreement) {
+      setSigningError("Documento no generado aún");
       return;
     }
-
     setSigningStatus("pending");
     setSigningError(null);
-
     try {
-      const signRequest: QTSPSignRequest = {
-        document_hash: contentHash,
-        signer_id: "SISTEMA",
-        signer_role: "SECRETARIO",
-        document_type: selectedPlantilla?.tipo || "DOCUMENTO",
-      };
-
-      await signMutation.mutateAsync(signRequest);
+      await signMutation.mutateAsync({
+        documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
+        documentData: docxBuffer,
+        signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
+        createdBy: "secretaria-demo",
+        agreementId: agreement.id,
+        onProgress: (msg) => { console.log("[QES]", msg); },
+      });
       setSigningStatus("signed");
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : "Error desconocido al firmar";
       setSigningError(errorMsg);
       setSigningStatus("error");
     }
-  }, [contentHash, signMutation, selectedPlantilla]);
+  }, [docxBuffer, selectedPlantilla, agreement, signMutation]);
 
   const handleArchive = useCallback(async () => {
     if (!docxBuffer || !agreement?.id) {

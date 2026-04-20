@@ -369,10 +369,66 @@ IncidenteDetalle/Stepper, Excepciones, Alertas, country packs.
 - Para reduce: `reduce<Record<string, RowType[]>>((acc, item) => {...}, {})`.
 - Para errores: `catch (e) { const msg = e instanceof Error ? e.message : String(e); }`.
 
+### Sprint A — Seeds & Motor Integration (commit `9b9b307`→`18105f2`)
+
+A0–A3: Seeds ejecutados en Supabase Cloud:
+- A0: Migración `000010` (rule_packs, rule_pack_versions, rule_param_overrides, etc.)
+- A1: `seed-rule-packs.ts` — 16 rule packs con payloads LSC
+- A2: `seed-demo-data.ts` — datos demo coherentes (personas, mandatos, reuniones, acuerdos)
+- A3: `seed-etd-stubs.ts` — EAD Trust Digital API stubs (case-files, evidences)
+
+A4–A6: Integración motor en UI:
+- A4: TramitadorStepper conectado al motor (useRulePackForMateria, 5 pasos)
+- A5: GenerarDocumentoStepper con QTSP pipeline (QES signing + SHA-512 archival)
+- A6: Storage archiver (`archiveDocxToStorage` + `computeSha512` via Web Crypto API)
+
+### Sprint B — Hardening Enterprise (commit `18105f2`)
+
+- B1: RLS real en todas las tablas de dominio (tenant_id + policies)
+- B2: RBAC con 5 roles (SECRETARIO/CONSEJERO/COMPLIANCE/ADMIN_TENANT/AUDITOR) + SoD toxic pairs + SodGuard component
+- B3: Audit Trail WORM (SHA-512 hash chain, trigger `fn_audit_worm`, verificación `fn_verify_audit_chain`)
+- B4: Evidence bundles SHA-512 + QTSP sealing stubs (`evidence_bundles` table)
+- B5: Legal Hold + Retention policies (seed + UI)
+- B6: Board Pack ejecutivo (`/secretaria/board-pack`) — 9 secciones, DL-2 cotizada warnings, DL-5 voto calidad
+- B7: Observability (telemetry OTel stub + SLODashboard con 3 gauges)
+
+### Sprint C — UX Polish (commit `18105f2`)
+
+- C1: Garrigues tokens audit — 0 violaciones (todos `var(--g-*)` y `var(--status-*)`)
+- C2: WCAG 2.1 AA — contrast ratios, aria-labels, focus rings
+- C3: Bundle optimization — React.lazy code-splitting en todas las páginas
+- C4–C5: Empty states + Loading skeletons + ErrorBoundary global
+- C6: Scope Switcher — filtrado funcional por entidad/jurisdicción
+- C7: Responsive/Mobile — hamburger menu, column collapse, touch targets
+
+### Code Review & Bug Fixes (commit `18105f2`)
+
+- Fix P0: `pack` scoping bug en `documentacion-engine.ts` (variable fuera de for-loop → `actaPack`)
+- Fix P0: `resolverReglaEfectiva` en `jerarquia-normativa.ts` (override mode para arrays, booleanos, strings)
+- Fix P0: unsafe `.toUpperCase()` en `useBoardPackData.ts`
+- Fix P1: double-nested CSS `var(var(...))` en `SLODashboard.tsx`
+- Fix P1: untyped `any` state en `EvidenceForenseSection.tsx`
+- Fix P1: missing debug context en `SodGuard.tsx` error log
+
+**Tests: 299/299 pass, tsc 0 errors, build clean.**
+
+### Próximos sprints — Sprint D (ruta crítica a producción)
+
+| Orden | Tarea | Estado |
+|---|---|---|
+| D1 | Workflow plantillas REVISADA→APROBADA→ACTIVA | Pendiente — bloqueante #1 go-live |
+| D3 | Notificación certificada ERDS (NO_SESSION + Convocatoria SL) | Pendiente — habilita 60-80% operativa |
+| D4 | Motor pactos parasociales (veto, mayoría pactada, consentimiento) | Pendiente — tabla + evaluador + orquestador |
+| D2 | Firma QES real EAD Trust | Pendiente — cierra triángulo confianza |
+
+Sprint E (mejoras producto): Dashboard v2, exportación PDF/DOCX, calendario, workflow aprobación, búsqueda global, pactos oleada 2 (transmisiones, sindicación).
+Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
+
 **Documentos de referencia (rutas absolutas — NO están en este repo):**
 - Spec: `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/specs/2026-04-18-secretaria-societaria-design.md`
 - Plan v1 (T1–T12, con deuda UX): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation.md`
 - Plan v2 (T1–T14, UX corregida): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md`
+- Plan maestro pendientes: `docs/superpowers/plans/2026-04-19-plan-maestro-pendientes.md`
 
 ---
 
@@ -481,42 +537,76 @@ export function useXxx(param?: string) {
 
 ---
 
-## Árbol de archivos a crear
+## Árbol de archivos clave
 
 ```
 src/
   pages/secretaria/
-    SecretariaLayout.tsx        T2  ← primero
-    Dashboard.tsx               T3
-    ConvocatoriasList.tsx       T4
-    ConvocatoriaDetalle.tsx     T4
-    ConvocatoriasStepper.tsx    T4
-    ReunionesLista.tsx          T5
-    ReunionStepper.tsx          T5
-    ActasLista.tsx              T6
-    ActaDetalle.tsx             T6
-    TramitadorLista.tsx         T7
-    TramitadorStepper.tsx       T7
-    AcuerdosSinSesion.tsx       T8
-    AcuerdoSinSesionStepper.tsx T8
-    AcuerdoSinSesionDetalle.tsx T8
-    DecisionesUnipersonales.tsx T9
-    DecisionDetalle.tsx         T9
-    LibrosObligatorios.tsx      T10
-    Plantillas.tsx              T11
-    ExpedienteAcuerdo.tsx       T14 ← nuevo
+    SecretariaLayout.tsx            T2   Layout Garrigues con sidebar verde
+    Dashboard.tsx                   T3   KPIs + próximas reuniones + acuerdos pendientes
+    ConvocatoriasList.tsx           T4
+    ConvocatoriaDetalle.tsx         T4
+    ConvocatoriasStepper.tsx        T4   7 pasos, motor V2 integrado
+    ReunionesLista.tsx              T5
+    ReunionStepper.tsx              T5   6 pasos, crea agreements
+    ActasLista.tsx                  T6
+    ActaDetalle.tsx                 T6
+    TramitadorLista.tsx             T7
+    TramitadorStepper.tsx           T7   5 pasos, motor rule packs A4
+    AcuerdosSinSesion.tsx           T8
+    AcuerdoSinSesionStepper.tsx     T8
+    AcuerdoSinSesionDetalle.tsx     T8
+    DecisionesUnipersonales.tsx     T9
+    DecisionDetalle.tsx             T9
+    LibrosObligatorios.tsx          T10
+    Plantillas.tsx                  T11
+    ExpedienteAcuerdo.tsx           T14  Timeline 8 estados + compliance snapshot
+    GenerarDocumentoStepper.tsx     A5   DOCX gen + QTSP QES + Storage archival
+    BoardPack.tsx                   B6   9 secciones ejecutivas + DL-2/DL-5
+
   hooks/
-    useJurisdiccionRules.ts     T3  ← incluye computeQuorumStatus, checkNoticePeriod
-    useConvocatorias.ts         T4
-    useReunionSecretaria.ts     T5
-    useActas.ts                 T6
-    useTramitador.ts            T7
-    useAcuerdosSinSesion.ts     T8
-    useDecisionesUnipers.ts     T9
-    useLibros.ts                T10
-    usePlantillas.ts            T11
-    useAgreements.ts            T1b ← nuevo
-    useAgreementCompliance.ts   T13 ← nuevo
+    useJurisdiccionRules.ts         T3   computeQuorumStatus, checkNoticePeriod
+    useConvocatorias.ts             T4
+    useReunionSecretaria.ts         T5
+    useActas.ts                     T6
+    useTramitador.ts                T7
+    useAcuerdosSinSesion.ts         T8
+    useDecisionesUnipers.ts         T9
+    useLibros.ts                    T10
+    usePlantillas.ts                T11
+    useAgreementsList.ts            T1b
+    useAgreementCompliance.ts       T13  Motor validez V2 + feature flag
+    useRulePackForMateria.ts        A4   Rule pack + active version lookup
+    useUserRole.ts                  B2   RBAC roles + permissions + hasPermission()
+    useEvidenceBundles.ts           B4   Evidence bundles + audit chain verify
+    useBoardPackData.ts             B6   9 parallel queries + DL-2 cotizada logic
+    useQTSPSign.ts                  A5   QES signing hook
+    useQTSPVerification.ts          T22  Trust Center verification
+
+  components/
+    SodGuard.tsx                    B2   SoD violation checker (BLOCK/WARN)
+    EvidenceForenseSection.tsx      B4   SHA-512 bundles + chain verification UI
+    SLODashboard.tsx                B7   3 gauges (latency, error rate, uptime)
+    ErrorBoundary.tsx               C5   Global error boundary + "Reintentar"
+
+  lib/
+    rules-engine/                        Motor de reglas LSC completo (15 archivos)
+      types.ts                           Tipos base (RulePack, ExplainNode, etc.)
+      jerarquia-normativa.ts             Resolución jerárquica LEY→ESTATUTOS→PACTO→REGLAMENTO
+      convocatoria-engine.ts             Validación convocatoria (plazo, forma, contenido)
+      constitucion-engine.ts             Quórum de constitución (simple/reforzado)
+      majority-evaluator.ts              Mayorías de votación (simple/reforzada/unanimidad)
+      votacion-engine.ts                 6-gate voting pipeline
+      no-session-engine.ts               5-gate sin sesión pipeline
+      documentacion-engine.ts            Acta + documentos pre-sesión
+      bordes-no-computables.ts           Cotizadas, representación, voto calidad
+      orquestador.ts                     Orquestador transversal (6 etapas)
+    doc-gen/
+      storage-archiver.ts               SHA-512 + Supabase Storage + evidence_bundles
+      template-renderer.ts              Handlebars template rendering
+      variable-resolver.ts              Capa2 variable resolution (Supabase data)
+      docx-generator.ts                 DOCX generation via docx-js
+    telemetry.ts                    B7   OTel-compatible event tracking stub
 ```
 
 ---
@@ -544,8 +634,36 @@ src/
 - No usar `--g-status-*` (incorrecto) → usar `--status-*` (sin prefijo `--g-`)
 - No usar `--g-surface-secondary` (no existe) → usar `--g-surface-subtle`
 - No usar `style={{ color: "var(--g-...)" }}` cuando existe clase Tailwind equivalente
+- No double-nest CSS variables: si `statusColor = "var(--status-success)"`, usar `color: statusColor`, NO `` `var(${statusColor})` ``
+- No usar `import crypto from "crypto"` — es módulo Node.js. Usar `globalThis.crypto.subtle` (Web Crypto API)
 - No añadir `strictNullChecks` o `noImplicitAny: true` — el proyecto usa TS relajado
 - No crear helpers/abstracciones para casos de uso único
 - No modificar las tablas del schema `sii.*`
 - No tocar hooks de Fase 1 salvo para cross-links específicos (T12)
 - No definir tokens `--g-*` en archivos de componentes — solo en `src/index.css`
+- No usar variables de for-loop fuera del bloque — extraer a variable con scope correcto (bug `pack` en documentacion-engine)
+
+## Testing
+
+```bash
+# Tests unitarios (299/299 pass)
+npx vitest run
+
+# Type check (0 errors)
+npx tsc --noEmit
+
+# Build (2219 modules, ~6.5s)
+npx vite build --outDir /tmp/tgms-dist
+```
+
+**Nota:** `vite build` al `dist/` por defecto puede fallar con EPERM por permisos del folder. Usar `--outDir /tmp/tgms-dist`.
+
+## Supabase Cloud
+
+- **Proyecto:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
+- **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
+- **Tenant:** `00000000-0000-0000-0000-000000000001`
+- **Entidad ARGA Seguros:** `00000000-0000-0000-0000-000000000010`
+- **Migraciones aplicadas:** 000001–000010 + seeds (rule packs, demo data, ETD stubs)
+- **RLS:** Habilitado en todas las tablas de dominio con tenant scoping
+- **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`

@@ -487,6 +487,7 @@ export interface ComplianceResult {
   warnings: string[];
   snapshot_hash?: string;
   gate_hash?: string;
+  pactosResult?: import('./pactos-engine').PactosEvalOutput;
 }
 
 // --- Plantilla types ---
@@ -520,7 +521,9 @@ export interface ReglaNoComputable {
   resolucion?: string;
 }
 
-// --- Pactos parasociales (estructura preparada, sin lógica real — Fase 2) ---
+// --- Pactos parasociales (D4 — Motor completo) ---
+
+export { type PactosEvalOutput, type PactoEvalResult, type PactoParasocial, type PactosEvalInput, type TipoPacto } from './pactos-engine';
 
 export interface PactosEvaluation {
   tienePacktosRelevantes: boolean;
@@ -529,5 +532,5 @@ export interface PactosEvaluation {
     tipo: string;
     impacto: string;
   }>;
-  evaluado: false; // always false in V1
+  evaluado: boolean;
 }

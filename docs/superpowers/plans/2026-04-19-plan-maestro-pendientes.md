@@ -5,16 +5,16 @@
 > **Supabase:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
 > **QTSP:** EAD Trust (empresa tecnológica del grupo Garrigues, propietaria de la operación QTSP — Digital Trust API)
 > **SIEM:** Microsoft Sentinel (decisión confirmada)
-> **Estado actual:** Aprobado-Condicionado para demo comercial
+> **Estado actual:** Sprints A+B+C completados. 299/299 tests, tsc 0 errors. Pendientes: Sprint D (funcionalidades avanzadas) y Sprint E (multi-jurisdicción)
 > **Cliente demo:** Grupo ARGA Seguros (seudónimo de MAPFRE — nunca usar "MAPFRE" en código, datos ni commits)
 
 ---
 
 ## Resumen ejecutivo
 
-La plataforma TGMS tiene **5 fases completadas** (Shell, Secretaría, GRC, AI Governance, Cross-module) con un motor de reglas LSC completo (16 materias, 9 plantillas, pipeline documental). El código fuente está listo pero la base de datos Supabase necesitaba sincronización — las 9 migraciones del motor de reglas se han aplicado hoy (19/04/2026).
+La plataforma TGMS tiene **5 fases completadas** (Shell, Secretaría, GRC, AI Governance, Cross-module) con un motor de reglas LSC completo (16 materias, 9 plantillas, pipeline documental). Las 9 migraciones del motor de reglas están aplicadas en Supabase Cloud.
 
-Para pasar de "demo funcional" a "producto enterprise", quedan **4 bloques de trabajo** organizados en sprints.
+**Sprints A, B y C están 100% completados** (2026-04-19). Quedan **Sprint D** (funcionalidades avanzadas, prioritario) y **Sprint E** (multi-jurisdicción, post-GA).
 
 ---
 
@@ -40,9 +40,9 @@ Para pasar de "demo funcional" a "producto enterprise", quedan **4 bloques de tr
 
 ## Pendientes organizados por prioridad
 
-### Sprint A — Seed Data + Integración Inmediata (1-2 días)
+### Sprint A — Seed Data + Integración Inmediata ✅ COMPLETADO (2026-04-19)
 
-Tareas que completan la funcionalidad existente sin nuevo código de features.
+Seeds ejecutados en Supabase Cloud, motor integrado en UI, pipeline QTSP + Storage archival wired.
 
 | # | Tarea | Descripción | Esfuerzo |
 |---|---|---|---|
@@ -57,9 +57,9 @@ Tareas que completan la funcionalidad existente sin nuevo código de features.
 
 ---
 
-### Sprint B — Enterprise Hardening / Task 0 (3-5 días)
+### Sprint B — Enterprise Hardening / Task 0 ✅ COMPLETADO (2026-04-19)
 
-Bloques críticos para pasar de "demo" a "enterprise-ready". Plan detallado en `docs/superpowers/plans/2026-04-19-task0-enterprise-hardening.md`.
+RLS en todas las tablas, RBAC 5 roles + SoD, Audit WORM SHA-512, Evidence bundles, Legal Hold + Retention, Board Pack 9 secciones, Observability OTel + Sentinel.
 
 | # | Tarea | Tipo | Esfuerzo |
 |---|---|---|---|
@@ -82,7 +82,7 @@ Bloques críticos para pasar de "demo" a "enterprise-ready". Plan detallado en `
 
 ---
 
-### Sprint C — Pulido UX + Calidad (2-3 días)
+### Sprint C — Pulido UX + Calidad ✅ COMPLETADO (2026-04-19)
 
 | # | Tarea | Descripción | Esfuerzo |
 |---|---|---|---|
@@ -98,22 +98,36 @@ Bloques críticos para pasar de "demo" a "enterprise-ready". Plan detallado en `
 
 ---
 
-### Sprint D — Funcionalidades Avanzadas (5-10 días, opcional pre-demo)
+### Sprint D — Ruta Crítica a Producción (próximas sesiones)
+
+**Secuencia priorizada por ruta crítica:**
+
+| Orden | # | Tarea | Justificación | Esfuerzo |
+|---|---|---|---|---|
+| 1 | D1 | **Workflow completo de plantillas** | **Bloqueante #1.** Las 7 plantillas están en REVISADA. Sin UI para REVISADA→APROBADA→ACTIVA, Gate PRE las rechaza en producción. Controles checklist #1 y #8. PlantillasTracker ya existe como shell — completar workflow de transición con validación COMITE_LEGAL, historial versiones con diff, recálculo hash al aprobar | 3d |
+| 2 | D3 | **Notificación certificada ERDS** | **Habilita NO_SESSION (60-80% operativa real).** Sin ERDS, el expediente sin sesión no acredita fehacientemente la entrega. Control #15. Tablas WORM `no_session_notificaciones` ya migradas. También consume Plantilla 7 (Convocatoria SL) para notificación individual art. 173.2 | 2d |
+| 3 | D4 | **Motor de pactos parasociales (3 cláusulas MVP)** | **Visibilidad completa para secretaría.** Veredicto paralelo `pacto_ok` independiente de proclamación societaria. MVP: (1) veto por materia, (2) mayoría reforzada pactada, (3) consentimiento inversor. Transmisiones/sindicación diferidas. Tabla `pactos_parasociales`, seed pacto Fundación ARGA, integración orquestador post-votación, activación `{{pacto_ok}}` en plantillas | 3d |
+| 4 | D2 | **Firma QES real (EAD Trust)** | **Cierra triángulo de confianza.** Controles #2 y #16. Arquitectura validada en NDA Suite (sr_tools + orchestrator). Sistema opera temporalmente con firma avanzada (stub) mientras D1/D3 se cierran | 3d |
+
+**Ejecución paralela recomendada:**
+- Semana 1: D1 (frontend + RLS) ‖ D3 (API + WORM) ‖ D4 migración + seed
+- Semana 2: D2 (API externa) ‖ D4 evaluarPactosParasociales() + orquestador
+- Cierre: plantillas ACTIVA + sección condicional pactos + Gate PRE verifica explain pactos
+
+### Sprint E — Mejoras de Producto (post go-live)
 
 | # | Tarea | Descripción | Prioridad | Esfuerzo |
 |---|---|---|---|---|
-| D1 | Gestión completa de plantillas | UI para transición de estado (REVISADA → APROBADA → ACTIVA), historial de versiones, diff entre versiones | Alta | 3d |
-| D2 | Firma QES real (EAD Trust) | Integrar EAD Trust Digital Trust API (QTSP del grupo Garrigues) en lugar de stubs. Flujo: enviar documento → webhook firma completada → sellar evidence bundle. Arquitectura ya validada en NDA Suite (sr_tools + orchestrator) | Alta | 3d |
-| D3 | Notificación certificada real | Integrar ERDS (eIDAS) para notificaciones certificadas en expedientes NO_SESSION. Flujo: enviar → evidencia entrega → WORM | Alta | 2d |
-| D4 | Dashboard ejecutivo mejorado | Métricas cross-module: % acuerdos compliant, tiempo medio de tramitación, alertas de legalización de libros, tendencias GRC | Media | 2d |
-| D5 | Exportación PDF/DOCX informes | Generar informes de compliance por entidad/órgano exportables para Consejo | Media | 2d |
-| D6 | Calendario de vencimientos | Vista calendario con deadlines: legalizaciones libros, renovaciones mandatos, revisiones de políticas, vencimientos DORA | Media | 2d |
-| D7 | Workflow de aprobación | Flujo multi-step: secretario propone → comité legal revisa → presidente aprueba → firma QES | Media | 3d |
-| D8 | Búsqueda global avanzada | Full-text search cross-module (acuerdos, políticas, hallazgos, incidentes) con filtros y highlights | Baja | 2d |
+| E-D5 | Dashboard ejecutivo v2 | Métricas cross-module: % acuerdos compliant, tiempo medio tramitación, alertas legalización, tendencias GRC | Media | 2d |
+| E-D6 | Exportación PDF/DOCX informes | Informes de compliance por entidad/órgano para Consejo | Media | 2d |
+| E-D7 | Calendario de vencimientos | Deadlines: legalizaciones libros, renovaciones mandatos, revisiones políticas, DORA | Media | 2d |
+| E-D8 | Workflow de aprobación | Multi-step: secretario → comité legal → presidente → firma QES | Media | 3d |
+| E-D9 | Búsqueda global avanzada | Full-text cross-module con filtros y highlights | Baja | 2d |
+| E-D10 | Pactos parasociales oleada 2 | Transmisiones (tag-along, drag-along, lock-up), sindicación de voto. Requiere modelo de transacciones de capital + cap table | Media | 5d |
 
 ---
 
-### Sprint E — Post-GA / Multi-jurisdicción (futuro, NO prioridad actual)
+### Sprint F — Post-GA / Multi-jurisdicción (futuro, NO prioridad actual)
 
 **Nota arquitectónica:** Aunque el desarrollo de jurisdicciones adicionales queda aplazado, el diseño debe contemplar desde ahora una **Matriz de Normalización Jurisdiccional** que permita coordinar y dar seguimiento a los mismos procesos societarios a nivel local en cada jurisdicción. Esta matriz mapea conceptos equivalentes (quórum, mayorías, plazos, documentación obligatoria, inscripción registral) entre las leyes societarias de cada país, permitiendo un dashboard unificado de cumplimiento multi-jurisdicción.
 
@@ -215,13 +229,13 @@ Sprint A (1-2 días) ──→ Sprint B (3-5 días) ──→ Sprint C (2-3 día
                                     └──────────────────┘
 ```
 
-**Timeline estimado hasta demo MAPFRE:**
-- Sprint A: inmediato (seeds + integración)
-- Sprint B: 1 semana (hardening enterprise)
-- Sprint C: 3 días (pulido UX)
-- **Total pre-demo: ~2 semanas**
-
-Sprint D y E son post-demo, según feedback de MAPFRE.
+**Timeline:**
+- Sprint A: ✅ COMPLETADO (2026-04-19)
+- Sprint B: ✅ COMPLETADO (2026-04-19)
+- Sprint C: ✅ COMPLETADO (2026-04-19)
+- Code Review: ✅ COMPLETADO — 299/299 tests, tsc 0 errors
+- **Sprint D: PRÓXIMO** — funcionalidades avanzadas (plantillas completas, firma QES real, reglas pactos parasociales, dashboard v2)
+- Sprint E: post-GA (multi-jurisdicción BR/MX/PT)
 
 ---
 
