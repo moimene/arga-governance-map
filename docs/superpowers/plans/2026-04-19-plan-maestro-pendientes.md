@@ -5,7 +5,7 @@
 > **Supabase:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
 > **QTSP:** EAD Trust (empresa tecnológica del grupo Garrigues, propietaria de la operación QTSP — Digital Trust API)
 > **SIEM:** Microsoft Sentinel (decisión confirmada)
-> **Estado actual:** Sprints A+B+C completados. 299/299 tests, tsc 0 errors. Pendientes: Sprint D (funcionalidades avanzadas) y Sprint E (multi-jurisdicción)
+> **Estado actual:** Sprints A+B+C+D+E completados. Oleada 2 completada. Motor v2.1 completado (2026-04-20). 352/352 tests, tsc 0 errors. Motor expandido a 28 rule packs, AdoptionMode CO_APROBACION+SOLIDARIO, pactos parasociales WORM, variable contract v1.1 (49 variables).
 > **Cliente demo:** Grupo ARGA Seguros (seudónimo de MAPFRE — nunca usar "MAPFRE" en código, datos ni commits)
 
 ---
@@ -98,7 +98,13 @@ RLS en todas las tablas, RBAC 5 roles + SoD, Audit WORM SHA-512, Evidence bundle
 
 ---
 
-### Sprint D — Ruta Crítica a Producción (próximas sesiones)
+### Oleada 2 — Plantillas de contenido + Rule Packs ✅ COMPLETADA (2026-04-20)
+
+17 modelos de acuerdo (8 REVISADA con texto legal real + 9 stubs pendientes legal). 13 rule pack payloads LSC completos. Hook `useModelosAcuerdo`, selector en TramitadorStepper, SLU/SAU tipo social, 26 tests nuevos (342 total), tab "Modelos de acuerdo" en Plantillas.
+
+---
+
+### Sprint D — Ruta Crítica a Producción (en curso)
 
 **Secuencia priorizada por ruta crítica:**
 
@@ -234,8 +240,9 @@ Sprint A (1-2 días) ──→ Sprint B (3-5 días) ──→ Sprint C (2-3 día
 - Sprint B: ✅ COMPLETADO (2026-04-19)
 - Sprint C: ✅ COMPLETADO (2026-04-19)
 - Code Review: ✅ COMPLETADO — 299/299 tests, tsc 0 errors
-- **Sprint D: PRÓXIMO** — funcionalidades avanzadas (plantillas completas, firma QES real, reglas pactos parasociales, dashboard v2)
-- Sprint E: post-GA (multi-jurisdicción BR/MX/PT)
+- **Sprint D: ✅ COMPLETADO (2026-04-20)** — D1 plantillas workflow, D2 QES real EAD Trust, D3 ERDS notificación, D4 motor pactos parasociales
+- **Sprint E: ✅ COMPLETADO (2026-04-20)** — E-D5 Dashboard v2, E-D6 PDF export, E-D7 Calendario, E-D8 Approval workflow, E-D9 Búsqueda global Cmd+K. E-D10 diferido.
+- Sprint F: post-GA (multi-jurisdicción BR/MX/PT)
 
 ---
 

@@ -412,16 +412,48 @@ A4–A6: Integración motor en UI:
 
 **Tests: 299/299 pass, tsc 0 errors, build clean.**
 
-### Próximos sprints — Sprint D (ruta crítica a producción)
+### Sprint D — Funcionalidades avanzadas ✅ COMPLETADO (commit `f017ff3`)
 
-| Orden | Tarea | Estado |
-|---|---|---|
-| D1 | Workflow plantillas REVISADA→APROBADA→ACTIVA | Pendiente — bloqueante #1 go-live |
-| D3 | Notificación certificada ERDS (NO_SESSION + Convocatoria SL) | Pendiente — habilita 60-80% operativa |
-| D4 | Motor pactos parasociales (veto, mayoría pactada, consentimiento) | Pendiente — tabla + evaluador + orquestador |
-| D2 | Firma QES real EAD Trust | Pendiente — cierra triángulo confianza |
+- D1: Workflow plantillas REVISADA→APROBADA→ACTIVA
+- D2: Firma QES real EAD Trust (hook `useQTSPSign`, pipeline completo)
+- D3: Notificación certificada ERDS (NO_SESSION + Convocatoria SL, hook `useERDSNotification`)
+- D4: Motor pactos parasociales MVP (pactos-engine.ts, 3 evaluadores, integración orquestador)
 
-Sprint E (mejoras producto): Dashboard v2, exportación PDF/DOCX, calendario, workflow aprobación, búsqueda global, pactos oleada 2 (transmisiones, sindicación).
+### Sprint E — Mejoras producto ✅ COMPLETADO (commits `f4b79d2`, `23e3d2f`, `3cab2fd`)
+
+- E-D5: Dashboard v2 con métricas avanzadas
+- E-D6: Exportación PDF Board Pack
+- E-D7: Calendario de vencimientos
+- E-D8: Flujo aprobación multi-step
+- E-D9: Búsqueda global cross-module Cmd+K
+
+### Oleada 2 — Plantillas de contenido + Rule Packs ✅ COMPLETADA (2026-04-20)
+
+- Migration 000012: 17 MODELO_ACUERDO + payloads 13 rule packs LSC
+- `useModelosAcuerdo` hook (plantillas por materia en TramitadorStepper)
+- TipoSocial extendido a `'SA' | 'SL' | 'SLU' | 'SAU'` + migration 000014
+- Tab "Modelos de acuerdo" en Plantillas.tsx con filtro por materia
+- **342/342 tests, tsc 0 errors, build clean**
+
+### Motor v2.1 — Expansión LSC ✅ COMPLETADO (2026-04-20)
+
+8 commits, 352/352 tests:
+
+- `AdoptionMode` += `CO_APROBACION` + `SOLIDARIO`; `TipoActa` += `ACTA_ORGANO_ADMIN`
+- `CoAprobacionConfig`, `SolidarioConfig`, `ExecutionMode` (migration 000016: `execution_mode JSONB` en `agreements`)
+- 3 nuevas tablas SQL: `pactos_parasociales`, `pacto_clausulas`, `pacto_evaluacion_results` (WORM) — migration 000015
+- 12 nuevos rule packs seeded (28 total) — migration 000017
+- `evaluarCoAprobacion()` + `evaluarSolidario()` en `votacion-engine.ts`
+- Orquestador flujos D (CO_APROBACION) y E (SOLIDARIO)
+- Seed `PACTO_FUNDACION_ARGA_2024` (3 cláusulas: VETO operaciones estructurales, CONSENTIMIENTO_INVERSOR capital, MAYORIA_REFORZADA_PACTADA 75% vinculadas) — migration 000018
+- 10 tests CO-01..CO-06 + SO-01..SO-04
+- `docs/contratos/variables-plantillas-v1.1.yaml` — contrato 49 variables (4 fuentes)
+- `usePactosParasociales` hook (`usePactosVigentes` + `usePactosParasociales`)
+
+**Tests: 352/352 pass, tsc 0 errors, build clean.**
+
+### Próximos — Sprint F (multi-jurisdicción)
+
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
 
 **Documentos de referencia (rutas absolutas — NO están en este repo):**
@@ -582,6 +614,9 @@ src/
     useBoardPackData.ts             B6   9 parallel queries + DL-2 cotizada logic
     useQTSPSign.ts                  A5   QES signing hook
     useQTSPVerification.ts          T22  Trust Center verification
+    useERDSNotification.ts          D3   ERDS certified notification hook
+    useModelosAcuerdo.ts            OL2  MODELO_ACUERDO query by materia
+    usePactosParasociales.ts        D4   Pactos vigentes + hook con cláusulas
 
   components/
     SodGuard.tsx                    B2   SoD violation checker (BLOCK/WARN)
