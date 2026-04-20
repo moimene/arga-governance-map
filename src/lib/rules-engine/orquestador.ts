@@ -18,10 +18,12 @@ import type {
   ExplainNode,
   EvaluacionResult,
   EvalSeverity,
+  CoAprobacionConfig,
+  SolidarioConfig,
 } from './types';
 import { evaluarConvocatoria } from './convocatoria-engine';
 import { evaluarConstitucion } from './constitucion-engine';
-import { evaluarVotacion } from './votacion-engine';
+import { evaluarVotacion, evaluarCoAprobacion, evaluarSolidario } from './votacion-engine';
 import { evaluarDocumentacion } from './documentacion-engine';
 import { evaluarPactosParasociales, type PactoParasocial, type PactosEvalInput, type PactosEvalOutput } from './pactos-engine';
 
@@ -45,6 +47,8 @@ export function determinarAdoptionMode(
     'NO_SESSION',
     'UNIPERSONAL_SOCIO',
     'UNIPERSONAL_ADMIN',
+    'CO_APROBACION',
+    'SOLIDARIO',
   ]
 ): AdoptionMode {
   // Caso 1: Decisión socio único en Junta General
@@ -442,6 +446,166 @@ export function evaluarAcuerdoCompleto(
       allBlockingIssues.push(...resultDoc.blocking_issues);
       allWarnings.push(...resultDoc.warnings);
 
+      if (resultDoc.severity === 'BLOCKING') {
+        ok = false;
+      }
+    }
+  }
+  // ===== FLUJO D: CO-APROBACIÓN (k-de-n administradores sin sesión formal) =====
+  else if (adoptionMode === 'CO_APROBACION') {
+    path = 'C'; // reuse path 'C' (sin sesión) for reporting
+
+    const pathNodeD: ExplainNode = {
+      regla: 'Flujo D: Co-aprobación k-de-n',
+      fuente: 'ESTATUTOS',
+      resultado: 'OK',
+      mensaje: 'Evaluación de acuerdo en modo co-aprobación sin sesión formal'
+    };
+    allExplain.push(pathNodeD);
+
+    // Skip convocatoria y constitución
+    const skipConvD: EvaluacionResult = {
+      etapa: 'convocatoria_skip',
+      ok: true,
+      severity: 'OK',
+      explain: [{
+        regla: 'skip_convocatoria_co_aprobacion',
+        fuente: 'ESTATUTOS',
+        resultado: 'OK',
+        mensaje: 'Convocatoria no requerida en modo CO_APROBACION',
+      }],
+      blocking_issues: [],
+      warnings: [],
+    };
+    etapas.push(skipConvD);
+    allExplain.push(...skipConvD.explain);
+
+    const skipConstD: EvaluacionResult = {
+      etapa: 'constitucion_skip',
+      ok: true,
+      severity: 'OK',
+      explain: [{
+        regla: 'skip_constitucion_co_aprobacion',
+        fuente: 'ESTATUTOS',
+        resultado: 'OK',
+        mensaje: 'Constitución no requerida en modo CO_APROBACION',
+      }],
+      blocking_issues: [],
+      warnings: [],
+    };
+    etapas.push(skipConstD);
+    allExplain.push(...skipConstD.explain);
+
+    // Evaluate co-aprobación
+    if (inputs.votacion) {
+      const resultVot = evaluarVotacion(inputs.votacion, packs, overrides);
+      etapas.push(resultVot);
+      allExplain.push(...resultVot.explain);
+      allBlockingIssues.push(...resultVot.blocking_issues);
+      allWarnings.push(...resultVot.warnings);
+
+      if (resultVot.severity === 'BLOCKING') {
+        ok = false;
+        return {
+          ok,
+          adoptionMode,
+          path,
+          etapas,
+          explain: allExplain,
+          blocking_issues: allBlockingIssues,
+          warnings: allWarnings,
+        };
+      }
+    }
+
+    // Documentación: ACTA_DECISION_CONJUNTA
+    if (inputs.documentacion) {
+      const resultDoc = evaluarDocumentacion(inputs.documentacion, packs);
+      etapas.push(resultDoc);
+      allExplain.push(...resultDoc.explain);
+      allBlockingIssues.push(...resultDoc.blocking_issues);
+      allWarnings.push(...resultDoc.warnings);
+      if (resultDoc.severity === 'BLOCKING') {
+        ok = false;
+      }
+    }
+  }
+  // ===== FLUJO E: SOLIDARIO (administrador solidario actúa individualmente) =====
+  else if (adoptionMode === 'SOLIDARIO') {
+    path = 'B'; // reuse path 'B' (unipersonal-like) for reporting
+
+    const pathNodeE: ExplainNode = {
+      regla: 'Flujo E: Administrador solidario',
+      fuente: 'LEY',
+      referencia: 'art. 233.1 LSC',
+      resultado: 'OK',
+      mensaje: 'Evaluación de acuerdo en modo administrador solidario'
+    };
+    allExplain.push(pathNodeE);
+
+    // Skip convocatoria y constitución
+    const skipConvE: EvaluacionResult = {
+      etapa: 'convocatoria_skip',
+      ok: true,
+      severity: 'OK',
+      explain: [{
+        regla: 'skip_convocatoria_solidario',
+        fuente: 'LEY',
+        referencia: 'art. 233.1 LSC',
+        resultado: 'OK',
+        mensaje: 'Convocatoria no requerida en modo SOLIDARIO',
+      }],
+      blocking_issues: [],
+      warnings: [],
+    };
+    etapas.push(skipConvE);
+    allExplain.push(...skipConvE.explain);
+
+    const skipConstE: EvaluacionResult = {
+      etapa: 'constitucion_skip',
+      ok: true,
+      severity: 'OK',
+      explain: [{
+        regla: 'skip_constitucion_solidario',
+        fuente: 'LEY',
+        resultado: 'OK',
+        mensaje: 'Constitución no requerida en modo SOLIDARIO',
+      }],
+      blocking_issues: [],
+      warnings: [],
+    };
+    etapas.push(skipConstE);
+    allExplain.push(...skipConstE.explain);
+
+    // Evaluate solidario
+    if (inputs.votacion) {
+      const resultVot = evaluarVotacion(inputs.votacion, packs, overrides);
+      etapas.push(resultVot);
+      allExplain.push(...resultVot.explain);
+      allBlockingIssues.push(...resultVot.blocking_issues);
+      allWarnings.push(...resultVot.warnings);
+
+      if (resultVot.severity === 'BLOCKING') {
+        ok = false;
+        return {
+          ok,
+          adoptionMode,
+          path,
+          etapas,
+          explain: allExplain,
+          blocking_issues: allBlockingIssues,
+          warnings: allWarnings,
+        };
+      }
+    }
+
+    // Documentación: ACTA_ORGANO_ADMIN
+    if (inputs.documentacion) {
+      const resultDoc = evaluarDocumentacion(inputs.documentacion, packs);
+      etapas.push(resultDoc);
+      allExplain.push(...resultDoc.explain);
+      allBlockingIssues.push(...resultDoc.blocking_issues);
+      allWarnings.push(...resultDoc.warnings);
       if (resultDoc.severity === 'BLOCKING') {
         ok = false;
       }
