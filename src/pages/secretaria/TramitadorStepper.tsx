@@ -3,6 +3,7 @@ import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById } from "@/hooks/useAgreementsList";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
+import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
 
 const STEPS: StepDef[] = [
   {
@@ -44,6 +45,11 @@ export default function TramitadorStepper() {
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
     selectedAgreement?.agreement_kind
   );
+
+  const [selectedModeloId, setSelectedModeloId] = useState<string | null>(null);
+
+  const materia = selectedAgreement?.agreement_kind ?? "";
+  const { data: modelos = [], isLoading: modelosLoading } = useModelosAcuerdo(materia);
 
   const [instrumentData, setInstrumentData] = useState({
     notary: "",
@@ -165,6 +171,74 @@ export default function TramitadorStepper() {
           Plazo de inscripción: {rulePackData.payload.plazoInscripcion} días
         </div>
       )}
+
+      {/* Modelo de acuerdo */}
+      <div className="border border-[var(--g-border-subtle)] p-4 space-y-3"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <div className="text-sm font-semibold text-[var(--g-text-primary)]">
+          Modelo de acuerdo (referencia)
+        </div>
+
+        {modelosLoading ? (
+          <div className="flex items-center gap-2 text-sm text-[var(--g-text-secondary)]">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Cargando modelos...
+          </div>
+        ) : modelos.length === 0 ? (
+          <div className="text-xs text-[var(--g-text-secondary)] px-3 py-2 bg-[var(--g-surface-muted)]"
+            style={{ borderRadius: "var(--g-radius-sm)" }}
+          >
+            Sin modelo disponible para esta materia. Pendiente Oleada 2 (legal).
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {modelos.map((m) => (
+              <label key={m.id} className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modelo_acuerdo"
+                  value={m.id}
+                  checked={selectedModeloId === m.id}
+                  onChange={() => setSelectedModeloId(m.id)}
+                  className="mt-0.5 accent-[var(--g-brand-3308)]"
+                />
+                <div className="flex-1">
+                  <span className="text-sm text-[var(--g-text-primary)]">
+                    {m.contenido_template ?? m.materia_acuerdo}
+                  </span>
+                  {m.referencia_legal && (
+                    <span className="ml-2 text-xs text-[var(--g-text-secondary)]">
+                      ({m.referencia_legal})
+                    </span>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {selectedModeloId && (() => {
+          const modelo = modelos.find((m) => m.id === selectedModeloId);
+          return modelo?.capa1_inmutable ? (
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-[var(--g-text-secondary)] uppercase tracking-wide">
+                Texto del modelo
+              </div>
+              <textarea
+                readOnly
+                rows={6}
+                value={modelo.capa1_inmutable}
+                className="w-full px-3 py-2 text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)] resize-none"
+                style={{ borderRadius: "var(--g-radius-sm)", fontFamily: "monospace" }}
+              />
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                El texto puede ser editado en la pantalla de redacción del acuerdo.
+              </p>
+            </div>
+          ) : null;
+        })()}
+      </div>
 
       {rulesLoading && (
         <div className="flex items-center gap-2 py-4 text-sm text-[var(--g-text-secondary)]">

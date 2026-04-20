@@ -186,7 +186,10 @@ export function checkNoticePeriodByType(params: {
   meetingDate: string;       // ISO date
   jurisdiction: string;      // 'ES' | 'BR' | 'MX' | 'PT'
   convocationType: string;   // 'ORDINARIA' | 'EXTRAORDINARIA' | 'UNIVERSAL'
+  tipoSocial?: string;       // 'SA' | 'SL' | 'SLU' | 'SAU'
 }): boolean {
+  // SLU/SAU: no convocatoria requerida (art. 173.3 LSC — solo comunicar al RM)
+  if (params.tipoSocial === 'SLU' || params.tipoSocial === 'SAU') return true;
   if (params.convocationType === "UNIVERSAL") return true; // no requiere plazo
   const today = new Date();
   const meeting = new Date(params.meetingDate);

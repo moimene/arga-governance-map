@@ -26,10 +26,28 @@ const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; i
   ACTIVA: { label: "Archivar", nextState: "ARCHIVADA", icon: Archive },
 };
 
+const MATERIAS_ACUERDO = [
+  'APROBACION_CUENTAS',
+  'DISTRIBUCION_DIVIDENDOS',
+  'NOMBRAMIENTO_CONSEJERO',
+  'CESE_CONSEJERO',
+  'DELEGACION_FACULTADES',
+  'MODIFICACION_ESTATUTOS',
+  'AUMENTO_CAPITAL',
+  'REDUCCION_CAPITAL',
+  'OPERACION_VINCULADA',
+  'NOMBRAMIENTO_AUDITOR',
+  'APROBACION_PLAN_NEGOCIO',
+  'AUTORIZACION_GARANTIA',
+  'RATIFICACION_ACTOS',
+];
+
 export default function Plantillas() {
   const { data, isLoading } = usePlantillasProtegidas();
   const updateEstado = useUpdateEstadoPlantilla();
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
+  const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>('proceso');
+  const [filterMateria, setFilterMateria] = useState<string>('');
 
   const handleTransicion = (plantilla: PlantillaProtegidaRow) => {
     const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
@@ -49,6 +67,14 @@ export default function Plantillas() {
     );
   };
 
+  const procesoDatos = (data ?? []).filter((p) => p.tipo !== 'MODELO_ACUERDO');
+  const modelosDatos = (data ?? []).filter((p) => p.tipo === 'MODELO_ACUERDO');
+  const displayData = activeTab === 'proceso' ? procesoDatos : modelosDatos;
+
+  const filteredData = activeTab === 'modelos' && filterMateria
+    ? displayData.filter((p) => (p as any).materia_acuerdo === filterMateria)
+    : displayData;
+
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       {/* Encabezado */}
@@ -65,6 +91,42 @@ export default function Plantillas() {
         </p>
       </div>
 
+      {/* Tab bar */}
+      <div className="mb-5 flex gap-1 border-b border-[var(--g-border-subtle)]">
+        {(['proceso', 'modelos'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => { setActiveTab(tab); setSelected(null); setFilterMateria(''); }}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'border-b-2 border-[var(--g-brand-3308)] text-[var(--g-brand-3308)]'
+                : 'text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)]'
+            }`}
+          >
+            {tab === 'proceso' ? 'Plantillas de proceso' : 'Modelos de acuerdo'}
+          </button>
+        ))}
+      </div>
+
+      {/* Materia filter (Modelos tab only) */}
+      {activeTab === 'modelos' && (
+        <div className="mb-4 flex items-center gap-3">
+          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia:</label>
+          <select
+            value={filterMateria}
+            onChange={(e) => setFilterMateria(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+            style={{ borderRadius: 'var(--g-radius-md)' }}
+          >
+            <option value="">Todas</option>
+            {MATERIAS_ACUERDO.map((m) => (
+              <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Master-Detail Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
         {/* Tabla Master */}
@@ -76,10 +138,10 @@ export default function Plantillas() {
             <thead>
               <tr className="bg-[var(--g-surface-subtle)]">
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                  Tipo
+                  {activeTab === 'modelos' ? 'Materia' : 'Tipo'}
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                  Materia
+                  {activeTab === 'modelos' ? 'Variante' : 'Materia'}
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   Jurisdicción
@@ -100,14 +162,16 @@ export default function Plantillas() {
                     Cargando…
                   </td>
                 </tr>
-              ) : !data || data.length === 0 ? (
+              ) : filteredData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                    Sin plantillas protegidas.
+                    {activeTab === 'modelos'
+                      ? 'No hay modelos de acuerdo. Pendiente entrega equipo legal (30/04/2026).'
+                      : 'Sin plantillas protegidas.'}
                   </td>
                 </tr>
               ) : (
-                data.map((plantilla) => (
+                filteredData.map((plantilla) => (
                   <tr
                     key={plantilla.id}
                     onClick={() => setSelected(plantilla)}
@@ -116,10 +180,14 @@ export default function Plantillas() {
                     }`}
                   >
                     <td className="px-5 py-3 text-sm font-medium text-[var(--g-text-primary)]">
-                      {plantilla.tipo}
+                      {activeTab === 'modelos'
+                        ? ((plantilla as any).materia_acuerdo ?? plantilla.tipo)
+                        : plantilla.tipo}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
-                      {plantilla.materia || "—"}
+                      {activeTab === 'modelos'
+                        ? (plantilla.contenido_template?.substring(0, 40) ?? '—')
+                        : (plantilla.materia || "—")}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {plantilla.jurisdiccion}
@@ -170,11 +238,11 @@ export default function Plantillas() {
                   </div>
                 </div>
 
-                {/* Materia */}
+                {/* Materia / materia_acuerdo */}
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Materia</div>
                   <div className="mt-1 text-sm text-[var(--g-text-primary)]">
-                    {selected.materia || "—"}
+                    {(selected as any).materia_acuerdo ?? selected.materia ?? "—"}
                   </div>
                 </div>
 
@@ -225,6 +293,11 @@ export default function Plantillas() {
                 {/* Capa 1 Inmutable */}
                 {selected.capa1_inmutable && (
                   <div className="mb-4">
+                    {activeTab === 'modelos' && (
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+                        Variables del sistema
+                      </div>
+                    )}
                     <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
                       Capa 1 (Inmutable)
                     </div>
@@ -249,6 +322,33 @@ export default function Plantillas() {
                           <span className="font-mono font-medium">{(v as any).variable}</span>
                           {" — "}
                           <span className="text-[10px]">{(v as any).fuente}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Capa 3 Editables (Modelos de acuerdo) */}
+                {(selected as any).capa3_editables && Array.isArray((selected as any).capa3_editables) && (selected as any).capa3_editables.length > 0 && (
+                  <div className="mb-4">
+                    {activeTab === 'modelos' && (
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+                        Campos del secretario
+                      </div>
+                    )}
+                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Campos del secretario (Capa 3)
+                    </div>
+                    <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
+                      {((selected as any).capa3_editables as any[]).map((v, i) => (
+                        <div key={i} className="rounded bg-[var(--g-surface-muted)] px-2 py-1">
+                          <span className="font-mono font-medium">{v.campo}</span>
+                          {v.obligatoriedad === 'OBLIGATORIO' && (
+                            <span className="ml-2 text-[var(--status-error)]">*</span>
+                          )}
+                          {v.descripcion && (
+                            <span className="ml-2 text-[10px] text-[var(--g-text-secondary)]">{v.descripcion}</span>
+                          )}
                         </div>
                       ))}
                     </div>

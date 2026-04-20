@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Bell, BookOpen, FileSignature,
   Users, FileText, Library, ChevronLeft, Gavel,
-  ScrollText, Building2, Layers, Briefcase, Calendar,
+  ScrollText, Building2, Layers, Briefcase, Calendar, Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/secretaria/GlobalSearch";
@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { label: "Plantillas",               to: "/secretaria/plantillas",               icon: FileText },
   { label: "Gestor plantillas",        to: "/secretaria/gestor-plantillas",        icon: Layers },
   { label: "Calendario",               to: "/secretaria/calendario",               icon: Calendar },
+  { label: "Multi-jurisdicción",        to: "/secretaria/multi-jurisdiccion",       icon: Globe },
 ];
 
 export function SecretariaLayout() {

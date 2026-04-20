@@ -67,6 +67,7 @@ const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerd
 const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDocumentoStepper"));
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
+const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
 const GrcLayout = lazy(() =>
@@ -187,6 +188,7 @@ const App = () => (
                   <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
                   <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
+                  <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
                 <Route
