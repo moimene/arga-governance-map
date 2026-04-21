@@ -911,6 +911,11 @@ $$ LANGUAGE plpgsql;
 -- = public mitigates search-path-based SECURITY DEFINER risks.
 -- ---------------------------------------------------------------------
 
+-- NOTE: orchestrator runs as caller (NOT SECURITY DEFINER). If T12 adds
+-- RLS to `censo_snapshot`, this INSERT will start being filtered/denied
+-- silently unless (a) this function is promoted to SECURITY DEFINER, or
+-- (b) the caller's role has an INSERT policy satisfying the predicate.
+-- The trigger IS SECURITY DEFINER because audit_log already has RLS.
 CREATE OR REPLACE FUNCTION fn_crear_censo_snapshot(
   p_meeting_id UUID,
   p_session_kind TEXT,
@@ -948,6 +953,17 @@ BEGIN
   FROM parte_votante_current pv
   WHERE pv.entity_id = p_entity_id
     AND pv.body_id IS NOT DISTINCT FROM p_body_id
+    -- Snapshot scope mapping (LSC-aligned):
+    --   ECONOMICO  → capital-weighted sources (JGA ordinarias, votación
+    --                por participación social).
+    --   POLITICO   → position-weighted sources (CdA, comisiones, voto
+    --                por cargo).
+    --   UNIVERSAL  → junta universal SA/SL (LSC art. 178): todos los
+    --                socios presentes y de acuerdo. El cómputo sigue
+    --                siendo sobre capital social (igual que ECONOMICO);
+    --                el elemento universal es el consentimiento previo,
+    --                no la base de cálculo. Por eso filtramos CAPITAL,
+    --                no un set distinto de source_type.
     AND (
       (p_snapshot_type = 'ECONOMICO'  AND pv.source_type = 'CAPITAL')
       OR (p_snapshot_type = 'POLITICO'  AND pv.source_type = 'CARGO')
@@ -979,10 +995,15 @@ BEGIN
 
   -- Chain the hash from the latest audit_log row for this tenant (same
   -- pattern as fn_audit_worm). GENESIS is used when no prior row exists.
+  -- `id DESC` is a deterministic tiebreaker when two rows share
+  -- `created_at` at microsecond resolution (possible under fast bulk
+  -- inserts). NOTE: concurrent inserts from two tx's still race on this
+  -- SELECT and can fork the chain — known app-wide limitation inherited
+  -- from fn_audit_worm; not fixed here.
   SELECT hash_sha512 INTO v_prev_hash
   FROM audit_log
   WHERE tenant_id = NEW.tenant_id
-  ORDER BY created_at DESC
+  ORDER BY created_at DESC, id DESC
   LIMIT 1;
 
   v_new_hash := encode(
