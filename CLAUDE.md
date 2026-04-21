@@ -519,6 +519,80 @@ type ComplianceResult = {
 
 ---
 
+## Modelo canónico de identidad (Fase 0+1 — completado 2026-04-21)
+
+### 8 tablas del modelo canónico
+
+| Tabla | Responsabilidad |
+|---|---|
+| `entities` (extendida) | sociedad + `person_id` FK + `tipo_organo_admin` |
+| `entity_capital_profile` | capital social (escriturado, desembolsado, títulos, nominal) con historial |
+| `share_classes` | clases de acciones/participaciones por entidad |
+| `condiciones_persona` | rol de persona en sociedad/órgano (SOCIO, CONSEJERO, ADMIN_*, etc.) |
+| `capital_holdings` | libro de socios con `share_class_id` FK y `is_treasury` |
+| `representaciones` | PJ_PERMANENTE + JUNTA_PROXY + CONSEJO_DELEGACION |
+| `parte_votante_current` | proyección regenerable (voting_weight + denominator_weight separados) |
+| `censo_snapshot` | inmutable, WORM, tipos ECONOMICO/POLITICO/UNIVERSAL |
+
+### Principio de acceso
+
+- **Fase 0+1 (actual):** `mandates` sigue siendo tabla; el backfill creó datos en `condiciones_persona` y `capital_holdings`. NO hay dual-write todavía.
+- **Fase 2 (futuro):** dual-write bidireccional `mandates ↔ nuevo modelo` con `pg_trigger_depth()` guard.
+- **Fase 3 (futuro):** motor LSC lee solo `censo_snapshot` vía `src/lib/rules-engine/snapshot-loader.ts`.
+- **Fase 4 (futuro):** hooks frontend migrados por módulo.
+- **Fase 5 (futuro):** `mandates` pasa a VIEW read-only.
+
+### Reglas de oro (vigentes ya en Fase 0+1)
+
+1. `entity_capital_profile` tiene como máximo **una fila VIGENTE por entidad** (UNIQUE parcial).
+2. `condiciones_persona` usa **`COALESCE(body_id, sentinel)`** en su índice único (`ux_condicion_vigente`), no índices parciales separados.
+3. `capital_holdings.is_treasury = true` implica `voting_weight = 0` y `denominator_weight = 0` en la proyección.
+4. `censo_snapshot` es **inmutable**: triggers BEFORE UPDATE/DELETE lanzan excepción con mensaje "inmutable".
+5. Todo `censo_snapshot` rellena `audit_worm_id` automáticamente vía trigger BEFORE INSERT.
+6. `persons.person_type` está restringido por CHECK a `('PF'|'PJ')` — el dominio "persona jurídica" se mapea a `'PJ'`, **no** a `'JURIDICA'`.
+
+### Estructura de capital demo (post-T17)
+
+```
+Fundación ARGA (G-99999901)
+   └─100%→ Cartera ARGA S.L.U. (B-99999902) [entity 00000000-...-020]
+              ├─69.69%→ ARGA Seguros S.A. (A-99999903) [entity 6d7ed736-...]
+              └─30.31% restante: Mercado libre (X-99999904)
+```
+
+**Constantes en `src/test/helpers/supabase-test-client.ts`:**
+- `DEMO_ENTITY_ARGA = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (no el `00000000-...-010` que el plan original asumía — ese UUID no existe en Cloud)
+- `DEMO_ENTITY_CARTERA = "00000000-0000-0000-0000-000000000020"`
+- `DEMO_PJ_FUNDACION_TAX_ID = "G-99999901"`
+- `DEMO_PJ_CARTERA_TAX_ID = "B-99999902"`
+- `DEMO_PJ_ARGA_SEGUROS_TAX_ID = "A-99999903"`
+- `DEMO_PJ_MERCADO_LIBRE_TAX_ID = "X-99999904"`
+
+### Scripts disponibles
+
+- `bun run scripts/seed-demo-arga-canonico.ts` — seed demo ARGA (cadena capital Fundación→Cartera→ARGA + Mercado Libre free float). Idempotente.
+- `bun run scripts/validate-model-bootstrap.ts` — valida las 6 paridades post-bootstrap (entity→PJ, capital_profile VIGENTE, mandates↔holdings, mandates↔condiciones, ARGA suma 100%). Read-only, exit code 0/1.
+
+### Tests
+
+- `src/test/schema/canonical-model.test.ts` — estructura tablas + constraints (T5–T8)
+- `src/test/schema/canonical-triggers.test.ts` — inmutabilidad censo_snapshot (T9)
+- `src/test/schema/canonical-functions.test.ts` — fn_refresh + fn_crear_snapshot (T10–T11)
+- `src/test/schema/canonical-bootstrap.test.ts` — bootstrap PJ + backfill T15/T16 + seed ARGA T17
+- `src/test/schema/canonical-rls.test.ts` — RLS tenant scoping (T12)
+
+### Limitaciones conocidas del Cloud project
+
+- **`execute_sql` RPC no está expuesto** en este proyecto. Todos los tests y scripts del modelo canónico usan PostgREST + joins client-side (Set-based keys, reduce-for-sum). No usar `supabase.rpc("execute_sql", ...)` en código nuevo — siempre PostgREST o `mcp__53aea412-..._execute_sql` (solo para orquestación fuera de runtime).
+- **`mandates` status en Cloud es 'Activo' (ES)**, no 'ACTIVE'. Backfill de T15 normaliza via `UPPER(COALESCE(m.status,'ACTIVO')) IN ('ACTIVE','ACTIVO')`.
+- **`mandates.role` en Cloud es texto libre** con mayúsculas mixtas y paréntesis (ej. "Consejera Delegada (CEO)", "presidente", "Secretaria no Consejera"). Backfill de T15 normaliza via `LOWER(m.role) LIKE '%pattern%'` con VICEPRESIDENTE evaluado antes que PRESIDENTE.
+
+### Deuda WORM intencional
+
+`censo_snapshot` es append-only. El sentinel insertado por los tests T9 (`meeting_id='eeeeeeee-0000-0000-0000-000000000001'`) persiste para siempre — cualquier `DELETE` del propio test fallaría por trigger inmutable. Si hiciera falta purgar (reset, T14 re-seed): `SET LOCAL session_replication_role = replica;` + DELETE en sesión admin fuera de cualquier test (desactiva triggers temporalmente **solo** para la purga).
+
+---
+
 ## Convenciones de hooks Secretaría
 
 ```typescript
