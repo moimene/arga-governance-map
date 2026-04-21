@@ -452,6 +452,68 @@ A4–A6: Integración motor en UI:
 
 **Tests: 352/352 pass, tsc 0 errors, build clean.**
 
+### Sprint MVP Gestión Societaria F1-F10 ✅ COMPLETADO (2026-04-21)
+
+Pipeline completo de generación de actas + certificaciones QTSP con gate
+hash basado en censo WORM. Plan: `docs/superpowers/plans/2026-04-21-gestion-societaria-mvp-plan.md`.
+
+**Migraciones aplicadas en Cloud (000023–000029):**
+- `000023` — capability_matrix + authority_evidence (schema base F1)
+- `000024` — minutes + certifications extensiones: `body_id`, `entity_id`, `snapshot_id`, `snapshot_hash`, `gate_hash`, `authority_evidence_id`, `tsq_token bytea`
+- `000025..000026` — sociedades/personas (sprint paralelo — no MVP F1-F10)
+- `000027` — `fn_generar_acta` + `fn_generar_certificacion` con gate_hash SHA-256(snapshot_hash‖resultado_hash)
+- `000028` — `fn_firmar_certificacion` (QES stub) + `fn_emitir_certificacion` (evidence bundle URI)
+- `000029` — backfill `minutes.body_id` + `minutes.entity_id` para actas legacy (desde `meetings → governing_bodies`). Regresión detectada en F10.2: sin esta propagación, `EmitirCertificacionButton` no renderizaba en ActaDetalle.
+
+**RPCs del pipeline QTSP:**
+- `fn_generar_acta(p_meeting_id, p_content, p_snapshot_id) → uuid` (F8.1)
+- `fn_generar_certificacion(p_minute_id, p_tipo, p_agreements_certified text[], p_certificante_role, p_visto_bueno_persona_id) → uuid` (F8.1)
+- `fn_firmar_certificacion(p_certification_id, p_qtsp_token, p_tsq_token) → void` (F8.2)
+- `fn_emitir_certificacion(p_certification_id) → text` (F8.2) — devuelve URI del evidence bundle
+
+**Componente F9:**
+- `src/components/secretaria/EmitirCertificacionButton.tsx` — ejecuta los 3 pasos en cadena, precarga Vº Bº con `usePresidenteVigente`, oculto si `useHasCapability(userRole, "CERTIFICATION")` es false. Demo default `userRole="SECRETARIO"` hasta sprint de auth real.
+- `src/hooks/useAuthorityEvidence.ts` — añadido `usePresidenteVigente(entityId, bodyId?)` para precargar Vº Bº en SA.
+- `src/hooks/useActas.ts` — añadido `useAgreementIdsForMinute(minuteId)` + extendido `ActaRow` con `body_id` + `entity_id`.
+- `src/pages/secretaria/ActaDetalle.tsx` — botón montado con guard `id && acta.entity_id`.
+
+**Hook `useCapabilityMatrix`:**
+- `useCapabilityMatrix()` — TanStack Query con staleTime 5 min.
+- `useHasCapability(role, action)` — helper sin fetch adicional.
+
+**Desviaciones del plan vs schema real (corregidas inline):**
+1. `meetings.entity_id` no existe → JOIN con `governing_bodies` para resolver
+2. `authority_evidence` usa `cargo`/`estado='VIGENTE'`, NO `role`/`valido_hasta`
+3. `censo_snapshot` no tiene `hash_snapshot` → derivarlo de `audit_log.hash_sha512` vía `audit_worm_id`
+4. `audit_log` usa `object_type`/`object_id`/`delta`, NO `entity`/`entity_id`/`payload`
+5. `evidence_bundles` no tiene `storage_uri` → sintetizar `evidence_bundle:<id>@<manifest_hash>`
+6. `certifications.tsq_token` es `bytea` no `text` → `decode(p_tsq_token, 'base64')::bytea` en RPC
+
+**Tests de schema (`src/test/schema/rpcs-acta-cert.test.ts`):**
+Probes de existencia vs Cloud para las 4 RPCs — aceptan cualquier error que NO sea `function does not exist`. 4/4 pass.
+
+**Estado Cloud post-F10.1 verificado vía MCP:**
+- `authority_evidence` VIGENTE en ARGA Seguros: 4 filas (PRESIDENTE × 2, SECRETARIO × 2)
+- `capability_matrix`: 15 filas (5 roles × 3 acciones SNAPSHOT/VOTE/CERTIFICATION, todos con `reason` jurídica anotada)
+- 6/6 paridad modelo canónico OK (entities_sin_pj=0, pj_mal_tipificados=0, entities_sin_profile_vigente=0, mandates_sin_holdings=0, mandates_sin_condiciones=0, ARGA cap table=100.00%)
+- `minutes` 2/2 con `body_id` + `entity_id` populados (post-000029)
+
+**Commits principales:**
+- `faeca5a` — F1 capability_matrix + authority_evidence + extensiones minutes/certifications
+- `5d052bc` — F8.1 fn_generar_acta + fn_generar_certificacion con gate hash
+- `d29dba5` — F8.2 fn_firmar_certificacion + fn_emitir_certificacion
+- `00df80c` — F9 botón Emitir certificación con pipeline QTSP completo
+- `e2daaab` — F10.1 seed demo ARGA coherente con autoridad y capability_matrix
+- `f075c95` — F10.2 backfill minutes.body_id/entity_id (regresión F9 button render)
+
+**Limitaciones conocidas (no bloqueantes para demo):**
+- 2 PRESIDENTEs VIGENTEs para el mismo body_id en ARGA Seguros (drift de backfill T15 ejecutado dos veces). `usePresidenteVigente` usa `.limit(1).maybeSingle()` — devuelve un presidente determinista pero la data es inconsistente. Limpieza pendiente para sprint de hardening.
+- Actas legacy (2 demo pre-F8.1) tienen `meeting_resolutions` vacío → `p_agreements_certified = []`. La RPC acepta arrays vacíos. Actas nuevas creadas via pipeline F5→F6→F7 sí tienen resolutions.
+- `snapshot_id` NULL en actas legacy → RPC usa `COALESCE 'NO_SNAPSHOT_HASH'` como gate. Sin WORM retroactivo (intencional — preservaría la cadena).
+- `userRole="SECRETARIO"` hardcodeado en el botón F9. La integración con `useUserRole` + `auth.users` es del sprint de auth real.
+
+**Tests: 356/356 pass (59 skipped por RPC `execute_sql` no expuesto), tsc 0 errors, build clean.**
+
 ### Próximos — Sprint F (multi-jurisdicción)
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
