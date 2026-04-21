@@ -167,36 +167,47 @@ function VotacionesStep() {
               Evaluación de Mayoría (V2)
             </h3>
             {(() => {
-              const result = evaluarMayoria({
-                favor,
-                contra,
-                abstencion,
-                total: voters.length,
-              });
+              const result = evaluarMayoria(
+                {
+                  formula: 'favor > contra',
+                  fuente: 'LEY',
+                  referencia: 'art. 201 LSC',
+                },
+                {
+                  favor,
+                  contra,
+                  abstenciones: abstencion,
+                  en_blanco: 0,
+                  capital_presente: voters.length,
+                  capital_total: voters.length,
+                  total_miembros: voters.length,
+                  miembros_presentes: voters.length,
+                }
+              );
               return (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    {result.ok ? (
+                    {result.alcanzada ? (
                       <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
                     ) : (
                       <AlertTriangle className="h-4 w-4 text-[var(--status-error)]" />
                     )}
                     <span
                       className={`inline-flex px-2.5 py-1 text-[11px] font-semibold ${
-                        result.ok
+                        result.alcanzada
                           ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                           : "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
                       }`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      {result.ok ? "OK" : "RECHAZADO"}
+                      {result.alcanzada ? "OK" : "RECHAZADO"}
                     </span>
                   </div>
                   <p className="text-xs text-[var(--g-text-secondary)]">
                     <span className="font-mono">{result.formula}</span> — Fuente: LSC art. 201
                   </p>
                   <p className="text-xs text-[var(--g-text-primary)]">
-                    {result.message}
+                    {result.explain.mensaje}
                   </p>
                 </div>
               );

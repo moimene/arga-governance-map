@@ -345,7 +345,7 @@ export async function computeContentHash(text: string): Promise<string> {
  * Trigger a browser download of the DOCX buffer.
  */
 export function downloadDocx(buffer: Uint8Array, filename: string): void {
-  const blob = new Blob([buffer], {
+  const blob = new Blob([buffer.buffer as ArrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
   const url = URL.createObjectURL(blob);

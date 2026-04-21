@@ -5,7 +5,7 @@
 
 // --- Enums y tipos básicos ---
 
-export type Fuente = 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO';
+export type Fuente = 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO' | 'SISTEMA';
 
 export type TipoSocial = 'SA' | 'SL' | 'SLU' | 'SAU';
 
@@ -35,7 +35,7 @@ export type TipoActa =
   | 'ACTA_ACUERDO_ESCRITO'
   | 'ACTA_ORGANO_ADMIN';
 
-export type MateriaClase = 'ORDINARIA' | 'ESTATUTARIA' | 'ESTRUCTURAL';
+export type MateriaClase = 'ORDINARIA' | 'ESTATUTARIA' | 'ESTRUCTURAL' | 'ESPECIAL';
 
 // --- Parámetros con fuente ---
 
@@ -300,6 +300,7 @@ export interface QTSPSealResponse {
   timestamp: string;
   issuer: string;
   status: 'SEALED' | 'ERROR';
+  seal_type?: 'QSEAL' | 'TSQ';
 }
 
 export interface QTSPSignRequest {

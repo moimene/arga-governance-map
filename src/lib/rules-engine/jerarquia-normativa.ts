@@ -15,6 +15,7 @@ const FUENTE_PRIORITY: Record<Fuente, number> = {
   ESTATUTOS: 80,
   PACTO_PARASOCIAL: 60,
   REGLAMENTO: 40,
+  SISTEMA: 0,
 };
 
 export function resolverReglaEfectiva<T>(
