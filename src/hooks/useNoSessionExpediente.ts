@@ -270,6 +270,7 @@ export function useNoSessionNotificaciones(expedienteId?: string) {
  * Input: agreement_id, tipo_proceso, condicion_adopcion, and optional propuesta data
  */
 export function useCrearExpediente() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       agreement_id: string;
@@ -306,7 +307,7 @@ export function useCrearExpediente() {
     },
     onSuccess: () => {
       // Invalidate lists
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_expedientes", "list"],
       });
     },
@@ -318,6 +319,7 @@ export function useCrearExpediente() {
  * Input: expediente_id, person_id, sentido (CONSENTIMIENTO|OBJECION|OBJECION_PROCEDIMIENTO|SILENCIO)
  */
 export function useRegistrarRespuesta() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -355,7 +357,7 @@ export function useRegistrarRespuesta() {
     },
     onSuccess: (_, input) => {
       // Invalidate respuestas list
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_respuestas", input.expediente_id],
       });
     },
@@ -367,6 +369,7 @@ export function useRegistrarRespuesta() {
  * Input: expediente_id, person_id, canal
  */
 export function useEnviarNotificacion() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -415,13 +418,13 @@ export function useEnviarNotificacion() {
     },
     onSuccess: (_, input) => {
       // Invalidate related queries
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_notificaciones", input.expediente_id],
       });
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_expedientes", "byId", input.expediente_id],
       });
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_expedientes", "list"],
       });
     },
@@ -432,6 +435,7 @@ export function useEnviarNotificacion() {
  * useActualizarExpediente — Updates expediente (non-WORM fields: estado, fecha_cierre, motivo_cierre)
  */
 export function useActualizarExpediente() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -457,10 +461,10 @@ export function useActualizarExpediente() {
       return data as NoSessionExpedienteRow;
     },
     onSuccess: (_, input) => {
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_expedientes", "byId", input.expediente_id],
       });
-      supabase.queryClient?.invalidateQueries({
+      qc.invalidateQueries({
         queryKey: ["no_session_expedientes", "list"],
       });
     },
