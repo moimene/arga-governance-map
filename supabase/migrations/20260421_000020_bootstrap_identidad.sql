@@ -137,3 +137,29 @@ WHERE m.role IS NOT NULL
 ON CONFLICT DO NOTHING;
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- Transaction 4 — T16: Backfill capital_holdings desde mandates.porcentaje_capital
+-- ---------------------------------------------------------------------------
+-- capital_participacion (opcional) → numero_titulos (CHECK >= 0, por eso
+-- COALESCE con 0). tiene_derecho_voto → voting_rights (default true si NULL).
+-- share_class_id queda NULL — el índice parcial ux_capital_holdings_vigente
+-- usa COALESCE(share_class_id, zero-uuid) para deduplicar y ON CONFLICT DO
+-- NOTHING (sin target) salta cualquier violación en re-apply.
+BEGIN;
+
+INSERT INTO capital_holdings(
+  tenant_id, entity_id, holder_person_id,
+  numero_titulos, porcentaje_capital, voting_rights, effective_from
+)
+SELECT m.tenant_id, gb.entity_id, m.person_id,
+       COALESCE(m.capital_participacion, 0),
+       m.porcentaje_capital,
+       COALESCE(m.tiene_derecho_voto, true),
+       COALESCE(m.start_date, CURRENT_DATE)
+FROM mandates m
+JOIN governing_bodies gb ON gb.id = m.body_id
+WHERE m.porcentaje_capital IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+COMMIT;

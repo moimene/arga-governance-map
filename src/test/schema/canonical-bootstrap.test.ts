@@ -130,5 +130,69 @@ describe.skipIf(!hasAdminClient())(
       });
       expect(missing).toEqual([]);
     });
+
+    // T16 — Backfill capital_holdings desde mandates.porcentaje_capital.
+    // Dos invariantes del plan: (a) cada mandate con porcentaje tiene holding
+    // equivalente; (b) la suma de porcentaje por entidad coincide entre
+    // mandates y capital_holdings (tolerancia 0.01).
+    // Tests reescritos en PostgREST (execute_sql no expuesto).
+    it("toda row de mandates con porcentaje_capital tiene capital_holdings equivalente", async () => {
+      const { data: mandates, error: mErr } = await supabaseAdmin!
+        .from("mandates")
+        .select("id, person_id, body_id, governing_bodies:body_id(entity_id)")
+        .not("porcentaje_capital", "is", null);
+      expect(mErr).toBeNull();
+
+      const { data: holdings, error: hErr } = await supabaseAdmin!
+        .from("capital_holdings")
+        .select("entity_id, holder_person_id")
+        .is("effective_to", null);
+      expect(hErr).toBeNull();
+
+      const holdingKeys = new Set(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (holdings ?? []).map((h: any) => `${h.holder_person_id}|${h.entity_id}`)
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const missing = (mandates ?? []).filter((m: any) => {
+        const entityId = m.governing_bodies?.entity_id;
+        return !holdingKeys.has(`${m.person_id}|${entityId}`);
+      });
+      expect(missing).toEqual([]);
+    });
+
+    it("la suma de porcentaje_capital por entidad es consistente entre mandates y capital_holdings", async () => {
+      const { data: mandates, error: mErr } = await supabaseAdmin!
+        .from("mandates")
+        .select("porcentaje_capital, governing_bodies:body_id(entity_id)")
+        .not("porcentaje_capital", "is", null);
+      expect(mErr).toBeNull();
+
+      const { data: holdings, error: hErr } = await supabaseAdmin!
+        .from("capital_holdings")
+        .select("entity_id, porcentaje_capital, is_treasury")
+        .is("effective_to", null);
+      expect(hErr).toBeNull();
+
+      // Sumar por entity_id en ambos lados, luego comparar con tolerancia.
+      const mSums: Record<string, number> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const m of mandates ?? [] as any[]) {
+        const eid = m.governing_bodies?.entity_id as string | undefined;
+        if (!eid) continue;
+        mSums[eid] = (mSums[eid] ?? 0) + Number(m.porcentaje_capital);
+      }
+      const hSums: Record<string, number> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const h of holdings ?? [] as any[]) {
+        if (h.is_treasury) continue;
+        const eid = h.entity_id as string;
+        hSums[eid] = (hSums[eid] ?? 0) + Number(h.porcentaje_capital ?? 0);
+      }
+      const mismatches = Object.keys(mSums).filter(
+        (eid) => hSums[eid] !== undefined && Math.abs(mSums[eid] - hSums[eid]) > 0.01
+      );
+      expect(mismatches).toEqual([]);
+    });
   }
 );
