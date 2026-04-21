@@ -43,13 +43,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_entities_person_id
 
 -- tipo_organo_admin typed enum used by the rules engine to decide
 -- administrator regime (distinct from free-text forma_administracion).
+-- Column + CHECK are separated so the constraint has an explicit stable
+-- name (chk_entities_tipo_organo_admin) and gets an idempotency guard
+-- matching the FK pattern above. Inline CHECK would rely on the PG auto
+-- name (entities_tipo_organo_admin_check), which is not contractually
+-- stable and wouldn't be re-added if later dropped while the column
+-- already exists.
 ALTER TABLE entities
-  ADD COLUMN IF NOT EXISTS tipo_organo_admin TEXT
-  CHECK (tipo_organo_admin IN (
-    'ADMIN_UNICO',
-    'ADMIN_SOLIDARIOS',
-    'ADMIN_MANCOMUNADOS',
-    'CDA'
-  ));
+  ADD COLUMN IF NOT EXISTS tipo_organo_admin TEXT;
+
+-- Clean up the auto-named inline CHECK from the previous migration run
+-- (if present), so the final state has exactly one CHECK constraint with
+-- an explicit stable name.
+ALTER TABLE entities
+  DROP CONSTRAINT IF EXISTS entities_tipo_organo_admin_check;
+
+-- Add the explicitly named CHECK, guarded so migration is idempotent.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_entities_tipo_organo_admin'
+  ) THEN
+    ALTER TABLE entities
+      ADD CONSTRAINT chk_entities_tipo_organo_admin
+      CHECK (tipo_organo_admin IN (
+        'ADMIN_UNICO',
+        'ADMIN_SOLIDARIOS',
+        'ADMIN_MANCOMUNADOS',
+        'CDA'
+      ));
+  END IF;
+END $$;
 
 COMMIT;

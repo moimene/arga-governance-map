@@ -41,8 +41,11 @@ describe.skipIf(!hasAdminClient())(
         person_id: fakePerson,
       });
       expect(error).not.toBeNull();
+      // Must specifically be a foreign-key violation — not any DB error.
+      // The loose /violates/ match would also pass on NOT NULL / CHECK /
+      // unique violations, which would hide schema regressions.
       expect(error!.message.toLowerCase()).toMatch(
-        /foreign key|fk_entities_person_id|violates/
+        /foreign key|fk_entities_person_id/
       );
     });
 
@@ -54,8 +57,12 @@ describe.skipIf(!hasAdminClient())(
         tipo_organo_admin: "INVALID_VALUE",
       });
       expect(error).not.toBeNull();
+      // Must specifically be a CHECK violation — matches either a generic
+      // "check constraint" phrasing, our explicit constraint name, or the
+      // column name. Tightened from a bare /check|violates/ to prevent
+      // false positives from unrelated DB errors.
       expect(error!.message.toLowerCase()).toMatch(
-        /check|tipo_organo_admin|violates/
+        /check.*constraint|chk_entities_tipo_organo_admin|tipo_organo_admin/
       );
     });
 
