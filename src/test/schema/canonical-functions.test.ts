@@ -262,3 +262,183 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+// =====================================================================
+// T11: fn_crear_censo_snapshot + WORM trigger integration
+// =====================================================================
+// T11 orchestrates snapshot creation:
+//   1. fn_crear_censo_snapshot(p_meeting_id, p_session_kind, p_entity_id,
+//      p_body_id, p_snapshot_type) → UUID
+//      - Looks up tenant_id from entities(p_entity_id).
+//      - Delegates to fn_refresh_parte_votante_entity(_body) first.
+//      - INSERTs a censo_snapshot row aggregating parte_votante_current rows
+//        via jsonb_agg + SUM(denominator_weight) + COUNT(*), filtered by
+//        source_type matching p_snapshot_type (ECONOMICO↔CAPITAL,
+//        POLITICO↔CARGO, UNIVERSAL↔CAPITAL).
+//   2. trg_censo_snapshot_worm (BEFORE INSERT): writes an audit_log entry
+//      and stores the audit row id back into NEW.audit_worm_id. The hash
+//      chain follows the same shape as fn_audit_worm so the chain stays
+//      consistent across the app.
+//   3. FK fk_censo_snapshot_worm DEFERRABLE INITIALLY DEFERRED, so the FK
+//      is satisfied within the same tx when the BEFORE trigger populates
+//      NEW.audit_worm_id.
+//
+// Critical adaptation (documented in detail in the migration): the plan
+// references "audit_worm_trail" but the actual audit sink on this project
+// is "audit_log". All columns, target table, and chain hash pattern match
+// the existing fn_audit_worm. SECURITY DEFINER is required because
+// audit_log has RLS enabled with 4 policies.
+//
+// DEMO_ENTITY_ARGA latent FK debt (T14 bootstrap pending): the behavioral
+// test exercises the full path, but fn_crear_censo_snapshot's INSERT into
+// censo_snapshot.entity_id FK-fails when the entity is absent. Apply the
+// visible-soft-skip pattern established in T7/T8/T9/T10 — structural
+// verification via pg_catalog happens on the server (MCP list_migrations
+// + pg_proc probe performed before commit), and the behavioral test
+// soft-skips cleanly locally with a console.warn when entity is absent.
+//
+// CLEANUP note: censo_snapshot has T9 WORM triggers that block DELETE
+// with RAISE EXCEPTION '... inmutable ...'. Rows this test creates persist
+// forever on Cloud. Same trade-off as T9 — acceptable because rows are
+// small and distinguishable via the 11111111-* sentinel prefix.
+// =====================================================================
+describe.skipIf(!hasAdminClient())(
+  "Canonical functions — T11 fn_crear_censo_snapshot + WORM",
+  () => {
+    // T11 sentinel prefix — never collides with T5 (aaaa), T6 (bbbb),
+    // T7 (cccc), T8 (dddd), T9 (eeee), T10 (ffff). Per-task prefix convention.
+    const MEETING_ID = "11111111-0000-0000-0000-000000000001";
+    const HOLDER_PERSON_ID = "11111111-0000-0000-0000-000000000002";
+
+    let entityPresent = false;
+
+    async function ensurePerson(id: string, fullName: string) {
+      const { error } = await supabaseAdmin!
+        .from("persons")
+        .upsert(
+          {
+            id,
+            tenant_id: DEMO_TENANT,
+            full_name: fullName,
+            person_type: "PF",
+            tax_id: `TEST-${id.replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+      expect(error).toBeNull();
+    }
+
+    beforeAll(async () => {
+      if (!supabaseAdmin) return;
+      const { data: entityCheck } = await supabaseAdmin
+        .from("entities")
+        .select("id")
+        .eq("id", DEMO_ENTITY_ARGA)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T11] Skipping behavioral test — DEMO_ENTITY_ARGA absent. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+      entityPresent = true;
+
+      // Seed holder + one VIGENTE capital_holdings row so the snapshot has
+      // at least one parte_votante_current entry to aggregate.
+      await ensurePerson(HOLDER_PERSON_ID, "Test Holder T11");
+      await supabaseAdmin
+        .from("capital_holdings")
+        .delete()
+        .eq("holder_person_id", HOLDER_PERSON_ID);
+      const { error: insertErr } = await supabaseAdmin
+        .from("capital_holdings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: DEMO_ENTITY_ARGA,
+          holder_person_id: HOLDER_PERSON_ID,
+          numero_titulos: 2000,
+          porcentaje_capital: 25,
+          voting_rights: true,
+          effective_from: "2026-01-01",
+        });
+      expect(insertErr).toBeNull();
+    });
+
+    afterAll(async () => {
+      if (!supabaseAdmin) return;
+      // Narrow cleanup — remove projection rows + holdings by holder,
+      // never touch censo_snapshot (WORM, DELETE-blocked by T9 trigger).
+      await supabaseAdmin
+        .from("parte_votante_current")
+        .delete()
+        .eq("person_id", HOLDER_PERSON_ID);
+      await supabaseAdmin
+        .from("capital_holdings")
+        .delete()
+        .eq("holder_person_id", HOLDER_PERSON_ID);
+    });
+
+    it("snapshot se crea y se vincula a audit_log vía audit_worm_id", async () => {
+      if (!entityPresent) {
+        console.warn(
+          "[T11] behavioral test skipped — DEMO_ENTITY_ARGA absent. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      // Refresh the projection first (idempotent — T10 function) so the
+      // snapshot aggregation has current data. fn_crear_censo_snapshot
+      // also does this internally, but calling it explicitly here mirrors
+      // the plan's test narrative and makes the setup chain visible.
+      const { error: refreshErr } = await supabaseAdmin!.rpc(
+        "fn_refresh_parte_votante_entity",
+        { p_entity_id: DEMO_ENTITY_ARGA }
+      );
+      expect(refreshErr).toBeNull();
+
+      // Call the RPC — ECONOMICO snapshot of a MEETING session, junta
+      // scope (body_id = null), returns the new censo_snapshot.id.
+      const { data: snapshotId, error } = await supabaseAdmin!.rpc(
+        "fn_crear_censo_snapshot",
+        {
+          p_meeting_id: MEETING_ID,
+          p_session_kind: "MEETING",
+          p_entity_id: DEMO_ENTITY_ARGA,
+          p_body_id: null,
+          p_snapshot_type: "ECONOMICO",
+        }
+      );
+      expect(error).toBeNull();
+      expect(snapshotId).toBeTruthy();
+
+      // Verify snapshot row: audit_worm_id populated by BEFORE trigger,
+      // payload is the jsonb_agg array, total_partes > 0.
+      const { data: snap } = await supabaseAdmin!
+        .from("censo_snapshot")
+        .select("id, audit_worm_id, payload, total_partes")
+        .eq("id", snapshotId as string)
+        .single();
+
+      expect(snap?.audit_worm_id).toBeTruthy();
+      expect(Array.isArray(snap?.payload)).toBe(true);
+      expect((snap?.payload as unknown[]).length).toBeGreaterThan(0);
+      expect(snap?.total_partes).toBeGreaterThan(0);
+
+      // Verify the audit_log row exists and references back. action,
+      // table_name, and hash_sha512 shape-match fn_audit_worm so the
+      // chain verify function stays consistent across tables.
+      const { data: auditRow } = await supabaseAdmin!
+        .from("audit_log")
+        .select("id, action, table_name, record_id, hash_sha512")
+        .eq("id", snap!.audit_worm_id as string)
+        .single();
+
+      expect(auditRow?.action).toBe("CENSO_SNAPSHOT_CREATED");
+      expect(auditRow?.table_name).toBe("censo_snapshot");
+      expect(auditRow?.record_id).toBe(snapshotId);
+      expect(auditRow?.hash_sha512).toBeTruthy();
+    });
+  }
+);

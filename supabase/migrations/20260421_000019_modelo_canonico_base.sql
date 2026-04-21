@@ -885,4 +885,158 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ---------------------------------------------------------------------
+-- T11. fn_crear_censo_snapshot + trigger WORM integration
+-- ---------------------------------------------------------------------
+-- Orchestrates snapshot creation for a session (MEETING / NO_SESSION /
+-- UNIPERSONAL). The plan text references `audit_worm_trail` but that
+-- table does NOT exist on this project — the actual audit sink is
+-- `public.audit_log`, populated by the generic `fn_audit_worm()` trigger
+-- across the app. T11 adapts the plan's trigger to:
+--   - Target `audit_log` (NOT `audit_worm_trail`).
+--   - Use column names `action` (not event_type), `record_id` (not
+--     subject_id), `delta` (not payload), plus `table_name`.
+--   - Reuse fn_audit_worm's chain-hash shape
+--     (COALESCE(prev, 'GENESIS') || '|' || action || '|' ||
+--      table_name || '|' || record_id::text || '|' || payload::text)
+--     so the SHA-512 chain stays consistent across tables.
+--   - Use `action = 'CENSO_SNAPSHOT_CREATED'` and
+--     `delta = jsonb_build_object('new', to_jsonb(NEW))` (matching the
+--     generic INSERT payload shape fn_audit_worm writes).
+-- FK fk_censo_snapshot_worm references audit_log(id), DEFERRABLE
+-- INITIALLY DEFERRED so the BEFORE INSERT trigger can populate
+-- NEW.audit_worm_id within the same transaction.
+-- SECURITY DEFINER is required because audit_log has RLS enabled with
+-- 4 policies; match the existing fn_audit_worm pattern. SET search_path
+-- = public mitigates search-path-based SECURITY DEFINER risks.
+-- ---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION fn_crear_censo_snapshot(
+  p_meeting_id UUID,
+  p_session_kind TEXT,
+  p_entity_id UUID,
+  p_body_id UUID,
+  p_snapshot_type TEXT
+)
+RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+  v_tenant_id UUID;
+BEGIN
+  SELECT tenant_id INTO v_tenant_id FROM entities WHERE id = p_entity_id;
+
+  IF p_body_id IS NULL THEN
+    PERFORM fn_refresh_parte_votante_entity(p_entity_id);
+  ELSE
+    PERFORM fn_refresh_parte_votante_body(p_body_id);
+  END IF;
+
+  INSERT INTO censo_snapshot(
+    tenant_id, meeting_id, session_kind, entity_id, body_id,
+    snapshot_type, payload, capital_total_base, total_partes
+  )
+  SELECT
+    v_tenant_id,
+    p_meeting_id,
+    p_session_kind,
+    p_entity_id,
+    p_body_id,
+    p_snapshot_type,
+    COALESCE(jsonb_agg(to_jsonb(pv) ORDER BY pv.person_id), '[]'::jsonb),
+    SUM(pv.denominator_weight),
+    COUNT(*)
+  FROM parte_votante_current pv
+  WHERE pv.entity_id = p_entity_id
+    AND pv.body_id IS NOT DISTINCT FROM p_body_id
+    AND (
+      (p_snapshot_type = 'ECONOMICO'  AND pv.source_type = 'CAPITAL')
+      OR (p_snapshot_type = 'POLITICO'  AND pv.source_type = 'CARGO')
+      OR (p_snapshot_type = 'UNIVERSAL' AND pv.source_type = 'CAPITAL')
+    )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- BEFORE INSERT trigger: writes an audit_log row and stores its id in
+-- NEW.audit_worm_id so the FK (deferred) is satisfied within the tx.
+-- SECURITY DEFINER + explicit search_path so audit_log RLS cannot block
+-- the trigger (matches the existing fn_audit_worm pattern).
+CREATE OR REPLACE FUNCTION trg_censo_snapshot_worm()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_audit_id UUID;
+  v_prev_hash TEXT;
+  v_payload JSONB;
+  v_new_hash TEXT;
+BEGIN
+  v_payload := jsonb_build_object('new', to_jsonb(NEW));
+
+  -- Chain the hash from the latest audit_log row for this tenant (same
+  -- pattern as fn_audit_worm). GENESIS is used when no prior row exists.
+  SELECT hash_sha512 INTO v_prev_hash
+  FROM audit_log
+  WHERE tenant_id = NEW.tenant_id
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  v_new_hash := encode(
+    digest(
+      COALESCE(v_prev_hash, 'GENESIS') || '|' ||
+      'INSERT' || '|' ||
+      'censo_snapshot' || '|' ||
+      NEW.id::text || '|' ||
+      v_payload::text,
+      'sha512'
+    ),
+    'hex'
+  );
+
+  INSERT INTO audit_log (
+    id, tenant_id, table_name, record_id, action, delta, hash_sha512, created_at
+  ) VALUES (
+    gen_random_uuid(),
+    NEW.tenant_id,
+    'censo_snapshot',
+    NEW.id,
+    'CENSO_SNAPSHOT_CREATED',
+    v_payload,
+    v_new_hash,
+    now()
+  )
+  RETURNING id INTO v_audit_id;
+
+  NEW.audit_worm_id := v_audit_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_censo_snapshot_worm ON censo_snapshot;
+CREATE TRIGGER trg_censo_snapshot_worm
+  BEFORE INSERT ON censo_snapshot
+  FOR EACH ROW EXECUTE FUNCTION trg_censo_snapshot_worm();
+
+-- FK fk_censo_snapshot_worm: idempotent add referencing audit_log(id).
+-- DEFERRABLE INITIALLY DEFERRED so the BEFORE trigger populating
+-- NEW.audit_worm_id in the same INSERT tx satisfies the FK at commit.
+ALTER TABLE censo_snapshot DROP CONSTRAINT IF EXISTS fk_censo_snapshot_worm;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'fk_censo_snapshot_worm'
+      AND conrelid = 'censo_snapshot'::regclass
+  ) THEN
+    ALTER TABLE censo_snapshot
+      ADD CONSTRAINT fk_censo_snapshot_worm
+      FOREIGN KEY (audit_worm_id)
+      REFERENCES audit_log(id)
+      DEFERRABLE INITIALLY DEFERRED;
+  END IF;
+END $$;
+
 COMMIT;
