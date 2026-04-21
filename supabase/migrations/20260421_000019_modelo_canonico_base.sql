@@ -848,7 +848,7 @@ BEGIN
       AND r.entity_id = ch.entity_id
       AND r.scope = 'ADMIN_PJ_REPRESENTANTE'
       AND (r.effective_to IS NULL OR r.effective_to >= CURRENT_DATE)
-    ORDER BY r.effective_from DESC
+    ORDER BY r.effective_from DESC, r.id DESC
     LIMIT 1
   ) rep ON true
   WHERE ch.entity_id = p_entity_id

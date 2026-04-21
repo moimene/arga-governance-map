@@ -210,6 +210,7 @@ describe.skipIf(!hasAdminClient())(
       expect(data![0].source_type).toBe("CAPITAL");
       // NUMERIC → string via PostgREST; coerce with Number() for comparison.
       expect(Number(data![0].denominator_weight)).toBeGreaterThan(0);
+      expect(Number(data![0].voting_weight)).toBeGreaterThan(0);
     });
 
     it("CA-9: is_treasury=true produce voting_weight=0 y denominator_weight=0", async () => {
