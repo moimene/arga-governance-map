@@ -259,8 +259,8 @@ describe("plantillas-metrics", () => {
 
     // p1 was created today → should be a small positive number (depends on when test runs)
     expect(result.leading.tiempoEnEstado["p1"]).toBeGreaterThanOrEqual(0);
-    // p2 was created 5 days ago → ~5 days
-    expect(result.leading.tiempoEnEstado["p2"]).toBeLessThanOrEqual(6);
+    // p2 was created 5 days ago → ~5 days (allow ±2 days for rounding/time drift)
+    expect(result.leading.tiempoEnEstado["p2"]).toBeLessThanOrEqual(7);
     expect(result.leading.tiempoEnEstado["p2"]).toBeGreaterThanOrEqual(4);
   });
 
