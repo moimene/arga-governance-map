@@ -672,7 +672,7 @@ CREATE INDEX IF NOT EXISTS idx_parte_votante_current_entity_body
   ON parte_votante_current(entity_id, body_id);
 
 -- ---------------------------------------------------------------------
--- 8. censo_snapshot — inmutable, WORM integrado (T9 — CA-7)
+-- T9. censo_snapshot — inmutable, WORM integrado (CA-7)
 -- ---------------------------------------------------------------------
 -- Append-only snapshot that freezes the voting census for a specific
 -- session (meeting / no-session / unipersonal). Once written, rows are

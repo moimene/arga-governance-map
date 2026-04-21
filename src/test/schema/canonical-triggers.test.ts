@@ -45,6 +45,31 @@ describe.skipIf(!hasAdminClient())(
     let snapshotId: string | null = null;
     let entityPresent = false;
 
+    // ---------------------------------------------------------------------
+    // WORM cleanup debt — INTENTIONAL. Do NOT add afterAll/afterEach.
+    // ---------------------------------------------------------------------
+    // censo_snapshot has BEFORE UPDATE and BEFORE DELETE triggers that raise
+    // an exception containing "inmutable" (see migration 000019, T9). That is
+    // exactly what CA-7 requires and what this file verifies — so any cleanup
+    // DELETE issued from within a test would itself be blocked by the trigger.
+    //
+    // Consequence: the row inserted by beforeAll (tenant_id = DEMO_TENANT,
+    // meeting_id = MEETING_SENTINEL = 'eeeeeeee-0000-0000-0000-000000000001')
+    // persists forever in Cloud after the first successful run. Re-runs are
+    // safe because the suite does not assume an empty table — it only asserts
+    // that UPDATE/DELETE on the freshly inserted row are rejected.
+    //
+    // If the sentinel row ever needs to be purged (e.g. T14 re-seed, schema
+    // reset, storage pressure), it MUST be done OUTSIDE triggers. Options:
+    //   - supabase-admin SQL with `SET LOCAL session_replication_role = replica;`
+    //     before DELETE ... WHERE tenant_id = DEMO_TENANT AND meeting_id =
+    //     'eeeeeeee-0000-0000-0000-000000000001';
+    //   - direct TRUNCATE censo_snapshot (wipes all rows; coordinate with T14).
+    //
+    // A future maintainer who "fixes" this by adding afterEach/afterAll will
+    // spend an hour rediscovering the trigger wins. Keep the debt visible.
+    // ---------------------------------------------------------------------
+
     beforeAll(async () => {
       if (!supabaseAdmin) return;
 
