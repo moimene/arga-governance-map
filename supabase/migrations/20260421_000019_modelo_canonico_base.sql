@@ -80,9 +80,10 @@ END $$;
 -- One entity has zero-or-one VIGENTE row (enforced by partial unique index)
 -- plus zero-or-more HISTORICO rows for audit/retrospection. Phase 1
 -- (T6+) will reference the VIGENTE row via share_classes and
--- capital_holdings. CHECK is inline (no DO $$ guard needed) because
--- CREATE TABLE IF NOT EXISTS is atomic — either the table exists with
--- all constraints or it does not.
+-- capital_holdings. The estado CHECK uses an inline named constraint so
+-- a fresh database gets a stable name from the start; the ALTER block
+-- below handles environments where the table was created before this
+-- rename (the auto-named CHECK is dropped, then the named one re-added).
 -- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS entity_capital_profile (
@@ -95,6 +96,7 @@ CREATE TABLE IF NOT EXISTS entity_capital_profile (
   numero_titulos         NUMERIC,
   valor_nominal          NUMERIC,
   estado                 TEXT        NOT NULL DEFAULT 'VIGENTE'
+                                     CONSTRAINT chk_entity_capital_profile_estado
                                      CHECK (estado IN ('VIGENTE','HISTORICO')),
   effective_from         DATE        NOT NULL,
   effective_to           DATE,
@@ -103,7 +105,11 @@ CREATE TABLE IF NOT EXISTS entity_capital_profile (
 
 -- Partial unique index: enforces at most one VIGENTE row per entity at
 -- the DB level. HISTORICO rows are unconstrained (no uniqueness), so
--- audit trails can hold multiple past states.
+-- audit trails can hold multiple past states. NOTE: the predicate is
+-- tied to the CHECK constraint vocabulary above — if a future migration
+-- extends the estado set (e.g. add 'ANULADO' or 'BORRADOR'), revisit
+-- whether those states should compete with VIGENTE for uniqueness or
+-- stay unconstrained.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_entity_capital_vigente
   ON entity_capital_profile(entity_id)
   WHERE estado = 'VIGENTE';
@@ -111,5 +117,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_entity_capital_vigente
 -- Composite index for time-series lookups (entity timeline ordering).
 CREATE INDEX IF NOT EXISTS idx_entity_capital_profile_entity
   ON entity_capital_profile(entity_id, effective_from);
+
+-- Clean up the auto-named inline CHECK from a prior migration run (if
+-- present), then add the explicitly named one so the final state has a
+-- stable constraint name matching the T2 convention. Needed because
+-- CREATE TABLE IF NOT EXISTS no-ops on existing tables — the rename
+-- can't happen via the CREATE TABLE alone in already-migrated envs.
+ALTER TABLE entity_capital_profile
+  DROP CONSTRAINT IF EXISTS entity_capital_profile_estado_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_entity_capital_profile_estado'
+  ) THEN
+    ALTER TABLE entity_capital_profile
+      ADD CONSTRAINT chk_entity_capital_profile_estado
+      CHECK (estado IN ('VIGENTE','HISTORICO'));
+  END IF;
+END $$;
 
 COMMIT;

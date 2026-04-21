@@ -11,7 +11,16 @@
  * We verify via PostgREST-compatible probes because the `execute_sql` RPC is not
  * exposed on this project.
  */
-import { describe, it, expect } from "vitest";
+
+// NOTE on CI & parallel execution:
+// These tests write to the shared Supabase Cloud demo project and
+// operate on DEMO_ENTITY_ARGA. Vitest parallelizes at file level and
+// serializes within a file, which covers same-file ordering.
+// However, two concurrent CI runs (or a CI run + a local run with
+// `.env.local`) against the same cloud project CAN contaminate each
+// other. If flakiness appears, serialize CI at the org level or
+// move to per-test sentinel UUIDs (spec amendment required).
+import { describe, it, expect, afterEach } from "vitest";
 import {
   supabaseAdmin,
   hasAdminClient,
@@ -85,6 +94,19 @@ describe.skipIf(!hasAdminClient())(
   () => {
     const entityId = DEMO_ENTITY_ARGA;
 
+    // Clean up rows for DEMO_ENTITY_ARGA after every test to keep the
+    // shared cloud entity free of leftover state even if an assertion
+    // fails between insert and explicit cleanup. Runs after the
+    // read-only probe too — harmless no-op delete.
+    afterEach(async () => {
+      if (supabaseAdmin) {
+        await supabaseAdmin
+          .from("entity_capital_profile")
+          .delete()
+          .eq("entity_id", entityId);
+      }
+    });
+
     it("entity_capital_profile table exists with required columns", async () => {
       const { error } = await supabaseAdmin!
         .from("entity_capital_profile")
@@ -95,13 +117,7 @@ describe.skipIf(!hasAdminClient())(
       expect(error).toBeNull();
     });
 
-    it("estado CHECK constraint rejects invalid values", async () => {
-      // clean slate
-      await supabaseAdmin!
-        .from("entity_capital_profile")
-        .delete()
-        .eq("entity_id", entityId);
-
+    it("chk_entity_capital_profile_estado rejects invalid estado values", async () => {
       const { error } = await supabaseAdmin!
         .from("entity_capital_profile")
         .insert({
@@ -112,18 +128,14 @@ describe.skipIf(!hasAdminClient())(
           effective_from: "2026-01-01",
         });
       expect(error).not.toBeNull();
+      // Tightened per code review: require explicit constraint name or
+      // generic "check constraint" phrasing (no bare column-name match).
       expect(error!.message.toLowerCase()).toMatch(
-        /check.*constraint|estado/
+        /chk_entity_capital_profile_estado|check.*constraint/
       );
     });
 
     it("ux_entity_capital_vigente rejects two VIGENTE rows for the same entity", async () => {
-      // clean slate
-      await supabaseAdmin!
-        .from("entity_capital_profile")
-        .delete()
-        .eq("entity_id", entityId);
-
       const { error: err1 } = await supabaseAdmin!
         .from("entity_capital_profile")
         .insert({
@@ -144,23 +156,11 @@ describe.skipIf(!hasAdminClient())(
           effective_from: "2026-06-01",
         });
       expect(err2).not.toBeNull();
-      expect(err2!.message.toLowerCase()).toMatch(
-        /ux_entity_capital_vigente|unique|duplicate/
-      );
-
-      // cleanup for next test
-      await supabaseAdmin!
-        .from("entity_capital_profile")
-        .delete()
-        .eq("entity_id", entityId);
+      // Tightened per code review: require the index name explicitly.
+      expect(err2!.message.toLowerCase()).toMatch(/ux_entity_capital_vigente/);
     });
 
     it("allows one VIGENTE + multiple HISTORICO rows for the same entity", async () => {
-      await supabaseAdmin!
-        .from("entity_capital_profile")
-        .delete()
-        .eq("entity_id", entityId);
-
       // HISTORICO — one
       const { error: errH1 } = await supabaseAdmin!
         .from("entity_capital_profile")
@@ -197,12 +197,6 @@ describe.skipIf(!hasAdminClient())(
           effective_from: "2026-01-01",
         });
       expect(errV).toBeNull();
-
-      // cleanup
-      await supabaseAdmin!
-        .from("entity_capital_profile")
-        .delete()
-        .eq("entity_id", entityId);
     });
   }
 );
