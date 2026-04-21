@@ -97,3 +97,43 @@ WHERE NOT EXISTS (
 );
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- Transaction 3 — T15: Backfill condiciones_persona desde mandates.role
+-- ---------------------------------------------------------------------------
+-- mandates.role en Cloud es texto libre con mayúsculas mixtas y
+-- paréntesis (ej. "Consejera Delegada (CEO)", "presidente",
+-- "Secretaria no Consejera"). Normalizamos al vocabulario de
+-- chk_condiciones_persona_tipo_condicion vía LIKE case-insensitive.
+-- Importante: el patrón VICEPRESIDENTE debe evaluarse ANTES que
+-- PRESIDENTE porque el primero es superstring del segundo.
+--
+-- mandates.status en Cloud es 'Activo' (ES), no 'ACTIVE' del plan.
+-- Cubrimos ambos vía UPPER().
+--
+-- ON CONFLICT DO NOTHING (sin target) salta cualquier violación del
+-- índice parcial ux_condicion_vigente — idempotente en re-apply.
+BEGIN;
+
+INSERT INTO condiciones_persona(
+  tenant_id, person_id, entity_id, body_id, tipo_condicion, estado, fecha_inicio, fecha_fin
+)
+SELECT m.tenant_id, m.person_id, gb.entity_id, m.body_id,
+       CASE
+         WHEN LOWER(m.role) LIKE '%vicepresidente%'  THEN 'VICEPRESIDENTE'
+         WHEN LOWER(m.role) LIKE '%presidente%'      THEN 'PRESIDENTE'
+         WHEN LOWER(m.role) LIKE '%secretari%'       THEN 'SECRETARIO'
+         ELSE 'CONSEJERO'
+       END,
+       CASE
+         WHEN UPPER(COALESCE(m.status, 'ACTIVO')) IN ('ACTIVE','ACTIVO') THEN 'VIGENTE'
+         ELSE 'CESADO'
+       END,
+       COALESCE(m.start_date, CURRENT_DATE),
+       m.end_date
+FROM mandates m
+JOIN governing_bodies gb ON gb.id = m.body_id
+WHERE m.role IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+COMMIT;

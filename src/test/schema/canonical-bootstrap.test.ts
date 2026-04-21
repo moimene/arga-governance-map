@@ -99,5 +99,36 @@ describe.skipIf(!hasAdminClient())(
       });
       expect(wrong).toEqual([]);
     });
+
+    // T15 — Backfill condiciones_persona desde mandates.role.
+    // Verifica que cada mandate (con role) tiene su condicion_persona
+    // equivalente. El test original del plan usaba execute_sql RPC (no
+    // disponible en este proyecto); se reescribe como join cliente-lado
+    // contra PostgREST: fetch mandates + FK-embed governing_bodies.entity_id,
+    // fetch condiciones, comparar por la clave natural (person_id, entity_id,
+    // body_id).
+    it("toda row de mandates con role tiene una condicion_persona equivalente", async () => {
+      const { data: mandates, error: mErr } = await supabaseAdmin!
+        .from("mandates")
+        .select("id, person_id, body_id, governing_bodies:body_id(entity_id)")
+        .not("role", "is", null);
+      expect(mErr).toBeNull();
+
+      const { data: cond, error: cErr } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .select("person_id, entity_id, body_id");
+      expect(cErr).toBeNull();
+
+      const condKeys = new Set(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (cond ?? []).map((c: any) => `${c.person_id}|${c.entity_id}|${c.body_id}`)
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const missing = (mandates ?? []).filter((m: any) => {
+        const entityId = m.governing_bodies?.entity_id;
+        return !condKeys.has(`${m.person_id}|${entityId}|${m.body_id}`);
+      });
+      expect(missing).toEqual([]);
+    });
   }
 );
