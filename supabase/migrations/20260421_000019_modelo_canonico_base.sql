@@ -1060,4 +1060,66 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------
+-- T12. RLS + tenant_isolation policies for the 7 new canonical tables
+-- ---------------------------------------------------------------------
+-- Matches the established app-wide RLS pattern (Sprint B1) used by
+-- `mandates`, `meetings`, `persons`, `governing_bodies`, `entities`,
+-- `agreements`, `rule_packs` and others: a single policy per table named
+-- `<table>_tenant_isolation`, `FOR ALL USING (tenant_id = DEMO_TENANT)`,
+-- no `WITH CHECK`, no RBAC-role policies here (role-based access is
+-- handled in the app layer via Sprint B2 RBAC + SodGuard).
+--
+-- Intentional deviations from the plan's literal SQL (controller verified
+-- via pg_proc that `current_tenant_id()` does not exist on Cloud and the
+-- existing tables all use the hardcoded-UUID pattern — per CLAUDE.md:
+-- "No construir infraestructura enterprise (RLS real, BYOK, WORM) — eso
+-- es fase posterior"):
+--   - Policy name `<t>_tenant_isolation` (not `p_read_tenant`/`p_write_secretario`).
+--   - `FOR ALL USING (...)` (single policy, not split SELECT + ALL).
+--   - Predicate `tenant_id = DEMO_TENANT_UUID::uuid` (not `current_tenant_id()`).
+--   - No `WITH CHECK` clause (matches existing `mandates_tenant_isolation`).
+--   - No RBAC role policies.
+--
+-- `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` is idempotent in PG 15+.
+-- Policies use `DROP POLICY IF EXISTS ... ; CREATE POLICY ...` so the
+-- block is safely re-runnable.
+-- ---------------------------------------------------------------------
+
+ALTER TABLE entity_capital_profile  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE share_classes           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE condiciones_persona     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE capital_holdings        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE representaciones        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parte_votante_current   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE censo_snapshot          ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS entity_capital_profile_tenant_isolation ON entity_capital_profile;
+CREATE POLICY entity_capital_profile_tenant_isolation ON entity_capital_profile
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS share_classes_tenant_isolation ON share_classes;
+CREATE POLICY share_classes_tenant_isolation ON share_classes
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS condiciones_persona_tenant_isolation ON condiciones_persona;
+CREATE POLICY condiciones_persona_tenant_isolation ON condiciones_persona
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS capital_holdings_tenant_isolation ON capital_holdings;
+CREATE POLICY capital_holdings_tenant_isolation ON capital_holdings
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS representaciones_tenant_isolation ON representaciones;
+CREATE POLICY representaciones_tenant_isolation ON representaciones
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS parte_votante_current_tenant_isolation ON parte_votante_current;
+CREATE POLICY parte_votante_current_tenant_isolation ON parte_votante_current
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
+DROP POLICY IF EXISTS censo_snapshot_tenant_isolation ON censo_snapshot;
+CREATE POLICY censo_snapshot_tenant_isolation ON censo_snapshot
+  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+
 COMMIT;
