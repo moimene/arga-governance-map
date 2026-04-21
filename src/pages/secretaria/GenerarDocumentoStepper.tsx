@@ -181,7 +181,7 @@ export default function GenerarDocumentoStepper() {
 
     try {
       const filename = `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}`;
-      const result = await archiveDocxToStorage(docxBuffer, agreement.id, filename);
+      const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename);
 
       if (result.ok) {
         setArchiveUrl(result.documentUrl || null);

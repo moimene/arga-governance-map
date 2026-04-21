@@ -125,7 +125,7 @@ export function evaluarConstitucion(
   // Step 4: Determine required quorum
   // ================================================================
   let requiredQuorum = 0;
-  let quorumFuente = 'LEY';
+  let quorumFuente: import('./types').Fuente = 'LEY';
   let quorumReferencia = 'art. 188 LSC';
   let isCombinadoProfile = false;
 
