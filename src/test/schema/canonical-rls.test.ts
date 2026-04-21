@@ -61,6 +61,12 @@ describe.skipIf(!hasAdminClient())(
     // publishable anon key hardcoded in src/integrations/supabase/client.ts
     // because tests run against the real Cloud project — no env prefixing
     // needed (the key is public-safe by design).
+    //
+    // Key-rotation maintenance: if the Cloud project anon key is rotated,
+    // update both src/integrations/supabase/client.ts AND the literal below
+    // in lock-step. A mismatch will surface as `JWSError` in the anon
+    // query's `error.message` and is caught by the explicit diagnostic
+    // below (not `expect(error).toBeNull()` alone).
     const SUPABASE_URL =
       process.env.VITE_SUPABASE_URL ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
     const SUPABASE_ANON_KEY =
@@ -97,8 +103,13 @@ describe.skipIf(!hasAdminClient())(
       demoEntityId = demoEntities[0].id as string;
 
       // Other-tenant entity — insert a sentinel entity so the OTHER-side
-      // share_classes row has a valid FK target. Upsert via service role so
-      // RLS is bypassed.
+      // share_classes row has a valid FK target. Pre-delete residue from
+      // aborted prior runs before upserting, so a process-killed previous
+      // run can't leave an entity with a stale `slug` that would collide
+      // on a UNIQUE constraint (id upsert resolves id-conflicts but a
+      // slug-UNIQUE index would still fail). share_classes with this
+      // entity_id get cascaded away by the ON DELETE CASCADE FK.
+      await supabaseAdmin.from("entities").delete().eq("id", OTHER_ENTITY_ID);
       {
         const { error } = await supabaseAdmin.from("entities").upsert(
           {
@@ -181,6 +192,20 @@ describe.skipIf(!hasAdminClient())(
           .select("id, tenant_id, class_code")
           .eq("class_code", SENTINEL_CLASS_CODE);
 
+        // Explicit diagnostic: a RLS/JWT failure surfaces as a populated
+        // error object (e.g. `JWSError` after anon key rotation without
+        // updating the fallback literal above, or a policy evaluation
+        // error). Throwing here produces a readable message instead of
+        // the opaque `expected { message: '...' } to be null` that a bare
+        // toBeNull() would emit. Preserve the toBeNull() assertion below
+        // so vitest still records the expectation.
+        if (error) {
+          throw new Error(
+            `[T12] anon query failed — RLS policy or anon-key problem: ${error.message}. ` +
+              `If this says JWSError, the anon-key fallback above is stale; update it ` +
+              `in lock-step with src/integrations/supabase/client.ts.`
+          );
+        }
         expect(error).toBeNull();
         expect(data).not.toBeNull();
         // (a) anon SEES the DEMO_TENANT row.
