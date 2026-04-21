@@ -163,4 +163,111 @@ CREATE TABLE IF NOT EXISTS share_classes (
 CREATE UNIQUE INDEX IF NOT EXISTS ux_share_class_entity_code
   ON share_classes(entity_id, class_code);
 
+-- ---------------------------------------------------------------------
+-- T5. condiciones_persona — rol de persona en sociedad/órgano
+-- Single source of truth for "what is person X in entity Y (and possibly
+-- body Z)". Covers SOCIO (no body_id — socio en sociedad) and consejero
+-- roles (with body_id — miembro de un órgano). The tipo_condicion CHECK
+-- partitions the vocabulary and the chk_condicion_body_coherente CHECK
+-- enforces cross-column coherence (SOCIO/ADMIN_* demand body_id NULL;
+-- CONSEJERO/PRESIDENTE/etc. demand body_id NOT NULL).
+--
+-- CA-4 correction: the VIGENTE uniqueness index uses COALESCE because
+-- PostgreSQL treats NULLs as DISTINCT in unique indexes — without the
+-- sentinel, two rows with body_id IS NULL for the same (person, entity,
+-- tipo) pair would coexist, defeating the "single VIGENTE condición"
+-- invariant for SOCIO and ADMIN_* roles.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS condiciones_persona (
+  id                         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                  UUID        NOT NULL,
+  person_id                  UUID        NOT NULL REFERENCES persons(id) ON DELETE RESTRICT,
+  entity_id                  UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  body_id                    UUID        NULL REFERENCES governing_bodies(id) ON DELETE CASCADE,
+  tipo_condicion             TEXT        NOT NULL
+                                         CONSTRAINT chk_condiciones_persona_tipo_condicion
+                                         CHECK (tipo_condicion IN (
+                                           'SOCIO',
+                                           'ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO','ADMIN_PJ',
+                                           'CONSEJERO','PRESIDENTE','SECRETARIO','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+                                         )),
+  estado                     TEXT        NOT NULL DEFAULT 'VIGENTE'
+                                         CONSTRAINT chk_condiciones_persona_estado
+                                         CHECK (estado IN ('VIGENTE','CESADO')),
+  fecha_inicio               DATE        NOT NULL,
+  fecha_fin                  DATE,
+  representative_person_id   UUID        REFERENCES persons(id),
+  metadata                   JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_condicion_body_coherente CHECK (
+    (tipo_condicion IN ('SOCIO','ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO','ADMIN_PJ')
+      AND body_id IS NULL)
+    OR
+    (tipo_condicion IN ('CONSEJERO','PRESIDENTE','SECRETARIO','VICEPRESIDENTE','CONSEJERO_COORDINADOR')
+      AND body_id IS NOT NULL)
+  )
+);
+
+-- Clean up auto-named inline CHECKs from prior migration runs, then add
+-- the explicitly named ones (same idempotency pattern as T2 chk_entities
+-- and T3 chk_entity_capital_profile_estado). Needed because
+-- CREATE TABLE IF NOT EXISTS no-ops on existing tables — the rename
+-- can't happen via CREATE TABLE alone in already-migrated envs.
+ALTER TABLE condiciones_persona
+  DROP CONSTRAINT IF EXISTS condiciones_persona_tipo_condicion_check;
+
+ALTER TABLE condiciones_persona
+  DROP CONSTRAINT IF EXISTS condiciones_persona_estado_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_condiciones_persona_tipo_condicion'
+  ) THEN
+    ALTER TABLE condiciones_persona
+      ADD CONSTRAINT chk_condiciones_persona_tipo_condicion
+      CHECK (tipo_condicion IN (
+        'SOCIO',
+        'ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO','ADMIN_PJ',
+        'CONSEJERO','PRESIDENTE','SECRETARIO','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+      ));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_condiciones_persona_estado'
+  ) THEN
+    ALTER TABLE condiciones_persona
+      ADD CONSTRAINT chk_condiciones_persona_estado
+      CHECK (estado IN ('VIGENTE','CESADO'));
+  END IF;
+END $$;
+
+-- CA-4: COALESCE sentinel index. PostgreSQL treats NULLs as DISTINCT in
+-- unique indexes, so a naive UNIQUE(person_id, entity_id, body_id,
+-- tipo_condicion) WHERE estado='VIGENTE' would accept two rows with
+-- body_id IS NULL. COALESCE into the zero-UUID forces collision for
+-- SOCIO/ADMIN_* (body_id NULL) while leaving CONSEJERO/etc. indexed on
+-- their real body_id. The sentinel is a pure UUID value, not an FK
+-- reference, so no governing_bodies row is required.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_condicion_vigente
+  ON condiciones_persona(
+    person_id,
+    entity_id,
+    COALESCE(body_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    tipo_condicion
+  )
+  WHERE estado = 'VIGENTE';
+
+-- Lookup index for "¿quiénes componen este órgano?" queries. Differs
+-- from ux_condicion_vigente in column order (entity_id first, body_id
+-- second, no person_id/tipo_condicion) and purpose (non-unique scan
+-- support vs. uniqueness enforcement), so not redundant.
+CREATE INDEX IF NOT EXISTS idx_condiciones_persona_entity_body
+  ON condiciones_persona(entity_id, body_id) WHERE estado = 'VIGENTE';
+
 COMMIT;

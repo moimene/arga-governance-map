@@ -307,3 +307,174 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T5 condiciones_persona",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+    // Sentinel person IDs — kept out of the persons auto-gen range so
+    // they don't collide with real seed rows. Upserted per-test via
+    // persons.upsert() with onConflict:'id' so reruns are idempotent.
+    const PERSON_A = "aaaaaaaa-0000-0000-0000-000000000001";
+    const PERSON_B = "aaaaaaaa-0000-0000-0000-000000000002";
+    const PERSON_C = "aaaaaaaa-0000-0000-0000-000000000003";
+    const PERSON_D = "aaaaaaaa-0000-0000-0000-000000000004";
+    const testPersonIds = [PERSON_A, PERSON_B, PERSON_C, PERSON_D];
+
+    // Cleanup matches T3/T4 shape: remove the condiciones_persona rows
+    // we inserted so assertion failures mid-test never leave junk. We
+    // intentionally do NOT delete the persons rows — they're reusable
+    // fixtures and upsert makes re-seeding free. Using .in() for a
+    // single round-trip instead of parallel .eq() calls.
+    afterEach(async () => {
+      if (!supabaseAdmin) return;
+      await supabaseAdmin
+        .from("condiciones_persona")
+        .delete()
+        .in("person_id", testPersonIds);
+    });
+
+    async function ensurePerson(id: string, fullName: string) {
+      // person_type 'PF' is the persons-table vocabulary on this
+      // project (CHECK: 'PF'|'PJ'). Using upsert with ignoreDuplicates
+      // because rerunning the test suite must not fail on the second
+      // insert, and we don't need to mutate existing person rows.
+      const { error } = await supabaseAdmin!
+        .from("persons")
+        .upsert(
+          {
+            id,
+            tenant_id: DEMO_TENANT,
+            full_name: fullName,
+            person_type: "PF",
+            tax_id: `X111111${id.slice(-1)}A`,
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+      expect(error).toBeNull();
+    }
+
+    it("condiciones_persona table exists with required columns", async () => {
+      // PostgREST returns an error if any column is unknown. A clean
+      // response proves every column in the plan landed. The existence
+      // of chk_condicion_body_coherente is proven implicitly by the
+      // SOCIO/CONSEJERO rejection tests below — no need to query
+      // pg_constraint (not exposed via PostgREST anyway).
+      const { error } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .select(
+          "id, tenant_id, person_id, entity_id, body_id, tipo_condicion, estado, fecha_inicio, fecha_fin, representative_person_id, metadata, created_at"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("ux_condicion_vigente (CA-4) rejects two VIGENTE SOCIO rows for same (person, entity) despite body_id NULL", async () => {
+      await ensurePerson(PERSON_A, "Test CA-4 Socio");
+
+      const { error: err1 } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          person_id: PERSON_A,
+          entity_id: entityId,
+          body_id: null,
+          tipo_condicion: "SOCIO",
+          fecha_inicio: "2026-01-01",
+        });
+      expect(err1).toBeNull();
+
+      // Second SOCIO VIGENTE row — must collide via COALESCE sentinel
+      // even though body_id is NULL on both rows. Without the COALESCE
+      // in the unique index, PostgreSQL's NULL-distinct semantics would
+      // let this insert succeed — that's the CA-4 defect we're guarding.
+      const { error: err2 } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          person_id: PERSON_A,
+          entity_id: entityId,
+          body_id: null,
+          tipo_condicion: "SOCIO",
+          fecha_inicio: "2026-06-01",
+        });
+      expect(err2).not.toBeNull();
+      expect(err2!.message.toLowerCase()).toMatch(/ux_condicion_vigente/);
+    });
+
+    it("chk_condicion_body_coherente rejects SOCIO with body_id NOT NULL", async () => {
+      await ensurePerson(PERSON_B, "Test body-coherente SOCIO");
+
+      // Need an existing body_id to trigger the CHECK rather than the
+      // FK. If no bodies are seeded for DEMO_ENTITY_ARGA, this test is
+      // a no-op (the query returns no rows and we bail early) — better
+      // than inventing a UUID that would fail via FK before CHECK.
+      const { data: bodies } = await supabaseAdmin!
+        .from("governing_bodies")
+        .select("id")
+        .eq("entity_id", entityId)
+        .limit(1);
+      if (!bodies || bodies.length === 0) {
+        // Cannot exercise CHECK without a valid body_id — skip softly.
+        return;
+      }
+      const bodyId = bodies[0].id;
+
+      const { error } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          person_id: PERSON_B,
+          entity_id: entityId,
+          body_id: bodyId, // must be NULL for SOCIO — should violate CHECK
+          tipo_condicion: "SOCIO",
+          fecha_inicio: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_condicion_body_coherente/
+      );
+    });
+
+    it("chk_condicion_body_coherente rejects CONSEJERO with body_id NULL", async () => {
+      await ensurePerson(PERSON_C, "Test body-coherente CONSEJERO");
+
+      const { error } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          person_id: PERSON_C,
+          entity_id: entityId,
+          body_id: null, // must be NOT NULL for CONSEJERO — should violate CHECK
+          tipo_condicion: "CONSEJERO",
+          fecha_inicio: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_condicion_body_coherente/
+      );
+    });
+
+    it("chk_condiciones_persona_tipo_condicion rejects invalid tipo_condicion values", async () => {
+      await ensurePerson(PERSON_D, "Test invalid tipo");
+
+      const { error } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          person_id: PERSON_D,
+          entity_id: entityId,
+          body_id: null,
+          tipo_condicion: "INVALID_ROLE",
+          fecha_inicio: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      // Tightened: require explicit constraint name OR generic
+      // "check constraint" phrasing (no bare column-name match, which
+      // would pass on NOT NULL violations too).
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_condiciones_persona_tipo_condicion|check.*constraint/
+      );
+    });
+  }
+);
