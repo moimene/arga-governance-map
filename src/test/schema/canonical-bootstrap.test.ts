@@ -39,6 +39,12 @@ import { describe, it, expect } from "vitest";
 import {
   supabaseAdmin,
   hasAdminClient,
+  DEMO_ENTITY_ARGA,
+  DEMO_ENTITY_CARTERA,
+  DEMO_PJ_ARGA_SEGUROS_TAX_ID,
+  DEMO_PJ_CARTERA_TAX_ID,
+  DEMO_PJ_FUNDACION_TAX_ID,
+  DEMO_PJ_MERCADO_LIBRE_TAX_ID,
 } from "../helpers/supabase-test-client";
 
 describe.skipIf(!hasAdminClient())(
@@ -193,6 +199,146 @@ describe.skipIf(!hasAdminClient())(
         (eid) => hSums[eid] !== undefined && Math.abs(mSums[eid] - hSums[eid]) > 0.01
       );
       expect(mismatches).toEqual([]);
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// T17 — Seed demo ARGA canónico (estructura Fundación → Cartera → ARGA Seguros).
+//
+// Verifica el resultado de `scripts/seed-demo-arga-canonico.ts` (o equivalente
+// aplicado vía apply_migration en Cloud al ejecutar T17) contra la tabla
+// capital objetivo IAR 2025:
+//   - Fundación ARGA ─100%→ Cartera ARGA S.L.U.
+//   - Cartera ARGA ─69.69%→ ARGA Seguros S.A.
+//   - Free Float (Mercado libre) ─30.31%→ ARGA Seguros S.A.
+//
+// DEVIATIONS vs plan §T17:
+//   1. Plan usa `supabaseAdmin.rpc("execute_sql", ...)` que NO está expuesto
+//      en este Cloud project. Reescrito como PostgREST: SELECT + sumar/aserto
+//      client-side. Patrón idéntico al de los tests T15/T16.
+//   2. Plan hardcoda tax_ids literales. Usamos las constantes
+//      DEMO_PJ_*_TAX_ID del helper (canonical tax_ids centralizados).
+//   3. Plan usa `.persons!inner(...)` — funciona pero la sintaxis de embed
+//      embed filtering en PostgREST varía. Usamos `.persons:person_id(...)`
+//      + filtro client-side, consistente con los otros tests del archivo.
+// ---------------------------------------------------------------------------
+describe.skipIf(!hasAdminClient())(
+  "Canonical bootstrap — seed ARGA canónico (T17)",
+  () => {
+    it(`ARGA Seguros tiene PJ asociada con tax_id ${DEMO_PJ_ARGA_SEGUROS_TAX_ID}`, async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("entities")
+        .select("id, person_id, persons:person_id(tax_id, person_type)")
+        .eq("id", DEMO_ENTITY_ARGA)
+        .maybeSingle();
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((data as any)?.persons?.tax_id).toBe(DEMO_PJ_ARGA_SEGUROS_TAX_ID);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((data as any)?.persons?.person_type).toBe("PJ");
+    });
+
+    it(`Cartera ARGA tiene PJ asociada con tax_id ${DEMO_PJ_CARTERA_TAX_ID}`, async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("entities")
+        .select("id, persons:person_id(tax_id)")
+        .eq("id", DEMO_ENTITY_CARTERA)
+        .maybeSingle();
+      expect(error).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((data as any)?.persons?.tax_id).toBe(DEMO_PJ_CARTERA_TAX_ID);
+    });
+
+    it(`Mercado Libre PJ existe con tax_id ${DEMO_PJ_MERCADO_LIBRE_TAX_ID}`, async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("persons")
+        .select("id, tax_id, person_type")
+        .eq("tax_id", DEMO_PJ_MERCADO_LIBRE_TAX_ID);
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      expect((data ?? []).length).toBeGreaterThanOrEqual(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((data as any)?.[0].person_type).toBe("PJ");
+    });
+
+    it(`Fundación ARGA tiene PJ asociada con tax_id ${DEMO_PJ_FUNDACION_TAX_ID}`, async () => {
+      // Fundación ARGA es la raíz de la cadena Cartera. Probe por tax_id (no
+      // conocemos el UUID del entity de Fundación centralmente; el DEMO_*
+      // centraliza solo ARGA y Cartera).
+      const { data, error } = await supabaseAdmin!
+        .from("persons")
+        .select("id, tax_id, person_type, full_name")
+        .eq("tax_id", DEMO_PJ_FUNDACION_TAX_ID);
+      expect(error).toBeNull();
+      expect((data ?? []).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("capital holdings de ARGA Seguros suman 100% (69.69 Cartera + 30.31 Mercado Libre)", async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .select("porcentaje_capital, is_treasury, holder_person_id")
+        .eq("entity_id", DEMO_ENTITY_ARGA)
+        .is("effective_to", null);
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (data as any[]) ?? [];
+      const total = rows
+        .filter((r) => !r.is_treasury)
+        .reduce((sum, r) => sum + Number(r.porcentaje_capital ?? 0), 0);
+      expect(total).toBeCloseTo(100, 1);
+      // Should be exactly 2 holders (Cartera + Mercado Libre).
+      expect(rows.length).toBe(2);
+    });
+
+    it("entity_capital_profile VIGENTE de ARGA Seguros tiene ~3.079M titulos y valor_nominal 0.1", async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .select("numero_titulos, valor_nominal, capital_escriturado")
+        .eq("entity_id", DEMO_ENTITY_ARGA)
+        .eq("estado", "VIGENTE")
+        .maybeSingle();
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = data as any;
+      expect(Number(p?.numero_titulos)).toBeGreaterThan(3_000_000_000);
+      expect(Number(p?.valor_nominal)).toBe(0.1);
+    });
+
+    it("Cartera ARGA tiene 1 holding al 100% por Fundación ARGA", async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .select("porcentaje_capital, holder_person_id")
+        .eq("entity_id", DEMO_ENTITY_CARTERA)
+        .is("effective_to", null);
+      expect(error).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (data as any[]) ?? [];
+      expect(rows.length).toBe(1);
+      expect(Number(rows[0].porcentaje_capital)).toBeCloseTo(100, 1);
+    });
+
+    it("condiciones SOCIO incluyen Cartera + Mercado Libre en ARGA + Fundación en Cartera", async () => {
+      const { data: argaSocios, error: e1 } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .select("person_id, tipo_condicion, estado, body_id")
+        .eq("entity_id", DEMO_ENTITY_ARGA)
+        .eq("tipo_condicion", "SOCIO")
+        .eq("estado", "VIGENTE");
+      expect(e1).toBeNull();
+      expect((argaSocios ?? []).length).toBeGreaterThanOrEqual(2);
+
+      const { data: carteraSocios, error: e2 } = await supabaseAdmin!
+        .from("condiciones_persona")
+        .select("person_id, tipo_condicion, estado")
+        .eq("entity_id", DEMO_ENTITY_CARTERA)
+        .eq("tipo_condicion", "SOCIO")
+        .eq("estado", "VIGENTE");
+      expect(e2).toBeNull();
+      expect((carteraSocios ?? []).length).toBeGreaterThanOrEqual(1);
     });
   }
 );

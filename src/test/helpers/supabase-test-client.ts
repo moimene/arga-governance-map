@@ -32,4 +32,21 @@ export function hasAdminClient(): boolean {
 }
 
 export const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
-export const DEMO_ENTITY_ARGA = "00000000-0000-0000-0000-000000000010";
+// Real Cloud UUID for ARGA Seguros, S.A. (entity was pre-seeded with a
+// random UUID, not the 00000000-0000-0000-0000-000000000010 the plan
+// assumed). Verified on project hzqwefkwsxopwrmtksbg at T17 dispatch time:
+// SELECT id FROM entities WHERE legal_name = 'ARGA Seguros, S.A.';
+// Updating this unblocks the T9 censo_snapshot trigger tests that were
+// soft-skipping because the old UUID didn't match any existing entity.
+export const DEMO_ENTITY_ARGA = "6d7ed736-f263-4531-a59d-c6ca0cd41602";
+// Stable UUIDs used by the T17 canonical seed. Kept as module constants
+// so tests can reference the same IDs the seed script inserts/updates.
+// Fundación, Cartera SLU and ARGA Seguros PJs already exist (created by
+// T14 bootstrap) — their pre-existing ids are not stable, but their
+// tax_ids below are canonical. Tests probe by tax_id, not by UUID.
+export const DEMO_PJ_FUNDACION_TAX_ID = "G-99999901";
+export const DEMO_PJ_CARTERA_TAX_ID = "B-99999902";
+export const DEMO_PJ_ARGA_SEGUROS_TAX_ID = "A-99999903";
+export const DEMO_PJ_MERCADO_LIBRE_TAX_ID = "X-99999904";
+// Cartera ARGA S.L.U. entity UUID — stable on Cloud, so hardcoded.
+export const DEMO_ENTITY_CARTERA = "00000000-0000-0000-0000-000000000020";
