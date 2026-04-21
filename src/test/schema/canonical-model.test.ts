@@ -200,3 +200,110 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T4 share_classes",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+
+    // Cleanup pattern matches T3: single afterEach deleting all rows for
+    // DEMO_ENTITY_ARGA so assertion failures between insert and explicit
+    // cleanup never leave junk in the shared cloud project.
+    afterEach(async () => {
+      if (supabaseAdmin) {
+        await supabaseAdmin
+          .from("share_classes")
+          .delete()
+          .eq("entity_id", entityId);
+      }
+    });
+
+    it("share_classes table exists with required columns", async () => {
+      const { error } = await supabaseAdmin!
+        .from("share_classes")
+        .select(
+          "id, tenant_id, entity_id, class_code, name, votes_per_title, economic_rights_coeff, voting_rights, veto_rights, created_at"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("ux_share_class_entity_code rejects duplicate class_code per entity", async () => {
+      const { error: err1 } = await supabaseAdmin!
+        .from("share_classes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          class_code: "TEST_ORD",
+          name: "Test Ordinaria",
+        });
+      expect(err1).toBeNull();
+
+      const { error: err2 } = await supabaseAdmin!
+        .from("share_classes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          class_code: "TEST_ORD", // same code for same entity
+          name: "Duplicate attempt",
+        });
+      expect(err2).not.toBeNull();
+      expect(err2!.message.toLowerCase()).toMatch(/ux_share_class_entity_code/);
+    });
+
+    // Limitation: the plan intended "same class_code across different
+    // entities is allowed", but we only have DEMO_ENTITY_ARGA reliably
+    // seeded in the cloud demo project. Rather than introduce a temporary
+    // entity (adds fixtures + teardown complexity we don't need yet), we
+    // verify the weaker but still useful invariant: distinct class_codes
+    // for the same entity are accepted. The full cross-entity scenario
+    // will be covered naturally in T6/T14 once multiple entities exist.
+    it("allows distinct class_codes for the same entity", async () => {
+      const { error: err1 } = await supabaseAdmin!
+        .from("share_classes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          class_code: "TEST_A",
+          name: "Clase A",
+          votes_per_title: 1,
+          economic_rights_coeff: 1,
+        });
+      expect(err1).toBeNull();
+
+      const { error: err2 } = await supabaseAdmin!
+        .from("share_classes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          class_code: "TEST_B",
+          name: "Clase B",
+          votes_per_title: 10,
+          economic_rights_coeff: 0.5,
+        });
+      expect(err2).toBeNull();
+    });
+
+    it("applies column defaults (votes_per_title=1, economic_rights_coeff=1, voting_rights=true, veto_rights=false)", async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("share_classes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          class_code: "TEST_DEFAULTS",
+          name: "Defaults test",
+        })
+        .select()
+        .single();
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      // PostgREST returns NUMERIC as strings (e.g. "1") rather than numbers;
+      // coerce via Number() so the assertion is robust to either wire form
+      // and our intent (value == 1) reads clearly.
+      expect(Number(data!.votes_per_title)).toBe(1);
+      expect(Number(data!.economic_rights_coeff)).toBe(1);
+      expect(data!.voting_rights).toBe(true);
+      expect(data!.veto_rights).toBe(false);
+    });
+  }
+);

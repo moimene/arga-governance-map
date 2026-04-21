@@ -137,4 +137,37 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------
+-- T4. share_classes — clases de acciones/participaciones por entidad
+-- Each class carries voting weight (votes_per_title), economic weight
+-- (economic_rights_coeff), and optional rights flags (voting, veto).
+-- Later tasks (T6 capital_holdings, T8 parte_votante_current) reference
+-- share_classes.id for weighted voting computations.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS share_classes (
+  id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id              UUID        NOT NULL,
+  entity_id              UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  class_code             TEXT        NOT NULL,
+  name                   TEXT        NOT NULL,
+  votes_per_title        NUMERIC     NOT NULL DEFAULT 1,
+  economic_rights_coeff  NUMERIC     NOT NULL DEFAULT 1,
+  voting_rights          BOOLEAN     NOT NULL DEFAULT true,
+  veto_rights            BOOLEAN     NOT NULL DEFAULT false,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Uniqueness at the (entity_id, class_code) level — each entity defines
+-- its own class vocabulary; same code in different entities is allowed.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_share_class_entity_code
+  ON share_classes(entity_id, class_code);
+
+-- Single-column lookup index for the common "list all classes for this
+-- entity" query pattern. The composite UX above covers exact-match
+-- lookups but not prefix scans / aggregations; matches T3 pattern with
+-- idx_entity_capital_profile_entity.
+CREATE INDEX IF NOT EXISTS idx_share_classes_entity
+  ON share_classes(entity_id);
+
 COMMIT;
