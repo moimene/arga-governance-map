@@ -43,3 +43,23 @@ describe("F8.1 — RPCs acta/certificación", () => {
     expect(error?.message ?? "").not.toMatch(/could not find the function/i);
   });
 });
+
+describe("F8.2 — RPCs firma/emisión", () => {
+  it("fn_firmar_certificacion existe y acepta (cert_id, qtsp_token, tsq_token)", async () => {
+    const { error } = await supabase.rpc("fn_firmar_certificacion", {
+      p_certification_id: "00000000-0000-0000-0000-000000000000",
+      p_qtsp_token: "probe-qtsp",
+      p_tsq_token: "cHJvYmU=", // base64("probe")
+    });
+    expect(error?.message ?? "").not.toMatch(/function .* does not exist/i);
+    expect(error?.message ?? "").not.toMatch(/could not find the function/i);
+  });
+
+  it("fn_emitir_certificacion existe y acepta (cert_id)", async () => {
+    const { error } = await supabase.rpc("fn_emitir_certificacion", {
+      p_certification_id: "00000000-0000-0000-0000-000000000000",
+    });
+    expect(error?.message ?? "").not.toMatch(/function .* does not exist/i);
+    expect(error?.message ?? "").not.toMatch(/could not find the function/i);
+  });
+});
