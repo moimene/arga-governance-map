@@ -492,3 +492,126 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T6 capital_holdings",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+    // Sentinel person IDs — different prefix from T5 (aaaaaaaa-*) so
+    // the two describe blocks can never collide if afterEach ordering
+    // ever changes or parallelisation semantics shift.
+    const PERSON_A = "bbbbbbbb-0000-0000-0000-000000000001";
+    const PERSON_B = "bbbbbbbb-0000-0000-0000-000000000002";
+    const PERSON_C = "bbbbbbbb-0000-0000-0000-000000000003";
+    const testPersonIds = [PERSON_A, PERSON_B, PERSON_C];
+
+    // Cleanup narrowed to rows this block inserted (holder_person_id IN
+    // testPersonIds) so we never stomp seed data or rows from other
+    // blocks that might share entity_id. persons rows are fixtures —
+    // left in place because upsert makes re-seeding free.
+    afterEach(async () => {
+      if (!supabaseAdmin) return;
+      await supabaseAdmin
+        .from("capital_holdings")
+        .delete()
+        .in("holder_person_id", testPersonIds);
+    });
+
+    // Inline helper duplicated from T5 (same persons vocabulary, same
+    // tax_id derivation). Keeps this block self-contained — extracting
+    // a shared module-level helper is a refactor tracked separately,
+    // not part of T6 scope.
+    async function ensurePerson(id: string, fullName: string) {
+      const { error } = await supabaseAdmin!
+        .from("persons")
+        .upsert(
+          {
+            id,
+            tenant_id: DEMO_TENANT,
+            full_name: fullName,
+            person_type: "PF",
+            tax_id: `TEST-${id.replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+      expect(error).toBeNull();
+    }
+
+    it("capital_holdings table exists with required columns", async () => {
+      // PostgREST returns an error if we select unknown columns. A clean
+      // response proves every T6 column landed. We don't probe indexes
+      // (not visible through PostgREST) — uniqueness/CHECK tests below
+      // exercise them implicitly.
+      const { error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .select(
+          "id, tenant_id, entity_id, holder_person_id, share_class_id, numero_titulos, porcentaje_capital, voting_rights, is_treasury, effective_from, effective_to, metadata, created_at"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("chk_capital_holdings_porcentaje_capital rejects values >100", async () => {
+      await ensurePerson(PERSON_A, "Test pct>100");
+
+      const { error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          holder_person_id: PERSON_A,
+          numero_titulos: 10,
+          porcentaje_capital: 101, // out of [0,100]
+          effective_from: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_capital_holdings_porcentaje_capital|porcentaje_capital/
+      );
+    });
+
+    it("chk_capital_holdings_numero_titulos rejects negative values", async () => {
+      await ensurePerson(PERSON_B, "Test negative titulos");
+
+      const { error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          holder_person_id: PERSON_B,
+          numero_titulos: -1, // violates numero_titulos >= 0
+          effective_from: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_capital_holdings_numero_titulos|numero_titulos/
+      );
+    });
+
+    it("applies column defaults (voting_rights=true, is_treasury=false, metadata={})", async () => {
+      await ensurePerson(PERSON_C, "Test defaults");
+
+      const { data, error } = await supabaseAdmin!
+        .from("capital_holdings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          holder_person_id: PERSON_C,
+          numero_titulos: 100,
+          effective_from: "2026-01-01",
+          // voting_rights, is_treasury, metadata omitted — defaults should apply
+        })
+        .select()
+        .maybeSingle();
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      // Booleans come back as booleans through PostgREST (only NUMERIC
+      // serialises to string — see T4 defaults test).
+      expect(data!.voting_rights).toBe(true);
+      expect(data!.is_treasury).toBe(false);
+      // metadata default is '{}'::jsonb which PostgREST deserialises
+      // to a plain JS object.
+      expect(data!.metadata).toEqual({});
+    });
+  }
+);

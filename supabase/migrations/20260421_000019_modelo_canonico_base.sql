@@ -270,4 +270,94 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_condicion_vigente
 CREATE INDEX IF NOT EXISTS idx_condiciones_persona_entity_body
   ON condiciones_persona(entity_id, body_id) WHERE estado = 'VIGENTE';
 
+-- ---------------------------------------------------------------------
+-- T6. capital_holdings — libro de socios
+-- Records who holds how many titles of which share class in which
+-- entity, valid between effective_from and effective_to. The share
+-- class link (share_class_id) is optional: early-stage entities that
+-- haven't declared classes yet (T4) can still have holdings, and
+-- NULL means "single implicit class" semantically. voting_rights on
+-- the holding row overrides the share_class default (honoring shares
+-- without voting rights, usufruct splits, etc.). is_treasury flags
+-- autocartera so the rules engine can deduct those titles from the
+-- voting base per LSC art. 148.
+--
+-- Two inline CHECK constraints (numero_titulos >= 0 and porcentaje in
+-- [0,100]) are named explicitly via the same DROP+DO-block pattern as
+-- T3/T5 so tests can regex-match on stable constraint names.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS capital_holdings (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID        NOT NULL,
+  entity_id           UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  holder_person_id    UUID        NOT NULL REFERENCES persons(id) ON DELETE RESTRICT,
+  share_class_id      UUID        NULL REFERENCES share_classes(id),
+  numero_titulos      NUMERIC     NOT NULL CHECK (numero_titulos >= 0),
+  porcentaje_capital  NUMERIC     CHECK (
+    porcentaje_capital IS NULL OR (porcentaje_capital >= 0 AND porcentaje_capital <= 100)
+  ),
+  voting_rights       BOOLEAN     NOT NULL DEFAULT true,
+  is_treasury         BOOLEAN     NOT NULL DEFAULT false,
+  effective_from      DATE        NOT NULL,
+  effective_to        DATE,
+  metadata            JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Clean up auto-named inline CHECKs from prior migration runs, then add
+-- the explicitly named ones. Same idempotency pattern as T3/T5: needed
+-- because CREATE TABLE IF NOT EXISTS no-ops on existing tables, so
+-- already-migrated envs wouldn't otherwise pick up the rename.
+ALTER TABLE capital_holdings
+  DROP CONSTRAINT IF EXISTS capital_holdings_numero_titulos_check;
+
+ALTER TABLE capital_holdings
+  DROP CONSTRAINT IF EXISTS capital_holdings_porcentaje_capital_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_capital_holdings_numero_titulos'
+  ) THEN
+    ALTER TABLE capital_holdings
+      ADD CONSTRAINT chk_capital_holdings_numero_titulos
+      CHECK (numero_titulos >= 0);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_capital_holdings_porcentaje_capital'
+  ) THEN
+    ALTER TABLE capital_holdings
+      ADD CONSTRAINT chk_capital_holdings_porcentaje_capital
+      CHECK (
+        porcentaje_capital IS NULL
+        OR (porcentaje_capital >= 0 AND porcentaje_capital <= 100)
+      );
+  END IF;
+END $$;
+
+-- Three indexes, each doing distinct work (verified non-redundant):
+--  - idx_capital_holdings_entity (entity_id, effective_to): composite
+--    for historical timeline queries ("all holdings past+current for X,
+--    ordered by effective_to").
+--  - idx_capital_holdings_holder (holder_person_id): different leading
+--    column, answers "what does person X hold?" across entities.
+--  - idx_capital_holdings_entity_vigente (entity_id) WHERE effective_to
+--    IS NULL: partial on ACTIVE rows only, hot path for the current
+--    shareholder book. Smaller than the composite → faster scans. The
+--    composite cannot fully substitute because the partial predicate
+--    makes the index dramatically narrower in practice.
+CREATE INDEX IF NOT EXISTS idx_capital_holdings_entity
+  ON capital_holdings(entity_id, effective_to);
+
+CREATE INDEX IF NOT EXISTS idx_capital_holdings_holder
+  ON capital_holdings(holder_person_id);
+
+CREATE INDEX IF NOT EXISTS idx_capital_holdings_entity_vigente
+  ON capital_holdings(entity_id) WHERE effective_to IS NULL;
+
 COMMIT;
