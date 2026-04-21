@@ -569,6 +569,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_representaciones_vigente
 -- invariant on (entity, body, person, source_type, source_id) and
 -- decides whether to enforce it via a unique index or by ordering on
 -- generated_at (C7).
+-- T10 will likely add: CREATE UNIQUE INDEX ux_parte_votante_current_regen
+--   ON parte_votante_current(entity_id, body_id, person_id, source_type, source_id);
+-- (shape is advisory — final predicate may differ if generated_at versioning is used)
 --
 -- Constraints follow the T3/T5/T6/T7 convention: extract both inline
 -- CHECKs into explicitly named constraints via the DROP + DO-block
@@ -632,6 +635,30 @@ BEGIN
       CHECK (exclusion_policy IN (
         'NONE','EXCLUIR_QUORUM','EXCLUIR_VOTO','EXCLUIR_AMBOS'
       ));
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- Magnitude invariants (added in T8 hardening, analogous to T6/T7 pattern):
+-- voting_weight and denominator_weight must be non-negative. Cheap defense
+-- in depth — T10 will populate these from bounded domain values, but a
+-- bug in the refresh function could write negatives that silently corrupt
+-- the rules engine's voting arithmetic downstream. One combined CHECK to
+-- keep pg_constraint clutter low; regex-match either column name to
+-- identify the violation.
+-- ---------------------------------------------------------------------
+ALTER TABLE parte_votante_current
+  DROP CONSTRAINT IF EXISTS chk_parte_votante_current_weights_nonneg;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_parte_votante_current_weights_nonneg'
+      AND conrelid = 'parte_votante_current'::regclass
+  ) THEN
+    ALTER TABLE parte_votante_current
+      ADD CONSTRAINT chk_parte_votante_current_weights_nonneg
+      CHECK (voting_weight >= 0 AND denominator_weight >= 0);
   END IF;
 END $$;
 

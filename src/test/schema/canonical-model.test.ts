@@ -1179,5 +1179,44 @@ describe.skipIf(!hasAdminClient())(
       expect(Number(data!.denominator_weight)).toBe(0);
       expect(data!.exclusion_policy).toBe("NONE");
     });
+
+    it("CHECK chk_parte_votante_current_weights_nonneg rechaza voting_weight < 0", async () => {
+      const id = "dddddddd-0000-0000-0000-000000000006";
+      testPersonIds.push(id);
+      await ensurePerson(id, "Test weights nonneg");
+
+      // Soft-skip if DEMO_ENTITY_ARGA absent (matches T8 pattern)
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", DEMO_ENTITY_ARGA)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T8-hardening] Skipping weights non-neg CHECK test — DEMO_ENTITY_ARGA absent. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      // Negative voting_weight must fail
+      const { error } = await supabaseAdmin!.from("parte_votante_current").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        body_id: null,
+        person_id: id,
+        source_type: "CAPITAL",
+        source_id: "00000000-0000-0000-0000-000000000aaa",
+        voting_rights: true,
+        voting_weight: -1, // violates non-negativity
+        denominator_weight: 100,
+        // exclusion_policy defaults to 'NONE'
+      });
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toMatch(
+        /chk_parte_votante_current_weights_nonneg|voting_weight|check.*constraint/i
+      );
+    });
   }
 );
