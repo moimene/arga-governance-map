@@ -780,4 +780,109 @@ CREATE TRIGGER trg_block_censo_snapshot_delete
   BEFORE DELETE ON censo_snapshot
   FOR EACH ROW EXECUTE FUNCTION trg_block_censo_snapshot_ud();
 
+-- ---------------------------------------------------------------------
+-- T10. Funciones de refresh de parte_votante_current (CA-5, CA-9)
+-- ---------------------------------------------------------------------
+-- Two PL/pgSQL functions that REGENERATE the regenerable projection
+-- parte_votante_current from the source-of-truth tables:
+--
+--   fn_refresh_parte_votante_entity(p_entity_id UUID)
+--     For economic voting (shareholders). Reads capital_holdings JOINed
+--     with share_classes (to compute voting_weight with votes_per_title)
+--     and LATERAL-joined with representaciones (to resolve the PJ admin
+--     representative when the holder is a persona jurídica with an
+--     ADMIN_PJ_REPRESENTANTE row). DELETE-then-INSERT rows where
+--     entity_id = p_entity_id AND body_id IS NULL (junta scope).
+--     CA-5 encoded: voting_rights=true AND NOT is_treasury → positive
+--     voting_weight and denominator_weight. CA-9 encoded: is_treasury=true
+--     → voting_weight=0 AND denominator_weight=0 (autocartera out of base).
+--
+--   fn_refresh_parte_votante_body(p_body_id UUID)
+--     For political voting (administrators). Reads condiciones_persona
+--     WHERE estado='VIGENTE' AND tipo_condicion IN the consejo-level set
+--     (CONSEJERO, PRESIDENTE, SECRETARIO, VICEPRESIDENTE,
+--     CONSEJERO_COORDINADOR). DELETE-then-INSERT rows where
+--     body_id = p_body_id. Every consejero counts as voting_weight=1 and
+--     denominator_weight=1 — the voto de calidad / weighted board rules
+--     live in the rules engine, not in this projection.
+--
+-- Both functions are idempotent (DELETE-then-INSERT) and return VOID.
+-- Applied via CREATE OR REPLACE FUNCTION so repeated runs are safe.
+-- ---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION fn_refresh_parte_votante_entity(p_entity_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  DELETE FROM parte_votante_current
+   WHERE entity_id = p_entity_id AND body_id IS NULL;
+
+  INSERT INTO parte_votante_current(
+    tenant_id, entity_id, body_id, person_id,
+    source_type, source_id, voting_rights,
+    voting_weight, denominator_weight
+  )
+  SELECT
+    ch.tenant_id,
+    ch.entity_id,
+    NULL,
+    COALESCE(rep.representative_person_id, ch.holder_person_id),
+    'CAPITAL',
+    ch.id,
+    ch.voting_rights,
+    CASE
+      WHEN ch.voting_rights AND NOT ch.is_treasury
+      THEN COALESCE(ch.porcentaje_capital, 0) * COALESCE(sc.votes_per_title, 1)
+      ELSE 0
+    END,
+    CASE
+      WHEN NOT ch.is_treasury
+      THEN COALESCE(ch.porcentaje_capital, 0)
+      ELSE 0
+    END
+  FROM capital_holdings ch
+  LEFT JOIN share_classes sc ON sc.id = ch.share_class_id
+  LEFT JOIN LATERAL (
+    SELECT r.representative_person_id
+    FROM representaciones r
+    WHERE r.represented_person_id = ch.holder_person_id
+      AND r.entity_id = ch.entity_id
+      AND r.scope = 'ADMIN_PJ_REPRESENTANTE'
+      AND (r.effective_to IS NULL OR r.effective_to >= CURRENT_DATE)
+    ORDER BY r.effective_from DESC
+    LIMIT 1
+  ) rep ON true
+  WHERE ch.entity_id = p_entity_id
+    AND ch.effective_to IS NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION fn_refresh_parte_votante_body(p_body_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  DELETE FROM parte_votante_current WHERE body_id = p_body_id;
+
+  INSERT INTO parte_votante_current(
+    tenant_id, entity_id, body_id, person_id,
+    source_type, source_id, voting_rights,
+    voting_weight, denominator_weight
+  )
+  SELECT
+    cp.tenant_id,
+    cp.entity_id,
+    cp.body_id,
+    cp.person_id,
+    'CARGO',
+    cp.id,
+    true,
+    1.0,
+    1.0
+  FROM condiciones_persona cp
+  WHERE cp.body_id = p_body_id
+    AND cp.estado = 'VIGENTE'
+    AND cp.tipo_condicion IN (
+      'CONSEJERO','PRESIDENTE','SECRETARIO','VICEPRESIDENTE','CONSEJERO_COORDINADOR'
+    );
+END;
+$$ LANGUAGE plpgsql;
+
 COMMIT;
