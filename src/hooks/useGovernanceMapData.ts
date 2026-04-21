@@ -108,7 +108,7 @@ export function useGovernanceMapData() {
           .order("common_name"),
         supabase
           .from("governing_bodies")
-          .select("id, slug, name, body_type, entity_id, status")
+          .select("id, slug, name, body_type, entity_id")
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("policies")
@@ -121,11 +121,11 @@ export function useGovernanceMapData() {
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("findings")
-          .select("id, code, title, severity, status, entity_id, policy_id")
+          .select("id, code, title, severity, status, entity_id")
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("delegations")
-          .select("id, code, title, status, entity_id")
+          .select("id, code, delegation_type, status, entity_id")
           .eq("tenant_id", DEMO_TENANT),
       ]);
       if (entRes.error) throw entRes.error;
