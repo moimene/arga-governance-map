@@ -196,7 +196,7 @@ export function useGovernanceMapData() {
             data: {
               label: b.name,
               type: "organ",
-              status: b.status ? { label: b.status, tone: "pending" } : undefined,
+              status: undefined,
               href: `/organos/${b.slug}`,
             },
           });
