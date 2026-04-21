@@ -543,4 +543,105 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_representaciones_vigente
   )
   WHERE effective_to IS NULL;
 
+-- ---------------------------------------------------------------------
+-- T8. parte_votante_current — proyección regenerable de la base votante
+-- Holds the CURRENT voting base per (entity, body), derived from two
+-- source vocabularies via source_type:
+--   - 'CAPITAL': rows derived from capital_holdings (junta-level voters).
+--   - 'CARGO':   rows derived from condiciones_persona cargos (consejo-
+--                level voters).
+-- source_id is a polymorphic pointer — intentionally NO FK (C9) because
+-- the target differs by source_type; T10's fn_refresh_parte_votante_entity
+-- / _body is responsible for referential integrity.
+-- body_id is nullable (C8): junta-level shareholders have body_id NULL
+-- (the entire shareholder base acts as the "body"); consejo-level members
+-- have body_id set to the specific governing_bodies row.
+-- Two weights separate voting from quorum accounting:
+--   - voting_weight:      weight applied when the person votes.
+--   - denominator_weight: weight contributed to the quorum/denominator.
+-- exclusion_policy drives conflict-of-interest handling: NONE (full
+-- participation), EXCLUIR_QUORUM (excluded from denominator only),
+-- EXCLUIR_VOTO (excluded from votes but counted in denominator),
+-- EXCLUIR_AMBOS (excluded from both).
+-- generated_at is the WRITE timestamp (not an effective_from interval).
+-- Unlike T5/T6/T7 this is a REGENERABLE projection, so NO temporal
+-- interval CHECK and NO VIGENTE unique index — T10 owns the dedup
+-- invariant on (entity, body, person, source_type, source_id) and
+-- decides whether to enforce it via a unique index or by ordering on
+-- generated_at (C7).
+--
+-- Constraints follow the T3/T5/T6/T7 convention: extract both inline
+-- CHECKs into explicitly named constraints via the DROP + DO-block
+-- idempotency pattern (C6).
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS parte_votante_current (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id            UUID        NOT NULL,
+  entity_id            UUID        NOT NULL REFERENCES entities(id),
+  body_id              UUID        NULL REFERENCES governing_bodies(id),
+  person_id            UUID        NOT NULL REFERENCES persons(id),
+  source_type          TEXT        NOT NULL
+                                    CONSTRAINT chk_parte_votante_current_source_type
+                                    CHECK (source_type IN ('CAPITAL','CARGO')),
+  source_id            UUID        NOT NULL,
+  voting_rights        BOOLEAN     NOT NULL,
+  voting_weight        NUMERIC     NOT NULL DEFAULT 0,
+  denominator_weight   NUMERIC     NOT NULL DEFAULT 0,
+  exclusion_policy     TEXT        NOT NULL DEFAULT 'NONE'
+                                    CONSTRAINT chk_parte_votante_current_exclusion_policy
+                                    CHECK (exclusion_policy IN (
+                                      'NONE','EXCLUIR_QUORUM','EXCLUIR_VOTO','EXCLUIR_AMBOS'
+                                    )),
+  exclusion_reason     TEXT,
+  generated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Clean up auto-named inline CHECKs from prior migration runs, then add
+-- the explicitly named ones. Same idempotency pattern as T3/T5/T6/T7:
+-- CREATE TABLE IF NOT EXISTS no-ops on existing tables, so already-
+-- migrated envs wouldn't otherwise pick up the rename.
+ALTER TABLE parte_votante_current
+  DROP CONSTRAINT IF EXISTS parte_votante_current_source_type_check;
+
+ALTER TABLE parte_votante_current
+  DROP CONSTRAINT IF EXISTS parte_votante_current_exclusion_policy_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_parte_votante_current_source_type'
+      AND conrelid = 'parte_votante_current'::regclass
+  ) THEN
+    ALTER TABLE parte_votante_current
+      ADD CONSTRAINT chk_parte_votante_current_source_type
+      CHECK (source_type IN ('CAPITAL','CARGO'));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_parte_votante_current_exclusion_policy'
+      AND conrelid = 'parte_votante_current'::regclass
+  ) THEN
+    ALTER TABLE parte_votante_current
+      ADD CONSTRAINT chk_parte_votante_current_exclusion_policy
+      CHECK (exclusion_policy IN (
+        'NONE','EXCLUIR_QUORUM','EXCLUIR_VOTO','EXCLUIR_AMBOS'
+      ));
+  END IF;
+END $$;
+
+-- Scan index for the hot "¿quién forma la base votante de este órgano?"
+-- query path — (entity_id, body_id) covers both junta-level (body_id
+-- NULL) and consejo-level (body_id set) reads. No partial predicate on
+-- generated_at because this table is a CURRENT projection: T10 rewrites
+-- it atomically on refresh, so every row is always "current" by
+-- construction.
+CREATE INDEX IF NOT EXISTS idx_parte_votante_current_entity_body
+  ON parte_votante_current(entity_id, body_id);
+
 COMMIT;

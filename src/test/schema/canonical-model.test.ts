@@ -954,3 +954,230 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T8 parte_votante_current",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+    // Sentinel person IDs — T8 uses the dddddddd-* prefix so it can never
+    // collide with T5 (aaaaaaaa-*), T6 (bbbbbbbb-*), or T7 (cccccccc-*).
+    // Declared up front per the T6-M1 / T7 convention so the cleanup list
+    // is stable and readable without runtime pushes.
+    const PERSON_A = "dddddddd-0000-0000-0000-000000000001";
+    const PERSON_B = "dddddddd-0000-0000-0000-000000000002";
+    const PERSON_C = "dddddddd-0000-0000-0000-000000000003";
+    const PERSON_D = "dddddddd-0000-0000-0000-000000000004";
+    const PERSON_E = "dddddddd-0000-0000-0000-000000000005";
+    const testPersonIds = [PERSON_A, PERSON_B, PERSON_C, PERSON_D, PERSON_E];
+
+    // Cleanup narrowed to rows this block inserted (rows whose person_id
+    // is one of the sentinels). persons rows are fixtures left in place —
+    // upsert makes re-seeding free. Using .in() for a single round-trip.
+    afterEach(async () => {
+      if (!supabaseAdmin) return;
+      await supabaseAdmin
+        .from("parte_votante_current")
+        .delete()
+        .in("person_id", testPersonIds);
+    });
+
+    // Inline helper duplicated from T5/T6/T7 per established convention:
+    // each describe block is self-contained. T8 only needs 'PF' because
+    // the voting base rows refer to natural persons (socios or cargos).
+    async function ensurePerson(id: string, fullName: string) {
+      const { error } = await supabaseAdmin!
+        .from("persons")
+        .upsert(
+          {
+            id,
+            tenant_id: DEMO_TENANT,
+            full_name: fullName,
+            person_type: "PF",
+            tax_id: `TEST-${id.replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+      expect(error).toBeNull();
+    }
+
+    it("parte_votante_current table exists with required columns", async () => {
+      // Structural probe via PostgREST (C1): `execute_sql` RPC is not
+      // exposed on this project, so we prove column presence by SELECTing
+      // them with .limit(0) — a clean response (error === null) means
+      // every T8 column landed and is PostgREST-visible. This test runs
+      // unconditionally — it does not require DEMO_ENTITY_ARGA to exist.
+      const { error } = await supabaseAdmin!
+        .from("parte_votante_current")
+        .select(
+          "id, tenant_id, entity_id, body_id, person_id, source_type, source_id, voting_rights, voting_weight, denominator_weight, exclusion_policy, exclusion_reason, generated_at"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("chk_parte_votante_current_exclusion_policy rejects invalid exclusion_policy values", async () => {
+      // Behavioral probe (C1): instead of reading pg_constraint via
+      // execute_sql (not available), we attempt an INSERT with an invalid
+      // exclusion_policy and expect the CHECK to fire. Strictly stronger
+      // than reading pg_get_constraintdef text because it verifies the
+      // constraint is actually enforced.
+      //
+      // Soft-skip on missing entity (C5): this INSERT needs FK-resolvable
+      // entity/person, so if DEMO_ENTITY_ARGA isn't seeded yet, bail with
+      // a visible console.warn rather than hit FK before CHECK.
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T8] Skipping chk_parte_votante_current_exclusion_policy test — DEMO_ENTITY_ARGA not present. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_A, "Test exclusion invalid");
+
+      const { error } = await supabaseAdmin!
+        .from("parte_votante_current")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          body_id: null,
+          person_id: PERSON_A,
+          source_type: "CAPITAL",
+          source_id: "00000000-0000-0000-0000-000000000000",
+          voting_rights: true,
+          voting_weight: 1,
+          denominator_weight: 1,
+          exclusion_policy: "INVALID_POLICY", // should fire the CHECK
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_parte_votante_current_exclusion_policy|check.*constraint/
+      );
+    });
+
+    it("chk_parte_votante_current_source_type rejects invalid source_type values", async () => {
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T8] Skipping chk_parte_votante_current_source_type test — DEMO_ENTITY_ARGA not present. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_B, "Test source_type invalid");
+
+      const { error } = await supabaseAdmin!
+        .from("parte_votante_current")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          body_id: null,
+          person_id: PERSON_B,
+          source_type: "INVALID_SOURCE", // should fire the CHECK
+          source_id: "00000000-0000-0000-0000-000000000000",
+          voting_rights: true,
+          voting_weight: 1,
+          denominator_weight: 1,
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_parte_votante_current_source_type|check.*constraint/
+      );
+    });
+
+    it("accepts all 4 exclusion_policy values (NONE, EXCLUIR_QUORUM, EXCLUIR_VOTO, EXCLUIR_AMBOS)", async () => {
+      // Positive coverage: prove the CHECK allows every documented value.
+      // Plan's original intent was to assert via pg_get_constraintdef that
+      // all four appear in the definition; the behavioral variant (INSERT
+      // one row per policy, all succeed) is strictly stronger.
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T8] Skipping exclusion_policy-accepts-all-4 test — DEMO_ENTITY_ARGA not present. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_C, "Test 4 policies");
+
+      const policies = ["NONE", "EXCLUIR_QUORUM", "EXCLUIR_VOTO", "EXCLUIR_AMBOS"];
+      for (const policy of policies) {
+        const { error } = await supabaseAdmin!
+          .from("parte_votante_current")
+          .insert({
+            tenant_id: DEMO_TENANT,
+            entity_id: entityId,
+            body_id: null,
+            person_id: PERSON_C,
+            source_type: "CAPITAL",
+            // source_id polymorphic (C9) — a zero-UUID placeholder is fine
+            // here because T8 itself adds NO FK on source_id; T10's refresh
+            // function is what enforces referential integrity against
+            // capital_holdings or condiciones_persona.
+            source_id: "00000000-0000-0000-0000-000000000000",
+            voting_rights: true,
+            voting_weight: 1,
+            denominator_weight: 1,
+            exclusion_policy: policy,
+          });
+        expect(error, `policy=${policy} should be accepted`).toBeNull();
+      }
+    });
+
+    it("applies column defaults (voting_weight=0, denominator_weight=0, exclusion_policy='NONE')", async () => {
+      // Happy-path write-read: verify the three defaults we explicitly set
+      // in the DDL. PostgREST serialises NUMERIC as string (C10), so the
+      // voting_weight/denominator_weight assertions coerce via Number().
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T8] Skipping column-defaults test — DEMO_ENTITY_ARGA not present. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_D, "Test defaults");
+
+      const { data, error } = await supabaseAdmin!
+        .from("parte_votante_current")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          body_id: null,
+          person_id: PERSON_D,
+          source_type: "CAPITAL",
+          source_id: "00000000-0000-0000-0000-000000000000",
+          voting_rights: true,
+          // voting_weight, denominator_weight, exclusion_policy omitted —
+          // defaults should apply (0, 0, 'NONE').
+        })
+        .select()
+        .maybeSingle();
+      expect(error).toBeNull();
+      expect(data).not.toBeNull();
+      expect(Number(data!.voting_weight)).toBe(0);
+      expect(Number(data!.denominator_weight)).toBe(0);
+      expect(data!.exclusion_policy).toBe("NONE");
+    });
+  }
+);
