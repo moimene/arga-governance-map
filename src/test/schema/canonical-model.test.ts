@@ -339,6 +339,12 @@ describe.skipIf(!hasAdminClient())(
       // project (CHECK: 'PF'|'PJ'). Using upsert with ignoreDuplicates
       // because rerunning the test suite must not fail on the second
       // insert, and we don't need to mutate existing person rows.
+      //
+      // tax_id derivation: persons.tax_id is currently `text` with no
+      // UNIQUE constraint and no format CHECK (verified 2026-04-21),
+      // but if a UNIQUE constraint is added later, test IDs derived
+      // from only the last UUID char would collide. Derive from the
+      // full UUID hex so each sentinel person gets a distinct tax_id.
       const { error } = await supabaseAdmin!
         .from("persons")
         .upsert(
@@ -347,7 +353,7 @@ describe.skipIf(!hasAdminClient())(
             tenant_id: DEMO_TENANT,
             full_name: fullName,
             person_type: "PF",
-            tax_id: `X111111${id.slice(-1)}A`,
+            tax_id: `TEST-${id.replace(/-/g, "").slice(0, 12).toUpperCase()}`,
           },
           { onConflict: "id", ignoreDuplicates: true }
         );
@@ -415,7 +421,15 @@ describe.skipIf(!hasAdminClient())(
         .eq("entity_id", entityId)
         .limit(1);
       if (!bodies || bodies.length === 0) {
-        // Cannot exercise CHECK without a valid body_id — skip softly.
+        // Cannot exercise CHECK without a valid body_id. Log visibly so
+        // the gap shows in CI rather than passing silently green — T14
+        // bootstrap must seed at least one governing_bodies row for
+        // DEMO_ENTITY_ARGA to exercise chk_condicion_body_coherente
+        // path B.
+        console.warn(
+          "[T5] Skipping SOCIO+body_id rejection test — DEMO_ENTITY_ARGA has no governing_bodies. " +
+          "T14 bootstrap must seed at least one body to exercise chk_condicion_body_coherente path B."
+        );
         return;
       }
       const bodyId = bodies[0].id;
