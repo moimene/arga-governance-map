@@ -194,7 +194,7 @@ function getStatusBadgeColor(status: string): "success" | "info" | "warning" | "
     case "FALLIDA":
       return "error";
     default:
-      return "muted";
+      return "info";
   }
 }
 

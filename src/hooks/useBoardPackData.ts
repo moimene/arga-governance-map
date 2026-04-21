@@ -440,7 +440,7 @@ export function useBoardPackData(meetingId: string): {
       pending: campaignAtts
         .filter((a) => a.status === "Pendiente")
         .map((a) => ({
-          person_name: a.persons?.full_name ?? "—",
+          person_name: a.persons?.[0]?.full_name ?? "—",
           campaign: a.campaign,
           status: a.status,
           completed_at: a.completed_at,

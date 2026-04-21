@@ -71,7 +71,7 @@ export default function GenerarDocumentoStepper() {
   );
   const [archiveUrl, setArchiveUrl] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
-  const [docxBuffer, setDocxBuffer] = useState<ArrayBuffer | null>(null);
+  const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
 
   const { signMutation } = useQTSPSign();
 
