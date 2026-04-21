@@ -148,7 +148,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS share_classes (
   id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id              UUID        NOT NULL,
-  entity_id              UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  entity_id              UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE, -- FK auto-named share_classes_entity_id_fkey
   class_code             TEXT        NOT NULL,
   name                   TEXT        NOT NULL,
   votes_per_title        NUMERIC     NOT NULL DEFAULT 1,
@@ -162,12 +162,5 @@ CREATE TABLE IF NOT EXISTS share_classes (
 -- its own class vocabulary; same code in different entities is allowed.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_share_class_entity_code
   ON share_classes(entity_id, class_code);
-
--- Single-column lookup index for the common "list all classes for this
--- entity" query pattern. The composite UX above covers exact-match
--- lookups but not prefix scans / aggregations; matches T3 pattern with
--- idx_entity_capital_profile_entity.
-CREATE INDEX IF NOT EXISTS idx_share_classes_entity
-  ON share_classes(entity_id);
 
 COMMIT;
