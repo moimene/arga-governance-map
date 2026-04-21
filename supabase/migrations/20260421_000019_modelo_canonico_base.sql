@@ -75,4 +75,41 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------
+-- T3. entity_capital_profile — capital social histórico
+-- One entity has zero-or-one VIGENTE row (enforced by partial unique index)
+-- plus zero-or-more HISTORICO rows for audit/retrospection. Phase 1
+-- (T6+) will reference the VIGENTE row via share_classes and
+-- capital_holdings. CHECK is inline (no DO $$ guard needed) because
+-- CREATE TABLE IF NOT EXISTS is atomic — either the table exists with
+-- all constraints or it does not.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS entity_capital_profile (
+  id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id              UUID        NOT NULL,
+  entity_id              UUID        NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  currency               TEXT        NOT NULL DEFAULT 'EUR',
+  capital_escriturado    NUMERIC     NOT NULL,
+  capital_desembolsado   NUMERIC,
+  numero_titulos         NUMERIC,
+  valor_nominal          NUMERIC,
+  estado                 TEXT        NOT NULL DEFAULT 'VIGENTE'
+                                     CHECK (estado IN ('VIGENTE','HISTORICO')),
+  effective_from         DATE        NOT NULL,
+  effective_to           DATE,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Partial unique index: enforces at most one VIGENTE row per entity at
+-- the DB level. HISTORICO rows are unconstrained (no uniqueness), so
+-- audit trails can hold multiple past states.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_entity_capital_vigente
+  ON entity_capital_profile(entity_id)
+  WHERE estado = 'VIGENTE';
+
+-- Composite index for time-series lookups (entity timeline ordering).
+CREATE INDEX IF NOT EXISTS idx_entity_capital_profile_entity
+  ON entity_capital_profile(entity_id, effective_from);
+
 COMMIT;

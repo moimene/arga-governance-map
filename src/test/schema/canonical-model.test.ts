@@ -16,6 +16,7 @@ import {
   supabaseAdmin,
   hasAdminClient,
   DEMO_TENANT,
+  DEMO_ENTITY_ARGA,
 } from "../helpers/supabase-test-client";
 
 describe.skipIf(!hasAdminClient())(
@@ -76,5 +77,132 @@ describe.skipIf(!hasAdminClient())(
         // intentionally empty
       }
     );
+  }
+);
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T3 entity_capital_profile",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+
+    it("entity_capital_profile table exists with required columns", async () => {
+      const { error } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .select(
+          "id, tenant_id, entity_id, capital_escriturado, capital_desembolsado, numero_titulos, valor_nominal, currency, estado, effective_from, effective_to"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("estado CHECK constraint rejects invalid values", async () => {
+      // clean slate
+      await supabaseAdmin!
+        .from("entity_capital_profile")
+        .delete()
+        .eq("entity_id", entityId);
+
+      const { error } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 100000,
+          estado: "INVALID_STATE",
+          effective_from: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /check.*constraint|estado/
+      );
+    });
+
+    it("ux_entity_capital_vigente rejects two VIGENTE rows for the same entity", async () => {
+      // clean slate
+      await supabaseAdmin!
+        .from("entity_capital_profile")
+        .delete()
+        .eq("entity_id", entityId);
+
+      const { error: err1 } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 100000,
+          effective_from: "2026-01-01",
+          // estado defaults to VIGENTE
+        });
+      expect(err1).toBeNull();
+
+      const { error: err2 } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 200000,
+          effective_from: "2026-06-01",
+        });
+      expect(err2).not.toBeNull();
+      expect(err2!.message.toLowerCase()).toMatch(
+        /ux_entity_capital_vigente|unique|duplicate/
+      );
+
+      // cleanup for next test
+      await supabaseAdmin!
+        .from("entity_capital_profile")
+        .delete()
+        .eq("entity_id", entityId);
+    });
+
+    it("allows one VIGENTE + multiple HISTORICO rows for the same entity", async () => {
+      await supabaseAdmin!
+        .from("entity_capital_profile")
+        .delete()
+        .eq("entity_id", entityId);
+
+      // HISTORICO — one
+      const { error: errH1 } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 50000,
+          effective_from: "2024-01-01",
+          effective_to: "2024-12-31",
+          estado: "HISTORICO",
+        });
+      expect(errH1).toBeNull();
+
+      // HISTORICO — two
+      const { error: errH2 } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 75000,
+          effective_from: "2025-01-01",
+          effective_to: "2025-12-31",
+          estado: "HISTORICO",
+        });
+      expect(errH2).toBeNull();
+
+      // VIGENTE — only one allowed
+      const { error: errV } = await supabaseAdmin!
+        .from("entity_capital_profile")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          capital_escriturado: 100000,
+          effective_from: "2026-01-01",
+        });
+      expect(errV).toBeNull();
+
+      // cleanup
+      await supabaseAdmin!
+        .from("entity_capital_profile")
+        .delete()
+        .eq("entity_id", entityId);
+    });
   }
 );
