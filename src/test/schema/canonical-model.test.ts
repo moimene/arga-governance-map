@@ -613,5 +613,55 @@ describe.skipIf(!hasAdminClient())(
       // to a plain JS object.
       expect(data!.metadata).toEqual({});
     });
+
+    it("CHECK chk_capital_holdings_effective_interval rechaza effective_to < effective_from", async () => {
+      const id = "bbbbbbbb-0000-0000-0000-000000000005";
+      testPersonIds.push(id);
+      await ensurePerson(id, "Test interval");
+
+      const { error } = await supabaseAdmin!.from("capital_holdings").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        holder_person_id: id,
+        numero_titulos: 100,
+        effective_from: "2026-06-01",
+        effective_to: "2026-01-01", // inverted
+      });
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toMatch(
+        /chk_capital_holdings_effective_interval|effective_to|check.*constraint/i
+      );
+    });
+
+    it("ux_capital_holdings_vigente impide dos VIGENTE mismo (entity, holder, share_class)", async () => {
+      const id = "bbbbbbbb-0000-0000-0000-000000000006";
+      testPersonIds.push(id);
+      await ensurePerson(id, "Test vigente unique");
+
+      // First VIGENTE insert — OK
+      const { error: err1 } = await supabaseAdmin!.from("capital_holdings").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        holder_person_id: id,
+        share_class_id: null, // NULL body class — COALESCE sentinel applies
+        numero_titulos: 50,
+        effective_from: "2026-01-01",
+      });
+      expect(err1).toBeNull();
+
+      // Second VIGENTE insert — FAIL (same entity, holder, NULL share_class, and
+      // both effective_to IS NULL).
+      const { error: err2 } = await supabaseAdmin!.from("capital_holdings").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        holder_person_id: id,
+        share_class_id: null,
+        numero_titulos: 30,
+        effective_from: "2026-02-01",
+      });
+      expect(err2).not.toBeNull();
+      expect(err2?.message).toMatch(/ux_capital_holdings_vigente/i);
+    });
   }
 );

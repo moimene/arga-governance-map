@@ -340,6 +340,26 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------
+-- Temporal validity invariant: effective_to must be NULL or >= effective_from
+-- (Added in T6 hardening: code review flagged the missing invariant.
+-- Without it, inverted intervals would silently corrupt historical queries.)
+-- ---------------------------------------------------------------------
+ALTER TABLE capital_holdings
+  DROP CONSTRAINT IF EXISTS chk_capital_holdings_effective_interval;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_capital_holdings_effective_interval'
+      AND conrelid = 'capital_holdings'::regclass
+  ) THEN
+    ALTER TABLE capital_holdings
+      ADD CONSTRAINT chk_capital_holdings_effective_interval
+      CHECK (effective_to IS NULL OR effective_to >= effective_from);
+  END IF;
+END $$;
+
 -- Three indexes, each doing distinct work (verified non-redundant):
 --  - idx_capital_holdings_entity (entity_id, effective_to): composite
 --    for historical timeline queries ("all holdings past+current for X,
@@ -359,5 +379,18 @@ CREATE INDEX IF NOT EXISTS idx_capital_holdings_holder
 
 CREATE INDEX IF NOT EXISTS idx_capital_holdings_entity_vigente
   ON capital_holdings(entity_id) WHERE effective_to IS NULL;
+
+-- COALESCE partial unique: prevents two VIGENTE holdings of the same
+-- (entity, holder, share_class). share_class_id is nullable, so we use
+-- the T5-style sentinel to make NULLs collide.
+-- Without this, fn_refresh_parte_votante_entity (T10) would double-count
+-- a holder with two VIGENTE rows of the same class.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_capital_holdings_vigente
+  ON capital_holdings(
+    entity_id,
+    holder_person_id,
+    COALESCE(share_class_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  )
+  WHERE effective_to IS NULL;
 
 COMMIT;
