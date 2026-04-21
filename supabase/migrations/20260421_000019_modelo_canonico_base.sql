@@ -671,4 +671,113 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_parte_votante_current_entity_body
   ON parte_votante_current(entity_id, body_id);
 
+-- ---------------------------------------------------------------------
+-- 8. censo_snapshot — inmutable, WORM integrado (T9 — CA-7)
+-- ---------------------------------------------------------------------
+-- Append-only snapshot that freezes the voting census for a specific
+-- session (meeting / no-session / unipersonal). Once written, rows are
+-- WORM: UPDATE and DELETE are blocked by BEFORE triggers that raise an
+-- exception whose message contains "inmutable" (the T9 test regex
+-- matches /inmutable/i).
+--
+-- session_kind distinguishes the three adoption flows; snapshot_type
+-- distinguishes the stake basis (ECONOMICO = capital holders with
+-- economic rights, POLITICO = voting rights carriers, UNIVERSAL = both).
+--
+-- audit_worm_id stays NULL-able and FK-less on purpose: T11 is responsible
+-- for adding the FK to audit_worm_trail(id) after the final column name
+-- and idempotency semantics are agreed. Keeping the column present now
+-- means T11 can ALTER TABLE ADD CONSTRAINT without another migration to
+-- add the column.
+--
+-- body_id keeps its nullable semantics (C8 from T8): junta-level snapshots
+-- use body_id NULL, consejo-level snapshots point at the specific
+-- governing_bodies row.
+--
+-- Constraints follow the T3/T5/T6/T7/T8 convention: extract inline CHECKs
+-- into explicitly named constraints via the DROP + DO-block idempotency
+-- pattern (C6), avoiding auto-generated *_check names.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS censo_snapshot (
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID        NOT NULL,
+  meeting_id          UUID        NOT NULL,
+  session_kind        TEXT        NOT NULL
+                                    CONSTRAINT chk_censo_snapshot_session_kind
+                                    CHECK (session_kind IN ('MEETING','NO_SESSION','UNIPERSONAL')),
+  entity_id           UUID        NOT NULL REFERENCES entities(id),
+  body_id             UUID        NULL REFERENCES governing_bodies(id),
+  snapshot_type       TEXT        NOT NULL
+                                    CONSTRAINT chk_censo_snapshot_snapshot_type
+                                    CHECK (snapshot_type IN ('ECONOMICO','POLITICO','UNIVERSAL')),
+  payload             JSONB       NOT NULL,
+  capital_total_base  NUMERIC,
+  total_partes        INT         NOT NULL,
+  audit_worm_id       UUID        NULL,   -- FK added in T11 (deferred per plan)
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Clean up auto-named inline CHECKs from prior migration runs, then add
+-- the explicitly named ones. CREATE TABLE IF NOT EXISTS no-ops on
+-- existing tables, so already-migrated envs wouldn't otherwise pick up
+-- the rename.
+ALTER TABLE censo_snapshot
+  DROP CONSTRAINT IF EXISTS censo_snapshot_session_kind_check;
+
+ALTER TABLE censo_snapshot
+  DROP CONSTRAINT IF EXISTS censo_snapshot_snapshot_type_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_censo_snapshot_session_kind'
+      AND conrelid = 'censo_snapshot'::regclass
+  ) THEN
+    ALTER TABLE censo_snapshot
+      ADD CONSTRAINT chk_censo_snapshot_session_kind
+      CHECK (session_kind IN ('MEETING','NO_SESSION','UNIPERSONAL'));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_censo_snapshot_snapshot_type'
+      AND conrelid = 'censo_snapshot'::regclass
+  ) THEN
+    ALTER TABLE censo_snapshot
+      ADD CONSTRAINT chk_censo_snapshot_snapshot_type
+      CHECK (snapshot_type IN ('ECONOMICO','POLITICO','UNIVERSAL'));
+  END IF;
+END $$;
+
+-- Hot path: "censo for a meeting" lookup. (meeting_id, snapshot_type)
+-- covers both the common "economico snapshot for meeting X" query and
+-- the less frequent POLITICO/UNIVERSAL variants.
+CREATE INDEX IF NOT EXISTS idx_censo_snapshot_meeting
+  ON censo_snapshot(meeting_id, snapshot_type);
+
+-- Shared guard function — one implementation, two triggers. The exception
+-- message MUST contain the substring "inmutable" because the T9 test
+-- regex matches /inmutable/i; any rewording here breaks CA-7 coverage.
+CREATE OR REPLACE FUNCTION trg_block_censo_snapshot_ud()
+RETURNS TRIGGER AS $$
+BEGIN
+  RAISE EXCEPTION 'censo_snapshot es inmutable (WORM). Operaciones UPDATE/DELETE prohibidas.';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_block_censo_snapshot_update ON censo_snapshot;
+CREATE TRIGGER trg_block_censo_snapshot_update
+  BEFORE UPDATE ON censo_snapshot
+  FOR EACH ROW EXECUTE FUNCTION trg_block_censo_snapshot_ud();
+
+DROP TRIGGER IF EXISTS trg_block_censo_snapshot_delete ON censo_snapshot;
+CREATE TRIGGER trg_block_censo_snapshot_delete
+  BEFORE DELETE ON censo_snapshot
+  FOR EACH ROW EXECUTE FUNCTION trg_block_censo_snapshot_ud();
+
 COMMIT;
