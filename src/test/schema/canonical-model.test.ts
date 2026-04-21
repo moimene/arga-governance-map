@@ -863,5 +863,94 @@ describe.skipIf(!hasAdminClient())(
         /chk_representacion_porcentaje_delegado|porcentaje_delegado|check.*constraint/
       );
     });
+
+    it("CHECK chk_representacion_effective_interval rechaza effective_to < effective_from", async () => {
+      // Use cccccccc-...-000000000005 (representado PJ) + ...000000000006 (representante PF)
+      // Add both to testPersonIds so afterEach cleanup picks them up.
+      const pPj = "cccccccc-0000-0000-0000-000000000005";
+      const pRep = "cccccccc-0000-0000-0000-000000000006";
+      testPersonIds.push(pPj, pRep);
+      await ensurePerson(pPj, "Test interval PJ", "PJ");
+      await ensurePerson(pRep, "Test interval REP", "PF");
+
+      // Soft-skip if DEMO_ENTITY_ARGA absent (matches existing T7 tests)
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", DEMO_ENTITY_ARGA)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T7-hardening] Skipping effective_interval CHECK test — DEMO_ENTITY_ARGA absent. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      const { error } = await supabaseAdmin!.from("representaciones").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        represented_person_id: pPj,
+        representative_person_id: pRep,
+        scope: "ADMIN_PJ_REPRESENTANTE",
+        meeting_id: null,
+        effective_from: "2026-06-01",
+        effective_to: "2026-01-01", // inverted
+      });
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toMatch(
+        /chk_representacion_effective_interval|effective_to|check.*constraint/i
+      );
+    });
+
+    it("ux_representaciones_vigente impide dos VIGENTE mismo (entity, represented, scope, meeting)", async () => {
+      const pPj = "cccccccc-0000-0000-0000-000000000007";
+      const pRep1 = "cccccccc-0000-0000-0000-000000000008";
+      const pRep2 = "cccccccc-0000-0000-0000-000000000009";
+      testPersonIds.push(pPj, pRep1, pRep2);
+      await ensurePerson(pPj, "Test vigente unique PJ", "PJ");
+      await ensurePerson(pRep1, "Test vigente unique REP1", "PF");
+      await ensurePerson(pRep2, "Test vigente unique REP2", "PF");
+
+      // Soft-skip on missing entity
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", DEMO_ENTITY_ARGA)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T7-hardening] Skipping VIGENTE unique test — DEMO_ENTITY_ARGA absent. " +
+          "T14 bootstrap will unblock."
+        );
+        return;
+      }
+
+      // First ADMIN_PJ_REPRESENTANTE row — OK
+      const { error: err1 } = await supabaseAdmin!.from("representaciones").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        represented_person_id: pPj,
+        representative_person_id: pRep1,
+        scope: "ADMIN_PJ_REPRESENTANTE",
+        meeting_id: null,
+        effective_from: "2026-01-01",
+      });
+      expect(err1).toBeNull();
+
+      // Second ADMIN_PJ_REPRESENTANTE row for same (entity, represented, scope, NULL meeting) — FAIL
+      const { error: err2 } = await supabaseAdmin!.from("representaciones").insert({
+        tenant_id: DEMO_TENANT,
+        entity_id: DEMO_ENTITY_ARGA,
+        represented_person_id: pPj,
+        representative_person_id: pRep2, // even if a different representative — scope+meeting already consumed
+        scope: "ADMIN_PJ_REPRESENTANTE",
+        meeting_id: null,
+        effective_from: "2026-02-01",
+      });
+      expect(err2).not.toBeNull();
+      expect(err2?.message).toMatch(/ux_representaciones_vigente/i);
+    });
   }
 );
