@@ -78,5 +78,26 @@ describe.skipIf(!hasAdminClient())(
       const uniq = new Set(ids);
       expect(ids.length).toBe(uniq.size);
     });
+
+    // Hardening test (T14 code-quality review, "Important #3"):
+    // Verifica que cada PJ creada por el bootstrap apunta al entity correcto
+    // vía el tax_id sintético 'PENDIENTE-<entity.id>'. Un cross-link (la misma
+    // entity apuntando a la PJ equivocada) pasaría los 3 tests anteriores pero
+    // fallaría aquí. Cubre el riesgo de colisión de tax_id con PJs
+    // pre-existentes — el CTE+RETURNING en la migración ya lo bloquea en
+    // origen; este test es el guardrail que lo verifica en Cloud.
+    it("cada PJ creada por bootstrap tiene tax_id = PENDIENTE-<entity.id>", async () => {
+      const { data, error } = await supabaseAdmin!
+        .from("entities")
+        .select("id, registration_number, persons:person_id(tax_id)")
+        .not("person_id", "is", null);
+      expect(error).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wrong = (data ?? []).filter((e: any) => {
+        const expected = `PENDIENTE-${e.id}`;
+        return e.persons?.tax_id !== expected;
+      });
+      expect(wrong).toEqual([]);
+    });
   }
 );
