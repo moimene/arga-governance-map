@@ -19,7 +19,6 @@ type BodyRow = {
   name: string;
   body_type: string | null;
   entity_id: string;
-  status: string | null;
 };
 type PolicyRow = {
   id: string;
@@ -41,12 +40,11 @@ type FindingRow = {
   severity: string | null;
   status: string | null;
   entity_id: string | null;
-  policy_id: string | null;
 };
 type DelegationRow = {
   id: string;
   code: string;
-  title: string;
+  delegation_type: string | null;
   status: string | null;
   entity_id: string | null;
 };
@@ -110,7 +108,7 @@ export function useGovernanceMapData() {
           .order("common_name"),
         supabase
           .from("governing_bodies")
-          .select("id, slug, name, body_type, entity_id, status")
+          .select("id, slug, name, body_type, entity_id")
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("policies")
@@ -123,11 +121,11 @@ export function useGovernanceMapData() {
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("findings")
-          .select("id, code, title, severity, status, entity_id, policy_id")
+          .select("id, code, title, severity, status, entity_id")
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("delegations")
-          .select("id, code, title, status, entity_id")
+          .select("id, code, delegation_type, status, entity_id")
           .eq("tenant_id", DEMO_TENANT),
       ]);
       if (entRes.error) throw entRes.error;
@@ -198,7 +196,7 @@ export function useGovernanceMapData() {
             data: {
               label: b.name,
               type: "organ",
-              status: b.status ? { label: b.status, tone: "pending" } : undefined,
+              status: undefined,
               href: `/organos/${b.slug}`,
             },
           });
@@ -287,16 +285,6 @@ export function useGovernanceMapData() {
             labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
           });
         }
-        if (f.policy_id) {
-          edges.push({
-            id: `e:fnd-pol:${f.id}`,
-            source: `find:${f.id}`,
-            target: `policy:${f.policy_id}`,
-            label: "origen",
-            type: "smoothstep",
-            style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.2 },
-          });
-        }
       });
 
       // Delegaciones — al lado de findings
@@ -306,7 +294,7 @@ export function useGovernanceMapData() {
           type: "gov",
           position: { x: (i - delegations.length / 2) * 260 + 400, y: DEL_Y },
           data: {
-            label: `${d.code} — ${d.title}`,
+            label: `${d.code} — ${d.delegation_type ?? ""}`,
             type: "delegation",
             status:
               d.status === "CADUCADA" || d.status === "Caducada"
