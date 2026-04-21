@@ -285,16 +285,6 @@ export function useGovernanceMapData() {
             labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
           });
         }
-        if (f.policy_id) {
-          edges.push({
-            id: `e:fnd-pol:${f.id}`,
-            source: `find:${f.id}`,
-            target: `policy:${f.policy_id}`,
-            label: "origen",
-            type: "smoothstep",
-            style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.2 },
-          });
-        }
       });
 
       // Delegaciones — al lado de findings
@@ -304,7 +294,7 @@ export function useGovernanceMapData() {
           type: "gov",
           position: { x: (i - delegations.length / 2) * 260 + 400, y: DEL_Y },
           data: {
-            label: `${d.code} — ${d.title}`,
+            label: `${d.code} — ${d.delegation_type ?? ""}`,
             type: "delegation",
             status:
               d.status === "CADUCADA" || d.status === "Caducada"
