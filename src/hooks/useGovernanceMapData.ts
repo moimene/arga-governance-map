@@ -19,7 +19,6 @@ type BodyRow = {
   name: string;
   body_type: string | null;
   entity_id: string;
-  status: string | null;
 };
 type PolicyRow = {
   id: string;
@@ -41,12 +40,11 @@ type FindingRow = {
   severity: string | null;
   status: string | null;
   entity_id: string | null;
-  policy_id: string | null;
 };
 type DelegationRow = {
   id: string;
   code: string;
-  title: string;
+  delegation_type: string | null;
   status: string | null;
   entity_id: string | null;
 };
