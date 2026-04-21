@@ -40,6 +40,7 @@ type FindingRow = {
   severity: string | null;
   status: string | null;
   entity_id: string | null;
+  obligation_id: string | null;
 };
 type DelegationRow = {
   id: string;
@@ -121,7 +122,7 @@ export function useGovernanceMapData() {
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("findings")
-          .select("id, code, title, severity, status, entity_id")
+          .select("id, code, title, severity, status, entity_id, obligation_id")
           .eq("tenant_id", DEMO_TENANT),
         supabase
           .from("delegations")
@@ -141,6 +142,12 @@ export function useGovernanceMapData() {
       const obligations = (oblRes.data ?? []) as ObligationRow[];
       const findings = (findRes.data ?? []) as FindingRow[];
       const delegations = (delRes.data ?? []) as DelegationRow[];
+
+      // Mapa obligación → política, para trazar finding → policy indirectamente
+      const oblToPolicy = new Map<string, string>();
+      for (const o of obligations) {
+        if (o.policy_id) oblToPolicy.set(o.id, o.policy_id);
+      }
 
       const pos = layoutEntities(entities);
       const nodes: Node<GovNodeData>[] = [];
@@ -283,6 +290,17 @@ export function useGovernanceMapData() {
             type: "smoothstep",
             style: { stroke: "hsl(var(--destructive))", strokeWidth: 1.5, strokeDasharray: "4 3" },
             labelStyle: { fill: "hsl(var(--destructive))", fontWeight: 600 },
+          });
+        }
+        const policyId = f.obligation_id ? oblToPolicy.get(f.obligation_id) : undefined;
+        if (policyId) {
+          edges.push({
+            id: `e:fnd-pol:${f.id}`,
+            source: `find:${f.id}`,
+            target: `policy:${policyId}`,
+            label: "origen",
+            type: "smoothstep",
+            style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.2 },
           });
         }
       });
