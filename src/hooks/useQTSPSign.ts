@@ -155,7 +155,7 @@ export function useQTSPSign() {
         );
 
         // Extract evidence hash from result
-        const evidenceHash = result.status?.hash || `SHA256-${evidenceId}`;
+        const evidenceHash = (result as any).hash || `SHA256-${evidenceId}`;
 
         return {
           ok: true,

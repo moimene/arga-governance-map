@@ -71,7 +71,7 @@ export default function GenerarDocumentoStepper() {
   );
   const [archiveUrl, setArchiveUrl] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
-  const [docxBuffer, setDocxBuffer] = useState<ArrayBuffer | null>(null);
+  const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
 
   const { signMutation } = useQTSPSign();
 
@@ -156,7 +156,7 @@ export default function GenerarDocumentoStepper() {
     try {
       await signMutation.mutateAsync({
         documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
-        documentData: docxBuffer,
+        documentData: docxBuffer.buffer as ArrayBuffer,
         signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
         createdBy: "secretaria-demo",
         agreementId: agreement.id,
@@ -181,7 +181,7 @@ export default function GenerarDocumentoStepper() {
 
     try {
       const filename = `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}`;
-      const result = await archiveDocxToStorage(docxBuffer, agreement.id, filename);
+      const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename);
 
       if (result.ok) {
         setArchiveUrl(result.documentUrl || null);
