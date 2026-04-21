@@ -86,8 +86,18 @@ export default function PlantillasTracker() {
 
   const plantillas = metrics?.plantillas ?? [];
   const alertas = metrics?.alertas ?? [];
-  const leading = metrics?.leading ?? {};
-  const lagging = metrics?.lagging ?? {};
+  const leading = metrics?.leading ?? {
+    velocidadRedaccion: 0,
+    ratioRetroceso: 0,
+    brechaDisponibilidad: 0,
+    tiempoEnEstado: {} as Record<string, number>,
+    coberturaModos: 0,
+  };
+  const lagging = metrics?.lagging ?? {
+    totalActivas: 0,
+    totalBorradores: 0,
+    totalAprobadas: 0,
+  };
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">

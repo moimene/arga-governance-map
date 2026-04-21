@@ -156,7 +156,7 @@ export default function GenerarDocumentoStepper() {
     try {
       await signMutation.mutateAsync({
         documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
-        documentData: docxBuffer,
+        documentData: docxBuffer.buffer as ArrayBuffer,
         signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
         createdBy: "secretaria-demo",
         agreementId: agreement.id,
