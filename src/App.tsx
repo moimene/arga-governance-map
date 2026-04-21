@@ -187,6 +187,7 @@ const App = () => (
                   <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
                   <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />
+                  <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
                 </Route>

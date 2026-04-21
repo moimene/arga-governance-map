@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,7 +14,10 @@ import {
   Printer,
 } from "lucide-react";
 import { useBoardPackData, type BoardPackData } from "@/hooks/useBoardPackData";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+
+const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 
@@ -419,13 +423,50 @@ function CotizadaWarnings({ warnings }: CotizadaWarningsProps) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function BoardPackPage() {
-  const { id } = useParams<{ id: string }>();
-  const { data: boardPackData, isLoading, error } = useBoardPackData(id || "");
+  const { id: paramId } = useParams<{ id: string }>();
+  // Guard contra `:id` literal (NavLinks mal formados) y valores vacíos.
+  const validParamId = paramId && paramId !== ":id" ? paramId : undefined;
 
-  if (isLoading) {
+  // Fallback: si no viene un id válido en la URL, resolvemos la reunión
+  // más reciente del CdA del tenant demo para que el sidebar "Board Pack"
+  // funcione sin necesidad de elegir reunión previamente.
+  const { data: fallbackMeeting, isLoading: loadingFallback } = useQuery({
+    queryKey: ["board-pack", "fallback-meeting", DEMO_TENANT],
+    enabled: !validParamId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("id, scheduled_start, governing_bodies!inner(body_type)")
+        .eq("tenant_id", DEMO_TENANT)
+        .eq("governing_bodies.body_type", "CDA")
+        .order("scheduled_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string } | null;
+    },
+  });
+
+  const meetingId = validParamId ?? fallbackMeeting?.id ?? "";
+  const { data: boardPackData, isLoading, error } = useBoardPackData(meetingId);
+
+  if (isLoading || loadingFallback) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-[var(--g-text-secondary)]">Cargando Board Pack...</p>
+      </div>
+    );
+  }
+
+  if (!meetingId) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="mx-auto mb-2 h-8 w-8 text-[var(--g-text-secondary)]" />
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            No hay reuniones del Consejo de Administración registradas.
+          </p>
+        </div>
       </div>
     );
   }

@@ -16,7 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard",                to: "/secretaria",                          icon: LayoutDashboard, end: true },
-  { label: "Board Pack",               to: "/secretaria/board-pack/:id",           icon: Briefcase },
+  { label: "Board Pack",               to: "/secretaria/board-pack",               icon: Briefcase },
   { label: "Convocatorias",            to: "/secretaria/convocatorias",            icon: Bell },
   { label: "Reuniones",                to: "/secretaria/reuniones",                icon: Users },
   { label: "Actas",                    to: "/secretaria/actas",                    icon: FileSignature },
