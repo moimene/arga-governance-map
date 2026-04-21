@@ -143,8 +143,52 @@ async function main() {
   // --- 7. Representación PJ permanente --------------------------------
   await ensureRepresentacionCartera();
 
+  // --- 8. Verificación post-seed F10.1 --------------------------------
+  // Comprueba que los rieles del pipeline F8→F9 (certificación) están
+  // correctamente poblados. NOTA: el plan usa `role`/`valido_hasta`, pero
+  // el schema real es `cargo`/`estado='VIGENTE'` (la migración 000024
+  // renombró las columnas). Los contadores se loguean para verificación
+  // visual; no interrumpimos el seed si salen bajos — puede ser que el
+  // operador quiera correr los seeds de autoridad/capability por
+  // separado.
+  await verifyAuthorityAndCapability();
+
   console.log("");
   console.log("Seed demo ARGA canónico — OK");
+}
+
+async function verifyAuthorityAndCapability() {
+  console.log("");
+  console.log("Verificación post-seed:");
+
+  // authority_evidence VIGENTE para ARGA Seguros
+  const { data: auth, error: authErr } = await supabase
+    .from("authority_evidence")
+    .select("id, cargo")
+    .eq("entity_id", ENTITY_ARGA_SEGUROS)
+    .eq("estado", "VIGENTE");
+  if (authErr) {
+    console.log(`  [authority_evidence] ERROR: ${authErr.message}`);
+  } else {
+    const cargos = (auth ?? []).map((a) => a.cargo).sort();
+    console.log(
+      `  [authority_evidence] VIGENTE en ARGA Seguros: ${auth?.length ?? 0} filas ` +
+        `(cargos: ${cargos.length > 0 ? cargos.join(", ") : "∅"})`,
+    );
+  }
+
+  // capability_matrix total (esperado ≥15: 5 roles × 3 actions)
+  const { data: cap, error: capErr } = await supabase
+    .from("capability_matrix")
+    .select("id", { count: "exact", head: false });
+  if (capErr) {
+    console.log(`  [capability_matrix] ERROR: ${capErr.message}`);
+  } else {
+    console.log(
+      `  [capability_matrix] ${cap?.length ?? 0} filas ` +
+        `(esperado ≥15 — 5 roles × 3 actions SNAPSHOT/VOTE/CERTIFICATION)`,
+    );
+  }
 }
 
 // ----------------------- Helpers --------------------------------------
