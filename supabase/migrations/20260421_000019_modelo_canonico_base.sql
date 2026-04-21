@@ -393,4 +393,114 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_capital_holdings_vigente
   )
   WHERE effective_to IS NULL;
 
+-- ---------------------------------------------------------------------
+-- T7. representaciones — PJ permanente + proxy junta + delegación consejo
+-- Three distinct representation scopes rolled into one table because the
+-- data model is identical (represented → representative with validity
+-- interval + evidence) while the business semantics diverge:
+--   - ADMIN_PJ_REPRESENTANTE: persistent (LSC art. 212 bis) — the natural
+--     person who exercises the administrator role on behalf of a persona
+--     jurídica administrador. No meeting scope.
+--   - JUNTA_PROXY: per-meeting proxy (LSC arts. 184–187) — a shareholder
+--     delegates voting power to another person for a specific junta.
+--   - CONSEJO_DELEGACION: per-session delegation (LSC arts. 248–249) — a
+--     consejero delegates their vote on a specific sesión de CdA.
+-- chk_representacion_scope_meeting enforces the meeting_id coherence:
+-- ADMIN_PJ_REPRESENTANTE must have meeting_id NULL (it's persistent);
+-- JUNTA_PROXY and CONSEJO_DELEGACION must have meeting_id NOT NULL.
+-- meeting_id intentionally has NO FK — how meetings integrate is future
+-- work (T8+ and agreements aggregation already cover meeting linkage
+-- elsewhere). The CHECK alone guarantees the NULL-vs-NOT-NULL invariant
+-- T7 needs.
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS representaciones (
+  id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID        NOT NULL,
+  entity_id                 UUID        NOT NULL REFERENCES entities(id),
+  represented_person_id     UUID        NOT NULL REFERENCES persons(id),
+  representative_person_id  UUID        NOT NULL REFERENCES persons(id),
+  scope                     TEXT        NOT NULL,
+  meeting_id                UUID,
+  porcentaje_delegado       NUMERIC     DEFAULT 100,
+  effective_from            DATE        NOT NULL,
+  effective_to              DATE,
+  evidence                  JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Clean up any auto-named inline CHECKs from prior migration runs, then
+-- add explicitly named ones via DO-block idempotency guards. Matches the
+-- T3/T5/T6 convention: named constraints are stable across rebuilds so
+-- tests can regex-match on constraint names without surprise. The scope
+-- CHECK and porcentaje CHECK are straightforward; chk_representacion_
+-- scope_meeting is the cross-column coherence guard wrapped in the same
+-- pattern so it too can be safely re-added if ever amended.
+ALTER TABLE representaciones
+  DROP CONSTRAINT IF EXISTS representaciones_scope_check;
+
+ALTER TABLE representaciones
+  DROP CONSTRAINT IF EXISTS representaciones_porcentaje_delegado_check;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_representacion_scope_enum'
+      AND conrelid = 'representaciones'::regclass
+  ) THEN
+    ALTER TABLE representaciones
+      ADD CONSTRAINT chk_representacion_scope_enum
+      CHECK (scope IN (
+        'ADMIN_PJ_REPRESENTANTE',
+        'JUNTA_PROXY',
+        'CONSEJO_DELEGACION'
+      ));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_representacion_porcentaje_delegado'
+      AND conrelid = 'representaciones'::regclass
+  ) THEN
+    ALTER TABLE representaciones
+      ADD CONSTRAINT chk_representacion_porcentaje_delegado
+      CHECK (porcentaje_delegado >= 0 AND porcentaje_delegado <= 100);
+  END IF;
+END $$;
+
+-- Cross-column coherence: meeting_id must be NULL for the persistent
+-- ADMIN_PJ_REPRESENTANTE scope and NOT NULL for the per-meeting
+-- JUNTA_PROXY and CONSEJO_DELEGACION scopes. Wrapped in the DROP+DO-block
+-- pattern (same as chk_capital_holdings_effective_interval in T6) so
+-- future migrations can safely amend the rule without leaving orphan
+-- constraints around.
+ALTER TABLE representaciones
+  DROP CONSTRAINT IF EXISTS chk_representacion_scope_meeting;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chk_representacion_scope_meeting'
+      AND conrelid = 'representaciones'::regclass
+  ) THEN
+    ALTER TABLE representaciones
+      ADD CONSTRAINT chk_representacion_scope_meeting
+      CHECK (
+        (scope = 'ADMIN_PJ_REPRESENTANTE' AND meeting_id IS NULL)
+        OR
+        (scope IN ('JUNTA_PROXY','CONSEJO_DELEGACION') AND meeting_id IS NOT NULL)
+      );
+  END IF;
+END $$;
+
+-- Partial index on ACTIVE representations for the hot path
+-- "¿quién me representa / a quién represento?" — effective_to IS NULL
+-- filters out historical records keeping the index narrow and scan-fast.
+CREATE INDEX IF NOT EXISTS idx_representaciones_represented
+  ON representaciones(represented_person_id, entity_id) WHERE effective_to IS NULL;
+
 COMMIT;

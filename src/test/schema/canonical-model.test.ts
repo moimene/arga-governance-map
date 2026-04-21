@@ -665,3 +665,203 @@ describe.skipIf(!hasAdminClient())(
     });
   }
 );
+
+describe.skipIf(!hasAdminClient())(
+  "Canonical model — T7 representaciones",
+  () => {
+    const entityId = DEMO_ENTITY_ARGA;
+    // Sentinel person IDs — T7 uses the cccccccc-* prefix so it can
+    // never collide with T5 (aaaaaaaa-*) or T6 (bbbbbbbb-*) even if
+    // afterEach ordering or parallelisation semantics ever shift.
+    // Declared up front per T6 code-review observation M1 rather than
+    // pushed at runtime, so the cleanup list is stable and readable.
+    const PERSON_PJ = "cccccccc-0000-0000-0000-000000000001";        // represented (persona jurídica)
+    const PERSON_REP = "cccccccc-0000-0000-0000-000000000002";       // representante (persona física)
+    const PERSON_PJ_B = "cccccccc-0000-0000-0000-000000000003";      // segundo represented para happy path
+    const PERSON_REP_B = "cccccccc-0000-0000-0000-000000000004";     // segundo representante para happy path
+    const testPersonIds = [PERSON_PJ, PERSON_REP, PERSON_PJ_B, PERSON_REP_B];
+
+    // Cleanup narrowed to rows this block inserted (rows where the
+    // represented OR representative is one of our sentinels). Using
+    // .or() so a single round-trip covers both columns. persons rows
+    // are fixtures left in place — upsert makes re-seeding free.
+    afterEach(async () => {
+      if (!supabaseAdmin) return;
+      await supabaseAdmin
+        .from("representaciones")
+        .delete()
+        .or(
+          `represented_person_id.in.(${testPersonIds.join(",")}),representative_person_id.in.(${testPersonIds.join(",")})`
+        );
+    });
+
+    // Inline helper duplicated from T5/T6 per established convention:
+    // each describe block is self-contained. Here we accept a
+    // person_type argument because T7 needs both PJ (represented legal
+    // entity) and PF (natural-person representative) — unlike T5/T6
+    // which only needed PF. The plan's test mistakenly uses
+    // 'NATURAL'/'JURIDICA' vocabulary; the real persons.person_type
+    // CHECK accepts only 'PF'|'PJ' (verified on cloud 2026-04-21).
+    async function ensurePerson(
+      id: string,
+      fullName: string,
+      personType: "PF" | "PJ"
+    ) {
+      const { error } = await supabaseAdmin!
+        .from("persons")
+        .upsert(
+          {
+            id,
+            tenant_id: DEMO_TENANT,
+            full_name: fullName,
+            person_type: personType,
+            tax_id: `TEST-${id.replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+      expect(error).toBeNull();
+    }
+
+    it("representaciones table exists with required columns", async () => {
+      // PostgREST returns an error if we select unknown columns. A clean
+      // response proves every T7 column landed. Index existence is
+      // covered implicitly by the happy-path insert when DEMO_ENTITY_ARGA
+      // is bootstrapped (T14); for now the column probe is the reliable
+      // structural guard.
+      const { error } = await supabaseAdmin!
+        .from("representaciones")
+        .select(
+          "id, tenant_id, entity_id, represented_person_id, representative_person_id, scope, meeting_id, porcentaje_delegado, effective_from, effective_to, evidence, created_at"
+        )
+        .limit(0);
+      expect(error).toBeNull();
+    });
+
+    it("CHECK chk_representacion_scope_meeting exige meeting_id para PROXY/DELEGACION", async () => {
+      // DEMO_ENTITY_ARGA currently missing on Cloud (T14 will bootstrap
+      // it). Rather than rely on ambiguous error ordering (FK vs CHECK),
+      // soft-skip with a visible console.warn when the entity is absent —
+      // matches T5's governing_bodies skip pattern. This test becomes
+      // active the moment T14 runs, with no edits required.
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T7] Skipping chk_representacion_scope_meeting insert test — DEMO_ENTITY_ARGA not present. " +
+          "T14 bootstrap must seed the entity for both the happy-path and the CHECK-rejection legs of this test."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_PJ, "PJ Represented Test", "PJ");
+      await ensurePerson(PERSON_REP, "Rep Test", "PF");
+
+      // ADMIN_PJ_REPRESENTANTE sin meeting_id → OK (CHECK branch 1:
+      // scope = 'ADMIN_PJ_REPRESENTANTE' AND meeting_id IS NULL)
+      const { error: okErr } = await supabaseAdmin!
+        .from("representaciones")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          represented_person_id: PERSON_PJ,
+          representative_person_id: PERSON_REP,
+          scope: "ADMIN_PJ_REPRESENTANTE",
+          meeting_id: null,
+          effective_from: "2026-01-01",
+        });
+      expect(okErr).toBeNull();
+
+      // JUNTA_PROXY sin meeting_id → FAIL (CHECK branch 2 requires
+      // meeting_id IS NOT NULL for JUNTA_PROXY / CONSEJO_DELEGACION).
+      const { error: failErr } = await supabaseAdmin!
+        .from("representaciones")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          represented_person_id: PERSON_PJ,
+          representative_person_id: PERSON_REP,
+          scope: "JUNTA_PROXY",
+          meeting_id: null,
+          effective_from: "2026-01-01",
+        });
+      expect(failErr).not.toBeNull();
+      expect(failErr?.message).toMatch(/chk_representacion_scope_meeting/);
+    });
+
+    it("chk_representacion_scope_enum rejects invalid scope values", async () => {
+      // Enum negative test — doesn't depend on DEMO_ENTITY_ARGA
+      // because an unknown scope value fires the CHECK before the
+      // FK is evaluated in practice (CHECK is on the same row as
+      // the INSERT). We still guard the entity existence so that
+      // if the CHECK/FK ordering ever surprises us, we get a
+      // visible skip rather than a confusing regex mismatch.
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T7] Skipping chk_representacion_scope_enum test — DEMO_ENTITY_ARGA not present."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_PJ_B, "PJ Enum Test", "PJ");
+      await ensurePerson(PERSON_REP_B, "Rep Enum Test", "PF");
+
+      const { error } = await supabaseAdmin!
+        .from("representaciones")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          represented_person_id: PERSON_PJ_B,
+          representative_person_id: PERSON_REP_B,
+          scope: "INVALID_SCOPE",
+          meeting_id: null,
+          effective_from: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_representacion_scope_enum|check.*constraint/
+      );
+    });
+
+    it("chk_representacion_porcentaje_delegado rejects values >100", async () => {
+      const { data: entityCheck } = await supabaseAdmin!
+        .from("entities")
+        .select("id")
+        .eq("id", entityId)
+        .limit(1);
+      if (!entityCheck || entityCheck.length === 0) {
+        console.warn(
+          "[T7] Skipping chk_representacion_porcentaje_delegado test — DEMO_ENTITY_ARGA not present."
+        );
+        return;
+      }
+
+      await ensurePerson(PERSON_PJ, "PJ Pct Test", "PJ");
+      await ensurePerson(PERSON_REP, "Rep Pct Test", "PF");
+
+      const { error } = await supabaseAdmin!
+        .from("representaciones")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          entity_id: entityId,
+          represented_person_id: PERSON_PJ,
+          representative_person_id: PERSON_REP,
+          scope: "ADMIN_PJ_REPRESENTANTE",
+          meeting_id: null,
+          porcentaje_delegado: 150, // out of [0,100]
+          effective_from: "2026-01-01",
+        });
+      expect(error).not.toBeNull();
+      expect(error!.message.toLowerCase()).toMatch(
+        /chk_representacion_porcentaje_delegado|porcentaje_delegado|check.*constraint/
+      );
+    });
+  }
+);
