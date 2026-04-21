@@ -181,7 +181,7 @@ export function useBoardPackData(meetingId: string): {
             status: string;
             decision_date: string | null;
             policy_id: string | null;
-            policies: { title: string } | null;
+            policies: { title: string }[] | null;
           };
           return ((data ?? []) as Raw[]).map((a) => ({
             id: a.id,
@@ -189,7 +189,7 @@ export function useBoardPackData(meetingId: string): {
             status: a.status,
             decision_date: a.decision_date,
             policy_id: a.policy_id,
-            policy_title: a.policies?.title ?? null,
+            policy_title: a.policies?.[0]?.title ?? null,
           }));
         },
       },
@@ -293,13 +293,13 @@ export function useBoardPackData(meetingId: string): {
             limits: string | null;
             end_date: string;
             status: string;
-            delegate: { full_name: string } | null;
+            delegate: { full_name: string }[] | null;
           };
           const today = new Date();
           return ((data ?? []) as Raw[]).map((d) => ({
             code: d.code,
             delegation_type: d.delegation_type,
-            delegate_name: d.delegate?.full_name ?? "—",
+            delegate_name: d.delegate?.[0]?.full_name ?? "—",
             scope: d.scope,
             limits: d.limits,
             end_date: d.end_date,
@@ -369,15 +369,17 @@ export function useBoardPackData(meetingId: string): {
       body_type: string;
       entity_id: string;
       quorum_rule: Record<string, unknown> | null;
-      entities: { common_name: string; es_cotizada: boolean | null } | null;
-    } | null;
-    president: { full_name: string } | null;
-    secretary: { full_name: string } | null;
+      entities: { common_name: string; es_cotizada: boolean | null }[] | null;
+    }[] | null;
+    president: { full_name: string }[] | null;
+    secretary: { full_name: string }[] | null;
   };
   const rawMeeting = meetingQ.data as RawMeeting | null;
 
   // DL-2: si la entidad es cotizada, añadir advertencias LMV
-  const esCotizada = rawMeeting?.governing_bodies?.entities?.es_cotizada === true;
+  const gb = rawMeeting?.governing_bodies?.[0];
+  const ent = gb?.entities?.[0];
+  const esCotizada = ent?.es_cotizada === true;
   const cotizadaWarnings: string[] = esCotizada
     ? [
         "Entidad cotizada en mercados regulados (IBEX 35)",
@@ -394,18 +396,18 @@ export function useBoardPackData(meetingId: string): {
         meeting_type: rawMeeting.meeting_type,
         status: rawMeeting.status,
         location: rawMeeting.location,
-        body: rawMeeting.governing_bodies
+        body: gb
           ? {
-              id: rawMeeting.governing_bodies.id,
-              name: rawMeeting.governing_bodies.name,
-              body_type: rawMeeting.governing_bodies.body_type,
-              entity_id: rawMeeting.governing_bodies.entity_id,
-              entity_name: rawMeeting.governing_bodies.entities?.common_name ?? "—",
-              quorum_rule: rawMeeting.governing_bodies.quorum_rule ?? null,
+              id: gb.id,
+              name: gb.name,
+              body_type: gb.body_type,
+              entity_id: gb.entity_id,
+              entity_name: ent?.common_name ?? "—",
+              quorum_rule: gb.quorum_rule ?? null,
             }
           : null,
-        president: rawMeeting.president,
-        secretary: rawMeeting.secretary,
+        president: rawMeeting.president?.[0] ?? null,
+        secretary: rawMeeting.secretary?.[0] ?? null,
         agenda_items: (agendaQ.data ?? []) as Array<{
           order_number: number;
           title: string;
@@ -419,7 +421,7 @@ export function useBoardPackData(meetingId: string): {
     campaign: string;
     status: string;
     completed_at: string | null;
-    persons: { full_name: string } | null;
+    persons: { full_name: string }[] | null;
   };
   const allAtts = (attestQ.data ?? []) as AttRaw[];
   const latestCampaign = allAtts[0]?.campaign ?? "";
