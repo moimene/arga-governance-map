@@ -1,12 +1,18 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, FileSignature, Shield, Stamp } from "lucide-react";
-import { useActaById, useCertificationsByMinute } from "@/hooks/useActas";
+import {
+  useActaById,
+  useCertificationsByMinute,
+  useAgreementIdsForMinute,
+} from "@/hooks/useActas";
+import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
 
 export default function ActaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: acta, isLoading } = useActaById(id);
   const { data: certs } = useCertificationsByMinute(id);
+  const { data: agreementIds } = useAgreementIdsForMinute(id);
 
   if (isLoading) {
     return (
@@ -79,12 +85,14 @@ export default function ActaDetalle() {
                   Certificaciones emitidas
                 </h2>
               </div>
-              <button
-                type="button"
-                className="text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
-              >
-                + Emitir certificación
-              </button>
+              {id && acta.entity_id ? (
+                <EmitirCertificacionButton
+                  minuteId={id}
+                  entityId={acta.entity_id}
+                  bodyId={acta.body_id}
+                  agreementIds={agreementIds ?? []}
+                />
+              ) : null}
             </div>
             <div className="divide-y divide-[var(--g-border-subtle)]">
               {certs && certs.length > 0 ? (

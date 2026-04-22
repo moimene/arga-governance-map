@@ -14,6 +14,9 @@ export interface ActaRow {
   registered_at: string | null;
   is_locked: boolean;
   created_at: string;
+  /** F8.1: las minutes ahora llevan body_id/entity_id denormalizados. */
+  body_id: string | null;
+  entity_id: string | null;
   meeting_type: string | null;
   body_name: string | null;
   entity_name: string | null;
@@ -94,6 +97,8 @@ export function useActaById(id: string | undefined) {
     enabled: !!id,
     queryKey: ["actas", "byId", id],
     queryFn: async () => {
+      // `*` incluye body_id/entity_id (añadidos en migración
+      // 20260421_000024). Los necesita EmitirCertificacionButton.
       const { data, error } = await supabase
         .from("minutes")
         .select(
@@ -104,6 +109,38 @@ export function useActaById(id: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       return data as ActaDetailRow | null;
+    },
+  });
+}
+
+/**
+ * Devuelve los `agreement_id` asociados a los `meeting_resolutions` del
+ * meeting al que pertenece este acta. Usado por el botón "Emitir
+ * certificación" para calcular `agreements_certified` en la RPC.
+ */
+export function useAgreementIdsForMinute(minuteId: string | undefined) {
+  return useQuery({
+    enabled: !!minuteId,
+    queryKey: ["agreement_ids", "forMinute", minuteId],
+    queryFn: async (): Promise<string[]> => {
+      // 1) minute → meeting_id
+      const { data: minute, error: em } = await supabase
+        .from("minutes")
+        .select("meeting_id")
+        .eq("id", minuteId!)
+        .maybeSingle();
+      if (em) throw em;
+      if (!minute?.meeting_id) return [];
+
+      // 2) meeting_resolutions → agreement_id[]
+      const { data: rows, error: er } = await supabase
+        .from("meeting_resolutions")
+        .select("agreement_id")
+        .eq("meeting_id", minute.meeting_id);
+      if (er) throw er;
+      return ((rows ?? []) as { agreement_id: string | null }[])
+        .map((r) => r.agreement_id)
+        .filter((x): x is string => !!x);
     },
   });
 }

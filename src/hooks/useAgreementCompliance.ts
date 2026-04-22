@@ -548,6 +548,54 @@ export function useAgreementCompliance(agreementId?: string) {
   });
 }
 
+/**
+ * F6.2: Firmantes vigentes de una entidad desde `authority_evidence`.
+ * Devuelve filas VIGENTES por cargo certificante. Usado por el flujo de
+ * certificación (ActaDetalle, EmitirCertificacionButton) para validar
+ * que el firmante tiene cargo vigente antes de llamar a fn_generar_certificacion.
+ */
+export function useFirmantesVigentes(entityId?: string, bodyId?: string | null) {
+  return useQuery({
+    queryKey: ["authority_evidence", "firmantes", entityId ?? "none", bodyId ?? "null"],
+    enabled: !!entityId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from("authority_evidence")
+        .select("id, person_id, cargo, body_id, fecha_inicio, fecha_fin, estado, person:person_id(full_name)")
+        .eq("tenant_id", DEMO_TENANT)
+        .eq("entity_id", entityId!)
+        .eq("estado", "VIGENTE")
+        .in("cargo", ["PRESIDENTE", "SECRETARIO", "VICEPRESIDENTE", "VICESECRETARIO", "ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "CONSEJERO_COORDINADOR"]);
+      if (bodyId !== undefined && bodyId !== null) {
+        q = q.eq("body_id", bodyId);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      type Raw = {
+        id: string;
+        person_id: string;
+        cargo: string;
+        body_id: string | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        estado: string;
+        person?: { full_name?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((r) => ({
+        id: r.id,
+        person_id: r.person_id,
+        cargo: r.cargo,
+        body_id: r.body_id,
+        fecha_inicio: r.fecha_inicio,
+        fecha_fin: r.fecha_fin,
+        estado: r.estado,
+        full_name: r.person?.full_name ?? null,
+      }));
+    },
+  });
+}
+
 export function useAgreementsByEntity(entityId?: string) {
   return useQuery({
     queryKey: ["agreements", "entity", entityId ?? "none"],

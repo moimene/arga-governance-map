@@ -234,9 +234,11 @@ describe("plantillas-metrics", () => {
   // Test 8: tiempoEnEstado computed per template
   // ============================================================================
   it("tiempoEnEstado computed for each template", () => {
-    // Use fixed dates so the test doesn't flake
-    const baseDate = new Date("2026-04-19T00:00:00Z").toISOString(); // Today
-    const fiveDaysAgo = new Date("2026-04-14T00:00:00Z").toISOString(); // 5 days ago
+    // Use run-relative dates — the metric function computes `Date.now() -
+    // created_at`, so hardcoded ISO strings drift into flakiness as the
+    // calendar advances past the hardcoded "today".
+    const baseDate = new Date().toISOString(); // Today, whenever the test runs
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
 
     const plantillas: PlantillaProtegidaRow[] = [
       {

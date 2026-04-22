@@ -452,6 +452,68 @@ A4–A6: Integración motor en UI:
 
 **Tests: 352/352 pass, tsc 0 errors, build clean.**
 
+### Sprint MVP Gestión Societaria F1-F10 ✅ COMPLETADO (2026-04-21)
+
+Pipeline completo de generación de actas + certificaciones QTSP con gate
+hash basado en censo WORM. Plan: `docs/superpowers/plans/2026-04-21-gestion-societaria-mvp-plan.md`.
+
+**Migraciones aplicadas en Cloud (000023–000029):**
+- `000023` — capability_matrix + authority_evidence (schema base F1)
+- `000024` — minutes + certifications extensiones: `body_id`, `entity_id`, `snapshot_id`, `snapshot_hash`, `gate_hash`, `authority_evidence_id`, `tsq_token bytea`
+- `000025..000026` — sociedades/personas (sprint paralelo — no MVP F1-F10)
+- `000027` — `fn_generar_acta` + `fn_generar_certificacion` con gate_hash SHA-256(snapshot_hash‖resultado_hash)
+- `000028` — `fn_firmar_certificacion` (QES stub) + `fn_emitir_certificacion` (evidence bundle URI)
+- `000029` — backfill `minutes.body_id` + `minutes.entity_id` para actas legacy (desde `meetings → governing_bodies`). Regresión detectada en F10.2: sin esta propagación, `EmitirCertificacionButton` no renderizaba en ActaDetalle.
+
+**RPCs del pipeline QTSP:**
+- `fn_generar_acta(p_meeting_id, p_content, p_snapshot_id) → uuid` (F8.1)
+- `fn_generar_certificacion(p_minute_id, p_tipo, p_agreements_certified text[], p_certificante_role, p_visto_bueno_persona_id) → uuid` (F8.1)
+- `fn_firmar_certificacion(p_certification_id, p_qtsp_token, p_tsq_token) → void` (F8.2)
+- `fn_emitir_certificacion(p_certification_id) → text` (F8.2) — devuelve URI del evidence bundle
+
+**Componente F9:**
+- `src/components/secretaria/EmitirCertificacionButton.tsx` — ejecuta los 3 pasos en cadena, precarga Vº Bº con `usePresidenteVigente`, oculto si `useHasCapability(userRole, "CERTIFICATION")` es false. Demo default `userRole="SECRETARIO"` hasta sprint de auth real.
+- `src/hooks/useAuthorityEvidence.ts` — añadido `usePresidenteVigente(entityId, bodyId?)` para precargar Vº Bº en SA.
+- `src/hooks/useActas.ts` — añadido `useAgreementIdsForMinute(minuteId)` + extendido `ActaRow` con `body_id` + `entity_id`.
+- `src/pages/secretaria/ActaDetalle.tsx` — botón montado con guard `id && acta.entity_id`.
+
+**Hook `useCapabilityMatrix`:**
+- `useCapabilityMatrix()` — TanStack Query con staleTime 5 min.
+- `useHasCapability(role, action)` — helper sin fetch adicional.
+
+**Desviaciones del plan vs schema real (corregidas inline):**
+1. `meetings.entity_id` no existe → JOIN con `governing_bodies` para resolver
+2. `authority_evidence` usa `cargo`/`estado='VIGENTE'`, NO `role`/`valido_hasta`
+3. `censo_snapshot` no tiene `hash_snapshot` → derivarlo de `audit_log.hash_sha512` vía `audit_worm_id`
+4. `audit_log` usa `object_type`/`object_id`/`delta`, NO `entity`/`entity_id`/`payload`
+5. `evidence_bundles` no tiene `storage_uri` → sintetizar `evidence_bundle:<id>@<manifest_hash>`
+6. `certifications.tsq_token` es `bytea` no `text` → `decode(p_tsq_token, 'base64')::bytea` en RPC
+
+**Tests de schema (`src/test/schema/rpcs-acta-cert.test.ts`):**
+Probes de existencia vs Cloud para las 4 RPCs — aceptan cualquier error que NO sea `function does not exist`. 4/4 pass.
+
+**Estado Cloud post-F10.1 verificado vía MCP:**
+- `authority_evidence` VIGENTE en ARGA Seguros: 4 filas (PRESIDENTE × 2, SECRETARIO × 2)
+- `capability_matrix`: 15 filas (5 roles × 3 acciones SNAPSHOT/VOTE/CERTIFICATION, todos con `reason` jurídica anotada)
+- 6/6 paridad modelo canónico OK (entities_sin_pj=0, pj_mal_tipificados=0, entities_sin_profile_vigente=0, mandates_sin_holdings=0, mandates_sin_condiciones=0, ARGA cap table=100.00%)
+- `minutes` 2/2 con `body_id` + `entity_id` populados (post-000029)
+
+**Commits principales:**
+- `faeca5a` — F1 capability_matrix + authority_evidence + extensiones minutes/certifications
+- `5d052bc` — F8.1 fn_generar_acta + fn_generar_certificacion con gate hash
+- `d29dba5` — F8.2 fn_firmar_certificacion + fn_emitir_certificacion
+- `00df80c` — F9 botón Emitir certificación con pipeline QTSP completo
+- `e2daaab` — F10.1 seed demo ARGA coherente con autoridad y capability_matrix
+- `f075c95` — F10.2 backfill minutes.body_id/entity_id (regresión F9 button render)
+
+**Limitaciones conocidas (no bloqueantes para demo):**
+- 2 PRESIDENTEs VIGENTEs para el mismo body_id en ARGA Seguros (drift de backfill T15 ejecutado dos veces). `usePresidenteVigente` usa `.limit(1).maybeSingle()` — devuelve un presidente determinista pero la data es inconsistente. Limpieza pendiente para sprint de hardening.
+- Actas legacy (2 demo pre-F8.1) tienen `meeting_resolutions` vacío → `p_agreements_certified = []`. La RPC acepta arrays vacíos. Actas nuevas creadas via pipeline F5→F6→F7 sí tienen resolutions.
+- `snapshot_id` NULL en actas legacy → RPC usa `COALESCE 'NO_SNAPSHOT_HASH'` como gate. Sin WORM retroactivo (intencional — preservaría la cadena).
+- `userRole="SECRETARIO"` hardcodeado en el botón F9. La integración con `useUserRole` + `auth.users` es del sprint de auth real.
+
+**Tests: 356/356 pass (59 skipped por RPC `execute_sql` no expuesto), tsc 0 errors, build clean.**
+
 ### Próximos — Sprint F (multi-jurisdicción)
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
@@ -516,6 +578,80 @@ type ComplianceResult = {
   blocking_issues: string[];
 }
 ```
+
+---
+
+## Modelo canónico de identidad (Fase 0+1 — completado 2026-04-21)
+
+### 8 tablas del modelo canónico
+
+| Tabla | Responsabilidad |
+|---|---|
+| `entities` (extendida) | sociedad + `person_id` FK + `tipo_organo_admin` |
+| `entity_capital_profile` | capital social (escriturado, desembolsado, títulos, nominal) con historial |
+| `share_classes` | clases de acciones/participaciones por entidad |
+| `condiciones_persona` | rol de persona en sociedad/órgano (SOCIO, CONSEJERO, ADMIN_*, etc.) |
+| `capital_holdings` | libro de socios con `share_class_id` FK y `is_treasury` |
+| `representaciones` | PJ_PERMANENTE + JUNTA_PROXY + CONSEJO_DELEGACION |
+| `parte_votante_current` | proyección regenerable (voting_weight + denominator_weight separados) |
+| `censo_snapshot` | inmutable, WORM, tipos ECONOMICO/POLITICO/UNIVERSAL |
+
+### Principio de acceso
+
+- **Fase 0+1 (actual):** `mandates` sigue siendo tabla; el backfill creó datos en `condiciones_persona` y `capital_holdings`. NO hay dual-write todavía.
+- **Fase 2 (futuro):** dual-write bidireccional `mandates ↔ nuevo modelo` con `pg_trigger_depth()` guard.
+- **Fase 3 (futuro):** motor LSC lee solo `censo_snapshot` vía `src/lib/rules-engine/snapshot-loader.ts`.
+- **Fase 4 (futuro):** hooks frontend migrados por módulo.
+- **Fase 5 (futuro):** `mandates` pasa a VIEW read-only.
+
+### Reglas de oro (vigentes ya en Fase 0+1)
+
+1. `entity_capital_profile` tiene como máximo **una fila VIGENTE por entidad** (UNIQUE parcial).
+2. `condiciones_persona` usa **`COALESCE(body_id, sentinel)`** en su índice único (`ux_condicion_vigente`), no índices parciales separados.
+3. `capital_holdings.is_treasury = true` implica `voting_weight = 0` y `denominator_weight = 0` en la proyección.
+4. `censo_snapshot` es **inmutable**: triggers BEFORE UPDATE/DELETE lanzan excepción con mensaje "inmutable".
+5. Todo `censo_snapshot` rellena `audit_worm_id` automáticamente vía trigger BEFORE INSERT.
+6. `persons.person_type` está restringido por CHECK a `('PF'|'PJ')` — el dominio "persona jurídica" se mapea a `'PJ'`, **no** a `'JURIDICA'`.
+
+### Estructura de capital demo (post-T17)
+
+```
+Fundación ARGA (G-99999901)
+   └─100%→ Cartera ARGA S.L.U. (B-99999902) [entity 00000000-...-020]
+              ├─69.69%→ ARGA Seguros S.A. (A-99999903) [entity 6d7ed736-...]
+              └─30.31% restante: Mercado libre (X-99999904)
+```
+
+**Constantes en `src/test/helpers/supabase-test-client.ts`:**
+- `DEMO_ENTITY_ARGA = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (no el `00000000-...-010` que el plan original asumía — ese UUID no existe en Cloud)
+- `DEMO_ENTITY_CARTERA = "00000000-0000-0000-0000-000000000020"`
+- `DEMO_PJ_FUNDACION_TAX_ID = "G-99999901"`
+- `DEMO_PJ_CARTERA_TAX_ID = "B-99999902"`
+- `DEMO_PJ_ARGA_SEGUROS_TAX_ID = "A-99999903"`
+- `DEMO_PJ_MERCADO_LIBRE_TAX_ID = "X-99999904"`
+
+### Scripts disponibles
+
+- `bun run scripts/seed-demo-arga-canonico.ts` — seed demo ARGA (cadena capital Fundación→Cartera→ARGA + Mercado Libre free float). Idempotente.
+- `bun run scripts/validate-model-bootstrap.ts` — valida las 6 paridades post-bootstrap (entity→PJ, capital_profile VIGENTE, mandates↔holdings, mandates↔condiciones, ARGA suma 100%). Read-only, exit code 0/1.
+
+### Tests
+
+- `src/test/schema/canonical-model.test.ts` — estructura tablas + constraints (T5–T8)
+- `src/test/schema/canonical-triggers.test.ts` — inmutabilidad censo_snapshot (T9)
+- `src/test/schema/canonical-functions.test.ts` — fn_refresh + fn_crear_snapshot (T10–T11)
+- `src/test/schema/canonical-bootstrap.test.ts` — bootstrap PJ + backfill T15/T16 + seed ARGA T17
+- `src/test/schema/canonical-rls.test.ts` — RLS tenant scoping (T12)
+
+### Limitaciones conocidas del Cloud project
+
+- **`execute_sql` RPC no está expuesto** en este proyecto. Todos los tests y scripts del modelo canónico usan PostgREST + joins client-side (Set-based keys, reduce-for-sum). No usar `supabase.rpc("execute_sql", ...)` en código nuevo — siempre PostgREST o `mcp__53aea412-..._execute_sql` (solo para orquestación fuera de runtime).
+- **`mandates` status en Cloud es 'Activo' (ES)**, no 'ACTIVE'. Backfill de T15 normaliza via `UPPER(COALESCE(m.status,'ACTIVO')) IN ('ACTIVE','ACTIVO')`.
+- **`mandates.role` en Cloud es texto libre** con mayúsculas mixtas y paréntesis (ej. "Consejera Delegada (CEO)", "presidente", "Secretaria no Consejera"). Backfill de T15 normaliza via `LOWER(m.role) LIKE '%pattern%'` con VICEPRESIDENTE evaluado antes que PRESIDENTE.
+
+### Deuda WORM intencional
+
+`censo_snapshot` es append-only. El sentinel insertado por los tests T9 (`meeting_id='eeeeeeee-0000-0000-0000-000000000001'`) persiste para siempre — cualquier `DELETE` del propio test fallaría por trigger inmutable. Si hiciera falta purgar (reset, T14 re-seed): `SET LOCAL session_replication_role = replica;` + DELETE en sesión admin fuera de cualquier test (desactiva triggers temporalmente **solo** para la purga).
 
 ---
 

@@ -106,7 +106,11 @@ export default function OrganoDetalle() {
           <Card>
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <div className="text-sm font-semibold">Miembros ({members.length})</div>
-              <Button size="sm" variant="outline" className="gap-1.5"><UserPlus className="h-3.5 w-3.5" />Añadir miembro</Button>
+              <Button size="sm" variant="outline" asChild className="gap-1.5">
+                <Link to={body.entity_id ? `/secretaria/sociedades/${body.entity_id}/administradores/designar?bodyId=${body.id}` : "#"}>
+                  <UserPlus className="h-3.5 w-3.5" />Añadir miembro
+                </Link>
+              </Button>
             </div>
             {members.length > 0 ? (
               <Table>

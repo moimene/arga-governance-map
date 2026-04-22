@@ -46,20 +46,36 @@ export interface RepresentanteValidationError {
 /**
  * Load all mandates for a body with person capital information.
  * Returns mandate data enriched with person_type, denomination, and representative_person_id.
+ *
+ * F6.2: Migrado de `mandates` a `condiciones_persona` (SSOT canónica).
+ * El shape MandateWithCapital se preserva para compatibilidad con consumidores.
+ * Las columnas capital_participacion/porcentaje_capital/etc. son null aquí —
+ * la información de capital vive en `capital_holdings` y se une por person_id
+ * a nivel de entity, no de body (órgano). Para los flujos de voting/representación
+ * los validadores toman person_id y resuelven el capital por separado.
  */
 export function usePersonasConCapital(bodyId: string | undefined) {
   return useQuery({
     enabled: !!bodyId,
-    queryKey: ["mandates", "withCapital", bodyId],
+    queryKey: ["condiciones_persona", "withCapital", bodyId],
     staleTime: 60_000,
     queryFn: async (): Promise<MandateWithCapital[]> => {
       const { data, error } = await supabase
-        .from("mandates")
-        .select("*, persons!inner(person_type, full_name, denomination, representative_person_id)")
+        .from("condiciones_persona")
+        .select(
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, persons!inner(person_type, full_name, denomination, representative_person_id)"
+        )
         .eq("body_id", bodyId!)
-        .order("role", { ascending: true });
+        .order("tipo_condicion", { ascending: true });
       if (error) throw error;
-      type MandateRaw = MandateWithCapital & {
+      type CondRaw = {
+        id: string;
+        body_id: string;
+        person_id: string;
+        tipo_condicion: string | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        estado: string | null;
         persons?: {
           person_type?: string | null;
           full_name?: string | null;
@@ -67,12 +83,23 @@ export function usePersonasConCapital(bodyId: string | undefined) {
           representative_person_id?: string | null;
         } | null;
       };
-      return ((data ?? []) as MandateRaw[]).map((m) => ({
-        ...m,
-        person_type: m.persons?.person_type ?? null,
-        full_name: m.persons?.full_name ?? null,
-        denomination: m.persons?.denomination ?? null,
+      return ((data ?? []) as CondRaw[]).map((m) => ({
+        id: m.id,
+        body_id: m.body_id,
+        person_id: m.person_id,
+        role: m.tipo_condicion,
+        type: null,
+        start_date: m.fecha_inicio,
+        end_date: m.fecha_fin,
+        status: m.estado === "VIGENTE" ? "Activo" : "Cesado",
+        capital_participacion: null,
+        porcentaje_capital: null,
+        tiene_derecho_voto: null,
+        clase_accion: null,
         representative_person_id: m.persons?.representative_person_id ?? null,
+        person_type: m.persons?.person_type ?? null,
+        denomination: m.persons?.denomination ?? null,
+        full_name: m.persons?.full_name ?? null,
       }));
     },
   });
@@ -115,8 +142,10 @@ export function useAsistentesConCapital(meetingId: string | undefined) {
  * Returns array of blocking validation errors for mandates missing representative.
  */
 export function validarRepresentantesPJ(mandates: MandateWithCapital[]): RepresentanteValidationError[] {
+  // F6.2: el dominio canónico usa 'PJ' (modelo canónico Fase 0+1) pero
+  // aceptamos también 'JURIDICA' por si hay datos legacy residuales.
   return mandates
-    .filter((m) => m.person_type === "JURIDICA" && !m.representative_person_id)
+    .filter((m) => (m.person_type === "PJ" || m.person_type === "JURIDICA") && !m.representative_person_id)
     .map((m) => ({
       mandate_id: m.id,
       person_name: m.full_name ?? m.denomination ?? "Sin nombre",
