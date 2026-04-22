@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
-  ShieldCheck, Scroll,
+  ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
 } from "lucide-react";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
@@ -65,13 +65,23 @@ export default function SociedadDetalle() {
         </Link>
       </div>
 
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          {s.common_name ?? s.legal_name}
-        </h1>
-        <p className="text-sm text-[var(--g-text-secondary)]">
-          {s.legal_name} · {s.registration_number ?? "sin NIF"} · {s.jurisdiction ?? "—"}
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            {s.common_name ?? s.legal_name}
+          </h1>
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            {s.legal_name} · {s.registration_number ?? "sin NIF"} · {s.jurisdiction ?? "—"}
+          </p>
+        </div>
+        <Link
+          to={`/secretaria/sociedades/${s.id}/reglas`}
+          className="inline-flex shrink-0 items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Reglas aplicables
+        </Link>
       </div>
 
       {/* Tabs */}
@@ -166,13 +176,25 @@ function TabCapital({ entityId }: { entityId: string }) {
       ? Math.round((Number(cap.capital_desembolsado) / Number(cap.capital_escriturado)) * 100)
       : null;
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-      <Kpi label="Capital escriturado" value={`${cap.capital_escriturado.toLocaleString()} ${cap.currency}`} />
-      <Kpi label="Capital desembolsado" value={cap.capital_desembolsado ? `${Number(cap.capital_desembolsado).toLocaleString()} ${cap.currency}` : "—"} sub={pct != null ? `${pct}% de escriturado` : undefined} />
-      <Kpi label="Número de títulos" value={cap.numero_titulos != null ? Number(cap.numero_titulos).toLocaleString() : "—"} />
-      <Kpi label="Valor nominal" value={cap.valor_nominal != null ? `${Number(cap.valor_nominal).toLocaleString()} ${cap.currency}` : "—"} />
-      <Kpi label="Vigente desde" value={cap.effective_from} />
-      <Kpi label="Estado" value={cap.estado} />
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <Link
+          to={`/secretaria/sociedades/${entityId}/transmision`}
+          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <ArrowRightLeft className="h-3.5 w-3.5" />
+          Transmisión
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <Kpi label="Capital escriturado" value={`${cap.capital_escriturado.toLocaleString()} ${cap.currency}`} />
+        <Kpi label="Capital desembolsado" value={cap.capital_desembolsado ? `${Number(cap.capital_desembolsado).toLocaleString()} ${cap.currency}` : "—"} sub={pct != null ? `${pct}% de escriturado` : undefined} />
+        <Kpi label="Número de títulos" value={cap.numero_titulos != null ? Number(cap.numero_titulos).toLocaleString() : "—"} />
+        <Kpi label="Valor nominal" value={cap.valor_nominal != null ? `${Number(cap.valor_nominal).toLocaleString()} ${cap.currency}` : "—"} />
+        <Kpi label="Vigente desde" value={cap.effective_from} />
+        <Kpi label="Estado" value={cap.estado} />
+      </div>
     </div>
   );
 }
@@ -217,6 +239,25 @@ function TabClases({ entityId }: { entityId: string }) {
 function TabSocios({ entityId }: { entityId: string }) {
   const { data, isLoading } = useCapitalHoldings(entityId);
   return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Link
+          to={`/secretaria/sociedades/${entityId}/transmision`}
+          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <ArrowRightLeft className="h-3.5 w-3.5" />
+          Transmisión
+        </Link>
+        <Link
+          to={`/secretaria/sociedades/${entityId}/socio/nuevo`}
+          className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          Añadir socio
+        </Link>
+      </div>
     <Table
       isLoading={isLoading}
       empty="Sin socios registrados."
@@ -252,6 +293,7 @@ function TabSocios({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 
@@ -286,6 +328,17 @@ function TabOrganos({ entityId }: { entityId: string }) {
 function TabAdmins({ entityId }: { entityId: string }) {
   const { data, isLoading } = useAdministradores(entityId);
   return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <Link
+          to={`/secretaria/sociedades/${entityId}/admin/nuevo`}
+          className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <UserCheck className="h-3.5 w-3.5" />
+          Designar administrador
+        </Link>
+      </div>
     <Table
       isLoading={isLoading}
       empty="Sin administradores no colegiados."
@@ -310,6 +363,7 @@ function TabAdmins({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 

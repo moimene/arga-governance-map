@@ -1,11 +1,20 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Users, Check, ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Users, Check, ChevronLeft, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePersonasCanonical, type PersonType } from "@/hooks/usePersonasCanonical";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+
+// G1.3: tipo del resultado del precheck de colisión de tax_id.
+// "entity"  = el tax_id ya pertenece a una sociedad gestionada (BLOQUEA)
+// "person"  = existe persona con mismo tax_id pero NO está vinculada a
+//             entity (ADVIERTE; BD rechazará si hay UNIQUE)
+type TaxIdConflict =
+  | { kind: "entity"; person_id: string; person_name: string; entity_id: string; entity_name: string }
+  | { kind: "person"; person_id: string; person_name: string }
+  | null;
 
 interface Draft {
   person_type: PersonType;
@@ -36,13 +45,82 @@ export default function PersonaNuevaStepper() {
   // lista PF disponibles (para elegir representante si es PJ)
   const { data: personasPF } = usePersonasCanonical({ person_type: "PF" });
 
+  // G1.3: precheck colisión tax_id.
+  const [taxIdConflict, setTaxIdConflict] = useState<TaxIdConflict>(null);
+  const [checkingTaxId, setCheckingTaxId] = useState(false);
+
+  useEffect(() => {
+    const raw = draft.tax_id.trim();
+    if (!raw) {
+      setTaxIdConflict(null);
+      setCheckingTaxId(false);
+      return;
+    }
+    setCheckingTaxId(true);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const { data: personMatch, error: pErr } = await supabase
+          .from("persons")
+          .select("id, full_name")
+          .eq("tenant_id", DEMO_TENANT)
+          .eq("tax_id", raw)
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (pErr && pErr.code !== "PGRST116") throw pErr;
+        if (!personMatch) {
+          setTaxIdConflict(null);
+          setCheckingTaxId(false);
+          return;
+        }
+        const { data: entityMatch, error: eErr } = await supabase
+          .from("entities")
+          .select("id, common_name, legal_name")
+          .eq("tenant_id", DEMO_TENANT)
+          .eq("person_id", personMatch.id)
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        if (eErr && eErr.code !== "PGRST116") throw eErr;
+        if (entityMatch) {
+          setTaxIdConflict({
+            kind: "entity",
+            person_id: personMatch.id,
+            person_name: personMatch.full_name,
+            entity_id: entityMatch.id,
+            entity_name: entityMatch.common_name ?? entityMatch.legal_name,
+          });
+        } else {
+          setTaxIdConflict({
+            kind: "person",
+            person_id: personMatch.id,
+            person_name: personMatch.full_name,
+          });
+        }
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        // Errores no bloqueantes: no mostrar UI de conflicto ante fallo de red.
+        setTaxIdConflict(null);
+      } finally {
+        setCheckingTaxId(false);
+      }
+    }, 400);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [draft.tax_id]);
+
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
   const canNext = (() => {
     if (step === 0) return !!draft.person_type;
-    if (step === 1) return draft.full_name.trim() && draft.tax_id.trim();
+    if (step === 1) {
+      // G1.3: bloquea avance si el tax_id ya pertenece a una sociedad gestionada.
+      if (taxIdConflict?.kind === "entity") return false;
+      return draft.full_name.trim() && draft.tax_id.trim();
+    }
     return true;
   })();
 
@@ -159,12 +237,62 @@ export default function PersonaNuevaStepper() {
               onChange={(v) => update("full_name", v)}
               placeholder={draft.person_type === "PF" ? "Lucía Martín García" : "ARGA Cartera, S.L.U."}
             />
-            <Input
-              label={draft.person_type === "PF" ? "DNI/NIE *" : "CIF *"}
-              value={draft.tax_id}
-              onChange={(v) => update("tax_id", v)}
-              placeholder={draft.person_type === "PF" ? "00000000-A" : "B-99999999"}
-            />
+            <div className="flex flex-col gap-1">
+              <Input
+                label={draft.person_type === "PF" ? "DNI/NIE *" : "CIF *"}
+                value={draft.tax_id}
+                onChange={(v) => update("tax_id", v)}
+                placeholder={draft.person_type === "PF" ? "00000000-A" : "B-99999999"}
+              />
+              {checkingTaxId && (
+                <span className="text-[11px] text-[var(--g-text-secondary)]">
+                  Comprobando disponibilidad…
+                </span>
+              )}
+              {!checkingTaxId && taxIdConflict?.kind === "entity" && (
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="flex items-start gap-2 border border-[var(--status-error)]/40 bg-[var(--status-error)]/10 p-2 text-xs text-[var(--g-text-primary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-error)]" />
+                  <div>
+                    Este NIF ya corresponde a la sociedad{" "}
+                    <strong>{taxIdConflict.entity_name}</strong>, que se gestiona
+                    en el sistema.{" "}
+                    <Link
+                      to={`/secretaria/sociedades/${taxIdConflict.entity_id}`}
+                      className="text-[var(--g-brand-3308)] underline"
+                    >
+                      Abrir en Sociedades
+                    </Link>{" "}
+                    o cambia el NIF.
+                  </div>
+                </div>
+              )}
+              {!checkingTaxId && taxIdConflict?.kind === "person" && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-start gap-2 border border-[var(--status-warning)]/40 bg-[var(--g-surface-muted)] p-2 text-xs text-[var(--g-text-primary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" />
+                  <div>
+                    Ya existe una persona con este NIF:{" "}
+                    <strong>{taxIdConflict.person_name}</strong>.{" "}
+                    <Link
+                      to={`/secretaria/personas/${taxIdConflict.person_id}`}
+                      className="text-[var(--g-brand-3308)] underline"
+                    >
+                      Ver ficha
+                    </Link>{" "}
+                    · La base de datos rechazará el alta si el NIF tiene clave única.
+                  </div>
+                </div>
+              )}
+            </div>
             <Input
               label="Email"
               value={draft.email}

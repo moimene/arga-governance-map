@@ -45,6 +45,19 @@ const CARGOS_COLEGIADOS: TipoCondicion[] = [
   "CONSEJERO",
 ];
 
+// G1.4: debe ir en sync con fn_sync_authority_evidence
+// (migration 20260421_000024). Cargos cuyo alta en condiciones_persona
+// propaga automáticamente una fila VIGENTE en authority_evidence.
+const CARGOS_CERTIFICANTES: TipoCondicion[] = [
+  "ADMIN_UNICO",
+  "ADMIN_SOLIDARIO",
+  "ADMIN_MANCOMUNADO",
+  "PRESIDENTE",
+  "VICEPRESIDENTE",
+  "SECRETARIO",
+  "CONSEJERO_COORDINADOR",
+];
+
 const STEPS = ["Persona", "Cargo", "Designación", "Confirmar"];
 
 export default function DesignarAdminStepper() {
@@ -148,7 +161,20 @@ export default function DesignarAdminStepper() {
       const { error } = await supabase.from("condiciones_persona").insert(payload);
       if (error) throw error;
 
-      toast.success("Cargo registrado correctamente. Se sincroniza authority_evidence si corresponde.");
+      // G1.4: el trigger fn_sync_authority_evidence solo actúa sobre los
+      // CARGOS_CERTIFICANTES. Avisamos explícitamente para que el usuario
+      // sepa si el cargo debería aparecer en la pestaña "Autoridad".
+      const esCertificante = CARGOS_CERTIFICANTES.includes(draft.tipo_condicion);
+      const cargoLabel = CARGO_LABELS[draft.tipo_condicion] ?? draft.tipo_condicion;
+      if (esCertificante) {
+        toast.success(
+          `Cargo "${cargoLabel}" registrado. Aparecerá en Autoridad (certifica actos sociales).`,
+        );
+      } else {
+        toast.success(
+          `Cargo "${cargoLabel}" registrado. No figura en Autoridad (no es certificante).`,
+        );
+      }
       navigate(`/secretaria/sociedades/${entityId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

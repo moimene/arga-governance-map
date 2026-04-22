@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { UserPlus, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -44,8 +44,10 @@ export default function AnadirSocioStepper() {
     effective_from: new Date().toISOString().slice(0, 10),
   });
 
-  // defaults: primera clase, efectivo hoy
-  useMemo(() => {
+  // G1.5: defaults — primera clase seleccionada automáticamente.
+  // useEffect porque setDraft es side effect; useMemo no garantiza
+  // ejecución única y React puede emitir warnings en dev.
+  useEffect(() => {
     if (!draft.share_class_id && clases && clases.length > 0) {
       setDraft((d) => ({ ...d, share_class_id: clases[0].id }));
     }
