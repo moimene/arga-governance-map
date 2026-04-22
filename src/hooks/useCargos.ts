@@ -52,6 +52,14 @@ export interface CargoDetailRow extends CargoRow {
     name: string;
     body_type: string;
   } | null;
+  // G3: entity join para que el detalle de persona pueda mostrar
+  // la sociedad a la que pertenece cada cargo, también cuando body_id es NULL
+  // (p. ej. ADMIN_UNICO, ADMIN_SOLIDARIO, SOCIO).
+  entity?: {
+    id: string;
+    common_name: string | null;
+    legal_name: string;
+  } | null;
   representative?: {
     id: string;
     full_name: string;
@@ -139,11 +147,14 @@ export function useCargosPersona(personId: string | undefined) {
     enabled: !!personId,
     queryKey: ["cargos", "byPerson", personId],
     queryFn: async (): Promise<CargoDetailRow[]> => {
+      // G3: incluye join a entity para resolver la sociedad incluso cuando
+      // el cargo no pertenece a un órgano colegiado (body_id NULL).
       const { data, error } = await supabase
         .from("condiciones_persona")
         .select(`
           *,
-          body:body_id(id, name, body_type)
+          body:body_id(id, name, body_type),
+          entity:entity_id(id, common_name, legal_name)
         `)
         .eq("tenant_id", DEMO_TENANT)
         .eq("person_id", personId!)

@@ -63,6 +63,46 @@ export function useCapitalHoldings(entityId: string | undefined) {
   });
 }
 
+/**
+ * G3: reverse lookup — todas las sociedades donde una persona es socio
+ * (capital_holdings con holder_person_id = personId y effective_to NULL).
+ * Incluye join a entity y share_class para mostrar clase + % en la ficha.
+ */
+export interface PersonaHoldingDetailRow extends CapitalHoldingRow {
+  entity?: {
+    id: string;
+    common_name: string | null;
+    legal_name: string;
+  } | null;
+  share_class?: {
+    id: string;
+    class_code: string;
+    name: string;
+  } | null;
+}
+
+export function useHoldingsPersona(personId: string | undefined) {
+  return useQuery({
+    enabled: !!personId,
+    queryKey: ["capital_holdings", "byPerson", personId],
+    queryFn: async (): Promise<PersonaHoldingDetailRow[]> => {
+      const { data, error } = await supabase
+        .from("capital_holdings")
+        .select(`
+          *,
+          entity:entity_id(id, common_name, legal_name),
+          share_class:share_class_id(id, class_code, name)
+        `)
+        .eq("tenant_id", DEMO_TENANT)
+        .eq("holder_person_id", personId!)
+        .is("effective_to", null)
+        .order("porcentaje_capital", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PersonaHoldingDetailRow[];
+    },
+  });
+}
+
 /** Todas las posiciones (incluye históricas) para trazabilidad. */
 export function useCapitalHoldingsHistory(entityId: string | undefined) {
   return useQuery({
