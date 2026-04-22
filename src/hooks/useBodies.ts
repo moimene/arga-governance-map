@@ -81,20 +81,27 @@ export function useBodiesList() {
   return useQuery({
     queryKey: ["governing_bodies", "list"],
     queryFn: async (): Promise<BodyListRow[]> => {
+      // F6.1: miembros vienen de condiciones_persona (SSOT canónica),
+      // no de mandates. Filtro por estado='VIGENTE' (equivalente al
+      // legacy status='Activo').
       const { data, error } = await supabase
         .from("governing_bodies")
-        .select("*, entity:entity_id(common_name, slug), mandates(id, status)")
+        .select(
+          "*, entity:entity_id(common_name, slug), condiciones_persona(id, estado)"
+        )
         .order("name", { ascending: true });
       if (error) throw error;
       type BodyRaw = BodyListRow & {
         entity?: { common_name?: string | null; slug?: string | null } | null;
-        mandates?: Array<{ id: string; status: string | null }> | null;
+        condiciones_persona?: Array<{ id: string; estado: string | null }> | null;
       };
       return ((data ?? []) as BodyRaw[]).map((b) => ({
         ...b,
         entity_name: b.entity?.common_name ?? null,
         entity_slug: b.entity?.slug ?? null,
-        member_count: (b.mandates ?? []).filter((m) => m.status === "Activo").length,
+        member_count: (b.condiciones_persona ?? []).filter(
+          (m) => m.estado === "VIGENTE"
+        ).length,
       }));
     },
   });
@@ -119,17 +126,38 @@ export function useBodyBySlug(slug: string | undefined) {
 export function useBodyMandates(bodyId: string | undefined) {
   return useQuery({
     enabled: !!bodyId,
-    queryKey: ["mandates", "byBody", bodyId],
+    queryKey: ["condiciones_persona", "byBody", bodyId],
     queryFn: async (): Promise<MandateRow[]> => {
+      // F6.1: leer de condiciones_persona, mapear al shape MandateRow
+      // (contrato legacy) para que OrganoDetalle y demás consumidores
+      // sigan funcionando sin cambios.
       const { data, error } = await supabase
-        .from("mandates")
-        .select("*, person:person_id(full_name, email)")
+        .from("condiciones_persona")
+        .select(
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id(full_name, email)"
+        )
         .eq("body_id", bodyId!)
-        .order("role", { ascending: true });
+        .order("tipo_condicion", { ascending: true });
       if (error) throw error;
-      type MandateRaw = MandateRow & { person?: { full_name?: string | null; email?: string | null } | null };
-      return ((data ?? []) as MandateRaw[]).map((m) => ({
-        ...m,
+      type CondRaw = {
+        id: string;
+        body_id: string;
+        person_id: string;
+        tipo_condicion: string | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        estado: string | null;
+        person?: { full_name?: string | null; email?: string | null } | null;
+      };
+      return ((data ?? []) as CondRaw[]).map((m) => ({
+        id: m.id,
+        body_id: m.body_id,
+        person_id: m.person_id,
+        role: m.tipo_condicion,
+        type: null,
+        start_date: m.fecha_inicio,
+        end_date: m.fecha_fin,
+        status: m.estado === "VIGENTE" ? "Activo" : "Cesado",
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,
       }));
@@ -198,17 +226,37 @@ export function useMeetingAgenda(meetingId: string | undefined) {
 export function useMeetingParticipants(bodyId: string | undefined) {
   return useQuery({
     enabled: !!bodyId,
-    queryKey: ["mandates", "active", bodyId],
+    queryKey: ["condiciones_persona", "active", bodyId],
     queryFn: async (): Promise<MandateRow[]> => {
+      // F6.1: participantes vigentes vienen de condiciones_persona
+      // (estado='VIGENTE') con el shape MandateRow para compatibilidad.
       const { data, error } = await supabase
-        .from("mandates")
-        .select("*, person:person_id(full_name, email)")
+        .from("condiciones_persona")
+        .select(
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id(full_name, email)"
+        )
         .eq("body_id", bodyId!)
-        .eq("status", "Activo");
+        .eq("estado", "VIGENTE");
       if (error) throw error;
-      type MandateRaw = MandateRow & { person?: { full_name?: string | null; email?: string | null } | null };
-      return ((data ?? []) as MandateRaw[]).map((m) => ({
-        ...m,
+      type CondRaw = {
+        id: string;
+        body_id: string;
+        person_id: string;
+        tipo_condicion: string | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        estado: string | null;
+        person?: { full_name?: string | null; email?: string | null } | null;
+      };
+      return ((data ?? []) as CondRaw[]).map((m) => ({
+        id: m.id,
+        body_id: m.body_id,
+        person_id: m.person_id,
+        role: m.tipo_condicion,
+        type: null,
+        start_date: m.fecha_inicio,
+        end_date: m.fecha_fin,
+        status: m.estado === "VIGENTE" ? "Activo" : "Cesado",
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,
       }));

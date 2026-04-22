@@ -68,6 +68,16 @@ const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDoc
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
+const SociedadesList = lazy(() => import("@/pages/secretaria/SociedadesList"));
+const SociedadDetalle = lazy(() => import("@/pages/secretaria/SociedadDetalle"));
+const SociedadNuevaStepper = lazy(() => import("@/pages/secretaria/SociedadNuevaStepper"));
+const PersonasList = lazy(() => import("@/pages/secretaria/PersonasList"));
+const PersonaDetalle = lazy(() => import("@/pages/secretaria/PersonaDetalle"));
+const PersonaNuevaStepper = lazy(() => import("@/pages/secretaria/PersonaNuevaStepper"));
+const AnadirSocioStepper = lazy(() => import("@/pages/secretaria/AnadirSocioStepper"));
+const TransmisionStepper = lazy(() => import("@/pages/secretaria/TransmisionStepper"));
+const DesignarAdminStepper = lazy(() => import("@/pages/secretaria/DesignarAdminStepper"));
+const ReglasAplicables = lazy(() => import("@/pages/secretaria/ReglasAplicables"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
 const GrcLayout = lazy(() =>
@@ -190,6 +200,17 @@ const App = () => (
                   <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
+                  {/* Gestión societaria — sociedades y personas (modelo canónico) */}
+                  <Route path="/secretaria/sociedades"                element={<Suspense fallback={<ModuleFallback />}><SociedadesList /></Suspense>} />
+                  <Route path="/secretaria/sociedades/nueva"          element={<Suspense fallback={<ModuleFallback />}><SociedadNuevaStepper /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id"            element={<Suspense fallback={<ModuleFallback />}><SociedadDetalle /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/socio/nuevo" element={<Suspense fallback={<ModuleFallback />}><AnadirSocioStepper /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/transmision" element={<Suspense fallback={<ModuleFallback />}><TransmisionStepper /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/admin/nuevo" element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/reglas"     element={<Suspense fallback={<ModuleFallback />}><ReglasAplicables /></Suspense>} />
+                  <Route path="/secretaria/personas"                  element={<Suspense fallback={<ModuleFallback />}><PersonasList /></Suspense>} />
+                  <Route path="/secretaria/personas/nueva"            element={<Suspense fallback={<ModuleFallback />}><PersonaNuevaStepper /></Suspense>} />
+                  <Route path="/secretaria/personas/:id"              element={<Suspense fallback={<ModuleFallback />}><PersonaDetalle /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
                 <Route

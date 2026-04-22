@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Bell, BookOpen, FileSignature,
   Users, FileText, Library, ChevronLeft, Gavel,
   ScrollText, Building2, Layers, Briefcase, Calendar, Globe,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/secretaria/GlobalSearch";
@@ -16,6 +17,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard",                to: "/secretaria",                          icon: LayoutDashboard, end: true },
+  { label: "Sociedades",               to: "/secretaria/sociedades",               icon: Building2 },
+  { label: "Personas",                 to: "/secretaria/personas",                 icon: UserCircle },
   { label: "Board Pack",               to: "/secretaria/board-pack",               icon: Briefcase },
   { label: "Convocatorias",            to: "/secretaria/convocatorias",            icon: Bell },
   { label: "Reuniones",                to: "/secretaria/reuniones",                icon: Users },
