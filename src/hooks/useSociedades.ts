@@ -44,10 +44,14 @@ export function useSociedades() {
   return useQuery({
     queryKey: ["sociedades", "list"],
     queryFn: async (): Promise<SociedadRow[]> => {
+      // G1.2: filtrar entities con `person_id NOT NULL` — sólo las que
+      // tienen su PJ canónica asociada son "sociedades" bien formadas.
+      // Evita mostrar entities legacy pre-modelo-canónico como sociedades.
       const { data, error } = await supabase
         .from("entities")
         .select("*")
         .eq("tenant_id", DEMO_TENANT)
+        .not("person_id", "is", null)
         .order("common_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as SociedadRow[];
