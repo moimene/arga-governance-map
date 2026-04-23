@@ -65,6 +65,8 @@ export default function ObligacionDetalle() {
       return (data ?? []) as IncidentLinked[];
     },
   });
+  const navigate = useNavigate();
+
   const openIncidents = linkedIncidents.filter(
     (i) => i.status !== "Cerrado" && i.status !== "Resuelto",
   ).length;
@@ -77,8 +79,6 @@ export default function ObligacionDetalle() {
       </div>
     );
   }
-
-  const navigate = useNavigate();
 
   if (!obligation) return <div className="p-6">Obligación no encontrada.</div>;
 

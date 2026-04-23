@@ -347,7 +347,7 @@ describe('QTSP Integration', () => {
         recipient_email: 'person@example.com',
         subject: 'Notificación',
         body: 'Contenido',
-        delivery_type: 'TIPO_INVALIDO' as any,
+        delivery_type: 'TIPO_INVALIDO' as unknown as QTSPNotificationRequest['delivery_type'],
       };
 
       const result = notificarCertificado(request);
@@ -365,7 +365,7 @@ describe('QTSP Integration', () => {
           recipient_email: 'person@example.com',
           subject: 'Notificación',
           body: 'Contenido',
-          delivery_type: tipo as any,
+          delivery_type: tipo as QTSPNotificationRequest['delivery_type'],
         };
 
         const result = notificarCertificado(request);

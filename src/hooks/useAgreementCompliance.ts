@@ -14,6 +14,12 @@ import {
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type RulePackJoinRow = {
+  id: string; params: unknown; status: string;
+  rule_packs: { materia: string; clase: string; organo_tipo: string } | null;
+};
+type OverrideRaw = { id: string; entity_id: string; materia: string; clave: string; valor: unknown; fuente: string; referencia: string | null };
+
 /**
  * Feature flag: activar para usar el Motor de Reglas LSC V2.
  * Cuando false, se usa la lógica V1 inline (queries ad-hoc a Supabase).
@@ -170,15 +176,16 @@ async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
     : { data: [] };
 
   // Buscar el rule pack de la materia del acuerdo
-  const matchingVersion = (rpVersions ?? []).find(
-    (v) => (v as any).rule_packs?.materia === a.agreement_kind
+  const rpRows = (rpVersions ?? []) as RulePackJoinRow[];
+  const matchingVersion = rpRows.find(
+    (v) => v.rule_packs?.materia === a.agreement_kind
   );
 
   const packs: RulePack[] = matchingVersion
-    ? [(matchingVersion as any).params as RulePack]
+    ? [matchingVersion.params as RulePack]
     : [];
 
-  const overrides: RuleParamOverride[] = (overridesRaw ?? []).map((o: any) => ({
+  const overrides: RuleParamOverride[] = ((overridesRaw ?? []) as OverrideRaw[]).map((o) => ({
     id: o.id,
     entity_id: o.entity_id,
     materia: o.materia,

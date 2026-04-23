@@ -8,8 +8,8 @@ export interface ModeloAcuerdo {
   materia_acuerdo: string;
   contenido_template: string | null;
   capa1_inmutable: string | null;
-  capa2_variables: any;
-  capa3_editables: any;
+  capa2_variables: Array<{ variable: string; fuente: string; condicion: string }> | null;
+  capa3_editables: Array<{ campo: string; tipo: string; label: string }> | null;
   referencia_legal: string | null;
   estado: string;
   version: string;

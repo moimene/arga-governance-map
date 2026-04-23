@@ -128,7 +128,6 @@ export function evaluarPlantillaProtegida(
   const blocking_issues: string[] = [];
   const warnings: string[] = [];
   let plantillaUsada: string | undefined;
-  let plantillaEsperada: string | undefined;
   let esFallback = false;
   let ok = false;
   let severity: EvalSeverity = 'INFO';
@@ -193,7 +192,7 @@ export function evaluarPlantillaProtegida(
   }
 
   // Paso 3: Buscar plantilla exacta (status ACTIVA o APROBADA)
-  plantillaEsperada = tipoActaEfectivo;
+  const plantillaEsperada = tipoActaEfectivo;
   const plantillaExacta = input.plantillasDisponibles.find((p) => {
     const tipoMatch = p.tipo === tipoActaEfectivo;
     const statusOk = p.status === 'ACTIVA' || p.status === 'APROBADA';

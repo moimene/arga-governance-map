@@ -5,6 +5,12 @@ import type {
   RulePack,
   MajoritySpec,
   ConflictoInteres,
+  ReglaConvocatoria,
+  ReglaConstitucion,
+  ReglaDocumentacion,
+  ReglaActa,
+  ReglaPlazosMateriales,
+  ReglaPostAcuerdo,
 } from '../types';
 
 // ============================================================
@@ -24,8 +30,8 @@ const createBaseRulePack = (overrides?: Partial<RulePack>): RulePack => ({
   clase: 'ORDINARIA',
   organoTipo: 'JUNTA_GENERAL',
   modosAdopcionPermitidos: ['MEETING', 'NO_SESSION'],
-  convocatoria: {} as any,
-  constitucion: {} as any,
+  convocatoria: {} as unknown as ReglaConvocatoria,
+  constitucion: {} as unknown as ReglaConstitucion,
   votacion: {
     mayoria: {
       SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
@@ -35,10 +41,10 @@ const createBaseRulePack = (overrides?: Partial<RulePack>): RulePack => ({
     abstenciones: 'no_cuentan',
     votoCalidadPermitido: true,
   },
-  documentacion: {} as any,
-  acta: {} as any,
-  plazosMateriales: {} as any,
-  postAcuerdo: {} as any,
+  documentacion: {} as unknown as ReglaDocumentacion,
+  acta: {} as unknown as ReglaActa,
+  plazosMateriales: {} as unknown as ReglaPlazosMateriales,
+  postAcuerdo: {} as unknown as ReglaPostAcuerdo,
   ...overrides,
 });
 

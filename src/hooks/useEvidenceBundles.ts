@@ -11,7 +11,7 @@ export interface EvidenceBundle {
   hash_sha512: string | null;
   signed_by: string | null;
   signature_date: string | null;
-  chain_of_custody: any | null;
+  chain_of_custody: Record<string, unknown> | null;
   legal_hold: boolean;
   created_at: string;
 }

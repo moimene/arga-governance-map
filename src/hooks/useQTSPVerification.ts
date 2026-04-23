@@ -32,7 +32,7 @@ interface RuleEvaluationResultRow {
   etapa: string;
   ok: boolean;
   severity: string;
-  explain_json: Record<string, any> | null;
+  explain_json: Record<string, unknown> | null;
   blocking_issues: string[] | null;
   warnings: string[] | null;
   created_at: string;

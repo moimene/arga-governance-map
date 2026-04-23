@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
+type UserRoleRow = {
+  rbac_roles: { role_code: string; display_name: string; permissions: string[] } | null;
+};
+
 export function useUserRole(userId?: string) {
   const query = useQuery({
     enabled: !!userId,
@@ -19,8 +23,9 @@ export function useUserRole(userId?: string) {
     },
   });
 
-  const roles = (query.data ?? []).map((r: any) => r.rbac_roles?.role_code).filter(Boolean);
-  const allPerms = (query.data ?? []).flatMap((r: any) => {
+  const rows = (query.data ?? []) as UserRoleRow[];
+  const roles = rows.map((r) => r.rbac_roles?.role_code).filter(Boolean);
+  const allPerms = rows.flatMap((r) => {
     const perms = r.rbac_roles?.permissions;
     return Array.isArray(perms) ? perms : [];
   });

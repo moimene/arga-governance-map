@@ -30,6 +30,8 @@ export interface RulePackRow {
   created_at: string;
 }
 
+type RulePackWithVersions = RulePackRow & { rule_pack_versions: RulePackVersionRow[] };
+
 export interface RulePackData {
   pack: RulePackRow;
   version: RulePackVersionRow;
@@ -82,8 +84,9 @@ export function useRulePackForMateria(materiaCla: string | undefined) {
 
       if (!data) return null;
 
-      const pack = data as any as RulePackRow;
-      const versions = (data as any).rule_pack_versions as RulePackVersionRow[];
+      const joined = data as unknown as RulePackWithVersions;
+      const pack: RulePackRow = joined;
+      const versions = joined.rule_pack_versions;
       const version = versions[0];
 
       if (!version || !version.payload) return null;

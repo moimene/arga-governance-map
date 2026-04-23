@@ -26,6 +26,9 @@ export interface PlantillaProtegidaRow {
   organo_tipo: string | null;
   contrato_variables_version: string | null;
   created_at: string;
+  materia_acuerdo: string | null;
+  approval_checklist: Array<{ check: string; passed: boolean }> | null;
+  version_history: Array<{ from: string; to: string; at: string; by: string }> | null;
 }
 
 export function usePlantillasProtegidas() {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolverReglaEfectiva } from '../jerarquia-normativa';
-import type { ReglaParametro, RuleParamOverride } from '../types';
+import type { ReglaParametro, RuleParamOverride, Fuente } from '../types';
 
 describe('resolverReglaEfectiva', () => {
   /**
@@ -500,7 +500,7 @@ describe('resolverReglaEfectiva', () => {
     const overrides: RuleParamOverride[] = [
       {
         valor: 30,
-        fuente: 'FUENTE_INEXISTENTE' as any, // Invalid source
+        fuente: 'FUENTE_INEXISTENTE' as unknown as Fuente,
         referencia: 'Ref',
       },
       {

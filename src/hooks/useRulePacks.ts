@@ -23,6 +23,12 @@ export interface RulePackVersionRow {
 /**
  * Rule parameter override row
  */
+type RulePackJoinRow = {
+  id: string; rule_pack_id: string; version_tag: string; status: string;
+  params: unknown; created_at: string; tenant_id: string;
+  rule_packs: { materia: string; clase: string; organo_tipo: string } | null;
+};
+
 export interface RuleParamOverrideRow {
   id: string;
   entity_id: string;
@@ -54,9 +60,9 @@ export function useRulePacks() {
       if (error) throw error;
 
       // Transform PostgREST response to flatten joined fields
-      const rows = (data ?? []) as any[];
+      const rows = (data ?? []) as RulePackJoinRow[];
       return rows.map((row) => {
-        const packed = row.rule_packs as any;
+        const packed = row.rule_packs;
         return {
           id: row.id,
           rule_pack_id: row.rule_pack_id,
@@ -96,8 +102,8 @@ export function useRulePacksForEntity(entityId?: string) {
 
       if (packsError) throw packsError;
 
-      const packs = (packsData ?? []).map((row: any) => {
-        const packed = row.rule_packs as any;
+      const packs = (packsData as RulePackJoinRow[] ?? []).map((row) => {
+        const packed = row.rule_packs;
         return {
           id: row.id,
           rule_pack_id: row.rule_pack_id,
@@ -156,7 +162,7 @@ export function useRulePackForMateria(materia?: string) {
 
       if (!data) return null;
 
-      const packed = (data as any).rule_packs as any;
+      const packed = (data as RulePackJoinRow).rule_packs;
       return {
         id: data.id,
         rule_pack_id: data.rule_pack_id,

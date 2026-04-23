@@ -42,6 +42,45 @@ export interface ResolvedVariables {
   errors: string[];
 }
 
+// ── Local join types ─────────────────────────────────────────────────────────
+
+type PersonRow = { name?: string | null; full_name?: string | null };
+type BodyMandateRow = {
+  role?: string | null;
+  person_name?: string | null;
+  persons?: PersonRow | null;
+};
+type BodyWithMandates = {
+  name: string;
+  established_date?: string | null;
+  legal_basis?: string | null;
+  body_mandates?: BodyMandateRow[];
+};
+type AgendaItemRow = { order_index?: number | null; title?: string | null; description?: string | null };
+type ParticipantRow = {
+  attendance_status?: string | null;
+  attended?: boolean | null;
+  person_name?: string | null;
+  name?: string | null;
+  role?: string | null;
+  absence_reason?: string | null;
+};
+type MeetingWithJoins = {
+  date?: string | null;
+  scheduled_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  location?: string | null;
+  convocation_date?: string | null;
+  publication_medium?: string | null;
+  publication_date?: string | null;
+  notice_days?: number | null;
+  second_call_date?: string | null;
+  second_call_time?: string | null;
+  meeting_participants?: ParticipantRow[];
+  meeting_agenda?: AgendaItemRow[];
+};
+
 // ── Entity resolver ──────────────────────────────────────────────────────────
 
 async function resolveEntityVars(entityId: string): Promise<Record<string, unknown>> {
@@ -81,32 +120,33 @@ async function resolveBodyVars(bodyId: string): Promise<Record<string, unknown>>
 
   if (error || !body) return {};
 
-  const mandates = (body as any).body_mandates ?? [];
+  const bodyTyped = body as unknown as BodyWithMandates;
+  const mandates = bodyTyped.body_mandates ?? [];
 
   // Find presidente and secretario by role
-  const presidenteMandate = mandates.find((m: any) =>
+  const presidenteMandate = mandates.find((m) =>
     m.role?.toLowerCase().includes("presidente") || m.role?.toLowerCase().includes("president")
   );
-  const secretarioMandate = mandates.find((m: any) =>
+  const secretarioMandate = mandates.find((m) =>
     m.role?.toLowerCase().includes("secretario") || m.role?.toLowerCase().includes("secretary")
   );
 
-  const miembros = mandates.map((m: any) => ({
+  const miembros = mandates.map((m) => ({
     nombre: m.persons?.name || m.person_name || "—",
     cargo: m.role || "Vocal",
   }));
 
   return {
-    nombre_comision: body.name,
-    organo_nombre: body.name,
+    nombre_comision: bodyTyped.name,
+    organo_nombre: bodyTyped.name,
     presidente: presidenteMandate?.persons?.name || presidenteMandate?.person_name || "—",
     secretario: secretarioMandate?.persons?.name || secretarioMandate?.person_name || "—",
     cargo_convocante: presidenteMandate?.role || "Presidente",
     convocante_nombre: presidenteMandate?.persons?.name || "—",
     miembros_totales: mandates.length,
     miembros: miembros,
-    fecha_constitucion_comision: body.established_date || "—",
-    base_cargo_mesa: body.legal_basis || "los Estatutos Sociales",
+    fecha_constitucion_comision: bodyTyped.established_date || "—",
+    base_cargo_mesa: bodyTyped.legal_basis || "los Estatutos Sociales",
   };
 }
 
@@ -122,45 +162,46 @@ async function resolveMeetingVars(meetingId: string): Promise<Record<string, unk
 
   if (error || !meeting) return {};
 
-  const participants = (meeting as any).meeting_participants ?? [];
-  const agenda = ((meeting as any).meeting_agenda ?? [])
-    .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+  const meetingTyped = meeting as unknown as MeetingWithJoins;
+  const participants = meetingTyped.meeting_participants ?? [];
+  const agenda = (meetingTyped.meeting_agenda ?? [])
+    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
-  const presentes = participants.filter((p: any) => p.attendance_status === "PRESENT" || p.attended);
-  const ausentes = participants.filter((p: any) => p.attendance_status === "ABSENT" || !p.attended);
+  const presentes = participants.filter((p) => p.attendance_status === "PRESENT" || p.attended);
+  const ausentes = participants.filter((p) => p.attendance_status === "ABSENT" || !p.attended);
 
-  const meetingDate = meeting.date || meeting.scheduled_date;
+  const meetingDate = meetingTyped.date || meetingTyped.scheduled_date;
 
   return {
     fecha: meetingDate,
-    hora_inicio: meeting.start_time || "—",
-    hora_fin: meeting.end_time || "—",
-    lugar: meeting.location || "—",
-    lugar_junta: meeting.location || "—",
+    hora_inicio: meetingTyped.start_time || "—",
+    hora_fin: meetingTyped.end_time || "—",
+    lugar: meetingTyped.location || "—",
+    lugar_junta: meetingTyped.location || "—",
     fecha_junta: meetingDate,
-    hora_junta: meeting.start_time || "—",
-    miembros_presentes: presentes.map((p: any) => ({
+    hora_junta: meetingTyped.start_time || "—",
+    miembros_presentes: presentes.map((p) => ({
       nombre: p.person_name || p.name || "—",
       cargo: p.role || "Miembro",
     })),
-    miembros_ausentes: ausentes.map((p: any) => ({
+    miembros_ausentes: ausentes.map((p) => ({
       nombre: p.person_name || p.name || "—",
       cargo: p.role || "Miembro",
       justificacion: p.absence_reason || null,
     })),
     miembros_presentes_count: presentes.length,
-    orden_dia: agenda.map((a: any, i: number) => ({
+    orden_dia: agenda.map((a, i) => ({
       ordinal: `${i + 1}`,
       descripcion_punto: a.title || a.description || "—",
     })),
     // Convocatoria specific
-    fecha_convocatoria: meeting.convocation_date || "—",
-    medio_publicacion: meeting.publication_medium || "—",
-    fecha_publicacion_convocatoria: meeting.publication_date || "—",
-    dias_antelacion: meeting.notice_days || "—",
-    segunda_convocatoria: !!meeting.second_call_date,
-    fecha_segunda_convocatoria: meeting.second_call_date || null,
-    hora_segunda_convocatoria: meeting.second_call_time || null,
+    fecha_convocatoria: meetingTyped.convocation_date || "—",
+    medio_publicacion: meetingTyped.publication_medium || "—",
+    fecha_publicacion_convocatoria: meetingTyped.publication_date || "—",
+    dias_antelacion: meetingTyped.notice_days || "—",
+    segunda_convocatoria: !!meetingTyped.second_call_date,
+    fecha_segunda_convocatoria: meetingTyped.second_call_date || null,
+    hora_segunda_convocatoria: meetingTyped.second_call_time || null,
   };
 }
 

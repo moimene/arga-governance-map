@@ -160,7 +160,7 @@ export default function GenerarDocumentoStepper() {
         signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
         createdBy: "secretaria-demo",
         agreementId: agreement.id,
-        onProgress: (msg) => { console.log("[QES]", msg); },
+        onProgress: () => {},
       });
       setSigningStatus("signed");
     } catch (e) {
@@ -409,7 +409,7 @@ export default function GenerarDocumentoStepper() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--g-border-subtle)]">
-                      {(selectedPlantilla.capa2_variables ?? []).map((v: any) => {
+                      {(selectedPlantilla.capa2_variables ?? []).map((v) => {
                         const value = resolvedVars[v.variable];
                         const isResolved = value !== undefined && value !== null;
                         return (
@@ -491,7 +491,7 @@ export default function GenerarDocumentoStepper() {
             </p>
 
             <Capa3Form
-              fields={(selectedPlantilla.capa3_editables ?? []) as any[]}
+              fields={(selectedPlantilla.capa3_editables ?? [])}
               values={capa3Values}
               onChange={setCapa3Values}
             />

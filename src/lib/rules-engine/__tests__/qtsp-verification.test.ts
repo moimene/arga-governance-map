@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { verificarIntegridad } from "../qtsp-integration";
+import type { IntegrityCheckDetail } from "../qtsp-integration";
+import type { ExplainNode } from "../types";
 
 describe("verificarIntegridad", () => {
   const DEMO_AGREEMENT_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -266,7 +268,7 @@ describe("verificarIntegridad", () => {
 
   describe("empty and mixed scenarios", () => {
     it("should return ok=true with empty artifacts array", () => {
-      const artifacts: any[] = [];
+      const artifacts: Parameters<typeof verificarIntegridad>[1] = [];
 
       const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
 
@@ -319,7 +321,7 @@ describe("verificarIntegridad", () => {
       expect(Array.isArray(result.explain)).toBe(true);
       expect(result.explain.length).toBeGreaterThan(0);
       // Each explain node should have expected structure
-      result.explain.forEach((node: any) => {
+      result.explain.forEach((node: ExplainNode) => {
         expect(node).toHaveProperty("regla");
         expect(node).toHaveProperty("fuente");
         expect(node).toHaveProperty("mensaje");
@@ -376,7 +378,7 @@ describe("verificarIntegridad", () => {
       expect(Array.isArray(result.explain)).toBe(true);
 
       // Verify each check has required fields
-      result.checks.forEach((check: any) => {
+      result.checks.forEach((check: IntegrityCheckDetail) => {
         expect(check).toHaveProperty("type");
         expect(check).toHaveProperty("label");
         expect(check).toHaveProperty("passed");

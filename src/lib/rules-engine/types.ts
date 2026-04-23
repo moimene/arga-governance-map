@@ -466,8 +466,13 @@ export interface VotacionInput {
   conflictos?: ConflictoInteres[];
   votoCalidadHabilitado?: boolean;
   esEmpate?: boolean;
-  decisionFirmada?: boolean;  // for unipersonal
-  noSessionInput?: NoSessionInput;  // for NO_SESSION delegation
+  decisionFirmada?: boolean;
+  noSessionInput?: NoSessionInput;
+  coAprobacionConfig?: CoAprobacionConfig;
+  solidarioConfig?: SolidarioConfig;
+  adminVigentes?: string[];
+  fechaAcuerdo?: string;
+  firmasPresentes?: string[];
 }
 
 export interface VotacionOutput extends EvaluacionResult {

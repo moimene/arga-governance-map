@@ -30,6 +30,12 @@ interface SearchResult {
   nav_to: string;
 }
 
+type AgreementRow = { id: string; agreement_kind: string; status: string; proposal_text?: string };
+type ConvocatoriaRow = { id: string; estado: string; fecha_1?: string; governing_bodies: { name: string } | null };
+type NoSessionRow = { id: string; title?: string; status: string };
+type PolicyRow = { id: string; name: string; status: string };
+type FindingRow = { id: string; code: string; title: string; severity?: string };
+
 const KIND_META = {
   agreement:   { icon: FileCheck2,    group: "Acuerdos" },
   convocatoria:{ icon: Bell,          group: "Convocatorias" },
@@ -72,7 +78,7 @@ async function runSearch(query: string): Promise<SearchResult[]> {
   ]);
 
   if (agreements.status === "fulfilled" && agreements.value.data) {
-    agreements.value.data.forEach((a: any) => {
+    (agreements.value.data as AgreementRow[]).forEach((a) => {
       results.push({
         id: a.id,
         label: a.agreement_kind.replace(/_/g, " "),
@@ -84,10 +90,10 @@ async function runSearch(query: string): Promise<SearchResult[]> {
   }
 
   if (convocatorias.status === "fulfilled" && convocatorias.value.data) {
-    convocatorias.value.data.forEach((c: any) => {
+    (convocatorias.value.data as ConvocatoriaRow[]).forEach((c) => {
       results.push({
         id: c.id,
-        label: (c.governing_bodies as any)?.name ?? "Convocatoria",
+        label: c.governing_bodies?.name ?? "Convocatoria",
         sublabel: `${c.estado} · ${c.fecha_1 ? new Date(c.fecha_1).toLocaleDateString("es-ES") : ""}`,
         kind: "convocatoria",
         nav_to: `/secretaria/convocatorias/${c.id}`,
@@ -96,7 +102,7 @@ async function runSearch(query: string): Promise<SearchResult[]> {
   }
 
   if (nosessions.status === "fulfilled" && nosessions.value.data) {
-    nosessions.value.data.forEach((n: any) => {
+    (nosessions.value.data as NoSessionRow[]).forEach((n) => {
       results.push({
         id: n.id,
         label: n.title ?? "Acuerdo sin sesión",
@@ -108,7 +114,7 @@ async function runSearch(query: string): Promise<SearchResult[]> {
   }
 
   if (policies.status === "fulfilled" && policies.value.data) {
-    policies.value.data.forEach((p: any) => {
+    (policies.value.data as PolicyRow[]).forEach((p) => {
       results.push({
         id: p.id,
         label: p.name,
@@ -120,7 +126,7 @@ async function runSearch(query: string): Promise<SearchResult[]> {
   }
 
   if (findings.status === "fulfilled" && findings.value.data) {
-    findings.value.data.forEach((f: any) => {
+    (findings.value.data as FindingRow[]).forEach((f) => {
       results.push({
         id: f.id,
         label: `${f.code} — ${f.title}`,

@@ -1,4 +1,4 @@
-import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle } from "lucide-react";
+import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { toast } from "sonner";
@@ -19,7 +19,7 @@ const ESTADO_LABEL = {
   ARCHIVADA: "Archivada",
 };
 
-const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; icon: any }> = {
+const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; icon: LucideIcon }> = {
   BORRADOR: { label: "Marcar como revisada", nextState: "REVISADA", icon: Clock },
   REVISADA: { label: "Aprobar", nextState: "APROBADA", icon: CheckCircle },
   APROBADA: { label: "Activar", nextState: "ACTIVA", icon: CheckCircle },
@@ -72,7 +72,7 @@ export default function Plantillas() {
   const displayData = activeTab === 'proceso' ? procesoDatos : modelosDatos;
 
   const filteredData = activeTab === 'modelos' && filterMateria
-    ? displayData.filter((p) => (p as any).materia_acuerdo === filterMateria)
+    ? displayData.filter((p) => p.materia_acuerdo === filterMateria)
     : displayData;
 
   return (
@@ -181,7 +181,7 @@ export default function Plantillas() {
                   >
                     <td className="px-5 py-3 text-sm font-medium text-[var(--g-text-primary)]">
                       {activeTab === 'modelos'
-                        ? ((plantilla as any).materia_acuerdo ?? plantilla.tipo)
+                        ? (plantilla.materia_acuerdo ?? plantilla.tipo)
                         : plantilla.tipo}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
@@ -242,7 +242,7 @@ export default function Plantillas() {
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Materia</div>
                   <div className="mt-1 text-sm text-[var(--g-text-primary)]">
-                    {(selected as any).materia_acuerdo ?? selected.materia ?? "—"}
+                    {selected.materia_acuerdo ?? selected.materia ?? "—"}
                   </div>
                 </div>
 
@@ -319,9 +319,9 @@ export default function Plantillas() {
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
                       {selected.capa2_variables.map((v, i) => (
                         <div key={i} className="rounded bg-[var(--g-surface-subtle)] px-2 py-1">
-                          <span className="font-mono font-medium">{(v as any).variable}</span>
+                          <span className="font-mono font-medium">{v.variable}</span>
                           {" — "}
-                          <span className="text-[10px]">{(v as any).fuente}</span>
+                          <span className="text-[10px]">{v.fuente}</span>
                         </div>
                       ))}
                     </div>
@@ -329,7 +329,7 @@ export default function Plantillas() {
                 )}
 
                 {/* Capa 3 Editables (Modelos de acuerdo) */}
-                {(selected as any).capa3_editables && Array.isArray((selected as any).capa3_editables) && (selected as any).capa3_editables.length > 0 && (
+                {selected.capa3_editables && selected.capa3_editables.length > 0 && (
                   <div className="mb-4">
                     {activeTab === 'modelos' && (
                       <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
@@ -340,7 +340,7 @@ export default function Plantillas() {
                       Campos del secretario (Capa 3)
                     </div>
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
-                      {((selected as any).capa3_editables as any[]).map((v, i) => (
+                      {selected.capa3_editables.map((v, i) => (
                         <div key={i} className="rounded bg-[var(--g-surface-muted)] px-2 py-1">
                           <span className="font-mono font-medium">{v.campo}</span>
                           {v.obligatoriedad === 'OBLIGATORIO' && (
@@ -379,11 +379,11 @@ export default function Plantillas() {
                 )}
 
                 {/* Checklist de aprobación */}
-                {(selected as any).approval_checklist && Array.isArray((selected as any).approval_checklist) && (selected as any).approval_checklist.length > 0 && (
+                {selected.approval_checklist && selected.approval_checklist.length > 0 && (
                   <div className="mb-4">
                     <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Checklist de aprobación</div>
                     <div className="mt-2 space-y-1">
-                      {((selected as any).approval_checklist as Array<{ check: string; passed: boolean }>).map((item, i) => (
+                      {selected.approval_checklist.map((item, i) => (
                         <div key={i} className="flex items-center gap-2 text-xs">
                           {item.passed ? <CheckCircle className="h-3.5 w-3.5 text-[var(--status-success)]" /> : <AlertCircle className="h-3.5 w-3.5 text-[var(--status-error)]" />}
                           <span className="text-[var(--g-text-primary)]">{item.check}</span>
@@ -394,11 +394,11 @@ export default function Plantillas() {
                 )}
 
                 {/* Historial de estado */}
-                {(selected as any).version_history && Array.isArray((selected as any).version_history) && (selected as any).version_history.length > 0 && (
+                {selected.version_history && selected.version_history.length > 0 && (
                   <div className="mb-4">
                     <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Historial de estado</div>
                     <div className="mt-2 space-y-1">
-                      {((selected as any).version_history as Array<{ from: string; to: string; at: string; by: string }>).map((h, i) => (
+                      {selected.version_history.map((h, i) => (
                         <div key={i} className="text-xs text-[var(--g-text-secondary)]">
                           <span className="font-medium text-[var(--g-text-primary)]">{h.from} → {h.to}</span>
                           {" · "}{new Date(h.at).toLocaleDateString("es-ES")}

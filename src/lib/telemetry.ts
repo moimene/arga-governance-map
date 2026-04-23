@@ -9,7 +9,7 @@
 interface TelemetryEvent {
   timestamp: string;
   event: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   sessionId: string;
 }
 
@@ -40,7 +40,7 @@ const performanceMarkers: Map<string, number> = new Map();
  */
 export function trackEvent(
   name: string,
-  properties?: Record<string, any>
+  properties?: Record<string, unknown>
 ): void {
   const evt: TelemetryEvent = {
     timestamp: new Date().toISOString(),
@@ -87,7 +87,7 @@ export function trackPageView(path: string): void {
  */
 export function trackError(
   error: Error,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): void {
   trackEvent("error", {
     message: error.message,

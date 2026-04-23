@@ -51,7 +51,7 @@ export function evaluarVotacion(
   let mayoriaAlcanzada = false;
   let unanimidadAlcanzada = false;
   let votoCalidadUsado = false;
-  let vetoAplicado = false;
+  const vetoAplicado = false;
 
   // ================================================================
   // Gate 0: Adoption mode routing
@@ -92,7 +92,7 @@ export function evaluarVotacion(
 
   // CO_APROBACION — k-de-n admins signing without formal session
   if (input.adoptionMode === 'CO_APROBACION') {
-    const coAprobConfig = (input as any).coAprobacionConfig as CoAprobacionConfig | undefined;
+    const coAprobConfig = input.coAprobacionConfig;
     if (!coAprobConfig) {
       return {
         etapa: 'VOTACION',
@@ -110,8 +110,8 @@ export function evaluarVotacion(
         mayoriaAlcanzada: false,
       };
     }
-    const adminVigentes: string[] = (input as any).adminVigentes ?? [];
-    const fechaAcuerdo: string = (input as any).fechaAcuerdo ?? new Date().toISOString();
+    const adminVigentes: string[] = input.adminVigentes ?? [];
+    const fechaAcuerdo: string = input.fechaAcuerdo ?? new Date().toISOString();
     const result = evaluarCoAprobacion(coAprobConfig, adminVigentes, fechaAcuerdo);
     return {
       etapa: 'VOTACION',
@@ -127,7 +127,7 @@ export function evaluarVotacion(
 
   // SOLIDARIO — individual solidario admin acting unilaterally
   if (input.adoptionMode === 'SOLIDARIO') {
-    const solidarioConfig = (input as any).solidarioConfig as SolidarioConfig | undefined;
+    const solidarioConfig = input.solidarioConfig;
     if (!solidarioConfig) {
       return {
         etapa: 'VOTACION',
@@ -145,10 +145,10 @@ export function evaluarVotacion(
         mayoriaAlcanzada: false,
       };
     }
-    const adminVigentes: string[] = (input as any).adminVigentes ?? [];
+    const adminVigentes: string[] = input.adminVigentes ?? [];
     const materia: string = input.materias[0] ?? '';
-    const fechaAcuerdo: string = (input as any).fechaAcuerdo ?? new Date().toISOString();
-    const firmasPresentes: string[] | undefined = (input as any).firmasPresentes;
+    const fechaAcuerdo: string = input.fechaAcuerdo ?? new Date().toISOString();
+    const firmasPresentes: string[] | undefined = input.firmasPresentes;
     const result = evaluarSolidario(solidarioConfig, adminVigentes, materia, fechaAcuerdo, firmasPresentes);
     return {
       etapa: 'VOTACION',

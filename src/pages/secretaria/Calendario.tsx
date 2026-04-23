@@ -34,6 +34,12 @@ const KIND_META: Record<DeadlineKind, { icon: React.ElementType; color: string; 
   TRAMITACION:       { icon: Gavel,       color: "text-[var(--status-info)]",    label: "Tramitación registral" },
 };
 
+type ConvRow = { id: string; fecha_1: string | null; estado: string | null; governing_bodies: { name: string } | null };
+type LibroRow = { id: string; book_type: string | null; legalization_deadline: string | null };
+type AcuerdoSinSesionRow = { id: string; title: string | null; status: string; voting_deadline: string | null };
+type MandatoRow = { id: string; role: string | null; end_date: string | null; persons: { full_name: string } | null };
+type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; deadline: string | null };
+
 function daysFromNow(isoDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -97,7 +103,7 @@ function useCalendarioDeadlines() {
       ]);
 
       // Convocatorias
-      ((convs.data ?? []) as any[]).forEach((c) => {
+      (convs.data as ConvRow[] ?? []).forEach((c) => {
         if (!c.fecha_1) return;
         const days = daysFromNow(c.fecha_1);
         items.push({
@@ -113,7 +119,7 @@ function useCalendarioDeadlines() {
       });
 
       // Libros obligatorios
-      ((libros.data ?? []) as any[]).forEach((b) => {
+      (libros.data as LibroRow[] ?? []).forEach((b) => {
         if (!b.legalization_deadline) return;
         const days = daysFromNow(b.legalization_deadline);
         items.push({
@@ -129,7 +135,7 @@ function useCalendarioDeadlines() {
       });
 
       // Acuerdos sin sesión — deadline de votación
-      ((asocs.data ?? []) as any[]).forEach((a) => {
+      (asocs.data as AcuerdoSinSesionRow[] ?? []).forEach((a) => {
         if (!a.voting_deadline) return;
         const days = daysFromNow(a.voting_deadline);
         items.push({
@@ -145,10 +151,10 @@ function useCalendarioDeadlines() {
       });
 
       // Mandatos próximos a vencer
-      ((mandates.data ?? []) as any[]).forEach((m) => {
+      (mandates.data as MandatoRow[] ?? []).forEach((m) => {
         if (!m.end_date) return;
         const days = daysFromNow(m.end_date);
-        const personName = (m.persons as any)?.full_name ?? "Consejero/a";
+        const personName = m.persons?.full_name ?? "Consejero/a";
         items.push({
           id: m.id,
           kind: "RENOVACION_MANDATO",
@@ -162,7 +168,7 @@ function useCalendarioDeadlines() {
       });
 
       // Tramitaciones con deadline
-      ((filings.data ?? []) as any[]).forEach((f) => {
+      (filings.data as FilingRow[] ?? []).forEach((f) => {
         if (!f.deadline) return;
         const days = daysFromNow(f.deadline);
         items.push({

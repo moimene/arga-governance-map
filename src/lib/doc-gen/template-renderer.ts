@@ -104,7 +104,7 @@ export function renderTemplate(input: RenderTemplateInput): RenderTemplateOutput
     // Pre-process: handle `{{#if var == 'value'}}` pseudo-syntax
     // Handlebars doesn't support inline comparison, so we convert these
     // to use the eq helper: {{#if (eq var "value")}}
-    let processedTemplate = input.template
+    const processedTemplate = input.template
       .replace(/\{\{#if\s+(\w+)\s*==\s*'([^']+)'\}\}/g, "{{#if (eq $1 \"$2\")}}")
       .replace(/\{\{#if\s+(\w+)\s*==\s*"([^"]+)"\}\}/g, '{{#if (eq $1 "$2")}}');
 

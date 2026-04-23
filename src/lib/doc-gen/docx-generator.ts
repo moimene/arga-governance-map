@@ -21,6 +21,7 @@ import {
   PageNumber,
   PageBreak,
   BorderStyle,
+  TabStopType,
 } from "docx";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ function parseRenderedText(text: string): ParsedSection[] {
 
     // Detect headings: ALL-CAPS lines (at least 3 chars), or known headers
     const isHeading =
-      (trimmed.length >= 3 && trimmed === trimmed.toUpperCase() && /^[A-ZÁÉÍÓÚÑÜ\s\(\)—–\-\.]+$/.test(trimmed)) ||
+      (trimmed.length >= 3 && trimmed === trimmed.toUpperCase() && /^[A-ZÁÉÍÓÚÑÜ\s()—–\-.]+$/.test(trimmed)) ||
       /^(CONSTITUCIÓN|ORDEN DEL DÍA|DELIBERACIONES|TRAZABILIDAD|DATOS DE LA REUNIÓN|DERECHO DE INFORMACIÓN|DERECHO DE REPRESENTACIÓN|COMPLEMENTO DE CONVOCATORIA|CANAL DE NOTIFICACIÓN|INFORMACIÓN AL CONSEJO|ÁMBITO DE DELEGACIÓN)/.test(trimmed);
 
     if (isHeading) {
@@ -235,7 +236,7 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
                   }),
                 ],
                 tabStops: [
-                  { type: "right" as any, position: 9026 },
+                  { type: TabStopType.RIGHT, position: 9026 },
                 ],
               }),
             ],
@@ -280,7 +281,7 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
                   }),
                 ],
                 tabStops: [
-                  { type: "right" as any, position: 9026 },
+                  { type: TabStopType.RIGHT, position: 9026 },
                 ],
               }),
             ],
