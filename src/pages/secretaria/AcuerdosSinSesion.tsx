@@ -40,15 +40,35 @@ export default function AcuerdosSinSesion() {
             otra mayoría reforzada.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate("/secretaria/acuerdos-sin-sesion/nuevo")}
-          className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo acuerdo
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/nuevo")}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4" />
+            Sin sesión (unanimidad)
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/co-aprobacion")}
+            className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4" />
+            Co-aprobación (k de n)
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/solidario")}
+            className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4" />
+            Administrador solidario
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

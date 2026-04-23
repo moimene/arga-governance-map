@@ -8,6 +8,7 @@ import { ShellLayout } from "@/components/shell/ShellLayout";
 import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { TenantProvider } from "@/context/TenantContext";
 import { ProtectedShell } from "@/components/RequireAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
@@ -54,6 +55,8 @@ const TramitadorLista = lazy(() => import("@/pages/secretaria/TramitadorLista"))
 const TramitadorStepper = lazy(() => import("@/pages/secretaria/TramitadorStepper"));
 const AcuerdosSinSesion = lazy(() => import("@/pages/secretaria/AcuerdosSinSesion"));
 const AcuerdoSinSesionStepper = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionStepper"));
+const CoAprobacionStepper = lazy(() => import("@/pages/secretaria/CoAprobacionStepper"));
+const SolidarioStepper = lazy(() => import("@/pages/secretaria/SolidarioStepper"));
 const ExpedienteSinSesionStepper = lazy(() => import("@/pages/secretaria/ExpedienteSinSesionStepper"));
 const AcuerdoSinSesionDetalle = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionDetalle"));
 const DecisionesUnipersonales = lazy(() => import("@/pages/secretaria/DecisionesUnipersonales"));
@@ -129,6 +132,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <TenantProvider>
           <ScopeProvider>
             <TourProvider>
               <ErrorBoundary>
@@ -185,6 +189,8 @@ const App = () => (
                   <Route path="/secretaria/tramitador/:id" element={<Suspense fallback={<ModuleFallback />}><TramitadorStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion" element={<Suspense fallback={<ModuleFallback />}><AcuerdosSinSesion /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/co-aprobacion" element={<Suspense fallback={<ModuleFallback />}><CoAprobacionStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/solidario" element={<Suspense fallback={<ModuleFallback />}><SolidarioStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/expediente" element={<Suspense fallback={<ModuleFallback />}><ExpedienteSinSesionStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionDetalle /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales" element={<Suspense fallback={<ModuleFallback />}><DecisionesUnipersonales /></Suspense>} />
@@ -259,6 +265,7 @@ const App = () => (
               </ErrorBoundary>
             </TourProvider>
           </ScopeProvider>
+          </TenantProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
