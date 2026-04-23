@@ -16,8 +16,7 @@ import {
 import { useBoardPackData, type BoardPackData } from "@/hooks/useBoardPackData";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 
@@ -424,6 +423,7 @@ function CotizadaWarnings({ warnings }: CotizadaWarningsProps) {
 
 export default function BoardPackPage() {
   const { id: paramId } = useParams<{ id: string }>();
+  const { tenantId } = useTenantContext();
   // Guard contra `:id` literal (NavLinks mal formados) y valores vacíos.
   const validParamId = paramId && paramId !== ":id" ? paramId : undefined;
 
@@ -431,13 +431,13 @@ export default function BoardPackPage() {
   // más reciente del CdA del tenant demo para que el sidebar "Board Pack"
   // funcione sin necesidad de elegir reunión previamente.
   const { data: fallbackMeeting, isLoading: loadingFallback } = useQuery({
-    queryKey: ["board-pack", "fallback-meeting", DEMO_TENANT],
-    enabled: !validParamId,
+    queryKey: ["board-pack", "fallback-meeting", tenantId],
+    enabled: !validParamId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("meetings")
         .select("id, scheduled_start, governing_bodies!inner(body_type)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("governing_bodies.body_type", "CDA")
         .order("scheduled_start", { ascending: false })
         .limit(1)

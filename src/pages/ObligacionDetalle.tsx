@@ -22,6 +22,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
@@ -37,7 +38,7 @@ export default function ObligacionDetalle() {
   const { data: evidences = [] } = useEvidencesByControlIds(controlIds);
 
   // Incidentes GRC vinculados por FK obligation_id (GAP 3 — obligation_id → incidents).
-  const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+  const { tenantId } = useTenantContext();
   type IncidentLinked = {
     id: string;
     code: string;
@@ -59,7 +60,7 @@ export default function ObligacionDetalle() {
         .from("incidents")
         .select("id, code, title, status, severity, incident_type, is_major_incident, regulatory_notification_required, detection_date, resolution_date")
         .eq("obligation_id", obligation!.id)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("detection_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as IncidentLinked[];

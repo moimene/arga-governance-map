@@ -32,6 +32,7 @@ import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolve
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { generateDocx, downloadDocx, computeContentHash } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
+import { useTenantContext } from "@/context/TenantContext";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ const STEPS = [
 export default function GenerarDocumentoStepper() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
 
@@ -100,6 +102,7 @@ export default function GenerarDocumentoStepper() {
         try {
           const context: ResolverContext = {
             agreementId: agreement.id,
+            tenantId: tenantId ?? "",
             entityId: agreement.entity_id,
             bodyId: agreement.body_id,
             meetingId: agreement.parent_meeting_id,
@@ -181,7 +184,7 @@ export default function GenerarDocumentoStepper() {
 
     try {
       const filename = `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}`;
-      const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename);
+      const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename, tenantId ?? "");
 
       if (result.ok) {
         setArchiveUrl(result.documentUrl || null);

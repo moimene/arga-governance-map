@@ -3,8 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, Clock, Bell } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { Link } from "react-router-dom";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type RegNotRow = {
   id: string;
@@ -34,27 +33,29 @@ type ExceptionRow = {
 };
 
 function useAlerts() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "alertas"],
+    queryKey: ["grc", "alertas", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const in30Days = new Date(Date.now() + 30 * 86_400_000).toISOString();
       const [regNots, bcmPlans, excs] = await Promise.all([
         supabase
           .from("regulatory_notifications")
           .select("id, authority, notification_type, notification_deadline, status, incident_id, incidents:incident_id(code, title)")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("status", "Pendiente")
           .order("notification_deadline", { ascending: true }),
         supabase
           .from("bcm_plans")
           .select("id, plan_code, plan_type, next_test_date, test_result")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .lt("next_test_date", in30Days)
           .order("next_test_date", { ascending: true }),
         supabase
           .from("exceptions")
           .select("id, code, status, expires_at, obligation_id, obligations:obligation_id(code, title)")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("status", "Pendiente")
           .order("expires_at", { ascending: true }),
       ]);

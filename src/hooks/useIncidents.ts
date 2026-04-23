@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type RegulatoryNotificationLite = {
   id: string;
@@ -35,15 +34,17 @@ export type IncidentWithJoins = {
 };
 
 export function useIncidents(incidentType?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "incidents", incidentType ?? "all"],
+    queryKey: ["grc", "incidents", tenantId, incidentType ?? "all"],
+    enabled: !!tenantId,
     queryFn: async () => {
       let q = supabase
         .from("incidents")
         .select(
           "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("detection_date", { ascending: false });
 
       if (incidentType) {
@@ -76,6 +77,7 @@ export function useIncident(id?: string) {
 }
 
 export function useCreateIncident() {
+  const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -91,7 +93,7 @@ export function useCreateIncident() {
     }) => {
       const { data, error } = await supabase
         .from("incidents")
-        .insert({ ...input, tenant_id: DEMO_TENANT })
+        .insert({ ...input, tenant_id: tenantId! })
         .select()
         .single();
       if (error) throw error;

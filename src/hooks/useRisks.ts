@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type RiskRow = {
   id: string;
@@ -20,15 +19,17 @@ export type RiskRow = {
 };
 
 export function useRisks(filters?: { moduleId?: string }) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "risks", filters],
+    queryKey: ["grc", "risks", tenantId, filters],
+    enabled: !!tenantId,
     queryFn: async () => {
       let q = supabase
         .from("risks")
         .select(
           "id, code, title, probability, impact, inherent_score, residual_score, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("code");
 
       if (filters?.moduleId) {

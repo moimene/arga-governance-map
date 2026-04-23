@@ -7,8 +7,7 @@ import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface Draft {
   holder_person_id: string;
@@ -25,6 +24,7 @@ const STEPS = ["Persona", "Participación", "Confirmar"];
 export default function AnadirSocioStepper() {
   const { id: entityId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
 
   const { data: sociedad } = useSociedad(entityId);
   const { data: capital } = useCapitalProfile(entityId);
@@ -84,7 +84,7 @@ export default function AnadirSocioStepper() {
     try {
       const pct = Number(draft.porcentaje_capital) || suggestedPct;
       const { error } = await supabase.from("capital_holdings").insert({
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         entity_id: entityId,
         holder_person_id: draft.holder_person_id,
         share_class_id: draft.share_class_id,

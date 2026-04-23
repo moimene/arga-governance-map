@@ -1,8 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type ModuleNavRow = {
   id: string;
@@ -21,14 +20,15 @@ const MODULE_LABEL: Record<string, string> = {
 };
 
 function useModuleNav(moduleId: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "module-nav", moduleId],
-    enabled: !!moduleId,
+    queryKey: ["grc", "module-nav", tenantId, moduleId],
+    enabled: !!moduleId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("grc_module_nav")
         .select("id, module_id, section, label, route, display_order")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("module_id", moduleId)
         .eq("is_enabled", true)
         .order("section")

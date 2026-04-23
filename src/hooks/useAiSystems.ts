@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type AiSystem = {
   id: string;
@@ -19,13 +18,15 @@ export type AiSystem = {
 };
 
 export function useAiSystemsList(riskFilter?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["ai_systems", riskFilter ?? "all"],
+    queryKey: ["ai_systems", tenantId, riskFilter ?? "all"],
+    enabled: !!tenantId,
     queryFn: async () => {
       let q = supabase
         .from("ai_systems")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (riskFilter) q = q.eq("risk_level", riskFilter);
       const { data, error } = await q;
@@ -36,30 +37,32 @@ export function useAiSystemsList(riskFilter?: string) {
 }
 
 export function useAiSystemById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["ai_systems", id],
+    queryKey: ["ai_systems", tenantId, id],
     queryFn: async () => {
       if (!id) return null;
       const { data, error } = await supabase
         .from("ai_systems")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", id)
         .single();
       if (error) throw error;
       return data as AiSystem;
     },
-    enabled: !!id,
+    enabled: !!id && !!tenantId,
   });
 }
 
 export function useCreateAiSystem() {
+  const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<AiSystem>) => {
       const { data, error } = await supabase
         .from("ai_systems")
-        .insert({ ...payload, tenant_id: DEMO_TENANT })
+        .insert({ ...payload, tenant_id: tenantId! })
         .select()
         .single();
       if (error) throw error;

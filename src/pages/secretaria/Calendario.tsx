@@ -5,8 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Calendar, AlertTriangle, Clock, BookOpen, ScrollText, Users, Gavel } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type DeadlineKind =
   | "CONVOCATORIA"
@@ -55,8 +54,10 @@ function urgencyFor(days: number): DeadlineItem["urgency"] {
 }
 
 function useCalendarioDeadlines() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "calendario"],
+    queryKey: ["secretaria", "calendario", tenantId],
+    enabled: !!tenantId,
     queryFn: async (): Promise<DeadlineItem[]> => {
       const items: DeadlineItem[] = [];
       const today = new Date().toISOString();
@@ -87,7 +88,7 @@ function useCalendarioDeadlines() {
         supabase
           .from("mandates")
           .select("id, end_date, role, persons(full_name)")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .gte("end_date", today)
           .lte("end_date", en90)
           .order("end_date", { ascending: true })

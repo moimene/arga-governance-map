@@ -19,10 +19,10 @@ export interface ArchiveResult {
 export async function archiveDocxToStorage(
   buffer: ArrayBuffer,
   agreementId: string,
-  filename: string
+  filename: string,
+  tenantId: string
 ): Promise<ArchiveResult> {
   try {
-    const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
     // Compute SHA-512 hash
     const hashBuffer = await globalThis.crypto.subtle.digest("SHA-512", buffer);
@@ -61,7 +61,7 @@ export async function archiveDocxToStorage(
 
     // Insert into evidence_bundles table
     const { error: insertError } = await supabase.from("evidence_bundles").insert({
-      tenant_id: DEMO_TENANT,
+      tenant_id: tenantId,
       agreement_id: agreementId,
       hash_sha512: hashHex,
       document_url: publicUrl,

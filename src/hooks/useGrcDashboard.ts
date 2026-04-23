@@ -1,29 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export function useGrcKpis() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "kpis"],
+    queryKey: ["grc", "kpis", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const [risks, incidents, exceptions, regNots] = await Promise.all([
         supabase
           .from("risks")
           .select("id, residual_score, status")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("incidents")
           .select("id, status, is_major_incident")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("exceptions")
           .select("id, status, expires_at")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("regulatory_notifications")
           .select("id, status, notification_deadline")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
       ]);
 
       const criticalRisks = (risks.data ?? []).filter(

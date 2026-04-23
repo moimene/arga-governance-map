@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useTenantContext } from "@/context/TenantContext";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { Link as RouterLink } from "react-router-dom";
 
@@ -100,17 +101,17 @@ export default function PoliticaDetalle() {
   });
 
   // Acuerdos vinculados directamente por policy_id FK (GAP 2)
-  const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+  const { tenantId } = useTenantContext();
   const { data: linkedAgreements = [] } = useQuery({
-    queryKey: ["policy-agreements-fk", policy?.id ?? "none"],
-    enabled: !!policy?.id,
+    queryKey: ["policy-agreements-fk", tenantId, policy?.id ?? "none"],
+    enabled: !!policy?.id && !!tenantId,
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agreements")
         .select("id, agreement_kind, status, decision_date, parent_meeting_id, meetings:parent_meeting_id(meeting_type, slug, scheduled_start)")
         .eq("policy_id", policy!.id)
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string;

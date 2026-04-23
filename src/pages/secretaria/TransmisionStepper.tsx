@@ -6,8 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface Draft {
   source_holding_id: string;
@@ -22,6 +21,7 @@ const STEPS = ["Origen", "Destino", "Confirmar"];
 export default function TransmisionStepper() {
   const { id: entityId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
 
   const { data: sociedad } = useSociedad(entityId);
   const { data: holdings } = useCapitalHoldings(entityId);
@@ -74,7 +74,7 @@ export default function TransmisionStepper() {
       const remanente = titulosOrigen - titulosATransmitir;
       if (remanente > 0) {
         const { error: remErr } = await supabase.from("capital_holdings").insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           entity_id: entityId,
           holder_person_id: sourceHolding.holder_person_id,
           share_class_id: sourceHolding.share_class_id,
@@ -90,7 +90,7 @@ export default function TransmisionStepper() {
 
       // 3) Crear holding de destino
       const { error: destErr } = await supabase.from("capital_holdings").insert({
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         entity_id: entityId,
         holder_person_id: draft.destino_person_id,
         share_class_id: sourceHolding.share_class_id,

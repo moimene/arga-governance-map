@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type TipoSocial = "SA" | "SL" | "SLU" | "SAU";
 type TipoOrgano = "ADMIN_UNICO" | "SOLIDARIO" | "MANCOMUNADO" | "CONSEJO";
@@ -50,6 +49,7 @@ const STEPS = ["Identidad", "Administración", "Capital", "Confirmar"];
 
 export default function SociedadNuevaStepper() {
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -72,7 +72,7 @@ export default function SociedadNuevaStepper() {
       const { data: person, error: pErr } = await supabase
         .from("persons")
         .insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           full_name: draft.legal_name,
           denomination: draft.legal_name,
           tax_id: draft.tax_id,
@@ -91,7 +91,7 @@ export default function SociedadNuevaStepper() {
       const { data: entity, error: eErr } = await supabase
         .from("entities")
         .insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           person_id: person.id,
           slug: `${slug}-${Date.now()}`,
           legal_name: draft.legal_name,
@@ -113,7 +113,7 @@ export default function SociedadNuevaStepper() {
 
       // 3) Crear entity_capital_profile VIGENTE
       const { error: cErr } = await supabase.from("entity_capital_profile").insert({
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         entity_id: entity.id,
         currency: draft.currency,
         capital_escriturado: Number(draft.capital_escriturado),
@@ -127,7 +127,7 @@ export default function SociedadNuevaStepper() {
 
       // 4) Clase única "A" por defecto
       const { error: scErr } = await supabase.from("share_classes").insert({
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         entity_id: entity.id,
         class_code: "A",
         name: "Clase ordinaria",

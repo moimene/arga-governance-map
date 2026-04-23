@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type PackRuleLite = {
   framework_code: string;
@@ -19,13 +18,15 @@ export type CountryPack = {
 };
 
 export function useCountryPacks() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "packs"],
+    queryKey: ["grc", "packs", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("country_packs")
         .select("*, pack_rules(framework_code, effective_date)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("country_code");
       if (error) throw error;
       return (data ?? []) as CountryPack[];
@@ -34,34 +35,35 @@ export function useCountryPacks() {
 }
 
 export function useCountryPackDetail(countryCode: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "pack", countryCode],
-    enabled: !!countryCode,
+    queryKey: ["grc", "pack", tenantId, countryCode],
+    enabled: !!countryCode && !!tenantId,
     queryFn: async () => {
       const { data: pack } = await supabase
         .from("country_packs")
         .select("*, pack_rules(framework_code, effective_date, local_adaptations)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("country_code", countryCode)
         .maybeSingle();
 
       const { count: incidentsOpen } = await supabase
         .from("incidents")
         .select("*", { count: "exact", head: true })
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .neq("status", "Cerrado")
         .eq("country_code", countryCode);
 
       const { count: risksHigh } = await supabase
         .from("risks")
         .select("*", { count: "exact", head: true })
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .gte("residual_score", 15);
 
       const { count: regNotsPending } = await supabase
         .from("regulatory_notifications")
         .select("*", { count: "exact", head: true })
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("status", "Pendiente");
 
       return {

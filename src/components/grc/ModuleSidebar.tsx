@@ -4,8 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import * as icons from "lucide-react";
 import { Dot, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type NavItem = {
   id: string;
@@ -32,14 +31,15 @@ const SECTION_LABEL: Record<string, string> = {
 };
 
 function useModuleNav(moduleId: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "module-nav", moduleId],
-    enabled: !!moduleId,
+    queryKey: ["grc", "module-nav", tenantId, moduleId],
+    enabled: !!moduleId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("grc_module_nav")
         .select("id, module_id, section, view_key, label, route, icon, display_order")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("module_id", moduleId)
         .eq("is_enabled", true)
         .order("section")

@@ -2,8 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Briefcase } from "lucide-react";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type IncidentLite = {
   code: string;
@@ -26,14 +25,16 @@ type ExceptionLite = {
 };
 
 function useMyWork() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "mywork"],
+    queryKey: ["grc", "mywork", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const [incidents, actionPlans, exceptions] = await Promise.all([
         supabase
           .from("incidents")
           .select("code, title, status, incident_type")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .neq("status", "Cerrado")
           .order("detection_date", { ascending: false })
           .limit(5),
@@ -45,7 +46,7 @@ function useMyWork() {
         supabase
           .from("exceptions")
           .select("code, status")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("status", "Pendiente"),
       ]);
 

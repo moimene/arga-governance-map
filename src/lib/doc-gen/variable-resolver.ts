@@ -17,8 +17,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface Capa2Variable {
@@ -29,6 +27,7 @@ export interface Capa2Variable {
 
 export interface ResolverContext {
   agreementId: string;
+  tenantId: string;
   entityId?: string;
   bodyId?: string;
   meetingId?: string;
@@ -83,12 +82,12 @@ type MeetingWithJoins = {
 
 // ── Entity resolver ──────────────────────────────────────────────────────────
 
-async function resolveEntityVars(entityId: string): Promise<Record<string, unknown>> {
+async function resolveEntityVars(entityId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data, error } = await supabase
     .from("entities")
     .select("*")
     .eq("id", entityId)
-    .eq("tenant_id", DEMO_TENANT)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error || !data) return {};
@@ -110,12 +109,12 @@ async function resolveEntityVars(entityId: string): Promise<Record<string, unkno
 
 // ── Body (organ) resolver ────────────────────────────────────────────────────
 
-async function resolveBodyVars(bodyId: string): Promise<Record<string, unknown>> {
+async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data: body, error } = await supabase
     .from("governing_bodies")
     .select("*, body_mandates(*, persons(*))")
     .eq("id", bodyId)
-    .eq("tenant_id", DEMO_TENANT)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error || !body) return {};
@@ -152,12 +151,12 @@ async function resolveBodyVars(bodyId: string): Promise<Record<string, unknown>>
 
 // ── Meeting resolver ─────────────────────────────────────────────────────────
 
-async function resolveMeetingVars(meetingId: string): Promise<Record<string, unknown>> {
+async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data: meeting, error } = await supabase
     .from("meetings")
     .select("*, meeting_participants(*), meeting_agenda(*)")
     .eq("id", meetingId)
-    .eq("tenant_id", DEMO_TENANT)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error || !meeting) return {};
@@ -207,12 +206,12 @@ async function resolveMeetingVars(meetingId: string): Promise<Record<string, unk
 
 // ── Agreement (expediente) resolver ──────────────────────────────────────────
 
-async function resolveAgreementVars(agreementId: string): Promise<Record<string, unknown>> {
+async function resolveAgreementVars(agreementId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data, error } = await supabase
     .from("agreements")
     .select("*")
     .eq("id", agreementId)
-    .eq("tenant_id", DEMO_TENANT)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error || !data) return {};
@@ -313,16 +312,16 @@ export async function resolveVariables(
   // Fetch all sources in parallel
   const [entityVars, bodyVars, meetingVars, agreementVars] = await Promise.all([
     sources.has("ENTIDAD") && context.entityId
-      ? resolveEntityVars(context.entityId)
+      ? resolveEntityVars(context.entityId, context.tenantId)
       : Promise.resolve({}),
     sources.has("ORGANO") && context.bodyId
-      ? resolveBodyVars(context.bodyId)
+      ? resolveBodyVars(context.bodyId, context.tenantId)
       : Promise.resolve({}),
     sources.has("REUNION") && context.meetingId
-      ? resolveMeetingVars(context.meetingId)
+      ? resolveMeetingVars(context.meetingId, context.tenantId)
       : Promise.resolve({}),
     sources.has("EXPEDIENTE") && context.agreementId
-      ? resolveAgreementVars(context.agreementId)
+      ? resolveAgreementVars(context.agreementId, context.tenantId)
       : Promise.resolve({}),
   ]);
 

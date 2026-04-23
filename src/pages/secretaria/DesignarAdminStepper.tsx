@@ -10,8 +10,7 @@ import {
   type TipoCondicion,
   type FuenteDesignacion,
 } from "@/hooks/useCargos";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface Draft {
   person_id: string;
@@ -65,6 +64,7 @@ export default function DesignarAdminStepper() {
   const [searchParams] = useSearchParams();
   const bodyIdFromUrl = searchParams.get("bodyId") ?? "";
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
 
   const { data: sociedad } = useSociedad(entityId);
   const { data: personas } = usePersonasCanonical({});
@@ -110,7 +110,7 @@ export default function DesignarAdminStepper() {
     const { data, error } = await supabase
       .from("governing_bodies")
       .select("id,name,body_type")
-      .eq("tenant_id", DEMO_TENANT)
+      .eq("tenant_id", tenantId!)
       .eq("entity_id", entityId)
       .order("name", { ascending: true });
     if (!error && data) setBodies(data as BodyRow[]);
@@ -142,7 +142,7 @@ export default function DesignarAdminStepper() {
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         person_id: draft.person_id,
         entity_id: entityId,
         body_id: esColegiado ? draft.body_id : null,

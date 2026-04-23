@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type VulnerabilityRow = {
   id: string;
@@ -15,13 +14,15 @@ type VulnerabilityRow = {
 };
 
 function useVulnerabilities() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "vulnerabilities"],
+    queryKey: ["grc", "vulnerabilities", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vulnerabilities")
         .select("id, cve_id, title, cvss_score, severity, asset_name, status, remediation_due")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("cvss_score", { ascending: false });
       if (error) throw error;
       return (data ?? []) as VulnerabilityRow[];

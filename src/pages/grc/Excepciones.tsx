@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FileWarning } from "lucide-react";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type ExceptionRow = {
   id: string;
@@ -17,13 +16,15 @@ type ExceptionRow = {
 };
 
 function useExceptions() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "excepciones"],
+    queryKey: ["grc", "excepciones", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("exceptions")
         .select("id, code, status, justification, compensatory_controls, requested_at, expires_at, obligation_id, obligations:obligation_id(code, title)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("requested_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ExceptionRow[];

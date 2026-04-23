@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface SodViolation {
   conflicting_role: string;
@@ -17,6 +16,7 @@ interface SodGuardProps {
 }
 
 export function SodGuard({ userId, proposedRole, onResult }: SodGuardProps) {
+  const { tenantId } = useTenantContext();
   const [violations, setViolations] = useState<SodViolation[]>([]);
   const [checked, setChecked] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -25,7 +25,7 @@ export function SodGuard({ userId, proposedRole, onResult }: SodGuardProps) {
     setChecking(true);
     try {
       const { data, error } = await supabase.rpc("fn_check_sod_violations", {
-        p_tenant_id: DEMO_TENANT,
+        p_tenant_id: tenantId!,
         p_user_id: userId,
         p_proposed_role: proposedRole,
       });

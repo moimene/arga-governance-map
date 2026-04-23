@@ -4,8 +4,7 @@ import { Users, Check, ChevronLeft, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePersonasCanonical, type PersonType } from "@/hooks/usePersonasCanonical";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 // G1.3: tipo del resultado del precheck de colisión de tax_id.
 // "entity"  = el tax_id ya pertenece a una sociedad gestionada (BLOQUEA)
@@ -38,6 +37,7 @@ const STEPS = ["Tipo", "Datos", "Confirmar"];
 
 export default function PersonaNuevaStepper() {
   const navigate = useNavigate();
+  const { tenantId } = useTenantContext();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export default function PersonaNuevaStepper() {
         const { data: personMatch, error: pErr } = await supabase
           .from("persons")
           .select("id, full_name")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("tax_id", raw)
           .abortSignal(controller.signal)
           .maybeSingle();
@@ -76,7 +76,7 @@ export default function PersonaNuevaStepper() {
         const { data: entityMatch, error: eErr } = await supabase
           .from("entities")
           .select("id, common_name, legal_name")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("person_id", personMatch.id)
           .abortSignal(controller.signal)
           .maybeSingle();
@@ -128,7 +128,7 @@ export default function PersonaNuevaStepper() {
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
-        tenant_id: DEMO_TENANT,
+        tenant_id: tenantId!,
         person_type: draft.person_type,
         full_name: draft.full_name.trim(),
         tax_id: draft.tax_id.trim() || null,

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type BiaRow = {
   id: string;
@@ -13,13 +12,15 @@ type BiaRow = {
 };
 
 function useBia() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "bia"],
+    queryKey: ["grc", "bia", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bcm_bia")
         .select("id, function_name, is_critical, rto_objective, rpo_objective, mtd_objective")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("function_name");
       if (error) throw error;
       return (data ?? []) as BiaRow[];

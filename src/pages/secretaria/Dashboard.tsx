@@ -18,9 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
-const DEMO_ENTITY = "6d7ed736-f263-4531-a59d-c6ca0cd41602";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface KpiCounts {
   convocatorias_proximas: number;
@@ -52,14 +50,16 @@ interface CrossModuleMetrics {
 }
 
 function useCrossModuleMetrics() {
+  const { tenantId, entityId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "cross_module"],
+    queryKey: ["secretaria", "cross_module", tenantId],
+    enabled: !!tenantId,
     queryFn: async (): Promise<CrossModuleMetrics> => {
       const [incidents, findings, policies, pactos] = await Promise.all([
         supabase.from("incidents").select("id", { count: "exact", head: true }).eq("status", "Abierto"),
         supabase.from("findings").select("id", { count: "exact", head: true }).in("severity", ["Alta", "Crítica"]).eq("status", "Abierto"),
         supabase.from("policies").select("id", { count: "exact", head: true }).in("status", ["In Review", "Approval Pending"]),
-        supabase.from("pactos_parasociales").select("id", { count: "exact", head: true }).eq("tenant_id", DEMO_TENANT).eq("entity_id", DEMO_ENTITY).eq("estado", "VIGENTE"),
+        supabase.from("pactos_parasociales").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("entity_id", entityId ?? "").eq("estado", "VIGENTE"),
       ]);
       return {
         incidents_open: incidents.count ?? 0,
@@ -73,8 +73,10 @@ function useCrossModuleMetrics() {
 }
 
 function useSecretariaKpis() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "kpis"],
+    queryKey: ["secretaria", "kpis", tenantId],
+    enabled: !!tenantId,
     queryFn: async (): Promise<KpiCounts> => {
       const hoyIso = new Date().toISOString();
       const en7 = new Date(Date.now() + 7 * 86400000).toISOString();
@@ -118,7 +120,7 @@ function useSecretariaKpis() {
           .from("rule_evaluation_results")
           .select("agreement_id", { count: "exact", head: true })
           .eq("ok", false)
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
       ]);
 
       return {
