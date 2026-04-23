@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollText, Plus } from "lucide-react";
-import { useAcuerdosSinSesionList } from "@/hooks/useAcuerdosSinSesion";
+import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -16,6 +16,13 @@ const SELECT_CLASS =
 export default function AcuerdosSinSesion() {
   const navigate = useNavigate();
   const { data, isLoading } = useAcuerdosSinSesionList();
+  const closeExpired = useCloseExpiredVotaciones();
+
+  // Auto-close expired VOTING_OPEN processes on page load (G6)
+  useEffect(() => {
+    closeExpired.mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
