@@ -241,7 +241,14 @@ export function evaluarAcuerdoCompleto(
 
     // Etapa 3: Votación
     if (inputs.votacion) {
-      const resultVot = evaluarVotacion(inputs.votacion, packs, overrides);
+      // Pre-check pactos veto so gate 5/6 can block voto de calidad when a veto is active.
+      // Pactos are also evaluated post-votación for the full explain tree; this is a fast pre-pass.
+      const vetoActivo = inputs.pactos && inputs.pactos.pactos.length > 0
+        ? evaluarPactosParasociales(inputs.pactos.pactos, inputs.pactos.evalInput)
+            .blocking_issues.some((b) => b.includes('VETO ACTIVO'))
+        : false;
+
+      const resultVot = evaluarVotacion({ ...inputs.votacion, vetoActivo }, packs, overrides);
       etapas.push(resultVot);
       allExplain.push(...resultVot.explain);
       allBlockingIssues.push(...resultVot.blocking_issues);

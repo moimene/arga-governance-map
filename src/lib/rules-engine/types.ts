@@ -473,6 +473,7 @@ export interface VotacionInput {
   adminVigentes?: string[];
   fechaAcuerdo?: string;
   firmasPresentes?: string[];
+  vetoActivo?: boolean;
 }
 
 export interface VotacionOutput extends EvaluacionResult {

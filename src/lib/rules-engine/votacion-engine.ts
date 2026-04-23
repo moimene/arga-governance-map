@@ -51,7 +51,7 @@ export function evaluarVotacion(
   let mayoriaAlcanzada = false;
   let unanimidadAlcanzada = false;
   let votoCalidadUsado = false;
-  const vetoAplicado = false;
+  const vetoAplicado = input.vetoActivo === true;
 
   // ================================================================
   // Gate 0: Adoption mode routing
@@ -378,15 +378,18 @@ export function evaluarVotacion(
   // Gate 5: Vetos
   // ================================================================
 
-  // Placeholder: vetos would come from pack.votacion.vetos (not in spec yet)
-  // For now, assume no vetos unless later specified
   const vetoNode: ExplainNode = {
     regla: 'Gate 5: Vetos',
-    fuente: 'ESTATUTOS',
-    resultado: 'OK',
-    mensaje: 'Sin vetos aplicados',
+    fuente: vetoAplicado ? 'PACTO_PARASOCIAL' : 'ESTATUTOS',
+    resultado: vetoAplicado ? 'WARNING' : 'OK',
+    mensaje: vetoAplicado
+      ? 'Pacto parasocial activo — veto aplicado. No afecta validez societaria, pero impide voto de calidad.'
+      : 'Sin vetos aplicados',
   };
   explainNodes.push(vetoNode);
+  if (vetoAplicado) {
+    warnings.push('VETO_PACTO_ACTIVO: Veto de pacto parasocial impide uso de voto de calidad');
+  }
 
   // ================================================================
   // Gate 6: Voto de calidad

@@ -650,3 +650,59 @@ describe('Abstenciones handling', () => {
     expect(result.mayoriaAlcanzada).toBe(false);
   });
 });
+
+// ============================================================
+// G3: Veto parasocial → gate 5 WARNING + gate 6 blocked
+// ============================================================
+
+describe('G3: vetoActivo', () => {
+  const packCalidad = createBaseRulePack({
+    votacion: {
+      mayoria: {
+        SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
+        SL: createBaseMajoritySpec(),
+        CONSEJO: createBaseMajoritySpec(),
+      },
+      abstenciones: 'no_cuentan',
+      votoCalidadPermitido: true,
+    },
+  });
+
+  it('V-G3-01: veto activo bloquea voto de calidad en empate', () => {
+    const input = createBaseInput({
+      votos: { favor: 5, contra: 5, abstenciones: 0, en_blanco: 0, capital_presente: 500, capital_total: 1000 },
+      esEmpate: true,
+      votoCalidadHabilitado: true,
+      vetoActivo: true,
+    });
+    const result = evaluarVotacion(input, [packCalidad]);
+
+    // Voto de calidad must NOT be used when veto is active
+    expect(result.votoCalidadUsado).toBeFalsy();
+    // Majority not reached (tie, voto de calidad blocked)
+    expect(result.mayoriaAlcanzada).toBe(false);
+  });
+
+  it('V-G3-02: veto activo aparece como WARNING en gate 5', () => {
+    const input = createBaseInput({ vetoActivo: true });
+    const result = evaluarVotacion(input, [packCalidad]);
+
+    const gate5 = result.explain.find((n) => n.regla === 'Gate 5: Vetos');
+    expect(gate5).toBeDefined();
+    expect(gate5!.resultado).toBe('WARNING');
+    expect(result.warnings.some((w) => w.includes('VETO_PACTO_ACTIVO'))).toBe(true);
+  });
+
+  it('V-G3-03: sin veto, voto de calidad funciona en empate', () => {
+    const input = createBaseInput({
+      votos: { favor: 5, contra: 5, abstenciones: 0, en_blanco: 0, capital_presente: 500, capital_total: 1000 },
+      esEmpate: true,
+      votoCalidadHabilitado: true,
+      vetoActivo: false,
+    });
+    const result = evaluarVotacion(input, [packCalidad]);
+
+    expect(result.votoCalidadUsado).toBe(true);
+    expect(result.mayoriaAlcanzada).toBe(true);
+  });
+});
