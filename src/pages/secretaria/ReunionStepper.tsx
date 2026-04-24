@@ -7,6 +7,7 @@ import { evaluarMayoria, validarCapitalUniversal } from "@/lib/rules-engine";
 // ── Tipos locales ────────────────────────────────────────────────────────────
 
 type VoteValue = "FAVOR" | "CONTRA" | "ABSTENCION" | "";
+type MeetingType = "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL";
 
 interface VoterRow {
   id: string;
@@ -344,27 +345,34 @@ function CierreStep() {
 
 // ── Paso 1: Constitución ─────────────────────────────────────────────────────
 
-function ConstitucionStep() {
-  const [meetingType, setMeetingType] = useState<"ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL">("ORDINARIA");
-  // Demo values: ARGA Seguros SA, 100 votos totales
-  const [capitalPresente, setCapitalPresente] = useState(75);
-  const capitalTotal = 100;
+interface ConstitucionStepProps {
+  tipoReunion: MeetingType;
+  setTipoReunion: (value: MeetingType) => void;
+  capitalPresente: number;
+  setCapitalPresente: (value: number) => void;
+}
 
-  const universalCheck = meetingType === "UNIVERSAL"
-    ? validarCapitalUniversal(capitalPresente, capitalTotal)
-    : null;
+function ConstitucionStep({
+  tipoReunion,
+  setTipoReunion,
+  capitalPresente,
+  setCapitalPresente,
+}: ConstitucionStepProps) {
+  const universalCheck =
+    tipoReunion === "UNIVERSAL" ? validarCapitalUniversal(capitalPresente, 100) : null;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        Selecciona el tipo de reunión y verifica la presencia del capital requerido para la válida constitución.
+        Selecciona el tipo de reunión y verifica la presencia del capital requerido para la válida
+        constitución.
       </p>
 
       <div className="space-y-1">
         <label className="text-xs font-medium text-[var(--g-text-primary)]">Tipo de reunión</label>
         <select
-          value={meetingType}
-          onChange={(e) => setMeetingType(e.target.value as typeof meetingType)}
+          value={tipoReunion}
+          onChange={(e) => setTipoReunion(e.target.value as MeetingType)}
           className="rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -374,7 +382,7 @@ function ConstitucionStep() {
         </select>
       </div>
 
-      {meetingType === "UNIVERSAL" && (
+      {tipoReunion === "UNIVERSAL" && (
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs font-medium text-[var(--g-text-primary)]">
@@ -410,8 +418,16 @@ function ConstitucionStep() {
                 <ShieldAlert className="h-5 w-5 shrink-0 text-[var(--status-error)]" />
               )}
               <div>
-                <p className={`text-sm font-semibold ${universalCheck.ok ? "text-[var(--g-brand-3308)]" : "text-[var(--status-error)]"}`}>
-                  {universalCheck.ok ? "Junta Universal válida" : "Capital insuficiente — Gate BLOQUEANTE"}
+                <p
+                  className={`text-sm font-semibold ${
+                    universalCheck.ok
+                      ? "text-[var(--g-brand-3308)]"
+                      : "text-[var(--status-error)]"
+                  }`}
+                >
+                  {universalCheck.ok
+                    ? "Junta Universal válida"
+                    : "Capital insuficiente — Gate BLOQUEANTE"}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
                   {universalCheck.mensaje}
@@ -422,12 +438,12 @@ function ConstitucionStep() {
         </div>
       )}
 
-      {meetingType !== "UNIVERSAL" && (
+      {tipoReunion !== "UNIVERSAL" && (
         <div
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-xs text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          Reunión {meetingType.toLowerCase()}. No se requiere 100% del capital para constituirse.
+          Reunión {tipoReunion.toLowerCase()}. No se requiere 100% del capital para constituirse.
           Aplica quórum estándar LSC según primera/segunda convocatoria.
         </div>
       )}
@@ -435,24 +451,64 @@ function ConstitucionStep() {
   );
 }
 
-// ── Steps ────────────────────────────────────────────────────────────────────
-
-const STEPS: StepDef[] = [
-  { n: 1, label: "Constitución",  hint: "Verificación de convocatoria previa y validación de presidencia/secretaría", body: <ConstitucionStep /> },
-  { n: 2, label: "Asistentes",    hint: "Registro de presentes, representados y ausentes — cálculo de capital representado" },
-  { n: 3, label: "Quórum",        hint: "Evaluación automática contra regla jurisdiccional aplicable" },
-  { n: 4, label: "Debates",       hint: "Puntos del orden del día discutidos y anotaciones del secretario" },
-  { n: 5, label: "Votaciones",    hint: "Por cada propuesta aprobada se genera un agreement en estado ADOPTED", body: <VotacionesStep /> },
-  { n: 6, label: "Cierre",        hint: "Revisión de acuerdos adoptados y generación del acta en borrador", body: <CierreStep /> },
-];
-
 export default function ReunionStepper() {
+  const [tipoReunion, setTipoReunion] = useState<MeetingType>("ORDINARIA");
+  const [capitalPresente, setCapitalPresente] = useState(75);
+  const universalCheck =
+    tipoReunion === "UNIVERSAL" ? validarCapitalUniversal(capitalPresente, 100) : null;
+  const universalGateBlocked =
+    tipoReunion === "UNIVERSAL" && universalCheck !== null && !universalCheck.ok;
+
+  const steps: StepDef[] = [
+    {
+      n: 1,
+      label: "Constitución",
+      hint: "Verificación de convocatoria previa y validación de presidencia/secretaría",
+      body: (
+        <ConstitucionStep
+          tipoReunion={tipoReunion}
+          setTipoReunion={setTipoReunion}
+          capitalPresente={capitalPresente}
+          setCapitalPresente={setCapitalPresente}
+        />
+      ),
+      canAdvance: !universalGateBlocked,
+    },
+    {
+      n: 2,
+      label: "Asistentes",
+      hint: "Registro de presentes, representados y ausentes — cálculo de capital representado",
+    },
+    {
+      n: 3,
+      label: "Quórum",
+      hint: "Evaluación automática contra regla jurisdiccional aplicable",
+    },
+    {
+      n: 4,
+      label: "Debates",
+      hint: "Puntos del orden del día discutidos y anotaciones del secretario",
+    },
+    {
+      n: 5,
+      label: "Votaciones",
+      hint: "Por cada propuesta aprobada se genera un agreement en estado ADOPTED",
+      body: <VotacionesStep />,
+    },
+    {
+      n: 6,
+      label: "Cierre",
+      hint: "Revisión de acuerdos adoptados y generación del acta en borrador",
+      body: <CierreStep />,
+    },
+  ];
+
   return (
     <StepperShell
       eyebrow="Secretaría · Reunión"
       title="Asistente de sesión societaria"
       backTo="/secretaria/reuniones"
-      steps={STEPS}
+      steps={steps}
       placeholderNote="Formulario del paso pendiente. En el demo se usa la reunión cda-22-04-2026 ya sembrada."
     />
   );

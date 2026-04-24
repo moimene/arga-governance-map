@@ -21,29 +21,46 @@ export interface PreviewParams {
   votosFavorPct?: number;
 }
 
-type RpVersionRow = { id: string; params: unknown; status: string; rule_packs: { materia: string; clase: string; organo_tipo: string } | null };
+type RpRow = {
+  materia: string;
+  clase: string;
+  organo_tipo: string;
+  rule_pack_versions: { id: string; params: unknown; is_active: boolean }[];
+};
 
 export function usePreviewAcuerdo(params: PreviewParams) {
   const { tenantId } = useTenantContext();
 
   return useQuery<ComplianceResult | null, Error>({
-    queryKey: ["preview_acuerdo", tenantId, params.materia, params.adoptionMode, params.tipoSocial, params.materiaClase, params.capitalPresentePct, params.votosFavorPct],
+    queryKey: ["preview_acuerdo", tenantId, params.materia, params.adoptionMode, params.tipoSocial, params.organoTipo, params.materiaClase, params.capitalPresentePct, params.votosFavorPct],
     enabled: !!params.materia && !!tenantId,
     staleTime: 30_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
       if (!params.materia) return null;
 
-      const { data: rpVersions } = await supabase
-        .from("rule_pack_versions")
-        .select("*, rule_packs!inner(materia, clase, organo_tipo)")
+      // Query from rule_packs side — is_active is on rule_pack_versions, not status
+      const { data: rulePacks, error } = await supabase
+        .from("rule_packs")
+        .select("materia, clase, organo_tipo, rule_pack_versions!inner(id, params, is_active)")
         .eq("tenant_id", tenantId!)
-        .eq("status", "ACTIVE");
+        .eq("materia", params.materia)
+        .eq("rule_pack_versions.is_active", true);
 
-      const rows = (rpVersions ?? []) as RpVersionRow[];
-      const match = rows.find((v) => v.rule_packs?.materia === params.materia);
-      if (!match?.params) return null;
+      if (error || !rulePacks?.length) return null;
 
-      const pack = match.params as RulePack;
+      const rows = rulePacks as unknown as RpRow[];
+
+      // Best match: prefer exact organo_tipo + clase, fall back to first
+      const candidates = rows.filter((rp) => {
+        if (params.organoTipo && rp.organo_tipo !== params.organoTipo) return false;
+        if (params.materiaClase && rp.clase !== params.materiaClase) return false;
+        return true;
+      });
+      const best = (candidates[0] ?? rows[0]);
+      const version = best?.rule_pack_versions?.[0];
+      if (!version?.params) return null;
+
+      const pack = version.params as RulePack;
       const mode: AdoptionMode = params.adoptionMode ?? "NO_SESSION";
       const tipoSocial: TipoSocial = params.tipoSocial ?? "SA";
       const organoTipo: TipoOrgano = params.organoTipo ?? "JUNTA_GENERAL";

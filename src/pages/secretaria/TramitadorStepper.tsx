@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { Loader2, AlertTriangle, CheckCircle2, ScrollText } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById } from "@/hooks/useAgreementsList";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
+import { useTenantContext } from "@/context/TenantContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const STEPS: StepDef[] = [
   {
@@ -34,6 +38,8 @@ const STEPS: StepDef[] = [
 ];
 
 export default function TramitadorStepper() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
   const { data: agreements = [], isLoading: agreementsLoading } = useAgreementsList([
     "CERTIFIED",
     "ADOPTED",
@@ -59,15 +65,124 @@ export default function TramitadorStepper() {
 
   const [filingChannel, setFilingChannel] = useState<string>("");
   const [filingStatus, setFilingStatus] = useState<string>("DRAFT");
-
-  const [deedData, setDeedData] = useState({
-    deedReference: "",
-    deedDate: "",
-    notaryId: "",
-    notaryName: "",
-    protocolNumber: "",
-  });
   const [deedSaved, setDeedSaved] = useState(false);
+  const [deedSaving, setDeedSaving] = useState(false);
+
+  const isDeedRequired = rulePackData?.payload.instrumentoRequerido === "ESCRITURA";
+  const filingType = (() => {
+    if (!rulePackData) return null;
+    const payload = rulePackData.payload as Record<string, unknown>;
+    if (typeof payload.filing_type === "string" && payload.filing_type.trim()) {
+      return payload.filing_type;
+    }
+    if (
+      Array.isArray(payload.registry_filing_types) &&
+      typeof payload.registry_filing_types[0] === "string" &&
+      payload.registry_filing_types[0].trim()
+    ) {
+      return payload.registry_filing_types[0];
+    }
+    return rulePackData.payload.instrumentoRequerido;
+  })();
+
+  const canRegisterDeed = Boolean(
+    tenantId &&
+      selectedAgreement &&
+      isDeedRequired &&
+      filingType &&
+      instrumentData.notary.trim() &&
+      instrumentData.deedDate &&
+      instrumentData.protocolNumber.trim()
+  );
+
+  const handleSelectAgreement = (agreementId: string) => {
+    setSelectedAgreementId(agreementId);
+    setSelectedModeloId(null);
+    setInstrumentData({
+      notary: "",
+      deedDate: "",
+      protocolNumber: "",
+    });
+    setFilingChannel("");
+    setFilingStatus("DRAFT");
+    setDeedSaved(false);
+  };
+
+  async function handleRegisterDeed() {
+    if (!tenantId || !selectedAgreement || !rulePackData) {
+      toast.error("No se pudo preparar la escritura para este acuerdo.");
+      return;
+    }
+
+    if (!isDeedRequired) {
+      toast.error("Este acuerdo no requiere escritura pública.");
+      return;
+    }
+
+    if (
+      !instrumentData.notary.trim() ||
+      !instrumentData.deedDate ||
+      !instrumentData.protocolNumber.trim()
+    ) {
+      toast.error("Complete notaría, fecha de escritura y número de protocolo.");
+      return;
+    }
+
+    const filingPayload = {
+      tenant_id: tenantId,
+      agreement_id: selectedAgreement.id,
+      deed_reference: instrumentData.protocolNumber.trim(),
+      deed_date: instrumentData.deedDate,
+      notary_id: null,
+      notary_name: instrumentData.notary.trim(),
+      protocol_number: instrumentData.protocolNumber.trim(),
+      elevated_at: new Date().toISOString(),
+      status: "ELEVATED",
+      filing_type: filingType,
+      filing_via: filingChannel || null,
+    };
+
+    setDeedSaving(true);
+    try {
+      const { error: upsertError } = await supabase
+        .from("registry_filings")
+        .upsert(filingPayload, { onConflict: "tenant_id,agreement_id" });
+
+      if (upsertError) {
+        const { data: existingRows, error: existingError } = await supabase
+          .from("registry_filings")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("agreement_id", selectedAgreement.id)
+          .limit(1);
+
+        if (existingError) throw upsertError;
+
+        const existingId = existingRows?.[0]?.id;
+        if (existingId) {
+          const { error: updateError } = await supabase
+            .from("registry_filings")
+            .update(filingPayload)
+            .eq("id", existingId);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from("registry_filings")
+            .insert(filingPayload);
+          if (insertError) throw insertError;
+        }
+      }
+
+      setDeedSaved(true);
+      setFilingStatus("ELEVATED");
+      await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`No se pudo registrar la escritura: ${message}`);
+    } finally {
+      setDeedSaving(false);
+    }
+  }
 
   // Step 1: Select agreement
   const step1Body = (
@@ -94,7 +209,7 @@ export default function TramitadorStepper() {
             <button
               key={agreement.id}
               type="button"
-              onClick={() => setSelectedAgreementId(agreement.id)}
+              onClick={() => handleSelectAgreement(agreement.id)}
               className={`w-full text-left flex items-center justify-between px-4 py-3 border transition-colors ${
                 selectedAgreementId === agreement.id
                   ? "border-[var(--g-brand-3308)] bg-[var(--g-sec-100)]"
@@ -383,22 +498,65 @@ export default function TramitadorStepper() {
     </div>
   );
 
-  const isInscribable = rulePackData?.payload.inscribible === true;
-
   // Step 5: Tracking status
   const step5Body = (
     <div className="space-y-4">
       <div
-        className="flex items-center gap-2 px-4 py-3 text-[var(--status-success)]"
-        style={{ borderRadius: "var(--g-radius-md)", background: "color-mix(in srgb, var(--status-success) 10%, transparent)" }}
+        className={`flex items-center gap-2 px-4 py-3 rounded-lg ${
+          deedSaved
+            ? "bg-[var(--status-success)]/10 text-[var(--status-success)]"
+            : isDeedRequired
+              ? "bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
+              : "bg-[var(--status-success)]/10 text-[var(--status-success)]"
+        }`}
       >
         <CheckCircle2 className="h-5 w-5" />
-        <span className="text-sm font-medium">Expediente en seguimiento</span>
+        <span className="text-sm font-medium">
+          {deedSaved
+            ? "Escritura registrada"
+            : isDeedRequired
+              ? "Pendiente de registrar escritura"
+              : "Expediente en seguimiento"}
+        </span>
       </div>
 
+      {isDeedRequired && (
+        <div
+          className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-card)]"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Escritura pública
+              </div>
+              <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                Se guardará en `registry_filings` con estado ELEVATED.
+              </div>
+            </div>
+
+            {deedSaved ? (
+              <div className="inline-flex items-center gap-2 rounded-full bg-[var(--g-sec-100)] px-3 py-1 text-xs font-semibold text-[var(--g-brand-3308)]">
+                <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+                Persistida
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRegisterDeed}
+                disabled={!canRegisterDeed || deedSaving}
+                className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-40"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {deedSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deedSaving ? "Guardando escritura..." : "Registrar escritura"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div
-        className="border border-[var(--g-border-subtle)] p-4 bg-[var(--g-surface-subtle)]"
-        style={{ borderRadius: "var(--g-radius-lg)" }}
+        className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-subtle)]"
       >
         <div className="text-sm font-semibold text-[var(--g-text-primary)] mb-3">
           Estado del trámite
@@ -407,10 +565,7 @@ export default function TramitadorStepper() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--g-text-secondary)]">Estado:</span>
-            <span
-              className="px-2 py-0.5 text-xs font-medium"
-              style={{ borderRadius: "var(--g-radius-sm)" }}
-            >
+            <span className="px-2 py-0.5 text-xs font-medium text-[var(--g-text-primary)]">
               {filingStatus}
             </span>
           </div>
@@ -421,143 +576,8 @@ export default function TramitadorStepper() {
               {filingChannel || "No asignado"}
             </span>
           </div>
-
-          {isInscribable && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--g-text-secondary)]">Inscribible:</span>
-              <span
-                className="px-2 py-0.5 text-xs font-medium text-[var(--status-success)]"
-                style={{ borderRadius: "var(--g-radius-sm)", background: "color-mix(in srgb, var(--status-success) 10%, transparent)" }}
-              >
-                Sí — elevación notarial requerida
-              </span>
-            </div>
-          )}
         </div>
       </div>
-
-      {/* Deed / elevación notarial tracking (I-D9) — only for inscribable acuerdos */}
-      {isInscribable && (
-        <div
-          className="border border-[var(--g-border-subtle)] p-4 space-y-4"
-          style={{ borderRadius: "var(--g-radius-lg)" }}
-        >
-          <div className="flex items-center gap-2">
-            <ScrollText className="h-4 w-4 text-[var(--g-brand-3308)]" />
-            <span className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Elevación a escritura pública
-            </span>
-          </div>
-
-          <p className="text-xs text-[var(--g-text-secondary)]">
-            El acuerdo adoptado requiere elevación notarial para su inscripción registral.
-            Registra aquí los datos de la escritura una vez otorgada.
-          </p>
-
-          {deedSaved ? (
-            <div
-              className="flex items-start gap-3 border border-[var(--status-success)] p-3"
-              style={{ borderRadius: "var(--g-radius-md)", background: "color-mix(in srgb, var(--status-success) 8%, transparent)" }}
-            >
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-success)]" />
-              <div className="space-y-0.5">
-                <p className="text-xs font-semibold text-[var(--g-text-primary)]">Escritura registrada</p>
-                <p className="text-xs text-[var(--g-text-secondary)]">
-                  {deedData.deedReference && <span>Ref: {deedData.deedReference} · </span>}
-                  {deedData.notaryName && <span>{deedData.notaryName} · </span>}
-                  {deedData.protocolNumber && <span>Prot. {deedData.protocolNumber}</span>}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                    Referencia escritura
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: ESC-2026-0042"
-                    value={deedData.deedReference}
-                    onChange={(e) => setDeedData({ ...deedData, deedReference: e.target.value })}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                    Fecha de escritura
-                  </label>
-                  <input
-                    type="date"
-                    value={deedData.deedDate}
-                    onChange={(e) => setDeedData({ ...deedData, deedDate: e.target.value })}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                    Notario (nombre)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: D. Francisco López García"
-                    value={deedData.notaryName}
-                    onChange={(e) => setDeedData({ ...deedData, notaryName: e.target.value })}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                    Número de protocolo
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: 2026/5432"
-                    value={deedData.protocolNumber}
-                    onChange={(e) => setDeedData({ ...deedData, protocolNumber: e.target.value })}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                  NIF / ID del notario
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: 12345678A"
-                  value={deedData.notaryId}
-                  onChange={(e) => setDeedData({ ...deedData, notaryId: e.target.value })}
-                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                />
-              </div>
-
-              <button
-                type="button"
-                disabled={!deedData.deedReference && !deedData.notaryName}
-                onClick={() => setDeedSaved(true)}
-                className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-40"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <ScrollText className="h-4 w-4" />
-                Registrar escritura
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       <div
         className="px-4 py-3 text-xs text-[var(--g-text-secondary)]"

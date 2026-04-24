@@ -157,11 +157,11 @@ function FirmaArchivoStep() {
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-success)]" />
           <div>
             <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Decisión firmada y archivada
+              Decisión registrada (modo demo)
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-              La firma QES ha sido aplicada vía EAD Trust. El documento queda archivado en el
-              Libro de Decisiones con estado FIRMADA y el acuerdo se registra en estado ADOPTED.
+              Simulación completada. En producción se ejecutaría firma QES vía EAD Trust y el
+              acuerdo quedaría archivado en el Libro de Decisiones en estado ADOPTADO.
             </p>
           </div>
         </div>
