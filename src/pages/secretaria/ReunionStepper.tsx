@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
-import { evaluarConstitucion, evaluarMayoria } from "@/lib/rules-engine";
+import { evaluarMayoria } from "@/lib/rules-engine";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -219,6 +220,128 @@ function VotacionesStep() {
   );
 }
 
+// ── Paso 6: Cierre ───────────────────────────────────────────────────────────
+
+const DEMO_RESOLUTIONS = [
+  { id: "r1", titulo: "Aprobación de cuentas anuales ejercicio 2025", resultado: "APROBADO" },
+  { id: "r2", titulo: "Aplicación del resultado del ejercicio", resultado: "APROBADO" },
+  { id: "r3", titulo: "Nombramiento auditor externo 2026", resultado: "APROBADO" },
+];
+
+function CierreStep() {
+  const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  function handleConfirmar() {
+    setConfirming(true);
+    setTimeout(() => {
+      setConfirming(false);
+      setConfirmed(true);
+    }, 1200);
+  }
+
+  if (confirmed) {
+    return (
+      <div className="space-y-4">
+        <div
+          className="flex items-center gap-3 border border-[var(--status-success)] bg-[var(--g-sec-100)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-success)]" />
+          <div>
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Acta generada en borrador
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+              {DEMO_RESOLUTIONS.length} acuerdo(s) registrado(s) en estado ADOPTED. Procede a firmar
+              el acta y emitir la certificación desde el módulo de Actas.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/secretaria/actas")}
+          className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <FileText className="h-4 w-4" />
+          Ir a Actas
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-[var(--g-text-secondary)]">
+        Revisa los acuerdos adoptados antes de confirmar el cierre. Al confirmar, se generará el
+        acta en borrador y los acuerdos quedarán registrados en estado{" "}
+        <span className="font-medium text-[var(--g-text-primary)]">ADOPTED</span>.
+      </p>
+
+      <div
+        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+            Acuerdos a registrar ({DEMO_RESOLUTIONS.length})
+          </p>
+        </div>
+        <ul className="divide-y divide-[var(--g-border-subtle)]">
+          {DEMO_RESOLUTIONS.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <span className="text-sm text-[var(--g-text-primary)]">{r.titulo}</span>
+              <span
+                className="shrink-0 px-2.5 py-1 text-[11px] font-semibold text-[var(--g-text-inverse)]"
+                style={{
+                  borderRadius: "var(--g-radius-full)",
+                  backgroundColor: "var(--status-success)",
+                }}
+              >
+                {r.resultado}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div
+        className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+        <p className="text-xs text-[var(--g-text-secondary)]">
+          Esta acción no se puede deshacer desde la interfaz. Si necesitas modificar algún acuerdo
+          tras el cierre, contacta con el administrador del sistema.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleConfirmar}
+        disabled={confirming}
+        aria-busy={confirming}
+        className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        {confirming ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generando acta…
+          </>
+        ) : (
+          <>
+            <FileText className="h-4 w-4" />
+            Confirmar cierre y generar acta
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 // ── Steps ────────────────────────────────────────────────────────────────────
 
 const STEPS: StepDef[] = [
@@ -227,7 +350,7 @@ const STEPS: StepDef[] = [
   { n: 3, label: "Quórum",        hint: "Evaluación automática contra regla jurisdiccional aplicable" },
   { n: 4, label: "Debates",       hint: "Puntos del orden del día discutidos y anotaciones del secretario" },
   { n: 5, label: "Votaciones",    hint: "Por cada propuesta aprobada se genera un agreement en estado ADOPTED", body: <VotacionesStep /> },
-  { n: 6, label: "Cierre",        hint: "Generación del acta en borrador y firmas pendientes" },
+  { n: 6, label: "Cierre",        hint: "Revisión de acuerdos adoptados y generación del acta en borrador", body: <CierreStep /> },
 ];
 
 export default function ReunionStepper() {

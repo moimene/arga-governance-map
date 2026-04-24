@@ -16,6 +16,8 @@ import {
   ShieldAlert,
   HandshakeIcon,
   Calendar,
+  Plus,
+  FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
@@ -293,6 +295,7 @@ function KpiCard({ icon: Icon, label, value, tone = "primary", sublabel, onClick
     <button
       type="button"
       onClick={onClick}
+      aria-label={sublabel ? `${label}: ${value} — ${sublabel}` : `${label}: ${value}`}
       className="flex w-full flex-col items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-left transition-all hover:border-[var(--g-brand-3308)]"
       style={{
         borderRadius: "var(--g-radius-lg)",
@@ -335,6 +338,28 @@ export default function SecretariaDashboard() {
           decisiones unipersonales y acuerdos sin sesión — conforme a LSC (ES), CSC (PT), Lei das SA
           (BR) y LGSM (MX).
         </p>
+      </div>
+
+      {/* Acciones rápidas */}
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Nueva convocatoria", icon: Bell,         path: "/secretaria/convocatorias/nueva" },
+          { label: "Nueva reunión",      icon: Users,        path: "/secretaria/reuniones/new" },
+          { label: "Nuevo acuerdo",      icon: ScrollText,   path: "/secretaria/acuerdos-sin-sesion/nuevo" },
+          { label: "Generar documento",  icon: FileText,     path: "/secretaria/tramitador/nuevo" },
+        ].map(({ label, icon: Icon, path }) => (
+          <button
+            key={path}
+            type="button"
+            onClick={() => navigate(path)}
+            className="flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-3 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-sec-100)] hover:text-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <Icon className="h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* KPIs */}

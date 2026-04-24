@@ -207,6 +207,20 @@ export default function ConvocatoriasStepper() {
                 </div>
               )}
 
+              {/* Inline error when notice period not met */}
+              {!evaluacionV2.ok && (
+                <div
+                  className="mt-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-card)] p-3"
+                  role="alert"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <p className="text-xs font-medium text-[var(--status-error)]">
+                    El plazo mínimo de antelación no está cumplido para la jurisdicción seleccionada.
+                    Ajusta la fecha de la reunión antes de continuar.
+                  </p>
+                </div>
+              )}
+
               {/* Expand explain tree */}
               <button
                 type="button"
@@ -292,7 +306,9 @@ export default function ConvocatoriasStepper() {
               <button
                 type="button"
                 onClick={() => setCurrent((n) => Math.min(STEPS.length, n + 1))}
-                className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                disabled={current === 2 && !noticeOk}
+                aria-disabled={current === 2 && !noticeOk}
+                className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 Siguiente
