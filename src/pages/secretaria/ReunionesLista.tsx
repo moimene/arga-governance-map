@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Plus, FileText, FolderOpen } from "lucide-react";
+import { Users, Plus, FileText, FolderOpen, Loader2 } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+
+const MEETING_TYPE_LABEL: Record<string, string> = {
+  ORDINARIA:     "Ordinaria",
+  EXTRAORDINARIA: "Extraordinaria",
+  UNIVERSAL:     "Universal",
+};
 
 const STATUS_TONE: Record<string, string> = {
   PROGRAMADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
@@ -129,8 +135,11 @@ export default function ReunionesLista() {
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Cargando…
+                <td colSpan={7} className="px-6 py-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
@@ -162,7 +171,7 @@ export default function ReunionesLista() {
                     {m.jurisdiction ? <span className="ml-2 text-[11px]">· {m.jurisdiction}</span> : null}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                    {m.meeting_type}
+                    {MEETING_TYPE_LABEL[m.meeting_type] ?? m.meeting_type}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {m.scheduled_start ? new Date(m.scheduled_start).toLocaleString("es-ES") : "—"}

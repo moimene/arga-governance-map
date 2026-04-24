@@ -1,6 +1,13 @@
-import { Library, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { Library, AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { useLibrosList } from "@/hooks/useLibros";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+
+const BOOK_KIND_LABEL: Record<string, string> = {
+  ACTAS:       "Libro de actas",
+  SOCIOS:      "Libro de socios",
+  ACCIONES:    "Libro de acciones nominativas",
+  SOCIO_UNICO: "Libro del socio único",
+};
 
 const LEG_STATUS_TONE: Record<string, string> = {
   PENDIENTE:  "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
@@ -50,7 +57,14 @@ export default function LibrosObligatorios() {
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Cargando…</td></tr>
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
+                </td>
+              </tr>
             ) : !data || data.length === 0 ? (
               <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Sin libros.</td></tr>
             ) : (
@@ -61,7 +75,7 @@ export default function LibrosObligatorios() {
                 return (
                   <tr key={b.id} className={isAlert ? "bg-[var(--g-sec-100)]/40" : ""}>
                     <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
-                      {b.book_kind}
+                      {BOOK_KIND_LABEL[b.book_kind] ?? b.book_kind}
                       <span className="ml-2 text-[11px] text-[var(--g-text-secondary)]">
                         vol. {b.volume_number}
                       </span>

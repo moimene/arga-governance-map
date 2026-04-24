@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { FileSignature, Lock, Unlock, FolderOpen } from "lucide-react";
+import { FileSignature, Lock, Unlock, FolderOpen, Loader2 } from "lucide-react";
 import { useActasList } from "@/hooks/useActas";
 
 export default function ActasLista() {
@@ -48,20 +48,23 @@ export default function ActasLista() {
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Cargando…
+                <td colSpan={5} className="px-6 py-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
                 </td>
               </tr>
             ) : !data || data.length === 0 ? (
               <tr>
                 <td colSpan={5}>
                   <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
-                    <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
+                    <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
                     <p className="text-sm font-medium text-[var(--g-text-secondary)]">
                       Sin actas registradas.
                     </p>
-                    <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
-                      Las actas se generarán automáticamente al celebrar reuniones.
+                    <p className="mt-1 text-xs text-[var(--g-text-secondary)]/70">
+                      Las actas se generan al completar el paso "Cierre" en el asistente de reunión.
                     </p>
                   </div>
                 </td>

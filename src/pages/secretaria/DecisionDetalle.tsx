@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { useDecisionUnipersById } from "@/hooks/useDecisionesUnipers";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 export default function DecisionDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -76,7 +77,7 @@ export default function DecisionDetalle() {
               label="Fecha decisión"
               value={d.decision_date ? new Date(d.decision_date).toLocaleDateString("es-ES") : "—"}
             />
-            <KV label="Estado" value={d.status} />
+            <KV label="Estado" value={statusLabel(d.status)} />
             <KV label="Requiere registro" value={d.requires_registry ? "Sí" : "No"} />
             <KV label="Creada" value={new Date(d.created_at).toLocaleString("es-ES")} />
           </div>

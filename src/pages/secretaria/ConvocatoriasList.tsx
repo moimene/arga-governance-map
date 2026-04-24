@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Plus, FolderOpen } from "lucide-react";
+import { Bell, Plus, FolderOpen, Loader2 } from "lucide-react";
 import { useConvocatoriasList } from "@/hooks/useConvocatorias";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const ESTADO_TONE: Record<string, string> = {
   BORRADOR:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -120,11 +121,11 @@ export default function ConvocatoriasList() {
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]"
-                >
-                  Cargando…
+                <td colSpan={6} className="px-6 py-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
@@ -175,7 +176,7 @@ export default function ConvocatoriasList() {
                       ) : null}
                       {c.is_second_call ? (
                         <span
-                          className="bg-[var(--status-warning)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                          className="bg-[var(--status-info)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
                           2ª conv
@@ -198,7 +199,7 @@ export default function ConvocatoriasList() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {c.estado}
+                      {statusLabel(c.estado)}
                     </span>
                   </td>
                 </tr>

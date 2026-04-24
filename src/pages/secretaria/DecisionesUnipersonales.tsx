@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2 } from "lucide-react";
+import { Building2, Plus, FolderOpen, Loader2, AlertTriangle } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 
@@ -13,6 +13,11 @@ const STATUS_TONE: Record<string, string> = {
 const TYPE_TONE: Record<string, string> = {
   SOCIO_UNICO:         "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   ADMINISTRADOR_UNICO: "bg-[var(--g-sec-300)] text-[var(--g-text-inverse)]",
+};
+
+const DECISION_TYPE_LABEL: Record<string, string> = {
+  SOCIO_UNICO:         "Socio único",
+  ADMINISTRADOR_UNICO: "Administrador único",
 };
 
 const SELECT_CLASS =
@@ -31,17 +36,28 @@ export default function DecisionesUnipersonales() {
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          <Building2 className="h-3.5 w-3.5" />
-          Secretaría · Decisiones unipersonales
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            <Building2 className="h-3.5 w-3.5" />
+            Secretaría · Decisiones unipersonales
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            Decisiones de socio único / administrador único
+          </h1>
+          <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
+            Adopción formal de decisiones cuando no hay órgano colegiado.
+          </p>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          Decisiones de socio único / administrador único
-        </h1>
-        <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          Adopción formal de decisiones cuando no hay órgano colegiado.
-        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/secretaria/decisiones-unipersonales/nueva")}
+          className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <Plus className="h-4 w-4" />
+          Nueva decisión
+        </button>
       </div>
 
       {/* Filtros */}
@@ -86,9 +102,28 @@ export default function DecisionesUnipersonales() {
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Cargando…</td></tr>
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
+                </td>
+              </tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Sin decisiones para los filtros seleccionados.</td></tr>
+              <tr>
+                <td colSpan={7}>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                    <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
+                    <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                      Sin decisiones para los filtros seleccionados.
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--g-text-secondary)]/70">
+                      Las decisiones unipersonales se aplican en SLU y SAU sin órgano colegiado.
+                    </p>
+                  </div>
+                </td>
+              </tr>
             ) : (
               filtered.map((d) => (
                 <tr
@@ -104,7 +139,7 @@ export default function DecisionesUnipersonales() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {d.decision_type}
+                      {DECISION_TYPE_LABEL[d.decision_type] ?? d.decision_type}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">{d.entity_name ?? "—"}</td>
@@ -114,7 +149,10 @@ export default function DecisionesUnipersonales() {
                   </td>
                   <td className="px-6 py-4 text-sm">
                     {d.requires_registry ? (
-                      <span className="text-[var(--status-warning)]">Sí</span>
+                      <span className="inline-flex items-center gap-1 text-[var(--status-error)]">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Sí
+                      </span>
                     ) : (
                       <span className="text-[var(--g-text-secondary)]">No</span>
                     )}

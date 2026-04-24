@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ScrollText, Plus } from "lucide-react";
+import { ScrollText, Plus, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -150,22 +150,32 @@ export default function AcuerdosSinSesion() {
                   onClick={() => navigate(`/secretaria/acuerdos-sin-sesion/${r.id}`)}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
-                    {r.title}
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-[var(--g-text-primary)]">{r.title}</div>
                     {r.requires_unanimity ? (
                       <span
-                        className="ml-2 bg-[var(--g-sec-100)] px-2 py-0.5 text-[10px] font-medium text-[var(--g-brand-3308)]"
+                        className="mt-1 inline-block bg-[var(--g-sec-100)] px-2 py-0.5 text-[10px] font-medium text-[var(--g-brand-3308)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
-                        UNANIMIDAD
+                        Unanimidad
                       </span>
                     ) : null}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {r.body_name ?? "—"}
                   </td>
-                  <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                    {r.votes_for ?? 0}✓ · {r.votes_against ?? 0}✗ · {r.abstentions ?? 0}–
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="flex items-center gap-0.5 text-[var(--status-success)]">
+                        <CheckCircle2 className="h-3.5 w-3.5" />{r.votes_for ?? 0}
+                      </span>
+                      <span className="flex items-center gap-0.5 text-[var(--status-error)]">
+                        <XCircle className="h-3.5 w-3.5" />{r.votes_against ?? 0}
+                      </span>
+                      <span className="flex items-center gap-0.5 text-[var(--g-text-secondary)]">
+                        <MinusCircle className="h-3.5 w-3.5" />{r.abstentions ?? 0}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {r.voting_deadline ? new Date(r.voting_deadline).toLocaleString("es-ES") : "—"}

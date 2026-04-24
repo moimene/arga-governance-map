@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus } from "lucide-react";
 import { useConvocatoriaById, useConvocatoriaAttachments } from "@/hooks/useConvocatorias";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 function generateIcs(convocatoria: {
   title: string;
@@ -75,7 +76,7 @@ export default function ConvocatoriaDetalle() {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <div className="text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-            Convocatoria · {conv.estado}
+            Convocatoria · {statusLabel(conv.estado)}
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
             {conv.body_name ?? "Órgano"}
