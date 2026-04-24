@@ -224,6 +224,38 @@ export function evaluarConstitucion(
 }
 
 /**
+ * validarCapitalUniversal — Verifica que el 100% del capital con derecho a voto
+ * esté presente/representado para la Junta Universal (art. 178 LSC).
+ *
+ * @param capitalPresente Capital presente y representado (unidades absolutas)
+ * @param capitalTotal Capital total con derecho a voto (excluyendo tesorería)
+ */
+export function validarCapitalUniversal(
+  capitalPresente: number,
+  capitalTotal: number
+): { ok: boolean; pctPresente: number; pctFaltante: number; mensaje: string } {
+  if (capitalTotal <= 0) {
+    return {
+      ok: false,
+      pctPresente: 0,
+      pctFaltante: 100,
+      mensaje: "Capital total no definido. No se puede validar Junta Universal.",
+    };
+  }
+  const pctPresente = (capitalPresente / capitalTotal) * 100;
+  const pctFaltante = Math.max(0, 100 - pctPresente);
+  const ok = pctPresente >= 100;
+  return {
+    ok,
+    pctPresente,
+    pctFaltante,
+    mensaje: ok
+      ? `100% del capital presente (art. 178 LSC). Junta Universal válida.`
+      : `Junta Universal requiere el 100% del capital. Presente: ${pctPresente.toFixed(2)}%. Falta: ${pctFaltante.toFixed(2)}%.`,
+  };
+}
+
+/**
  * calcularDenominadorAjustado — Calculate adjusted denominator (capital convocable)
  *
  * Adjusts for interest conflicts:

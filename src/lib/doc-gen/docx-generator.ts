@@ -22,6 +22,9 @@ import {
   PageBreak,
   BorderStyle,
   TabStopType,
+  ShadingType,
+  BookmarkStart,
+  BookmarkEnd,
 } from "docx";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -34,6 +37,17 @@ const FONT = "Montserrat";
 const FONT_FALLBACK = "Arial";
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+export interface EditableField {
+  /** Machine key, used as bookmark name */
+  key: string;
+  /** Human label shown above the field */
+  label: string;
+  /** Placeholder text inside the field */
+  placeholder?: string;
+  /** Pre-filled value (if already resolved from capa2) */
+  value?: string;
+}
 
 export interface DocxGeneratorInput {
   /** Rendered plain text from template-renderer */
@@ -52,6 +66,8 @@ export interface DocxGeneratorInput {
   entityName?: string;
   /** Generation date */
   generatedAt?: string;
+  /** capa3_editables fields rendered as bookmarked content controls */
+  editableFields?: EditableField[];
 }
 
 // ── Text parsing ─────────────────────────────────────────────────────────────
@@ -164,6 +180,95 @@ function buildParagraphs(sections: ParsedSection[]): Paragraph[] {
   }
 
   return paragraphs;
+}
+
+// ── Editable fields (capa3) ──────────────────────────────────────────────────
+
+let _bookmarkCounter = 0;
+
+function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
+  if (!fields || fields.length === 0) return [];
+
+  const result: Paragraph[] = [];
+
+  result.push(new Paragraph({ children: [new PageBreak()] }));
+
+  result.push(
+    new Paragraph({
+      spacing: { before: 360, after: 240 },
+      children: [
+        new TextRun({
+          text: "CAMPOS EDITABLES",
+          bold: true,
+          size: 22,
+          font: FONT,
+          color: BRAND_GREEN,
+        }),
+      ],
+    })
+  );
+
+  result.push(
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        new TextRun({
+          text: "Los siguientes campos pueden ser completados o modificados por el destinatario del documento sin alterar el texto jurídico inmutable.",
+          size: 18,
+          font: FONT,
+          color: TEXT_SECONDARY,
+          italics: true,
+        }),
+      ],
+    })
+  );
+
+  for (const field of fields) {
+    const bmId = ++_bookmarkCounter;
+    const displayValue = field.value || field.placeholder || `[${field.label.toUpperCase()}]`;
+
+    result.push(
+      new Paragraph({
+        spacing: { before: 200, after: 60 },
+        children: [
+          new TextRun({
+            text: field.label,
+            bold: true,
+            size: 18,
+            font: FONT,
+            color: TEXT_PRIMARY,
+          }),
+        ],
+      })
+    );
+
+    result.push(
+      new Paragraph({
+        spacing: { after: 160 },
+        shading: {
+          type: ShadingType.CLEAR,
+          fill: "D8ECE7",
+        },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 8, color: BRAND_GREEN },
+        },
+        children: [
+          new BookmarkStart(`field_${field.key}`, bmId),
+          new TextRun({
+            text: ` ${displayValue} `,
+            size: 20,
+            font: FONT,
+            color: field.value ? TEXT_PRIMARY : "666666",
+            italics: !field.value,
+          }),
+          new BookmarkEnd(bmId),
+        ],
+        indent: { left: 360 },
+      })
+    );
+  }
+
+  return result;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -321,6 +426,8 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
             : []),
           // Body
           ...bodyParagraphs,
+          // Editable fields (capa3_editables) rendered with bookmarks
+          ...buildEditableFieldParagraphs(input.editableFields ?? []),
         ],
       },
     ],

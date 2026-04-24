@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
-import { evaluarMayoria } from "@/lib/rules-engine";
+import { evaluarMayoria, validarCapitalUniversal } from "@/lib/rules-engine";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -342,10 +342,103 @@ function CierreStep() {
   );
 }
 
+// ── Paso 1: Constitución ─────────────────────────────────────────────────────
+
+function ConstitucionStep() {
+  const [meetingType, setMeetingType] = useState<"ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL">("ORDINARIA");
+  // Demo values: ARGA Seguros SA, 100 votos totales
+  const [capitalPresente, setCapitalPresente] = useState(75);
+  const capitalTotal = 100;
+
+  const universalCheck = meetingType === "UNIVERSAL"
+    ? validarCapitalUniversal(capitalPresente, capitalTotal)
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--g-text-secondary)]">
+        Selecciona el tipo de reunión y verifica la presencia del capital requerido para la válida constitución.
+      </p>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[var(--g-text-primary)]">Tipo de reunión</label>
+        <select
+          value={meetingType}
+          onChange={(e) => setMeetingType(e.target.value as typeof meetingType)}
+          className="rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="ORDINARIA">Junta General Ordinaria</option>
+          <option value="EXTRAORDINARIA">Junta General Extraordinaria</option>
+          <option value="UNIVERSAL">Junta Universal (art. 178 LSC)</option>
+        </select>
+      </div>
+
+      {meetingType === "UNIVERSAL" && (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--g-text-primary)]">
+              Capital presente y representado (% del total)
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={capitalPresente}
+                onChange={(e) => setCapitalPresente(Number(e.target.value))}
+                className="flex-1 accent-[var(--g-brand-3308)]"
+              />
+              <span className="w-12 text-right text-sm font-mono text-[var(--g-text-primary)]">
+                {capitalPresente}%
+              </span>
+            </div>
+          </div>
+
+          {universalCheck && (
+            <div
+              className={`flex items-start gap-3 border p-4 ${
+                universalCheck.ok
+                  ? "border-[var(--status-success)] bg-[var(--g-sec-100)]"
+                  : "border-[var(--status-error)] bg-[var(--status-error)]/5"
+              }`}
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
+              {universalCheck.ok ? (
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-success)]" />
+              ) : (
+                <ShieldAlert className="h-5 w-5 shrink-0 text-[var(--status-error)]" />
+              )}
+              <div>
+                <p className={`text-sm font-semibold ${universalCheck.ok ? "text-[var(--g-brand-3308)]" : "text-[var(--status-error)]"}`}>
+                  {universalCheck.ok ? "Junta Universal válida" : "Capital insuficiente — Gate BLOQUEANTE"}
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+                  {universalCheck.mensaje}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {meetingType !== "UNIVERSAL" && (
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-xs text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Reunión {meetingType.toLowerCase()}. No se requiere 100% del capital para constituirse.
+          Aplica quórum estándar LSC según primera/segunda convocatoria.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Steps ────────────────────────────────────────────────────────────────────
 
 const STEPS: StepDef[] = [
-  { n: 1, label: "Constitución",  hint: "Verificación de convocatoria previa y validación de presidencia/secretaría" },
+  { n: 1, label: "Constitución",  hint: "Verificación de convocatoria previa y validación de presidencia/secretaría", body: <ConstitucionStep /> },
   { n: 2, label: "Asistentes",    hint: "Registro de presentes, representados y ausentes — cálculo de capital representado" },
   { n: 3, label: "Quórum",        hint: "Evaluación automática contra regla jurisdiccional aplicable" },
   { n: 4, label: "Debates",       hint: "Puntos del orden del día discutidos y anotaciones del secretario" },

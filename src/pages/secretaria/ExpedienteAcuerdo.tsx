@@ -27,6 +27,7 @@ import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import { supabase } from "@/integrations/supabase/client";
+import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 
 interface RuleEvaluationResult {
   id: string;
@@ -421,6 +422,15 @@ export default function ExpedienteAcuerdo() {
         </div>
 
         <aside className="space-y-6">
+          <PreviewGatePanel
+            params={{
+              materia: a.agreement_kind,
+              adoptionMode: a.adoption_mode as any,
+              tipoSocial: a.entities?.legal_form?.toUpperCase() === "SA" ? "SA" : "SL",
+              materiaClase: a.matter_class as any,
+            }}
+          />
+
           <div
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
