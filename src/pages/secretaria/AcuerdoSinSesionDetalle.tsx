@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ScrollText, CheckCircle2, XCircle, MinusCircle, Mail, Loader2, AlertTriangle } from "lucide-react";
-import { useAcuerdoSinSesionById } from "@/hooks/useAcuerdosSinSesion";
+import { useAcuerdoSinSesionById, useCastVote, useCloseVotacionManual } from "@/hooks/useAcuerdosSinSesion";
 import { useERDSNotification } from "@/hooks/useERDSNotification";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 export default function AcuerdoSinSesionDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data, isLoading } = useAcuerdoSinSesionById(id);
   const { sendAndTrackNotification } = useERDSNotification();
+  const castVote = useCastVote(id);
+  const closeVotacion = useCloseVotacionManual(id);
   const [erdsStatus, setErdsStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [erdsError, setErdsError] = useState<string | null>(null);
   const [erdsRef, setErdsRef] = useState<string | null>(null);
@@ -65,7 +68,7 @@ export default function AcuerdoSinSesionDetalle() {
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
           <ScrollText className="h-3.5 w-3.5" />
-          Acuerdo sin sesión · {r.status}
+          Acuerdo sin sesión · {statusLabel(r.status)}
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
           {r.title}
@@ -137,6 +140,88 @@ export default function AcuerdoSinSesionDetalle() {
           </div>
         </div>
       </div>
+
+      {/* Panel de votación — sólo cuando VOTING_OPEN */}
+      {r.status === "VOTING_OPEN" && (
+        <div
+          className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="border-b border-[var(--g-border-subtle)] px-5 py-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+              <CheckCircle2 className="h-4 w-4 text-[var(--g-brand-3308)]" />
+              Emitir voto
+            </h2>
+          </div>
+          <div className="space-y-4 p-5">
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => castVote.mutate("FOR")}
+                disabled={castVote.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--status-success)] text-[var(--g-text-inverse)] hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Votar a favor
+              </button>
+              <button
+                type="button"
+                onClick={() => castVote.mutate("AGAINST")}
+                disabled={castVote.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--status-error)] text-[var(--g-text-inverse)] hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <XCircle className="h-4 w-4" />
+                Votar en contra
+              </button>
+              <button
+                type="button"
+                onClick={() => castVote.mutate("ABSTAIN")}
+                disabled={castVote.isPending}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:border-[var(--g-brand-3308)] hover:text-[var(--g-brand-3308)] transition-colors disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <MinusCircle className="h-4 w-4" />
+                Abstenerme
+              </button>
+            </div>
+            {castVote.isPending && (
+              <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Registrando voto…
+              </div>
+            )}
+            <div className="border-t border-[var(--g-border-subtle)] pt-4">
+              <p className="mb-3 text-xs text-[var(--g-text-secondary)]">
+                Cierre manual de la votación (Secretaría):
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => closeVotacion.mutate("APROBADO")}
+                  disabled={closeVotacion.isPending}
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-[var(--status-success)] text-[var(--status-success)] hover:bg-[var(--status-success)] hover:text-[var(--g-text-inverse)] transition-colors disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Cerrar como Aprobado
+                </button>
+                <button
+                  type="button"
+                  onClick={() => closeVotacion.mutate("RECHAZADO")}
+                  disabled={closeVotacion.isPending}
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-[var(--status-error)] text-[var(--status-error)] hover:bg-[var(--status-error)] hover:text-[var(--g-text-inverse)] transition-colors disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Cerrar como Rechazado
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Panel ERDS — Notificación certificada */}
       <div

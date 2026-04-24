@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 // ============================================================================
 // Row interfaces (WORM — Write-Once tables)
@@ -98,9 +97,10 @@ export interface NoSessionExpedienteDetailRow extends NoSessionExpedienteRow {
  * Includes agreement, entity, body, proposer, and related respuestas/notificaciones
  */
 export function useNoSessionExpediente(expedienteId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!expedienteId,
-    queryKey: ["no_session_expedientes", "byId", expedienteId],
+    enabled: !!expedienteId && !!tenantId,
+    queryKey: ["no_session_expedientes", tenantId, "byId", expedienteId],
     staleTime: 30_000,
     queryFn: async (): Promise<NoSessionExpedienteDetailRow | null> => {
       const { data, error } = await supabase
@@ -108,7 +108,7 @@ export function useNoSessionExpediente(expedienteId?: string) {
         .select(
           "*, agreements(id, matter_class, adoption_mode), entities(id, common_name, legal_form), governing_bodies(id, name, body_type), persons(id, nombre_completo)"
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", expedienteId!)
         .maybeSingle();
 
@@ -158,16 +158,18 @@ export function useNoSessionExpediente(expedienteId?: string) {
  * Includes basic entity/body info
  */
 export function useNoSessionExpedientes(agreementId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["no_session_expedientes", "list", agreementId ?? "all"],
+    queryKey: ["no_session_expedientes", tenantId, "list", agreementId ?? "all"],
     staleTime: 60_000,
+    enabled: !!tenantId,
     queryFn: async (): Promise<NoSessionExpedienteDetailRow[]> => {
       let query = supabase
         .from("no_session_expedientes")
         .select(
           "*, agreements(id, matter_class, adoption_mode), entities(id, common_name, legal_form), governing_bodies(id, name, body_type)"
         )
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
 
       if (agreementId) {
         query = query.eq("agreement_id", agreementId);
@@ -220,15 +222,16 @@ export function useNoSessionExpedientes(agreementId?: string) {
  * WORM table — no edits allowed
  */
 export function useNoSessionRespuestas(expedienteId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!expedienteId,
-    queryKey: ["no_session_respuestas", expedienteId],
+    enabled: !!expedienteId && !!tenantId,
+    queryKey: ["no_session_respuestas", tenantId, expedienteId],
     staleTime: 30_000,
     queryFn: async (): Promise<NoSessionRespuestaRow[]> => {
       const { data, error } = await supabase
         .from("no_session_respuestas")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("expediente_id", expedienteId!)
         .order("fecha_respuesta", { ascending: false });
 
@@ -243,15 +246,16 @@ export function useNoSessionRespuestas(expedienteId?: string) {
  * WORM table — no edits allowed
  */
 export function useNoSessionNotificaciones(expedienteId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!expedienteId,
-    queryKey: ["no_session_notificaciones", expedienteId],
+    enabled: !!expedienteId && !!tenantId,
+    queryKey: ["no_session_notificaciones", tenantId, expedienteId],
     staleTime: 30_000,
     queryFn: async (): Promise<NoSessionNotificacionRow[]> => {
       const { data, error } = await supabase
         .from("no_session_notificaciones")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("expediente_id", expedienteId!)
         .order("enviada_at", { ascending: false });
 
@@ -271,6 +275,7 @@ export function useNoSessionNotificaciones(expedienteId?: string) {
  */
 export function useCrearExpediente() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async (input: {
       agreement_id: string;
@@ -286,7 +291,7 @@ export function useCrearExpediente() {
       const { data, error } = await supabase
         .from("no_session_expedientes")
         .insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           agreement_id: input.agreement_id,
           entity_id: input.entity_id,
           body_id: input.body_id,
@@ -320,6 +325,7 @@ export function useCrearExpediente() {
  */
 export function useRegistrarRespuesta() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -336,7 +342,7 @@ export function useRegistrarRespuesta() {
       const { data, error } = await supabase
         .from("no_session_respuestas")
         .insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           expediente_id: input.expediente_id,
           person_id: input.person_id,
           sentido: input.sentido,
@@ -370,6 +376,7 @@ export function useRegistrarRespuesta() {
  */
 export function useEnviarNotificacion() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -382,7 +389,7 @@ export function useEnviarNotificacion() {
       const { data: notif, error: notifError } = await supabase
         .from("no_session_notificaciones")
         .insert({
-          tenant_id: DEMO_TENANT,
+          tenant_id: tenantId!,
           expediente_id: input.expediente_id,
           person_id: input.person_id,
           canal: input.canal,
@@ -401,7 +408,7 @@ export function useEnviarNotificacion() {
         .from("no_session_expedientes")
         .select("estado")
         .eq("id", input.expediente_id)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .single();
 
       if (expError) throw expError;
@@ -411,7 +418,7 @@ export function useEnviarNotificacion() {
           .from("no_session_expedientes")
           .update({ estado: "NOTIFICADO" })
           .eq("id", input.expediente_id)
-          .eq("tenant_id", DEMO_TENANT);
+          .eq("tenant_id", tenantId!);
       }
 
       return notif as NoSessionNotificacionRow;
@@ -436,6 +443,7 @@ export function useEnviarNotificacion() {
  */
 export function useActualizarExpediente() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async (input: {
       expediente_id: string;
@@ -453,7 +461,7 @@ export function useActualizarExpediente() {
         .from("no_session_expedientes")
         .update(updateData)
         .eq("id", input.expediente_id)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .select()
         .single();
 

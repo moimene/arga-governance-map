@@ -1,13 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   computePlantillasMetrics,
   PlantillaProtegidaRow,
   LeadingMetrics,
   LaggingMetrics,
 } from "@/lib/plantillas-metrics";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 export interface UsePlantillasMetricsResult {
   leading: LeadingMetrics;
@@ -24,14 +23,16 @@ export interface UsePlantillasMetricsResult {
  * Hook to fetch plantillas_protegidas and compute leading/lagging metrics
  */
 export function usePlantillasMetrics() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["plantillas", "metrics"],
+    queryKey: ["plantillas", tenantId, "metrics"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<UsePlantillasMetricsResult> => {
-      // Fetch all plantillas for the demo tenant
+      // Fetch all plantillas for the tenant
       const { data: plantillas, error } = await supabase
         .from("plantillas_protegidas")
         .select("id, tipo, adoption_mode, estado, created_at, fecha_aprobacion")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

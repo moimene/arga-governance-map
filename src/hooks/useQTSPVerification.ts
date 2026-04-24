@@ -5,12 +5,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   verificarIntegridad,
   type IntegrityVerificationResult,
 } from "@/lib/rules-engine";
 
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 interface EvidenceBundleRow {
   id: string;
@@ -46,9 +46,10 @@ interface RuleEvaluationResultRow {
  * @returns Query result with IntegrityVerificationResult
  */
 export function useQTSPVerification(agreementId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["qtsp-verification", agreementId],
-    enabled: !!agreementId,
+    queryKey: ["qtsp-verification", tenantId, agreementId],
+    enabled: !!agreementId && !!tenantId,
     staleTime: 60_000, // 1 minute
     queryFn: async () => {
       if (!agreementId) throw new Error("Agreement ID required");
@@ -57,7 +58,7 @@ export function useQTSPVerification(agreementId: string | undefined) {
       const { data: bundles, error: bundleError } = await supabase
         .from("evidence_bundles")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("agreement_id", agreementId)
         .order("created_at", { ascending: false });
 
@@ -67,7 +68,7 @@ export function useQTSPVerification(agreementId: string | undefined) {
       const { data: evaluations, error: evalError } = await supabase
         .from("rule_evaluation_results")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("agreement_id", agreementId);
 
       if (evalError) throw evalError;

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface FilingRow {
   id: string;
@@ -27,13 +26,15 @@ export interface FilingRow {
 }
 
 export function useTramitacionesList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["registry_filings", "list"],
+    queryKey: ["registry_filings", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<FilingRow[]> => {
       const { data, error } = await supabase
         .from("registry_filings")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("presentation_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as FilingRow[];
@@ -42,15 +43,16 @@ export function useTramitacionesList() {
 }
 
 export function useTramitacionById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["registry_filings", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["registry_filings", tenantId, "byId", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("registry_filings")
         .select("*, deeds(notary, deed_date, status, content)")
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return data;

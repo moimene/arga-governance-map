@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2 } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -125,7 +126,7 @@ export default function DecisionesUnipersonales() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {d.status}
+                      {statusLabel(d.status)}
                     </span>
                   </td>
                 </tr>

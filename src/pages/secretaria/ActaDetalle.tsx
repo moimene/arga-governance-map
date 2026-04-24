@@ -6,6 +6,7 @@ import {
   useAgreementIdsForMinute,
 } from "@/hooks/useActas";
 import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 
 export default function ActaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export default function ActaDetalle() {
   const { data: acta, isLoading } = useActaById(id);
   const { data: certs } = useCertificationsByMinute(id);
   const { data: agreementIds } = useAgreementIdsForMinute(id);
+  const { primaryRole } = useCurrentUserRole();
 
   if (isLoading) {
     return (
@@ -91,6 +93,7 @@ export default function ActaDetalle() {
                   entityId={acta.entity_id}
                   bodyId={acta.body_id}
                   agreementIds={agreementIds ?? []}
+                  userRole={primaryRole}
                 />
               ) : null}
             </div>

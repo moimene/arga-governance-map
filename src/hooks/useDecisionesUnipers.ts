@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface UnipersonalDecisionRow {
   id: string;
@@ -21,15 +20,17 @@ export interface UnipersonalDecisionRow {
 }
 
 export function useDecisionesUnipersList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["unipersonal_decisions", "list"],
+    queryKey: ["unipersonal_decisions", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<UnipersonalDecisionRow[]> => {
       const { data, error } = await supabase
         .from("unipersonal_decisions")
         .select(
           "*, entities(common_name, jurisdiction), persons:decided_by_id(full_name)",
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("decision_date", { ascending: false });
       if (error) throw error;
       type Raw = Omit<UnipersonalDecisionRow, "entity_name" | "jurisdiction" | "decider_name"> & {
@@ -59,15 +60,16 @@ export type UnipersonalDecisionDetailRow = Omit<
 };
 
 export function useDecisionUnipersById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["unipersonal_decisions", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["unipersonal_decisions", tenantId, "byId", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("unipersonal_decisions")
         .select("*, entities(common_name, jurisdiction, legal_form), persons:decided_by_id(full_name)")
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return data as UnipersonalDecisionDetailRow | null;

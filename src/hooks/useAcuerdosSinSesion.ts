@@ -70,6 +70,73 @@ export function useAcuerdoSinSesionById(id: string | undefined) {
   });
 }
 
+export type VoteChoice = "FOR" | "AGAINST" | "ABSTAIN";
+
+export function useCastVote(resolutionId: string | undefined) {
+  const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
+
+  return useMutation({
+    mutationFn: async (choice: VoteChoice) => {
+      if (!resolutionId || !tenantId) return;
+      const col =
+        choice === "FOR" ? "votes_for" :
+        choice === "AGAINST" ? "votes_against" : "abstentions";
+
+      // Read current value first (PostgREST has no atomic increment in one round-trip without RPC)
+      const { data: current, error: readErr } = await supabase
+        .from("no_session_resolutions")
+        .select(`${col}, requires_unanimity, votes_for, votes_against, abstentions`)
+        .eq("id", resolutionId)
+        .eq("tenant_id", tenantId)
+        .eq("status", "VOTING_OPEN")
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!current) throw new Error("Votación no activa");
+
+      const newVal = ((current as Record<string, number>)[col] ?? 0) + 1;
+      const updates: Record<string, unknown> = { [col]: newVal };
+
+      // If unanimity required and someone votes against/abstains → close immediately
+      if (current.requires_unanimity && (choice === "AGAINST" || choice === "ABSTAIN")) {
+        updates.status = "RECHAZADO";
+        updates.closed_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from("no_session_resolutions")
+        .update(updates)
+        .eq("id", resolutionId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
+    },
+  });
+}
+
+export function useCloseVotacionManual(resolutionId: string | undefined) {
+  const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
+
+  return useMutation({
+    mutationFn: async (resultado: "APROBADO" | "RECHAZADO") => {
+      if (!resolutionId || !tenantId) return;
+      const { error } = await supabase
+        .from("no_session_resolutions")
+        .update({ status: resultado, closed_at: new Date().toISOString() })
+        .eq("id", resolutionId)
+        .eq("tenant_id", tenantId)
+        .eq("status", "VOTING_OPEN");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
+    },
+  });
+}
+
 /**
  * Calls fn_cerrar_votaciones_vencidas() to close expired VOTING_OPEN processes.
  * Invalidates the list query on success so the UI refreshes automatically.

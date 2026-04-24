@@ -7,6 +7,7 @@ import {
 import {
   usePlantillasProtegidas,
   useUpdateEstadoPlantilla,
+  useUpdateContenidoPlantilla,
   type PlantillaProtegidaRow,
 } from "@/hooks/usePlantillasProtegidas";
 
@@ -104,6 +105,9 @@ function SectionToggle({
 
 function PlantillaDetailPanel({ plantilla }: { plantilla: PlantillaProtegidaRow }) {
   const updateEstado = useUpdateEstadoPlantilla();
+  const updateContenido = useUpdateContenidoPlantilla();
+  const [editingCapa1, setEditingCapa1] = useState(false);
+  const [capa1Draft, setCapa1Draft] = useState("");
   const transition = TRANSITION_MAP[plantilla.estado];
   const tipoLabel = TIPO_LABELS[plantilla.tipo] || plantilla.tipo;
   const organoLabel = plantilla.organo_tipo ? ORGANO_LABELS[plantilla.organo_tipo] || plantilla.organo_tipo : null;
@@ -181,14 +185,74 @@ function PlantillaDetailPanel({ plantilla }: { plantilla: PlantillaProtegidaRow 
       <div className="flex-1 overflow-y-auto">
         {/* Capa 1 — Inmutable */}
         <SectionToggle title="Capa 1 — Contenido inmutable" icon={Lock} defaultOpen={true}>
-          {hasCapa1 ? (
-            <pre className="whitespace-pre-wrap bg-[var(--g-surface-subtle)] p-4 text-[12px] leading-relaxed text-[var(--g-text-primary)] font-sans max-h-[400px] overflow-y-auto" style={{ borderRadius: "var(--g-radius-md)" }}>
-              {plantilla.capa1_inmutable}
-            </pre>
+          {editingCapa1 ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={capa1Draft}
+                onChange={(e) => setCapa1Draft(e.target.value)}
+                rows={16}
+                className="w-full resize-y rounded border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 font-mono text-[12px] leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={updateContenido.isPending}
+                  onClick={() => {
+                    updateContenido.mutate(
+                      { id: plantilla.id, capa1_inmutable: capa1Draft },
+                      { onSuccess: () => setEditingCapa1(false) }
+                    );
+                  }}
+                  className="flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {updateContenido.isPending ? "Guardando…" : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCapa1(false)}
+                  className="flex items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : hasCapa1 ? (
+            <div className="flex flex-col gap-2">
+              <pre className="whitespace-pre-wrap bg-[var(--g-surface-subtle)] p-4 text-[12px] leading-relaxed text-[var(--g-text-primary)] font-sans max-h-[400px] overflow-y-auto" style={{ borderRadius: "var(--g-radius-md)" }}>
+                {plantilla.capa1_inmutable}
+              </pre>
+              {plantilla.estado === "BORRADOR" && (
+                <button
+                  type="button"
+                  onClick={() => { setCapa1Draft(plantilla.capa1_inmutable ?? ""); setEditingCapa1(true); }}
+                  className="self-start flex items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Editar contenido
+                </button>
+              )}
+            </div>
           ) : (
-            <div className="flex items-center gap-2 py-4 text-sm text-[var(--status-warning)]">
-              <AlertTriangle className="h-4 w-4" />
-              Sin contenido jurídico — pendiente Oleada 1
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 py-2 text-sm text-[var(--status-warning)]">
+                <AlertTriangle className="h-4 w-4" />
+                Sin contenido jurídico todavía.
+              </div>
+              {plantilla.estado === "BORRADOR" && (
+                <button
+                  type="button"
+                  onClick={() => { setCapa1Draft(""); setEditingCapa1(true); }}
+                  className="self-start flex items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Añadir contenido
+                </button>
+              )}
             </div>
           )}
         </SectionToggle>

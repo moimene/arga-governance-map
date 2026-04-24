@@ -514,7 +514,50 @@ Probes de existencia vs Cloud para las 4 RPCs — aceptan cualquier error que NO
 
 **Tests: 356/356 pass (59 skipped por RPC `execute_sql` no expuesto), tsc 0 errors, build clean.**
 
-### Próximos — Sprint F (multi-jurisdicción)
+### Sprint G — Acuerdos sin sesión: modos avanzados + veto ✅ COMPLETADO (2026-04-23)
+
+Migración `000031` aplicada en Cloud. **359/359 tests, tsc 0 errors.**
+
+- **G3:** Bug `vetoAplicado` always-false corregido. `VotacionInput` recibe `vetoActivo?: boolean`. Gate 5 del votacion-engine emite WARNING cuando hay pacto activo. Orquestador Flujo A pre-evalúa pactos y pasa `vetoActivo` antes de llamar a `evaluarVotacion`. 3 tests V-G3-01/02/03.
+- **G4:** `CoAprobacionStepper.tsx` (5 pasos) — adopción `CO_APROBACION` (k de n admins). Usa `evaluarCoAprobacion()` en tiempo real. Ruta: `/secretaria/acuerdos-sin-sesion/co-aprobacion`.
+- **G5:** `SolidarioStepper.tsx` (4 pasos) — adopción `SOLIDARIO`. Usa `evaluarSolidario()`. Ruta: `/secretaria/acuerdos-sin-sesion/solidario`.
+- **G6:** Auto-cierre de procesos `VOTING_OPEN` vencidos. Migración `000031`: `fn_cerrar_votaciones_vencidas(p_tenant_id)` SECURITY DEFINER, devuelve int. Hook `useCloseExpiredVotaciones` (mutation). `AcuerdosSinSesion.tsx` llama `closeExpired.mutate()` en mount.
+- **AcuerdosSinSesion.tsx**: 3 botones CTA (Sin sesión, Co-aprobación, Administrador solidario).
+
+**Archivos modificados:** `types.ts`, `votacion-engine.ts`, `orquestador.ts`, `votacion-engine.test.ts`, `useAcuerdosSinSesion.ts`, `AcuerdosSinSesion.tsx`, `App.tsx`. **Nuevos:** `CoAprobacionStepper.tsx`, `SolidarioStepper.tsx`, `20260423_000031_fn_cerrar_votaciones_vencidas.sql`.
+
+### Sprint H — UX/UI Review + Gestor Documental ✅ COMPLETADO (2026-04-23)
+
+**359/359 tests, tsc 0 errors.**
+
+**H1 — Gestor documental operativo:**
+- **H1a — `variable-resolver.ts`:** Bug raíz: `sources.has("ENTIDAD")` fallaba porque la BD guarda fuentes como `"entities.name"` (dotted path), no `"ENTIDAD"`. Fix: `normalizeFuente()` mapea `"entities.*"→"ENTIDAD"`, `"governing_bodies.*"→"ORGANO"`, `"meetings.*"→"REUNION"`, `"agreements.*"→"EXPEDIENTE"`. Además eliminada la guarda `sources.has(...)`: todas las fuentes se pre-cargan cuando el contexto tiene IDs. Resolución automática de variables funcional para todas las plantillas existentes.
+- **H1b — SQL:** Eliminadas cabeceras `-- PLANTILLA N:` de `capa1_inmutable` en `COMISION_DELEGADA` y `CONVOCATORIA_SL_NOTIFICACION` vía `regexp_replace`.
+- **H1c — SQL:** Contenido legal real español escrito para 4 `MODELO_ACUERDO` BORRADOR: `MODIFICACION_ESTATUTOS`, `AUMENTO_CAPITAL`, `DISTRIBUCION_DIVIDENDOS`, `NOMBRAMIENTO_AUDITOR`. Cada uno incluye `capa2_variables` y `capa3_editables` con campos tipados. Promovidos a ACTIVA.
+- **H1d — SQL:** 8 plantillas `REVISADA` → `ACTIVA`: `APROBACION_CUENTAS` (×2), `CESE_CONSEJERO` (×2), `DELEGACION_FACULTADES` (×2), `NOMBRAMIENTO_CONSEJERO` (×2). Ahora visibles en `GenerarDocumentoStepper`.
+
+**H2 — Etiquetas de estado en español:**
+- Creado `src/lib/secretaria/status-labels.ts` — mapa central con 30+ estados de todos los dominios.
+- Función `statusLabel(status)` con fallback al valor raw.
+- Actualizado: `AcuerdosSinSesion.tsx`, `TramitadorLista.tsx`, `ReunionesLista.tsx`, `DecisionesUnipersonales.tsx`. Ya no muestran claves DB (`VOTING_OPEN`, `EN_TRAMITE`, etc.) — muestran "Votación abierta", "En trámite", etc.
+
+**H3 — Acciones rápidas en Dashboard:**
+- Sección "Acciones rápidas" con 4 botones: Nueva convocatoria, Nueva reunión, Nuevo acuerdo, Generar documento. Insertada entre header y KPIs.
+
+**H4 — CTA "Usar esta plantilla" en Plantillas.tsx:**
+- Botón primario verde aparece en el panel de detalle cuando `estado === 'ACTIVA'`.
+- Navega a `/secretaria/tramitador/nuevo?materia=X&plantilla=Y` para `MODELO_ACUERDO`, o `?plantilla=Y` para otros tipos.
+- Botón de transición de workflow degradado a outline (secundario) cuando coexiste con el CTA principal.
+
+**H5 — Editor inline capa1 en GestorPlantillas.tsx:**
+- Para plantillas en `BORRADOR`: botón "Editar contenido" / "Añadir contenido" en la sección Capa 1.
+- Abre textarea editable con Save/Cancel. Usa `useUpdateContenidoPlantilla` (ya existía).
+- Permite al equipo legal añadir/corregir texto sin acceso directo a SQL.
+
+**H6 — Limpieza mensajes placeholder:**
+- `TramitadorStepper.tsx`: "Pendiente Oleada 2 (legal)" → "No hay modelo de acuerdo disponible para esta materia en este momento."
+
+**Próximos — Sprint F (multi-jurisdicción)**
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
 
@@ -657,17 +700,21 @@ Fundación ARGA (G-99999901)
 
 ## Convenciones de hooks Secretaría
 
+**⚠️ IMPORTANTE (Sprint G):** Ya NO usar `DEMO_TENANT` hardcodeado. Todos los hooks usan `useTenantContext()`:
+
 ```typescript
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export function useXxx(param?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["tabla", param ?? "all"],
+    queryKey: ["tabla", tenantId, param ?? "all"],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tabla")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
       return (data ?? []) as Tipo[];
     },
@@ -689,9 +736,11 @@ export function useXxx(param?: string) {
   <Route path="/secretaria/reuniones/:id"                element={<ReunionStepper />} />
   <Route path="/secretaria/decisiones-unipersonales"     element={<DecisionesUnipersonales />} />
   <Route path="/secretaria/decisiones-unipersonales/:id" element={<DecisionDetalle />} />
-  <Route path="/secretaria/acuerdos-sin-sesion"          element={<AcuerdosSinSesion />} />
-  <Route path="/secretaria/acuerdos-sin-sesion/nuevo"    element={<AcuerdoSinSesionStepper />} />
-  <Route path="/secretaria/acuerdos-sin-sesion/:id"      element={<AcuerdoSinSesionDetalle />} />
+  <Route path="/secretaria/acuerdos-sin-sesion"                  element={<AcuerdosSinSesion />} />
+  <Route path="/secretaria/acuerdos-sin-sesion/nuevo"            element={<AcuerdoSinSesionStepper />} />
+  <Route path="/secretaria/acuerdos-sin-sesion/co-aprobacion"    element={<CoAprobacionStepper />} />
+  <Route path="/secretaria/acuerdos-sin-sesion/solidario"        element={<SolidarioStepper />} />
+  <Route path="/secretaria/acuerdos-sin-sesion/:id"              element={<AcuerdoSinSesionDetalle />} />
   <Route path="/secretaria/tramitador"                   element={<TramitadorLista />} />
   <Route path="/secretaria/tramitador/nuevo"             element={<TramitadorStepper />} />
   <Route path="/secretaria/tramitador/:id"               element={<TramitadorStepper />} />
@@ -727,10 +776,13 @@ src/
     DecisionesUnipersonales.tsx     T9
     DecisionDetalle.tsx             T9
     LibrosObligatorios.tsx          T10
-    Plantillas.tsx                  T11
+    Plantillas.tsx                  T11  + H4: CTA "Usar esta plantilla" para ACTIVA
+    GestorPlantillas.tsx            T11  + H5: editor inline capa1 para BORRADOR
     ExpedienteAcuerdo.tsx           T14  Timeline 8 estados + compliance snapshot
     GenerarDocumentoStepper.tsx     A5   DOCX gen + QTSP QES + Storage archival
     BoardPack.tsx                   B6   9 secciones ejecutivas + DL-2/DL-5
+    CoAprobacionStepper.tsx         G4   5 pasos adopción CO_APROBACION (k de n)
+    SolidarioStepper.tsx            G5   4 pasos adopción SOLIDARIO
 
   hooks/
     useJurisdiccionRules.ts         T3   computeQuorumStatus, checkNoticePeriod
@@ -753,6 +805,7 @@ src/
     useERDSNotification.ts          D3   ERDS certified notification hook
     useModelosAcuerdo.ts            OL2  MODELO_ACUERDO query by materia
     usePactosParasociales.ts        D4   Pactos vigentes + hook con cláusulas
+    useAcuerdosSinSesion.ts         T8+G6 + useCloseExpiredVotaciones mutation
 
   components/
     SodGuard.tsx                    B2   SoD violation checker (BLOCK/WARN)
@@ -775,8 +828,10 @@ src/
     doc-gen/
       storage-archiver.ts               SHA-512 + Supabase Storage + evidence_bundles
       template-renderer.ts              Handlebars template rendering
-      variable-resolver.ts              Capa2 variable resolution (Supabase data)
+      variable-resolver.ts              H1a: normalizeFuente fix — dotted DB paths → ENTIDAD/ORGANO/REUNION/EXPEDIENTE
       docx-generator.ts                 DOCX generation via docx-js
+    secretaria/
+      status-labels.ts                  H2: mapa central STATUS_LABEL + fn statusLabel()
     telemetry.ts                    B7   OTel-compatible event tracking stub
 ```
 

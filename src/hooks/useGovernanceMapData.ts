@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import type { GovNodeData } from "@/components/governance-map/GovNode";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 type EntityRow = {
   id: string;
@@ -97,37 +96,39 @@ function layoutEntities(entities: EntityRow[]): Map<string, { x: number; y: numb
 }
 
 export function useGovernanceMapData() {
+  const { tenantId } = useTenantContext();
   return useQuery<GovernanceMapData>({
-    queryKey: ["governance_map", "all"],
+    queryKey: ["governance_map", tenantId, "all"],
+    enabled: !!tenantId,
     staleTime: 60_000,
     queryFn: async () => {
       const [entRes, bodyRes, polRes, oblRes, findRes, delRes] = await Promise.all([
         supabase
           .from("entities")
           .select("id, slug, common_name, jurisdiction, parent_entity_id")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .order("common_name"),
         supabase
           .from("governing_bodies")
           .select("id, slug, name, body_type, entity_id")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("policies")
           .select("id, policy_code, title, status")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .order("policy_code"),
         supabase
           .from("obligations")
           .select("id, code, title, criticality, policy_id")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("findings")
           .select("id, code, title, severity, status, entity_id, obligation_id")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("delegations")
           .select("id, code, delegation_type, status, entity_id")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
       ]);
       if (entRes.error) throw entRes.error;
       if (bodyRes.error) throw bodyRes.error;

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollText, Plus } from "lucide-react";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -166,7 +167,7 @@ export default function AcuerdosSinSesion() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {r.status}
+                      {statusLabel(r.status)}
                     </span>
                   </td>
                 </tr>

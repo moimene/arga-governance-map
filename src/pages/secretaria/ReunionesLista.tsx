@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Plus, FileText, FolderOpen } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const STATUS_TONE: Record<string, string> = {
   PROGRAMADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
@@ -176,7 +177,7 @@ export default function ReunionesLista() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {m.status}
+                      {statusLabel(m.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type PersonType = "PF" | "PJ";
 
@@ -49,10 +48,12 @@ export function usePersonasCanonical(filter?: {
   person_type?: PersonType;
   search?: string;
 }) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["personas_canonical", "list", filter?.person_type ?? "all", filter?.search ?? ""],
+    queryKey: ["personas_canonical", tenantId, "list", filter?.person_type ?? "all", filter?.search ?? ""],
+    enabled: !!tenantId,
     queryFn: async (): Promise<PersonaRow[]> => {
-      let q = supabase.from("persons").select("*").eq("tenant_id", DEMO_TENANT);
+      let q = supabase.from("persons").select("*").eq("tenant_id", tenantId!);
       if (filter?.person_type) q = q.eq("person_type", filter.person_type);
       if (filter?.search && filter.search.trim().length > 0) {
         const s = filter.search.trim();
@@ -79,18 +80,21 @@ export function usePersonasEnriquecidas(filter?: {
   tipo_condicion?: string; // opcional: filtra personas que tengan ese cargo vigente
   entity_id?: string;      // opcional: filtra personas con cargo O holding en esa entity
 }) {
+  const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: [
       "personas_canonical",
+      tenantId,
       "enriquecidas",
       filter?.person_type ?? "all",
       filter?.search ?? "",
       filter?.tipo_condicion ?? "all",
       filter?.entity_id ?? "all",
     ],
+    enabled: !!tenantId,
     queryFn: async (): Promise<PersonaEnriquecida[]> => {
       // 1. Personas (con filtros propios de la tabla persons)
-      let personsQ = supabase.from("persons").select("*").eq("tenant_id", DEMO_TENANT);
+      let personsQ = supabase.from("persons").select("*").eq("tenant_id", tenantId!);
       if (filter?.person_type) personsQ = personsQ.eq("person_type", filter.person_type);
       if (filter?.search && filter.search.trim().length > 0) {
         const s = filter.search.trim();
@@ -111,7 +115,7 @@ export function usePersonasEnriquecidas(filter?: {
           entity:entity_id(id, common_name, legal_name),
           body:body_id(id, name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("estado", "VIGENTE");
 
       // 3. Holdings VIGENTES (effective_to IS NULL) + join a entity.
@@ -124,7 +128,7 @@ export function usePersonasEnriquecidas(filter?: {
           effective_to,
           entity:entity_id(id, common_name, legal_name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .is("effective_to", null);
 
       const [personsR, cargosR, holdingsR] = await Promise.all([personsQ, cargosQ, holdingsQ]);
@@ -198,9 +202,10 @@ export function usePersonasEnriquecidas(filter?: {
 }
 
 export function usePersonaCanonical(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["personas_canonical", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["personas_canonical", tenantId, "byId", id],
     queryFn: async (): Promise<PersonaDetailRow | null> => {
       const { data, error } = await supabase
         .from("persons")
@@ -208,7 +213,7 @@ export function usePersonaCanonical(id: string | undefined) {
           *,
           representative:representative_person_id(id, full_name, tax_id)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;

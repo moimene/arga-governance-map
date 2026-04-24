@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface PlantillaRow {
   id: string;
@@ -17,13 +16,15 @@ export interface PlantillaRow {
 }
 
 export function usePlantillasList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["document_templates", "list"],
+    queryKey: ["document_templates", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<PlantillaRow[]> => {
       const { data, error } = await supabase
         .from("document_templates")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("template_code", { ascending: true });
       if (error) throw error;
       return (data ?? []) as PlantillaRow[];

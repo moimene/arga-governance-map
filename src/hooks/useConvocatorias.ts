@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface ConvocatoriaRow {
   id: string;
@@ -42,15 +41,17 @@ export interface AttachmentRow {
 }
 
 export function useConvocatoriasList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["convocatorias", "list"],
+    queryKey: ["convocatorias", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<ConvocatoriaWithBody[]> => {
       const { data, error } = await supabase
         .from("convocatorias")
         .select(
           "*, governing_bodies(name, body_type, entities(common_name, jurisdiction, legal_form))",
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("fecha_1", { ascending: false });
       if (error) throw error;
       type Raw = Omit<ConvocatoriaWithBody, "body_name" | "entity_name" | "jurisdiction" | "legal_form"> & {
@@ -72,9 +73,10 @@ export function useConvocatoriasList() {
 }
 
 export function useConvocatoriaById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["convocatorias", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["convocatorias", tenantId, "byId", id],
     queryFn: async (): Promise<ConvocatoriaWithBody | null> => {
       const { data, error } = await supabase
         .from("convocatorias")
@@ -82,7 +84,7 @@ export function useConvocatoriaById(id: string | undefined) {
           "*, governing_bodies(name, body_type, entities(common_name, jurisdiction, legal_form))",
         )
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
@@ -106,14 +108,15 @@ export function useConvocatoriaById(id: string | undefined) {
 }
 
 export function useConvocatoriaAttachments(convocatoriaId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!convocatoriaId,
-    queryKey: ["attachments", "convocatoria", convocatoriaId],
+    enabled: !!convocatoriaId && !!tenantId,
+    queryKey: ["attachments", tenantId, "convocatoria", convocatoriaId],
     queryFn: async (): Promise<AttachmentRow[]> => {
       const { data, error } = await supabase
         .from("attachments")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("convocatoria_id", convocatoriaId!)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;

@@ -1,5 +1,6 @@
-import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, type LucideIcon } from "lucide-react";
+import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, Play, type LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ const MATERIAS_ACUERDO = [
 ];
 
 export default function Plantillas() {
+  const navigate = useNavigate();
   const { data, isLoading } = usePlantillasProtegidas();
   const updateEstado = useUpdateEstadoPlantilla();
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
@@ -420,26 +422,41 @@ export default function Plantillas() {
                 </div>
               </div>
 
-              {/* Detail Footer - Action Button */}
-              {WORKFLOW_TRANSITIONS[selected.estado] && (
-                <div className="border-t border-[var(--g-border-subtle)] px-5 py-4">
-                  {(() => {
+              {/* Detail Footer - Action Buttons */}
+              <div className="border-t border-[var(--g-border-subtle)] px-5 py-4 flex flex-col gap-2">
+                {selected.estado === 'ACTIVA' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(
+                      selected.tipo === 'MODELO_ACUERDO'
+                        ? `/secretaria/tramitador/nuevo?materia=${encodeURIComponent(selected.materia_acuerdo ?? '')}&plantilla=${selected.id}`
+                        : `/secretaria/tramitador/nuevo?plantilla=${selected.id}`
+                    )}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <Play className="h-4 w-4" />
+                    Usar esta plantilla
+                  </button>
+                )}
+                {WORKFLOW_TRANSITIONS[selected.estado] && (
+                  (() => {
                     const transition = WORKFLOW_TRANSITIONS[selected.estado];
                     const IconComponent = transition.icon;
                     return (
                       <button
                         onClick={() => handleTransicion(selected)}
                         disabled={updateEstado.isPending}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       >
                         <IconComponent className="h-4 w-4" />
                         {updateEstado.isPending ? "Procesando…" : transition.label}
                       </button>
                     );
-                  })()}
-                </div>
-              )}
+                  })()
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-5">

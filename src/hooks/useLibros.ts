@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface MandatoryBookRow {
   id: string;
@@ -21,13 +20,15 @@ export interface MandatoryBookRow {
 }
 
 export function useLibrosList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["mandatory_books", "list"],
+    queryKey: ["mandatory_books", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<MandatoryBookRow[]> => {
       const { data, error } = await supabase
         .from("mandatory_books")
         .select("*, entities(common_name, jurisdiction)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("legalization_deadline", { ascending: true });
       if (error) throw error;
       type Raw = Omit<MandatoryBookRow, "entity_name" | "jurisdiction"> & {

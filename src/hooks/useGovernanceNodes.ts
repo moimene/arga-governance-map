@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import type { Node, Edge } from "@xyflow/react";
 import type { GovNodeData } from "@/components/governance-map/GovNode";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 // Raw types from Supabase — no `as any`, castear en el boundary de la query
 
@@ -54,23 +53,25 @@ function policyStatusToGovStatus(status: string): GovNodeData["status"] {
 }
 
 export function useGovernanceNodes() {
+  const { tenantId } = useTenantContext();
   return useQuery<GovernanceNodesData>({
-    queryKey: ["governance_nodes", "supabase"],
+    queryKey: ["governance_nodes", tenantId, "supabase"],
+    enabled: !!tenantId,
     staleTime: 60_000,
     queryFn: async () => {
       const [entRes, bodyRes, polRes] = await Promise.all([
         supabase
           .from("entities")
           .select("id, common_name, entity_status")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("governing_bodies")
           .select("id, name, body_type, entity_id")
-          .eq("tenant_id", DEMO_TENANT),
+          .eq("tenant_id", tenantId!),
         supabase
           .from("policies")
           .select("id, title, policy_code, status")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .order("policy_code")
           .limit(8),
       ]);

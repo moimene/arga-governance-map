@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -126,7 +127,7 @@ export default function TramitadorLista() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {f.status}
+                      {statusLabel(f.status)}
                     </span>
                   </td>
                 </tr>

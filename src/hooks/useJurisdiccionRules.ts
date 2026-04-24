@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface JurisdictionRuleSet {
   id: string;
@@ -42,13 +41,15 @@ export interface NoticePeriodResult {
 
 /** All jurisdiction rule sets. */
 export function useJurisdiccionRules() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["jurisdiction_rule_sets", "all"],
+    queryKey: ["jurisdiction_rule_sets", tenantId, "all"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<JurisdictionRuleSet[]> => {
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("jurisdiction", { ascending: true });
       if (error) throw error;
       return (data ?? []) as JurisdictionRuleSet[];
@@ -58,14 +59,15 @@ export function useJurisdiccionRules() {
 
 /** Applicable rule set(s) for an entity's jurisdiction + company_form. */
 export function useEntityRules(jurisdictionCode?: string, companyForm?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!jurisdictionCode && !!companyForm,
-    queryKey: ["jurisdiction_rule_sets", "forEntity", jurisdictionCode, companyForm],
+    enabled: !!jurisdictionCode && !!companyForm && !!tenantId,
+    queryKey: ["jurisdiction_rule_sets", tenantId, "forEntity", jurisdictionCode, companyForm],
     queryFn: async (): Promise<JurisdictionRuleSet[]> => {
       const { data, error } = await supabase
         .from("jurisdiction_rule_sets")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("jurisdiction", jurisdictionCode!)
         .eq("company_form", companyForm!)
         .eq("is_active", true);

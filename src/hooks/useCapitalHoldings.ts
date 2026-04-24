@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface CapitalHoldingRow {
   id: string;
@@ -42,9 +41,10 @@ export interface CapitalHoldingDetailRow extends CapitalHoldingRow {
  * Incluye autocartera (is_treasury=true) — filtrar en UI si hace falta.
  */
 export function useCapitalHoldings(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["capital_holdings", "vigente", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["capital_holdings", tenantId, "vigente", entityId],
     queryFn: async (): Promise<CapitalHoldingDetailRow[]> => {
       const { data, error } = await supabase
         .from("capital_holdings")
@@ -53,7 +53,7 @@ export function useCapitalHoldings(entityId: string | undefined) {
           holder:holder_person_id(id, full_name, tax_id, person_type, denomination),
           share_class:share_class_id(id, class_code, name, votes_per_title, voting_rights)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .is("effective_to", null)
         .order("porcentaje_capital", { ascending: false });
@@ -82,9 +82,10 @@ export interface PersonaHoldingDetailRow extends CapitalHoldingRow {
 }
 
 export function useHoldingsPersona(personId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!personId,
-    queryKey: ["capital_holdings", "byPerson", personId],
+    enabled: !!personId && !!tenantId,
+    queryKey: ["capital_holdings", tenantId, "byPerson", personId],
     queryFn: async (): Promise<PersonaHoldingDetailRow[]> => {
       const { data, error } = await supabase
         .from("capital_holdings")
@@ -93,7 +94,7 @@ export function useHoldingsPersona(personId: string | undefined) {
           entity:entity_id(id, common_name, legal_name),
           share_class:share_class_id(id, class_code, name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("holder_person_id", personId!)
         .is("effective_to", null)
         .order("porcentaje_capital", { ascending: false });
@@ -105,9 +106,10 @@ export function useHoldingsPersona(personId: string | undefined) {
 
 /** Todas las posiciones (incluye históricas) para trazabilidad. */
 export function useCapitalHoldingsHistory(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["capital_holdings", "history", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["capital_holdings", tenantId, "history", entityId],
     queryFn: async (): Promise<CapitalHoldingDetailRow[]> => {
       const { data, error } = await supabase
         .from("capital_holdings")
@@ -116,7 +118,7 @@ export function useCapitalHoldingsHistory(entityId: string | undefined) {
           holder:holder_person_id(id, full_name, tax_id, person_type, denomination),
           share_class:share_class_id(id, class_code, name, votes_per_title, voting_rights)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .order("effective_from", { ascending: false });
       if (error) throw error;

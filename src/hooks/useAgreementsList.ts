@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface AgreementListRow {
   id: string;
@@ -25,13 +24,15 @@ export interface AgreementListRow {
  *   const { data: agreements } = useAgreementsList(["CERTIFIED", "ADOPTED"]);
  */
 export function useAgreementsList(statusFilter?: string[]) {
+  const { tenantId } = useTenantContext();
   return useQuery<AgreementListRow[], Error>({
-    queryKey: ["agreements", "list", statusFilter ? statusFilter.join(",") : "all"],
+    queryKey: ["agreements", tenantId, "list", statusFilter ? statusFilter.join(",") : "all"],
+    enabled: !!tenantId,
     queryFn: async () => {
       let query = supabase
         .from("agreements")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
 
       if (statusFilter && statusFilter.length > 0) {
@@ -49,15 +50,16 @@ export function useAgreementsList(statusFilter?: string[]) {
  * useAgreementById — Fetches a single agreement with its related entities
  */
 export function useAgreementById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery<AgreementListRow | null, Error>({
-    enabled: !!id,
-    queryKey: ["agreements", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["agreements", tenantId, "byId", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agreements")
         .select("*")
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as AgreementListRow | null;

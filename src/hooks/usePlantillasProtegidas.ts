@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface PlantillaProtegidaRow {
   id: string;
@@ -32,13 +31,15 @@ export interface PlantillaProtegidaRow {
 }
 
 export function usePlantillasProtegidas() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["plantillas_protegidas"],
+    queryKey: ["plantillas_protegidas", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("plantillas_protegidas")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("tipo", { ascending: true });
       if (error) throw error;
       return (data ?? []) as PlantillaProtegidaRow[];
@@ -47,24 +48,26 @@ export function usePlantillasProtegidas() {
 }
 
 export function usePlantillaProtegida(id?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["plantillas_protegidas", id],
+    queryKey: ["plantillas_protegidas", tenantId, id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("plantillas_protegidas")
         .select("*")
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return data as PlantillaProtegidaRow | null;
     },
-    enabled: !!id,
+    enabled: !!id && !!tenantId,
   });
 }
 
 export function useUpdateEstadoPlantilla() {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
 
   return useMutation({
     mutationFn: async (params: {
@@ -90,7 +93,7 @@ export function useUpdateEstadoPlantilla() {
         .from("plantillas_protegidas")
         .update(updates)
         .eq("id", params.id)
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
 
       if (error) throw error;
     },
@@ -103,6 +106,7 @@ export function useUpdateEstadoPlantilla() {
 
 export function useUpdateContenidoPlantilla() {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
 
   return useMutation({
     mutationFn: async (params: {
@@ -133,7 +137,7 @@ export function useUpdateContenidoPlantilla() {
         .from("plantillas_protegidas")
         .update(updates)
         .eq("id", params.id)
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
 
       if (error) throw error;
     },

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from '@/context/TenantContext';
 
 /**
  * Rule pack version row with joined rule pack fields
@@ -46,14 +45,16 @@ export interface RuleParamOverrideRow {
  * staleTime: 60 seconds
  */
 export function useRulePacks() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["rulePacks", "active"],
+    queryKey: ["rulePacks", tenantId, "active"],
     staleTime: 60_000,
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rule_pack_versions")
         .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("status", "ACTIVE")
         .order("version_tag", { ascending: false });
 
@@ -87,16 +88,17 @@ export function useRulePacks() {
  * staleTime: 60 seconds
  */
 export function useRulePacksForEntity(entityId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["rulePacks", "entity", entityId ?? "none"],
+    queryKey: ["rulePacks", tenantId, "entity", entityId ?? "none"],
     staleTime: 60_000,
-    enabled: !!entityId,
+    enabled: !!entityId && !!tenantId,
     queryFn: async () => {
       // Load active pack versions
       const { data: packsData, error: packsError } = await supabase
         .from("rule_pack_versions")
         .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("status", "ACTIVE")
         .order("version_tag", { ascending: false });
 
@@ -122,7 +124,7 @@ export function useRulePacksForEntity(entityId?: string) {
       const { data: overridesData, error: overridesError } = await supabase
         .from("rule_param_overrides")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId);
 
       if (overridesError) throw overridesError;
@@ -144,15 +146,16 @@ export function useRulePacksForEntity(entityId?: string) {
  * staleTime: 60 seconds
  */
 export function useRulePackForMateria(materia?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["rulePacks", "materia", materia ?? "none"],
+    queryKey: ["rulePacks", tenantId, "materia", materia ?? "none"],
     staleTime: 60_000,
-    enabled: !!materia,
+    enabled: !!materia && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rule_pack_versions")
         .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("status", "ACTIVE")
         .eq("rule_packs.materia", materia)
         .order("version_tag", { ascending: false })

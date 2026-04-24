@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface CapitalProfileRow {
   id: string;
@@ -33,14 +32,15 @@ export interface ShareClassRow {
 
 /** Perfil de capital VIGENTE para una sociedad. */
 export function useCapitalProfile(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["entity_capital_profile", "vigente", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["entity_capital_profile", tenantId, "vigente", entityId],
     queryFn: async (): Promise<CapitalProfileRow | null> => {
       const { data, error } = await supabase
         .from("entity_capital_profile")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("estado", "VIGENTE")
         .maybeSingle();
@@ -52,14 +52,15 @@ export function useCapitalProfile(entityId: string | undefined) {
 
 /** Historial de capital (VIGENTE + HISTORICO) ordenado cronológicamente. */
 export function useCapitalProfileHistory(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["entity_capital_profile", "history", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["entity_capital_profile", tenantId, "history", entityId],
     queryFn: async (): Promise<CapitalProfileRow[]> => {
       const { data, error } = await supabase
         .from("entity_capital_profile")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .order("effective_from", { ascending: false });
       if (error) throw error;
@@ -70,14 +71,15 @@ export function useCapitalProfileHistory(entityId: string | undefined) {
 
 /** Clases de acciones/participaciones de una sociedad. */
 export function useShareClasses(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["share_classes", "byEntity", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["share_classes", tenantId, "byEntity", entityId],
     queryFn: async (): Promise<ShareClassRow[]> => {
       const { data, error } = await supabase
         .from("share_classes")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .order("class_code", { ascending: true });
       if (error) throw error;

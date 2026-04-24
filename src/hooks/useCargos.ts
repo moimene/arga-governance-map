@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type TipoCondicion =
   | "SOCIO"
@@ -87,9 +86,10 @@ const CARGOS_ORGANO_COLEGIADO: TipoCondicion[] = [
  * ADMIN_UNICO, ADMIN_SOLIDARIO, ADMIN_MANCOMUNADO, ADMIN_PJ.
  */
 export function useAdministradores(entityId: string | undefined, soloVigentes = true) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["cargos", "administradores", entityId, soloVigentes],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["cargos", tenantId, "administradores", entityId, soloVigentes],
     queryFn: async (): Promise<CargoDetailRow[]> => {
       let q = supabase
         .from("condiciones_persona")
@@ -98,7 +98,7 @@ export function useAdministradores(entityId: string | undefined, soloVigentes = 
           person:person_id(id, full_name, tax_id, person_type, denomination),
           representative:representative_person_id(id, full_name, tax_id)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .is("body_id", null)
         .in("tipo_condicion", CARGOS_ADMIN_NO_COLEGIADO);
@@ -115,9 +115,10 @@ export function useAdministradores(entityId: string | undefined, soloVigentes = 
  * CONSEJERO, PRESIDENTE, VICEPRESIDENTE, SECRETARIO, CONSEJERO_COORDINADOR.
  */
 export function useComposicionOrgano(bodyId: string | undefined, soloVigentes = true) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!bodyId,
-    queryKey: ["cargos", "composicionOrgano", bodyId, soloVigentes],
+    enabled: !!bodyId && !!tenantId,
+    queryKey: ["cargos", tenantId, "composicionOrgano", bodyId, soloVigentes],
     queryFn: async (): Promise<CargoDetailRow[]> => {
       let q = supabase
         .from("condiciones_persona")
@@ -127,7 +128,7 @@ export function useComposicionOrgano(bodyId: string | undefined, soloVigentes = 
           body:body_id(id, name, body_type),
           representative:representative_person_id(id, full_name, tax_id)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("body_id", bodyId!)
         .in("tipo_condicion", CARGOS_ORGANO_COLEGIADO);
       if (soloVigentes) q = q.eq("estado", "VIGENTE");
@@ -143,9 +144,10 @@ export function useComposicionOrgano(bodyId: string | undefined, soloVigentes = 
  * Útil para perfil de persona.
  */
 export function useCargosPersona(personId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!personId,
-    queryKey: ["cargos", "byPerson", personId],
+    enabled: !!personId && !!tenantId,
+    queryKey: ["cargos", tenantId, "byPerson", personId],
     queryFn: async (): Promise<CargoDetailRow[]> => {
       // G3: incluye join a entity para resolver la sociedad incluso cuando
       // el cargo no pertenece a un órgano colegiado (body_id NULL).
@@ -156,7 +158,7 @@ export function useCargosPersona(personId: string | undefined) {
           body:body_id(id, name, body_type),
           entity:entity_id(id, common_name, legal_name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("person_id", personId!)
         .order("fecha_inicio", { ascending: false });
       if (error) throw error;

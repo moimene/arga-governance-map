@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   evaluarAcuerdoCompleto,
   type RulePack,
@@ -11,8 +12,6 @@ import {
   type MateriaClase,
   type ComplianceResult as EngineComplianceResult,
 } from "@/lib/rules-engine";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 type RulePackJoinRow = {
   id: string; params: unknown; status: string;
@@ -111,9 +110,10 @@ type NoSessionRow = { status: string; requires_unanimity: boolean; votes_for: nu
 type UnipersonalRow = { status: string } | null;
 
 export function useAgreement(agreementId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["agreement", agreementId ?? "none"],
-    enabled: !!agreementId,
+    queryKey: ["agreement", tenantId, agreementId ?? "none"],
+    enabled: !!agreementId && !!tenantId,
     staleTime: 60_000,
     queryFn: async (): Promise<AgreementFull | null> => {
       const { data, error } = await supabase
@@ -121,7 +121,7 @@ export function useAgreement(agreementId?: string) {
         .select(
           "*, entities(common_name, jurisdiction, legal_form), governing_bodies(name, body_type)",
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", agreementId!)
         .maybeSingle();
       if (error) throw error;
@@ -154,7 +154,7 @@ function toMateriaClase(mc: string): MateriaClase {
  * Ejecuta el motor V2 y mapea el resultado a ComplianceResult V1.
  * Carga rule packs + overrides desde Supabase, ejecuta evaluarAcuerdoCompleto().
  */
-async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
+async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<ComplianceResult> {
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
   const tipoSocial = toTipoSocial(companyForm);
   const organoTipo = toTipoOrgano(a.governing_bodies?.body_type ?? null);
@@ -163,7 +163,7 @@ async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
   const { data: rpVersions } = await supabase
     .from("rule_pack_versions")
     .select("*, rule_packs!inner(materia, clase, organo_tipo)")
-    .eq("tenant_id", DEMO_TENANT)
+    .eq("tenant_id", tenantId)
     .eq("status", "ACTIVE");
 
   // Cargar overrides para la entidad
@@ -171,7 +171,7 @@ async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
     ? await supabase
         .from("rule_param_overrides")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId)
         .eq("entity_id", a.entity_id)
     : { data: [] };
 
@@ -288,9 +288,10 @@ async function evaluateV2(a: AgreementWithEntity): Promise<ComplianceResult> {
  * No aplica cambios en BD — es una vista derivada para el expediente del acuerdo.
  */
 export function useAgreementCompliance(agreementId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["agreement_compliance", agreementId ?? "none"],
-    enabled: !!agreementId,
+    queryKey: ["agreement_compliance", tenantId, agreementId ?? "none"],
+    enabled: !!agreementId && !!tenantId,
     staleTime: 60_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
       // 1. Acuerdo + entidad (V2 carga body_type adicional)
@@ -300,7 +301,7 @@ export function useAgreementCompliance(agreementId?: string) {
       const { data: agreement, error: aErr } = await supabase
         .from("agreements")
         .select(selectCols)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", agreementId!)
         .maybeSingle();
       if (aErr) throw aErr;
@@ -310,7 +311,7 @@ export function useAgreementCompliance(agreementId?: string) {
 
       // --- V2 path: motor de reglas LSC puro ---
       if (ENGINE_V2) {
-        return evaluateV2(a);
+        return evaluateV2(a, tenantId!);
       }
 
       // --- V1 path: lógica inline (legacy) ---
@@ -324,7 +325,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data } = await supabase
           .from("jurisdiction_rule_sets")
           .select("*")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("jurisdiction", jurisdiction)
           .eq("company_form", companyForm)
           .eq("is_active", true)
@@ -348,18 +349,18 @@ export function useAgreementCompliance(agreementId?: string) {
           supabase
             .from("meetings")
             .select("*")
-            .eq("tenant_id", DEMO_TENANT)
+            .eq("tenant_id", tenantId!)
             .eq("id", a.parent_meeting_id)
             .maybeSingle(),
           supabase
             .from("meeting_resolutions")
             .select("status")
-            .eq("tenant_id", DEMO_TENANT)
+            .eq("tenant_id", tenantId!)
             .eq("agreement_id", a.id),
           supabase
             .from("conflicts_of_interest")
             .select("id, status")
-            .eq("tenant_id", DEMO_TENANT)
+            .eq("tenant_id", tenantId!)
             .eq("related_meeting_id", a.parent_meeting_id),
         ]);
 
@@ -375,7 +376,7 @@ export function useAgreementCompliance(agreementId?: string) {
           const { data: convs } = await supabase
             .from("convocatorias")
             .select("fecha_emision, fecha_1, urgente, junta_universal")
-            .eq("tenant_id", DEMO_TENANT)
+            .eq("tenant_id", tenantId!)
             .eq("body_id", m.body_id)
             .eq("fecha_1", meetingDateISO)
             .order("fecha_emision", { ascending: false })
@@ -449,7 +450,7 @@ export function useAgreementCompliance(agreementId?: string) {
           .select(
             "status, requires_unanimity, votes_for, votes_against, abstentions",
           )
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("id", a.no_session_resolution_id)
           .maybeSingle();
         const n = nsr as NoSessionRow;
@@ -476,7 +477,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const { data: dec } = await supabase
           .from("unipersonal_decisions")
           .select("status")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("id", a.unipersonal_decision_id)
           .maybeSingle();
         const d = dec as UnipersonalRow;
@@ -562,15 +563,16 @@ export function useAgreementCompliance(agreementId?: string) {
  * que el firmante tiene cargo vigente antes de llamar a fn_generar_certificacion.
  */
 export function useFirmantesVigentes(entityId?: string, bodyId?: string | null) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["authority_evidence", "firmantes", entityId ?? "none", bodyId ?? "null"],
-    enabled: !!entityId,
+    queryKey: ["authority_evidence", tenantId, "firmantes", entityId ?? "none", bodyId ?? "null"],
+    enabled: !!entityId && !!tenantId,
     staleTime: 30_000,
     queryFn: async () => {
       let q = supabase
         .from("authority_evidence")
         .select("id, person_id, cargo, body_id, fecha_inicio, fecha_fin, estado, person:person_id(full_name)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("estado", "VIGENTE")
         .in("cargo", ["PRESIDENTE", "SECRETARIO", "VICEPRESIDENTE", "VICESECRETARIO", "ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "CONSEJERO_COORDINADOR"]);
@@ -604,15 +606,16 @@ export function useFirmantesVigentes(entityId?: string, bodyId?: string | null) 
 }
 
 export function useAgreementsByEntity(entityId?: string) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["agreements", "entity", entityId ?? "none"],
-    enabled: !!entityId,
+    queryKey: ["agreements", tenantId, "entity", entityId ?? "none"],
+    enabled: !!entityId && !!tenantId,
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agreements")
         .select("*, governing_bodies(name, body_type)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .order("created_at", { ascending: false });
       if (error) throw error;

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type RepresentationScope =
   | "PJ_PERMANENTE"
@@ -43,9 +42,10 @@ export function useRepresentaciones(
   entityId: string | undefined,
   scope?: RepresentationScope,
 ) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["representaciones", "vigente", entityId, scope ?? "all"],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["representaciones", tenantId, "vigente", entityId, scope ?? "all"],
     queryFn: async (): Promise<RepresentacionDetailRow[]> => {
       let q = supabase
         .from("representaciones")
@@ -54,7 +54,7 @@ export function useRepresentaciones(
           represented:represented_person_id(id, full_name, tax_id, person_type),
           representative:representative_person_id(id, full_name, tax_id, person_type)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .is("effective_to", null);
       if (scope) q = q.eq("scope", scope);

@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import { useSociedad } from "@/hooks/useSociedades";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
 
 export type ReglasSource = "LEY" | "ESTATUTOS" | "PACTO" | "REGLAMENTO";
 
@@ -51,13 +50,15 @@ interface JurisdictionRuleSetRow {
  * Los STUBS quedan listos para cuando se añadan.
  */
 export function useReglasAplicables(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   const { data: sociedad } = useSociedad(entityId);
   const { data: pactos } = usePactosVigentes(entityId);
 
   return useQuery({
-    enabled: !!entityId && !!sociedad,
+    enabled: !!entityId && !!sociedad && !!tenantId,
     queryKey: [
       "reglas_aplicables",
+      tenantId,
       entityId,
       sociedad?.jurisdiction ?? null,
       sociedad?.tipo_social ?? null,
@@ -71,7 +72,7 @@ export function useReglasAplicables(entityId: string | undefined) {
         const { data: jrs, error: jrsErr } = await supabase
           .from("jurisdiction_rule_sets")
           .select("id, jurisdiction, company_form, rule_set_version, legal_reference")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("jurisdiction", sociedad.jurisdiction)
           .eq("company_form", sociedad.tipo_social);
         if (jrsErr) throw jrsErr;
@@ -92,7 +93,7 @@ export function useReglasAplicables(entityId: string | undefined) {
       const { data: rps, error: rpsErr } = await supabase
         .from("rule_packs")
         .select("*, rule_pack_versions(id, version, version_number, is_active)")
-        .eq("tenant_id", DEMO_TENANT);
+        .eq("tenant_id", tenantId!);
       if (rpsErr) {
         // si la tabla o columnas fallan por versión de schema, caemos silenciosamente
         // (la UI mostrará lo que haya)

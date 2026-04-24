@@ -64,6 +64,12 @@ type ParticipantRow = {
   role?: string | null;
   absence_reason?: string | null;
 };
+type ResolutionRow = {
+  agenda_item_index?: number | null;
+  resolution_text?: string | null;
+  resolution_type?: string | null;
+  status?: string | null;
+};
 type MeetingWithJoins = {
   date?: string | null;
   scheduled_date?: string | null;
@@ -78,6 +84,7 @@ type MeetingWithJoins = {
   second_call_time?: string | null;
   meeting_participants?: ParticipantRow[];
   meeting_agenda?: AgendaItemRow[];
+  meeting_resolutions?: ResolutionRow[];
 };
 
 // ── Entity resolver ──────────────────────────────────────────────────────────
@@ -138,6 +145,7 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
   return {
     nombre_comision: bodyTyped.name,
     organo_nombre: bodyTyped.name,
+    organo_convocante: bodyTyped.name,   // alias used in JGA acta templates
     presidente: presidenteMandate?.persons?.name || presidenteMandate?.person_name || "—",
     secretario: secretarioMandate?.persons?.name || secretarioMandate?.person_name || "—",
     cargo_convocante: presidenteMandate?.role || "Presidente",
@@ -154,7 +162,7 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
 async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data: meeting, error } = await supabase
     .from("meetings")
-    .select("*, meeting_participants(*), meeting_agenda(*)")
+    .select("*, meeting_participants(*), meeting_agenda(*), meeting_resolutions(*)")
     .eq("id", meetingId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -169,6 +177,29 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
   const presentes = participants.filter((p) => p.attendance_status === "PRESENT" || p.attended);
   const ausentes = participants.filter((p) => p.attendance_status === "ABSENT" || !p.attended);
 
+  // Extract mesa roles from participants (fallback for JGA where no body mandate exists)
+  const presidenteP = participants.find(
+    (p) => p.role?.toLowerCase().includes("presidente") || p.role?.toLowerCase().includes("president")
+  );
+  const secretarioP = participants.find(
+    (p) => p.role?.toLowerCase().includes("secretario") || p.role?.toLowerCase().includes("secretary")
+  );
+
+  // Build ordered acuerdos from meeting_resolutions
+  const resolutions = meetingTyped.meeting_resolutions ?? [];
+  const acuerdos = resolutions
+    .sort((a, b) => (a.agenda_item_index ?? 0) - (b.agenda_item_index ?? 0))
+    .map((r, i) => ({
+      ordinal: String(i + 1),
+      titulo: `Punto ${r.agenda_item_index ?? i + 1} del orden del día`,
+      texto: r.resolution_text || "—",
+      resultado_votacion:
+        r.status === "ADOPTED" ? "Adoptado" :
+        r.status === "REJECTED" ? "Rechazado" :
+        r.status || "Pendiente",
+      tipo: r.resolution_type || "—",
+    }));
+
   const meetingDate = meetingTyped.date || meetingTyped.scheduled_date;
 
   return {
@@ -179,6 +210,9 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
     lugar_junta: meetingTyped.location || "—",
     fecha_junta: meetingDate,
     hora_junta: meetingTyped.start_time || "—",
+    // Mesa roles from participants (used when no governing_body mandate is available, e.g. JGA)
+    presidente: presidenteP?.person_name || presidenteP?.name || null,
+    secretario: secretarioP?.person_name || secretarioP?.name || null,
     miembros_presentes: presentes.map((p) => ({
       nombre: p.person_name || p.name || "—",
       cargo: p.role || "Miembro",
@@ -193,6 +227,7 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
       ordinal: `${i + 1}`,
       descripcion_punto: a.title || a.description || "—",
     })),
+    acuerdos,
     // Convocatoria specific
     fecha_convocatoria: meetingTyped.convocation_date || "—",
     medio_publicacion: meetingTyped.publication_medium || "—",
@@ -288,6 +323,99 @@ function resolveSystemVars(): Record<string, unknown> {
   };
 }
 
+// ── Cap-table resolver ───────────────────────────────────────────────────────
+
+async function resolveCapTableVars(entityId: string, tenantId: string): Promise<Record<string, unknown>> {
+  const { data: holdings, error } = await supabase
+    .from("capital_holdings")
+    .select("holder_person_id, numero_titulos, porcentaje_capital, voting_rights")
+    .eq("entity_id", entityId)
+    .eq("tenant_id", tenantId)
+    .is("effective_to", null)
+    .eq("is_treasury", false)
+    .order("porcentaje_capital", { ascending: false });
+
+  if (error || !holdings || holdings.length === 0) return {};
+
+  // Fetch persons for all holders in one round-trip
+  const personIds = [...new Set(holdings.map((h) => h.holder_person_id).filter(Boolean))];
+  const { data: persons } = await supabase
+    .from("persons")
+    .select("id, full_name, tax_id, denomination")
+    .in("id", personIds);
+
+  type PersonRow2 = { id: string; full_name?: string | null; tax_id?: string | null; denomination?: string | null };
+  const personMap: Record<string, PersonRow2> = {};
+  for (const p of (persons ?? []) as PersonRow2[]) {
+    personMap[p.id] = p;
+  }
+
+  // Fetch voting weights (parte_votante_current); graceful if empty
+  const { data: voting } = await supabase
+    .from("parte_votante_current")
+    .select("person_id, voting_weight, denominator_weight")
+    .eq("entity_id", entityId)
+    .eq("tenant_id", tenantId)
+    .eq("voting_rights", true);
+
+  const votingMap: Record<string, { weight: number; denominator: number }> = {};
+  for (const v of voting ?? []) {
+    if (v.person_id) {
+      votingMap[v.person_id] = { weight: Number(v.voting_weight), denominator: Number(v.denominator_weight) };
+    }
+  }
+
+  const lista_socios = holdings.map((h) => {
+    const person = personMap[h.holder_person_id] || {};
+    const nombre = person.full_name || person.denomination || "—";
+    const porcentaje = h.porcentaje_capital ? Number(h.porcentaje_capital) : 0;
+
+    const vv = votingMap[h.holder_person_id];
+    const porcentaje_voto =
+      vv && vv.denominator > 0
+        ? ((vv.weight / vv.denominator) * 100).toFixed(4)
+        : porcentaje.toFixed(4);
+
+    return {
+      nombre,
+      tax_id: person.tax_id || "—",
+      numero_titulos: Number(h.numero_titulos).toLocaleString("es-ES"),
+      porcentaje_capital: porcentaje.toFixed(4),
+      porcentaje_voto,
+      tiene_voto: h.voting_rights,
+    };
+  });
+
+  const porcentaje_capital_presente = lista_socios
+    .reduce((sum, s) => sum + Number(s.porcentaje_capital), 0)
+    .toFixed(2);
+
+  return {
+    lista_socios,
+    porcentaje_capital_presente,
+    total_socios: lista_socios.length,
+  };
+}
+
+// ── Fuente normalizer ────────────────────────────────────────────────────────
+
+// DB stores dotted-path fuente values like "entities.name" or "governing_bodies.id"
+// but the source map keys are uppercase category names. Normalize before lookup.
+function normalizeFuente(fuente: string): string {
+  if (fuente.startsWith("entities."))          return "ENTIDAD";
+  if (fuente.startsWith("governing_bodies."))  return "ORGANO";
+  if (fuente.startsWith("meetings."))          return "REUNION";
+  if (fuente.startsWith("agreements.") || fuente === "agreement") return "EXPEDIENTE";
+  if (
+    fuente.startsWith("capital_holdings.") ||
+    fuente.startsWith("cap_table.") ||
+    fuente.startsWith("parte_votante.") ||
+    fuente.startsWith("socios.")
+  ) return "CAP_TABLE";
+  // Already uppercase category key or unknown — pass through uppercased
+  return fuente.toUpperCase();
+}
+
 // ── Main resolver ────────────────────────────────────────────────────────────
 
 /**
@@ -306,22 +434,23 @@ export async function resolveVariables(
   const unresolved: string[] = [];
   const errors: string[] = [];
 
-  // Determine which sources we need
-  const sources = new Set(capa2.map((v) => v.fuente));
-
-  // Fetch all sources in parallel
-  const [entityVars, bodyVars, meetingVars, agreementVars] = await Promise.all([
-    sources.has("ENTIDAD") && context.entityId
+  // Fetch all sources in parallel — always fetch when IDs are present so that
+  // dotted-path fuente values (e.g. "entities.name") don't silently skip resolution.
+  const [entityVars, bodyVars, meetingVars, agreementVars, capTableVars] = await Promise.all([
+    context.entityId
       ? resolveEntityVars(context.entityId, context.tenantId)
       : Promise.resolve({}),
-    sources.has("ORGANO") && context.bodyId
+    context.bodyId
       ? resolveBodyVars(context.bodyId, context.tenantId)
       : Promise.resolve({}),
-    sources.has("REUNION") && context.meetingId
+    context.meetingId
       ? resolveMeetingVars(context.meetingId, context.tenantId)
       : Promise.resolve({}),
-    sources.has("EXPEDIENTE") && context.agreementId
+    context.agreementId
       ? resolveAgreementVars(context.agreementId, context.tenantId)
+      : Promise.resolve({}),
+    context.entityId
+      ? resolveCapTableVars(context.entityId, context.tenantId)
       : Promise.resolve({}),
   ]);
 
@@ -334,6 +463,7 @@ export async function resolveVariables(
     ORGANO: bodyVars,
     REUNION: meetingVars,
     EXPEDIENTE: agreementVars,
+    CAP_TABLE: capTableVars,
     MOTOR: motorVars,
     SISTEMA: systemVars,
     USUARIO: {}, // Filled from capa3 form — not auto-resolved
@@ -341,7 +471,7 @@ export async function resolveVariables(
 
   // Resolve each variable
   for (const v of capa2) {
-    const source = sourceMap[v.fuente] || {};
+    const source = sourceMap[normalizeFuente(v.fuente)] || {};
     const value = source[v.variable];
 
     if (value !== undefined && value !== null) {

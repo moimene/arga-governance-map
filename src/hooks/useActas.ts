@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface ActaRow {
   id: string;
@@ -38,15 +37,17 @@ export interface CertificationRow {
 }
 
 export function useActasList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["actas", "list"],
+    queryKey: ["actas", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<ActaRow[]> => {
       const { data, error } = await supabase
         .from("minutes")
         .select(
           "*, meetings(meeting_type, governing_bodies(name, entities(common_name)))",
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       type MinuteRaw = Omit<ActaRow, "meeting_type" | "body_name" | "entity_name" | "resolutions_count"> & {
@@ -93,9 +94,10 @@ export type ActaDetailRow = Omit<ActaRow, "meeting_type" | "body_name" | "entity
 };
 
 export function useActaById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["actas", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["actas", tenantId, "byId", id],
     queryFn: async () => {
       // `*` incluye body_id/entity_id (añadidos en migración
       // 20260421_000024). Los necesita EmitirCertificacionButton.
@@ -105,7 +107,7 @@ export function useActaById(id: string | undefined) {
           "*, meetings(meeting_type, scheduled_start, governing_bodies(name, entities(common_name, jurisdiction)))",
         )
         .eq("id", id!)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return data as ActaDetailRow | null;
@@ -146,14 +148,15 @@ export function useAgreementIdsForMinute(minuteId: string | undefined) {
 }
 
 export function useCertificationsByMinute(minuteId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!minuteId,
-    queryKey: ["certifications", "byMinute", minuteId],
+    enabled: !!minuteId && !!tenantId,
+    queryKey: ["certifications", tenantId, "byMinute", minuteId],
     queryFn: async (): Promise<CertificationRow[]> => {
       const { data, error } = await supabase
         .from("certifications")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("minute_id", minuteId!)
         .order("created_at", { ascending: false });
       if (error) throw error;

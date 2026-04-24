@@ -21,6 +21,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompliance";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
@@ -77,6 +78,7 @@ export default function ExpedienteAcuerdo() {
   const { data: agreement, isLoading } = useAgreement(id);
   const { data: compliance } = useAgreementCompliance(id);
   const { data: verification, isLoading: verificationLoading } = useQTSPVerification(id);
+  const { primaryRole, displayName } = useCurrentUserRole();
 
   const { data: ruleEvaluations = [] } = useQuery({
     queryKey: ["rule_evaluations", id],
@@ -329,6 +331,8 @@ export default function ExpedienteAcuerdo() {
           <ApprovalWorkflowCard
             agreementId={a.id}
             onNavigateGenerar={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+            currentUserRole={primaryRole}
+            currentUserName={displayName}
           />
 
           {/* Trust Center — Evidencias de confianza */}
@@ -824,7 +828,17 @@ function makeDefaultSteps(): ApprovalStep[] {
   ];
 }
 
-function ApprovalWorkflowCard({ agreementId, onNavigateGenerar }: { agreementId: string; onNavigateGenerar: () => void }) {
+function ApprovalWorkflowCard({
+  agreementId,
+  onNavigateGenerar,
+  currentUserRole = "SECRETARIO",
+  currentUserName,
+}: {
+  agreementId: string;
+  onNavigateGenerar: () => void;
+  currentUserRole?: string;
+  currentUserName?: string;
+}) {
   const storageKey = `approval-workflow-${agreementId}`;
 
   const [steps, setSteps] = useState<ApprovalStep[]>(() => {
@@ -845,14 +859,20 @@ function ApprovalWorkflowCard({ agreementId, onNavigateGenerar }: { agreementId:
       onNavigateGenerar();
       return;
     }
+    const step = steps[idx];
+    // Use real user name if this step matches the current user's role
+    const approverName =
+      step.role === currentUserRole && currentUserName
+        ? currentUserName
+        : DEMO_APPROVERS[step.role] ?? step.role;
     const next = steps.map((s, i) =>
       i === idx
-        ? { ...s, approvedAt: new Date().toISOString(), approvedBy: DEMO_APPROVERS[s.role] ?? s.role }
+        ? { ...s, approvedAt: new Date().toISOString(), approvedBy: approverName }
         : s
     );
     setSteps(next);
     localStorage.setItem(storageKey, JSON.stringify(next));
-  }, [steps, storageKey, onNavigateGenerar]);
+  }, [steps, storageKey, onNavigateGenerar, currentUserRole, currentUserName]);
 
   const resetWorkflow = useCallback(() => {
     const fresh = makeDefaultSteps();
@@ -935,14 +955,16 @@ function ApprovalWorkflowCard({ agreementId, onNavigateGenerar }: { agreementId:
                     </p>
                   )}
                   {isActive && (
+                    <>
+                      {currentUserName && (
+                        <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
+                          Actuando como: <span className="font-medium text-[var(--g-brand-3308)]">{currentUserName}</span>
+                        </p>
+                      )}
                     <button
                       type="button"
                       onClick={() => approveStep(i)}
-                      className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                        step.id === "QES_FIRMA"
-                          ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
-                          : "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
-                      }`}
+                      className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       {step.id === "QES_FIRMA" ? (
@@ -957,6 +979,7 @@ function ApprovalWorkflowCard({ agreementId, onNavigateGenerar }: { agreementId:
                         </>
                       )}
                     </button>
+                    </>
                   )}
                 </div>
               </div>

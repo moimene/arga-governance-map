@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface PostAcuerdoPayload {
   inscribible: boolean;
@@ -49,9 +48,10 @@ export interface RulePackData {
  *   }
  */
 export function useRulePackForMateria(materiaCla: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery<RulePackData | null, Error>({
-    enabled: !!materiaCla,
-    queryKey: ["rule_packs", "byMateria", materiaCla],
+    enabled: !!materiaCla && !!tenantId,
+    queryKey: ["rule_packs", tenantId, "byMateria", materiaCla],
     queryFn: async () => {
       if (!materiaCla) return null;
 
@@ -75,7 +75,7 @@ export function useRulePackForMateria(materiaCla: string | undefined) {
           )
         `
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("materia_clase", materiaCla)
         .eq("rule_pack_versions.is_active", true)
         .maybeSingle();

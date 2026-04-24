@@ -1,21 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 type UserRoleRow = {
   rbac_roles: { role_code: string; display_name: string; permissions: string[] } | null;
 };
 
 export function useUserRole(userId?: string) {
+  const { tenantId } = useTenantContext();
   const query = useQuery({
-    enabled: !!userId,
-    queryKey: ["rbac_user_roles", userId],
+    enabled: !!userId && !!tenantId,
+    queryKey: ["rbac_user_roles", tenantId, userId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rbac_user_roles")
         .select("*, rbac_roles!inner(role_code, display_name, permissions)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("user_id", userId!)
         .eq("is_active", true);
       if (error) throw error;

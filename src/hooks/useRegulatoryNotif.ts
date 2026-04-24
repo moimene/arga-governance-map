@@ -1,18 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export function useRegulatoryNotifications() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "regulatory-notifications"],
+    queryKey: ["grc", tenantId, "regulatory-notifications"],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("regulatory_notifications")
         .select(
           "id, authority, notification_type, notification_deadline, submitted_at, status, reference_number, incident_id, incidents:incident_id(code, title, incident_type, severity)"
         )
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("notification_deadline", { ascending: true });
       if (error) throw error;
       return data ?? [];

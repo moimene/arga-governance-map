@@ -189,7 +189,7 @@ export default function TramitadorStepper() {
           <div className="text-xs text-[var(--g-text-secondary)] px-3 py-2 bg-[var(--g-surface-muted)]"
             style={{ borderRadius: "var(--g-radius-sm)" }}
           >
-            Sin modelo disponible para esta materia. Pendiente Oleada 2 (legal).
+            No hay modelo de acuerdo disponible para esta materia en este momento.
           </div>
         ) : (
           <div className="space-y-2">

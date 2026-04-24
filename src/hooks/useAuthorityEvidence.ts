@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type CargoCertificante =
   | "ADMIN_UNICO"
@@ -53,9 +52,10 @@ export interface AuthorityEvidenceDetailRow extends AuthorityEvidenceRow {
 
 /** Authority evidence vigentes para una sociedad. */
 export function useAuthorityEvidence(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["authority_evidence", "vigente", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["authority_evidence", tenantId, "vigente", entityId],
     queryFn: async (): Promise<AuthorityEvidenceDetailRow[]> => {
       const { data, error } = await supabase
         .from("authority_evidence")
@@ -64,7 +64,7 @@ export function useAuthorityEvidence(entityId: string | undefined) {
           person:person_id(id, full_name, tax_id, person_type),
           body:body_id(id, name, body_type)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("estado", "VIGENTE")
         .order("cargo", { ascending: true });
@@ -85,10 +85,12 @@ export function useAuthorityEvidenceFor(params: {
   cargos: CargoCertificante[];
 }) {
   const { entityId, bodyId, personId, cargos } = params;
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId && !!personId && cargos.length > 0,
+    enabled: !!entityId && !!personId && cargos.length > 0 && !!tenantId,
     queryKey: [
       "authority_evidence",
+      tenantId,
       "lookup",
       entityId,
       bodyId ?? "null",
@@ -99,7 +101,7 @@ export function useAuthorityEvidenceFor(params: {
       let q = supabase
         .from("authority_evidence")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("person_id", personId!)
         .eq("estado", "VIGENTE")
@@ -121,9 +123,10 @@ export function usePresidenteVigente(
   entityId: string | undefined,
   bodyId?: string | null,
 ) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["authority_evidence", "presidente", entityId, bodyId ?? "null"],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["authority_evidence", tenantId, "presidente", entityId, bodyId ?? "null"],
     queryFn: async (): Promise<AuthorityEvidenceDetailRow | null> => {
       let q = supabase
         .from("authority_evidence")
@@ -131,7 +134,7 @@ export function usePresidenteVigente(
           *,
           person:person_id(id, full_name, tax_id, person_type)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("cargo", "PRESIDENTE")
         .eq("estado", "VIGENTE");

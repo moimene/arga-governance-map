@@ -1,7 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface EvidenceBundle {
   id: string;
@@ -17,13 +16,15 @@ export interface EvidenceBundle {
 }
 
 export function useEvidenceBundlesList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["evidence_bundles", "list"],
+    queryKey: ["evidence_bundles", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<EvidenceBundle[]> => {
       const { data, error } = await supabase
         .from("evidence_bundles")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as EvidenceBundle[];
@@ -32,10 +33,11 @@ export function useEvidenceBundlesList() {
 }
 
 export function useVerifyAuditChain() {
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("fn_verify_audit_chain", {
-        p_tenant_id: DEMO_TENANT,
+        p_tenant_id: tenantId!,
       });
       if (error) throw error;
       return data;

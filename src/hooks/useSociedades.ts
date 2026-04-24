@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface SociedadRow {
   id: string;
@@ -41,8 +40,10 @@ export interface SociedadDetailRow extends SociedadRow {
 }
 
 export function useSociedades() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["sociedades", "list"],
+    queryKey: ["sociedades", tenantId, "list"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<SociedadRow[]> => {
       // G1.2: filtrar entities con `person_id NOT NULL` — sólo las que
       // tienen su PJ canónica asociada son "sociedades" bien formadas.
@@ -50,7 +51,7 @@ export function useSociedades() {
       const { data, error } = await supabase
         .from("entities")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .not("person_id", "is", null)
         .order("common_name", { ascending: true });
       if (error) throw error;
@@ -60,9 +61,10 @@ export function useSociedades() {
 }
 
 export function useSociedad(id: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!id,
-    queryKey: ["sociedades", "byId", id],
+    enabled: !!id && !!tenantId,
+    queryKey: ["sociedades", tenantId, "byId", id],
     queryFn: async (): Promise<SociedadDetailRow | null> => {
       const { data, error } = await supabase
         .from("entities")
@@ -71,7 +73,7 @@ export function useSociedad(id: string | undefined) {
           person:person_id(id, full_name, tax_id, denomination, person_type),
           parent:parent_entity_id(id, common_name, legal_name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
@@ -81,9 +83,10 @@ export function useSociedad(id: string | undefined) {
 }
 
 export function useSociedadBySlug(slug: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!slug,
-    queryKey: ["sociedades", "bySlug", slug],
+    enabled: !!slug && !!tenantId,
+    queryKey: ["sociedades", tenantId, "bySlug", slug],
     queryFn: async (): Promise<SociedadDetailRow | null> => {
       const { data, error } = await supabase
         .from("entities")
@@ -92,7 +95,7 @@ export function useSociedadBySlug(slug: string | undefined) {
           person:person_id(id, full_name, tax_id, denomination, person_type),
           parent:parent_entity_id(id, common_name, legal_name)
         `)
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;

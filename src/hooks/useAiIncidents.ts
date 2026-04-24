@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type AiIncident = {
   id: string;
@@ -19,13 +18,15 @@ export type AiIncident = {
 };
 
 export function useAiIncidentsList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["ai_incidents", "all"],
+    queryKey: ["ai_incidents", tenantId, "all"],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*, ai_systems(name)")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .order("reported_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AiIncident[];
@@ -34,19 +35,20 @@ export function useAiIncidentsList() {
 }
 
 export function useAiIncidentsBySystem(systemId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["ai_incidents", systemId],
+    queryKey: ["ai_incidents", tenantId, systemId],
     queryFn: async () => {
       if (!systemId) return [];
       const { data, error } = await supabase
         .from("ai_incidents")
         .select("*")
-        .eq("tenant_id", DEMO_TENANT)
+        .eq("tenant_id", tenantId!)
         .eq("system_id", systemId)
         .order("reported_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AiIncident[];
     },
-    enabled: !!systemId,
+    enabled: !!systemId && !!tenantId,
   });
 }

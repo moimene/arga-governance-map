@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type ModuleStatus = {
   secretaria: {
@@ -22,8 +21,10 @@ export type ModuleStatus = {
 };
 
 export function useModuleStatus() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["module_status"],
+    queryKey: ["module_status", tenantId],
+    enabled: !!tenantId,
     queryFn: async (): Promise<ModuleStatus> => {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -44,7 +45,7 @@ export function useModuleStatus() {
         supabase
           .from("convocatorias")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("estado", "EMITIDA")
           .gte("created_at", startOfMonth),
 
@@ -53,7 +54,7 @@ export function useModuleStatus() {
         supabase
           .from("agreements")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("inscribable", true)
           .in("status", ["ADOPTED", "CERTIFIED", "INSTRUMENTED", "FILED", "REJECTED_REGISTRY"]),
 
@@ -61,7 +62,7 @@ export function useModuleStatus() {
         supabase
           .from("incidents")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .ilike("module_id", "%dora%")
           .in("status", ["OPEN", "ABIERTO", "IN_PROGRESS"]),
 
@@ -69,7 +70,7 @@ export function useModuleStatus() {
         supabase
           .from("regulatory_notifications")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .lte("deadline", h72)
           .gt("deadline", now.toISOString()),
 
@@ -77,7 +78,7 @@ export function useModuleStatus() {
         supabase
           .from("ai_systems")
           .select("id")
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .eq("risk_level", "Alto"),
 
         // AI: evaluaciones aprobadas (para filtrar sistemas ya evaluados)
@@ -90,7 +91,7 @@ export function useModuleStatus() {
         supabase
           .from("ai_incidents")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", DEMO_TENANT)
+          .eq("tenant_id", tenantId!)
           .in("status", ["ABIERTO", "EN_INVESTIGACION"]),
 
         // SII: casos abiertos
