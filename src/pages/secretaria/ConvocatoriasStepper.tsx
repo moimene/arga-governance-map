@@ -1,28 +1,23 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Globe } from "lucide-react";
 import { evaluarConvocatoria } from "@/lib/rules-engine/convocatoria-engine";
 import type { ConvocatoriaInput } from "@/lib/rules-engine/types";
-import { checkNoticePeriodByType } from "@/hooks/useJurisdiccionRules";
+import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
+import { useEntitiesList } from "@/hooks/useEntities";
 
 const STEPS = [
-  { n: 1, label: "Tipo y órgano",            hint: "Seleccionar tipo de reunión y órgano convocante" },
-  { n: 2, label: "Fecha y plazo legal",       hint: "Calcular antelación según jurisdicción y forma jurídica" },
-  { n: 3, label: "Orden del día",             hint: "Clasificar ítems en ordinaria / estatutaria / estructural" },
-  { n: 4, label: "Destinatarios",             hint: "Seleccionar miembros del órgano o socios" },
-  { n: 5, label: "Canales de publicación",    hint: "BORME / PSM / JORNAL / web corporativa" },
-  { n: 6, label: "Adjuntos",                  hint: "Documentos de referencia y propuestas" },
-  { n: 7, label: "Revisión y emisión",        hint: "Verificación de compliance y cierre" },
+  { n: 1, label: "Sociedad y órgano",         hint: "Seleccionar sociedad, jurisdicción, tipo de reunión y órgano convocante" },
+  { n: 2, label: "Fecha y plazo legal",        hint: "Calcular antelación según jurisdicción y forma jurídica" },
+  { n: 3, label: "Orden del día",              hint: "Clasificar ítems en ordinaria / estatutaria / estructural" },
+  { n: 4, label: "Destinatarios",              hint: "Seleccionar miembros del órgano o socios" },
+  { n: 5, label: "Canales de publicación",     hint: "BORME / PSM / JORNAL / web corporativa" },
+  { n: 6, label: "Adjuntos",                   hint: "Documentos de referencia y propuestas" },
+  { n: 7, label: "Revisión y emisión",         hint: "Verificación de compliance y cierre" },
 ];
 
-// Datos de formulario demo — en producción vendrían del estado del stepper
-const DEMO_FORM = {
-  meeting_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), // +10 días desde hoy
-  jurisdiction: "ES",
-  meeting_type: "ORDINARIA" as "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL",
-};
+const JURIS_FLAGS: Record<string, string> = { ES: "🇪🇸", PT: "🇵🇹", BR: "🇧🇷", MX: "🇲🇽" };
 
-// Feature flag for engine V2
 const ENGINE_V2 = true;
 
 export default function ConvocatoriasStepper() {
@@ -31,19 +26,38 @@ export default function ConvocatoriasStepper() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandExplain, setExpandExplain] = useState(false);
 
-  // V1 fallback
+  // Entity selector state
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const { data: entities = [] } = useEntitiesList();
+  const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
+  const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
+  const tipoSocial = (selectedEntity as any)?.tipo_social ?? "SA";
+
+  // Live jurisdiction rules from DB
+  const { data: ruleSets = [] } = useEntityRules(
+    selectedEntityId ? jurisdiction : undefined,
+    selectedEntityId ? tipoSocial : undefined
+  );
+  const activeRuleSet = ruleSets.find((r) => r.is_active) ?? ruleSets[0] ?? null;
+  const liveNoticeDays = activeRuleSet?.rule_config?.notice_min_days_first_call ?? null;
+
+  const meetingDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+  const meeting_type = "ORDINARIA" as const;
+
+  // V1 fallback (uses live days if available, else hardcoded map)
   const noticeOkV1 = checkNoticePeriodByType({
-    meetingDate: DEMO_FORM.meeting_date,
-    jurisdiction: DEMO_FORM.jurisdiction,
-    convocationType: DEMO_FORM.meeting_type,
+    meetingDate: meetingDate,
+    jurisdiction: jurisdiction,
+    convocationType: meeting_type,
+    tipoSocial: tipoSocial,
   });
 
-  // V2 engine evaluation (with empty packs for demo)
+  // V2 engine evaluation
   const convocatoriaInput: ConvocatoriaInput = {
-    tipoSocial: "SA",
+    tipoSocial: tipoSocial as any,
     organoTipo: "JUNTA_GENERAL",
     adoptionMode: "MEETING",
-    fechaJunta: DEMO_FORM.meeting_date,
+    fechaJunta: meetingDate,
     esCotizada: false,
     webInscrita: true,
     primeraConvocatoria: true,
@@ -259,8 +273,75 @@ export default function ConvocatoriasStepper() {
             </div>
           )}
 
-          {/* Generic placeholder for other steps */}
-          {current !== 2 && (
+          {/* Step 1: Entity / Jurisdiction selector */}
+          {current === 1 && (
+            <div className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Sociedad convocante
+                </label>
+                <select
+                  value={selectedEntityId ?? ""}
+                  onChange={(e) => setSelectedEntityId(e.target.value || null)}
+                  className="w-full rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <option value="">— Seleccionar sociedad —</option>
+                  {entities.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {JURIS_FLAGS[(e as any).jurisdiction ?? "ES"] ?? "🏢"}{" "}
+                      {e.legal_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedEntity && (
+                <div
+                  className="flex items-center gap-3 p-3 bg-[var(--g-sec-100)] border border-[var(--g-sec-300)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Globe className="h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                      {JURIS_FLAGS[jurisdiction] ?? "🏢"} {jurisdiction}
+                      {(selectedEntity as any).tipo_social && (
+                        <span className="ml-2 text-xs text-[var(--g-text-secondary)]">
+                          {(selectedEntity as any).tipo_social}
+                        </span>
+                      )}
+                    </p>
+                    {liveNoticeDays != null && (
+                      <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
+                        Preaviso mínimo (TGMS): <span className="font-semibold text-[var(--g-brand-3308)]">{liveNoticeDays} días</span>
+                        {activeRuleSet?.legal_reference && (
+                          <span className="ml-1 text-[10px]">· {activeRuleSet.legal_reference}</span>
+                        )}
+                      </p>
+                    )}
+                    {activeRuleSet?.statutory_override && (
+                      <p className="text-xs text-[var(--status-warning)] mt-0.5">
+                        ⚠ statutory_override — confirmar plazos con estatutos de la entidad
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="border-l-4 border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-4"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <p className="text-sm text-[var(--g-text-primary)]">
+                  Selecciona la sociedad para cargar las reglas jurisdiccionales aplicables.
+                  El motor validará plazos, quórum y canales de publicación según la jurisdicción.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Generic placeholder for steps 3-7 */}
+          {current !== 1 && current !== 2 && (
             <div
               className="mt-6 border-l-4 border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-4"
               style={{ borderRadius: "var(--g-radius-md)" }}

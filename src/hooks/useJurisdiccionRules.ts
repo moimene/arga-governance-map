@@ -7,21 +7,34 @@ export interface JurisdictionRuleSet {
   tenant_id: string;
   jurisdiction: string;
   company_form: string;
-  body_type: string | null;
+  typology_code: string;
   rule_set_version: string;
-  effective_from: string;
-  effective_to: string | null;
+  legal_reference: string | null;
+  name: string | null;
+  pack_id: string | null;
+  statutory_override: boolean;
+  is_active: boolean;
   rule_config: {
+    version?: string;
+    notice_min_days_first_call?: number;
+    notice_min_days_second_call?: number | null;
+    second_call_gap_min_hours?: number | null;
+    publication_channels?: string[];
+    quorum?: { first_call_pct: number; second_call_pct: number | null; art194_applies?: boolean };
+    majority?: Record<string, string | number | null>;
+    allows_universal?: boolean;
+    allows_written_resolution?: { enabled: boolean; requires_unanimity: boolean; scope: string[] };
+    registry_submission?: { requires_notarial: boolean | string; deadline_days_from_deed: number };
+    books?: { legalization_deadline_days_after_year_end: number; legalization_channel: string };
+    statutory_note?: string;
+    // Legacy V1 compat
     notice_periods_days?: Record<string, number>;
     quorum_rules?: Record<string, number>;
     majority_rules?: Record<string, number | string>;
     second_call?: { enabled: boolean; min_interval_hours?: number; reinforced?: boolean };
     inscribable_matters?: string[];
-    publication_channels?: string[];
     registry_filing_types?: Record<string, string>;
-  };
-  legal_reference: string | null;
-  created_at: string;
+  } | null;
 }
 
 export interface QuorumStatusResult {
