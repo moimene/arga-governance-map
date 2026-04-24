@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
   { label: "Decisiones unipersonales", to: "/secretaria/decisiones-unipersonales", icon: Building2 },
   { label: "Acuerdos sin sesión",      to: "/secretaria/acuerdos-sin-sesion",      icon: ScrollText },
   { label: "Tramitador registral",     to: "/secretaria/tramitador",               icon: Gavel },
+  { label: "Libro de socios",          to: "/secretaria/libro-socios",             icon: BookOpen },
   { label: "Libros obligatorios",      to: "/secretaria/libros",                   icon: Library },
   { label: "Plantillas",               to: "/secretaria/plantillas",               icon: FileText },
   { label: "Gestor plantillas",        to: "/secretaria/gestor-plantillas",        icon: Layers },

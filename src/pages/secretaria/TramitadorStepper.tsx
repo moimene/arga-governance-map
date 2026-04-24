@@ -67,6 +67,10 @@ export default function TramitadorStepper() {
   const [filingStatus, setFilingStatus] = useState<string>("DRAFT");
   const [deedSaved, setDeedSaved] = useState(false);
   const [deedSaving, setDeedSaving] = useState(false);
+  const [subsanacionMotivo, setSubsanacionMotivo] = useState("");
+  const [subsanacionDocs, setSubsanacionDocs] = useState("");
+  const [subsanacionSaving, setSubsanacionSaving] = useState(false);
+  const [subsanacionDone, setSubsanacionDone] = useState(false);
 
   const isDeedRequired = rulePackData?.payload.instrumentoRequerido === "ESCRITURA";
   const filingType = (() => {
@@ -106,6 +110,9 @@ export default function TramitadorStepper() {
     setFilingChannel("");
     setFilingStatus("DRAFT");
     setDeedSaved(false);
+    setSubsanacionMotivo("");
+    setSubsanacionDocs("");
+    setSubsanacionDone(false);
   };
 
   async function handleRegisterDeed() {
@@ -181,6 +188,30 @@ export default function TramitadorStepper() {
       toast.error(`No se pudo registrar la escritura: ${message}`);
     } finally {
       setDeedSaving(false);
+    }
+  }
+
+  async function handleSubsanacionSubmit() {
+    if (!selectedAgreementId || !tenantId) {
+      toast.error("No se puede enviar la subsanación sin acuerdo y tenant activos.");
+      return;
+    }
+    setSubsanacionSaving(true);
+    try {
+      const { error } = await supabase
+        .from("registry_filings")
+        .update({ status: "SUBMITTED" })
+        .eq("agreement_id", selectedAgreementId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      setFilingStatus("SUBMITTED");
+      setSubsanacionDone(true);
+      await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
+      toast.error("No se pudo enviar la respuesta de subsanación", { description });
+    } finally {
+      setSubsanacionSaving(false);
     }
   }
 
@@ -578,6 +609,70 @@ export default function TramitadorStepper() {
           </div>
         </div>
       </div>
+
+      {filingStatus === "SUBSANACION" && (
+        <div className="space-y-3 border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          {subsanacionDone ? (
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-success)]" />
+              <div>
+                <p className="text-sm font-semibold text-[var(--g-text-primary)]">Subsanación enviada</p>
+                <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+                  La respuesta ha sido registrada. El trámite vuelve a estado SUBMITTED.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--status-warning)]">
+                <AlertTriangle className="h-4 w-4" />
+                Subsanación requerida por el Registro
+              </div>
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                El Registro ha solicitado subsanación. Indique el motivo de la respuesta y los documentos adjuntos.
+              </p>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Motivo de la subsanación
+                </label>
+                <textarea
+                  rows={3}
+                  value={subsanacionMotivo}
+                  onChange={(e) => setSubsanacionMotivo(e.target.value)}
+                  placeholder="Describa la corrección realizada…"
+                  className="w-full resize-none rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Documentos adjuntos (referencia)
+                </label>
+                <input
+                  type="text"
+                  value={subsanacionDocs}
+                  onChange={(e) => setSubsanacionDocs(e.target.value)}
+                  placeholder="Ej: Escritura corregida, certificado notarial…"
+                  className="w-full rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSubsanacionSubmit}
+                disabled={!subsanacionMotivo.trim() || subsanacionSaving}
+                className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {subsanacionSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {subsanacionSaving ? "Enviando…" : "Enviar respuesta de subsanación"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div
         className="px-4 py-3 text-xs text-[var(--g-text-secondary)]"

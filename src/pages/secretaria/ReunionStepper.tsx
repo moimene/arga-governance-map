@@ -1,16 +1,20 @@
-import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldAlert } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useTenantContext } from "@/context/TenantContext";
+import { useActiveConflicts } from "@/hooks/useConflicts";
+import { supabase } from "@/integrations/supabase/client";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
-import { evaluarMayoria, validarCapitalUniversal } from "@/lib/rules-engine";
+import { evaluarMayoria } from "@/lib/rules-engine";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
 
 type VoteValue = "FAVOR" | "CONTRA" | "ABSTENCION" | "";
-type MeetingType = "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL";
 
 interface VoterRow {
   id: string;
+  person_id: string | null;
   name: string;
   vote: VoteValue;
   conflict_flag: boolean;
@@ -18,19 +22,128 @@ interface VoterRow {
 }
 
 const DEMO_VOTERS: VoterRow[] = [
-  { id: "v1", name: "Carlos Ruiz (Presidente)", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v2", name: "Lucía Martín (Secretaria)", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v3", name: "Ana García", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v4", name: "Pedro López", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v5", name: "Isabel Sánchez", vote: "", conflict_flag: false, conflict_reason: "" },
+  { id: "v1", person_id: null, name: "Carlos Ruiz (Presidente)", vote: "", conflict_flag: false, conflict_reason: "" },
+  { id: "v2", person_id: null, name: "Lucía Martín (Secretaria)", vote: "", conflict_flag: false, conflict_reason: "" },
+  { id: "v3", person_id: null, name: "Ana García", vote: "", conflict_flag: false, conflict_reason: "" },
+  { id: "v4", person_id: null, name: "Pedro López", vote: "", conflict_flag: false, conflict_reason: "" },
+  { id: "v5", person_id: null, name: "Isabel Sánchez", vote: "", conflict_flag: false, conflict_reason: "" },
 ];
+
+interface MeetingVoterRow {
+  id: string;
+  person_id: string | null;
+  role: string | null;
+  present: boolean | null;
+  person_name: string | null;
+}
+
+interface MeetingVotacionContext {
+  entityId: string | null;
+  voters: MeetingVoterRow[];
+}
+
+function formatMeetingVoterName(voter: MeetingVoterRow) {
+  const name = voter.person_name?.trim() || "Miembro sin identificar";
+  return voter.role ? `${name} (${voter.role})` : name;
+}
 
 // ── Paso 5: Votaciones ───────────────────────────────────────────────────────
 
 const ENGINE_V2 = true; // V2 motor de reglas activo (T20 — switch definitivo)
 
-function VotacionesStep() {
+function VotacionesStep({ meetingId }: { meetingId?: string }) {
+  const { tenantId } = useTenantContext();
+  const { data: meetingContext } = useQuery({
+    enabled: !!meetingId && !!tenantId,
+    queryKey: ["secretaria", tenantId, "meetings", meetingId, "votaciones"],
+    staleTime: 60_000,
+    queryFn: async (): Promise<MeetingVotacionContext> => {
+      const [meetingRes, attendeesRes] = await Promise.all([
+        supabase
+          .from("meetings")
+          .select("governing_bodies(entity_id)")
+          .eq("tenant_id", tenantId!)
+          .eq("id", meetingId!)
+          .maybeSingle(),
+        supabase
+          .from("meeting_attendees")
+          .select("id, person_id, role, present, person:person_id(full_name)")
+          .eq("tenant_id", tenantId!)
+          .eq("meeting_id", meetingId!)
+          .order("role", { ascending: true }),
+      ]);
+
+      if (meetingRes.error) throw meetingRes.error;
+      if (attendeesRes.error) throw attendeesRes.error;
+
+      type MeetingRaw = { governing_bodies?: { entity_id?: string | null } | null } | null;
+      type AttendeeRaw = {
+        id: string;
+        person_id: string | null;
+        role: string | null;
+        present: boolean | null;
+        person?: { full_name?: string | null } | null;
+      };
+
+      const voters = ((attendeesRes.data ?? []) as AttendeeRaw[]).map((attendee) => ({
+        id: attendee.id,
+        person_id: attendee.person_id,
+        role: attendee.role ?? null,
+        present: attendee.present ?? null,
+        person_name: attendee.person?.full_name ?? null,
+      }));
+      const presentVoters = voters.filter((voter) => voter.present !== false);
+
+      return {
+        entityId: ((meetingRes.data as MeetingRaw)?.governing_bodies?.entity_id ?? null),
+        voters: presentVoters.length > 0 ? presentVoters : voters,
+      };
+    },
+  });
+  const activeConflictScope = meetingId ? (meetingContext?.entityId ?? null) : undefined;
+  const { data: activeConflicts = [], isLoading: activeConflictsLoading } = useActiveConflicts(activeConflictScope);
   const [voters, setVoters] = useState<VoterRow[]>(DEMO_VOTERS);
+  const activeConflictPersonIds = useMemo(
+    () =>
+      new Set(
+        activeConflicts
+          .map((conflict) => conflict.person_id)
+          .filter((personId): personId is string => Boolean(personId)),
+      ),
+    [activeConflicts],
+  );
+
+  useEffect(() => {
+    const nextVoters =
+      meetingContext && meetingContext.voters.length > 0
+        ? meetingContext.voters.map((voter) => ({
+            id: voter.id,
+            person_id: voter.person_id,
+            name: formatMeetingVoterName(voter),
+            vote: "" as VoteValue,
+            conflict_flag: false,
+            conflict_reason: "",
+          }))
+        : DEMO_VOTERS;
+
+    setVoters((prev) =>
+      nextVoters.map((nextVoter) => {
+        const existing = prev.find(
+          (currentVoter) =>
+            currentVoter.id === nextVoter.id ||
+            (nextVoter.person_id !== null && currentVoter.person_id === nextVoter.person_id),
+        );
+        return existing
+          ? {
+              ...nextVoter,
+              vote: existing.vote,
+              conflict_flag: existing.conflict_flag,
+              conflict_reason: existing.conflict_reason,
+            }
+          : nextVoter;
+      }),
+    );
+  }, [meetingContext]);
 
   function update(id: string, patch: Partial<VoterRow>) {
     setVoters((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)));
@@ -68,14 +181,24 @@ function VotacionesStep() {
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {voters.map((v) => {
+              const hasActiveConflict =
+                !activeConflictsLoading && v.person_id ? activeConflictPersonIds.has(v.person_id) : false;
               const needsReason = v.vote === "ABSTENCION" || v.conflict_flag;
               return (
                 <tr key={v.id} className="transition-colors hover:bg-[var(--g-surface-subtle)]/30">
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[var(--g-text-primary)]">
-                        {v.name}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-[var(--g-text-primary)]">
+                          {v.name}
+                        </span>
+                        {hasActiveConflict && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--status-warning)]">
+                            <AlertTriangle className="h-3 w-3" />
+                            Conflicto de interés activo — abstención recomendada
+                          </span>
+                        )}
+                      </div>
                       {v.conflict_flag && (
                         <span
                           className="inline-flex w-fit items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--status-warning)]"
@@ -343,172 +466,27 @@ function CierreStep() {
   );
 }
 
-// ── Paso 1: Constitución ─────────────────────────────────────────────────────
+// ── Steps ────────────────────────────────────────────────────────────────────
 
-interface ConstitucionStepProps {
-  tipoReunion: MeetingType;
-  setTipoReunion: (value: MeetingType) => void;
-  capitalPresente: number;
-  setCapitalPresente: (value: number) => void;
-}
-
-function ConstitucionStep({
-  tipoReunion,
-  setTipoReunion,
-  capitalPresente,
-  setCapitalPresente,
-}: ConstitucionStepProps) {
-  const universalCheck =
-    tipoReunion === "UNIVERSAL" ? validarCapitalUniversal(capitalPresente, 100) : null;
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-[var(--g-text-secondary)]">
-        Selecciona el tipo de reunión y verifica la presencia del capital requerido para la válida
-        constitución.
-      </p>
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--g-text-primary)]">Tipo de reunión</label>
-        <select
-          value={tipoReunion}
-          onChange={(e) => setTipoReunion(e.target.value as MeetingType)}
-          className="rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <option value="ORDINARIA">Junta General Ordinaria</option>
-          <option value="EXTRAORDINARIA">Junta General Extraordinaria</option>
-          <option value="UNIVERSAL">Junta Universal (art. 178 LSC)</option>
-        </select>
-      </div>
-
-      {tipoReunion === "UNIVERSAL" && (
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--g-text-primary)]">
-              Capital presente y representado (% del total)
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={capitalPresente}
-                onChange={(e) => setCapitalPresente(Number(e.target.value))}
-                className="flex-1 accent-[var(--g-brand-3308)]"
-              />
-              <span className="w-12 text-right text-sm font-mono text-[var(--g-text-primary)]">
-                {capitalPresente}%
-              </span>
-            </div>
-          </div>
-
-          {universalCheck && (
-            <div
-              className={`flex items-start gap-3 border p-4 ${
-                universalCheck.ok
-                  ? "border-[var(--status-success)] bg-[var(--g-sec-100)]"
-                  : "border-[var(--status-error)] bg-[var(--status-error)]/5"
-              }`}
-              style={{ borderRadius: "var(--g-radius-lg)" }}
-            >
-              {universalCheck.ok ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-success)]" />
-              ) : (
-                <ShieldAlert className="h-5 w-5 shrink-0 text-[var(--status-error)]" />
-              )}
-              <div>
-                <p
-                  className={`text-sm font-semibold ${
-                    universalCheck.ok
-                      ? "text-[var(--g-brand-3308)]"
-                      : "text-[var(--status-error)]"
-                  }`}
-                >
-                  {universalCheck.ok
-                    ? "Junta Universal válida"
-                    : "Capital insuficiente — Gate BLOQUEANTE"}
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-                  {universalCheck.mensaje}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tipoReunion !== "UNIVERSAL" && (
-        <div
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-xs text-[var(--g-text-secondary)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          Reunión {tipoReunion.toLowerCase()}. No se requiere 100% del capital para constituirse.
-          Aplica quórum estándar LSC según primera/segunda convocatoria.
-        </div>
-      )}
-    </div>
-  );
+function buildSteps(meetingId?: string): StepDef[] {
+  return [
+    { n: 1, label: "Constitución", hint: "Verificación de convocatoria previa y validación de presidencia/secretaría" },
+    { n: 2, label: "Asistentes", hint: "Registro de presentes, representados y ausentes — cálculo de capital representado" },
+    { n: 3, label: "Quórum", hint: "Evaluación automática contra regla jurisdiccional aplicable" },
+    { n: 4, label: "Debates", hint: "Puntos del orden del día discutidos y anotaciones del secretario" },
+    { n: 5, label: "Votaciones", hint: "Por cada propuesta aprobada se genera un agreement en estado ADOPTED", body: <VotacionesStep meetingId={meetingId} /> },
+    { n: 6, label: "Cierre", hint: "Revisión de acuerdos adoptados y generación del acta en borrador", body: <CierreStep /> },
+  ];
 }
 
 export default function ReunionStepper() {
-  const [tipoReunion, setTipoReunion] = useState<MeetingType>("ORDINARIA");
-  const [capitalPresente, setCapitalPresente] = useState(75);
-  const universalCheck =
-    tipoReunion === "UNIVERSAL" ? validarCapitalUniversal(capitalPresente, 100) : null;
-  const universalGateBlocked =
-    tipoReunion === "UNIVERSAL" && universalCheck !== null && !universalCheck.ok;
-
-  const steps: StepDef[] = [
-    {
-      n: 1,
-      label: "Constitución",
-      hint: "Verificación de convocatoria previa y validación de presidencia/secretaría",
-      body: (
-        <ConstitucionStep
-          tipoReunion={tipoReunion}
-          setTipoReunion={setTipoReunion}
-          capitalPresente={capitalPresente}
-          setCapitalPresente={setCapitalPresente}
-        />
-      ),
-      canAdvance: !universalGateBlocked,
-    },
-    {
-      n: 2,
-      label: "Asistentes",
-      hint: "Registro de presentes, representados y ausentes — cálculo de capital representado",
-    },
-    {
-      n: 3,
-      label: "Quórum",
-      hint: "Evaluación automática contra regla jurisdiccional aplicable",
-    },
-    {
-      n: 4,
-      label: "Debates",
-      hint: "Puntos del orden del día discutidos y anotaciones del secretario",
-    },
-    {
-      n: 5,
-      label: "Votaciones",
-      hint: "Por cada propuesta aprobada se genera un agreement en estado ADOPTED",
-      body: <VotacionesStep />,
-    },
-    {
-      n: 6,
-      label: "Cierre",
-      hint: "Revisión de acuerdos adoptados y generación del acta en borrador",
-      body: <CierreStep />,
-    },
-  ];
-
+  const { id } = useParams();
   return (
     <StepperShell
       eyebrow="Secretaría · Reunión"
       title="Asistente de sesión societaria"
       backTo="/secretaria/reuniones"
-      steps={steps}
+      steps={buildSteps(id)}
       placeholderNote="Formulario del paso pendiente. En el demo se usa la reunión cda-22-04-2026 ya sembrada."
     />
   );
