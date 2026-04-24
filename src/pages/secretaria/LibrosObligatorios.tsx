@@ -1,5 +1,6 @@
 import { Library, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { useLibrosList } from "@/hooks/useLibros";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const LEG_STATUS_TONE: Record<string, string> = {
   PENDIENTE:  "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
@@ -97,7 +98,7 @@ export default function LibrosObligatorios() {
                         }`}
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
-                        {b.legalization_status}
+                        {statusLabel(b.legalization_status)}
                       </span>
                     </td>
                   </tr>

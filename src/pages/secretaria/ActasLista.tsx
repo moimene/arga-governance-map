@@ -86,9 +86,17 @@ export default function ActasLista() {
                     {a.signed_at ? new Date(a.signed_at).toLocaleDateString("es-ES") : "—"}
                   </td>
                   <td className="px-6 py-4">
-                    {a.is_locked ? (
+                    {a.signed_at && a.is_locked ? (
                       <span
                         className="inline-flex items-center gap-1 bg-[var(--status-success)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        <Lock className="h-3 w-3" />
+                        Firmada y cerrada
+                      </span>
+                    ) : a.signed_at ? (
+                      <span
+                        className="inline-flex items-center gap-1 bg-[var(--status-info)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
                         <Lock className="h-3 w-3" />
@@ -96,7 +104,7 @@ export default function ActasLista() {
                       </span>
                     ) : (
                       <span
-                        className="inline-flex items-center gap-1 bg-[var(--status-warning)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                        className="inline-flex items-center gap-1 bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
                         <Unlock className="h-3 w-3" />

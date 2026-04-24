@@ -14,15 +14,15 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 function registryRef(f: FilingRow): string {
-  return (
-    f.borme_ref ??
-    f.psm_ref ??
-    f.siger_ref ??
-    f.conservatoria_ref ??
-    f.jucerja_ref ??
-    f.diario_oficial_ref ??
-    "—"
-  );
+  const refs = [
+    f.borme_ref && `BORME: ${f.borme_ref}`,
+    f.psm_ref && `PSM: ${f.psm_ref}`,
+    f.siger_ref && `SIGER: ${f.siger_ref}`,
+    f.conservatoria_ref && `CONSERV.: ${f.conservatoria_ref}`,
+    f.jucerja_ref && `JUCERJA: ${f.jucerja_ref}`,
+    f.diario_oficial_ref && `D.O.: ${f.diario_oficial_ref}`,
+  ].filter(Boolean);
+  return refs.length > 0 ? refs.join(" · ") : "—";
 }
 
 export default function TramitadorLista() {

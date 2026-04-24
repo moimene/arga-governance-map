@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScrollText, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 
@@ -21,7 +22,16 @@ export default function AcuerdosSinSesion() {
 
   // Auto-close expired VOTING_OPEN processes on page load (G6)
   useEffect(() => {
-    closeExpired.mutate();
+    closeExpired.mutate(undefined, {
+      onSuccess: (count) => {
+        if (count && count > 0) {
+          toast.info(
+            `${count} proceso${count > 1 ? "s" : ""} cerrado${count > 1 ? "s" : ""} por vencimiento del plazo.`,
+            { duration: 5000 }
+          );
+        }
+      },
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -74,6 +74,7 @@ export default function GenerarDocumentoStepper() {
   const [archiveUrl, setArchiveUrl] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
+  const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
 
   const { signMutation } = useQTSPSign();
 
@@ -496,8 +497,23 @@ export default function GenerarDocumentoStepper() {
             <Capa3Form
               fields={(selectedPlantilla.capa3_editables ?? [])}
               values={capa3Values}
-              onChange={setCapa3Values}
+              onChange={(vals) => { setCapa3Values(vals); setCapa3Errors({}); }}
             />
+
+            {Object.keys(capa3Errors).length > 0 && (
+              <div
+                className="flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--status-error)]"
+                role="alert"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="space-y-0.5">
+                  {Object.values(capa3Errors).map((msg, i) => (
+                    <p key={i}>{msg}</p>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-between pt-2">
               <button
@@ -511,7 +527,15 @@ export default function GenerarDocumentoStepper() {
               </button>
               <button
                 type="button"
-                onClick={handleRenderPreview}
+                onClick={() => {
+                  const errors = validateCapa3(selectedPlantilla.capa3_editables ?? [], capa3Values);
+                  if (Object.keys(errors).length > 0) {
+                    setCapa3Errors(errors);
+                    return;
+                  }
+                  setCapa3Errors({});
+                  handleRenderPreview();
+                }}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >

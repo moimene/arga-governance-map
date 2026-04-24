@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FileSignature, Shield, Stamp } from "lucide-react";
+import { ArrowLeft, FileSignature, Shield, Stamp, Lock, Unlock } from "lucide-react";
 import {
   useActaById,
   useCertificationsByMinute,
@@ -138,10 +138,37 @@ export default function ActaDetalle() {
               <Shield className="h-4 w-4 text-[var(--g-brand-3308)]" />
               <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Firma y registro</h2>
             </div>
-            <div className="space-y-2 p-5 text-sm">
+            <div className="space-y-3 p-5 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[var(--g-text-secondary)]">Estado</span>
+                {m.signed_at && m.is_locked ? (
+                  <span
+                    className="inline-flex items-center gap-1 bg-[var(--status-success)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    <Lock className="h-3 w-3" />
+                    Firmada y cerrada
+                  </span>
+                ) : m.signed_at ? (
+                  <span
+                    className="inline-flex items-center gap-1 bg-[var(--status-info)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    <Lock className="h-3 w-3" />
+                    Firmada
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    <Unlock className="h-3 w-3" />
+                    Borrador
+                  </span>
+                )}
+              </div>
               <KV label="Firmada" value={m.signed_at ? new Date(m.signed_at).toLocaleString("es-ES") : "—"} />
               <KV label="Registrada" value={m.registered_at ? new Date(m.registered_at).toLocaleString("es-ES") : "—"} />
-              <KV label="Bloqueada" value={m.is_locked ? "Sí" : "No"} />
               <KV label="Creada" value={new Date(m.created_at).toLocaleString("es-ES")} />
             </div>
           </div>

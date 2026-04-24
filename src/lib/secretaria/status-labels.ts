@@ -30,6 +30,11 @@ export const STATUS_LABEL: Record<string, string> = {
   ENVIADA:      "Enviada",
   CONFIRMADA:   "Confirmada",
 
+  // Libros obligatorios — legalización
+  PENDIENTE:    "Pendiente",
+  PRESENTADO:   "Presentado",
+  LEGALIZADO:   "Legalizado",
+
   // Decisiones unipersonales
   FIRMADA:      "Firmada",
 

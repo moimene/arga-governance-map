@@ -1,4 +1,4 @@
-import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, Play, type LucideIcon } from "lucide-react";
+import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, Play, FolderOpen, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -166,10 +166,26 @@ export default function Plantillas() {
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                    {activeTab === 'modelos'
-                      ? 'No hay modelos de acuerdo. Pendiente entrega equipo legal (30/04/2026).'
-                      : 'Sin plantillas protegidas.'}
+                  <td colSpan={6}>
+                    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                      <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
+                      <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                        {activeTab === 'modelos' && filterMateria
+                          ? `Sin modelos para la materia "${filterMateria.replace(/_/g, ' ')}".`
+                          : activeTab === 'modelos'
+                          ? 'No hay modelos de acuerdo disponibles.'
+                          : 'Sin plantillas protegidas.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/secretaria/plantillas/gestor')}
+                        className="mt-4 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                        style={{ borderRadius: 'var(--g-radius-md)' }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Crear nueva plantilla
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (

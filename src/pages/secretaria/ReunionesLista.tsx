@@ -6,7 +6,7 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 
 const STATUS_TONE: Record<string, string> = {
   PROGRAMADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-  EN_CURSO:   "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+  EN_CURSO:   "bg-[var(--status-error)] text-[var(--g-text-inverse)] animate-pulse",
   CELEBRADA:  "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   CANCELADA:  "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   BORRADOR:   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
