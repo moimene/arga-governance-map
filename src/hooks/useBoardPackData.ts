@@ -132,8 +132,8 @@ export function useBoardPackData(meetingId: string): {
     queries: [
       // Q1: Meeting + body + president + secretary
       {
-        queryKey: ["board-pack", "meeting", meetingId],
-        enabled: !!meetingId,
+        queryKey: ["board-pack", "meeting", tenantId, meetingId],
+        enabled: !!meetingId && !!tenantId,
         queryFn: async () => {
           const { data, error } = await supabase
             .from("meetings")
@@ -166,8 +166,8 @@ export function useBoardPackData(meetingId: string): {
       },
       // Q3: Acuerdos vinculados a esta reunión
       {
-        queryKey: ["board-pack", "agreements", meetingId],
-        enabled: !!meetingId,
+        queryKey: ["board-pack", "agreements", tenantId, meetingId],
+        enabled: !!meetingId && !!tenantId,
         queryFn: async () => {
           const { data, error } = await supabase
             .from("agreements")
@@ -196,6 +196,7 @@ export function useBoardPackData(meetingId: string): {
       // Q4: Top 5 riesgos por inherent_score DESC
       {
         queryKey: ["board-pack", "risks", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const { data, error } = await supabase
             .from("risks")
@@ -210,6 +211,7 @@ export function useBoardPackData(meetingId: string): {
       // Q5: Obligaciones + conteo incidentes y controles
       {
         queryKey: ["board-pack", "obligations", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const [oblRes, incRes, ctrlRes] = await Promise.all([
             supabase
@@ -242,6 +244,7 @@ export function useBoardPackData(meetingId: string): {
       // Q6: Hallazgos abiertos + planes de acción
       {
         queryKey: ["board-pack", "findings", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const { data: findings, error } = await supabase
             .from("findings")
@@ -265,6 +268,7 @@ export function useBoardPackData(meetingId: string): {
       // Q7: Attestations — campaña más reciente
       {
         queryKey: ["board-pack", "attestations", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const { data, error } = await supabase
             .from("attestations")
@@ -278,6 +282,7 @@ export function useBoardPackData(meetingId: string): {
       // Q8: Delegaciones vigentes ordenadas por vencimiento
       {
         queryKey: ["board-pack", "delegations", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const { data, error } = await supabase
             .from("delegations")
@@ -313,6 +318,7 @@ export function useBoardPackData(meetingId: string): {
       // Q9: Sistemas IA Alto Riesgo + compliance checks
       {
         queryKey: ["board-pack", "ai-systems", tenantId],
+        enabled: !!tenantId,
         queryFn: async () => {
           const { data: systems, error } = await supabase
             .from("ai_systems")

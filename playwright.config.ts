@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -8,7 +10,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     actionTimeout: 15_000,
@@ -28,10 +30,14 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
-  webServer: {
-    command: 'npx vite --port 5173',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  ...(process.env.PLAYWRIGHT_BASE_URL
+    ? {}
+    : {
+        webServer: {
+          command: 'npx vite --port 5173',
+          url: baseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 60_000,
+        },
+      }),
 });

@@ -17,7 +17,7 @@ export interface CapitalMovementRow {
   created_at: string;
   persons?: { full_name: string | null; tax_id: string | null } | null;
   agreements?: { agreement_kind: string | null } | null;
-  share_classes?: { class_name: string | null } | null;
+  share_classes?: { name: string | null } | null;
 }
 
 export function useCapitalMovements(entityId?: string) {
@@ -30,7 +30,7 @@ export function useCapitalMovements(entityId?: string) {
       let q = supabase
         .from("capital_movements")
         .select(
-          `*, persons(full_name, tax_id), agreements(agreement_kind), share_classes(class_name)`
+          `*, persons(full_name, tax_id), agreements(agreement_kind), share_classes(name)`
         )
         .eq("tenant_id", tenantId!)
         .order("effective_date", { ascending: false });
