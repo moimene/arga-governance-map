@@ -29,6 +29,16 @@ dist-ssr
 # Claude Code
 .claude/
 
+# Codex/Ruflo local orchestration
+.codex/
+.swarm/
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+
+# Environment variables
+.env
+
 # Working docs (no committable)
 docs/BORRADORES\ INTERMEDIOS/
 Plantillas_Oleada1_Revision_Legal.docx

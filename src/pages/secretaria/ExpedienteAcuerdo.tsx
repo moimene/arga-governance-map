@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   FileCheck2,
@@ -9,6 +9,7 @@ import {
   Circle,
   Scale,
   FileSignature,
+  FileText,
   Building2,
   Gavel,
   Megaphone,
@@ -147,15 +148,29 @@ export default function ExpedienteAcuerdo() {
         </p>
         {/* Generar documento — visible when ADOPTED or later */}
         {statusIndex >= TIMELINE.indexOf("ADOPTED") && (
-          <button
-            type="button"
-            onClick={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
-            className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <FileSignature className="h-4 w-4" />
-            Generar documento
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <FileSignature className="h-4 w-4" />
+              Generar documento
+            </button>
+            {a.document_url && (
+              <a
+                href={a.document_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                Ver documento archivado
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -334,6 +349,7 @@ export default function ExpedienteAcuerdo() {
             onNavigateGenerar={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
             currentUserRole={primaryRole}
             currentUserName={displayName}
+            initialWorkflow={a.approval_workflow as ApprovalStep[] | null}
           />
 
           {/* Trust Center — Evidencias de confianza */}
@@ -843,34 +859,41 @@ function ApprovalWorkflowCard({
   onNavigateGenerar,
   currentUserRole = "SECRETARIO",
   currentUserName,
+  initialWorkflow,
 }: {
   agreementId: string;
   onNavigateGenerar: () => void;
   currentUserRole?: string;
   currentUserName?: string;
+  initialWorkflow?: ApprovalStep[] | null;
 }) {
-  const storageKey = `approval-workflow-${agreementId}`;
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
 
-  const [steps, setSteps] = useState<ApprovalStep[]>(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      return stored ? JSON.parse(stored) : makeDefaultSteps();
-    } catch {
-      return makeDefaultSteps();
-    }
-  });
+  const [steps, setSteps] = useState<ApprovalStep[]>(
+    () => (Array.isArray(initialWorkflow) && initialWorkflow.length > 0
+      ? initialWorkflow
+      : makeDefaultSteps())
+  );
 
   const currentIdx = steps.findIndex((s) => s.approvedAt === null);
   const allApproved = currentIdx === -1;
 
+  const saveWorkflow = useCallback(async (next: ApprovalStep[] | null) => {
+    await supabase
+      .from("agreements")
+      .update({ approval_workflow: next })
+      .eq("id", agreementId)
+      .eq("tenant_id", tenantId!);
+    qc.invalidateQueries({ queryKey: ["agreement", tenantId, agreementId] });
+  }, [agreementId, tenantId, qc]);
+
   const approveStep = useCallback((idx: number) => {
     if (idx === steps.length - 1) {
-      // QES step — navigate to document generator
       onNavigateGenerar();
       return;
     }
     const step = steps[idx];
-    // Use real user name if this step matches the current user's role
     const approverName =
       step.role === currentUserRole && currentUserName
         ? currentUserName
@@ -881,14 +904,14 @@ function ApprovalWorkflowCard({
         : s
     );
     setSteps(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
-  }, [steps, storageKey, onNavigateGenerar, currentUserRole, currentUserName]);
+    saveWorkflow(next);
+  }, [steps, onNavigateGenerar, currentUserRole, currentUserName, saveWorkflow]);
 
   const resetWorkflow = useCallback(() => {
     const fresh = makeDefaultSteps();
     setSteps(fresh);
-    localStorage.removeItem(storageKey);
-  }, [storageKey]);
+    saveWorkflow(null);
+  }, [saveWorkflow]);
 
   const stepIcons = [UserCheck, ClipboardCheck, CheckCircle2, Lock];
 

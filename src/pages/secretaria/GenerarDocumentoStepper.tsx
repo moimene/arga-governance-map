@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,6 +27,7 @@ import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
+import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { renderTemplate } from "@/lib/doc-gen/template-renderer";
 import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
@@ -53,6 +55,7 @@ export default function GenerarDocumentoStepper() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
 
@@ -191,8 +194,18 @@ export default function GenerarDocumentoStepper() {
       const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename, tenantId ?? "");
 
       if (result.ok) {
-        setArchiveUrl(result.documentUrl || null);
+        const docUrl = result.documentUrl || null;
+        setArchiveUrl(docUrl);
         setArchiveStatus("archived");
+        // C5: write document_url back to the agreement record
+        if (docUrl && agreement?.id && tenantId) {
+          await supabase
+            .from("agreements")
+            .update({ document_url: docUrl })
+            .eq("id", agreement.id)
+            .eq("tenant_id", tenantId);
+          qc.invalidateQueries({ queryKey: ["agreement", tenantId, agreement.id] });
+        }
       } else {
         setArchiveError(result.error || "Error al archivar el documento");
         setArchiveStatus("error");
@@ -738,12 +751,20 @@ export default function GenerarDocumentoStepper() {
                       </a>
                     </p>
                   )}
-                  <span
-                    className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                    style={{ borderRadius: "var(--g-radius-full)" }}
-                  >
-                    Archivado
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      Archivado
+                    </span>
+                    <span
+                      className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      Vinculado al expediente
+                    </span>
+                  </div>
                   {/* Verificador Offline HTML — GAS spec item */}
                   <button
                     type="button"
