@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -121,6 +121,63 @@ export function useConvocatoriaAttachments(convocatoriaId: string | undefined) {
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as AttachmentRow[];
+    },
+  });
+}
+
+export interface AgendaItem {
+  id: string;
+  titulo: string;
+  tipo: "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL";
+  inscribible: boolean;
+}
+
+export interface CreateConvocatoriaInput {
+  body_id: string;
+  tipo_convocatoria: string;
+  fecha_1: string;
+  fecha_2?: string | null;
+  modalidad: string;
+  lugar?: string | null;
+  junta_universal: boolean;
+  is_second_call: boolean;
+  publication_channels: string[];
+  agenda_items: Omit<AgendaItem, "id">[];
+  statutory_basis?: string | null;
+  convocatoria_text?: string | null;
+}
+
+export function useCreateConvocatoria() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateConvocatoriaInput): Promise<ConvocatoriaRow> => {
+      const { data, error } = await supabase
+        .from("convocatorias")
+        .insert({
+          tenant_id: tenantId!,
+          body_id: input.body_id,
+          tipo_convocatoria: input.tipo_convocatoria,
+          estado: "EMITIDA",
+          fecha_emision: new Date().toISOString().split("T")[0],
+          fecha_1: input.fecha_1,
+          fecha_2: input.fecha_2 ?? null,
+          modalidad: input.modalidad,
+          lugar: input.lugar ?? null,
+          junta_universal: input.junta_universal,
+          is_second_call: input.is_second_call,
+          publication_channels: input.publication_channels,
+          agenda_items: input.agenda_items,
+          statutory_basis: input.statutory_basis ?? null,
+          convocatoria_text: input.convocatoria_text ?? null,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ConvocatoriaRow;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["convocatorias", tenantId] });
     },
   });
 }

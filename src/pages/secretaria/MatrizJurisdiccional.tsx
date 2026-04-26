@@ -8,9 +8,14 @@ import {
   Globe, Building2, FileCheck2, AlertTriangle, Clock,
   ChevronRight, CheckCircle2, ArrowRight, Info,
   Gavel, ScrollText, Flag, LayoutGrid, GitCompare,
-  ShieldCheck, Languages, CircleDot, Lock,
+  ShieldCheck, Languages, CircleDot, Lock, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  useFilialEntitiesByJurisdiction,
+  useFilialAgreementCounts,
+} from "@/hooks/useFilialEntities";
+import { useEntityRules } from "@/hooks/useJurisdiccionRules";
 
 /* ── Tipos ────────────────────────────────────────────────────────────────── */
 
@@ -375,6 +380,17 @@ export default function MatrizJurisdiccional() {
 /* ── Dashboard por filial ────────────────────────────────────────────────── */
 
 function FilialDashboard({ f }: { f: FilialFormalizacion }) {
+  const { data: byJuris, filiales, isLoading: filialesLoading } = useFilialEntitiesByJurisdiction();
+  const liveEntities = byJuris[f.code] ?? [];
+  const { data: agreementCounts = {} } = useFilialAgreementCounts(
+    liveEntities.length > 0 ? liveEntities.map((e) => e.id) : []
+  );
+  const { data: ruleSets = [] } = useEntityRules(
+    f.code,
+    liveEntities[0]?.tipo_social ?? undefined
+  );
+  const activeRuleSet = ruleSets.find((r) => r.is_active) ?? ruleSets[0] ?? null;
+
   return (
     <div className="space-y-5">
       {/* Encabezado filial */}
@@ -499,42 +515,138 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
 
         {/* Panel derecho */}
         <div className="space-y-4">
-          {/* Entidades */}
+          {/* Entidades — live DB data */}
           <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
-            <div className="px-5 py-4 border-b border-[var(--g-border-subtle)]">
+            <div className="px-5 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Filiales en {f.nombre}</h3>
+              {liveEntities.length > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 text-[var(--g-brand-bright)] bg-[var(--g-sec-100)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}>
+                  TGMS
+                </span>
+              )}
             </div>
             <div className="divide-y divide-[var(--g-border-subtle)]">
-              {f.entidades.map((e) => (
-                <div key={e.nombre} className="flex items-center gap-3 px-5 py-3">
-                  <Building2 className="h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--g-text-primary)] truncate">{e.nombre}</p>
-                    <p className="text-xs text-[var(--g-text-secondary)]">
-                      {e.ciudad} ·{" "}
-                      <span className="font-semibold text-[var(--g-brand-3308)]">{e.participacion}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {e.acuerdos_pendientes > 0 && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 text-[var(--g-brand-3308)] bg-[var(--g-sec-100)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                        {e.acuerdos_pendientes}
-                      </span>
-                    )}
-                    {e.alertas > 0 && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 text-white bg-[var(--status-error)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                        {e.alertas}
-                      </span>
-                    )}
-                    <ChevronRight className="h-3.5 w-3.5 text-[var(--g-text-secondary)]" />
-                  </div>
+              {filialesLoading ? (
+                <div className="flex items-center gap-2 px-5 py-3 text-sm text-[var(--g-text-secondary)]">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Cargando…
                 </div>
-              ))}
+              ) : liveEntities.length > 0 ? (
+                liveEntities.map((e) => {
+                  const pending = agreementCounts[e.id] ?? 0;
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 px-5 py-3">
+                      <Building2 className="h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--g-text-primary)] truncate">
+                          {e.common_name ?? e.legal_name}
+                        </p>
+                        <p className="text-xs text-[var(--g-text-secondary)]">
+                          {e.legal_form ?? e.tipo_social} ·{" "}
+                          <span className="font-semibold text-[var(--g-brand-3308)]">
+                            {e.ownership_percentage != null ? `${e.ownership_percentage}%` : "100%"}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {pending > 0 && (
+                          <span className="text-xs font-semibold px-1.5 py-0.5 text-[var(--g-brand-3308)] bg-[var(--g-sec-100)]"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}>
+                            {pending}
+                          </span>
+                        )}
+                        <ChevronRight className="h-3.5 w-3.5 text-[var(--g-text-secondary)]" />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                f.entidades.map((e) => (
+                  <div key={e.nombre} className="flex items-center gap-3 px-5 py-3">
+                    <Building2 className="h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--g-text-primary)] truncate">{e.nombre}</p>
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        {e.ciudad} ·{" "}
+                        <span className="font-semibold text-[var(--g-brand-3308)]">{e.participacion}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {e.acuerdos_pendientes > 0 && (
+                        <span className="text-xs font-semibold px-1.5 py-0.5 text-[var(--g-brand-3308)] bg-[var(--g-sec-100)]"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}>
+                          {e.acuerdos_pendientes}
+                        </span>
+                      )}
+                      <ChevronRight className="h-3.5 w-3.5 text-[var(--g-text-secondary)]" />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
+
+          {/* Reglas jurisdiccionales activas — live DB data */}
+          {activeRuleSet && (
+            <div
+              className="bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] p-4"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Gavel className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Reglas activas en TGMS
+                </h3>
+              </div>
+              <div className="space-y-1.5 text-xs text-[var(--g-text-secondary)]">
+                <div className="flex justify-between">
+                  <span>Preaviso 1ª conv.</span>
+                  <span className="font-medium text-[var(--g-text-primary)]">
+                    {activeRuleSet.rule_config?.notice_min_days_first_call ?? "—"} días
+                  </span>
+                </div>
+                {activeRuleSet.rule_config?.quorum?.first_call_pct != null && (
+                  <div className="flex justify-between">
+                    <span>Quórum 1ª conv.</span>
+                    <span className="font-medium text-[var(--g-text-primary)]">
+                      {activeRuleSet.rule_config.quorum.first_call_pct === 0
+                        ? "Sin mínimo"
+                        : `${activeRuleSet.rule_config.quorum.first_call_pct}%`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>Junta universal</span>
+                  <span className={cn(
+                    "font-medium",
+                    activeRuleSet.rule_config?.allows_universal ? "text-[var(--status-success)]" : "text-[var(--status-warning)]"
+                  )}>
+                    {activeRuleSet.rule_config?.allows_universal ? "Permitida" : "No permitida"}
+                  </span>
+                </div>
+                {activeRuleSet.rule_config?.registry_submission && (
+                  <div className="flex justify-between">
+                    <span>Plazo inscripción</span>
+                    <span className="font-medium text-[var(--g-text-primary)]">
+                      {activeRuleSet.rule_config.registry_submission.deadline_days_from_deed} días
+                    </span>
+                  </div>
+                )}
+                {activeRuleSet.statutory_override && (
+                  <p className="mt-2 text-[var(--status-warning)] leading-tight">
+                    ⚠ statutory_override: confirmar con estatutos de la entidad
+                  </p>
+                )}
+                <p className="mt-2 text-[10px] text-[var(--g-text-secondary)] leading-tight">
+                  {activeRuleSet.legal_reference ?? activeRuleSet.name}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Vencimientos */}
           <div

@@ -87,6 +87,7 @@ export function verificarOCSP(signerId: string): OCSPVerificationResult {
     };
   }
 
+  // Allow test/demo override: include 'REVOKED' in signerId to simulate revocation
   if (signerId.includes('REVOKED')) {
     return {
       status: 'REVOKED',
@@ -94,10 +95,87 @@ export function verificarOCSP(signerId: string): OCSPVerificationResult {
     };
   }
 
+  // Real OCSP: if EAD Trust endpoint is configured, delegate to async version
+  // Use verificarOCSPAsync() for real network calls when VITE_EAD_TRUST_OCSP_URL is set.
+  // This sync version is retained for synchronous gate evaluation.
+  const ocspUrl = typeof import.meta !== 'undefined'
+    ? (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_OCSP_URL as string | undefined
+    : undefined;
+
+  if (ocspUrl) {
+    // Endpoint configured but we can't await here — return UNKNOWN and let async version handle it
+    return {
+      status: 'UNKNOWN',
+      detail: `OCSP endpoint configurado (${ocspUrl.substring(0, 30)}…). Use verificarOCSPAsync() para validación en tiempo real.`,
+    };
+  }
+
   return {
     status: 'GOOD',
-    detail: `Certificado válido para ${signerId}`,
+    detail: `Certificado válido para ${signerId} (modo demo — EAD Trust OCSP no configurado)`,
   };
+}
+
+/**
+ * Async OCSP verification against EAD Trust endpoint.
+ * Only active when VITE_EAD_TRUST_OCSP_URL and VITE_EAD_TRUST_API_KEY are set.
+ * Falls back to sync stub otherwise.
+ */
+export async function verificarOCSPAsync(signerId: string): Promise<OCSPVerificationResult> {
+  const ocspUrl = (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_OCSP_URL as string | undefined;
+  const apiKey = (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_API_KEY as string | undefined;
+
+  if (!ocspUrl || !apiKey) {
+    // Fall back to sync stub
+    return verificarOCSP(signerId);
+  }
+
+  try {
+    const response = await fetch(`${ocspUrl}/check`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'X-EAD-Client': 'TGMS-Secretaria/1.0',
+      },
+      body: JSON.stringify({ certificate_id: signerId }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      return {
+        status: 'UNKNOWN',
+        detail: `EAD Trust OCSP respondió con ${response.status}. Revocación no verificada.`,
+      };
+    }
+
+    const data = await response.json() as { status?: string; reason?: string };
+
+    if (data.status === 'REVOKED') {
+      return {
+        status: 'REVOKED',
+        detail: `Certificado revocado por EAD Trust. Motivo: ${data.reason ?? 'no especificado'}`,
+      };
+    }
+
+    if (data.status === 'GOOD') {
+      return {
+        status: 'GOOD',
+        detail: `Certificado válido según EAD Trust OCSP (${new Date().toISOString()})`,
+      };
+    }
+
+    return {
+      status: 'UNKNOWN',
+      detail: `Estado OCSP desconocido: ${data.status ?? 'sin respuesta'}`,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      status: 'UNKNOWN',
+      detail: `Error al contactar EAD Trust OCSP: ${msg}`,
+    };
+  }
 }
 
 // ============================================================

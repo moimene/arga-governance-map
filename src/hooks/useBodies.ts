@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface BodyListRow {
   id: string;
@@ -278,3 +279,28 @@ const hhmm = (iso: string | null) => {
 };
 export const formatDate = ddmmyyyy;
 export const formatTime = hhmm;
+
+export interface BodySlim {
+  id: string;
+  slug: string;
+  name: string;
+  body_type: string;
+}
+
+export function useBodiesByEntity(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["governing_bodies", "byEntity", entityId, tenantId],
+    queryFn: async (): Promise<BodySlim[]> => {
+      const { data, error } = await supabase
+        .from("governing_bodies")
+        .select("id, slug, name, body_type")
+        .eq("entity_id", entityId!)
+        .eq("tenant_id", tenantId!)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as BodySlim[];
+    },
+  });
+}

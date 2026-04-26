@@ -8,6 +8,8 @@ export interface StepDef {
   hint: string;
   /** Opcional: contenido custom del paso; si no, se renderiza placeholder. */
   body?: ReactNode;
+  /** Cuando es false, bloquea el avance al siguiente paso. */
+  canAdvance?: boolean;
 }
 
 interface StepperShellProps {
@@ -28,6 +30,11 @@ export function StepperShell({
   const navigate = useNavigate();
   const [current, setCurrent] = useState(1);
   const currentStep = steps.find((s) => s.n === current) ?? steps[0];
+  const nextBlockedByGate = currentStep?.canAdvance === false;
+  const nextDisabled = current === steps.length || nextBlockedByGate;
+  const nextTitle = nextBlockedByGate
+    ? "Resuelve el bloqueo antes de continuar"
+    : undefined;
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
@@ -124,8 +131,9 @@ export function StepperShell({
             <button
               type="button"
               onClick={() => setCurrent((n) => Math.min(steps.length, n + 1))}
-              disabled={current === steps.length}
-              className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-40"
+              disabled={nextDisabled}
+              title={nextTitle}
+              className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)] disabled:opacity-100"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Siguiente

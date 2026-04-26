@@ -507,7 +507,7 @@ Probes de existencia vs Cloud para las 4 RPCs — aceptan cualquier error que NO
 - `f075c95` — F10.2 backfill minutes.body_id/entity_id (regresión F9 button render)
 
 **Limitaciones conocidas (no bloqueantes para demo):**
-- 2 PRESIDENTEs VIGENTEs para el mismo body_id en ARGA Seguros (drift de backfill T15 ejecutado dos veces). `usePresidenteVigente` usa `.limit(1).maybeSingle()` — devuelve un presidente determinista pero la data es inconsistente. Limpieza pendiente para sprint de hardening.
+- ~~2 PRESIDENTEs VIGENTEs para el mismo body_id~~ — **Resuelto 2026-04-24**: duplicados eliminados. Quedan `00000000-...-0102` (Antonio Ríos, PRESIDENTE) y `00000000-...-0101` (Lucía Paredes, SECRETARIO). `usePresidenteVigente` sin ambigüedad.
 - Actas legacy (2 demo pre-F8.1) tienen `meeting_resolutions` vacío → `p_agreements_certified = []`. La RPC acepta arrays vacíos. Actas nuevas creadas via pipeline F5→F6→F7 sí tienen resolutions.
 - `snapshot_id` NULL en actas legacy → RPC usa `COALESCE 'NO_SNAPSHOT_HASH'` como gate. Sin WORM retroactivo (intencional — preservaría la cadena).
 - `userRole="SECRETARIO"` hardcodeado en el botón F9. La integración con `useUserRole` + `auth.users` es del sprint de auth real.
@@ -556,6 +556,66 @@ Migración `000031` aplicada en Cloud. **359/359 tests, tsc 0 errors.**
 
 **H6 — Limpieza mensajes placeholder:**
 - `TramitadorStepper.tsx`: "Pendiente Oleada 2 (legal)" → "No hay modelo de acuerdo disponible para esta materia en este momento."
+
+### Sprint C gestor societario MVP ✅ COMPLETADO (2026-04-24)
+
+**359/359 tests, tsc 0 errors.** Migración `000041` aplicada en Cloud.
+
+**Migración 000041:**
+```sql
+ALTER TABLE agreements
+  ADD COLUMN IF NOT EXISTS approval_workflow jsonb,
+  ADD COLUMN IF NOT EXISTS document_url text;
+```
+
+**C3 — ReunionStepper pasos 1–4 reales (`useReunionSecretaria.ts` + `ReunionStepper.tsx`):**
+- `ConstitutionStep`: datos reunión + botón "Declarar apertura" → `useOpenMeeting` (status→OPEN)
+- `AsistentesStep`: miembros de `condiciones_persona` vía `useBodyMembers`; selector PRESENCIAL/REPRESENTADO/AUSENTE; guarda con `useReplaceAttendees` (delete-all + insert)
+- `QuorumStep`: presentes/total/%, Motor V2 `evaluarMayoria`; persiste en `meetings.quorum_data.quorum`
+- `DebatesStep`: lista dinámica `{punto, notas}`; persiste en `meetings.quorum_data.debates`
+- Hooks añadidos: `useBodyMembers`, `useOpenMeeting`, `useReplaceAttendees`, `useUpdateQuorumData`
+
+**C4 — ApprovalWorkflowCard usa Supabase (`ExpedienteAcuerdo.tsx`):**
+- Estado inicializado desde `agreement.approval_workflow` (no localStorage)
+- `saveWorkflow()` → `agreements.update({ approval_workflow })` + invalidateQueries
+- Badge "Ver documento archivado" cuando `agreement.document_url` existe
+
+**C5 — document_url escrito tras archivar (`GenerarDocumentoStepper.tsx`):**
+- Tras archivar en Storage: `agreements.update({ document_url: docUrl })` + invalidateQueries
+- Badge verde "Vinculado al expediente" en UI de estado archivado
+
+**C6 — CierreStep real — golden path completo (`ReunionStepper.tsx` + `useReunionSecretaria.ts`):**
+- `useSaveMeetingResolutions(meetingId)`: delete-all + insert `meeting_resolutions` (1 fila por debate punto; ADOPTED si favor>contra)
+- `useGenerarActa()`: RPC `fn_generar_acta(p_meeting_id, p_content, null)` → devuelve UUID acta
+- `VotacionesStep`: botón "Registrar resultado de la votación" → persiste `meeting_resolutions` reales
+- `CierreStep`: carga resolutions reales, llama `fn_generar_acta` con `buildActaContent()`, navega a `/secretaria/actas/:minuteId`
+- `buildSteps` pasa `meetingId` a `CierreStep`
+
+**Gotcha clave confirmado:** `meeting_attendees` tiene `attendance_type` (no `role`/`present`/`attendance_mode`). Fuente de verdad: `supabase/functions/_types/database.ts`.
+
+### Smoke test + deuda de tipos ✅ COMPLETADO (2026-04-25)
+
+**Smoke test golden path — resultados:**
+- `fn_generar_acta(p_meeting_id uuid, p_content text, p_snapshot_id uuid) → uuid` verificada en Cloud
+- `agreements.approval_workflow` (jsonb) y `agreements.document_url` (text) verificadas en Cloud
+- Reunión `cda-22-04-2026` (`c3305c16-...`) tiene `body_id` CdA con 17 miembros vigentes (post-cleanup)
+- `meeting_attendees` y `meeting_resolutions` vacíos — correcto, el stepper los crea
+- Golden path predicho sin bloqueantes
+
+**condiciones_persona CdA — limpieza Cloud:**
+Seeds antiguo y canónico se solapaban. Eliminados:
+- `000…0101` (Lucía Paredes dummy) y `000…0102` (Antonio Ríos dummy) — PRESIDENTE/SECRETARIO duplicados
+- `000…0104–0109` — 6 CONSEJERO dummy (Carlos Vega, María Santos, Pedro García, Ana López, Jorge Martínez, Elena Ruiz)
+
+Estado post-limpieza: **1 PRESIDENTE + 1 SECRETARIO + 15 CONSEJERO = 17 miembros únicos**.
+
+**Deuda de tipos resuelta:**
+`AgreementFull` en `src/hooks/useAgreementCompliance.ts` ahora incluye:
+```typescript
+approval_workflow: Record<string, unknown>[] | null;
+document_url: string | null;
+```
+Eliminados los casts `as { approval_workflow?: ... }` y `as { document_url?: ... }` en `ExpedienteAcuerdo.tsx`. Único cast residual: `a.approval_workflow as ApprovalStep[] | null` (narrowing JSONB genérico → tipo concreto, inevitable).
 
 **Próximos — Sprint F (multi-jurisdicción)**
 

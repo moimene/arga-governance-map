@@ -137,6 +137,102 @@ export function useCloseVotacionManual(resolutionId: string | undefined) {
   });
 }
 
+export interface CreateNoSessionResolutionInput {
+  body_id: string;
+  title: string;
+  proposal_text: string;
+  matter_class: string;
+  agreement_kind: string;
+  requires_unanimity: boolean;
+  total_members: number;
+  voting_deadline: string;
+}
+
+export function useCreateNoSessionResolution() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateNoSessionResolutionInput): Promise<{ id: string }> => {
+      const { data, error } = await supabase
+        .from("no_session_resolutions")
+        .insert({
+          tenant_id: tenantId!,
+          body_id: input.body_id,
+          title: input.title,
+          proposal_text: input.proposal_text,
+          matter_class: input.matter_class,
+          agreement_kind: input.agreement_kind,
+          requires_unanimity: input.requires_unanimity,
+          total_members: input.total_members,
+          voting_deadline: input.voting_deadline,
+          status: "VOTING_OPEN",
+          opened_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
+    },
+  });
+}
+
+export function useAdoptNoSessionAgreement() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      resolutionId,
+      bodyId,
+      entityId,
+      matterClass,
+      agreementKind,
+      resultado,
+    }: {
+      resolutionId: string;
+      bodyId: string;
+      entityId: string;
+      matterClass: string;
+      agreementKind: string;
+      resultado: "APROBADO" | "RECHAZADO";
+    }) => {
+      const { error: closeErr } = await supabase
+        .from("no_session_resolutions")
+        .update({ status: resultado, closed_at: new Date().toISOString() })
+        .eq("id", resolutionId)
+        .eq("tenant_id", tenantId!);
+      if (closeErr) throw closeErr;
+
+      if (resultado === "APROBADO") {
+        const { data, error: agErr } = await supabase
+          .from("agreements")
+          .insert({
+            tenant_id: tenantId!,
+            entity_id: entityId,
+            body_id: bodyId,
+            agreement_kind: agreementKind,
+            matter_class: matterClass,
+            adoption_mode: "NO_SESSION",
+            status: "ADOPTED",
+            no_session_resolution_id: resolutionId,
+            decision_date: new Date().toISOString().split("T")[0],
+          })
+          .select("id")
+          .single();
+        if (agErr) throw agErr;
+        return (data as { id: string }).id;
+      }
+      return null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
+      queryClient.invalidateQueries({ queryKey: ["agreements"] });
+    },
+  });
+}
+
 /**
  * Calls fn_cerrar_votaciones_vencidas() to close expired VOTING_OPEN processes.
  * Invalidates the list query on success so the UI refreshes automatically.

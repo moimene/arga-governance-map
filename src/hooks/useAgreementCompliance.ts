@@ -81,6 +81,8 @@ export interface AgreementFull {
   no_session_resolution_id: string | null;
   statutory_basis: string | null;
   compliance_snapshot: Record<string, unknown> | null;
+  approval_workflow: Record<string, unknown>[] | null;
+  document_url: string | null;
   created_at: string;
   entities?: { common_name: string; jurisdiction: string; legal_form: string } | null;
   governing_bodies?: { name: string; body_type: string } | null;

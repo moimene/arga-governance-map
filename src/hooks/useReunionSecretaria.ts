@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -24,12 +24,20 @@ export interface MeetingSecretariaRow {
 
 export interface MeetingAttendee {
   id: string;
-  meeting_id: string;
+  meeting_id: string | null;
   person_id: string | null;
-  role: string | null;
-  attendance_mode: string | null;
-  present: boolean | null;
+  attendance_type: string;
   represented_by_id: string | null;
+  capital_representado: number | null;
+  via_representante: boolean | null;
+  tenant_id: string | null;
+}
+
+export interface BodyMember {
+  id: string;
+  person_id: string;
+  tipo_condicion: string;
+  full_name: string;
 }
 
 export interface MeetingResolution {
@@ -127,6 +135,145 @@ export function useReunionResolutions(meetingId: string | undefined) {
         .order("agenda_item_index", { ascending: true });
       if (error) throw error;
       return (data ?? []) as MeetingResolution[];
+    },
+  });
+}
+
+export function useBodyMembers(bodyId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!bodyId && !!tenantId,
+    queryKey: ["condiciones_persona", tenantId, "body", bodyId],
+    queryFn: async (): Promise<BodyMember[]> => {
+      const { data, error } = await supabase
+        .from("condiciones_persona")
+        .select("id, person_id, tipo_condicion, persons(full_name)")
+        .eq("body_id", bodyId!)
+        .eq("estado", "VIGENTE")
+        .eq("tenant_id", tenantId!);
+      if (error) throw error;
+      type Raw = {
+        id: string;
+        person_id: string;
+        tipo_condicion: string;
+        persons?: { full_name?: string | null } | null;
+      };
+      return ((data ?? []) as Raw[]).map((r) => ({
+        id: r.id,
+        person_id: r.person_id,
+        tipo_condicion: r.tipo_condicion,
+        full_name: r.persons?.full_name ?? "Sin nombre",
+      }));
+    },
+  });
+}
+
+export function useOpenMeeting(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!meetingId || !tenantId) return;
+      const { error } = await supabase
+        .from("meetings")
+        .update({ status: "OPEN" })
+        .eq("id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
+    },
+  });
+}
+
+export function useReplaceAttendees(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      rows: Array<{ person_id: string; attendance_type: string; represented_by_id: string | null }>
+    ) => {
+      if (!meetingId || !tenantId) return;
+      const { error: delErr } = await supabase
+        .from("meeting_attendees")
+        .delete()
+        .eq("meeting_id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (delErr) throw delErr;
+      if (rows.length === 0) return;
+      const { error: insErr } = await supabase
+        .from("meeting_attendees")
+        .insert(rows.map((r) => ({ ...r, meeting_id: meetingId, tenant_id: tenantId })));
+      if (insErr) throw insErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meeting_attendees", tenantId, meetingId] });
+    },
+  });
+}
+
+export function useUpdateQuorumData(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (quorum_data: Record<string, unknown>) => {
+      if (!meetingId || !tenantId) return;
+      const { error } = await supabase
+        .from("meetings")
+        .update({ quorum_data })
+        .eq("id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "byId", meetingId] });
+    },
+  });
+}
+
+export function useSaveMeetingResolutions(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      rows: Array<{
+        agenda_item_index: number;
+        resolution_text: string;
+        resolution_type?: string | null;
+        status: string;
+        required_majority_code?: string | null;
+      }>
+    ) => {
+      if (!meetingId || !tenantId) return;
+      const { error: delErr } = await supabase
+        .from("meeting_resolutions")
+        .delete()
+        .eq("meeting_id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (delErr) throw delErr;
+      if (rows.length === 0) return;
+      const { error: insErr } = await supabase
+        .from("meeting_resolutions")
+        .insert(rows.map((r) => ({ ...r, meeting_id: meetingId, tenant_id: tenantId })));
+      if (insErr) throw insErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meeting_resolutions", tenantId, meetingId] });
+    },
+  });
+}
+
+export function useGenerarActa() {
+  return useMutation({
+    mutationFn: async ({ meetingId, content }: { meetingId: string; content: string }) => {
+      const { data, error } = await supabase.rpc("fn_generar_acta", {
+        p_meeting_id: meetingId,
+        p_content: content,
+        p_snapshot_id: null,
+      });
+      if (error) throw error;
+      return data as string;
     },
   });
 }

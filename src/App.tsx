@@ -61,7 +61,9 @@ const ExpedienteSinSesionStepper = lazy(() => import("@/pages/secretaria/Expedie
 const AcuerdoSinSesionDetalle = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionDetalle"));
 const DecisionesUnipersonales = lazy(() => import("@/pages/secretaria/DecisionesUnipersonales"));
 const DecisionDetalle = lazy(() => import("@/pages/secretaria/DecisionDetalle"));
+const DecisionUnipersonalStepper = lazy(() => import("@/pages/secretaria/DecisionUnipersonalStepper"));
 const LibrosObligatorios = lazy(() => import("@/pages/secretaria/LibrosObligatorios"));
+const LibroSocios = lazy(() => import("@/pages/secretaria/LibroSocios"));
 const Plantillas = lazy(() => import("@/pages/secretaria/Plantillas"));
 const PlantillasTracker = lazy(() => import("@/pages/secretaria/PlantillasTracker"));
 const GestorPlantillas = lazy(() => import("@/pages/secretaria/GestorPlantillas"));
@@ -194,8 +196,10 @@ const App = () => (
                   <Route path="/secretaria/acuerdos-sin-sesion/expediente" element={<Suspense fallback={<ModuleFallback />}><ExpedienteSinSesionStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionDetalle /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales" element={<Suspense fallback={<ModuleFallback />}><DecisionesUnipersonales /></Suspense>} />
+                  <Route path="/secretaria/decisiones-unipersonales/nueva" element={<Suspense fallback={<ModuleFallback />}><DecisionUnipersonalStepper /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales/:id" element={<Suspense fallback={<ModuleFallback />}><DecisionDetalle /></Suspense>} />
                   <Route path="/secretaria/libros" element={<Suspense fallback={<ModuleFallback />}><LibrosObligatorios /></Suspense>} />
+                  <Route path="/secretaria/libro-socios" element={<Suspense fallback={<ModuleFallback />}><LibroSocios /></Suspense>} />
                   <Route path="/secretaria/plantillas" element={<Suspense fallback={<ModuleFallback />}><Plantillas /></Suspense>} />
                   <Route path="/secretaria/plantillas-tracker" element={<Suspense fallback={<ModuleFallback />}><PlantillasTracker /></Suspense>} />
                   <Route path="/secretaria/gestor-plantillas" element={<Suspense fallback={<ModuleFallback />}><GestorPlantillas /></Suspense>} />

@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,12 +27,16 @@ import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
+import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { renderTemplate } from "@/lib/doc-gen/template-renderer";
 import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { generateDocx, downloadDocx, computeContentHash } from "@/lib/doc-gen/docx-generator";
+import type { EditableField } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
+import { generarVerificadorOffline } from "@/lib/rules-engine";
+import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
@@ -50,6 +55,7 @@ export default function GenerarDocumentoStepper() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
 
@@ -188,8 +194,18 @@ export default function GenerarDocumentoStepper() {
       const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename, tenantId ?? "");
 
       if (result.ok) {
-        setArchiveUrl(result.documentUrl || null);
+        const docUrl = result.documentUrl || null;
+        setArchiveUrl(docUrl);
         setArchiveStatus("archived");
+        // C5: write document_url back to the agreement record
+        if (docUrl && agreement?.id && tenantId) {
+          await supabase
+            .from("agreements")
+            .update({ document_url: docUrl })
+            .eq("id", agreement.id)
+            .eq("tenant_id", tenantId);
+          qc.invalidateQueries({ queryKey: ["agreement", tenantId, agreement.id] });
+        }
       } else {
         setArchiveError(result.error || "Error al archivar el documento");
         setArchiveStatus("error");
@@ -212,6 +228,15 @@ export default function GenerarDocumentoStepper() {
       setContentHash(hash);
       const title = renderedText.split("\n")[0] || selectedPlantilla.tipo;
 
+      const editableFields: EditableField[] = (selectedPlantilla.capa3_editables ?? []).map(
+        (f: { campo: string; descripcion: string; placeholder?: string }) => ({
+          key: f.campo,
+          label: f.descripcion || f.campo,
+          placeholder: f.placeholder,
+          value: capa3Values[f.campo] || undefined,
+        })
+      );
+
       const buffer = await generateDocx({
         renderedText,
         title,
@@ -221,6 +246,7 @@ export default function GenerarDocumentoStepper() {
         contentHash: hash,
         entityName: resolvedVars.denominacion_social as string,
         generatedAt: new Date().toISOString().split("T")[0],
+        editableFields: editableFields.length > 0 ? editableFields : undefined,
       });
 
       // Save buffer for later archival
@@ -725,12 +751,59 @@ export default function GenerarDocumentoStepper() {
                       </a>
                     </p>
                   )}
-                  <span
-                    className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                    style={{ borderRadius: "var(--g-radius-full)" }}
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      Archivado
+                    </span>
+                    <span
+                      className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      Vinculado al expediente
+                    </span>
+                  </div>
+                  {/* Verificador Offline HTML — GAS spec item */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const artifact: EvidenceArtifact = {
+                        type: "PLANTILLA_SNAPSHOT",
+                        ref: archiveUrl ?? selectedPlantilla?.tipo ?? "doc",
+                        hash: contentHash ?? "",
+                        timestamp: new Date().toISOString(),
+                        metadata: {
+                          templateTipo: selectedPlantilla?.tipo,
+                          templateVersion: selectedPlantilla?.version,
+                        },
+                      };
+                      const manifest: EvidenceManifest = {
+                        version: "1.0.0",
+                        agreement_id: agreement?.id ?? "",
+                        generated_at: new Date().toISOString(),
+                        artifacts: [artifact],
+                        artifact_count: 1,
+                        manifest_hash: contentHash ?? "",
+                      };
+                      const html = generarVerificadorOffline(manifest);
+                      const blob = new Blob([html], { type: "text/html" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `verificador_${agreement?.id?.slice(0, 8) ?? "doc"}.html`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    Archivado
-                  </span>
+                    <Shield className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                    Descargar verificador offline
+                  </button>
                 </div>
               )}
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useTenantContext } from "@/hooks/useTenantContext";
+import { useTenantContext } from "@/context/TenantContext";
 import { evaluarSolidario } from "@/lib/rules-engine/votacion-engine";
 import type { SolidarioConfig } from "@/lib/rules-engine/types";
 
@@ -195,7 +195,7 @@ function StepEvaluacion({ result }: { result: ReturnType<typeof evaluarSolidario
   return (
     <div className="space-y-4">
       <div
-        className={`flex items-center gap-3 p-4 ${result.ok ? "bg-[var(--g-sec-100)]" : "bg-red-50"}`}
+        className={`flex items-center gap-3 p-4 ${result.ok ? "bg-[var(--g-sec-100)]" : "bg-[var(--g-surface-muted)]"}`}
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
         {result.ok ? (
