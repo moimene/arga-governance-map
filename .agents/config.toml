@@ -1,0 +1,72 @@
+# Ruflo/Codex project configuration for arga-governance-map.
+# Keep AGENTS.md as the canonical project instructions.
+
+model = "gpt-5.3-codex"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+project_doc_max_bytes = 65536
+project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md", "README.md"]
+
+[features]
+child_agents_md = true
+shell_snapshot = true
+request_rule = true
+remote_compaction = true
+
+[mcp_servers.ruflo]
+command = "./node_modules/.bin/ruflo"
+args = ["mcp", "start"]
+enabled = true
+tool_timeout_sec = 120
+
+[[skills.config]]
+path = ".agents/skills/arga-finish-review"
+enabled = true
+
+[[skills.config]]
+path = ".agents/skills/swarm-orchestration"
+enabled = true
+
+[[skills.config]]
+path = ".agents/skills/memory-management"
+enabled = true
+
+[[skills.config]]
+path = ".agents/skills/security-audit"
+enabled = true
+
+[performance]
+max_agents = 8
+task_timeout = 300
+memory_limit = "512MB"
+cache_enabled = true
+cache_ttl = 3600
+parallel_execution = true
+
+[profiles.dev]
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+web_search = "live"
+
+[profiles.safe]
+approval_policy = "untrusted"
+sandbox_mode = "read-only"
+web_search = "disabled"
+
+[profiles.ci]
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+
+[history]
+persistence = "save-all"
+
+[shell_environment_policy]
+inherit = "core"
+exclude = ["*_KEY", "*_SECRET", "*_TOKEN", "*_PASSWORD"]
+
+[sandbox_workspace_write]
+writable_roots = []
+network_access = true
+exclude_slash_tmp = false

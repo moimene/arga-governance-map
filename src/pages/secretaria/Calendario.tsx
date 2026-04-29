@@ -6,6 +6,9 @@ import { useNavigate } from "react-router-dom";
 import { Calendar, AlertTriangle, Clock, BookOpen, ScrollText, Users, Gavel } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 type DeadlineKind =
   | "CONVOCATORIA"
@@ -34,10 +37,10 @@ const KIND_META: Record<DeadlineKind, { icon: React.ElementType; color: string; 
 };
 
 type ConvRow = { id: string; fecha_1: string | null; estado: string | null; governing_bodies: { name: string } | null };
-type LibroRow = { id: string; book_type: string | null; legalization_deadline: string | null };
+type LibroRow = { id: string; book_kind: string | null; legalization_deadline: string | null };
 type AcuerdoSinSesionRow = { id: string; title: string | null; status: string; voting_deadline: string | null };
 type MandatoRow = { id: string; role: string | null; end_date: string | null; persons: { full_name: string } | null };
-type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; deadline: string | null };
+type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; estimated_resolution: string | null };
 
 function daysFromNow(isoDate: string): number {
   const today = new Date();
@@ -53,58 +56,107 @@ function urgencyFor(days: number): DeadlineItem["urgency"] {
   return "normal";
 }
 
-function useCalendarioDeadlines() {
+function useCalendarioDeadlines(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "calendario", tenantId],
+    queryKey: ["secretaria", "calendario", tenantId, entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<DeadlineItem[]> => {
       const items: DeadlineItem[] = [];
       const today = new Date().toISOString();
       const en90 = new Date(Date.now() + 90 * 86400000).toISOString().split("T")[0];
+      const { bodyIds, agreementIds } = await getSecretariaScopedIds(tenantId!, entityId);
 
-      const [convs, libros, asocs, mandates, filings] = await Promise.all([
-        supabase
+      async function fetchConvocatorias(): Promise<ConvRow[]> {
+        if (bodyIds?.length === 0) return [];
+        let query = supabase
           .from("convocatorias")
           .select("id, fecha_1, estado, governing_bodies(name)")
+          .eq("tenant_id", tenantId!)
           .gte("fecha_1", today)
-          .lte("fecha_1", en90)
+          .lte("fecha_1", en90);
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { data, error } = await query
           .order("fecha_1", { ascending: true })
-          .limit(20),
-        supabase
+          .limit(20);
+        if (error) throw error;
+        return (data ?? []) as ConvRow[];
+      }
+
+      async function fetchLibros(): Promise<LibroRow[]> {
+        let query = supabase
           .from("mandatory_books")
-          .select("id, book_type, legalization_deadline, status")
+          .select("id, book_kind, legalization_deadline, status")
+          .eq("tenant_id", tenantId!)
           .lte("legalization_deadline", en90)
-          .not("status", "eq", "LEGALIZADO")
+          .not("status", "eq", "LEGALIZADO");
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { data, error } = await query
           .order("legalization_deadline", { ascending: true })
-          .limit(10),
-        supabase
+          .limit(10);
+        if (error) throw error;
+        return (data ?? []) as LibroRow[];
+      }
+
+      async function fetchAcuerdosSinSesion(): Promise<AcuerdoSinSesionRow[]> {
+        if (bodyIds?.length === 0) return [];
+        let query = supabase
           .from("no_session_resolutions")
           .select("id, title, voting_deadline, status")
+          .eq("tenant_id", tenantId!)
           .eq("status", "VOTING_OPEN")
-          .gte("voting_deadline", today)
+          .gte("voting_deadline", today);
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { data, error } = await query
           .order("voting_deadline", { ascending: true })
-          .limit(10),
-        supabase
+          .limit(10);
+        if (error) throw error;
+        return (data ?? []) as AcuerdoSinSesionRow[];
+      }
+
+      async function fetchMandatos(): Promise<MandatoRow[]> {
+        if (bodyIds?.length === 0) return [];
+        let query = supabase
           .from("mandates")
           .select("id, end_date, role, persons(full_name)")
           .eq("tenant_id", tenantId!)
           .gte("end_date", today)
-          .lte("end_date", en90)
+          .lte("end_date", en90);
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { data, error } = await query
           .order("end_date", { ascending: true })
-          .limit(10),
-        supabase
+          .limit(10);
+        if (error) throw error;
+        return (data ?? []) as MandatoRow[];
+      }
+
+      async function fetchTramitaciones(): Promise<FilingRow[]> {
+        if (agreementIds?.length === 0) return [];
+        let query = supabase
           .from("registry_filings")
-          .select("id, filing_number, filing_via, status, deadline")
+          .select("id, filing_number, filing_via, status, estimated_resolution")
+          .eq("tenant_id", tenantId!)
           .in("status", ["EN_TRAMITE", "PRESENTADA", "SUBSANACION"])
-          .not("deadline", "is", null)
-          .lte("deadline", en90)
-          .order("deadline", { ascending: true })
-          .limit(10),
+          .not("estimated_resolution", "is", null)
+          .lte("estimated_resolution", en90);
+        if (agreementIds) query = query.in("agreement_id", agreementIds);
+        const { data, error } = await query
+          .order("estimated_resolution", { ascending: true })
+          .limit(10);
+        if (error) throw error;
+        return (data ?? []) as FilingRow[];
+      }
+
+      const [convs, libros, asocs, mandates, filings] = await Promise.all([
+        fetchConvocatorias(),
+        fetchLibros(),
+        fetchAcuerdosSinSesion(),
+        fetchMandatos(),
+        fetchTramitaciones(),
       ]);
 
       // Convocatorias
-      (convs.data as ConvRow[] ?? []).forEach((c) => {
+      convs.forEach((c) => {
         if (!c.fecha_1) return;
         const days = daysFromNow(c.fecha_1);
         items.push({
@@ -120,13 +172,13 @@ function useCalendarioDeadlines() {
       });
 
       // Libros obligatorios
-      (libros.data as LibroRow[] ?? []).forEach((b) => {
+      libros.forEach((b) => {
         if (!b.legalization_deadline) return;
         const days = daysFromNow(b.legalization_deadline);
         items.push({
           id: b.id,
           kind: "LEGALIZACION_LIBRO",
-          label: b.book_type ?? "Libro obligatorio",
+          label: b.book_kind ?? "Libro obligatorio",
           sublabel: `Plazo: ${new Date(b.legalization_deadline).toLocaleDateString("es-ES")}`,
           deadline: b.legalization_deadline,
           daysLeft: days,
@@ -136,7 +188,7 @@ function useCalendarioDeadlines() {
       });
 
       // Acuerdos sin sesión — deadline de votación
-      (asocs.data as AcuerdoSinSesionRow[] ?? []).forEach((a) => {
+      asocs.forEach((a) => {
         if (!a.voting_deadline) return;
         const days = daysFromNow(a.voting_deadline);
         items.push({
@@ -152,7 +204,7 @@ function useCalendarioDeadlines() {
       });
 
       // Mandatos próximos a vencer
-      (mandates.data as MandatoRow[] ?? []).forEach((m) => {
+      mandates.forEach((m) => {
         if (!m.end_date) return;
         const days = daysFromNow(m.end_date);
         const personName = m.persons?.full_name ?? "Consejero/a";
@@ -169,15 +221,15 @@ function useCalendarioDeadlines() {
       });
 
       // Tramitaciones con deadline
-      (filings.data as FilingRow[] ?? []).forEach((f) => {
-        if (!f.deadline) return;
-        const days = daysFromNow(f.deadline);
+      filings.forEach((f) => {
+        if (!f.estimated_resolution) return;
+        const days = daysFromNow(f.estimated_resolution);
         items.push({
           id: f.id,
           kind: "TRAMITACION",
           label: f.filing_number ?? "Tramitación",
-          sublabel: `${f.filing_via ?? ""} · ${f.status}`.trim(),
-          deadline: f.deadline,
+          sublabel: `${f.filing_via ?? ""} · ${statusLabel(f.status)}`.trim(),
+          deadline: f.estimated_resolution,
           daysLeft: days,
           urgency: urgencyFor(days),
           nav_to: `/secretaria/tramitador/${f.id}`,
@@ -258,7 +310,10 @@ function groupByWeek(items: DeadlineItem[]): Array<{ label: string; items: Deadl
 
 export default function Calendario() {
   const navigate = useNavigate();
-  const { data: deadlines = [], isLoading } = useCalendarioDeadlines();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data: deadlines = [], isLoading } = useCalendarioDeadlines(scopedEntityId);
+  const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
 
   const groups = groupByWeek(deadlines);
   const criticalCount = deadlines.filter((d) => d.urgency === "critical").length;
@@ -278,6 +333,14 @@ export default function Calendario() {
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
           Próximos 90 días — convocatorias, legalizaciones de libros, plazos de votación y renovaciones de mandato.
         </p>
+        <div
+          className="mt-3 inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-full)" }}
+        >
+          {scope.mode === "sociedad" && scope.selectedEntity
+            ? `Vista filtrada por sociedad: ${scope.selectedEntity.legalName}`
+            : "Vista de grupo: plazos agregados de la cartera societaria"}
+        </div>
       </div>
 
       {/* Summary bar */}
@@ -303,8 +366,8 @@ export default function Calendario() {
           )}
           {criticalCount === 0 && warningCount === 0 && deadlines.length > 0 && (
             <div
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-[var(--status-success)]"
-              style={{ borderRadius: "var(--g-radius-md)", background: "hsl(var(--status-success) / 0.08)" }}
+              className="flex items-center gap-2 bg-[var(--g-sec-100)] px-3 py-2 text-sm font-medium text-[var(--status-success)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Sin plazos urgentes en los próximos 30 días
             </div>
@@ -352,15 +415,15 @@ export default function Calendario() {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => navigate(item.nav_to)}
+                      onClick={() => navigateSecretaria(item.nav_to)}
                       className={`flex w-full items-center justify-between px-5 py-3 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 ${
                         i > 0 ? "border-t border-[var(--g-border-subtle)]" : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <div
-                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center ${meta.color}`}
-                          style={{ background: "var(--g-surface-subtle)", borderRadius: "var(--g-radius-sm)" }}
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] ${meta.color}`}
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
                           <Icon className="h-3.5 w-3.5" />
                         </div>

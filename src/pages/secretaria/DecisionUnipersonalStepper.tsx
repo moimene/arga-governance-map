@@ -1,20 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { CheckCircle2, AlertTriangle, Loader2, UserCheck } from "lucide-react";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
-import { useMateriaCatalog } from "@/hooks/useMateriaConfig";
+import { useMateriaCatalog, type MateriaCatalogRow } from "@/hooks/useMateriaConfig";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import type { AdoptionMode } from "@/lib/rules-engine";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
+import { useCreateUnipersonalDecision } from "@/hooks/useDecisionesUnipers";
+
+type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
+
+function decisionAdoptionMode(tipo: DecisionType): AdoptionMode {
+  return tipo === "SOCIO_UNICO" ? "UNIPERSONAL_SOCIO" : "UNIPERSONAL_ADMIN";
+}
 
 // ── Paso 1: Tipo y materia ───────────────────────────────────────────────────
 
-function TipoMateriaStep() {
-  const [tipo, setTipo] = useState<"SOCIO_UNICO" | "ADMINISTRADOR_UNICO">("SOCIO_UNICO");
-  const [materia, setMateria] = useState("");
-  const { data: materias = [], isLoading } = useMateriaCatalog();
-
-  const adoptionMode: AdoptionMode =
-    tipo === "SOCIO_UNICO" ? "UNIPERSONAL_SOCIO" : "UNIPERSONAL_ADMIN";
+function TipoMateriaStep({
+  tipo,
+  setTipo,
+  materia,
+  setMateria,
+  entities,
+  selectedEntityId,
+  setSelectedEntityId,
+  isSociedadScoped,
+  materias,
+  isLoading,
+}: {
+  tipo: DecisionType;
+  setTipo: (value: DecisionType) => void;
+  materia: string;
+  setMateria: (value: string) => void;
+  entities: EntityWithParent[];
+  selectedEntityId: string;
+  setSelectedEntityId: (value: string) => void;
+  isSociedadScoped: boolean;
+  materias: MateriaCatalogRow[];
+  isLoading: boolean;
+}) {
+  const adoptionMode = decisionAdoptionMode(tipo);
+  const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
 
   return (
     <div className="space-y-5">
@@ -22,6 +50,31 @@ function TipoMateriaStep() {
         Selecciona el tipo de decisión y la materia del acuerdo. El motor verificará
         que el modo unipersonal sea válido para la materia escogida.
       </p>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-[var(--g-text-primary)]">
+          Sociedad
+        </label>
+        <select
+          value={selectedEntityId}
+          onChange={(e) => setSelectedEntityId(e.target.value)}
+          disabled={isSociedadScoped}
+          className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:cursor-not-allowed disabled:opacity-70"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="">Selecciona sociedad</option>
+          {entities.map((entity) => (
+            <option key={entity.id} value={entity.id}>
+              {entity.legal_name || entity.common_name}
+            </option>
+          ))}
+        </select>
+        {selectedEntity ? (
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            {selectedEntity.legal_form} · {selectedEntity.jurisdiction}
+          </p>
+        ) : null}
+      </div>
 
       <div className="space-y-2">
         <label className="text-xs font-medium text-[var(--g-text-primary)]">
@@ -90,10 +143,17 @@ function TipoMateriaStep() {
 
 // ── Paso 2: Texto del acuerdo ─────────────────────────────────────────────────
 
-function TextoAcuerdoStep() {
-  const [texto, setTexto] = useState("");
-  const [fundamentoLegal, setFundamentoLegal] = useState("");
-
+function TextoAcuerdoStep({
+  texto,
+  setTexto,
+  fundamentoLegal,
+  setFundamentoLegal,
+}: {
+  texto: string;
+  setTexto: (value: string) => void;
+  fundamentoLegal: string;
+  setFundamentoLegal: (value: string) => void;
+}) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--g-text-secondary)]">
@@ -134,20 +194,19 @@ function TextoAcuerdoStep() {
 
 // ── Paso 3: Firma y archivo ───────────────────────────────────────────────────
 
-function FirmaArchivoStep() {
+function FirmaArchivoStep({
+  onCreate,
+  creating,
+  createdDecisionId,
+}: {
+  onCreate: () => void;
+  creating: boolean;
+  createdDecisionId: string | null;
+}) {
   const navigate = useNavigate();
-  const [signing, setSigning] = useState(false);
-  const [signed, setSigned] = useState(false);
+  const scope = useSecretariaScope();
 
-  function handleFirmar() {
-    setSigning(true);
-    setTimeout(() => {
-      setSigning(false);
-      setSigned(true);
-    }, 1400);
-  }
-
-  if (signed) {
+  if (createdDecisionId) {
     return (
       <div className="space-y-4">
         <div
@@ -157,22 +216,22 @@ function FirmaArchivoStep() {
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-success)]" />
           <div>
             <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Decisión registrada (modo demo)
+              Decisión registrada y expediente creado
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-              Simulación completada. En producción se ejecutaría firma QES vía EAD Trust y el
-              acuerdo quedaría archivado en el Libro de Decisiones en estado ADOPTADO.
+              La decisión queda firmada en Secretaría y el acuerdo queda vinculado para generar
+              el DOCX final y su evidencia documental.
             </p>
           </div>
         </div>
         <button
           type="button"
-          onClick={() => navigate("/secretaria/decisiones-unipersonales")}
+          onClick={() => navigate(scope.createScopedTo(`/secretaria/decisiones-unipersonales/${createdDecisionId}`))}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <UserCheck className="h-4 w-4" />
-          Ver decisiones unipersonales
+          Ver decisión registrada
         </button>
       </div>
     );
@@ -181,8 +240,8 @@ function FirmaArchivoStep() {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        El documento generado se firmará electrónicamente con QES (Qualified Electronic Signature)
-        a través de EAD Trust. La firma quedará archivada en el evidence bundle WORM.
+        La plataforma registrará la decisión, creará el expediente de acuerdo vinculado y dejará
+        preparado el documento final para firma QES y evidencia documental.
       </p>
 
       <div
@@ -211,20 +270,20 @@ function FirmaArchivoStep() {
 
       <button
         type="button"
-        onClick={handleFirmar}
-        disabled={signing}
+        onClick={onCreate}
+        disabled={creating}
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-5 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-60"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
-        {signing ? (
+        {creating ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Firmando con QES…
+            Registrando decisión…
           </>
         ) : (
           <>
             <CheckCircle2 className="h-4 w-4" />
-            Firmar y archivar decisión
+            Registrar decisión y expediente
           </>
         )}
       </button>
@@ -232,36 +291,114 @@ function FirmaArchivoStep() {
   );
 }
 
-// ── Steps ─────────────────────────────────────────────────────────────────────
-
-const STEPS: StepDef[] = [
-  {
-    n: 1,
-    label: "Tipo y materia",
-    hint: "Selecciona si es decisión de socio único o administrador único y la materia del acuerdo",
-    body: <TipoMateriaStep />,
-  },
-  {
-    n: 2,
-    label: "Texto del acuerdo",
-    hint: "Redacción del acuerdo adoptado con fundamento jurídico",
-    body: <TextoAcuerdoStep />,
-  },
-  {
-    n: 3,
-    label: "Firma y archivo",
-    hint: "Firma QES via EAD Trust + archivado en evidence bundle WORM",
-    body: <FirmaArchivoStep />,
-  },
-];
-
 export default function DecisionUnipersonalStepper() {
+  const scope = useSecretariaScope();
+  const { data: entities = [] } = useEntitiesList();
+  const { data: materias = [], isLoading: materiasLoading } = useMateriaCatalog();
+  const createDecision = useCreateUnipersonalDecision();
+  const [tipo, setTipo] = useState<DecisionType>("SOCIO_UNICO");
+  const [materia, setMateria] = useState("");
+  const [selectedEntityId, setSelectedEntityId] = useState(scope.selectedEntity?.id ?? "");
+  const [texto, setTexto] = useState("");
+  const [fundamentoLegal, setFundamentoLegal] = useState("");
+  const [createdDecisionId, setCreatedDecisionId] = useState<string | null>(null);
+  const isSociedadScoped = scope.mode === "sociedad";
+  const selectedMateria = materias.find((item) => item.materia === materia) ?? null;
+
+  useEffect(() => {
+    if (scope.mode === "sociedad" && scope.selectedEntity?.id) {
+      setSelectedEntityId(scope.selectedEntity.id);
+    }
+  }, [scope.mode, scope.selectedEntity?.id]);
+
+  const content = [
+    texto.trim(),
+    fundamentoLegal.trim() ? `Fundamento jurídico: ${fundamentoLegal.trim()}` : null,
+  ].filter(Boolean).join("\n\n");
+
+  function handleCreate() {
+    if (!selectedEntityId || !materia || !texto.trim() || !selectedMateria) return;
+    createDecision.mutate(
+      {
+        entityId: selectedEntityId,
+        decisionType: tipo,
+        agreementKind: materia,
+        matterClass: selectedMateria.matter_class,
+        title: selectedMateria.materia_label_es,
+        content,
+        requiresRegistry: selectedMateria.requires_registry || selectedMateria.inscribable,
+      },
+      {
+        onSuccess: ({ decisionId }) => {
+          setCreatedDecisionId(decisionId);
+          toast.success("Decisión registrada", {
+            description: "Se ha creado el expediente de acuerdo vinculado.",
+          });
+        },
+        onError: (error) => {
+          toast.error("No se pudo registrar la decisión", {
+            description: error instanceof Error ? error.message : "Revise los datos del expediente.",
+          });
+        },
+      },
+    );
+  }
+
+  const steps: StepDef[] = [
+    {
+      n: 1,
+      label: "Tipo y materia",
+      hint: "Selecciona sociedad, decisor unipersonal y materia",
+      canAdvance: Boolean(selectedEntityId && materia),
+      body: (
+        <TipoMateriaStep
+          tipo={tipo}
+          setTipo={setTipo}
+          materia={materia}
+          setMateria={setMateria}
+          entities={entities}
+          selectedEntityId={selectedEntityId}
+          setSelectedEntityId={setSelectedEntityId}
+          isSociedadScoped={isSociedadScoped}
+          materias={materias}
+          isLoading={materiasLoading}
+        />
+      ),
+    },
+    {
+      n: 2,
+      label: "Texto del acuerdo",
+      hint: "Redacción del acuerdo adoptado con fundamento jurídico",
+      canAdvance: texto.trim().length > 0,
+      body: (
+        <TextoAcuerdoStep
+          texto={texto}
+          setTexto={setTexto}
+          fundamentoLegal={fundamentoLegal}
+          setFundamentoLegal={setFundamentoLegal}
+        />
+      ),
+    },
+    {
+      n: 3,
+      label: "Registro y documento",
+      hint: "Crea la decisión y el expediente de acuerdo vinculado",
+      body: (
+        <FirmaArchivoStep
+          onCreate={handleCreate}
+          creating={createDecision.isPending}
+          createdDecisionId={createdDecisionId}
+        />
+      ),
+    },
+  ];
+
   return (
     <StepperShell
       eyebrow="Secretaría · Nueva decisión unipersonal"
       title="Asistente de decisión unipersonal"
       backTo="/secretaria/decisiones-unipersonales"
-      steps={STEPS}
+      steps={steps}
     />
   );
 }

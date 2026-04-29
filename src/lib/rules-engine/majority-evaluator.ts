@@ -188,9 +188,9 @@ function evaluateFormula(
   if (formula === 'mayoria_consejeros') {
     const requerido = total_miembros / 2;
     return {
-      alcanzada: miembros_presentes > requerido,
+      alcanzada: favor > requerido,
       valorRequerido: requerido,
-      valorObtenido: miembros_presentes,
+      valorObtenido: favor,
     };
   }
 

@@ -10,6 +10,7 @@ import { BPHallazgos } from "@/components/board-pack/BPHallazgos";
 import { BPIdoneidad } from "@/components/board-pack/BPIdoneidad";
 import { BPDelegaciones } from "@/components/board-pack/BPDelegaciones";
 import { BPSistemasIA } from "@/components/board-pack/BPSistemasIA";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 // ─── Estados de carga / error ────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ function BoardPackSkeleton() {
   );
 }
 
-function BoardPackError({ message }: { message?: string }) {
+function BoardPackError({ message, backTo }: { message?: string; backTo: string }) {
   return (
     <div className="mx-auto max-w-4xl p-8">
       <div
@@ -39,7 +40,7 @@ function BoardPackError({ message }: { message?: string }) {
           {message ?? "La reunión no existe o no tiene datos suficientes."}
         </p>
         <Link
-          to="/secretaria/reuniones"
+          to={backTo}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -56,11 +57,14 @@ function BoardPackError({ message }: { message?: string }) {
 
 export default function BoardPackPreview() {
   const { id = "" } = useParams<{ id: string }>();
-  const { data, isLoading, error } = useBoardPackData(id);
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const backToReuniones = scope.createScopedTo("/secretaria/reuniones");
+  const { data, isLoading, error } = useBoardPackData(id, scopedEntityId);
 
   if (isLoading) return <BoardPackSkeleton />;
   if (error || !data?.meeting) {
-    return <BoardPackError message={error?.message} />;
+    return <BoardPackError message={error?.message} backTo={backToReuniones} />;
   }
 
   return (
@@ -72,7 +76,7 @@ export default function BoardPackPreview() {
       >
         <div className="flex items-center gap-3">
           <Link
-            to="/secretaria/reuniones"
+            to={backToReuniones}
             className="inline-flex items-center gap-1.5 text-sm text-[var(--g-text-secondary)] transition-colors hover:text-[var(--g-text-primary)]"
           >
             <ArrowLeft className="h-4 w-4" />

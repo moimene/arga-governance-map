@@ -14,7 +14,14 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
-    "e2e:ci": "playwright test --reporter=list"
+    "e2e:ci": "playwright test --reporter=list",
+    "db:check-target": "bash scripts/check-supabase-target.sh --strict-mcp",
+    "agents:doctor": "ruflo doctor",
+    "agents:validate": "ruflo doctor && ruflo swarm status",
+    "agents:mcp:tools": "ruflo mcp tools",
+    "agents:route": "ruflo route task",
+    "agents:swarm:status": "ruflo swarm status",
+    "agents:memory:stats": "ruflo memory stats"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

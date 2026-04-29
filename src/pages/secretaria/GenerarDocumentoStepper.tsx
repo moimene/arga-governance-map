@@ -6,8 +6,8 @@
  * Route: /secretaria/acuerdos/:id/generar
  */
 
-import { useState, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -26,10 +26,10 @@ import {
 import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
-import { useQTSPSign } from "@/hooks/useQTSPSign";
+import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
-import { renderTemplate } from "@/lib/doc-gen/template-renderer";
+import { findMissingVariables, renderTemplate } from "@/lib/doc-gen/template-renderer";
 import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { generateDocx, downloadDocx, computeContentHash } from "@/lib/doc-gen/docx-generator";
@@ -38,6 +38,8 @@ import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -49,15 +51,24 @@ const STEPS = [
   { key: "generar", label: "Generar", icon: Download },
 ] as const;
 
+function hasResolvedValue(value: unknown) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string" && value.trim() === "") return false;
+  return true;
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function GenerarDocumentoStepper() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scope = useSecretariaScope();
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
+  const requestedPlantillaId = searchParams.get("plantilla");
 
   const [step, setStep] = useState(0);
   const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaProtegidaRow | null>(null);
@@ -80,22 +91,56 @@ export default function GenerarDocumentoStepper() {
   const [archiveUrl, setArchiveUrl] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
+  const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
 
   const { signMutation } = useQTSPSign();
+  const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
+  const missingRequiredCapa2 = useMemo(() => {
+    if (!selectedPlantilla) return [];
+    return (selectedPlantilla.capa2_variables ?? [])
+      .filter((variable) => variable.fuente !== "USUARIO")
+      .map((variable) => variable.variable)
+      .filter((variable) => !hasResolvedValue(resolvedVars[variable]));
+  }, [resolvedVars, selectedPlantilla]);
 
   // Filter plantillas compatible with this agreement
   const compatiblePlantillas = useMemo(() => {
     if (!agreement) return [];
+    const agreementJurisdiction = agreement.entities?.jurisdiction ?? "ES";
     return plantillas.filter((p) => {
-      const statusOk = p.estado === "ACTIVA" || p.estado === "APROBADA" || p.estado === "REVISADA";
-      const jurisdiccionOk = p.jurisdiccion === "ES";
-      // Match adoption_mode if set
+      const statusOk = p.estado === "ACTIVA" || p.estado === "APROBADA";
+      const templateJurisdiction = p.jurisdiccion?.toUpperCase();
+      const jurisdiccionOk =
+        !templateJurisdiction ||
+        templateJurisdiction === "GLOBAL" ||
+        templateJurisdiction === "MULTI" ||
+        templateJurisdiction === agreementJurisdiction.toUpperCase();
+      const materiaOk =
+        !p.materia_acuerdo ||
+        p.materia_acuerdo === agreement.agreement_kind ||
+        p.materia_acuerdo === agreement.matter_class;
       const adoptionOk =
         !p.adoption_mode || p.adoption_mode === agreement.adoption_mode;
-      return statusOk && jurisdiccionOk && adoptionOk;
+      const organoOk =
+        !p.organo_tipo ||
+        !agreement.governing_bodies?.body_type ||
+        p.organo_tipo === agreement.governing_bodies.body_type;
+      return statusOk && jurisdiccionOk && materiaOk && adoptionOk && organoOk;
     });
   }, [plantillas, agreement]);
+  const requestedPlantilla = useMemo(
+    () => compatiblePlantillas.find((plantilla) => plantilla.id === requestedPlantillaId) ?? null,
+    [compatiblePlantillas, requestedPlantillaId],
+  );
+  const normalizedCapa3Fields = useMemo(
+    () => normalizeCapa3Fields(selectedPlantilla?.capa3_editables),
+    [selectedPlantilla?.capa3_editables],
+  );
+  const normalizedCapa3Values = useMemo(
+    () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values).values,
+    [capa3Values, normalizedCapa3Fields],
+  );
 
   // ── Step 1: Select plantilla ─────────────────────────────────────────────
 
@@ -129,8 +174,14 @@ export default function GenerarDocumentoStepper() {
 
       setStep(1);
     },
-    [agreement]
+    [agreement, tenantId]
   );
+
+  useEffect(() => {
+    if (!requestedPlantillaId || !requestedPlantilla) return;
+    if (selectedPlantilla?.id === requestedPlantillaId) return;
+    void handleSelectPlantilla(requestedPlantilla);
+  }, [handleSelectPlantilla, requestedPlantilla, requestedPlantillaId, selectedPlantilla?.id]);
 
   // ── Step 4: Render preview ───────────────────────────────────────────────
 
@@ -140,11 +191,19 @@ export default function GenerarDocumentoStepper() {
       return;
     }
 
-    const mergedVars = mergeVariables(resolvedVars, capa3Values);
+    const mergedVars = mergeVariables(resolvedVars, normalizedCapa3Values);
     const result = renderTemplate({
       template: selectedPlantilla.capa1_inmutable,
       variables: mergedVars,
     });
+    const requiredTemplateMisses = findMissingVariables(selectedPlantilla.capa1_inmutable, mergedVars)
+      .filter((variable) => missingRequiredCapa2.includes(variable) || missingRequiredCapa2.includes(variable.split(".")[0]));
+
+    if (requiredTemplateMisses.length > 0) {
+      setRenderError(`Faltan variables obligatorias: ${requiredTemplateMisses.join(", ")}`);
+      setStep(1);
+      return;
+    }
 
     if (result.ok) {
       setRenderedText(result.text);
@@ -154,7 +213,7 @@ export default function GenerarDocumentoStepper() {
     }
 
     setStep(3);
-  }, [selectedPlantilla, resolvedVars, capa3Values]);
+  }, [selectedPlantilla, resolvedVars, normalizedCapa3Values, missingRequiredCapa2]);
 
   const handleSignQES = useCallback(async () => {
     if (!docxBuffer || !selectedPlantilla || !agreement) {
@@ -164,14 +223,18 @@ export default function GenerarDocumentoStepper() {
     setSigningStatus("pending");
     setSigningError(null);
     try {
-      await signMutation.mutateAsync({
+      const result = await signMutation.mutateAsync({
         documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
-        documentData: docxBuffer.buffer as ArrayBuffer,
+        documentData: docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer,
         signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
         createdBy: "secretaria-demo",
         agreementId: agreement.id,
         onProgress: () => {},
       });
+      setQesResult(result);
+      if (result.signedDocumentData) {
+        setDocxBuffer(new Uint8Array(result.signedDocumentData));
+      }
       setSigningStatus("signed");
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : "Error desconocido al firmar";
@@ -191,7 +254,24 @@ export default function GenerarDocumentoStepper() {
 
     try {
       const filename = `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}`;
-      const result = await archiveDocxToStorage(docxBuffer.buffer as ArrayBuffer, agreement.id, filename, tenantId ?? "");
+      const archiveBuffer = qesResult?.signedDocumentData
+        ? qesResult.signedDocumentData
+        : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
+      const result = await archiveDocxToStorage(archiveBuffer, agreement.id, filename, tenantId ?? "", {
+        processKind: "DOCUMENTO_REGISTRAL",
+        recordId: agreement.id,
+        templateId: selectedPlantilla?.id ?? null,
+        templateTipo: selectedPlantilla?.tipo,
+        templateVersion: selectedPlantilla?.version,
+        contentHash,
+        signedBy: qesResult ? "EAD Trust" : undefined,
+        qesSrId: qesResult?.srId,
+        qesDocumentId: qesResult?.documentId,
+        qesDocumentHash: qesResult?.documentHash,
+        qesSignatoryIds: qesResult?.signatoryIds,
+        qesSignedAt: qesResult?.signed_at,
+        archivedBufferKind: qesResult?.signedDocumentData ? "QTSP_SIGNED_DOCX" : "ORIGINAL_DOCX",
+      });
 
       if (result.ok) {
         const docUrl = result.documentUrl || null;
@@ -215,7 +295,7 @@ export default function GenerarDocumentoStepper() {
       setArchiveError(errorMsg);
       setArchiveStatus("error");
     }
-  }, [docxBuffer, agreement, selectedPlantilla]);
+  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash]);
 
   // ── Step 5: Generate DOCX ───────────────────────────────────────────────
 
@@ -228,12 +308,11 @@ export default function GenerarDocumentoStepper() {
       setContentHash(hash);
       const title = renderedText.split("\n")[0] || selectedPlantilla.tipo;
 
-      const editableFields: EditableField[] = (selectedPlantilla.capa3_editables ?? []).map(
-        (f: { campo: string; descripcion: string; placeholder?: string }) => ({
+      const editableFields: EditableField[] = normalizedCapa3Fields.map(
+        (f) => ({
           key: f.campo,
           label: f.descripcion || f.campo,
-          placeholder: f.placeholder,
-          value: capa3Values[f.campo] || undefined,
+          value: normalizedCapa3Values[f.campo] || undefined,
         })
       );
 
@@ -257,6 +336,7 @@ export default function GenerarDocumentoStepper() {
       setGenerated(true);
       setSigningStatus("idle");
       setSigningError(null);
+      setQesResult(null);
       setArchiveStatus("idle");
       setArchiveUrl(null);
       setArchiveError(null);
@@ -266,7 +346,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedPlantilla, renderedText, agreement, resolvedVars]);
+  }, [selectedPlantilla, renderedText, agreement, resolvedVars, normalizedCapa3Fields, normalizedCapa3Values]);
 
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -295,7 +375,7 @@ export default function GenerarDocumentoStepper() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate(`/secretaria/acuerdos/${id}`)}
+          onClick={() => navigate(expedientePath)}
           className="flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
           aria-label="Volver al expediente"
         >
@@ -354,6 +434,29 @@ export default function GenerarDocumentoStepper() {
             <p className="text-xs text-[var(--g-text-secondary)]">
               Plantillas compatibles con el acuerdo (adopción: {agreement.adoption_mode}, jurisdicción: ES)
             </p>
+
+            {requestedPlantillaId ? (
+              <div
+                className={`flex items-start gap-2 px-4 py-3 text-sm ${
+                  requestedPlantilla
+                    ? "border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                    : "border border-[var(--status-warning)] bg-[var(--g-surface-muted)] text-[var(--g-text-primary)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {requestedPlantilla ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-success)]" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+                )}
+                <span>
+                  {requestedPlantilla
+                    ? "Plantilla indicada detectada y seleccionada automáticamente."
+                    : "La plantilla indicada no es compatible con este acuerdo; elige una alternativa."}
+                  <span className="ml-1 font-mono text-xs">{requestedPlantillaId.slice(0, 8)}</span>
+                </span>
+              </div>
+            ) : null}
 
             {compatiblePlantillas.length === 0 ? (
               <div
@@ -485,6 +588,19 @@ export default function GenerarDocumentoStepper() {
                   </div>
                 )}
 
+                {missingRequiredCapa2.length > 0 ? (
+                  <div
+                    className="flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-card)] px-4 py-2 text-xs text-[var(--status-error)]"
+                    role="alert"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Variables obligatorias no resueltas: {missingRequiredCapa2.join(", ")}.
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="flex justify-between pt-2">
                   <button
                     type="button"
@@ -498,7 +614,8 @@ export default function GenerarDocumentoStepper() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+                    disabled={missingRequiredCapa2.length > 0}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     Siguiente
@@ -521,8 +638,8 @@ export default function GenerarDocumentoStepper() {
             </p>
 
             <Capa3Form
-              fields={(selectedPlantilla.capa3_editables ?? [])}
-              values={capa3Values}
+              fields={normalizedCapa3Fields}
+              values={normalizedCapa3Values}
               onChange={(vals) => { setCapa3Values(vals); setCapa3Errors({}); }}
             />
 
@@ -554,7 +671,7 @@ export default function GenerarDocumentoStepper() {
               <button
                 type="button"
                 onClick={() => {
-                  const errors = validateCapa3(selectedPlantilla.capa3_editables ?? [], capa3Values);
+                  const errors = validateCapa3(normalizedCapa3Fields, normalizedCapa3Values);
                   if (Object.keys(errors).length > 0) {
                     setCapa3Errors(errors);
                     return;
@@ -676,11 +793,18 @@ export default function GenerarDocumentoStepper() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)] rounded">
                     <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Documento firmado correctamente</span>
+                    <span className="text-sm font-medium">Solicitud QES activada correctamente</span>
                   </div>
                   <p className="text-xs text-[var(--g-text-secondary)]">
-                    La firma QES se ha aplicado al documento. El certificado está disponible en el expediente.
+                    EAD Trust ha registrado la solicitud de firma. El archivo se archivará con los
+                    identificadores QTSP y, si el proveedor entrega un artefacto firmado, se archivará
+                    ese binario firmado.
                   </p>
+                  {qesResult ? (
+                    <p className="font-mono text-[10px] text-[var(--g-text-secondary)]">
+                      SR {qesResult.srId} · DOC {qesResult.documentId} · hash {qesResult.documentHash.slice(0, 12)}
+                    </p>
+                  ) : null}
                 </div>
               )}
 
@@ -711,7 +835,8 @@ export default function GenerarDocumentoStepper() {
               {archiveStatus === "idle" && (
                 <>
                   <p className="text-xs text-[var(--g-text-secondary)] mb-4">
-                    Guarde el documento de forma segura en Supabase Storage con hash SHA-512 para verificación futura.
+                    Guarde el documento en Supabase Storage con hash SHA-512 y bundle operativo demo de evidencia documental; no constituye evidencia final productiva.
+                    {qesResult ? " Se adjuntarán los metadatos QTSP de EAD Trust." : ""}
                   </p>
                   <button
                     type="button"
@@ -839,6 +964,7 @@ export default function GenerarDocumentoStepper() {
                   setArchiveUrl(null);
                   setArchiveError(null);
                   setDocxBuffer(null);
+                  setQesResult(null);
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
@@ -847,7 +973,7 @@ export default function GenerarDocumentoStepper() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate(`/secretaria/acuerdos/${id}`)}
+                onClick={() => navigate(expedientePath)}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >

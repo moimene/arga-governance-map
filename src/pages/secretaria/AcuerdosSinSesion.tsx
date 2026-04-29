@@ -4,6 +4,7 @@ import { ScrollText, Plus, CheckCircle2, XCircle, MinusCircle } from "lucide-rea
 import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -17,7 +18,9 @@ const SELECT_CLASS =
 
 export default function AcuerdosSinSesion() {
   const navigate = useNavigate();
-  const { data, isLoading } = useAcuerdosSinSesionList();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useAcuerdosSinSesionList(scopedEntityId);
   const closeExpired = useCloseExpiredVotaciones();
 
   // Auto-close expired VOTING_OPEN processes on page load (G6)
@@ -61,7 +64,7 @@ export default function AcuerdosSinSesion() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/nuevo")}
+            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/nuevo"))}
             className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -70,7 +73,7 @@ export default function AcuerdosSinSesion() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/co-aprobacion")}
+            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/co-aprobacion"))}
             className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -79,7 +82,7 @@ export default function AcuerdosSinSesion() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/secretaria/acuerdos-sin-sesion/solidario")}
+            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/solidario"))}
             className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -88,6 +91,18 @@ export default function AcuerdosSinSesion() {
           </button>
         </div>
       </div>
+
+      {scope.mode === "sociedad" && scope.selectedEntity ? (
+        <div
+          className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Vista filtrada por sociedad:
+          <span className="ml-1 font-semibold text-[var(--g-text-primary)]">
+            {scope.selectedEntity.legalName}
+          </span>
+        </div>
+      ) : null}
 
       {/* Filtros */}
       <div className="mb-4 flex items-center gap-3">
@@ -147,7 +162,7 @@ export default function AcuerdosSinSesion() {
               filtered.map((r) => (
                 <tr
                   key={r.id}
-                  onClick={() => navigate(`/secretaria/acuerdos-sin-sesion/${r.id}`)}
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos-sin-sesion/${r.id}`))}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4">

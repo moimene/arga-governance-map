@@ -8,16 +8,23 @@
 
 const EAD_CONFIG = {
   okta: {
-    tokenUrl: 'https://legalappfactory.okta.com/oauth2/aus5zlw4kr0vhHKyx417/v1/token',
-    clientId: '0oa5zlx3zw9B6rJIT417',
-    clientSecret: 'F43FLFHrQZ0xIAFv6YjhBdMtcToU6HdxxgyYFsLf',
-    scope: 'token',
+    tokenUrl: import.meta.env.VITE_EAD_TRUST_OKTA_TOKEN_URL ?? '',
+    clientId: import.meta.env.VITE_EAD_TRUST_CLIENT_ID ?? '',
+    clientSecret: '',
+    scope: import.meta.env.VITE_EAD_TRUST_SCOPE ?? 'token',
   },
-  evidenceApiBaseUrl: 'https://api.int.gcloudfactory.com/digital-trust',
-  signatureApiBaseUrl: 'https://api.int.gcloudfactory.com/signature-manager',
-  pollIntervalMs: 3000,
-  pollMaxAttempts: 20,
+  evidenceApiBaseUrl: import.meta.env.VITE_EAD_TRUST_EVIDENCE_API_BASE_URL ?? '',
+  signatureApiBaseUrl: import.meta.env.VITE_EAD_TRUST_SIGNATURE_API_BASE_URL ?? '',
+  pollIntervalMs: Number(import.meta.env.VITE_EAD_TRUST_POLL_INTERVAL_MS ?? 3000),
+  pollMaxAttempts: Number(import.meta.env.VITE_EAD_TRUST_POLL_MAX_ATTEMPTS ?? 20),
 } as const;
+
+function assertServerSideQTSPProxyConfigured(): void {
+  throw new EADTrustError(
+    'EAD Trust client_credentials must run server-side through a QTSP proxy. Browser demo flows must use sandbox adapters.',
+    'QTSP_SERVER_PROXY_REQUIRED'
+  );
+}
 
 // ─── Token Cache ────────────────────────────────────────────────────────────
 
@@ -34,6 +41,10 @@ const TOKEN_SAFETY_MARGIN_MS = 60_000;
  * Caches the token and reuses it until 60s before expiry.
  */
 export async function getOktaToken(): Promise<string> {
+  if (!EAD_CONFIG.okta.tokenUrl || !EAD_CONFIG.okta.clientId || !EAD_CONFIG.okta.clientSecret) {
+    assertServerSideQTSPProxyConfigured();
+  }
+
   const now = Date.now();
 
   if (tokenCache && tokenCache.expiresAt > now + TOKEN_SAFETY_MARGIN_MS) {
@@ -553,6 +564,7 @@ export interface QESSignFlowResult {
   documentId: string;
   documentHash: string;
   signatoryIds: string[];
+  signedDocumentData?: ArrayBuffer;
 }
 
 /**

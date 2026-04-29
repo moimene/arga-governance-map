@@ -340,6 +340,8 @@ describe('Gate 6: Voto de Calidad', () => {
 
     expect(result.votoCalidadUsado).toBe(true);
     expect(result.mayoriaAlcanzada).toBe(true);
+    expect(result.acuerdoProclamable).toBe(true);
+    expect(result.blocking_issues).not.toContain('majority_not_achieved');
   });
 
   it('Empate sin voto calidad → no resuelto', () => {
@@ -456,6 +458,69 @@ describe('Consejo votación', () => {
     const result = evaluarVotacion(input, [pack]);
 
     expect(result.mayoriaAlcanzada).toBe(true);
+  });
+
+  it('Consejo no aprueba por mera presencia si faltan votos favorables', () => {
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      votos: {
+        favor: 0,
+        contra: 0,
+        abstenciones: 0,
+        en_blanco: 0,
+        capital_presente: 0,
+        capital_total: 0,
+        total_miembros: 10,
+        miembros_presentes: 10,
+      },
+    });
+    const pack = createBaseRulePack({
+      organoTipo: 'CONSEJO',
+      votacion: {
+        mayoria: {
+          SA: createBaseMajoritySpec(),
+          SL: createBaseMajoritySpec(),
+          CONSEJO: createBaseMajoritySpec({ formula: 'mayoria_consejeros' }),
+        },
+        abstenciones: 'no_cuentan',
+      },
+    });
+    const result = evaluarVotacion(input, [pack]);
+
+    expect(result.mayoriaAlcanzada).toBe(false);
+    expect(result.blocking_issues).toContain('majority_not_achieved');
+  });
+
+  it('Consejo de SA usa mayoria.CONSEJO antes que mayoria.SA', () => {
+    const input = createBaseInput({
+      tipoSocial: 'SA',
+      organoTipo: 'CONSEJO',
+      votos: {
+        favor: 4,
+        contra: 0,
+        abstenciones: 0,
+        en_blanco: 0,
+        capital_presente: 0,
+        capital_total: 0,
+        total_miembros: 9,
+        miembros_presentes: 4,
+      },
+    });
+    const pack = createBaseRulePack({
+      organoTipo: 'CONSEJO',
+      votacion: {
+        mayoria: {
+          SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
+          SL: createBaseMajoritySpec({ formula: 'favor > contra' }),
+          CONSEJO: createBaseMajoritySpec({ formula: 'mayoria_consejeros' }),
+        },
+        abstenciones: 'no_cuentan',
+      },
+    });
+    const result = evaluarVotacion(input, [pack]);
+
+    expect(result.mayoriaAlcanzada).toBe(false);
+    expect(result.blocking_issues).toContain('majority_not_achieved');
   });
 });
 
@@ -704,5 +769,7 @@ describe('G3: vetoActivo', () => {
 
     expect(result.votoCalidadUsado).toBe(true);
     expect(result.mayoriaAlcanzada).toBe(true);
+    expect(result.acuerdoProclamable).toBe(true);
+    expect(result.blocking_issues).not.toContain('majority_not_achieved');
   });
 });

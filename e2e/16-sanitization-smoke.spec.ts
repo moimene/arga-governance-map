@@ -1,0 +1,149 @@
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures/base';
+
+test.describe.configure({ timeout: 90_000 });
+
+const FATAL_UI_PATTERNS = [
+  /Ha ocurrido un error/i,
+  /relation .* does not exist/i,
+  /column .* does not exist/i,
+  /function .* does not exist/i,
+  /permission denied/i,
+  /violates row-level security/i,
+  /JWT expired/i,
+];
+
+async function isVisible(page: Page, pattern: RegExp): Promise<boolean> {
+  const heading = page.getByRole('heading', { name: pattern }).first();
+  if (await heading.isVisible().catch(() => false)) return true;
+  return page.getByText(pattern).first().isVisible().catch(() => false);
+}
+
+async function expectAnySignal(page: Page, signals: RegExp[]) {
+  await expect
+    .poll(async () => {
+      for (const signal of signals) {
+        if (await isVisible(page, signal)) return true;
+      }
+      return false;
+    }, { timeout: 15_000 })
+    .toBe(true);
+}
+
+async function expectNoFatalUi(page: Page) {
+  await expect(page).not.toHaveURL(/\/login/);
+  for (const pattern of FATAL_UI_PATTERNS) {
+    await expect(page.getByText(pattern).first()).toHaveCount(0);
+  }
+}
+
+async function visitRoute(page: Page, path: string, signals: RegExp[]) {
+  await page.goto(path);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 15_000 });
+  await expectAnySignal(page, signals);
+  await expectNoFatalUi(page);
+}
+
+async function openFirstDataRow(
+  page: Page,
+  path: string,
+  signals: RegExp[],
+  detailUrl: RegExp,
+  label: string,
+) {
+  await visitRoute(page, path, signals);
+
+  const rows = page.locator('tbody tr');
+  const rowCount = await rows.count();
+  for (let index = 0; index < rowCount; index += 1) {
+    const row = rows.nth(index);
+    const cells = row.locator('td');
+    if ((await cells.count()) <= 1) continue;
+
+    await cells.first().click();
+    if (!detailUrl.test(page.url())) {
+      await cells.first().dblclick();
+    }
+    await expect(page).toHaveURL(detailUrl);
+    await page.waitForLoadState('networkidle').catch(() => undefined);
+    await expectNoFatalUi(page);
+    return;
+  }
+
+  throw new Error(`${label}: no hay fila demo navegable para el smoke de sanitizacion`);
+}
+
+test.describe('Sanitization smoke — AIMS-GRC', () => {
+  test('pantallas core renderizan contra Cloud actual', async ({ page }) => {
+    const routes: Array<{ path: string; signals: RegExp[] }> = [
+      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i] },
+      { path: '/ai-governance/sistemas', signals: [/Sistemas IA/i, /Buscar sistema/i] },
+      { path: '/ai-governance/evaluaciones', signals: [/Evaluaciones/i, /Evaluaci[oó]n/i] },
+      { path: '/ai-governance/incidentes', signals: [/Incidentes IA/i, /Incidente/i] },
+      { path: '/grc', signals: [/GRC Compass/i, /Riesgos cr[ií]ticos/i] },
+      { path: '/grc/risk-360', signals: [/Risk 360/i, /Riesgo/i] },
+      { path: '/grc/packs', signals: [/Packs por Pa[ií]s/i, /Pack/i] },
+      { path: '/grc/mywork', signals: [/Mi Trabajo/i, /Trabajo/i] },
+      { path: '/grc/alertas', signals: [/Alertas/i] },
+      { path: '/grc/excepciones', signals: [/Excepciones/i] },
+    ];
+
+    for (const route of routes) {
+      await test.step(route.path, async () => {
+        await visitRoute(page, route.path, route.signals);
+      });
+    }
+  });
+});
+
+test.describe('Sanitization smoke — Secretaria', () => {
+  test('flujo convocatoria reunion acuerdo acta certificacion documento renderiza', async ({ page }) => {
+    await test.step('convocatoria detalle', async () => {
+      await openFirstDataRow(
+        page,
+        '/secretaria/convocatorias?scope=grupo',
+        [/Convocatorias/i],
+        /\/secretaria\/convocatorias\/[^/?]+/,
+        'convocatorias',
+      );
+      await expect(page.getByRole('button', { name: 'Convocatoria DOCX' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
+    });
+
+    await test.step('reunion detalle', async () => {
+      await openFirstDataRow(
+        page,
+        '/secretaria/reuniones?scope=grupo',
+        [/Reuniones/i],
+        /\/secretaria\/reuniones\/[^/?]+/,
+        'reuniones',
+      );
+      await expectAnySignal(page, [/Constituci[oó]n/i, /Qu[oó]rum/i, /Debates/i, /Votaciones/i, /Cierre/i]);
+    });
+
+    await test.step('acuerdo sin sesion asistente', async () => {
+      await visitRoute(
+        page,
+        '/secretaria/acuerdos-sin-sesion/nuevo',
+        [/Asistente de acuerdo escrito sin sesi[oó]n/i, /Paso 1/i],
+      );
+    });
+
+    await test.step('acta y certificacion', async () => {
+      await openFirstDataRow(
+        page,
+        '/secretaria/actas',
+        [/Actas y certificaciones/i],
+        /\/secretaria\/actas\/[^/?]+/,
+        'actas',
+      );
+      await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
+      await expectAnySignal(page, [/Certificaciones emitidas/i, /Certificaci[oó]n DOCX/i, /Emitir certificaci[oó]n/i]);
+    });
+
+    await test.step('gestor documental', async () => {
+      await visitRoute(page, '/secretaria/gestor-plantillas', [/Plantillas con contenido jur[ií]dico/i]);
+    });
+  });
+});

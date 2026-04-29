@@ -4,7 +4,41 @@ export interface ArchiveResult {
   ok: boolean;
   documentUrl?: string;
   hash512?: string;
+  evidenceBundleId?: string;
   error?: string;
+}
+
+export interface ArchiveMetadata {
+  processKind?: string;
+  recordId?: string;
+  templateId?: string | null;
+  templateTipo?: string;
+  templateVersion?: string;
+  contentHash?: string;
+  signedBy?: string;
+  qesSrId?: string;
+  qesDocumentId?: string;
+  qesDocumentHash?: string;
+  qesSignatoryIds?: string[];
+  qesSignedAt?: string;
+  archivedBufferKind?: "ORIGINAL_DOCX" | "QTSP_SIGNED_DOCX";
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`)
+    .join(",")}}`;
+}
+
+async function computeSha256(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -20,7 +54,8 @@ export async function archiveDocxToStorage(
   buffer: ArrayBuffer,
   agreementId: string,
   filename: string,
-  tenantId: string
+  tenantId: string,
+  metadata: ArchiveMetadata = {}
 ): Promise<ArchiveResult> {
   try {
 
@@ -31,6 +66,7 @@ export async function archiveDocxToStorage(
 
     // Upload to Supabase Storage
     const storagePath = `agreements/${agreementId}/${filename}.docx`;
+    const archivedAt = new Date().toISOString();
     const { error: uploadError, data } = await supabase.storage
       .from("matter-documents")
       .upload(storagePath, buffer, {
@@ -59,25 +95,60 @@ export async function archiveDocxToStorage(
       };
     }
 
+    const manifest = {
+      version: "docgen-process-v2",
+      created_at: archivedAt,
+      agreement_id: agreementId,
+      tenant_id: tenantId,
+      artifacts: [
+        {
+          type: "DOCX",
+          ref: data?.path ?? storagePath,
+          filename: `${filename}.docx`,
+          mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          hash_sha512: hashHex,
+          timestamp_iso: archivedAt,
+        },
+      ],
+      metadata,
+    };
+    const manifestHash = await computeSha256(canonicalJson(manifest));
+
     // Insert into evidence_bundles table
-    const { error: insertError } = await supabase.from("evidence_bundles").insert({
+    const { data: bundle, error: insertError } = await supabase.from("evidence_bundles").insert({
       tenant_id: tenantId,
       agreement_id: agreementId,
+      manifest,
+      manifest_hash: manifestHash,
       hash_sha512: hashHex,
       document_url: publicUrl,
-      signed_by: "SISTEMA",
-      archived_at: new Date().toISOString(),
-    });
+      signed_by: metadata.signedBy ?? "SISTEMA",
+      status: "OPEN",
+    }).select("id").maybeSingle();
 
     if (insertError) {
-      // Log the error but don't fail the archival since the file is already uploaded
-      console.warn("Warning: evidence_bundles insert failed:", insertError.message);
+      return {
+        ok: false,
+        documentUrl: publicUrl,
+        hash512: hashHex,
+        error: `Evidence bundle no creado: ${insertError.message}`,
+      };
+    }
+
+    if (!bundle?.id) {
+      return {
+        ok: false,
+        documentUrl: publicUrl,
+        hash512: hashHex,
+        error: "Evidence bundle no creado: la inserción no devolvió identificador",
+      };
     }
 
     return {
       ok: true,
       documentUrl: publicUrl,
       hash512: hashHex,
+      evidenceBundleId: bundle.id,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Error desconocido";

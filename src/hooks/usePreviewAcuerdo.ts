@@ -23,10 +23,17 @@ export interface PreviewParams {
 
 type RpRow = {
   materia: string;
-  clase: string;
-  organo_tipo: string;
-  rule_pack_versions: { id: string; params: unknown; is_active: boolean }[];
+  organo_tipo: string | null;
+  rule_pack_versions: { id: string; payload: unknown; is_active: boolean | null }[];
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function payloadClase(payload: unknown): string | null {
+  return isRecord(payload) && typeof payload.clase === "string" ? payload.clase : null;
+}
 
 export function usePreviewAcuerdo(params: PreviewParams) {
   const { tenantId } = useTenantContext();
@@ -41,7 +48,7 @@ export function usePreviewAcuerdo(params: PreviewParams) {
       // Query from rule_packs side — is_active is on rule_pack_versions, not status
       const { data: rulePacks, error } = await supabase
         .from("rule_packs")
-        .select("materia, clase, organo_tipo, rule_pack_versions!inner(id, params, is_active)")
+        .select("materia, organo_tipo, rule_pack_versions!inner(id, payload, is_active)")
         .eq("tenant_id", tenantId!)
         .eq("materia", params.materia)
         .eq("rule_pack_versions.is_active", true);
@@ -52,15 +59,16 @@ export function usePreviewAcuerdo(params: PreviewParams) {
 
       // Best match: prefer exact organo_tipo + clase, fall back to first
       const candidates = rows.filter((rp) => {
-        if (params.organoTipo && rp.organo_tipo !== params.organoTipo) return false;
-        if (params.materiaClase && rp.clase !== params.materiaClase) return false;
+        const versionPayload = rp.rule_pack_versions?.[0]?.payload;
+        if (params.organoTipo && rp.organo_tipo && rp.organo_tipo !== params.organoTipo) return false;
+        if (params.materiaClase && payloadClase(versionPayload) !== params.materiaClase) return false;
         return true;
       });
       const best = (candidates[0] ?? rows[0]);
       const version = best?.rule_pack_versions?.[0];
-      if (!version?.params) return null;
+      if (!version?.payload) return null;
 
-      const pack = version.params as RulePack;
+      const pack = version.payload as RulePack;
       const mode: AdoptionMode = params.adoptionMode ?? "NO_SESSION";
       const tipoSocial: TipoSocial = params.tipoSocial ?? "SA";
       const organoTipo: TipoOrgano = params.organoTipo ?? "JUNTA_GENERAL";

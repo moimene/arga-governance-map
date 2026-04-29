@@ -27,8 +27,10 @@ import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
+import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 interface RuleEvaluationResult {
   id: string;
@@ -74,9 +76,30 @@ const TIMELINE_LABEL: Record<string, string> = {
   PUBLISHED:    "Publicado",
 };
 
+const ADOPTION_MODES: AdoptionMode[] = [
+  "MEETING",
+  "UNIVERSAL",
+  "NO_SESSION",
+  "UNIPERSONAL_SOCIO",
+  "UNIPERSONAL_ADMIN",
+  "CO_APROBACION",
+  "SOLIDARIO",
+];
+
+const MATERIA_CLASES: MateriaClase[] = ["ORDINARIA", "ESTATUTARIA", "ESTRUCTURAL", "ESPECIAL"];
+
+function toAdoptionMode(value: string | null | undefined): AdoptionMode {
+  return ADOPTION_MODES.includes(value as AdoptionMode) ? (value as AdoptionMode) : "MEETING";
+}
+
+function toMateriaClase(value: string | null | undefined): MateriaClase {
+  return MATERIA_CLASES.includes(value as MateriaClase) ? (value as MateriaClase) : "ORDINARIA";
+}
+
 export default function ExpedienteAcuerdo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
   const { data: agreement, isLoading } = useAgreement(id);
   const { data: compliance } = useAgreementCompliance(id);
   const { data: verification, isLoading: verificationLoading } = useQTSPVerification(id);
@@ -112,12 +135,14 @@ export default function ExpedienteAcuerdo() {
 
   const a = agreement;
   const statusIndex = TIMELINE.indexOf(a.status);
+  const generarTo = scope.createScopedTo(`/secretaria/acuerdos/${id}/generar`);
+  const tramitadorTo = scope.createScopedTo("/secretaria/tramitador");
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate(-1)}
+        onClick={() => navigate(tramitadorTo)}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -151,7 +176,7 @@ export default function ExpedienteAcuerdo() {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+              onClick={() => navigate(generarTo)}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -248,7 +273,7 @@ export default function ExpedienteAcuerdo() {
               <p className="text-sm text-[var(--g-text-primary)]">
                 Adoptado en reunión{" "}
                 <Link
-                  to={`/secretaria/reuniones/${a.parent_meeting_id}`}
+                  to={scope.createScopedTo(`/secretaria/reuniones/${a.parent_meeting_id}`)}
                   className="text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
                 >
                   ver reunión
@@ -258,7 +283,7 @@ export default function ExpedienteAcuerdo() {
               <p className="text-sm text-[var(--g-text-primary)]">
                 Origen: decisión unipersonal{" "}
                 <Link
-                  to={`/secretaria/decisiones-unipersonales/${a.unipersonal_decision_id}`}
+                  to={scope.createScopedTo(`/secretaria/decisiones-unipersonales/${a.unipersonal_decision_id}`)}
                   className="text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
                 >
                   ver decisión
@@ -268,7 +293,7 @@ export default function ExpedienteAcuerdo() {
               <p className="text-sm text-[var(--g-text-primary)]">
                 Origen: acuerdo sin sesión{" "}
                 <Link
-                  to={`/secretaria/acuerdos-sin-sesion/${a.no_session_resolution_id}`}
+                  to={scope.createScopedTo(`/secretaria/acuerdos-sin-sesion/${a.no_session_resolution_id}`)}
                   className="text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
                 >
                   ver acuerdo
@@ -346,7 +371,7 @@ export default function ExpedienteAcuerdo() {
 
           <ApprovalWorkflowCard
             agreementId={a.id}
-            onNavigateGenerar={() => navigate(`/secretaria/acuerdos/${id}/generar`)}
+            onNavigateGenerar={() => navigate(generarTo)}
             currentUserRole={primaryRole}
             currentUserName={displayName}
             initialWorkflow={a.approval_workflow as ApprovalStep[] | null}
@@ -441,9 +466,9 @@ export default function ExpedienteAcuerdo() {
           <PreviewGatePanel
             params={{
               materia: a.agreement_kind,
-              adoptionMode: a.adoption_mode as any,
+              adoptionMode: toAdoptionMode(a.adoption_mode),
               tipoSocial: a.entities?.legal_form?.toUpperCase() === "SA" ? "SA" : "SL",
-              materiaClase: a.matter_class as any,
+              materiaClase: toMateriaClase(a.matter_class),
             }}
           />
 

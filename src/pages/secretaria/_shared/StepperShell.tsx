@@ -1,6 +1,7 @@
-import { useState, ReactNode } from "react";
+import { useEffect, useMemo, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 export interface StepDef {
   n: number;
@@ -28,7 +29,19 @@ export function StepperShell({
   placeholderNote,
 }: StepperShellProps) {
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
   const [current, setCurrent] = useState(1);
+  const firstBlockedStep = useMemo(
+    () => [...steps].sort((a, b) => a.n - b.n).find((step) => step.canAdvance === false) ?? null,
+    [steps],
+  );
+
+  useEffect(() => {
+    if (firstBlockedStep && current > firstBlockedStep.n) {
+      setCurrent(firstBlockedStep.n);
+    }
+  }, [current, firstBlockedStep]);
+
   const currentStep = steps.find((s) => s.n === current) ?? steps[0];
   const nextBlockedByGate = currentStep?.canAdvance === false;
   const nextDisabled = current === steps.length || nextBlockedByGate;
@@ -40,7 +53,7 @@ export function StepperShell({
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate(backTo)}
+        onClick={() => navigate(scope.createScopedTo(backTo))}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -65,14 +78,21 @@ export function StepperShell({
           {steps.map((s) => {
             const done = s.n < current;
             const active = s.n === current;
+            const blockedByEarlierStep = Boolean(firstBlockedStep && s.n > firstBlockedStep.n);
             return (
               <button
                 key={s.n}
                 type="button"
-                onClick={() => setCurrent(s.n)}
+                onClick={() => {
+                  if (!blockedByEarlierStep) setCurrent(s.n);
+                }}
+                disabled={blockedByEarlierStep}
+                title={blockedByEarlierStep ? "Complete el paso bloqueante antes de continuar" : undefined}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   active
                     ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
+                    : blockedByEarlierStep
+                    ? "cursor-not-allowed text-[var(--g-text-secondary)] opacity-50"
                     : "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50"
                 }`}
                 style={{ borderRadius: "var(--g-radius-md)" }}

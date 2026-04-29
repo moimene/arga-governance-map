@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY =
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: localStorage,
+    storage: typeof localStorage === "undefined" ? undefined : localStorage,
     persistSession: true,
     autoRefreshToken: true,
   },

@@ -6,6 +6,7 @@ import {
   FileSignature,
   Gavel,
   Library,
+  Database,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -18,9 +19,19 @@ import {
   Calendar,
   Plus,
   FileText,
+  Repeat2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
+import { statusLabel } from "@/lib/secretaria/status-labels";
+import {
+  SECRETARIA_SANITIZED_FLOW_CONTRACTS,
+  summarizeSecretariaSanitizedFlows,
+  type SecretariaFlowDemoStatus,
+  type SecretariaFlowParityRisk,
+} from "@/lib/secretaria/sanitized-flow-contracts";
 
 interface KpiCounts {
   convocatorias_proximas: number;
@@ -51,90 +62,218 @@ interface CrossModuleMetrics {
   pactos_vigentes: number;
 }
 
-function useCrossModuleMetrics() {
-  const { tenantId, entityId } = useTenantContext();
+function useCrossModuleMetrics(entityId?: string | null) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "cross_module", tenantId],
+    queryKey: ["secretaria", "cross_module", tenantId, entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<CrossModuleMetrics> => {
+      const { bodyIds } = await getSecretariaScopedIds(tenantId!, entityId);
+
+      async function countIncidents() {
+        let query = supabase
+          .from("incidents")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId!)
+          .eq("status", "Abierto");
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countFindings() {
+        let query = supabase
+          .from("findings")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId!)
+          .in("severity", ["Alta", "Crítica"])
+          .eq("status", "Abierto");
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countPolicies() {
+        if (bodyIds?.length === 0) return 0;
+        let query = supabase
+          .from("policies")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId!)
+          .in("status", ["In Review", "Approval Pending"]);
+        if (bodyIds) query = query.in("approval_body_id", bodyIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countPactos() {
+        let query = supabase
+          .from("pactos_parasociales")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId!)
+          .eq("estado", "VIGENTE");
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
       const [incidents, findings, policies, pactos] = await Promise.all([
-        supabase.from("incidents").select("id", { count: "exact", head: true }).eq("status", "Abierto"),
-        supabase.from("findings").select("id", { count: "exact", head: true }).in("severity", ["Alta", "Crítica"]).eq("status", "Abierto"),
-        supabase.from("policies").select("id", { count: "exact", head: true }).in("status", ["In Review", "Approval Pending"]),
-        supabase.from("pactos_parasociales").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId!).eq("entity_id", entityId ?? "").eq("estado", "VIGENTE"),
+        countIncidents(),
+        countFindings(),
+        countPolicies(),
+        countPactos(),
       ]);
+
       return {
-        incidents_open: incidents.count ?? 0,
-        findings_criticos: findings.count ?? 0,
-        policies_pendientes: policies.count ?? 0,
-        pactos_vigentes: pactos.count ?? 0,
+        incidents_open: incidents,
+        findings_criticos: findings,
+        policies_pendientes: policies,
+        pactos_vigentes: pactos,
       };
     },
     staleTime: 60_000,
   });
 }
 
-function useSecretariaKpis() {
+function useSecretariaKpis(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "kpis", tenantId],
+    queryKey: ["secretaria", "kpis", tenantId, entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<KpiCounts> => {
       const hoyIso = new Date().toISOString();
       const en7 = new Date(Date.now() + 7 * 86400000).toISOString();
       const en30 = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+      const { bodyIds, agreementIds } = await getSecretariaScopedIds(tenantId!, entityId);
 
-      const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
-        supabase
+      async function countConvocatorias(maxDate?: string) {
+        if (bodyIds?.length === 0) return 0;
+        let query = supabase
           .from("convocatorias")
           .select("id", { count: "exact", head: true })
-          .gte("fecha_1", hoyIso),
-        supabase
-          .from("convocatorias")
+          .eq("tenant_id", tenantId!)
+          .gte("fecha_1", hoyIso);
+        if (maxDate) query = query.lte("fecha_1", maxDate);
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countReunionesSemana() {
+        if (bodyIds?.length === 0) return 0;
+        let query = supabase
+          .from("meetings")
           .select("id", { count: "exact", head: true })
-          .gte("fecha_1", hoyIso)
-          .lte("fecha_1", en7),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .gte("scheduled_start", hoyIso)
+          .lte("scheduled_start", en7);
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countActasSinFirmar() {
+        let query = supabase
           .from("minutes")
           .select("id", { count: "exact", head: true })
-          .is("signed_at", null),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .is("signed_at", null);
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countTramitaciones(statuses: string[]) {
+        if (agreementIds?.length === 0) return 0;
+        let query = supabase
           .from("registry_filings")
           .select("id", { count: "exact", head: true })
-          .in("status", ["EN_TRAMITE", "PRESENTADA"]),
-        supabase
-          .from("registry_filings")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "SUBSANACION"),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .in("status", statuses);
+        if (agreementIds) query = query.in("agreement_id", agreementIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countAcuerdosSinSesion() {
+        if (bodyIds?.length === 0) return 0;
+        let query = supabase
           .from("no_session_resolutions")
           .select("id", { count: "exact", head: true })
-          .eq("status", "VOTING_OPEN"),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .eq("status", "VOTING_OPEN");
+        if (bodyIds) query = query.in("body_id", bodyIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countDecisionesUnipersonales() {
+        let query = supabase
           .from("unipersonal_decisions")
           .select("id", { count: "exact", head: true })
-          .eq("status", "BORRADOR"),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .eq("status", "BORRADOR");
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countLibrosAlerta() {
+        let query = supabase
           .from("mandatory_books")
           .select("id", { count: "exact", head: true })
-          .lte("legalization_deadline", en30),
-        supabase
+          .eq("tenant_id", tenantId!)
+          .lte("legalization_deadline", en30);
+        if (entityId) query = query.eq("entity_id", entityId);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      async function countCompliancePendiente() {
+        if (agreementIds?.length === 0) return 0;
+        let query = supabase
           .from("rule_evaluation_results")
           .select("agreement_id", { count: "exact", head: true })
-          .eq("ok", false)
-          .eq("tenant_id", tenantId!),
+          .eq("tenant_id", tenantId!)
+          .eq("ok", false);
+        if (agreementIds) query = query.in("agreement_id", agreementIds);
+        const { count, error } = await query;
+        if (error) throw error;
+        return count ?? 0;
+      }
+
+      const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
+        countConvocatorias(),
+        countReunionesSemana(),
+        countActasSinFirmar(),
+        countTramitaciones(["EN_TRAMITE", "PRESENTADA"]),
+        countTramitaciones(["SUBSANACION"]),
+        countAcuerdosSinSesion(),
+        countDecisionesUnipersonales(),
+        countLibrosAlerta(),
+        countCompliancePendiente(),
       ]);
 
       return {
-        convocatorias_proximas: conv.count ?? 0,
-        reuniones_semana: reun.count ?? 0,
-        actas_sin_firmar: actas.count ?? 0,
-        tramitaciones_curso: tram.count ?? 0,
-        tramitaciones_subsanacion: tramSub.count ?? 0,
-        acuerdos_sin_sesion_votando: asoc.count ?? 0,
-        decisiones_unipersonales_borrador: du.count ?? 0,
-        libros_alerta: libros.count ?? 0,
-        acuerdos_compliance_pendiente: compliancePending.count ?? 0,
+        convocatorias_proximas: conv,
+        reuniones_semana: reun,
+        actas_sin_firmar: actas,
+        tramitaciones_curso: tram,
+        tramitaciones_subsanacion: tramSub,
+        acuerdos_sin_sesion_votando: asoc,
+        decisiones_unipersonales_borrador: du,
+        libros_alerta: libros,
+        acuerdos_compliance_pendiente: compliancePending,
       };
     },
   });
@@ -147,6 +286,14 @@ type ConvocatoriaAgendaRow = {
   modalidad: string | null;
   is_second_call: boolean | null;
   body_id: string;
+  governing_bodies?: { name?: string | null } | null;
+};
+
+type MeetingAgendaRow = {
+  id: string;
+  status: string | null;
+  scheduled_start: string | null;
+  meeting_type: string | null;
   governing_bodies?: { name?: string | null } | null;
 };
 
@@ -165,71 +312,118 @@ type NoSessionAgendaRow = {
   voting_deadline: string | null;
 };
 
-function useSecretariaAgenda() {
+function useSecretariaAgenda(entityId?: string | null) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["secretaria", "agenda"],
+    queryKey: ["secretaria", "agenda", tenantId, entityId ?? "all"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<AgendaItem[]> => {
       const items: AgendaItem[] = [];
+      const { bodyIds, agreementIds } = await getSecretariaScopedIds(tenantId!, entityId);
 
-      const { data: convs } = await supabase
-        .from("convocatorias")
-        .select(
-          "id, estado, fecha_1, modalidad, is_second_call, body_id, governing_bodies(name)",
-        )
-        .order("fecha_1", { ascending: true })
-        .limit(5);
+      if (bodyIds?.length !== 0) {
+        let convsQuery = supabase
+          .from("convocatorias")
+          .select(
+            "id, estado, fecha_1, modalidad, is_second_call, body_id, governing_bodies(name)",
+          )
+          .eq("tenant_id", tenantId!)
+          .gte("fecha_1", new Date().toISOString());
+        if (bodyIds) convsQuery = convsQuery.in("body_id", bodyIds);
+        const { data: convs, error: convsError } = await convsQuery
+          .order("fecha_1", { ascending: true })
+          .limit(5);
+        if (convsError) throw convsError;
 
-      ((convs ?? []) as ConvocatoriaAgendaRow[]).forEach((c) => {
-        const bodyName = c.governing_bodies?.name ?? "Órgano";
-        const conv2 = c.is_second_call ? " · 2ª conv" : "";
-        items.push({
-          id: c.id,
-          tipo: "convocatoria",
-          titulo: `${bodyName}${conv2}`,
-          fecha: c.fecha_1,
-          estado: c.estado,
-          sublabel: `Convocatoria · ${c.modalidad ?? ""}`.trim(),
-          nav_to: `/secretaria/convocatorias/${c.id}`,
+        ((convs ?? []) as ConvocatoriaAgendaRow[]).forEach((c) => {
+          const bodyName = c.governing_bodies?.name ?? "Órgano";
+          const conv2 = c.is_second_call ? " · 2ª conv" : "";
+          items.push({
+            id: c.id,
+            tipo: "convocatoria",
+            titulo: `${bodyName}${conv2}`,
+            fecha: c.fecha_1,
+            estado: c.estado,
+            sublabel: `Convocatoria · ${c.modalidad ?? ""}`.trim(),
+            nav_to: `/secretaria/convocatorias/${c.id}`,
+          });
         });
-      });
+      }
 
-      const { data: filings } = await supabase
-        .from("registry_filings")
-        .select("id, filing_number, filing_via, status, presentation_date")
-        .in("status", ["EN_TRAMITE", "PRESENTADA", "SUBSANACION"])
-        .order("presentation_date", { ascending: false })
-        .limit(5);
+      if (bodyIds?.length !== 0) {
+        let meetingsQuery = supabase
+          .from("meetings")
+          .select("id, status, scheduled_start, meeting_type, governing_bodies(name)")
+          .eq("tenant_id", tenantId!)
+          .gte("scheduled_start", new Date().toISOString());
+        if (bodyIds) meetingsQuery = meetingsQuery.in("body_id", bodyIds);
+        const { data: meetings, error: meetingsError } = await meetingsQuery
+          .order("scheduled_start", { ascending: true })
+          .limit(5);
+        if (meetingsError) throw meetingsError;
 
-      ((filings ?? []) as FilingAgendaRow[]).forEach((f) => {
-        items.push({
-          id: f.id,
-          tipo: "tramitacion",
-          titulo: `${f.filing_number ?? "s/n"} · ${f.filing_via ?? ""}`.trim(),
-          fecha: f.presentation_date,
-          estado: f.status,
-          sublabel: "Tramitación registral",
-          nav_to: `/secretaria/tramitador/${f.id}`,
+        ((meetings ?? []) as MeetingAgendaRow[]).forEach((m) => {
+          items.push({
+            id: m.id,
+            tipo: "reunion",
+            titulo: m.governing_bodies?.name ?? "Reunión societaria",
+            fecha: m.scheduled_start,
+            estado: m.status ?? "PROGRAMADA",
+            sublabel: `Reunión · ${m.meeting_type ?? ""}`.trim(),
+            nav_to: `/secretaria/reuniones/${m.id}`,
+          });
         });
-      });
+      }
 
-      const { data: asocs } = await supabase
-        .from("no_session_resolutions")
-        .select("id, title, status, voting_deadline")
-        .eq("status", "VOTING_OPEN")
-        .order("voting_deadline", { ascending: true })
-        .limit(3);
+      if (agreementIds?.length !== 0) {
+        let filingsQuery = supabase
+          .from("registry_filings")
+          .select("id, filing_number, filing_via, status, presentation_date")
+          .eq("tenant_id", tenantId!)
+          .in("status", ["EN_TRAMITE", "PRESENTADA", "SUBSANACION"]);
+        if (agreementIds) filingsQuery = filingsQuery.in("agreement_id", agreementIds);
+        const { data: filings, error: filingsError } = await filingsQuery
+          .order("presentation_date", { ascending: false })
+          .limit(5);
+        if (filingsError) throw filingsError;
 
-      ((asocs ?? []) as NoSessionAgendaRow[]).forEach((a) => {
-        items.push({
-          id: a.id,
-          tipo: "acuerdo_sin_sesion",
-          titulo: a.title ?? "Acuerdo sin sesión",
-          fecha: a.voting_deadline,
-          estado: a.status,
-          sublabel: "Acuerdo sin sesión",
-          nav_to: `/secretaria/acuerdos-sin-sesion/${a.id}`,
+        ((filings ?? []) as FilingAgendaRow[]).forEach((f) => {
+          items.push({
+            id: f.id,
+            tipo: "tramitacion",
+            titulo: `${f.filing_number ?? "s/n"} · ${f.filing_via ?? ""}`.trim(),
+            fecha: f.presentation_date,
+            estado: f.status,
+            sublabel: "Tramitación registral",
+            nav_to: `/secretaria/tramitador/${f.id}`,
+          });
         });
-      });
+      }
+
+      if (bodyIds?.length !== 0) {
+        let asocsQuery = supabase
+          .from("no_session_resolutions")
+          .select("id, title, status, voting_deadline")
+          .eq("tenant_id", tenantId!)
+          .eq("status", "VOTING_OPEN");
+        if (bodyIds) asocsQuery = asocsQuery.in("body_id", bodyIds);
+        const { data: asocs, error: asocsError } = await asocsQuery
+          .order("voting_deadline", { ascending: true })
+          .limit(3);
+        if (asocsError) throw asocsError;
+
+        ((asocs ?? []) as NoSessionAgendaRow[]).forEach((a) => {
+          items.push({
+            id: a.id,
+            tipo: "acuerdo_sin_sesion",
+            titulo: a.title ?? "Acuerdo sin sesión",
+            fecha: a.voting_deadline,
+            estado: a.status,
+            sublabel: "Acuerdo sin sesión",
+            nav_to: `/secretaria/acuerdos-sin-sesion/${a.id}`,
+          });
+        });
+      }
 
       return items
         .sort((a, b) => {
@@ -267,7 +461,7 @@ function StatusChip({ value }: { value: string }) {
       className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium ${tone.bg} ${tone.text}`}
       style={{ borderRadius: "var(--g-radius-sm)" }}
     >
-      {value}
+      {statusLabel(value)}
     </span>
   );
 }
@@ -317,11 +511,58 @@ function KpiCard({ icon: Icon, label, value, tone = "primary", sublabel, onClick
   );
 }
 
+const flowRoute: Record<string, string> = {
+  "agreement-360": "/secretaria/acuerdos-sin-sesion",
+  convocatorias: "/secretaria/convocatorias",
+  reuniones: "/secretaria/reuniones",
+  actas: "/secretaria/actas",
+  certificaciones: "/secretaria/actas",
+  "gestor-documental": "/secretaria/gestor-plantillas",
+  "plantillas-pre": "/secretaria/gestor-plantillas",
+  "board-pack": "/secretaria/board-pack",
+};
+
+function flowStatusLabel(status: SecretariaFlowDemoStatus) {
+  if (status === "ready") return "Demo";
+  if (status === "partial") return "Parcial";
+  return "Bloqueado";
+}
+
+function flowStatusClass(status: SecretariaFlowDemoStatus) {
+  if (status === "ready") return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
+  if (status === "partial") return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+  return "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+}
+
+function parityRiskLabel(risk: SecretariaFlowParityRisk) {
+  if (risk === "low") return "Riesgo bajo";
+  if (risk === "medium") return "Riesgo medio";
+  return "Riesgo alto";
+}
+
+function flowEvidenceLabel(level: string) {
+  const labels: Record<string, string> = {
+    none: "sin evidencia final productiva",
+    OWNER_RECORD: "registro owner",
+    GENERATED: "generado; no final productivo",
+    ARCHIVED: "archivado demo/operativo",
+    BUNDLED: "bundle operativo demo",
+    QTSP_SIGNED: "firma QTSP demo/operativa",
+    AUDIT_VERIFIED: "audit verificado",
+    mixed: "mixta; revisar postura",
+  };
+  return labels[level] ?? "postura por revisar";
+}
+
 export default function SecretariaDashboard() {
   const navigate = useNavigate();
-  const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis();
-  const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda();
-  const { data: crossModule } = useCrossModuleMetrics();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis(scopedEntityId);
+  const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda(scopedEntityId);
+  const { data: crossModule } = useCrossModuleMetrics(scopedEntityId);
+  const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
+  const flowSummary = summarizeSecretariaSanitizedFlows();
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -338,20 +579,31 @@ export default function SecretariaDashboard() {
           decisiones unipersonales y acuerdos sin sesión — conforme a LSC (ES), CSC (PT), Lei das SA
           (BR) y LGSM (MX).
         </p>
+        <div
+          className="mt-3 inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-full)" }}
+        >
+          {scope.mode === "sociedad" && scope.selectedEntity
+            ? `Vista filtrada por sociedad: ${scope.selectedEntity.legalName}`
+            : "Vista de grupo: datos agregados de la cartera societaria"}
+        </div>
       </div>
 
       {/* Acciones rápidas */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {[
+          ...(scope.mode === "grupo"
+            ? [{ label: "Campaña cuentas grupo", icon: Repeat2, path: "/secretaria/procesos-grupo" }]
+            : []),
           { label: "Nueva convocatoria", icon: Bell,         path: "/secretaria/convocatorias/nueva" },
-          { label: "Nueva reunión",      icon: Users,        path: "/secretaria/reuniones/new" },
+          { label: "Nueva reunión",      icon: Users,        path: "/secretaria/reuniones/nueva" },
           { label: "Nuevo acuerdo",      icon: ScrollText,   path: "/secretaria/acuerdos-sin-sesion/nuevo" },
           { label: "Generar documento",  icon: FileText,     path: "/secretaria/tramitador/nuevo" },
         ].map(({ label, icon: Icon, path }) => (
           <button
             key={path}
             type="button"
-            onClick={() => navigate(path)}
+            onClick={() => navigateSecretaria(path)}
             className="flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-3 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-sec-100)] hover:text-[var(--g-brand-3308)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -370,14 +622,14 @@ export default function SecretariaDashboard() {
           value={kpiLoading ? "…" : kpis?.convocatorias_proximas ?? 0}
           sublabel={`${kpis?.reuniones_semana ?? 0} en los próximos 7 días`}
           tone="primary"
-          onClick={() => navigate("/secretaria/convocatorias")}
+          onClick={() => navigateSecretaria("/secretaria/convocatorias")}
         />
         <KpiCard
           icon={FileSignature}
           label="Actas sin firmar"
           value={kpiLoading ? "…" : kpis?.actas_sin_firmar ?? 0}
           tone={kpis && kpis.actas_sin_firmar > 0 ? "warning" : "neutral"}
-          onClick={() => navigate("/secretaria/actas")}
+          onClick={() => navigateSecretaria("/secretaria/actas")}
         />
         <KpiCard
           icon={Gavel}
@@ -389,7 +641,7 @@ export default function SecretariaDashboard() {
               : "Ninguna en subsanación"
           }
           tone={kpis && kpis.tramitaciones_subsanacion > 0 ? "warning" : "primary"}
-          onClick={() => navigate("/secretaria/tramitador")}
+          onClick={() => navigateSecretaria("/secretaria/tramitador")}
         />
         <KpiCard
           icon={Library}
@@ -397,14 +649,14 @@ export default function SecretariaDashboard() {
           value={kpiLoading ? "…" : kpis?.libros_alerta ?? 0}
           sublabel="Legalización próxima"
           tone={kpis && kpis.libros_alerta > 0 ? "error" : "neutral"}
-          onClick={() => navigate("/secretaria/libros")}
+          onClick={() => navigateSecretaria("/secretaria/libros")}
         />
         <KpiCard
           icon={TrendingUp}
           label="Métricas plantillas"
           value="→"
           sublabel="Seguimiento leading/lagging"
-          onClick={() => navigate("/secretaria/plantillas-tracker")}
+          onClick={() => navigateSecretaria("/secretaria/plantillas-tracker")}
         />
       </div>
 
@@ -415,28 +667,28 @@ export default function SecretariaDashboard() {
           label="Acuerdos sin sesión · Votando"
           value={kpiLoading ? "…" : kpis?.acuerdos_sin_sesion_votando ?? 0}
           tone="warning"
-          onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
         />
         <KpiCard
           icon={Building2}
           label="Decisiones unipersonales · Borrador"
           value={kpiLoading ? "…" : kpis?.decisiones_unipersonales_borrador ?? 0}
           tone="neutral"
-          onClick={() => navigate("/secretaria/decisiones-unipersonales")}
+          onClick={() => navigateSecretaria("/secretaria/decisiones-unipersonales")}
         />
         <KpiCard
           icon={Users}
           label="Reuniones esta semana"
           value={kpiLoading ? "…" : kpis?.reuniones_semana ?? 0}
           tone="primary"
-          onClick={() => navigate("/secretaria/reuniones")}
+          onClick={() => navigateSecretaria("/secretaria/reuniones")}
         />
         <KpiCard
           icon={Scale}
           label="Acuerdos pendientes compliance"
           value={kpiLoading ? "…" : kpis?.acuerdos_compliance_pendiente ?? 0}
           tone={kpis && kpis.acuerdos_compliance_pendiente > 0 ? "warning" : "neutral"}
-          onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
         />
       </div>
 
@@ -446,23 +698,23 @@ export default function SecretariaDashboard() {
           icon={HandshakeIcon}
           label="Pactos parasociales vigentes"
           value={crossModule?.pactos_vigentes ?? "…"}
-          sublabel="Fundación ARGA · VIGENTE"
+          sublabel={scope.mode === "sociedad" && scope.selectedEntity ? scope.selectedEntity.name : "Grupo ARGA"}
           tone="primary"
-          onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
         />
         <KpiCard
           icon={ShieldAlert}
           label="Incidencias GRC abiertas"
           value={crossModule?.incidents_open ?? "…"}
           tone={crossModule && crossModule.incidents_open > 0 ? "warning" : "neutral"}
-          onClick={() => navigate("/grc/incidents")}
+          onClick={() => navigate("/grc/incidentes")}
         />
         <KpiCard
           icon={AlertTriangle}
           label="Hallazgos críticos"
           value={crossModule?.findings_criticos ?? "…"}
           tone={crossModule && crossModule.findings_criticos > 0 ? "error" : "neutral"}
-          onClick={() => navigate("/grc/findings")}
+          onClick={() => navigate("/grc/m/audit/operate/findings")}
         />
         <KpiCard
           icon={Calendar}
@@ -470,8 +722,72 @@ export default function SecretariaDashboard() {
           value="→"
           sublabel="Ver todos los plazos"
           tone="primary"
-          onClick={() => navigate("/secretaria/calendario")}
+          onClick={() => navigateSecretaria("/secretaria/calendario")}
         />
+      </div>
+
+      <div
+        className="mt-8 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="flex flex-col gap-3 border-b border-[var(--g-border-subtle)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+              <Database className="h-3.5 w-3.5" />
+              Sanitización Supabase
+            </div>
+            <h2 className="mt-1 text-base font-semibold text-[var(--g-text-primary)]">
+              Contratos por flujo Secretaría
+            </h2>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Cloud es fuente de verdad. Sin migraciones, tipos, RLS, RPC ni storage en esta tanda.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+              <div className="text-xs text-[var(--g-text-secondary)]">Listos</div>
+              <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.ready}/{flowSummary.total}</div>
+            </div>
+            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+              <div className="text-xs text-[var(--g-text-secondary)]">Parciales</div>
+              <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.partial}</div>
+            </div>
+            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+              <div className="text-xs text-[var(--g-text-secondary)]">Riesgo alto</div>
+              <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.highRisk}</div>
+            </div>
+          </div>
+        </div>
+        <div className="grid divide-y divide-[var(--g-border-subtle)] md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+          {SECRETARIA_SANITIZED_FLOW_CONTRACTS.map((flow) => (
+            <button
+              key={flow.id}
+              type="button"
+              onClick={() => navigateSecretaria(flowRoute[flow.id] ?? "/secretaria")}
+              className="flex min-h-[132px] flex-col items-start gap-2 px-5 py-4 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
+            >
+              <div className="flex w-full items-start justify-between gap-2">
+                <span className="text-sm font-semibold text-[var(--g-text-primary)]">{flow.label}</span>
+                <span
+                  className={`shrink-0 px-2 py-0.5 text-[10px] font-semibold ${flowStatusClass(flow.demoStatus)}`}
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {flowStatusLabel(flow.demoStatus)}
+                </span>
+              </div>
+              <div className="text-xs text-[var(--g-text-secondary)]">
+                Owner: {flow.ownerTables.length ? flow.ownerTables.slice(0, 2).join(", ") : "lectura compuesta"}
+                {flow.ownerTables.length > 2 ? "…" : ""}
+              </div>
+              <div className="text-xs text-[var(--g-text-secondary)]">
+                Postura probatoria: {flowEvidenceLabel(flow.evidenceLevel)} · {parityRiskLabel(flow.parityRisk)}
+              </div>
+              <div className="mt-auto text-[11px] text-[var(--g-text-secondary)]">
+                Migración: no · Tipos/RLS/RPC/storage: no
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Agenda / Actividad reciente */}
@@ -495,7 +811,7 @@ export default function SecretariaDashboard() {
                 <button
                   key={`${item.tipo}-${item.id}`}
                   type="button"
-                  onClick={() => navigate(item.nav_to)}
+                  onClick={() => navigateSecretaria(item.nav_to)}
                   className="flex w-full items-center justify-between px-5 py-3 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <div className="flex flex-col gap-0.5">

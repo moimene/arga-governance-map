@@ -3,7 +3,10 @@ import { useParams, Link } from "react-router-dom";
 import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
+  Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
+  Landmark, Route, ScrollText,
 } from "lucide-react";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
@@ -33,9 +36,72 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "autoridad",        label: "Autoridad",           icon: ShieldCheck },
 ];
 
+function tipoSocialLabel(value: string | null | undefined) {
+  if (!value) return "Tipo social pendiente";
+  return (
+    {
+      SA: "Sociedad Anónima",
+      SAU: "Sociedad Anónima Unipersonal",
+      SL: "Sociedad Limitada",
+      SLU: "Sociedad Limitada Unipersonal",
+    } as Record<string, string>
+  )[value] ?? value;
+}
+
+function normalizeAdminForm(value: string | null | undefined, fallback: string | null | undefined) {
+  const joined = `${value ?? ""} ${fallback ?? ""}`.toUpperCase();
+  if (joined.includes("MANCOMUN")) return "Administradores mancomunados";
+  if (joined.includes("SOLIDAR")) return "Administradores solidarios";
+  if (joined.includes("UNICO") || joined.includes("ÚNICO")) return "Administrador único";
+  if (joined.includes("CONSEJO")) return "Consejo de Administración";
+  return value ?? fallback ?? "Forma de administración pendiente";
+}
+
+function getSociedadModel(s: NonNullable<ReturnType<typeof useSociedad>["data"]>) {
+  const admin = normalizeAdminForm(s.forma_administracion, s.tipo_organo_admin);
+  const social = s.tipo_social ?? s.legal_form ?? "";
+  const isSa = social.includes("SA");
+  const isSl = social.includes("SL");
+
+  const adminFlow = admin.includes("mancomunados")
+    ? "Co-aprobación: requiere las firmas mancomunadas vigentes antes de documentar el acuerdo."
+    : admin.includes("solidarios")
+      ? "Administrador solidario: el expediente puede cerrarse con actuación de un administrador vigente."
+      : admin.includes("único")
+        ? "Administrador único: no hay sesión ni convocatoria; se documenta la decisión del cargo vigente."
+        : "Consejo: el sistema propone sesión formal o acuerdo sin sesión según materia, urgencia y estatutos.";
+
+  const juntaFlow = s.es_unipersonal
+    ? "Socio único: las materias de junta se documentan como decisión unipersonal, sin convocatoria formal."
+    : isSa
+      ? "Junta SA: convocatoria con antelación legal reforzada y control documental desde la convocatoria."
+      : isSl
+        ? "Junta SL: convocatoria individual a socios con evidencia del canal utilizado."
+        : "Junta: se aplican reglas de constitución, mayoría y documentación según jurisdicción y estatutos.";
+
+  const evidenceFlow = s.es_cotizada
+    ? "Cotizada: el motor evalúa LSC y añade advertencias LMV sin bloquear automáticamente el flujo."
+    : "No cotizada: el flujo se centra en LSC, estatutos, evidencias y trazabilidad registral.";
+
+  return {
+    admin,
+    socialLabel: tipoSocialLabel(s.tipo_social ?? s.legal_form),
+    adminFlow,
+    juntaFlow,
+    evidenceFlow,
+    facts: [
+      { label: "Tipo social", value: tipoSocialLabel(s.tipo_social ?? s.legal_form) },
+      { label: "Administración", value: admin },
+      { label: "Unipersonal", value: s.es_unipersonal ? "Sí" : "No" },
+      { label: "Cotizada", value: s.es_cotizada ? "Sí" : "No" },
+    ],
+  };
+}
+
 export default function SociedadDetalle() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<TabId>("perfil");
+  const scope = useSecretariaScope();
   const { data: s, isLoading } = useSociedad(id);
 
   if (isLoading) {
@@ -54,25 +120,37 @@ export default function SociedadDetalle() {
     );
   }
 
+  const model = getSociedadModel(s);
+
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <div className="mb-4">
         <Link
-          to="/secretaria/sociedades"
+          to="/secretaria/sociedades?scope=grupo"
           className="inline-flex items-center gap-1 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
         >
-          <ChevronLeft className="h-3 w-3" /> Sociedades
+          <ChevronLeft className="h-3 w-3" /> Cartera de sociedades
         </Link>
       </div>
 
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            <Building2 className="h-3.5 w-3.5" />
+            Secretaría · Ficha societaria
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
             {s.common_name ?? s.legal_name}
           </h1>
-          <p className="text-sm text-[var(--g-text-secondary)]">
+          <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
             {s.legal_name} · {s.registration_number ?? "sin NIF"} · {s.jurisdiction ?? "—"}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <SociedadBadge label={model.socialLabel} />
+            <SociedadBadge label={model.admin} />
+            {s.es_unipersonal ? <SociedadBadge label="Unipersonal" tone="accent" /> : null}
+            {s.es_cotizada ? <SociedadBadge label="Cotizada" tone="accent" /> : null}
+          </div>
         </div>
         <Link
           to={`/secretaria/sociedades/${s.id}/reglas`}
@@ -84,8 +162,14 @@ export default function SociedadDetalle() {
         </Link>
       </div>
 
+      <SociedadOperationalOverview entityId={s.id} s={s} model={model} />
+
+      <SociedadDecisionModel s={s} model={model} />
+
+      <SociedadQuickActions entityId={s.id} scopedTo={scope.createScopedTo} />
+
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 border-b border-[var(--g-border-subtle)]">
+      <div className="mb-4 mt-6 flex gap-1 overflow-x-auto border-b border-[var(--g-border-subtle)]">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = t.id === tab;
@@ -118,6 +202,224 @@ export default function SociedadDetalle() {
         {tab === "autoridad"        && <TabAutoridad entityId={s.id} />}
       </div>
     </div>
+  );
+}
+
+type SociedadModel = ReturnType<typeof getSociedadModel>;
+
+function SociedadBadge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "accent" }) {
+  return (
+    <span
+      className={
+        tone === "accent"
+          ? "inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+          : "inline-flex items-center px-2.5 py-1 text-xs font-semibold bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+      }
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function SociedadOperationalOverview({
+  entityId,
+  s,
+  model,
+}: {
+  entityId: string;
+  s: NonNullable<ReturnType<typeof useSociedad>["data"]>;
+  model: SociedadModel;
+}) {
+  const { data: capital } = useCapitalProfile(entityId);
+  const { data: socios = [] } = useCapitalHoldings(entityId);
+  const { data: organos = [] } = useEntityBodies(entityId);
+  const { data: administradores = [] } = useAdministradores(entityId);
+  const { data: autoridad = [] } = useAuthorityEvidence(entityId);
+
+  const capitalValue = capital
+    ? `${Number(capital.capital_escriturado).toLocaleString("es-ES")} ${capital.currency}`
+    : "Pendiente";
+
+  return (
+    <section className="mb-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex items-start gap-3">
+            <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Identidad operativa de la sociedad
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+                Esta ficha concentra los datos maestros que gobiernan sus expedientes:
+                tipo social, forma de administración, unipersonalidad, capital, órganos y evidencias
+                de autoridad.
+              </p>
+            </div>
+          </div>
+
+          <dl className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {[
+              ["Denominación legal", s.legal_name],
+              ["Jurisdicción", s.jurisdiction ?? "—"],
+              ["Forma social", model.socialLabel],
+              ["Administración", model.admin],
+              ["Matriz", s.parent?.common_name ?? s.parent?.legal_name ?? "—"],
+              ["Participación matriz", s.ownership_percentage != null ? `${s.ownership_percentage}%` : "—"],
+            ].map(([label, value]) => (
+              <div key={label} className="border-l-2 border-[var(--g-sec-300)] pl-3">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g-text-secondary)]">
+                  {label}
+                </dt>
+                <dd className="mt-0.5 text-sm font-medium text-[var(--g-text-primary)]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MiniMetric icon={Coins} label="Capital" value={capitalValue} />
+          <MiniMetric icon={Users} label="Socios" value={socios.length} />
+          <MiniMetric icon={Gavel} label="Órganos" value={organos.length} />
+          <MiniMetric icon={UserCheck} label="Admins." value={administradores.length} />
+          <MiniMetric icon={ShieldCheck} label="Autoridad" value={autoridad.length} />
+          <MiniMetric icon={CheckCircle2} label="Estado" value={s.entity_status ?? "Activa"} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MiniMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Building2;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-[var(--g-brand-3308)]" />
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g-text-secondary)]">
+          {label}
+        </span>
+      </div>
+      <div className="mt-2 text-lg font-semibold text-[var(--g-text-primary)]">{value}</div>
+    </div>
+  );
+}
+
+function SociedadDecisionModel({
+  s,
+  model,
+}: {
+  s: NonNullable<ReturnType<typeof useSociedad>["data"]>;
+  model: SociedadModel;
+}) {
+  return (
+    <section
+      className="mb-5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex flex-col gap-5 lg:flex-row">
+        <div className="lg:w-[300px]">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+            <Route className="h-4 w-4 text-[var(--g-brand-3308)]" />
+            Modelo de decisión
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--g-text-secondary)]">
+            El sistema usa estos datos para decidir si crea una reunión, una decisión unipersonal,
+            una co-aprobación, una actuación solidaria o una tarea posterior.
+          </p>
+        </div>
+
+        <div className="grid flex-1 grid-cols-1 gap-3 xl:grid-cols-3">
+          <DecisionRule
+            icon={Gavel}
+            title="Órgano de administración"
+            body={model.adminFlow}
+          />
+          <DecisionRule
+            icon={Users}
+            title={s.es_unipersonal ? "Socio único" : "Junta general"}
+            body={model.juntaFlow}
+          />
+          <DecisionRule
+            icon={ShieldCheck}
+            title="Evidencia y alertas"
+            body={model.evidenceFlow}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DecisionRule({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: typeof Building2;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+        <Icon className="h-4 w-4 text-[var(--g-brand-3308)]" />
+        {title}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[var(--g-text-secondary)]">{body}</p>
+    </div>
+  );
+}
+
+function SociedadQuickActions({
+  entityId,
+  scopedTo,
+}: {
+  entityId: string;
+  scopedTo: (to: string) => string;
+}) {
+  const actions = [
+    { label: "Nueva convocatoria", icon: Bell, to: "/secretaria/convocatorias/nueva" },
+    { label: "Nueva reunión", icon: CalendarDays, to: "/secretaria/reuniones/nueva" },
+    { label: "Acuerdo sin sesión", icon: ScrollText, to: "/secretaria/acuerdos-sin-sesion/nuevo" },
+    { label: "Generar documento", icon: FileText, to: "/secretaria/tramitador/nuevo" },
+    { label: "Reglas aplicables", icon: ClipboardList, to: `/secretaria/sociedades/${entityId}/reglas` },
+  ];
+
+  return (
+    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-5">
+      {actions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <Link
+            key={action.label}
+            to={scopedTo(action.to)}
+            className="inline-flex min-h-11 items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-sec-100)] hover:text-[var(--g-brand-3308)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Icon className="h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+            <span>{action.label}</span>
+          </Link>
+        );
+      })}
+    </section>
   );
 }
 

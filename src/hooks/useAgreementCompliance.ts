@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import {
   evaluarAcuerdoCompleto,
   type RulePack,
@@ -14,8 +15,12 @@ import {
 } from "@/lib/rules-engine";
 
 type RulePackJoinRow = {
-  id: string; params: unknown; status: string;
-  rule_packs: { materia: string; clase: string; organo_tipo: string } | null;
+  id: string;
+  pack_id: string;
+  version: string;
+  payload: unknown;
+  is_active: boolean | null;
+  rule_packs: { materia: string; organo_tipo: string | null } | null;
 };
 type OverrideRaw = { id: string; entity_id: string; materia: string; clave: string; valor: unknown; fuente: string; referencia: string | null };
 
@@ -104,7 +109,7 @@ type RuleConfig = {
 };
 type JurisdictionRule = { rule_config: RuleConfig } | null;
 
-type MeetingRow = { id: string; body_id: string | null; scheduled_start: string | null } | null;
+type MeetingRow = { id: string; body_id: string | null; scheduled_start: string | null; quorum_data?: Record<string, unknown> | null } | null;
 type ConvocatoriaRow = { fecha_emision: string | null; fecha_1: string | null; urgente: boolean | null; junta_universal: boolean | null };
 type ResolutionRow = { status: string };
 type ConflictRow = { id: string; status: string };
@@ -164,9 +169,9 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   // Cargar rule packs activos
   const { data: rpVersions } = await supabase
     .from("rule_pack_versions")
-    .select("*, rule_packs!inner(materia, clase, organo_tipo)")
-    .eq("tenant_id", tenantId)
-    .eq("status", "ACTIVE");
+    .select("id, pack_id, version, payload, is_active, rule_packs!inner(materia, organo_tipo)")
+    .eq("rule_packs.tenant_id", tenantId)
+    .eq("is_active", true);
 
   // Cargar overrides para la entidad
   const { data: overridesRaw } = a.entity_id
@@ -184,7 +189,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   );
 
   const packs: RulePack[] = matchingVersion
-    ? [matchingVersion.params as RulePack]
+    ? [matchingVersion.payload as RulePack]
     : [];
 
   const overrides: RuleParamOverride[] = ((overridesRaw ?? []) as OverrideRaw[]).map((o) => ({
@@ -350,7 +355,7 @@ export function useAgreementCompliance(agreementId?: string) {
         const [meetingRes, resolutionsRes, conflictsRes] = await Promise.all([
           supabase
             .from("meetings")
-            .select("*")
+            .select("id, body_id, scheduled_start, quorum_data")
             .eq("tenant_id", tenantId!)
             .eq("id", a.parent_meeting_id)
             .maybeSingle(),
@@ -370,10 +375,19 @@ export function useAgreementCompliance(agreementId?: string) {
         const res = (resolutionsRes.data ?? []) as ResolutionRow[];
         const conflicts = (conflictsRes.data ?? []) as ConflictRow[];
 
-        // No existe FK meetings↔convocatorias: se localiza la convocatoria por
-        // body_id + fecha_1 == fecha de la reunión (match determinista sobre el seed).
+        // Preferimos vínculo explícito en meetings.quorum_data.source_links.
+        // El match body_id + fecha_1 queda como fallback legacy hasta cerrar paridad.
         let conv: ConvocatoriaRow | null = null;
-        if (m?.body_id && m?.scheduled_start) {
+        const explicitConvocatoriaId = extractMeetingSourceLinks(m?.quorum_data).convocatoria_id;
+        if (explicitConvocatoriaId) {
+          const { data } = await supabase
+            .from("convocatorias")
+            .select("fecha_emision, fecha_1, urgente, junta_universal")
+            .eq("tenant_id", tenantId!)
+            .eq("id", explicitConvocatoriaId)
+            .maybeSingle();
+          conv = (data as ConvocatoriaRow | null) ?? null;
+        } else if (m?.body_id && m?.scheduled_start) {
           const meetingDateISO = String(m.scheduled_start).slice(0, 10);
           const { data: convs } = await supabase
             .from("convocatorias")

@@ -1,17 +1,105 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ScrollText, CheckCircle2, XCircle, MinusCircle, Mail, Loader2, AlertTriangle } from "lucide-react";
-import { useAcuerdoSinSesionById, useCastVote, useCloseVotacionManual } from "@/hooks/useAcuerdosSinSesion";
+import {
+  useAcuerdoSinSesionById,
+  useAdoptNoSessionAgreement,
+  useAgreementForNoSessionResolution,
+  useCastVote,
+} from "@/hooks/useAcuerdosSinSesion";
 import { useERDSNotification } from "@/hooks/useERDSNotification";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+
+function buildNoSessionVariables(
+  r: NonNullable<ReturnType<typeof useAcuerdoSinSesionById>["data"]>,
+  body: string,
+  entity: string,
+) {
+  const fechaApertura = r.opened_at ? new Date(r.opened_at).toLocaleDateString("es-ES") : "";
+  const fechaCierre = r.closed_at ? new Date(r.closed_at).toLocaleDateString("es-ES") : "";
+  const votosFavor = r.votes_for ?? 0;
+  const votosContra = r.votes_against ?? 0;
+  const abstenciones = r.abstentions ?? 0;
+  const tipoProceso = r.requires_unanimity ? "UNANIMIDAD_CAPITAL_SL" : "CIRCULACION_CONSEJO";
+  const condicionAdopcion = r.requires_unanimity
+    ? "Unanimidad requerida de los destinatarios legitimados."
+    : "Adopción conforme a la mayoría aplicable y a las respuestas recibidas.";
+  const relacionRespuestas = [
+    `A favor: ${votosFavor}`,
+    `En contra: ${votosContra}`,
+    `Abstenciones: ${abstenciones}`,
+  ].join("\n");
+
+  return {
+    denominacion_social: entity,
+    organo_convocante: body,
+    organo_nombre: body,
+    organo_tipo: r.governing_bodies?.body_type ?? "",
+    modo_adopcion: "NO_SESSION",
+    titulo_acuerdo: r.title,
+    contenido_acuerdo: r.proposal_text ?? "",
+    propuesta_acuerdo: r.proposal_text ?? "",
+    propuesta_texto: r.proposal_text ?? "",
+    texto_decision: r.proposal_text ?? "",
+    tipo_proceso: tipoProceso,
+    condicion_adopcion: condicionAdopcion,
+    relacion_respuestas_texto: relacionRespuestas,
+    resultado_evaluacion: condicionAdopcion,
+    estado: statusLabel(r.status),
+    votes_for: votosFavor,
+    votes_against: votosContra,
+    abstentions: abstenciones,
+    requiere_unanimidad: r.requires_unanimity ? "Sí" : "No",
+    fecha_apertura: fechaApertura,
+    fecha_circulacion: fechaApertura,
+    fecha_limite_voto: r.voting_deadline ? new Date(r.voting_deadline).toLocaleDateString("es-ES") : "",
+    fecha_cierre: fechaCierre,
+    fecha_cierre_expediente: fechaCierre,
+    ciudad_emision: "",
+    jurisdiccion: r.governing_bodies?.entities?.jurisdiction ?? "",
+  };
+}
+
+function buildNoSessionFallback(
+  r: NonNullable<ReturnType<typeof useAcuerdoSinSesionById>["data"]>,
+  body: string,
+  entity: string,
+) {
+  return [
+    "ACTA DE ACUERDO ESCRITO SIN SESION",
+    "",
+    `Sociedad: ${entity}`,
+    `Organo: ${body}`,
+    `Titulo: ${r.title}`,
+    `Estado: ${statusLabel(r.status)}`,
+    "",
+    "PROPUESTA",
+    r.proposal_text ?? "Sin texto de propuesta registrado.",
+    "",
+    "RESULTADO DE VOTACION",
+    `A favor: ${r.votes_for ?? 0}`,
+    `En contra: ${r.votes_against ?? 0}`,
+    `Abstenciones: ${r.abstentions ?? 0}`,
+    `Unanimidad requerida: ${r.requires_unanimity ? "Si" : "No"}`,
+    "",
+    "FECHAS",
+    `Apertura: ${r.opened_at ? new Date(r.opened_at).toLocaleString("es-ES") : "No consta"}`,
+    `Plazo: ${r.voting_deadline ? new Date(r.voting_deadline).toLocaleString("es-ES") : "No consta"}`,
+    `Cierre: ${r.closed_at ? new Date(r.closed_at).toLocaleString("es-ES") : "No consta"}`,
+  ].join("\n");
+}
 
 export default function AcuerdoSinSesionDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
   const { data, isLoading } = useAcuerdoSinSesionById(id);
+  const { data: linkedAgreement } = useAgreementForNoSessionResolution(id);
   const { sendAndTrackNotification } = useERDSNotification();
   const castVote = useCastVote(id);
-  const closeVotacion = useCloseVotacionManual(id);
+  const adoptAgreement = useAdoptNoSessionAgreement();
   const [erdsStatus, setErdsStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [erdsError, setErdsError] = useState<string | null>(null);
   const [erdsRef, setErdsRef] = useState<string | null>(null);
@@ -34,6 +122,25 @@ export default function AcuerdoSinSesionDetalle() {
   const r = data;
   const body = r.governing_bodies?.name ?? "Órgano";
   const entity = r.governing_bodies?.entities?.common_name ?? "—";
+  const jurisdiction = r.governing_bodies?.entities?.jurisdiction ?? null;
+  const docVariables = buildNoSessionVariables(r, body, entity);
+  const docFallback = buildNoSessionFallback(r, body, entity);
+  const canGenerateFinalDoc = Boolean(linkedAgreement?.id);
+
+  function handleClose(decision: "APROBADO" | "RECHAZADO") {
+    const entityId = r.entity_id ?? r.governing_bodies?.entity_id ?? null;
+    if (!entityId) {
+      return;
+    }
+    adoptAgreement.mutate({
+      resolutionId: r.id,
+      bodyId: r.body_id,
+      entityId,
+      matterClass: r.matter_class,
+      agreementKind: r.agreement_kind,
+      resultado: decision,
+    });
+  }
 
   const handleSendERDS = async () => {
     if (!r.id) return;
@@ -58,24 +165,60 @@ export default function AcuerdoSinSesionDetalle() {
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+        onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion"))}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
         Volver
       </button>
 
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          <ScrollText className="h-3.5 w-3.5" />
-          Acuerdo sin sesión · {statusLabel(r.status)}
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            <ScrollText className="h-3.5 w-3.5" />
+            Acuerdo sin sesión · {statusLabel(r.status)}
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            {r.title}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
+            {body} · {entity}
+          </p>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          {r.title}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          {body} · {entity}
-        </p>
+        {canGenerateFinalDoc ? (
+          <ProcessDocxButton
+            label="Acuerdo DOCX"
+            variant="primary"
+            input={{
+              kind: "ACUERDO_SIN_SESION",
+              recordId: r.id,
+              title: `Acuerdo sin sesión: ${r.title}`,
+              subtitle: `${body} · ${entity}`,
+              entityName: entity,
+              templateTypes: ["ACTA_ACUERDO_ESCRITO", "MODELO_ACUERDO", "INFORME_DOCUMENTAL_PRE"],
+              variables: {
+                ...docVariables,
+                agreement_id: linkedAgreement?.id ?? "",
+              },
+              templateCriteria: {
+                jurisdiction,
+                materia: r.agreement_kind,
+                adoptionMode: "NO_SESSION",
+                organoTipo: r.governing_bodies?.body_type,
+              },
+              fallbackText: docFallback,
+              filenamePrefix: "acuerdo_sin_sesion",
+              archive: { agreementId: linkedAgreement?.id },
+            }}
+          />
+        ) : (
+          <div
+            className="max-w-[260px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            El DOCX final se habilita al cerrar la votación y crear el expediente del acuerdo.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -199,8 +342,8 @@ export default function AcuerdoSinSesionDetalle() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => closeVotacion.mutate("APROBADO")}
-                  disabled={closeVotacion.isPending}
+                  onClick={() => handleClose("APROBADO")}
+                  disabled={adoptAgreement.isPending}
                   className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-[var(--status-success)] text-[var(--status-success)] hover:bg-[var(--status-success)] hover:text-[var(--g-text-inverse)] transition-colors disabled:opacity-50"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
@@ -209,8 +352,8 @@ export default function AcuerdoSinSesionDetalle() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => closeVotacion.mutate("RECHAZADO")}
-                  disabled={closeVotacion.isPending}
+                  onClick={() => handleClose("RECHAZADO")}
+                  disabled={adoptAgreement.isPending}
                   className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-[var(--status-error)] text-[var(--status-error)] hover:bg-[var(--status-error)] hover:text-[var(--g-text-inverse)] transition-colors disabled:opacity-50"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >

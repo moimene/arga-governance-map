@@ -23,9 +23,13 @@ export interface RulePackVersionRow {
  * Rule parameter override row
  */
 type RulePackJoinRow = {
-  id: string; rule_pack_id: string; version_tag: string; status: string;
-  params: unknown; created_at: string; tenant_id: string;
-  rule_packs: { materia: string; clase: string; organo_tipo: string } | null;
+  id: string;
+  pack_id: string;
+  version: string;
+  is_active: boolean | null;
+  payload: unknown;
+  created_at: string | null;
+  rule_packs: { tenant_id: string; materia: string; organo_tipo: string | null } | null;
 };
 
 export interface RuleParamOverrideRow {
@@ -53,10 +57,10 @@ export function useRulePacks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rule_pack_versions")
-        .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", tenantId!)
-        .eq("status", "ACTIVE")
-        .order("version_tag", { ascending: false });
+        .select("*, rule_packs!inner(tenant_id, materia, organo_tipo)")
+        .eq("rule_packs.tenant_id", tenantId!)
+        .eq("is_active", true)
+        .order("version", { ascending: false });
 
       if (error) throw error;
 
@@ -66,15 +70,15 @@ export function useRulePacks() {
         const packed = row.rule_packs;
         return {
           id: row.id,
-          rule_pack_id: row.rule_pack_id,
-          version_tag: row.version_tag,
-          status: row.status,
-          params: row.params,
+          rule_pack_id: row.pack_id,
+          version_tag: row.version,
+          status: row.is_active ? "ACTIVE" : "DEPRECATED",
+          params: row.payload,
           created_at: row.created_at,
-          tenant_id: row.tenant_id,
+          tenant_id: packed?.tenant_id ?? tenantId!,
           materia: packed?.materia,
-          clase: packed?.clase,
-          organo_tipo: packed?.organo_tipo,
+          clase: undefined,
+          organo_tipo: packed?.organo_tipo ?? undefined,
         } as RulePackVersionRow;
       });
     },
@@ -97,10 +101,10 @@ export function useRulePacksForEntity(entityId?: string) {
       // Load active pack versions
       const { data: packsData, error: packsError } = await supabase
         .from("rule_pack_versions")
-        .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", tenantId!)
-        .eq("status", "ACTIVE")
-        .order("version_tag", { ascending: false });
+        .select("*, rule_packs!inner(tenant_id, materia, organo_tipo)")
+        .eq("rule_packs.tenant_id", tenantId!)
+        .eq("is_active", true)
+        .order("version", { ascending: false });
 
       if (packsError) throw packsError;
 
@@ -108,15 +112,15 @@ export function useRulePacksForEntity(entityId?: string) {
         const packed = row.rule_packs;
         return {
           id: row.id,
-          rule_pack_id: row.rule_pack_id,
-          version_tag: row.version_tag,
-          status: row.status,
-          params: row.params,
+          rule_pack_id: row.pack_id,
+          version_tag: row.version,
+          status: row.is_active ? "ACTIVE" : "DEPRECATED",
+          params: row.payload,
           created_at: row.created_at,
-          tenant_id: row.tenant_id,
+          tenant_id: packed?.tenant_id ?? tenantId!,
           materia: packed?.materia,
-          clase: packed?.clase,
-          organo_tipo: packed?.organo_tipo,
+          clase: undefined,
+          organo_tipo: packed?.organo_tipo ?? undefined,
         } as RulePackVersionRow;
       });
 
@@ -154,11 +158,11 @@ export function useRulePackForMateria(materia?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rule_pack_versions")
-        .select("*, rule_packs(materia, clase, organo_tipo)")
-        .eq("tenant_id", tenantId!)
-        .eq("status", "ACTIVE")
+        .select("*, rule_packs!inner(tenant_id, materia, organo_tipo)")
+        .eq("rule_packs.tenant_id", tenantId!)
+        .eq("is_active", true)
         .eq("rule_packs.materia", materia)
-        .order("version_tag", { ascending: false })
+        .order("version", { ascending: false })
         .maybeSingle();
 
       if (error) throw error;
@@ -168,15 +172,15 @@ export function useRulePackForMateria(materia?: string) {
       const packed = (data as RulePackJoinRow).rule_packs;
       return {
         id: data.id,
-        rule_pack_id: data.rule_pack_id,
-        version_tag: data.version_tag,
-        status: data.status,
-        params: data.params,
+        rule_pack_id: data.pack_id,
+        version_tag: data.version,
+        status: data.is_active ? "ACTIVE" : "DEPRECATED",
+        params: data.payload,
         created_at: data.created_at,
-        tenant_id: data.tenant_id,
+        tenant_id: packed?.tenant_id ?? tenantId!,
         materia: packed?.materia,
-        clase: packed?.clase,
-        organo_tipo: packed?.organo_tipo,
+        clase: undefined,
+        organo_tipo: packed?.organo_tipo ?? undefined,
       } as RulePackVersionRow;
     },
   });

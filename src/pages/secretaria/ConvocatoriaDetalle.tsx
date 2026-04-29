@@ -1,7 +1,183 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus } from "lucide-react";
 import { useConvocatoriaById, useConvocatoriaAttachments } from "@/hooks/useConvocatorias";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+
+function formatDateTime(value?: string | null) {
+  return value ? new Date(value).toLocaleString("es-ES") : "—";
+}
+
+function getTraceArray(trace: Record<string, unknown> | null, key: string): unknown[] {
+  const value = trace?.[key];
+  return Array.isArray(value) ? value : [];
+}
+
+type ConvocatoriaDocContext = {
+  id: string;
+  tipo_convocatoria?: string | null;
+  body_name?: string | null;
+  body_type?: string | null;
+  entity_name?: string | null;
+  legal_form?: string | null;
+  jurisdiction?: string | null;
+  fecha_emision?: string | null;
+  fecha_1?: string | null;
+  fecha_2?: string | null;
+  is_second_call?: boolean | null;
+  lugar?: string | null;
+  modalidad?: string | null;
+  statutory_basis?: string | null;
+  publication_channels?: string[] | null;
+  agenda_items?: Array<{ titulo?: string; materia?: string; tipo?: string; inscribible?: boolean }> | null;
+  reminders_trace?: Record<string, unknown> | null;
+  rule_trace?: Record<string, unknown> | null;
+  accepted_warnings?: Record<string, unknown>[] | null;
+};
+
+function agendaItems(conv: ConvocatoriaDocContext) {
+  return Array.isArray(conv.agenda_items) ? conv.agenda_items : [];
+}
+
+function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
+  const agenda = Array.isArray(conv.agenda_items) ? conv.agenda_items : [];
+  const fecha1 = conv.fecha_1 ? new Date(conv.fecha_1) : null;
+  const emittedAt = conv.fecha_emision ?? new Date().toISOString();
+  const horaJunta = fecha1
+    ? fecha1.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+    : "—";
+  const ruleContext = conv.rule_trace?.context as Record<string, unknown> | undefined;
+  const ruleEvaluation = conv.rule_trace?.evaluation as Record<string, unknown> | undefined;
+  const reminderTrace = conv.reminders_trace ?? {};
+  const documents = (reminderTrace.documents as { missing_required?: Array<{ nombre?: string; document_name?: string }> } | undefined)?.missing_required ?? [];
+  const channels = (reminderTrace.channels as { pending?: Array<{ label?: string; value?: string }> } | undefined)?.pending ?? [];
+  const comprobaciones = [
+    `Órgano convocante: ${conv.body_name ?? "órgano no informado"}`,
+    `Canales seleccionados: ${(conv.publication_channels ?? []).join(", ") || "sin canales registrados"}`,
+    `Documentación PRE pendiente: ${documents.length}`,
+    `Canales pendientes de evidencia: ${channels.length}`,
+    `Advertencias aceptadas: ${(conv.accepted_warnings ?? []).length}`,
+  ];
+  return {
+    convocatoria: conv,
+    tipo_junta: conv.tipo_convocatoria ?? "ORDINARIA",
+    tipo_junta_texto: conv.tipo_convocatoria ?? "Ordinaria",
+    denominacion_social: conv.entity_name ?? "Sociedad",
+    cif: "No informado en demo",
+    jurisdiccion: conv.jurisdiction ?? "",
+    organo_convocante: conv.body_name ?? "Órgano",
+    organo_tipo: conv.body_type ?? "",
+    fecha: emittedAt,
+    fecha_emision: emittedAt,
+    fecha_junta: conv.fecha_1 ?? "—",
+    hora: horaJunta,
+    hora_junta: horaJunta,
+    lugar: conv.lugar ?? "domicilio social",
+    lugar_junta: conv.lugar ?? "domicilio social",
+    ciudad: conv.lugar ?? "Madrid",
+    modalidad: conv.modalidad ?? "—",
+    destinatarios: "Personas legitimadas conforme a la ley, estatutos y, en su caso, pactos aplicables.",
+    orden_dia: agenda.map((item, index) => ({
+      ordinal: String(index + 1),
+      descripcion_punto: item.titulo ?? "Punto del orden del día",
+      tipo: item.tipo ?? "ORDINARIA",
+      inscribible: !!item.inscribible,
+    })),
+    numero_convocatoria: conv.is_second_call ? "Segunda convocatoria" : "Primera convocatoria",
+    requiere_segunda_convocatoria: conv.is_second_call ? "Sí" : "No",
+    articulo_segunda_convocatoria: conv.is_second_call ? "Régimen estatutario y legal aplicable" : "No aplica",
+    derecho_informacion: "Derecho de información disponible conforme a la normativa y estatutos aplicables.",
+    plazo_informacion_dias: "Desde la publicación o notificación de la convocatoria.",
+    documentacion_disponible: getTraceArray(conv.reminders_trace, "documents").length > 0,
+    documentos_disponibles: [],
+    documentos_adjuntos: [],
+    canales_publicacion: conv.publication_channels ?? [],
+    canal_notificacion: conv.publication_channels?.join(", ") ?? "—",
+    statutory_basis: conv.statutory_basis ?? "—",
+    advertencias_aceptadas: conv.accepted_warnings ?? [],
+    comprobaciones,
+    comprobaciones_texto: comprobaciones.join("\n"),
+    resultado_gate: String(ruleEvaluation?.ok ?? ruleContext?.ok ?? "recordatorio"),
+    resultado_evaluacion: "Convocatoria generada con alertas no bloqueantes y trazabilidad operativa.",
+    snapshot_rule_pack_id: String(ruleContext?.rule_pack_id ?? ruleContext?.pack_id ?? "rule-pack-operativo-demo"),
+    snapshot_rule_pack_version: String(ruleContext?.rule_pack_version ?? ruleContext?.version ?? "demo"),
+    snapshot_hash: String(conv.rule_trace?.snapshot_hash ?? conv.rule_trace?.hash ?? "snapshot-operativo-demo"),
+    tsq_token: "Pendiente de timestamp cualificado EAD Trust en entorno productivo",
+    cargo_firmante: "Secretaría del órgano",
+    firma: "Secretaría Societaria",
+    firma_qes_ref: "Pendiente de QES productiva EAD Trust",
+  };
+}
+
+function buildConvocatoriaFallback(conv: ConvocatoriaDocContext) {
+  const variables = buildConvocatoriaVariables(conv);
+  const agenda = variables.orden_dia;
+  return [
+    `CONVOCATORIA DE ${variables.tipo_junta_texto} DE ${variables.denominacion_social}`,
+    "",
+    `Órgano convocante: ${variables.organo_convocante}`,
+    `Fecha de emisión: ${formatDateTime(conv.fecha_emision)}`,
+    `Primera convocatoria: ${formatDateTime(conv.fecha_1)}`,
+    conv.fecha_2 ? `Segunda convocatoria: ${formatDateTime(conv.fecha_2)}` : null,
+    `Modalidad: ${variables.modalidad}`,
+    `Lugar: ${variables.lugar_junta}`,
+    "",
+    "ORDEN DEL DÍA",
+    ...(agenda.length > 0
+      ? agenda.map((item) => `${item.ordinal}. ${item.descripcion_punto}`)
+      : ["1. Orden del día pendiente de detalle."]),
+    "",
+    "CANALES DE PUBLICACIÓN Y NOTIFICACIÓN",
+    variables.canales_publicacion.length > 0 ? variables.canales_publicacion.join(", ") : "Sin canales registrados.",
+    "",
+    "FUNDAMENTO",
+    variables.statutory_basis,
+  ].filter(Boolean).join("\n");
+}
+
+function buildInformePreceptivoFallback(conv: ConvocatoriaDocContext) {
+  const warnings = conv.accepted_warnings ?? [];
+  const reminderTrace = conv.reminders_trace ?? {};
+  const documents = (reminderTrace.documents as { missing_required?: Array<{ nombre?: string; document_name?: string }> } | undefined)?.missing_required ?? [];
+  const channels = (reminderTrace.channels as { pending?: Array<{ label?: string; value?: string }> } | undefined)?.pending ?? [];
+
+  return [
+    `INFORME PRECEPTIVO DOCUMENTAL DE CONVOCATORIA`,
+    "",
+    `Sociedad: ${conv.entity_name ?? "—"}`,
+    `Órgano: ${conv.body_name ?? "—"}`,
+    `Convocatoria: ${conv.id}`,
+    `Fecha de reunión: ${formatDateTime(conv.fecha_1)}`,
+    "",
+    "ALCANCE",
+    "Este informe resume las comprobaciones PRE asociadas a la convocatoria: plazos, canales de publicación o notificación, documentación puesta a disposición y advertencias aceptadas en modo recordatorio.",
+    "",
+    "DOCUMENTACIÓN PRE",
+    documents.length > 0
+      ? documents.map((doc, index) => `${index + 1}. ${doc.nombre ?? doc.document_name ?? "Documento pendiente"}`).join("\n")
+      : "Sin documentos obligatorios pendientes registrados en la traza.",
+    "",
+    "CANALES PENDIENTES DE EVIDENCIA",
+    channels.length > 0
+      ? channels.map((channel, index) => `${index + 1}. ${channel.label ?? channel.value ?? "Canal pendiente"}`).join("\n")
+      : "Sin canales pendientes registrados en la traza.",
+    "",
+    "ADVERTENCIAS ACEPTADAS",
+    warnings.length > 0
+      ? warnings.map((warning, index) => `${index + 1}. ${String(warning.message ?? warning.type ?? "Advertencia")}`).join("\n")
+      : "Sin advertencias aceptadas.",
+  ].join("\n");
+}
+
+function selectedTemplateFromTrace(trace?: Record<string, unknown> | null) {
+  const context = trace?.context;
+  if (!context || typeof context !== "object") return null;
+  const selectedTemplate = (context as { selected_template?: unknown }).selected_template;
+  if (!selectedTemplate || typeof selectedTemplate !== "object") return null;
+  const id = (selectedTemplate as { id?: unknown }).id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
 
 function generateIcs(convocatoria: {
   title: string;
@@ -43,6 +219,8 @@ function downloadIcs(content: string, filename: string) {
 export default function ConvocatoriaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scope = useSecretariaScope();
   const { data: conv, isLoading } = useConvocatoriaById(id);
   const { data: attachments } = useConvocatoriaAttachments(id);
 
@@ -62,11 +240,27 @@ export default function ConvocatoriaDetalle() {
     );
   }
 
+  const docVariables = buildConvocatoriaVariables(conv);
+  const convocatoriaFallback = buildConvocatoriaFallback(conv);
+  const informeFallback = buildInformePreceptivoFallback(conv);
+  const backToList = scope.createScopedTo("/secretaria/convocatorias");
+  const requestedPlantillaId = searchParams.get("plantilla");
+  const requestedTemplateType = searchParams.get("tipo");
+  const tracedTemplateId = selectedTemplateFromTrace(conv.rule_trace);
+  const preferredConvocatoriaTemplateId =
+    requestedTemplateType && requestedTemplateType.startsWith("INFORME")
+      ? tracedTemplateId
+      : requestedPlantillaId ?? tracedTemplateId;
+  const preferredInformeTemplateId =
+    requestedTemplateType && requestedTemplateType.startsWith("INFORME")
+      ? requestedPlantillaId
+      : null;
+
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate("/secretaria/convocatorias")}
+        onClick={() => navigate(backToList)}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -87,24 +281,68 @@ export default function ConvocatoriaDetalle() {
             {conv.legal_form ? ` · ${conv.legal_form}` : ""}
           </p>
         </div>
-        {conv.fecha_1 ? (
-          <button
-            type="button"
-            onClick={() => {
-              const ics = generateIcs({
-                title: `${conv.body_name ?? "Reunión"} — ${conv.entity_name ?? ""}`,
-                meeting_date: conv.fecha_1!,
-                location: null,
-                body_name: conv.body_name,
-              });
-              downloadIcs(ics, `convocatoria-${conv.id}.ics`);
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <ProcessDocxButton
+            label={preferredConvocatoriaTemplateId ? "Convocatoria con plantilla" : "Convocatoria DOCX"}
+            variant="primary"
+            input={{
+              kind: "CONVOCATORIA",
+              recordId: conv.id,
+              title: `Convocatoria de ${conv.body_name ?? "órgano"}`,
+              subtitle: conv.entity_name ?? undefined,
+              entityName: conv.entity_name,
+              templateTypes: conv.legal_form?.toUpperCase().includes("SL")
+                ? ["CONVOCATORIA_SL_NOTIFICACION", "CONVOCATORIA"]
+                : ["CONVOCATORIA", "CONVOCATORIA_SL_NOTIFICACION"],
+              variables: docVariables,
+              templateCriteria: {
+                jurisdiction: conv.jurisdiction,
+                organoTipo: conv.body_type,
+              },
+              preferredTemplateId: preferredConvocatoriaTemplateId,
+              fallbackText: convocatoriaFallback,
+              filenamePrefix: "convocatoria",
             }}
-            className="inline-flex shrink-0 items-center gap-2 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            Añadir a calendario
-          </button>
-        ) : null}
+          />
+          <ProcessDocxButton
+            label={preferredInformeTemplateId ? "Informe PRE con plantilla" : "Informe PRE"}
+            input={{
+              kind: "INFORME_PRECEPTIVO",
+              recordId: conv.id,
+              title: "Informe preceptivo documental",
+              subtitle: conv.entity_name ?? undefined,
+              entityName: conv.entity_name,
+              templateTypes: ["INFORME_PRECEPTIVO", "INFORME_DOCUMENTAL_PRE"],
+              variables: docVariables,
+              templateCriteria: {
+                jurisdiction: conv.jurisdiction,
+                organoTipo: conv.body_type,
+              },
+              preferredTemplateId: preferredInformeTemplateId,
+              fallbackText: informeFallback,
+              filenamePrefix: "informe_pre_convocatoria",
+            }}
+          />
+          {conv.fecha_1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                const ics = generateIcs({
+                  title: `${conv.body_name ?? "Reunión"} — ${conv.entity_name ?? ""}`,
+                  meeting_date: conv.fecha_1!,
+                  location: null,
+                  body_name: conv.body_name,
+                });
+                downloadIcs(ics, `convocatoria-${conv.id}.ics`);
+              }}
+              className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <CalendarPlus className="h-4 w-4" />
+              Calendario
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

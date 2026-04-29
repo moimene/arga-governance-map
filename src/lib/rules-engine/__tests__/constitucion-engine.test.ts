@@ -206,6 +206,31 @@ describe('constitucion-engine', () => {
     expect(result.quorumRequerido).toBe(0.3);
   });
 
+  it('CONSEJO: quórum uses members majority before sociedad type', () => {
+    const input: ConstitucionInput = {
+      tipoSocial: 'SA',
+      organoTipo: 'CONSEJO',
+      adoptionMode: 'MEETING',
+      primeraConvocatoria: true,
+      materiaClase: 'ORDINARIA',
+      capitalConDerechoVoto: 10,
+      capitalPresenteRepresentado: 5,
+      totalMiembros: 10,
+      asistentesPresentes: 5,
+    };
+    const pack = { ...createRulePack('ORDINARIA'), organoTipo: 'CONSEJO' as const };
+
+    const exactHalf = evaluarConstitucion(input, [pack]);
+    const majority = evaluarConstitucion(
+      { ...input, capitalPresenteRepresentado: 6, asistentesPresentes: 6 },
+      [pack]
+    );
+
+    expect(exactHalf.ok).toBe(false);
+    expect(exactHalf.quorumRequerido).toBe(0.6);
+    expect(majority.ok).toBe(true);
+  });
+
   // ===== Test: Denominador ajustado — EXCLUIR_QUORUM =====
 
   it('denominador ajustado: EXCLUIR_QUORUM should reduce quorum denominator', () => {

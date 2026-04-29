@@ -29,6 +29,7 @@ import HallazgosList from "@/pages/HallazgosList";
 import HallazgoDetalle from "@/pages/HallazgoDetalle";
 import ControlDetalle from "@/pages/ControlDetalle";
 import Conflictos from "@/pages/Conflictos";
+import Esg from "@/pages/Esg";
 import SiiDashboard from "@/pages/sii/SiiDashboard";
 import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
 import { SiiLayout } from "@/pages/sii/SiiLayout";
@@ -38,6 +39,7 @@ import Notificaciones from "@/pages/Notificaciones";
 import GrcDashboard from "@/pages/modules/GrcDashboard";
 import AimsDashboard from "@/pages/modules/AimsDashboard";
 import { RequireAuth } from "@/components/RequireAuth";
+const DemoScenarioResult = lazy(() => import("@/pages/DemoScenarioResult"));
 
 // ── Módulo Garrigues: Secretaría (lazy) ─────────────────────────────────────
 const SecretariaLayout = lazy(() =>
@@ -68,6 +70,7 @@ const Plantillas = lazy(() => import("@/pages/secretaria/Plantillas"));
 const PlantillasTracker = lazy(() => import("@/pages/secretaria/PlantillasTracker"));
 const GestorPlantillas = lazy(() => import("@/pages/secretaria/GestorPlantillas"));
 const Calendario = lazy(() => import("@/pages/secretaria/Calendario"));
+const ProcesosGrupo = lazy(() => import("@/pages/secretaria/ProcesosGrupo"));
 const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerdo"));
 const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDocumentoStepper"));
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
@@ -160,12 +163,14 @@ const App = () => (
                   <Route path="/hallazgos" element={<HallazgosList />} />
                   <Route path="/hallazgos/:id" element={<HallazgoDetalle />} />
                   <Route path="/conflictos" element={<Conflictos />} />
+                  <Route path="/esg" element={<Esg />} />
                   <Route element={<SiiLayout />}>
                     <Route path="/sii" element={<SiiDashboard />} />
                     <Route path="/sii/:id" element={<SiiCaseDetalle />} />
                   </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
+                  <Route path="/demo-operable/:scenarioId" element={<Suspense fallback={<ModuleFallback />}><DemoScenarioResult /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues Secretaría — layout propio (sidebar verde) */}
                 <Route
@@ -204,6 +209,7 @@ const App = () => (
                   <Route path="/secretaria/plantillas-tracker" element={<Suspense fallback={<ModuleFallback />}><PlantillasTracker /></Suspense>} />
                   <Route path="/secretaria/gestor-plantillas" element={<Suspense fallback={<ModuleFallback />}><GestorPlantillas /></Suspense>} />
                   <Route path="/secretaria/calendario" element={<Suspense fallback={<ModuleFallback />}><Calendario /></Suspense>} />
+                  <Route path="/secretaria/procesos-grupo" element={<Suspense fallback={<ModuleFallback />}><ProcesosGrupo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
                   <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />

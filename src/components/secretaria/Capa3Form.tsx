@@ -18,8 +18,9 @@ import {
   Info,
   Minus,
 } from "lucide-react";
+import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
 
-interface Capa3Field {
+export interface Capa3Field {
   campo: string;
   obligatoriedad: string;
   descripcion: string;
@@ -94,7 +95,7 @@ export function Capa3Form({
   );
 
   const isFieldRequired = (field: Capa3Field): boolean => {
-    if (field.obligatoriedad === "OBLIGATORIO") return true;
+    if (isRequiredCapa3Field(field)) return true;
     if (field.obligatoriedad === "OBLIGATORIO_SI_TELEMATICA" && telematicaEnabled) return true;
     return false;
   };
@@ -208,20 +209,20 @@ export function Capa3Form({
 
 /**
  * Validate capa3 values against field requirements.
- * Returns list of field names with validation errors.
+ * Returns a field-to-message map for validation errors.
  */
 export function validateCapa3(
   fields: Capa3Field[],
   values: Record<string, string>,
   telematicaEnabled = false
-): string[] {
-  const errors: string[] = [];
+): Record<string, string> {
+  const errors: Record<string, string> = {};
   for (const field of fields) {
     const required =
-      field.obligatoriedad === "OBLIGATORIO" ||
+      isRequiredCapa3Field(field) ||
       (field.obligatoriedad === "OBLIGATORIO_SI_TELEMATICA" && telematicaEnabled);
     if (required && !values[field.campo]?.trim()) {
-      errors.push(field.campo);
+      errors[field.campo] = `${field.descripcion || field.campo}: campo obligatorio.`;
     }
   }
   return errors;

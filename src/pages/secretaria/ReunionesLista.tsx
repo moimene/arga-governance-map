@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Users, Plus, FileText, FolderOpen, Loader2 } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const MEETING_TYPE_LABEL: Record<string, string> = {
   ORDINARIA:     "Ordinaria",
@@ -23,7 +24,9 @@ const SELECT_CLASS =
 
 export default function ReunionesLista() {
   const navigate = useNavigate();
-  const { data, isLoading } = useReunionesList();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useReunionesList(scopedEntityId);
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [filterBody, setFilterBody] = useState<string>("ALL");
@@ -56,7 +59,7 @@ export default function ReunionesLista() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/secretaria/reuniones/nueva")}
+          onClick={() => navigate(scope.createScopedTo("/secretaria/reuniones/nueva"))}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -64,6 +67,18 @@ export default function ReunionesLista() {
           Nueva reunión
         </button>
       </div>
+
+      {scope.mode === "sociedad" && scope.selectedEntity ? (
+        <div
+          className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Vista filtrada por sociedad:
+          <span className="ml-1 font-semibold text-[var(--g-text-primary)]">
+            {scope.selectedEntity.legalName}
+          </span>
+        </div>
+      ) : null}
 
       {/* Filtros */}
       <div className="mb-4 flex items-center gap-3">
@@ -160,7 +175,7 @@ export default function ReunionesLista() {
               filtered.map((m) => (
                 <tr
                   key={m.id}
-                  onClick={() => navigate(`/secretaria/reuniones/${m.id}`)}
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/reuniones/${m.id}`))}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
@@ -192,7 +207,7 @@ export default function ReunionesLista() {
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     {(m.status === "CONVOCADA" || m.status === "CELEBRADA" || m.status === "EN_CURSO") && (
                       <Link
-                        to={`/secretaria/reuniones/${m.id}/board-pack`}
+                        to={scope.createScopedTo(`/secretaria/reuniones/${m.id}/board-pack`)}
                         className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       >

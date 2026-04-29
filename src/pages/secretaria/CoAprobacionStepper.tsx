@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import { evaluarCoAprobacion } from "@/lib/rules-engine/votacion-engine";
 import type { CoAprobacionConfig } from "@/lib/rules-engine/types";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -321,6 +323,8 @@ function StepEvaluacion({ result }: { result: ReturnType<typeof evaluarCoAprobac
 export default function CoAprobacionStepper() {
   const navigate = useNavigate();
   const { tenantId } = useTenantContext();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const [current, setCurrent] = useState(1);
 
   // Step 1 state
@@ -370,6 +374,7 @@ export default function CoAprobacionStepper() {
         .from("agreements")
         .insert({
           tenant_id: tenantId,
+          entity_id: scopedEntityId,
           agreement_kind: "CO_APROBACION",
           matter_class: materia || "OTROS",
           adoption_mode: "CO_APROBACION",
@@ -439,7 +444,7 @@ export default function CoAprobacionStepper() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate(`/secretaria/acuerdos/${savedId}`)}
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${savedId}`))}
                   className="ml-auto text-sm text-[var(--g-brand-3308)] hover:underline"
                 >
                   Ver expediente →
@@ -450,7 +455,10 @@ export default function CoAprobacionStepper() {
                 <div className="text-sm text-[var(--g-text-secondary)]">
                   Se creará un acuerdo con <strong>adoption_mode = CO_APROBACION</strong> y
                   el snapshot del motor. Estado:{" "}
-                  <strong>{motorResult?.ok ? "ADOPTED" : "DRAFT"}</strong>.
+                  <strong>{statusLabel(motorResult?.ok ? "ADOPTED" : "DRAFT")}</strong>.
+                  {scope.mode === "sociedad" && scope.selectedEntity ? (
+                    <> Sociedad: <strong>{scope.selectedEntity.legalName}</strong>.</>
+                  ) : null}
                 </div>
                 {saveError && (
                   <div className="text-sm text-[var(--status-error)]">{saveError}</div>
@@ -477,7 +485,7 @@ export default function CoAprobacionStepper() {
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+        onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion"))}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -491,6 +499,12 @@ export default function CoAprobacionStepper() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
           Asistente de acuerdo por co-aprobación (k de n)
         </h1>
+        {scope.mode === "sociedad" && scope.selectedEntity ? (
+          <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
+            Modo sociedad: el acuerdo se vinculará a{" "}
+            <span className="font-semibold text-[var(--g-text-primary)]">{scope.selectedEntity.legalName}</span>.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">

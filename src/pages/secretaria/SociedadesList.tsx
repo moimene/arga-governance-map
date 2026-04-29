@@ -1,6 +1,7 @@
 import { Building2, Plus, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useState } from "react";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedades } from "@/hooks/useSociedades";
 
 const STATUS_CHIP: Record<string, string> = {
@@ -35,8 +36,19 @@ function tipoOrganoLabel(s: string | null): string {
 }
 
 export default function SociedadesList() {
+  const scope = useSecretariaScope();
   const { data, isLoading } = useSociedades();
   const [search, setSearch] = useState("");
+
+  if (scope.mode === "sociedad" && scope.selectedEntity) {
+    return (
+      <Navigate
+        replace
+        to={scope.createScopedTo(`/secretaria/sociedades/${scope.selectedEntity.id}`)}
+      />
+    );
+  }
+
   const filtered = (data ?? []).filter((s) => {
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();

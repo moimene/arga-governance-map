@@ -433,7 +433,7 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
     ],
   });
 
-  const buffer = await Packer.toBuffer(doc);
+  const buffer = await Packer.toArrayBuffer(doc);
   return new Uint8Array(buffer);
 }
 
@@ -461,6 +461,7 @@ export function downloadDocx(buffer: Uint8Array, filename: string): void {
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
+  window.dispatchEvent(new CustomEvent("tgms:docx-download", { detail: { filename } }));
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);

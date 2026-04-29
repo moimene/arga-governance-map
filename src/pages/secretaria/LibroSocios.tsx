@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { BookText, TrendingUp, TrendingDown, ArrowLeftRight, FolderOpen, Loader2 } from "lucide-react";
+import { BookText, TrendingUp, TrendingDown, ArrowLeftRight, FolderOpen, Loader2, Building2 } from "lucide-react";
 import { useCapitalMovements } from "@/hooks/useCapitalMovements";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const MOVEMENT_LABEL: Record<string, string> = {
   EMISION:          "Emisión",
@@ -33,12 +34,22 @@ const MOVEMENT_COLOR: Record<string, string> = {
 };
 
 export default function LibroSocios() {
-  const { data = [], isLoading } = useCapitalMovements();
+  const scope = useSecretariaScope();
+  const isSociedadMode = scope.mode === "sociedad";
+  const selectedEntity = scope.selectedEntity;
+  const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
+  const scopedEntityId = isSociedadMode ? selectedEntity?.id ?? undefined : undefined;
+  const { data = [], isLoading } = useCapitalMovements(scopedEntityId);
   const [filterType, setFilterType] = useState("ALL");
 
   const filtered = filterType === "ALL"
     ? data
     : data.filter((m) => m.movement_type === filterType);
+  const transmissions = data.filter((m) => m.movement_type === "TRANSMISION").length;
+  const netShares = data.reduce((sum, movement) => sum + Number(movement.delta_shares ?? 0), 0);
+  const latestMovement = data[0]?.effective_date
+    ? new Date(data[0].effective_date).toLocaleDateString("es-ES")
+    : "—";
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -48,12 +59,63 @@ export default function LibroSocios() {
           Secretaría · Libro de socios
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          Libro de socios — Movimientos de capital
+          {isSociedadMode ? `Libro de socios de ${selectedEntityName}` : "Libro de socios — Movimientos de capital"}
         </h1>
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          Registro WORM append-only de movimientos de capital. Cada fila es inmutable.
+          {isSociedadMode
+            ? "Movimientos de capital, transmisiones y peso de voto asociados a la sociedad seleccionada."
+            : "Registro WORM append-only de movimientos de capital. Cada fila es inmutable."}
         </p>
       </div>
+
+      {isSociedadMode && selectedEntity ? (
+        <div
+          className="mb-5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+                <Building2 className="h-3.5 w-3.5" />
+                Sociedad en contexto
+              </div>
+              <div className="mt-1 text-base font-semibold text-[var(--g-text-primary)]">
+                {selectedEntityName}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+                <span>{selectedEntity.legalForm}</span>
+                <span aria-hidden="true">·</span>
+                <span>{selectedEntity.jurisdiction}</span>
+                <span aria-hidden="true">·</span>
+                <span>{selectedEntity.status}</span>
+              </div>
+              <p className="mt-2 max-w-3xl text-sm text-[var(--g-text-secondary)]">
+                Cada movimiento queda ligado al expediente societario que lo origina, para reconstruir socios, participaciones y derechos de voto.
+              </p>
+            </div>
+            <dl className="grid min-w-full grid-cols-1 gap-3 text-sm sm:min-w-[460px] sm:grid-cols-3 lg:min-w-[520px]">
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Movimientos</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{data.length}</dd>
+              </div>
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Transmisiones</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{transmissions}</dd>
+              </div>
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Último asiento</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{latestMovement}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="mt-3 text-xs text-[var(--g-text-secondary)]">
+            Variación neta de participaciones en el histórico filtrado:{" "}
+            <span className="font-semibold text-[var(--g-text-primary)]">
+              {netShares.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-4">
         <select
@@ -113,7 +175,13 @@ export default function LibroSocios() {
               filtered.map((m) => {
                 const Icon = MOVEMENT_ICON[m.movement_type] ?? BookText;
                 const colorClass = MOVEMENT_COLOR[m.movement_type] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
-                const isDelta = m.delta_shares > 0;
+                const deltaShares = Number(m.delta_shares ?? 0);
+                const deltaSharesClass =
+                  deltaShares > 0
+                    ? "text-[var(--status-success)]"
+                    : deltaShares < 0
+                    ? "text-[var(--status-error)]"
+                    : "text-[var(--g-text-secondary)]";
                 return (
                   <tr key={m.id} className="transition-colors hover:bg-[var(--g-surface-subtle)]/50">
                     <td className="px-6 py-4">
@@ -136,8 +204,8 @@ export default function LibroSocios() {
                         <div className="text-xs text-[var(--g-text-secondary)]">{m.persons.tax_id}</div>
                       )}
                     </td>
-                    <td className={`px-6 py-4 text-right text-sm font-mono font-medium ${isDelta ? "text-[var(--status-success)]" : "text-[var(--status-error)]"}`}>
-                      {isDelta ? "+" : ""}{m.delta_shares.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    <td className={`px-6 py-4 text-right text-sm font-mono font-medium ${deltaSharesClass}`}>
+                      {deltaShares > 0 ? "+" : ""}{deltaShares.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </td>
                     <td className={`px-6 py-4 text-right text-sm font-mono ${m.delta_voting_weight > 0 ? "text-[var(--status-success)]" : m.delta_voting_weight < 0 ? "text-[var(--status-error)]" : "text-[var(--g-text-secondary)]"}`}>
                       {m.delta_voting_weight > 0 ? "+" : ""}{m.delta_voting_weight.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}

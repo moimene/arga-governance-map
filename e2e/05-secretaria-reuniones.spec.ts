@@ -31,6 +31,7 @@ test.describe('Secretaría — Actas', () => {
     if (await acta.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await acta.click();
       await expect(page.url()).toMatch(/\/secretaria\/actas\/.+/);
+      await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
     }
   });
 });

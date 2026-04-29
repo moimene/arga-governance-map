@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Bell, Plus, FolderOpen, Loader2 } from "lucide-react";
 import { useConvocatoriasList } from "@/hooks/useConvocatorias";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const ESTADO_TONE: Record<string, string> = {
   BORRADOR:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -16,10 +17,23 @@ const SELECT_CLASS =
 
 export default function ConvocatoriasList() {
   const navigate = useNavigate();
-  const { data, isLoading } = useConvocatoriasList();
+  const [searchParams] = useSearchParams();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useConvocatoriasList(scopedEntityId);
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [filterJurisdiction, setFilterJurisdiction] = useState<string>("ALL");
+  const requestedPlantillaId = searchParams.get("plantilla");
+  const requestedTemplateType = searchParams.get("tipo");
+
+  function detailPath(convocatoriaId: string) {
+    const params = new URLSearchParams();
+    if (requestedPlantillaId) params.set("plantilla", requestedPlantillaId);
+    if (requestedTemplateType) params.set("tipo", requestedTemplateType);
+    const suffix = params.toString();
+    return scope.createScopedTo(`/secretaria/convocatorias/${convocatoriaId}${suffix ? `?${suffix}` : ""}`);
+  }
 
   const filtered = (data ?? []).filter((item) => {
     if (filterStatus !== "ALL" && item.estado !== filterStatus) return false;
@@ -44,7 +58,7 @@ export default function ConvocatoriasList() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/secretaria/convocatorias/nueva")}
+          onClick={() => navigate(scope.createScopedTo("/secretaria/convocatorias/nueva"))}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-label="Crear nueva convocatoria"
@@ -53,6 +67,29 @@ export default function ConvocatoriasList() {
           Nueva convocatoria
         </button>
       </div>
+
+      {scope.mode === "sociedad" && scope.selectedEntity ? (
+        <div
+          className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Vista filtrada por sociedad:
+          <span className="ml-1 font-semibold text-[var(--g-text-primary)]">
+            {scope.selectedEntity.legalName}
+          </span>
+        </div>
+      ) : null}
+
+      {requestedPlantillaId ? (
+        <div
+          className="mb-4 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Plantilla documental seleccionada:
+          <span className="ml-1 font-mono text-xs">{requestedPlantillaId.slice(0, 8)}</span>
+          {requestedTemplateType ? ` · ${requestedTemplateType}` : ""}. Elige la convocatoria sobre la que se generará el documento.
+        </div>
+      ) : null}
 
       {/* Filtros */}
       <div className="mb-4 flex items-center gap-3">
@@ -146,7 +183,7 @@ export default function ConvocatoriasList() {
               filtered.map((c) => (
                 <tr
                   key={c.id}
-                  onClick={() => navigate(`/secretaria/convocatorias/${c.id}`)}
+                  onClick={() => navigate(detailPath(c.id))}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">

@@ -280,12 +280,12 @@ export function evaluarVotacion(
 
   // Select majority spec from matched packs
   for (const pack of matchedPacks) {
-    if (input.tipoSocial === 'SA') {
-      majoritySpec = pack.votacion.mayoria.SA;
-    } else if (input.tipoSocial === 'SL') {
-      majoritySpec = pack.votacion.mayoria.SL;
-    } else if (input.organoTipo === 'CONSEJO') {
+    if (input.organoTipo === 'CONSEJO' || input.organoTipo === 'COMISION_DELEGADA') {
       majoritySpec = pack.votacion.mayoria.CONSEJO;
+    } else if (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU') {
+      majoritySpec = pack.votacion.mayoria.SA;
+    } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
+      majoritySpec = pack.votacion.mayoria.SL;
     }
 
     if (majoritySpec) break;
@@ -408,6 +408,10 @@ export function evaluarVotacion(
     } else {
       votoCalidadUsado = true;
       mayoriaAlcanzada = true; // Tie is broken
+      const majorityIssueIndex = blockingIssues.indexOf('majority_not_achieved');
+      if (majorityIssueIndex >= 0) {
+        blockingIssues.splice(majorityIssueIndex, 1);
+      }
 
       const vetoCalidadNode: ExplainNode = {
         regla: 'Voto de calidad (desempate)',
@@ -416,6 +420,7 @@ export function evaluarVotacion(
         mensaje: 'Empate resuelto con voto de calidad del presidente/administrador',
       };
       explainNodes.push(vetoCalidadNode);
+      if (blockingIssues.length === 0) severity = 'OK';
     }
   }
 

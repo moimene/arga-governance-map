@@ -129,7 +129,17 @@ export function evaluarConstitucion(
   let quorumReferencia = 'art. 188 LSC';
   let isCombinadoProfile = false;
 
-  if (input.tipoSocial === 'SA') {
+  if (input.organoTipo === 'CONSEJO' || input.organoTipo === 'COMISION_DELEGADA') {
+    // Consejo/comisiones: the denominator is members, not share capital.
+    // Use the exact majority threshold when total members are known so 5/10
+    // does not incorrectly constitute a "mayoría de miembros".
+    requiredQuorum = input.totalMiembros && input.totalMiembros > 0
+      ? (Math.floor(input.totalMiembros / 2) + 1) / input.totalMiembros
+      : 0.5;
+    quorumReferencia = input.organoTipo === 'CONSEJO'
+      ? 'art. 247.1 LSC — mayoría de vocales del Consejo'
+      : 'Reglamento/estatutos — mayoría de miembros de la comisión';
+  } else if (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU') {
     // SA: quorum depends on primeraConvocatoria and materiaClase
     // But if we have multiple material classes, use the most demanding
     let determineMateriaClase = input.materiaClase;
@@ -150,14 +160,10 @@ export function evaluarConstitucion(
 
     requiredQuorum = quorumPct;
     quorumReferencia = `art. 189 LSC (SA ${input.primeraConvocatoria ? '1a' : '2a'} ${determineMateriaClase})`;
-  } else if (input.tipoSocial === 'SL') {
+  } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
     // SL: typically 0 (sin quórum legal) unless override
     requiredQuorum = 0;
     quorumReferencia = 'art. 201 LSC (SL)';
-  } else if (input.organoTipo === 'CONSEJO') {
-    // CONSEJO: mayoría de miembros
-    requiredQuorum = input.totalMiembros ? input.totalMiembros / 2 : 0;
-    quorumReferencia = 'Estatutos / Consejo';
   }
 
   // ================================================================

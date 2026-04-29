@@ -1,4 +1,12 @@
 export const STATUS_LABEL: Record<string, string> = {
+  // Estados maestros
+  ACTIVE:       "Activa",
+  Active:       "Activa",
+  INACTIVE:     "Inactiva",
+  Inactive:     "Inactiva",
+  ELEVATED:     "Elevada a público",
+  SUBMITTED:    "Presentada",
+
   // Acuerdos sin sesión
   BORRADOR:     "Borrador",
   VOTING_OPEN:  "Votación abierta",

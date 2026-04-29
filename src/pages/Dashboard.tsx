@@ -4,6 +4,8 @@ import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
 import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
 import { useModuleStatus } from "@/hooks/useModuleStatus";
+import { DemoOperablePanel } from "@/components/arga-console/DemoOperablePanel";
+import { ErpConsolePanel } from "@/components/arga-console/ErpConsolePanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
@@ -16,7 +18,6 @@ import {
   Play,
   ShieldAlert,
   Calendar,
-  CheckSquare,
   Activity,
   Network,
   ArrowRight,
@@ -24,14 +25,16 @@ import {
   Compass,
   ClipboardList,
   Brain,
+  GitBranch,
 } from "lucide-react";
-import { personalTasks, recentActivity } from "@/data/dashboard";
+import { recentActivity } from "@/data/dashboard";
 import { scopeData } from "@/data/scopeData";
 import { esgGroupScore, esgTotals } from "@/data/esg";
 import { socialAverages } from "@/data/esgSocial";
 import { Leaf } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { consoleJourneys } from "@/lib/arga-console/contracts";
 
 export default function Dashboard() {
   const { start, step, completed } = useTour();
@@ -73,6 +76,14 @@ export default function Dashboard() {
           <Play className="h-4 w-4 fill-current" />
           {label}
         </Button>
+      </div>
+
+      <div className="mb-6">
+        <ErpConsolePanel moduleStatus={moduleStatus} alerts={alerts} />
+      </div>
+
+      <div className="mb-6">
+        <DemoOperablePanel />
       </div>
 
       {/* KPIs */}
@@ -166,33 +177,34 @@ export default function Dashboard() {
 
       {/* Bottom row */}
       <div className="mt-6 grid grid-cols-12 gap-6">
-        {/* Tareas */}
+        {/* Handoffs cross-module */}
         <Card className="col-span-6 overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Mis tareas pendientes</h2>
+              <GitBranch className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Handoffs cross-module</h2>
             </div>
-            <span className="text-xs text-muted-foreground">5 tareas</span>
+            <span className="text-xs text-muted-foreground">Contratos owner-first</span>
           </div>
           <ul>
-            {personalTasks.map((t, i) => (
-              <li key={i} className="flex items-start gap-3 border-b border-border last:border-0 px-5 py-3 hover:bg-accent/40">
-                <input type="checkbox" className="mt-1 h-4 w-4 rounded border-border accent-primary" />
-                <div className="flex-1">
-                  <div className="text-sm text-foreground">{t.text}</div>
-                  <div
-                    className={cn(
-                      "mt-0.5 text-xs font-medium",
-                      t.level === "overdue" && "text-destructive",
-                      t.level === "warning" && "text-status-warning",
-                      t.level === "normal" && "text-muted-foreground",
-                    )}
-                  >
-                    Vence: {t.due}
-                    {t.level === "overdue" && " · Vencida"}
-                  </div>
-                </div>
+            {consoleJourneys.map((journey) => (
+              <li key={journey.id} className="border-b border-border last:border-0 px-5 py-3 hover:bg-accent/40">
+                <Link to={journey.targetRoute} className="flex items-start gap-3">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">{journey.title}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{journey.summary}</span>
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {journey.sourceOwner} → {journey.targetOwner}
+                      </span>
+                      <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {journey.contract}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground" />
+                </Link>
               </li>
             ))}
           </ul>
@@ -253,7 +265,7 @@ export default function Dashboard() {
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
                   {i < recentActivity.length - 1 && <span className="mt-1 w-px flex-1 bg-border" />}
                 </div>
-                <div className="flex-1 pb-2">
+                <div className="flex-1">
                   <div className="text-xs leading-snug text-foreground">{a.text}</div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">{a.time}</div>
                 </div>

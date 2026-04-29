@@ -18,6 +18,27 @@
 
 import Handlebars from "handlebars";
 
+const HELPER_NAMES = new Set([
+  "fechaES",
+  "uppercase",
+  "lowercase",
+  "eq",
+  "or",
+  "and",
+  "gt",
+  "gte",
+  "porcentaje",
+  "ordinalES",
+  "if",
+  "unless",
+  "each",
+  "with",
+  "lookup",
+  "log",
+]);
+
+const SPECIAL_PATHS = new Set(["this", ".", "..", "@index", "@key", "@first", "@last"]);
+
 // ── Spanish date formatting ──────────────────────────────────────────────────
 
 const MESES_ES = [
@@ -25,8 +46,9 @@ const MESES_ES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
-function formatFechaES(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+function formatFechaES(date: unknown): string {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(String(date));
   if (isNaN(d.getTime())) return String(date);
   return `${d.getDate()} de ${MESES_ES[d.getMonth()]} de ${d.getFullYear()}`;
 }
@@ -86,6 +108,92 @@ export interface RenderTemplateOutput {
   error?: string;
 }
 
+function preprocessTemplate(template: string) {
+  return template
+    .replace(/\{\{#if\s+([\w.]+)\s*==\s*'([^']+)'\}\}/g, "{{#if (eq $1 \"$2\")}}")
+    .replace(/\{\{#if\s+([\w.]+)\s*==\s*"([^"]+)"\}\}/g, '{{#if (eq $1 "$2")}}');
+}
+
+function pathName(node: unknown): string | null {
+  const value = node as { type?: string; original?: string; parts?: string[]; data?: boolean; value?: unknown } | null;
+  if (!value || value.type !== "PathExpression") return null;
+  const original = value.original ?? value.parts?.join(".");
+  if (!original || SPECIAL_PATHS.has(original)) return null;
+  if (original.startsWith("@")) return null;
+  return original;
+}
+
+function addVariable(vars: Set<string>, rawName: string | null) {
+  if (!rawName) return;
+  const normalized = rawName.replace(/^this\./, "");
+  const root = normalized.split(".")[0];
+  if (!root || HELPER_NAMES.has(root) || SPECIAL_PATHS.has(root)) return;
+  vars.add(normalized);
+}
+
+function isHelperInvocation(node: { path?: unknown; params?: unknown[]; hash?: { pairs?: unknown[] } }) {
+  const name = pathName(node.path);
+  if (!name) return false;
+  return HELPER_NAMES.has(name) || (node.params?.length ?? 0) > 0 || (node.hash?.pairs?.length ?? 0) > 0;
+}
+
+function visitTemplateNode(node: unknown, vars: Set<string>) {
+  if (!node || typeof node !== "object") return;
+  const typed = node as {
+    type?: string;
+    path?: unknown;
+    params?: unknown[];
+    hash?: { pairs?: Array<{ value?: unknown }> };
+    program?: unknown;
+    inverse?: unknown;
+    body?: unknown[];
+    value?: unknown;
+  };
+
+  if (typed.type === "PathExpression") {
+    addVariable(vars, pathName(typed));
+    return;
+  }
+
+  if (
+    typed.type === "MustacheStatement" ||
+    typed.type === "SubExpression" ||
+    typed.type === "BlockStatement" ||
+    typed.type === "PartialStatement"
+  ) {
+    const helperName = pathName(typed.path);
+    if (typed.type === "BlockStatement" && helperName === "each") {
+      typed.params?.forEach((param) => visitTemplateNode(param, vars));
+      typed.hash?.pairs?.forEach((pair) => visitTemplateNode(pair.value, vars));
+      visitTemplateNode(typed.inverse, vars);
+      return;
+    }
+    if (!isHelperInvocation(typed)) {
+      addVariable(vars, pathName(typed.path));
+    }
+    typed.params?.forEach((param) => visitTemplateNode(param, vars));
+    typed.hash?.pairs?.forEach((pair) => visitTemplateNode(pair.value, vars));
+    visitTemplateNode(typed.program, vars);
+    visitTemplateNode(typed.inverse, vars);
+    return;
+  }
+
+  typed.body?.forEach((child) => visitTemplateNode(child, vars));
+}
+
+function hasValue(variables: Record<string, unknown>, varName: string) {
+  const parts = varName.split(".");
+  let current: unknown = variables;
+  for (const part of parts) {
+    if (current === undefined || current === null) return false;
+    if (typeof current !== "object" || !(part in current)) return false;
+    current = (current as Record<string, unknown>)[part];
+  }
+  if (current === undefined || current === null) return false;
+  if (typeof current === "string" && current.trim() === "") return false;
+  return true;
+}
+
 /**
  * Compile and render a capa1 Handlebars template with the given variables.
  *
@@ -101,12 +209,7 @@ export function renderTemplate(input: RenderTemplateInput): RenderTemplateOutput
     const hbs = Handlebars.create();
     registerCustomHelpers(hbs);
 
-    // Pre-process: handle `{{#if var == 'value'}}` pseudo-syntax
-    // Handlebars doesn't support inline comparison, so we convert these
-    // to use the eq helper: {{#if (eq var "value")}}
-    const processedTemplate = input.template
-      .replace(/\{\{#if\s+(\w+)\s*==\s*'([^']+)'\}\}/g, "{{#if (eq $1 \"$2\")}}")
-      .replace(/\{\{#if\s+(\w+)\s*==\s*"([^"]+)"\}\}/g, '{{#if (eq $1 "$2")}}');
+    const processedTemplate = preprocessTemplate(input.template);
 
     // Compile template
     const compiled = hbs.compile(processedTemplate, {
@@ -114,28 +217,8 @@ export function renderTemplate(input: RenderTemplateInput): RenderTemplateOutput
       strict: false,  // Don't throw on missing variables
     });
 
-    // Track unresolved variables
-    const unresolvedVariables: string[] = [];
-
-    // Extract variable names from template (simple scan)
-    const varPattern = /\{\{(?!#|\/|!|>|else)([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/g;
-    let match;
-    const referencedVars = new Set<string>();
-    while ((match = varPattern.exec(input.template)) !== null) {
-      referencedVars.add(match[1]);
-    }
-
-    // Check which are unresolved
-    for (const varName of referencedVars) {
-      // Skip loop-internal variables (they come from #each context)
-      if (varName.includes(".")) continue;
-      // Skip helpers
-      if (["fechaES", "uppercase", "lowercase", "ordinalES", "porcentaje"].includes(varName)) continue;
-
-      if (!(varName in input.variables) || input.variables[varName] === undefined || input.variables[varName] === null) {
-        unresolvedVariables.push(varName);
-      }
-    }
+    const referencedVars = extractVariableNames(processedTemplate);
+    const unresolvedVariables = referencedVars.filter((varName) => !hasValue(input.variables, varName));
 
     // Render
     const text = compiled(input.variables);
@@ -162,7 +245,7 @@ export function validateTemplate(template: string): { ok: boolean; error?: strin
   try {
     const hbs = Handlebars.create();
     registerCustomHelpers(hbs);
-    hbs.precompile(template);
+    hbs.precompile(preprocessTemplate(template));
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -175,10 +258,19 @@ export function validateTemplate(template: string): { ok: boolean; error?: strin
  */
 export function extractVariableNames(template: string): string[] {
   const vars = new Set<string>();
-  const pattern = /\{\{(?!#|\/|!|>|else)([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
-  let match;
-  while ((match = pattern.exec(template)) !== null) {
-    vars.add(match[1]);
+  try {
+    const ast = Handlebars.parse(preprocessTemplate(template));
+    visitTemplateNode(ast, vars);
+  } catch {
+    const pattern = /\{\{(?!#|\/|!|>|else)([a-zA-Z_][a-zA-Z0-9_.]*)/g;
+    let match;
+    while ((match = pattern.exec(template)) !== null) {
+      addVariable(vars, match[1]);
+    }
   }
   return Array.from(vars);
+}
+
+export function findMissingVariables(template: string, variables: Record<string, unknown>) {
+  return extractVariableNames(template).filter((varName) => !hasValue(variables, varName));
 }

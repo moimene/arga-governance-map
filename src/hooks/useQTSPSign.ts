@@ -24,6 +24,7 @@ export interface QESSignResult {
   documentHash: string;
   signatoryIds: string[];
   signed_at: string;
+  signedDocumentData?: ArrayBuffer;
   errors: string[];
 }
 
@@ -111,6 +112,7 @@ export function useQTSPSign() {
           documentHash: result.documentHash,
           signatoryIds: result.signatoryIds,
           signed_at: new Date().toISOString(),
+          signedDocumentData: result.signedDocumentData,
           errors: [],
         };
       } catch (error) {

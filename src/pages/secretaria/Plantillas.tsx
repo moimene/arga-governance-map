@@ -1,7 +1,22 @@
-import { FileText, ChevronRight, CheckCircle, Clock, Archive, AlertCircle, Play, FolderOpen, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  FileText,
+  ChevronRight,
+  CheckCircle,
+  Clock,
+  Archive,
+  AlertCircle,
+  Play,
+  FolderOpen,
+  Building2,
+  ShieldCheck,
+  Filter,
+  type LucideIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import { toast } from "sonner";
 
 const ESTADO_BADGE = {
@@ -43,13 +58,86 @@ const MATERIAS_ACUERDO = [
   'RATIFICACION_ACTOS',
 ];
 
+const JURISDICTION_LABEL: Record<string, string> = {
+  ES: "España",
+  PT: "Portugal",
+  BR: "Brasil",
+  MX: "México",
+  GLOBAL: "Global",
+  MULTI: "Multijurisdicción",
+};
+
+const TIPO_LABEL: Record<string, string> = {
+  ACTA_SESION: "Acta de sesión",
+  ACTA_CONSIGNACION: "Acta de consignación",
+  ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
+  CERTIFICACION: "Certificación de acuerdos",
+  CONVOCATORIA: "Convocatoria",
+  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
+  INFORME_PRECEPTIVO: "Informe preceptivo",
+  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
+  INFORME_GESTION: "Informe de gestión",
+  MODELO_ACUERDO: "Modelo de acuerdo",
+};
+
+const INFORME_TIPOS = new Set([
+  "INFORME_PRECEPTIVO",
+  "INFORME_DOCUMENTAL_PRE",
+  "INFORME_GESTION",
+]);
+
+function jurisdictionLabel(code?: string | null) {
+  if (!code) return "Jurisdicción pendiente";
+  return JURISDICTION_LABEL[code] ?? code;
+}
+
+function tipoLabel(value?: string | null) {
+  if (!value) return "—";
+  return TIPO_LABEL[value] ?? value.replace(/_/g, " ");
+}
+
+function materiaLabel(value?: string | null) {
+  return value ? value.replace(/_/g, " ") : "—";
+}
+
+function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdiction?: string | null) {
+  if (!jurisdiction) return true;
+  return (
+    !plantilla.jurisdiccion ||
+    plantilla.jurisdiccion === jurisdiction ||
+    plantilla.jurisdiccion === "GLOBAL" ||
+    plantilla.jurisdiccion === "MULTI"
+  );
+}
+
 export default function Plantillas() {
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
   const { data, isLoading } = usePlantillasProtegidas();
   const updateEstado = useUpdateEstadoPlantilla();
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
   const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>('proceso');
   const [filterMateria, setFilterMateria] = useState<string>('');
+  const isSociedadMode = scope.mode === "sociedad";
+  const selectedEntity = scope.selectedEntity;
+  const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
+  const selectedJurisdiction = selectedEntity?.jurisdiction ?? null;
+
+  const scopedData = useMemo(() => {
+    const rows = data ?? [];
+    if (!isSociedadMode) return rows;
+    return rows.filter((plantilla) => templateAppliesToJurisdiction(plantilla, selectedJurisdiction));
+  }, [data, isSociedadMode, selectedJurisdiction]);
+
+  const scopeMetrics = useMemo(() => {
+    const active = scopedData.filter((p) => p.estado === "ACTIVA").length;
+    const modelos = scopedData.filter((p) => p.tipo === "MODELO_ACUERDO").length;
+    const informes = scopedData.filter((p) => INFORME_TIPOS.has(p.tipo)).length;
+    const exactJurisdiction = selectedJurisdiction
+      ? scopedData.filter((p) => p.jurisdiccion === selectedJurisdiction).length
+      : 0;
+    return { active, modelos, informes, exactJurisdiction };
+  }, [scopedData, selectedJurisdiction]);
 
   const handleTransicion = (plantilla: PlantillaProtegidaRow) => {
     const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
@@ -69,9 +157,18 @@ export default function Plantillas() {
     );
   };
 
-  const procesoDatos = (data ?? []).filter((p) => p.tipo !== 'MODELO_ACUERDO');
-  const modelosDatos = (data ?? []).filter((p) => p.tipo === 'MODELO_ACUERDO');
+  const procesoDatos = scopedData.filter((p) => p.tipo !== 'MODELO_ACUERDO');
+  const modelosDatos = scopedData.filter((p) => p.tipo === 'MODELO_ACUERDO');
   const displayData = activeTab === 'proceso' ? procesoDatos : modelosDatos;
+  const procesoCoverage = [...new Set(procesoDatos.map((p) => p.tipo))].map((tipo) => {
+    const rows = procesoDatos.filter((p) => p.tipo === tipo);
+    return {
+      tipo,
+      label: tipoLabel(tipo),
+      total: rows.length,
+      activas: rows.filter((p) => p.estado === "ACTIVA").length,
+    };
+  });
 
   const filteredData = activeTab === 'modelos' && filterMateria
     ? displayData.filter((p) => p.materia_acuerdo === filterMateria)
@@ -86,12 +183,74 @@ export default function Plantillas() {
           Secretaría · Plantillas
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          Plantillas documentales protegidas
+          {isSociedadMode ? `Plantillas aplicables a ${selectedEntityName}` : "Plantillas documentales protegidas"}
         </h1>
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          Ciclo de vida: Borrador → Revisada → Aprobada → Activa → Archivada
+          {isSociedadMode
+            ? `Biblioteca filtrada por jurisdicción ${jurisdictionLabel(selectedJurisdiction)} y preparada para crear expedientes de la sociedad.`
+            : "Ciclo de vida: Borrador → Revisada → Aprobada → Activa → Archivada"}
         </p>
       </div>
+
+      {isSociedadMode && selectedEntity ? (
+        <div
+          className="mb-5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+                <Building2 className="h-3.5 w-3.5" />
+                Sociedad en contexto
+              </div>
+              <div className="mt-1 text-base font-semibold text-[var(--g-text-primary)]">
+                {selectedEntityName}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+                <span>{selectedEntity.legalForm}</span>
+                <span aria-hidden="true">·</span>
+                <span>{jurisdictionLabel(selectedEntity.jurisdiction)}</span>
+                <span aria-hidden="true">·</span>
+                <span>{selectedEntity.status}</span>
+              </div>
+              <p className="mt-2 max-w-3xl text-sm text-[var(--g-text-secondary)]">
+                El tramitador arranca desde estas plantillas y conserva el ámbito de la sociedad para resolver variables, órgano competente y rule pack aplicable.
+              </p>
+            </div>
+
+            <dl className="grid min-w-full grid-cols-1 gap-3 text-sm sm:min-w-[480px] sm:grid-cols-4 lg:min-w-[640px]">
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Activas
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.active}</dd>
+              </div>
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
+                  <FileText className="h-3.5 w-3.5" />
+                  Modelos
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.modelos}</dd>
+              </div>
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
+                  <Archive className="h-3.5 w-3.5" />
+                  Informes
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.informes}</dd>
+              </div>
+              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+                <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
+                  <Filter className="h-3.5 w-3.5" />
+                  Jurisdicción
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.exactJurisdiction}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      ) : null}
 
       {/* Tab bar */}
       <div className="mb-5 flex gap-1 border-b border-[var(--g-border-subtle)]">
@@ -111,6 +270,21 @@ export default function Plantillas() {
         ))}
       </div>
 
+      {activeTab === 'proceso' && procesoCoverage.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {procesoCoverage.map((item) => (
+            <span
+              key={item.tipo}
+              className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-full)" }}
+            >
+              <span className="font-medium text-[var(--g-text-primary)]">{item.label}</span>
+              <span>{item.activas}/{item.total} activas</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Materia filter (Modelos tab only) */}
       {activeTab === 'modelos' && (
         <div className="mb-4 flex items-center gap-3">
@@ -123,7 +297,7 @@ export default function Plantillas() {
           >
             <option value="">Todas</option>
             {MATERIAS_ACUERDO.map((m) => (
-              <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
+              <option key={m} value={m}>{materiaLabel(m)}</option>
             ))}
           </select>
         </div>
@@ -171,14 +345,18 @@ export default function Plantillas() {
                       <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
                       <p className="text-sm font-medium text-[var(--g-text-secondary)]">
                         {activeTab === 'modelos' && filterMateria
-                          ? `Sin modelos para la materia "${filterMateria.replace(/_/g, ' ')}".`
+                          ? `Sin modelos para la materia "${materiaLabel(filterMateria)}".`
                           : activeTab === 'modelos'
-                          ? 'No hay modelos de acuerdo disponibles.'
+                          ? isSociedadMode
+                            ? 'No hay modelos de acuerdo aplicables a esta sociedad.'
+                            : 'No hay modelos de acuerdo disponibles.'
+                          : isSociedadMode
+                          ? 'Sin plantillas protegidas aplicables a esta sociedad.'
                           : 'Sin plantillas protegidas.'}
                       </p>
                       <button
                         type="button"
-                        onClick={() => navigate('/secretaria/plantillas/gestor')}
+                        onClick={() => navigate(scope.createScopedTo('/secretaria/gestor-plantillas'))}
                         className="mt-4 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
                         style={{ borderRadius: 'var(--g-radius-md)' }}
                       >
@@ -199,8 +377,8 @@ export default function Plantillas() {
                   >
                     <td className="px-5 py-3 text-sm font-medium text-[var(--g-text-primary)]">
                       {activeTab === 'modelos'
-                        ? (plantilla.materia_acuerdo ?? plantilla.tipo)
-                        : plantilla.tipo}
+                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.tipo)
+                        : tipoLabel(plantilla.tipo)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
@@ -208,7 +386,7 @@ export default function Plantillas() {
                         : (plantilla.materia || "—")}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
-                      {plantilla.jurisdiccion}
+                      {jurisdictionLabel(plantilla.jurisdiccion)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {plantilla.version}
@@ -252,7 +430,7 @@ export default function Plantillas() {
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Tipo</div>
                   <div className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
-                    {selected.tipo}
+                    {tipoLabel(selected.tipo)}
                   </div>
                 </div>
 
@@ -260,7 +438,7 @@ export default function Plantillas() {
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Materia</div>
                   <div className="mt-1 text-sm text-[var(--g-text-primary)]">
-                    {selected.materia_acuerdo ?? selected.materia ?? "—"}
+                    {materiaLabel(selected.materia_acuerdo ?? selected.materia)}
                   </div>
                 </div>
 
@@ -268,9 +446,25 @@ export default function Plantillas() {
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Jurisdicción</div>
                   <div className="mt-1 text-sm text-[var(--g-text-primary)]">
-                    {selected.jurisdiccion}
+                    {jurisdictionLabel(selected.jurisdiccion)}
                   </div>
                 </div>
+
+                {isSociedadMode && selectedEntity && (
+                  <div
+                    className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Aplicación
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--g-text-primary)]">
+                      {templateAppliesToJurisdiction(selected, selectedEntity.jurisdiction)
+                        ? `Disponible para ${selectedEntity.legalName}`
+                        : "No aplica a la jurisdicción seleccionada"}
+                    </div>
+                  </div>
+                )}
 
                 {/* Versión */}
                 <div className="mb-4">
@@ -443,18 +637,22 @@ export default function Plantillas() {
                 {selected.estado === 'ACTIVA' && (
                   <button
                     type="button"
-                    onClick={() => navigate(
-                      selected.tipo === 'MODELO_ACUERDO'
-                        ? `/secretaria/tramitador/nuevo?materia=${encodeURIComponent(selected.materia_acuerdo ?? '')}&plantilla=${selected.id}`
-                        : `/secretaria/tramitador/nuevo?plantilla=${selected.id}`
-                    )}
+                    onClick={() => {
+                      const target = getTemplateUsageTarget(selected).to;
+                      navigate(scope.createScopedTo(target));
+                    }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <Play className="h-4 w-4" />
-                    Usar esta plantilla
+                    {getTemplateUsageTarget(selected).label}
                   </button>
                 )}
+                {selected.estado === "ACTIVA" ? (
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    {getTemplateUsageTarget(selected).hint}
+                  </p>
+                ) : null}
                 {WORKFLOW_TRANSITIONS[selected.estado] && (
                   (() => {
                     const transition = WORKFLOW_TRANSITIONS[selected.estado];

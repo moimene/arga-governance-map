@@ -8,6 +8,7 @@ export interface EntityRow {
   common_name: string;
   jurisdiction: string;
   legal_form: string | null;
+  tipo_social?: string | null;
   registration_number: string | null;
   parent_entity_id: string | null;
   ownership_percentage: number | null;

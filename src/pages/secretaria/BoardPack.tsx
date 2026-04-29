@@ -12,11 +12,13 @@ import {
   Users,
   Calendar,
   Printer,
+  Building2,
 } from "lucide-react";
 import { useBoardPackData, type BoardPackData } from "@/hooks/useBoardPackData";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 
@@ -424,31 +426,59 @@ function CotizadaWarnings({ warnings }: CotizadaWarningsProps) {
 export default function BoardPackPage() {
   const { id: paramId } = useParams<{ id: string }>();
   const { tenantId } = useTenantContext();
+  const scope = useSecretariaScope();
   // Guard contra `:id` literal (NavLinks mal formados) y valores vacíos.
   const validParamId = paramId && paramId !== ":id" ? paramId : undefined;
+  const isSociedadMode = scope.mode === "sociedad";
+  const selectedEntity = scope.selectedEntity;
+  const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
+  const scopedEntityId = isSociedadMode ? selectedEntity?.id ?? null : null;
 
   // Fallback: si no viene un id válido en la URL, resolvemos la reunión
-  // más reciente del CdA del tenant demo para que el sidebar "Board Pack"
-  // funcione sin necesidad de elegir reunión previamente.
+  // más reciente del ámbito actual para que el sidebar "Board Pack" funcione
+  // sin necesidad de elegir reunión previamente.
   const { data: fallbackMeeting, isLoading: loadingFallback } = useQuery({
-    queryKey: ["board-pack", "fallback-meeting", tenantId],
-    enabled: !validParamId && !!tenantId,
+    queryKey: ["board-pack", "fallback-meeting", tenantId, scopedEntityId ?? "grupo"],
+    enabled: !validParamId && !!tenantId && (!isSociedadMode || !!scopedEntityId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("meetings")
-        .select("id, scheduled_start, governing_bodies!inner(body_type)")
-        .eq("tenant_id", tenantId!)
-        .eq("governing_bodies.body_type", "CDA")
+        .select("id, scheduled_start, governing_bodies!inner(body_type, entity_id, name)")
+        .eq("tenant_id", tenantId!);
+
+      if (scopedEntityId) {
+        query = query.eq("governing_bodies.entity_id", scopedEntityId);
+      } else {
+        query = query.eq("governing_bodies.body_type", "CDA");
+      }
+
+      const { data, error } = await query
         .order("scheduled_start", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(scopedEntityId ? 20 : 1);
       if (error) throw error;
-      return data as { id: string } | null;
+      type FallbackBody = { body_type: string | null; entity_id: string | null; name: string | null };
+      type FallbackMeetingRow = {
+        id: string;
+        scheduled_start: string | null;
+        governing_bodies: FallbackBody[] | FallbackBody | null;
+      };
+      const rows = (data ?? []) as FallbackMeetingRow[];
+      if (!scopedEntityId) return rows[0] ?? null;
+      return (
+        rows.find((row) => {
+          const body = Array.isArray(row.governing_bodies)
+            ? row.governing_bodies[0]
+            : row.governing_bodies;
+          return body?.body_type === "CDA";
+        }) ??
+        rows[0] ??
+        null
+      );
     },
   });
 
   const meetingId = validParamId ?? fallbackMeeting?.id ?? "";
-  const { data: boardPackData, isLoading, error } = useBoardPackData(meetingId);
+  const { data: boardPackData, isLoading, error } = useBoardPackData(meetingId, scopedEntityId);
 
   if (isLoading || loadingFallback) {
     return (
@@ -464,7 +494,9 @@ export default function BoardPackPage() {
         <div className="text-center">
           <AlertCircle className="mx-auto mb-2 h-8 w-8 text-[var(--g-text-secondary)]" />
           <p className="text-sm text-[var(--g-text-secondary)]">
-            No hay reuniones del Consejo de Administración registradas.
+            {isSociedadMode
+              ? `No hay reuniones registradas para ${selectedEntityName}.`
+              : "No hay reuniones del Consejo de Administración registradas."}
           </p>
         </div>
       </div>
@@ -501,10 +533,12 @@ export default function BoardPackPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
-              Board Pack
+              {isSociedadMode ? "Board Pack de sociedad" : "Board Pack"}
             </h1>
             <p className="text-sm text-[var(--g-text-secondary)] mt-1">
-              Consejo de Administración — Informe ejecutivo
+              {isSociedadMode
+                ? `${selectedEntityName} — Informe ejecutivo del órgano seleccionado`
+                : "Consejo de Administración — Informe ejecutivo"}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -523,6 +557,26 @@ export default function BoardPackPage() {
             </button>
           </div>
         </div>
+
+        {isSociedadMode && selectedEntity ? (
+          <div
+            className="mt-4 flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-secondary)] lg:flex-row lg:items-center lg:justify-between"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="flex items-start gap-3">
+              <Building2 className="mt-0.5 h-4 w-4 text-[var(--g-brand-3308)]" />
+              <div>
+                <div className="font-semibold text-[var(--g-text-primary)]">{selectedEntityName}</div>
+                <div>
+                  {selectedEntity.legalForm} · {selectedEntity.jurisdiction} · {selectedEntity.status}
+                </div>
+              </div>
+            </div>
+            <div className="max-w-2xl">
+              Reunión, acuerdos, riesgos, hallazgos y delegaciones se resuelven para la sociedad seleccionada cuando el dato maestro permite filtrarlo por entidad.
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="p-6 space-y-6">

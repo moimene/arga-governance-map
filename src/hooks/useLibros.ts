@@ -19,17 +19,23 @@ export interface MandatoryBookRow {
   jurisdiction: string | null;
 }
 
-export function useLibrosList() {
+export function useLibrosList(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["mandatory_books", tenantId, "list"],
+    queryKey: ["mandatory_books", tenantId, "list", entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<MandatoryBookRow[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("mandatory_books")
         .select("*, entities(common_name, jurisdiction)")
         .eq("tenant_id", tenantId!)
         .order("legalization_deadline", { ascending: true });
+
+      if (entityId) {
+        query = query.eq("entity_id", entityId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       type Raw = Omit<MandatoryBookRow, "entity_name" | "jurisdiction"> & {
         entities?: { common_name?: string | null; jurisdiction?: string | null } | null;

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, Plus, FolderOpen, Loader2, AlertTriangle } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -25,7 +26,9 @@ const SELECT_CLASS =
 
 export default function DecisionesUnipersonales() {
   const navigate = useNavigate();
-  const { data, isLoading } = useDecisionesUnipersList();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useDecisionesUnipersList(scopedEntityId);
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
@@ -51,7 +54,7 @@ export default function DecisionesUnipersonales() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/secretaria/decisiones-unipersonales/nueva")}
+          onClick={() => navigate(scope.createScopedTo("/secretaria/decisiones-unipersonales/nueva"))}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -59,6 +62,18 @@ export default function DecisionesUnipersonales() {
           Nueva decisión
         </button>
       </div>
+
+      {scope.mode === "sociedad" && scope.selectedEntity ? (
+        <div
+          className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Vista filtrada por sociedad:
+          <span className="ml-1 font-semibold text-[var(--g-text-primary)]">
+            {scope.selectedEntity.legalName}
+          </span>
+        </div>
+      ) : null}
 
       {/* Filtros */}
       <div className="mb-4 flex items-center gap-3">
@@ -128,7 +143,7 @@ export default function DecisionesUnipersonales() {
               filtered.map((d) => (
                 <tr
                   key={d.id}
-                  onClick={() => navigate(`/secretaria/decisiones-unipersonales/${d.id}`)}
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/decisiones-unipersonales/${d.id}`))}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">{d.title}</td>

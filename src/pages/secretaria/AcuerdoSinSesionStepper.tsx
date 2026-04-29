@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, Check, ChevronRight, FileText,
@@ -16,6 +16,7 @@ import {
   type VoteChoice,
 } from "@/hooks/useAcuerdosSinSesion";
 import { evaluarMayoria } from "@/lib/rules-engine/majority-evaluator";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -96,23 +97,38 @@ function evaluarResultado(
 
 export default function AcuerdoSinSesionStepper() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scope = useSecretariaScope();
+  const scopedEntityId =
+    scope.mode === "sociedad"
+      ? scope.selectedEntity?.id ?? searchParams.get("entity")
+      : null;
+  const isSociedadScoped = Boolean(scopedEntityId);
+  const scopedListPath = scope.createScopedTo("/secretaria/acuerdos-sin-sesion");
   const createResolution = useCreateNoSessionResolution();
   const adoptAgreement = useAdoptNoSessionAgreement();
 
   const [current, setCurrent] = useState(1);
 
   // ── Step 1 ──
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => scopedEntityId);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
   const [matterClass, setMatterClass] = useState<"ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL">("ORDINARIA");
   const [agreementKind, setAgreementKind] = useState("");
   const [requiresUnanimity, setRequiresUnanimity] = useState(false);
 
+  useEffect(() => {
+    if (!scopedEntityId) return;
+    setSelectedEntityId((current) => (current === scopedEntityId ? current : scopedEntityId));
+    setSelectedBodyId(null);
+    setAgreementKind("");
+  }, [scopedEntityId]);
+
   const { data: entities = [] } = useEntitiesList();
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
   const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
-  const jurisdiction = (selectedEntity as any)?.jurisdiction ?? "ES";
+  const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
 
   // ── Step 2 ──
   const [title, setTitle] = useState("");
@@ -129,7 +145,11 @@ export default function AcuerdoSinSesionStepper() {
   function toggleExclude(personId: string) {
     setExcludedPersonIds((prev) => {
       const next = new Set(prev);
-      next.has(personId) ? next.delete(personId) : next.add(personId);
+      if (next.has(personId)) {
+        next.delete(personId);
+      } else {
+        next.add(personId);
+      }
       return next;
     });
   }
@@ -143,7 +163,7 @@ export default function AcuerdoSinSesionStepper() {
   const votesFor = resolution?.votes_for ?? 0;
   const votesAgainst = resolution?.votes_against ?? 0;
   const abstentions = resolution?.abstentions ?? 0;
-  const totalVoters = resolution ? (resolution as any).total_members ?? includedMembers.length : includedMembers.length;
+  const totalVoters = resolution ? resolution.total_members ?? includedMembers.length : includedMembers.length;
   const votadosCount = Object.keys(memberVotes).length;
   const pendingVoters = includedMembers.filter((m) => !memberVotes[m.person_id]);
 
@@ -256,7 +276,7 @@ export default function AcuerdoSinSesionStepper() {
             {adoptedAgreementId && (
               <button
                 type="button"
-                onClick={() => navigate(`/secretaria/acuerdos/${adoptedAgreementId}`)}
+                onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${adoptedAgreementId}`))}
                 className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
@@ -265,7 +285,7 @@ export default function AcuerdoSinSesionStepper() {
             )}
             <button
               type="button"
-              onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+              onClick={() => navigate(scopedListPath)}
               className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -281,7 +301,7 @@ export default function AcuerdoSinSesionStepper() {
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate("/secretaria/acuerdos-sin-sesion")}
+        onClick={() => navigate(scopedListPath)}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -359,20 +379,26 @@ export default function AcuerdoSinSesionStepper() {
               {/* Entidad */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-[var(--g-text-primary)]">Sociedad</label>
+                {isSociedadScoped && (
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    Modo Sociedad activo: el acuerdo sin sesión se abrirá para esta sociedad.
+                  </p>
+                )}
                 <select
                   value={selectedEntityId ?? ""}
+                  disabled={isSociedadScoped}
                   onChange={(e) => {
                     setSelectedEntityId(e.target.value || null);
                     setSelectedBodyId(null);
                     setAgreementKind("");
                   }}
-                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
                   <option value="">— Seleccionar sociedad —</option>
                   {entities.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {JURIS_FLAGS[(e as any).jurisdiction ?? "ES"] ?? "🏢"} {e.legal_name}
+                      {JURIS_FLAGS[e.jurisdiction ?? "ES"] ?? "🏢"} {e.legal_name}
                     </option>
                   ))}
                 </select>

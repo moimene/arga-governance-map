@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { label: 'Sociedades', path: '/secretaria/sociedades', heading: 'Sociedades' },
   { label: 'Personas', path: '/secretaria/personas', heading: 'Personas' },
   { label: 'Board Pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
+  { label: 'Campañas de grupo', path: '/secretaria/procesos-grupo', heading: 'Campañas de grupo' },
   { label: 'Convocatorias', path: '/secretaria/convocatorias', heading: 'Convocatorias' },
   { label: 'Reuniones', path: '/secretaria/reuniones', heading: 'Reuniones' },
   { label: 'Actas', path: '/secretaria/actas', heading: 'Actas y certificaciones' },
@@ -36,6 +37,61 @@ const NAV_ITEMS = [
 ];
 
 test.describe('Secretaría navigation smoke', () => {
+  test('dashboard expone contratos sanitizados por flujo', async ({ page }) => {
+    await page.goto('/secretaria');
+
+    await expect(page.locator('main').getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText('Sanitización Supabase')).toBeVisible();
+    await expect(page.getByText('Contratos por flujo Secretaría')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Acuerdo 360/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Board Pack/ })).toBeVisible();
+    await expect(page.getByText('Migración: no · Tipos/RLS/RPC/storage: no').first()).toBeVisible();
+  });
+
+  test('cambia entre modo Sociedad y Grupo sin crash', async ({ page }) => {
+    const failedSupabaseResponses: string[] = [];
+
+    page.on('response', (response) => {
+      const status = response.status();
+      const url = response.url();
+      if (status >= 400 && url.includes('supabase.co/rest/v1')) {
+        failedSupabaseResponses.push(`${status} ${url}`);
+      }
+    });
+
+    await page.goto('/secretaria');
+
+    await page.getByRole('button', { name: 'Sociedad', exact: true }).click();
+    const sociedadSelect = page.getByLabel('Sociedad seleccionada');
+    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
+    await expect.poll(async () => sociedadSelect.locator('option').count()).toBeGreaterThan(1);
+
+    const sociedadValue = await sociedadSelect.evaluate((select) => {
+      const options = Array.from((select as HTMLSelectElement).options);
+      return options.find((option) => option.textContent?.includes('ARGA Seguros, S.A.'))?.value ?? options[1]?.value;
+    });
+    expect(sociedadValue).toBeTruthy();
+    await sociedadSelect.selectOption(sociedadValue!);
+
+    await page.getByRole('link', { name: 'Convocatorias', exact: true }).click();
+    await expect(page).toHaveURL(/\/secretaria\/convocatorias\?scope=sociedad&entity=/);
+    await expect(page.locator('main').getByRole('heading', { name: 'Convocatorias', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText('Ha ocurrido un error', { exact: false })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Grupo', exact: true }).click();
+    await page.getByRole('link', { name: 'Campañas de grupo', exact: true }).click();
+    await expect(page).toHaveURL('/secretaria/procesos-grupo');
+    await expect(page.locator('main').getByRole('heading', { name: 'Campañas de grupo', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText('Ha ocurrido un error', { exact: false })).toHaveCount(0);
+    expect(failedSupabaseResponses, 'El cambio Sociedad/Grupo no debe disparar errores REST').toEqual([]);
+  });
+
   test('recorre todo el menú lateral sin crashes ni errores Supabase', async ({ page }) => {
     const failedSupabaseResponses: string[] = [];
 

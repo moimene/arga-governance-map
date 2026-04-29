@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -19,19 +19,25 @@ export interface UnipersonalDecisionRow {
   decider_name: string | null;
 }
 
-export function useDecisionesUnipersList() {
+export function useDecisionesUnipersList(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["unipersonal_decisions", tenantId, "list"],
+    queryKey: ["unipersonal_decisions", tenantId, "list", entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async (): Promise<UnipersonalDecisionRow[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("unipersonal_decisions")
         .select(
           "*, entities(common_name, jurisdiction), persons:decided_by_id(full_name)",
         )
         .eq("tenant_id", tenantId!)
         .order("decision_date", { ascending: false });
+
+      if (entityId) {
+        query = query.eq("entity_id", entityId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       type Raw = Omit<UnipersonalDecisionRow, "entity_name" | "jurisdiction" | "decider_name"> & {
         entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
@@ -73,6 +79,73 @@ export function useDecisionUnipersById(id: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       return data as UnipersonalDecisionDetailRow | null;
+    },
+  });
+}
+
+export interface CreateUnipersonalDecisionInput {
+  entityId: string;
+  decisionType: "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
+  agreementKind: string;
+  matterClass: string;
+  title: string;
+  content: string;
+  requiresRegistry: boolean;
+}
+
+function adoptionModeForDecision(type: CreateUnipersonalDecisionInput["decisionType"]) {
+  return type === "SOCIO_UNICO" ? "UNIPERSONAL_SOCIO" : "UNIPERSONAL_ADMIN";
+}
+
+export function useCreateUnipersonalDecision() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateUnipersonalDecisionInput): Promise<{ decisionId: string; agreementId: string }> => {
+      const decisionDate = new Date().toISOString().split("T")[0];
+      const { data: decision, error: decisionError } = await supabase
+        .from("unipersonal_decisions")
+        .insert({
+          tenant_id: tenantId!,
+          entity_id: input.entityId,
+          decision_type: input.decisionType,
+          title: input.title,
+          content: input.content,
+          decision_date: decisionDate,
+          decided_by_id: null,
+          status: "FIRMADA",
+          requires_registry: input.requiresRegistry,
+        })
+        .select("id")
+        .single();
+      if (decisionError) throw decisionError;
+
+      const decisionId = (decision as { id: string }).id;
+      const { data: agreement, error: agreementError } = await supabase
+        .from("agreements")
+        .insert({
+          tenant_id: tenantId!,
+          entity_id: input.entityId,
+          body_id: null,
+          agreement_kind: input.agreementKind,
+          matter_class: input.matterClass,
+          adoption_mode: adoptionModeForDecision(input.decisionType),
+          status: "ADOPTED",
+          unipersonal_decision_id: decisionId,
+          decision_date: decisionDate,
+          decision_text: input.content,
+          proposal_text: input.title,
+        })
+        .select("id")
+        .single();
+      if (agreementError) throw agreementError;
+
+      return { decisionId, agreementId: (agreement as { id: string }).id };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unipersonal_decisions"] });
+      queryClient.invalidateQueries({ queryKey: ["agreements"] });
     },
   });
 }

@@ -6,6 +6,24 @@ Implementación pura (sin side effects, sin DB, sin React/Supabase) del motor de
 
 ### Core Functions
 
+#### `rule-resolution.ts`
+Capa canónica para resolver qué versión de regla aplica antes de ejecutar un stepper o campaña.
+
+**Funciones principales:**
+```typescript
+normalizeRuleLifecycleStatus(row)
+normalizeRulePackVersion(row)
+resolveRulePackForMatter(input)
+```
+
+**Responsabilidades:**
+- Normalizar esquemas legacy (`is_active`, `payload`, `version`) y lifecycle jurídico (`status`, `params`, `version_tag`).
+- Seleccionar versión por materia, órgano, clase, vigencia y estado.
+- Bloquear en producción cualquier versión que no esté `ACTIVE`.
+- Permitir `APPROVED` solo en UAT cuando se solicita expresamente.
+- Incluir overrides aplicables en el `rulesetSnapshotId`.
+- Devolver un contrato único `RuleResolution` para UI, campañas y motor.
+
 #### `bordes-no-computables.ts`
 Evaluación de 7 "bordes no-computables" — edge cases que el motor determinístico no puede resolver sin intervención externa.
 

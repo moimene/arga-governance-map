@@ -122,7 +122,7 @@ export interface BoardPackData {
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
-export function useBoardPackData(meetingId: string): {
+export function useBoardPackData(meetingId: string, entityId?: string | null): {
   data: BoardPackData | null;
   isLoading: boolean;
   error: Error | null;
@@ -195,15 +195,15 @@ export function useBoardPackData(meetingId: string): {
       },
       // Q4: Top 5 riesgos por inherent_score DESC
       {
-        queryKey: ["board-pack", "risks", tenantId],
+        queryKey: ["board-pack", "risks", tenantId, entityId ?? "all"],
         enabled: !!tenantId,
         queryFn: async () => {
-          const { data, error } = await supabase
+          let query = supabase
             .from("risks")
             .select("code, title, inherent_score, residual_score, status")
-            .eq("tenant_id", tenantId!)
-            .order("inherent_score", { ascending: false })
-            .limit(5);
+            .eq("tenant_id", tenantId!);
+          if (entityId) query = query.eq("entity_id", entityId);
+          const { data, error } = await query.order("inherent_score", { ascending: false }).limit(5);
           if (error) throw error;
           return (data ?? []) as BoardPackRisk[];
         },
@@ -243,14 +243,16 @@ export function useBoardPackData(meetingId: string): {
       },
       // Q6: Hallazgos abiertos + planes de acción
       {
-        queryKey: ["board-pack", "findings", tenantId],
+        queryKey: ["board-pack", "findings", tenantId, entityId ?? "all"],
         enabled: !!tenantId,
         queryFn: async () => {
-          const { data: findings, error } = await supabase
+          let findingsQuery = supabase
             .from("findings")
             .select("id, code, title, severity, status, origin, due_date")
             .eq("tenant_id", tenantId!)
             .eq("status", "Abierto");
+          if (entityId) findingsQuery = findingsQuery.eq("entity_id", entityId);
+          const { data: findings, error } = await findingsQuery;
           if (error) throw error;
           const findingIds = (findings ?? []).map((f) => f.id);
           const { data: plans } = findingIds.length
@@ -281,15 +283,16 @@ export function useBoardPackData(meetingId: string): {
       },
       // Q8: Delegaciones vigentes ordenadas por vencimiento
       {
-        queryKey: ["board-pack", "delegations", tenantId],
+        queryKey: ["board-pack", "delegations", tenantId, entityId ?? "all"],
         enabled: !!tenantId,
         queryFn: async () => {
-          const { data, error } = await supabase
+          let delegationsQuery = supabase
             .from("delegations")
             .select("code, delegation_type, scope, limits, end_date, status, delegate:delegate_id ( full_name )")
             .eq("tenant_id", tenantId!)
-            .in("status", ["Vigente"])
-            .order("end_date");
+            .in("status", ["Vigente"]);
+          if (entityId) delegationsQuery = delegationsQuery.eq("entity_id", entityId);
+          const { data, error } = await delegationsQuery.order("end_date");
           if (error) throw error;
           type Raw = {
             code: string;

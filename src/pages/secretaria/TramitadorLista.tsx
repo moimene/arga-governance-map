@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -27,7 +28,9 @@ function registryRef(f: FilingRow): string {
 
 export default function TramitadorLista() {
   const navigate = useNavigate();
-  const { data, isLoading } = useTramitacionesList();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data, isLoading } = useTramitacionesList(scopedEntityId);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -47,7 +50,7 @@ export default function TramitadorLista() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/secretaria/tramitador/nuevo")}
+          onClick={() => navigate(scope.createScopedTo("/secretaria/tramitador/nuevo"))}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -55,6 +58,18 @@ export default function TramitadorLista() {
           Nueva tramitación
         </button>
       </div>
+
+      {scope.mode === "sociedad" && scope.selectedEntity ? (
+        <div
+          className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Vista filtrada por sociedad:
+          <span className="ml-1 font-semibold text-[var(--g-text-primary)]">
+            {scope.selectedEntity.legalName}
+          </span>
+        </div>
+      ) : null}
 
       <div
         className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -105,7 +120,7 @@ export default function TramitadorLista() {
               data.map((f) => (
                 <tr
                   key={f.id}
-                  onClick={() => navigate(`/secretaria/tramitador/${f.id}`)}
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/tramitador/${f.id}`))}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
