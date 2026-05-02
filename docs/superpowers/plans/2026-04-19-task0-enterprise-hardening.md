@@ -602,7 +602,7 @@ Task 0 está cerrado cuando:
 - [ ] `telemetry.ts` inicializado en main.tsx + SIEM feed deployed
 - [ ] `docs/DEMO_SCOPE.md` actualizado: quitar ❌ de ítems cerrados
 
-**Una vez cerrado Task 0:** El producto puede presentarse al equipo técnico de MAPFRE como "implementación alineada con ETD" y no solo como "mockup funcional".
+**Una vez cerrado Task 0:** El producto puede presentarse al equipo técnico del cliente objetivo como "implementación alineada con ETD" y no solo como "mockup funcional".
 
 ---
 
