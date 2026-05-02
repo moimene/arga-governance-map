@@ -67,6 +67,14 @@ function textForAgreement(input: MeetingAgreementMaterializationInput) {
   return input.resolutionText?.trim() || input.snapshot.resolution_text || input.snapshot.materia;
 }
 
+function normalizeRequiredMajorityCode(input: MeetingAgreementMaterializationInput) {
+  const stored = input.requiredMajorityCode?.trim();
+  if (stored && !stored.includes(":")) return stored;
+  if (input.snapshot.materia_clase === "ORDINARIA") return "SIMPLE";
+  if (input.snapshot.materia_clase === "ESTRUCTURAL") return "ESTRUCTURAL";
+  return "REFORZADA";
+}
+
 export function isInscribableAgreementMatter(materia: string, matterClass: string) {
   return INSCRIBABLE_MATTERS.has(materia) || matterClass === "ESTRUCTURAL";
 }
@@ -99,8 +107,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
   const origin = input.origin ?? "MEETING_FLOOR";
   const resolutionText = textForAgreement(input);
   const decisionDate = dateOnly(input.scheduledStart) ?? dateOnly(input.snapshot.evaluated_at) ?? dateOnly(now);
-  const requiredMajorityCode =
-    input.requiredMajorityCode ?? `${input.snapshot.materia}:${input.snapshot.materia_clase}`;
+  const requiredMajorityCode = normalizeRequiredMajorityCode(input);
 
   const agreement360 = {
     version: AGREEMENT_360_VERSION,
@@ -166,8 +173,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     decision_text: null,
     decision_date: null,
     proposal_text: textForAgreement(input),
-    required_majority_code:
-      input.requiredMajorityCode ?? `${input.snapshot.materia}:${input.snapshot.materia_clase}`,
+    required_majority_code: normalizeRequiredMajorityCode(input),
     compliance_snapshot: input.snapshot,
     compliance_explain: {
       agreement_360: agreement360,

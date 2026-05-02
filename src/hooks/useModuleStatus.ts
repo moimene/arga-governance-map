@@ -71,8 +71,8 @@ export function useModuleStatus() {
           .from("regulatory_notifications")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId!)
-          .lte("deadline", h72)
-          .gt("deadline", now.toISOString()),
+          .lte("notification_deadline", h72)
+          .gt("notification_deadline", now.toISOString()),
 
         // AI: sistemas con riesgo Alto
         supabase

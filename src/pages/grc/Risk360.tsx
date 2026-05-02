@@ -1,6 +1,6 @@
 import { useRisks, type RiskRow } from "@/hooks/useRisks";
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity } from "lucide-react";
+import { Activity, Route } from "lucide-react";
 
 const SCORE_BG = (score: number) => {
   if (score >= 20) return "bg-[var(--status-error)]";
@@ -20,6 +20,8 @@ const MODULE_LABEL: Record<string, string> = {
 export default function Risk360() {
   const [params] = useSearchParams();
   const findingFilter = params.get("finding");
+  const handoff = params.get("handoff");
+  const handoffSource = params.get("source");
   const { data: allRisks = [], isLoading } = useRisks();
 
   const risks = findingFilter
@@ -64,6 +66,33 @@ export default function Risk360() {
           </Link>
         )}
       </header>
+
+      {handoffSource === "aims" && handoff && (
+        <div
+          className="flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4 md:flex-row md:items-center md:justify-between"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <div className="flex items-start gap-3">
+            <Route className="mt-0.5 h-5 w-5 text-[var(--g-brand-3308)]" />
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Intake read-only desde AIMS
+              </h2>
+              <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
+                {handoff} se muestra como contexto de entrada. GRC decidirá si abre riesgo,
+                control o plan owner; esta ruta no escribe eventos ni links cross-module.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/grc/m/audit/operate/plans"
+            className="inline-flex items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Ver planes GRC
+          </Link>
+        </div>
+      )}
 
       <div className="flex gap-4 flex-col lg:flex-row">
         {/* Heatmap */}

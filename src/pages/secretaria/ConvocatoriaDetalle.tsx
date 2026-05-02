@@ -1,9 +1,12 @@
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus } from "lucide-react";
 import { useConvocatoriaById, useConvocatoriaAttachments } from "@/hooks/useConvocatorias";
+import { useCreateMeetingFromConvocatoria, useMeetingForConvocatoria } from "@/hooks/useReunionSecretaria";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { validateMeetingScheduleFromConvocatoria } from "@/lib/secretaria/meeting-scheduler";
 
 function formatDateTime(value?: string | null) {
   return value ? new Date(value).toLocaleString("es-ES") : "—";
@@ -12,6 +15,13 @@ function formatDateTime(value?: string | null) {
 function getTraceArray(trace: Record<string, unknown> | null, key: string): unknown[] {
   const value = trace?.[key];
   return Array.isArray(value) ? value : [];
+}
+
+function scheduleReasonLabel(reason: string) {
+  if (reason === "body_id_missing") return "Falta órgano social asociado a la convocatoria.";
+  if (reason === "fecha_1_missing") return "Falta fecha de primera convocatoria.";
+  if (reason === "convocatoria_missing") return "No se ha cargado la convocatoria.";
+  return reason;
 }
 
 type ConvocatoriaDocContext = {
@@ -223,6 +233,8 @@ export default function ConvocatoriaDetalle() {
   const scope = useSecretariaScope();
   const { data: conv, isLoading } = useConvocatoriaById(id);
   const { data: attachments } = useConvocatoriaAttachments(id);
+  const { data: scheduledMeeting, isLoading: isMeetingLoading } = useMeetingForConvocatoria(id, conv);
+  const createMeetingFromConvocatoria = useCreateMeetingFromConvocatoria();
 
   if (isLoading) {
     return (
@@ -255,6 +267,25 @@ export default function ConvocatoriaDetalle() {
     requestedTemplateType && requestedTemplateType.startsWith("INFORME")
       ? requestedPlantillaId
       : null;
+  const meetingValidation = validateMeetingScheduleFromConvocatoria(conv);
+
+  const openOrScheduleMeeting = async () => {
+    try {
+      if (scheduledMeeting?.id) {
+        navigate(scope.createScopedTo(`/secretaria/reuniones/${scheduledMeeting.id}`));
+        return;
+      }
+
+      const result = await createMeetingFromConvocatoria.mutateAsync(conv);
+      toast.success(result.reused ? "Reunión existente localizada" : "Reunión programada", {
+        description: "La sesión conserva la convocatoria como origen y cargará su orden del día.",
+      });
+      navigate(scope.createScopedTo(`/secretaria/reuniones/${result.id}`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error("No se pudo programar la reunión", { description: message });
+    }
+  };
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
@@ -323,6 +354,17 @@ export default function ConvocatoriaDetalle() {
               filenamePrefix: "informe_pre_convocatoria",
             }}
           />
+          <button
+            type="button"
+            onClick={openOrScheduleMeeting}
+            disabled={!meetingValidation.ok || createMeetingFromConvocatoria.isPending || isMeetingLoading}
+            aria-busy={createMeetingFromConvocatoria.isPending || isMeetingLoading}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            {scheduledMeeting ? "Abrir reunión" : "Programar reunión"}
+          </button>
           {conv.fecha_1 ? (
             <button
               type="button"
@@ -409,6 +451,38 @@ export default function ConvocatoriaDetalle() {
         </div>
 
         <div className="space-y-6">
+          <Card title="Reunión operativa" icon={CalendarPlus}>
+            {scheduledMeeting ? (
+              <>
+                <KV label="Estado" value={statusLabel(scheduledMeeting.status)} />
+                <KV label="Inicio" value={formatDateTime(scheduledMeeting.scheduled_start)} />
+                <KV label="Tipo" value={scheduledMeeting.meeting_type} />
+                <button
+                  type="button"
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/reuniones/${scheduledMeeting.id}`))}
+                  className="mt-3 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                  Abrir reunión
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[var(--g-text-secondary)]">
+                  Programa una reunión operativa desde esta convocatoria para cargar su orden del día, conservar el vínculo de origen y continuar con votación, acta, certificación y Acuerdo 360.
+                </p>
+                {!meetingValidation.ok ? (
+                  <ul className="mt-3 space-y-1 text-xs text-[var(--status-warning)]">
+                    {meetingValidation.reasons.map((reason) => (
+                      <li key={reason}>· {scheduleReasonLabel(reason)}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            )}
+          </Card>
+
           <Card title="Trazabilidad" icon={Shield}>
             <KV label="Creada" value={new Date(conv.created_at).toLocaleString("es-ES")} />
             <KV label="Actualizada" value={new Date(conv.updated_at).toLocaleString("es-ES")} />

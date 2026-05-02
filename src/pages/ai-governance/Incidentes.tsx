@@ -1,6 +1,7 @@
-import { useNavigate } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { AlertTriangle, Route } from "lucide-react";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
+import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
 
 const SEVERITY_CHIP: Record<string, string> = {
   CRITICO: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -87,12 +88,14 @@ export default function AiIncidentes() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Severidad</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Estado</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Reportado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Escalación</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
               {incidents.map((inc) => {
                 const sevCls = SEVERITY_CHIP[inc.severity ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
                 const stCls = STATUS_CHIP[inc.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
+                const isMaterial = isAimsMaterialIncidentCandidate(inc);
                 return (
                   <tr
                     key={inc.id}
@@ -126,6 +129,32 @@ export default function AiIncidentes() {
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                       {new Date(inc.reported_at).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    </td>
+                    <td className="px-6 py-4">
+                      {isMaterial ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            to={`/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          >
+                            <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                            GRC
+                          </Link>
+                          <Link
+                            to={`/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=${inc.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          >
+                            <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                            Secretaría
+                          </Link>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-[var(--g-text-secondary)]">Seguimiento AIMS</span>
+                      )}
                     </td>
                   </tr>
                 );

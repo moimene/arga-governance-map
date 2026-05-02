@@ -230,8 +230,8 @@ const MATERIAS_GRUPO: MateriaGrupo[] = [
 /* ── Helpers UI ──────────────────────────────────────────────────────────── */
 
 function urgencyBadge(dias: number) {
-  if (dias <= 7)  return "bg-[var(--status-error)] text-white";
-  if (dias <= 30) return "bg-[var(--status-warning)] text-white";
+  if (dias <= 7)  return "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+  if (dias <= 30) return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
   return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
 }
 
@@ -354,7 +354,7 @@ export default function MatrizJurisdiccional() {
               <span>{ff.nombre}</span>
               {alerts > 0 && (
                 <span
-                  className="flex h-4 w-4 items-center justify-center text-[10px] font-bold text-white bg-[var(--status-error)]"
+                  className="flex h-4 w-4 items-center justify-center text-[10px] font-bold text-[var(--g-text-inverse)] bg-[var(--status-error)]"
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
                   {alerts}
@@ -462,7 +462,7 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
                     className={cn(
                       "flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold -translate-x-full",
                       step.highlight
-                        ? "bg-[var(--g-brand-3308)] text-white"
+                        ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
                         : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-default)]"
                     )}
                     style={{ borderRadius: "var(--g-radius-full)" }}
@@ -694,7 +694,7 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
                 <span className={cn(
                   "text-xs font-semibold px-2 py-0.5",
                   f.traduccion_jurada
-                    ? "text-[var(--status-error)] bg-[hsl(0,84%,97%)]"
+                    ? "text-[var(--status-error)] bg-[var(--g-surface-muted)]"
                     : "text-[var(--status-success)] bg-[var(--g-sec-100)]"
                 )} style={{ borderRadius: "var(--g-radius-sm)" }}>
                   {f.traduccion_jurada ? "Requerida" : "No necesaria"}
@@ -705,7 +705,7 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
                 <span className={cn(
                   "text-xs font-semibold px-2 py-0.5",
                   f.requiere_escritura_pub
-                    ? "text-[var(--status-error)] bg-[hsl(0,84%,97%)]"
+                    ? "text-[var(--status-error)] bg-[var(--g-surface-muted)]"
                     : "text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
                 )} style={{ borderRadius: "var(--g-radius-sm)" }}>
                   {f.requiere_escritura_pub ? "Siempre" : "Solo en estructurales"}
@@ -784,7 +784,7 @@ function MateriasCrossView({ activeCode }: { activeCode: JurisCode }) {
                       <p className="text-xs text-[var(--g-text-secondary)] leading-snug">{local.requiere}</p>
                     </div>
                     {local.bloqueo && (
-                      <div className="flex items-start gap-1.5 mt-2 p-2 bg-[hsl(0,84%,97%)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                      <div className="flex items-start gap-1.5 mt-2 p-2 bg-[var(--g-surface-muted)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--status-error)] mt-0.5" />
                         <p className="text-xs text-[var(--status-error)] leading-snug">{local.bloqueo}</p>
                       </div>

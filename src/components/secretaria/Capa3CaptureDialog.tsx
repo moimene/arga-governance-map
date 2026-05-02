@@ -92,7 +92,11 @@ export function Capa3CaptureDialog({
           </button>
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void onSubmit();
+            }}
             disabled={loading}
             aria-busy={loading}
             className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"

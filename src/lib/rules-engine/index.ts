@@ -12,6 +12,7 @@ export { buildMeetingAdoptionSnapshot } from './meeting-adoption-snapshot';
 export type {
   MeetingAdoptionSnapshot,
   MeetingAdoptionSnapshotInput,
+  MeetingAdoptionRuleTrace,
   MeetingAdoptionVoter,
   VoteSummary,
 } from './meeting-adoption-snapshot';

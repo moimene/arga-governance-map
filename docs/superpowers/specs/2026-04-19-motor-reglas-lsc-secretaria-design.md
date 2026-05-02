@@ -1523,7 +1523,7 @@ USUARIO:
 
 Cada variable documenta:
 - Nombre canonico (ej: `tsq_token`, `firma_qes`, `timestamp_notificacion`)
-- Servicio QTSP (ej: "TSQ vía G-Trust", "QES via EAD Trust", "Notificacion certificada")
+- Servicio QTSP (ej: "TSQ via EAD Trust", "QES via EAD Trust", "Notificacion certificada EAD Trust")
 - Momento de inyeccion (ej: "fase Gate PRE", "fase firma", "post ADOPTED")
 - Formato de persistencia (ej: "JWT", "base64 PKCS#7", "reference URI")
 
@@ -1532,7 +1532,7 @@ Ejemplo:
 QTSP:
   tsq_token:
     tipo: "JWT"
-    servicio: "TSQ via G-Trust"
+    servicio: "TSQ via EAD Trust"
     momento_inyeccion: "inmediatamente despues evaluacion, antes renderizado"
     persistencia: "rule_evaluation_results.tsq_token TEXT"
   

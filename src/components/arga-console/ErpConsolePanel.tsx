@@ -8,7 +8,9 @@ import {
   ClipboardList,
   Compass,
   Database,
+  FileWarning,
   Link2,
+  LockKeyhole,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,11 @@ import {
   consoleSourceNotes,
   type ConsoleSourcePosture,
 } from "@/lib/arga-console/contracts";
+import {
+  getPlatformReadinessSummary,
+  platformReadinessLanes,
+  type PlatformLaneStatus,
+} from "@/lib/arga-console/platform-readiness";
 
 type WorkTone = "danger" | "warning" | "success" | "neutral";
 
@@ -52,6 +59,20 @@ const postureClass: Record<ConsoleSourcePosture, string> = {
   "local pending": "bg-secondary text-muted-foreground",
   "generated types only": "bg-secondary text-muted-foreground",
   none: "bg-destructive/10 text-destructive",
+};
+
+const laneStatusLabel: Record<PlatformLaneStatus, string> = {
+  operational: "Operativo",
+  read_only: "Read-only",
+  pending: "Pendiente",
+  hold: "HOLD",
+};
+
+const laneStatusClass: Record<PlatformLaneStatus, string> = {
+  operational: "bg-status-active-bg text-status-active",
+  read_only: "bg-secondary text-muted-foreground",
+  pending: "bg-status-warning/10 text-status-warning",
+  hold: "bg-destructive/10 text-destructive",
 };
 
 function toneClass(tone: WorkTone) {
@@ -113,6 +134,7 @@ function buildWorkItems(moduleStatus: ModuleStatus | undefined, alerts: Notifica
 
 export function ErpConsolePanel({ moduleStatus, alerts }: ErpConsolePanelProps) {
   const workItems = buildWorkItems(moduleStatus, alerts);
+  const readinessSummary = getPlatformReadinessSummary();
   const visibleContracts = consoleDataContracts.filter((contract) =>
     ["core-identity", "secretaria-agreements", "grc-incidents", "aims-systems", "cross-module-contracts"].includes(contract.id)
   );
@@ -171,7 +193,63 @@ export function ErpConsolePanel({ moduleStatus, alerts }: ErpConsolePanelProps) 
         </div>
       </Card>
 
-      <Card className="col-span-12 overflow-hidden lg:col-span-4">
+      <Card className="col-span-12 overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <LockKeyhole className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Postura de plataforma</h2>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Estado ejecutivo por carril: operativo, read-only, pendiente o HOLD. No crea writes ni dependencias nuevas.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <span className="rounded-md bg-status-active-bg px-2 py-1 font-semibold text-status-active">
+              {readinessSummary.operational} operativo
+            </span>
+            <span className="rounded-md bg-secondary px-2 py-1 font-semibold text-muted-foreground">
+              {readinessSummary.read_only} read-only
+            </span>
+            <span className="rounded-md bg-status-warning/10 px-2 py-1 font-semibold text-status-warning">
+              {readinessSummary.pending} pendiente
+            </span>
+            <span className="rounded-md bg-destructive/10 px-2 py-1 font-semibold text-destructive">
+              {readinessSummary.hold} HOLD
+            </span>
+          </div>
+        </div>
+
+        <div className="grid divide-y divide-border lg:grid-cols-5 lg:divide-x lg:divide-y-0">
+          {platformReadinessLanes.map((lane) => (
+            <Link key={lane.id} to={lane.route} className="flex min-h-[188px] flex-col justify-between p-4 transition-colors hover:bg-accent/40">
+              <span>
+                <span className="mb-3 flex items-start justify-between gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    {lane.status === "hold" ? <FileWarning className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                  </span>
+                  <span className={cn("shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold", laneStatusClass[lane.status])}>
+                    {laneStatusLabel[lane.status]}
+                  </span>
+                </span>
+                <span className="block text-sm font-semibold text-foreground">{lane.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">{lane.summary}</span>
+              </span>
+              <span className="mt-4 flex flex-wrap gap-1.5">
+                <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", postureClass[lane.sourcePosture])}>
+                  {postureLabel[lane.sourcePosture]}
+                </span>
+                <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {lane.owner}
+                </span>
+                <span className="w-full text-[11px] leading-5 text-muted-foreground">{lane.nextAction}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="col-span-12 overflow-hidden lg:col-span-4 lg:col-start-9 lg:row-start-1">
         <div className="flex items-center gap-2 border-b border-border px-5 py-4">
           <Link2 className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Contratos de datos</h2>

@@ -1,6 +1,6 @@
 import { useIncidents } from "@/hooks/useIncidents";
-import { Link, useNavigate } from "react-router-dom";
-import { Plus, AlertOctagon } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Plus, AlertOctagon, Route } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 
 const SEV_CHIP: Record<string, string> = {
@@ -20,7 +20,10 @@ const STATUS_CHIP: Record<string, string> = {
 
 export default function IncidentesList() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { data: incidents = [], isLoading } = useIncidents();
+  const handoff = params.get("handoff");
+  const handoffSource = params.get("source");
 
   return (
     <div className="p-6 space-y-5">
@@ -46,6 +49,34 @@ export default function IncidentesList() {
           Nuevo incidente
         </button>
       </header>
+
+      {handoffSource === "aims" && handoff && (
+        <div
+          className="flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4 md:flex-row md:items-center md:justify-between"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <div className="flex items-start gap-3">
+            <Route className="mt-0.5 h-5 w-5 text-[var(--g-brand-3308)]" />
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Intake read-only desde AIMS
+              </h2>
+              <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
+                {handoff} se recibe como señal de preparación. GRC conserva el owner del
+                incidente operativo; esta pantalla no escribe en contratos cross-module.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/grc/incidentes/nuevo")}
+            className="inline-flex items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Registrar incidente GRC
+          </button>
+        </div>
+      )}
 
       {isLoading && (
         <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando…</div>

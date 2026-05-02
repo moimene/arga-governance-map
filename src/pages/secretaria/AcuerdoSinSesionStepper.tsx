@@ -65,6 +65,18 @@ const BODY_TYPE_LABELS: Record<string, string> = {
   COMITE:  "Comité",
 };
 
+const TALLY_COUNT_CLASS = {
+  FOR: "text-[var(--status-success)]",
+  AGAINST: "text-[var(--status-error)]",
+  ABSTAIN: "text-[var(--g-text-secondary)]",
+} as const;
+
+const VOTE_BADGE_CLASS: Record<VoteChoice, string> = {
+  FOR: "bg-[var(--status-success)]",
+  AGAINST: "bg-[var(--status-error)]",
+  ABSTAIN: "bg-[var(--status-warning)]",
+};
+
 function evaluarResultado(
   votesFor: number,
   votesAgainst: number,
@@ -633,17 +645,17 @@ export default function AcuerdoSinSesionStepper() {
             <div className="mt-6 space-y-5">
               {/* Tally */}
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "A favor", count: votesFor, color: "var(--status-success)" },
-                  { label: "En contra", count: votesAgainst, color: "var(--status-error)" },
-                  { label: "Abstenciones", count: abstentions, color: "var(--g-text-secondary)" },
-                ].map((v) => (
+                {([
+                  { label: "A favor", count: votesFor, tone: "FOR" },
+                  { label: "En contra", count: votesAgainst, tone: "AGAINST" },
+                  { label: "Abstenciones", count: abstentions, tone: "ABSTAIN" },
+                ] as const).map((v) => (
                   <div
                     key={v.label}
                     className="border border-[var(--g-border-subtle)] p-4 text-center"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <p className="text-2xl font-bold" style={{ color: v.color }}>{v.count}</p>
+                    <p className={`text-2xl font-bold ${TALLY_COUNT_CLASS[v.tone]}`}>{v.count}</p>
                     <p className="text-xs text-[var(--g-text-secondary)] mt-1">{v.label}</p>
                   </div>
                 ))}
@@ -671,13 +683,9 @@ export default function AcuerdoSinSesionStepper() {
                       </div>
                       {vote ? (
                         <span
-                          className="text-xs font-semibold px-2.5 py-1 text-[var(--g-text-inverse)]"
+                          className={`text-xs font-semibold px-2.5 py-1 text-[var(--g-text-inverse)] ${VOTE_BADGE_CLASS[vote]}`}
                           style={{
                             borderRadius: "var(--g-radius-full)",
-                            backgroundColor:
-                              vote === "FOR" ? "var(--status-success)" :
-                              vote === "AGAINST" ? "var(--status-error)" :
-                              "var(--status-warning)",
                           }}
                         >
                           {vote === "FOR" ? "A favor" : vote === "AGAINST" ? "En contra" : "Abstención"}

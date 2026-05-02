@@ -14,5 +14,18 @@ setup('authenticate as demo user', async ({ page }) => {
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
   }
-  await page.context().storageState({ path: AUTH_FILE });
+  const storageState = await page.context().storageState();
+  const activeBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
+  const pageOrigin = new URL(page.url()).origin;
+  const activeOrigin = activeBaseUrl ? new URL(activeBaseUrl).origin : pageOrigin;
+  const pageOriginState = storageState.origins.find((origin) => origin.origin === pageOrigin);
+
+  if (pageOriginState && activeOrigin !== pageOrigin) {
+    storageState.origins = [
+      ...storageState.origins.filter((origin) => origin.origin !== activeOrigin),
+      { origin: activeOrigin, localStorage: pageOriginState.localStorage },
+    ];
+  }
+
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(storageState, null, 2));
 });

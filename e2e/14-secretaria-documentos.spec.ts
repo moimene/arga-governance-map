@@ -115,6 +115,29 @@ test.describe('Secretaría — documentos DOCX', () => {
     }
   });
 
+  test('acta explica trazabilidad legal hacia certificación y tramitador', async ({ page }) => {
+    await openFirstActaDetalle(page);
+
+    await expect(page.getByRole('heading', { name: 'Revisión legal para certificación' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText('Certificables')).toBeVisible();
+    await expect(page.getByText('Acuerdo 360').first()).toBeVisible();
+    await expect(page.getByText('Refs. por punto')).toBeVisible();
+    await expect(page.getByText(/Estado Acuerdo 360|Falta snapshot legal por punto/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
+
+    const abrirTramitador = page.getByRole('button', { name: 'Abrir en tramitador' }).first();
+    if (await abrirTramitador.isVisible().catch(() => false)) {
+      await abrirTramitador.click();
+      await expect(page).toHaveURL(/\/secretaria\/tramitador\/nuevo\?certificacion=/);
+      await expect(page.getByText('Entrada desde certificación')).toBeVisible({ timeout: 10_000 });
+      await expect(
+        page.getByText(/Firmada|Pendiente de firma|Evidencia operativa pendiente|Evidencia demo\/operativa vinculada/i).first()
+      ).toBeVisible();
+    }
+  });
+
   test('gestor permite usar fixture registral local sin cargarlo en Supabase', async ({ page }) => {
     await page.goto('/secretaria/gestor-plantillas');
 
@@ -124,7 +147,7 @@ test.describe('Secretaría — documentos DOCX', () => {
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('Documento registral');
 
     await page.getByRole('button', { name: /Documento registral/ }).first().click();
-    await expect(page.getByText('Fixture local no persistido')).toBeVisible();
+    await expect(page.getByText('Fixture local no persistido').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Elegir trámite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Elegir trámite' }).click();

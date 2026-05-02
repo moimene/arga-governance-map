@@ -12,6 +12,7 @@ const MEETING_TYPE_LABEL: Record<string, string> = {
 };
 
 const STATUS_TONE: Record<string, string> = {
+  CONVOCADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   PROGRAMADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   EN_CURSO:   "bg-[var(--status-error)] text-[var(--g-text-inverse)] animate-pulse",
   CELEBRADA:  "bg-[var(--status-success)] text-[var(--g-text-inverse)]",

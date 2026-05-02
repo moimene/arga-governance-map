@@ -29,221 +29,21 @@ import {
   type GroupCampaignWarRoomCampaign,
   type GroupCampaignWarRoomExpediente,
   type GroupCampaignWarRoomStep,
-  type LaunchGroupCampaignInput,
 } from "@/hooks/useGroupCampaigns";
 import { useSociedades, type SociedadRow } from "@/hooks/useSociedades";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-
-type CampaignType =
-  | "CUENTAS_ANUALES"
-  | "RENOVACION_CARGOS"
-  | "PRESUPUESTO"
-  | "GARANTIAS_INTRAGRUPO"
-  | "DIVIDENDOS"
-  | "MOD_ESTATUTOS"
-  | "AUDITOR"
-  | "FUSION"
-  | "COMPLIANCE_ANUAL"
-  | "SUCURSALES";
-
-type CampaignOrgan = "ADMIN" | "JUNTA" | "POST" | "COMPLIANCE";
-
-type AdoptionMode =
-  | "MEETING"
-  | "NO_SESSION"
-  | "UNIPERSONAL_ADMIN"
-  | "UNIPERSONAL_SOCIO"
-  | "CO_APROBACION"
-  | "SOLIDARIO"
-  | "POST_TASK";
-
-type CampaignStatus = "PENDIENTE" | "EN_CURSO" | "COMPLETADO" | "BLOQUEADO";
-
-interface CampaignAgreement {
-  code: string;
-  label: string;
-  organ: CampaignOrgan;
-  dependency: string | null;
-  deadlineDays: number;
-}
-
-interface CampaignTemplate {
-  type: CampaignType;
-  name: string;
-  summary: string;
-  legalAnchor: string;
-  cadence: string;
-  agreements: CampaignAgreement[];
-}
-
-interface CampaignParams {
-  type: CampaignType;
-  ejercicio: string;
-  fechaCierre: string;
-  fechaLanzamiento: string;
-  selectedJurisdictions: string[];
-  includeCotizada: boolean;
-  preferNoSession: boolean;
-}
-
-interface CampaignExpediente {
-  id: string;
-  sociedadId: string;
-  sociedad: string;
-  jurisdiction: string;
-  formaSocial: string;
-  formaAdministracion: string;
-  faseActual: string;
-  estado: CampaignStatus;
-  adoptionMode: AdoptionMode;
-  rulePack: string;
-  deadline: string;
-  responsable: string;
-  alertas: string[];
-  explain: string[];
-}
-
-const DEFAULT_JURISDICTIONS = ["ES", "PT", "BR", "MX"];
-
-const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
-  {
-    type: "CUENTAS_ANUALES",
-    name: "Ciclo anual de cuentas",
-    summary: "Formulación, convocatoria, aprobación y depósito coordinado para todas las sociedades del grupo.",
-    legalAnchor: "art. 253 LSC, art. 42 C.Comercio y reglas locales equivalentes",
-    cadence: "Anual",
-    agreements: [
-      { code: "FORMULACION_CUENTAS", label: "A. Formulación de cuentas", organ: "ADMIN", dependency: null, deadlineDays: 90 },
-      { code: "CONVOCATORIA_JGA", label: "B. Convocatoria de JGA", organ: "ADMIN", dependency: "FORMULACION_CUENTAS", deadlineDays: 120 },
-      { code: "APROBACION_CUENTAS", label: "C. Aprobación cuentas y resultado", organ: "JUNTA", dependency: "CONVOCATORIA_JGA", deadlineDays: 180 },
-      { code: "DEPOSITO_CUENTAS", label: "D. Depósito Registro Mercantil", organ: "POST", dependency: "APROBACION_CUENTAS", deadlineDays: 210 },
-    ],
-  },
-  {
-    type: "RENOVACION_CARGOS",
-    name: "Renovación de cargos",
-    summary: "Cese por expiración, nombramiento, aceptación, inscripción y cargos internos del consejo.",
-    legalAnchor: "LSC, RRM y estatutos sociales",
-    cadence: "Por vencimiento",
-    agreements: [
-      { code: "CESE_CARGO", label: "Cese por expiración", organ: "JUNTA", dependency: null, deadlineDays: 15 },
-      { code: "NOMBRAMIENTO_CARGO", label: "Nombramiento o reelección", organ: "JUNTA", dependency: "CESE_CARGO", deadlineDays: 30 },
-      { code: "CONSTITUCION_CONSEJO", label: "Constitución de cargos del consejo", organ: "ADMIN", dependency: "NOMBRAMIENTO_CARGO", deadlineDays: 45 },
-      { code: "PODERES", label: "Renovación de poderes", organ: "POST", dependency: "CONSTITUCION_CONSEJO", deadlineDays: 60 },
-    ],
-  },
-  {
-    type: "PRESUPUESTO",
-    name: "Presupuesto anual / plan de negocio",
-    summary: "Aprobación coordinada del presupuesto y verificación de pactos de control presupuestario.",
-    legalAnchor: "Estatutos, pactos P6 y normativa interna de grupo",
-    cadence: "Anual",
-    agreements: [
-      { code: "APROBACION_PRESUPUESTO", label: "Aprobación presupuesto", organ: "ADMIN", dependency: null, deadlineDays: 45 },
-      { code: "PACTOS_CONTROL", label: "Verificación de pactos", organ: "COMPLIANCE", dependency: "APROBACION_PRESUPUESTO", deadlineDays: 50 },
-    ],
-  },
-  {
-    type: "GARANTIAS_INTRAGRUPO",
-    name: "Garantías intragrupo",
-    summary: "Determina órgano competente por umbral de materialidad y genera autorizaciones por sociedad garante.",
-    legalAnchor: "art. 160.f LSC, operaciones vinculadas y estatutos",
-    cadence: "Por operación",
-    agreements: [
-      { code: "AUTORIZACION_GARANTIA", label: "Autorización de garantía", organ: "ADMIN", dependency: null, deadlineDays: 20 },
-      { code: "OPERACION_VINCULADA", label: "Control operación vinculada", organ: "COMPLIANCE", dependency: "AUTORIZACION_GARANTIA", deadlineDays: 25 },
-    ],
-  },
-  {
-    type: "DIVIDENDOS",
-    name: "Dividendo a cuenta / distribución",
-    summary: "Flujo ascendente: filiales aprueban reparto, pagan a matriz y la matriz decide su distribución.",
-    legalAnchor: "arts. 273, 277 y 326 LSC; reglas de liquidez",
-    cadence: "Por cierre o reparto",
-    agreements: [
-      { code: "DIVIDENDO_FILIAL", label: "Dividendo a cuenta filial", organ: "ADMIN", dependency: null, deadlineDays: 30 },
-      { code: "PAGO_MATRIZ", label: "Pago a matriz", organ: "POST", dependency: "DIVIDENDO_FILIAL", deadlineDays: 45 },
-      { code: "APLICACION_RESULTADO", label: "Aplicación resultado matriz", organ: "JUNTA", dependency: "PAGO_MATRIZ", deadlineDays: 75 },
-    ],
-  },
-  {
-    type: "MOD_ESTATUTOS",
-    name: "Modificación de estatutos coordinada",
-    summary: "Homogeneiza estatutos, detecta competencia del órgano y prepara escritura e inscripción.",
-    legalAnchor: "arts. 285, 286 y 287 LSC; estatutos",
-    cadence: "Por proyecto",
-    agreements: [
-      { code: "MODIFICACION_ESTATUTOS", label: "Aprobación modificación", organ: "JUNTA", dependency: null, deadlineDays: 45 },
-      { code: "ESCRITURA_INSCRIPCION", label: "Escritura e inscripción", organ: "POST", dependency: "MODIFICACION_ESTATUTOS", deadlineDays: 75 },
-    ],
-  },
-  {
-    type: "AUDITOR",
-    name: "Nombramiento / renovación auditor",
-    summary: "Coordina nombramiento obligatorio o voluntario y registro ROAC por sociedad.",
-    legalAnchor: "arts. 263 y 264 LSC; RRM",
-    cadence: "3-9 años",
-    agreements: [
-      { code: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento auditor", organ: "JUNTA", dependency: null, deadlineDays: 120 },
-      { code: "INSCRIPCION_AUDITOR", label: "Inscripción RM", organ: "POST", dependency: "NOMBRAMIENTO_AUDITOR", deadlineDays: 150 },
-    ],
-  },
-  {
-    type: "FUSION",
-    name: "Operación estructural de grupo",
-    summary: "Coordina proyecto, convocatorias, juntas, publicación, escritura e inscripción cruzada.",
-    legalAnchor: "LME, LSC y plazos de oposición de acreedores",
-    cadence: "Por operación",
-    agreements: [
-      { code: "PROYECTO_FUSION", label: "Proyecto común de fusión", organ: "ADMIN", dependency: null, deadlineDays: 30 },
-      { code: "CONVOCATORIA_FUSION", label: "Convocatoria JGA", organ: "ADMIN", dependency: "PROYECTO_FUSION", deadlineDays: 60 },
-      { code: "APROBACION_FUSION", label: "Aprobación JGA", organ: "JUNTA", dependency: "CONVOCATORIA_FUSION", deadlineDays: 90 },
-      { code: "OPOSICION_INSCRIPCION", label: "Oposición, escritura e inscripción", organ: "POST", dependency: "APROBACION_FUSION", deadlineDays: 135 },
-    ],
-  },
-  {
-    type: "COMPLIANCE_ANUAL",
-    name: "Compliance anual societario",
-    summary: "Dispensas, conflictos, vinculadas y pactos activos revisados de forma coordinada.",
-    legalAnchor: "arts. 229-230 LSC, pactos parasociales y política interna",
-    cadence: "Anual",
-    agreements: [
-      { code: "DECLARACION_CONFLICTOS", label: "Declaración de conflictos", organ: "COMPLIANCE", dependency: null, deadlineDays: 30 },
-      { code: "DISPENSAS_VINCULADAS", label: "Dispensas y vinculadas", organ: "ADMIN", dependency: "DECLARACION_CONFLICTOS", deadlineDays: 60 },
-      { code: "PACTOS", label: "Evaluación de pactos", organ: "COMPLIANCE", dependency: "DISPENSAS_VINCULADAS", deadlineDays: 75 },
-    ],
-  },
-  {
-    type: "SUCURSALES",
-    name: "Cierre y apertura de sucursales",
-    summary: "Lanza decisiones de apertura o cierre y tareas de inscripción por territorio.",
-    legalAnchor: "RRM, estatutos y normativa local",
-    cadence: "Por reestructuración",
-    agreements: [
-      { code: "APERTURA_CIERRE_SUCURSAL", label: "Acuerdo apertura/cierre", organ: "ADMIN", dependency: null, deadlineDays: 30 },
-      { code: "INSCRIPCION_SUCURSAL", label: "Inscripción sucursal", organ: "POST", dependency: "APERTURA_CIERRE_SUCURSAL", deadlineDays: 60 },
-    ],
-  },
-];
-
-function makeDefaultParams(): CampaignParams {
-  const ejercicio = String(new Date().getFullYear() - 1);
-  return {
-    type: "CUENTAS_ANUALES",
-    ejercicio,
-    fechaCierre: `${ejercicio}-12-31`,
-    fechaLanzamiento: new Date().toISOString().slice(0, 10),
-    selectedJurisdictions: DEFAULT_JURISDICTIONS,
-    includeCotizada: true,
-    preferNoSession: false,
-  };
-}
-
-function addDays(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00`);
-  value.setDate(value.getDate() + days);
-  return value.toISOString().slice(0, 10);
-}
+import {
+  GROUP_CAMPAIGN_TEMPLATES,
+  addCampaignDays,
+  buildGroupCampaignExpedientes,
+  buildGroupCampaignLaunchInput,
+  makeDefaultCampaignParams,
+  uniqueCampaignJurisdictions,
+  type CampaignParams,
+  type CampaignType,
+  type CampaignAdoptionMode,
+  type CampaignStatus,
+} from "@/lib/secretaria/group-campaign-engine";
 
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("es-ES", {
@@ -253,195 +53,8 @@ function formatDate(date: string) {
   });
 }
 
-function normalizeAdminForm(sociedad: SociedadRow) {
-  const value = `${sociedad.tipo_organo_admin ?? ""} ${sociedad.forma_administracion ?? ""}`.toUpperCase();
-  if (value.includes("MANCOMUN")) return "ADM_MANCOMUNADOS";
-  if (value.includes("SOLIDAR")) return "ADM_SOLIDARIOS";
-  if (value.includes("UNICO") || value.includes("ÚNICO")) return "ADMINISTRADOR_UNICO";
-  if (value.includes("CONSEJO")) return "CONSEJO";
-  return sociedad.es_unipersonal ? "ADMINISTRADOR_UNICO" : "CONSEJO";
-}
-
-function determineAdoptionMode(sociedad: SociedadRow, organ: CampaignOrgan, preferNoSession: boolean): AdoptionMode {
-  if (organ === "POST" || organ === "COMPLIANCE") return "POST_TASK";
-  if (organ === "JUNTA" && sociedad.es_unipersonal) return "UNIPERSONAL_SOCIO";
-
-  const adminForm = normalizeAdminForm(sociedad);
-  if (adminForm === "ADMINISTRADOR_UNICO") return "UNIPERSONAL_ADMIN";
-  if (adminForm === "ADM_MANCOMUNADOS") return "CO_APROBACION";
-  if (adminForm === "ADM_SOLIDARIOS") return "SOLIDARIO";
-  return preferNoSession ? "NO_SESSION" : "MEETING";
-}
-
-function statusFor(index: number, template: CampaignTemplate): CampaignStatus {
-  if (template.type !== "CUENTAS_ANUALES") {
-    return index % 5 === 0 ? "PENDIENTE" : index % 4 === 0 ? "BLOQUEADO" : "EN_CURSO";
-  }
-  const sequence: CampaignStatus[] = ["COMPLETADO", "EN_CURSO", "PENDIENTE", "BLOQUEADO", "COMPLETADO"];
-  return sequence[index % sequence.length];
-}
-
-function phaseFor(status: CampaignStatus, template: CampaignTemplate, index: number) {
-  if (status === "COMPLETADO") return template.agreements[template.agreements.length - 1];
-  if (status === "BLOQUEADO") return template.agreements[Math.min(1, template.agreements.length - 1)];
-  return template.agreements[Math.min(index % template.agreements.length, template.agreements.length - 1)];
-}
-
-function makeRulePack(sociedad: SociedadRow, phase: CampaignAgreement) {
-  const jurisdiction = sociedad.jurisdiction ?? "ES";
-  const social = sociedad.tipo_social ?? sociedad.legal_form ?? "SOCIEDAD";
-  return `${jurisdiction}-${social}-${phase.code}`;
-}
-
-function explainFor(sociedad: SociedadRow, phase: CampaignAgreement, mode: AdoptionMode) {
-  const adminForm = normalizeAdminForm(sociedad);
-  const items = [
-    `forma_social=${sociedad.tipo_social ?? sociedad.legal_form ?? "N/D"}`,
-    `forma_administracion=${adminForm}`,
-    `organo=${phase.organ}`,
-    `adoption_mode=${mode}`,
-  ];
-  if (sociedad.es_unipersonal) items.push("unipersonal=true");
-  if (sociedad.es_cotizada) items.push("cotizada=true");
-  return items;
-}
-
-function explainRecordFor(sociedad: SociedadRow, phase: CampaignAgreement, mode: AdoptionMode) {
-  return {
-    forma_social: sociedad.tipo_social ?? sociedad.legal_form ?? "N/D",
-    forma_administracion: normalizeAdminForm(sociedad),
-    organo: phase.organ,
-    adoption_mode: mode,
-    unipersonal: Boolean(sociedad.es_unipersonal),
-    cotizada: Boolean(sociedad.es_cotizada),
-  };
-}
-
-function alertsFor(sociedad: SociedadRow, phase: CampaignAgreement, mode: AdoptionMode, status: CampaignStatus) {
-  const alerts: string[] = [];
-  if (status === "BLOQUEADO") alerts.push(mode === "CO_APROBACION" ? "Co-firmas incompletas" : "Bloqueo documental");
-  if (phase.code === "FORMULACION_CUENTAS" && mode === "CO_APROBACION") alerts.push("Gate: k=2 firmas mancomunadas");
-  if (phase.code === "CONVOCATORIA_JGA" && sociedad.tipo_social === "SA") alerts.push("Antelación SA: 1 mes calendario");
-  if (phase.code === "CONVOCATORIA_JGA" && ["SL", "SLU"].includes(sociedad.tipo_social ?? "")) alerts.push("Canal individual con evidencia ERDS");
-  if (phase.organ === "JUNTA" && sociedad.es_unipersonal) alerts.push("Sin convocatoria: decisión de socio único");
-  if (sociedad.es_cotizada) alerts.push("Advertencias LMV activas");
-  return alerts;
-}
-
-function statusForStep(
-  expedienteStatus: CampaignStatus,
-  agreements: CampaignAgreement[],
-  currentPhase: CampaignAgreement,
-  stepIndex: number,
-) {
-  const currentIndex = agreements.findIndex((agreement) => agreement.code === currentPhase.code);
-  if (expedienteStatus === "BLOQUEADO" && stepIndex === currentIndex) return "BLOQUEADO";
-  if (expedienteStatus === "COMPLETADO") return "COMPLETADO";
-  if (stepIndex < currentIndex) return "COMPLETADO";
-  if (stepIndex === currentIndex) return expedienteStatus === "PENDIENTE" ? "PENDIENTE" : "EN_CURSO";
-  return "PENDIENTE";
-}
-
-function buildExpedientes(
-  sociedades: SociedadRow[],
-  template: CampaignTemplate,
-  params: CampaignParams,
-): CampaignExpediente[] {
-  return sociedades.map((sociedad, index) => {
-    const estado = statusFor(index, template);
-    const phase = phaseFor(estado, template, index);
-    const adoptionMode = determineAdoptionMode(sociedad, phase.organ, params.preferNoSession);
-    return {
-      id: `${params.type}-${sociedad.id}`,
-      sociedadId: sociedad.id,
-      sociedad: sociedad.common_name ?? sociedad.legal_name,
-      jurisdiction: sociedad.jurisdiction ?? "N/D",
-      formaSocial: sociedad.tipo_social ?? sociedad.legal_form ?? "Sociedad",
-      formaAdministracion: normalizeAdminForm(sociedad),
-      faseActual: phase.label,
-      estado,
-      adoptionMode,
-      rulePack: makeRulePack(sociedad, phase),
-      deadline: addDays(params.fechaCierre, phase.deadlineDays),
-      responsable: "Secretaría de la sociedad",
-      alertas: alertsFor(sociedad, phase, adoptionMode, estado),
-      explain: explainFor(sociedad, phase, adoptionMode),
-    };
-  });
-}
-
-function buildLaunchInput(
-  params: CampaignParams,
-  template: CampaignTemplate,
-  sociedades: SociedadRow[],
-  expedientes: CampaignExpediente[],
-): LaunchGroupCampaignInput {
-  const plazoLimite = template.agreements
-    .map((agreement) => addDays(params.fechaCierre, agreement.deadlineDays))
-    .sort((a, b) => b.localeCompare(a))[0] ?? null;
-
-  return {
-    campaignType: params.type,
-    name: `${template.name} ${params.ejercicio}`,
-    ejercicio: params.ejercicio,
-    fechaLanzamiento: params.fechaLanzamiento,
-    fechaCierre: params.fechaCierre,
-    plazoLimite,
-    params: {
-      include_cotizada: params.includeCotizada,
-      prefer_no_session: params.preferNoSession,
-      selected_jurisdictions: params.selectedJurisdictions,
-      legal_anchor: template.legalAnchor,
-    },
-    acuerdosCadena: template.agreements,
-    expedientes: expedientes.map((expediente) => {
-      const sociedad = sociedades.find((item) => item.id === expediente.sociedadId);
-      const currentPhase = template.agreements.find((agreement) => agreement.label === expediente.faseActual) ?? template.agreements[0];
-      const steps = template.agreements.map((agreement, index) => {
-        const mode = sociedad
-          ? determineAdoptionMode(sociedad, agreement.organ, params.preferNoSession)
-          : expediente.adoptionMode;
-        const status = statusForStep(expediente.estado, template.agreements, currentPhase, index);
-        return {
-          materia: agreement.code,
-          label: agreement.label,
-          organ: agreement.organ,
-          dependency: agreement.dependency,
-          stepOrder: index + 1,
-          status,
-          adoptionMode: mode,
-          rulePackCode: sociedad ? makeRulePack(sociedad, agreement) : expediente.rulePack,
-          deadline: addDays(params.fechaCierre, agreement.deadlineDays),
-          alertas: sociedad ? alertsFor(sociedad, agreement, mode, status as CampaignStatus) : expediente.alertas,
-          explain: sociedad ? explainRecordFor(sociedad, agreement, mode) : { explain: expediente.explain },
-        };
-      });
-
-      return {
-        entityId: expediente.sociedadId,
-        societyName: expediente.sociedad,
-        jurisdiction: expediente.jurisdiction,
-        formaSocial: expediente.formaSocial,
-        formaAdministracion: expediente.formaAdministracion,
-        status: expediente.estado,
-        faseActual: expediente.faseActual,
-        adoptionMode: expediente.adoptionMode,
-        deadline: expediente.deadline,
-        rulePackCode: expediente.rulePack,
-        responsable: expediente.responsable,
-        alertas: expediente.alertas,
-        explain: sociedad ? explainRecordFor(sociedad, currentPhase, expediente.adoptionMode) : { explain: expediente.explain },
-        steps,
-      };
-    }),
-  };
-}
-
-function uniqueJurisdictions(sociedades: SociedadRow[]) {
-  const values = sociedades
-    .map((sociedad) => sociedad.jurisdiction)
-    .filter((jurisdiction): jurisdiction is string => Boolean(jurisdiction));
-  return Array.from(new Set([...DEFAULT_JURISDICTIONS, ...values])).sort();
+function normalizeStatus(value: string | null | undefined) {
+  return (value ?? "").toUpperCase();
 }
 
 function countBy<T extends string>(items: T[]) {
@@ -458,7 +71,7 @@ function statusTone(status: CampaignStatus) {
   return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
 }
 
-function modeTone(mode: AdoptionMode) {
+function modeTone(mode: CampaignAdoptionMode) {
   if (mode === "MEETING" || mode === "NO_SESSION") return "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]";
   if (mode === "CO_APROBACION" || mode === "SOLIDARIO") return "bg-[var(--status-info)] text-[var(--g-text-inverse)]";
   if (mode === "POST_TASK") return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
@@ -480,7 +93,7 @@ function displayStatus(status: string | null | undefined) {
 }
 
 function recordStatusTone(status: string | null | undefined) {
-  const value = normalize(status);
+  const value = normalizeStatus(status);
   if (["COMPLET", "ADOPTED", "CERTIFIED", "REGISTERED", "LEGALIZADO", "CONFIRMADA"].some((token) => value.includes(token))) {
     return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
   }
@@ -506,7 +119,7 @@ function formatOptionalDate(date: string | null | undefined) {
 }
 
 function campaignTemplateName(campaignType: string) {
-  return CAMPAIGN_TEMPLATES.find((template) => template.type === campaignType)?.name ?? campaignType.replace(/_/g, " ");
+  return GROUP_CAMPAIGN_TEMPLATES.find((template) => template.type === campaignType)?.name ?? campaignType.replace(/_/g, " ");
 }
 
 function liveTableLabel(table: string | null | undefined) {
@@ -532,11 +145,11 @@ export default function ProcesosGrupo() {
     error: warRoomError,
     isLoading: isWarRoomLoading,
   } = useGroupCampaignWarRoom();
-  const [params, setParams] = useState<CampaignParams>(() => makeDefaultParams());
+  const [params, setParams] = useState<CampaignParams>(() => makeDefaultCampaignParams());
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
 
-  const template = CAMPAIGN_TEMPLATES.find((item) => item.type === params.type) ?? CAMPAIGN_TEMPLATES[0];
-  const jurisdictions = useMemo(() => uniqueJurisdictions(sociedades), [sociedades]);
+  const template = GROUP_CAMPAIGN_TEMPLATES.find((item) => item.type === params.type) ?? GROUP_CAMPAIGN_TEMPLATES[0];
+  const jurisdictions = useMemo(() => uniqueCampaignJurisdictions(sociedades), [sociedades]);
 
   const sociedadesScope = useMemo(
     () =>
@@ -550,7 +163,7 @@ export default function ProcesosGrupo() {
   );
 
   const expedientes = useMemo(
-    () => buildExpedientes(sociedadesScope, template, params),
+    () => buildGroupCampaignExpedientes(sociedadesScope, template, params),
     [params, sociedadesScope, template],
   );
   const selectedCampaign = useMemo(
@@ -598,7 +211,7 @@ export default function ProcesosGrupo() {
 
   const launchCampaign = async () => {
     try {
-      const payload = buildLaunchInput(params, template, sociedadesScope, expedientes);
+      const payload = buildGroupCampaignLaunchInput(params, template, sociedadesScope, expedientes);
       const result = await launchMutation.mutateAsync(payload);
       setSelectedCampaignId(result.id);
       toast.success("Campaña lanzada", {
@@ -703,7 +316,7 @@ export default function ProcesosGrupo() {
                 className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {CAMPAIGN_TEMPLATES.map((item) => (
+                {GROUP_CAMPAIGN_TEMPLATES.map((item) => (
                   <option key={item.type} value={item.type}>
                     {item.name}
                   </option>
@@ -838,7 +451,7 @@ export default function ProcesosGrupo() {
                     {agreement.dependency ? `Depende de ${agreement.dependency}` : "Primer hito de campaña"}
                   </p>
                   <p className="mt-2 text-xs font-semibold text-[var(--g-text-primary)]">
-                    Plazo: {formatDate(addDays(params.fechaCierre, agreement.deadlineDays))}
+                    Plazo: {formatDate(addCampaignDays(params.fechaCierre, agreement.deadlineDays))}
                   </p>
                 </div>
               ))}

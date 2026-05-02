@@ -693,6 +693,9 @@ export default function SecretariaDashboard() {
       </div>
 
       {/* KPIs cross-módulo */}
+      <p className="mt-4 text-xs text-[var(--g-text-secondary)]">
+        Señales read-only de carriles owner; Secretaría solo las enruta para intake o agenda, sin crear incidentes ni hallazgos.
+      </p>
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiCard
           icon={HandshakeIcon}
@@ -704,15 +707,17 @@ export default function SecretariaDashboard() {
         />
         <KpiCard
           icon={ShieldAlert}
-          label="Incidencias GRC abiertas"
+          label="Señales GRC · incidentes"
           value={crossModule?.incidents_open ?? "…"}
+          sublabel="Read-only"
           tone={crossModule && crossModule.incidents_open > 0 ? "warning" : "neutral"}
           onClick={() => navigate("/grc/incidentes")}
         />
         <KpiCard
           icon={AlertTriangle}
-          label="Hallazgos críticos"
+          label="Señales GRC · hallazgos"
           value={crossModule?.findings_criticos ?? "…"}
+          sublabel="Read-only"
           tone={crossModule && crossModule.findings_criticos > 0 ? "error" : "neutral"}
           onClick={() => navigate("/grc/m/audit/operate/findings")}
         />
@@ -889,20 +894,20 @@ export default function SecretariaDashboard() {
               note={`${crossModule?.pactos_vigentes ?? 0} vigente(s) — evaluación activa`}
             />
             <ComplianceRow
-              label="Incidencias GRC"
+              label="Señales GRC read-only"
               status={crossModule && crossModule.incidents_open > 0 ? "WARNING" : "OK"}
               note={
                 crossModule && crossModule.incidents_open > 0
-                  ? `${crossModule.incidents_open} incidencia(s) abiertas`
+                  ? `${crossModule.incidents_open} incidencia(s) abiertas; intake en GRC`
                   : "Sin incidencias abiertas"
               }
             />
             <ComplianceRow
-              label="Políticas pendientes revisión"
+              label="Políticas owner pendientes"
               status={crossModule && crossModule.policies_pendientes > 0 ? "WARNING" : "OK"}
               note={
                 crossModule && crossModule.policies_pendientes > 0
-                  ? `${crossModule.policies_pendientes} política(s) en revisión`
+                  ? `${crossModule.policies_pendientes} política(s) en revisión; no estado legal`
                   : "Todas aprobadas"
               }
             />

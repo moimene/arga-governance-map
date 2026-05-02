@@ -13,6 +13,8 @@ describe("legal-template-fixtures", () => {
       "legal-fixture-acta-consignacion-socio-unico-es",
       "legal-fixture-acta-consignacion-admin-unico-es",
       "legal-fixture-acta-acuerdo-escrito-sin-sesion-es",
+      "legal-fixture-acta-decision-conjunta-es",
+      "legal-fixture-acta-organo-admin-solidario-es",
       "legal-fixture-certificacion-es",
       "legal-fixture-informe-preceptivo-es",
       "legal-fixture-informe-documental-pre-es",

@@ -49,6 +49,14 @@ export interface CertificationRow {
   gate_hash?: string | null;
 }
 
+function requiredMajorityCodeForSnapshot(
+  snapshot: MeetingAdoptionSnapshot,
+  storedCode?: string | null,
+) {
+  if (storedCode?.startsWith(`${snapshot.materia}:`)) return storedCode;
+  return `${snapshot.materia}:${snapshot.materia_clase}`;
+}
+
 export function useActasList(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -265,7 +273,7 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
         scheduledStart: input.scheduledStart,
         snapshot: input.snapshot,
         resolutionText: resolution.resolution_text,
-        requiredMajorityCode: resolution.required_majority_code,
+        requiredMajorityCode: requiredMajorityCodeForSnapshot(input.snapshot, resolution.required_majority_code),
         origin: input.origin ?? "MEETING_FLOOR",
       });
       if (!payload) {
@@ -292,7 +300,12 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
 
       const { error: linkError } = await supabase
         .from("meeting_resolutions")
-        .update({ agreement_id: agreementId })
+        .update({
+          agreement_id: agreementId,
+          status: "ADOPTED",
+          resolution_text: input.snapshot.resolution_text,
+          required_majority_code: requiredMajorityCodeForSnapshot(input.snapshot, resolution.required_majority_code),
+        })
         .eq("tenant_id", tenantId)
         .eq("id", resolution.id);
       if (linkError) throw linkError;

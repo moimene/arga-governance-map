@@ -417,6 +417,32 @@ La implementación de cualquier sprint se bloquea si aparece alguno de estos cas
 | Alcance GRC/AIMS en demo comercial v1 | Producto + GRC + AIMS | Decidido: fuera de v1 persistida; v2 por contratos cross-module. |
 | Uso de `governance_module_events/links` | Integration | Decidido: no writes hasta Cloud/local/types y ownership aprobados. |
 
+## Actualizacion 2026-04-30 — Postura de plataforma TGMS
+
+Se ha añadido una vista ejecutiva de readiness en la consola principal para explicar, sin nuevos writes, el estado de cada carril:
+
+- Secretaría Societaria: operativo sobre Cloud para golden paths demo.
+- GRC Compass: read-only sobre legacy operativo hasta decidir adopción `grc_*` por workflow.
+- AI Governance: read-only sobre `ai_*` legacy hasta activar backbone `aims_*`.
+- Contratos cross-module: pendientes de write probes aprobados.
+- Bloque probatorio: `000049` en HOLD; sin evidencia final productiva.
+
+Contrato de datos:
+
+- Tablas usadas nuevas: ninguna.
+- Source of truth: contrato local derivado; rutas existentes siguen leyendo Cloud/legacy según su owner.
+- Migración requerida: no.
+- Tipos/RLS/RPC/storage: no modificados.
+- Cross-module contracts: se muestran como postura, no se escriben.
+- Riesgo de paridad: bajo; no se introduce dependencia nueva de schema.
+
+Verificación:
+
+- `bun test src/lib/arga-console/__tests__/platform-readiness.test.ts`: verde, 4/4.
+- `bunx eslint src/lib/arga-console/platform-readiness.ts src/lib/arga-console/__tests__/platform-readiness.test.ts src/components/arga-console/ErpConsolePanel.tsx e2e/15-demo-operable.spec.ts`: verde.
+- `bunx tsc --noEmit --pretty false`: verde.
+- `PLAYWRIGHT_PORT=5187 bunx playwright test e2e/15-demo-operable.spec.ts --project=chromium --reporter=list`: verde, 7/7.
+
 ## Cierre De Este Documento
 
 Este roadmap fija una secuencia segura y registra la ejecución local completada: contratos, UI, fixtures deterministas, trust/evidencia sandbox, presenter mode y e2e comercial. La persistencia Cloud queda fuera hasta que exista paridad verificada y un plan de migración revisado.

@@ -18,6 +18,7 @@ import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
 import { validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
+import { buildConvocatoriaNoticeDoubleEvaluation } from "@/lib/secretaria/dual-evaluation";
 import {
   buildTemplateTraceEvidence,
   resolveTemplateProcessMatrix,
@@ -394,9 +395,18 @@ export default function ConvocatoriasStepper() {
     selectedRulePacks,
     agendaApplicableOverrides,
   );
+  const noticeDoubleEvaluation = buildConvocatoriaNoticeDoubleEvaluation({
+    meetingDate: meetingIso,
+    isUniversal: tipoConvocatoria === "UNIVERSAL",
+    v1NoticeOk: noticeOkV1,
+    v2RequiredDays: evaluacionV2.antelacionDiasRequerida,
+    v2Severity: evaluacionV2.severity,
+    v2BlockingIssues: evaluacionV2.blocking_issues,
+    v2Warnings: evaluacionV2.warnings,
+  });
   const noticeOk = tipoConvocatoria === "UNIVERSAL"
     ? true
-    : (evaluacionV2 ? evaluacionV2.ok : noticeOkV1);
+    : noticeDoubleEvaluation.effective_ok;
 
   function addAgendaItem() {
     setAgendaItems((prev) => [...prev, newAgendaItem()]);
@@ -604,6 +614,15 @@ export default function ConvocatoriasStepper() {
         message: "Alguna regla aplicable no está lista para producción o su payload no es compatible.",
       }]
       : []),
+    ...(!noticeDoubleEvaluation.converged
+      ? [{
+        type: "DUAL_EVALUATION_DIVERGENCE",
+        severity: "WARNING",
+        message: noticeDoubleEvaluation.divergence?.message ?? "Divergencia V1/V2 en plazo de convocatoria.",
+        stage: noticeDoubleEvaluation.stage,
+        effective_source: noticeDoubleEvaluation.effective_source,
+      }]
+      : []),
     ...pendingLegalChannelReminders.map((item) => ({
       type: "CHANNEL_REMINDER",
       severity: "WARNING",
@@ -661,6 +680,7 @@ export default function ConvocatoriasStepper() {
             : null,
         },
         rule_resolutions: ruleResolutions.map(serializeRuleResolution),
+        dual_evaluation: noticeDoubleEvaluation,
         active_rule_set: activeRuleSet
           ? {
             id: activeRuleSet.id,
@@ -700,6 +720,7 @@ export default function ConvocatoriasStepper() {
           meeting_date: meetingIso,
           required_days: evaluacionV2.antelacionDiasRequerida,
           deadline: evaluacionV2.fechaLimitePublicacion,
+          dual_evaluation: noticeDoubleEvaluation,
         },
         channels: {
           selected: selectedChannels,
@@ -1230,10 +1251,14 @@ export default function ConvocatoriasStepper() {
                   </div>
 
                   {ruleResolutions.length > 0 && (
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
                       <MiniFact label="Rule packs" value={String(ruleResolutions.filter((r) => r.rulePack).length)} />
                       <MiniFact label="Antelación" value={`${evaluacionV2.antelacionDiasRequerida} días`} />
                       <MiniFact label="Overrides" value={String(agendaApplicableOverrides.length)} />
+                      <MiniFact
+                        label="Doble eval."
+                        value={noticeDoubleEvaluation.converged ? "Convergente" : "Divergente"}
+                      />
                     </div>
                   )}
 
@@ -1245,6 +1270,11 @@ export default function ConvocatoriasStepper() {
                   {ruleAlertActive && (
                     <p className="mt-2 text-xs text-[var(--status-error)]">
                       Recordatorio: alguna regla aplicable no está lista para producción o su payload no es compatible con el motor de convocatoria.
+                    </p>
+                  )}
+                  {!noticeDoubleEvaluation.converged && (
+                    <p className="mt-2 text-xs text-[var(--status-warning)]">
+                      Doble evaluación V1/V2 divergente. Se conserva el criterio operativo V1 como recordatorio y se registra la divergencia para revisión.
                     </p>
                   )}
                   {ruleGatePending && (

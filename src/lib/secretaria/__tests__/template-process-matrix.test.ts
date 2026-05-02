@@ -87,6 +87,51 @@ describe("template-process-matrix", () => {
     expect(selectTemplateProcessEntry(sinSesion)?.processId).toBe("acuerdo_sin_sesion");
   });
 
+  it("enruta CO_APROBACION y SOLIDARIO al proceso sin sesion sin tratarlos como acta generica", () => {
+    const decisionConjunta = template({
+      id: "co-aprobacion",
+      tipo: "ACTA_DECISION_CONJUNTA",
+      adoption_mode: "CO_APROBACION",
+      capa3_editables: [
+        { campo: "administradores_firmantes", obligatoriedad: "OBLIGATORIO", descripcion: "Firmantes" },
+      ],
+    });
+    const organoSolidario = template({
+      id: "solidario",
+      tipo: "ACTA_ORGANO_ADMIN",
+      adoption_mode: "SOLIDARIO",
+      capa3_editables: [
+        { campo: "administrador_actuante", obligatoriedad: "OBLIGATORIO", descripcion: "Administrador" },
+      ],
+    });
+
+    const conjunta = resolveTemplateProcessMatrix(decisionConjunta, {
+      processHint: "ACUERDO_SIN_SESION",
+      variables: { denominacion_social: "ARGA Seguros, S.A." },
+      derived: { materia_acuerdo: "DELEGACION_FACULTADES", ventana_consenso: "15d" },
+      capa3Values: { administradores_firmantes: "Admin 1; Admin 2" },
+    });
+    const solidario = resolveTemplateProcessMatrix(organoSolidario, {
+      processHint: "acuerdo_sin_sesion",
+      variables: { denominacion_social: "ARGA Seguros, S.A." },
+      derived: { materia_acuerdo: "AUTORIZACION_GARANTIA", restricciones_estatutarias: "Sin cofirma" },
+      capa3Values: { administrador_actuante: "Admin solidario 1" },
+    });
+
+    expect(conjunta?.entry.key).toBe("acta-decision-conjunta");
+    expect(conjunta?.processId).toBe("acuerdo_sin_sesion");
+    expect(conjunta?.documentKinds).toEqual(["ACUERDO_SIN_SESION"]);
+    expect(conjunta?.variables.modo_adopcion).toBe("CO_APROBACION");
+    expect(conjunta?.sources.administradores_firmantes).toBe("capa3");
+    expect(templateMatchesProcess(decisionConjunta, "ACTA")).toBe(false);
+
+    expect(solidario?.entry.key).toBe("acta-organo-admin-solidario");
+    expect(solidario?.processId).toBe("acuerdo_sin_sesion");
+    expect(solidario?.variables.modo_adopcion).toBe("SOLIDARIO");
+    expect(solidario?.sources.administrador_actuante).toBe("capa3");
+    expect(templateMatchesProcess(organoSolidario, "ACTA")).toBe(false);
+  });
+
   it("valida faltantes obligatorios sin inventar fuentes", () => {
     const registral = LEGAL_TEAM_TEMPLATE_FIXTURES.find((item) => item.id === "legal-fixture-documento-registral-es");
     const resolution = resolveTemplateProcessMatrix(registral, {

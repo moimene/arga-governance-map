@@ -8,12 +8,11 @@ test.describe('Secretaría — Reuniones', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test('nueva reunión — stepper renderiza paso 1', async ({ page }) => {
+  test('nueva reunión — intake enruta a convocatoria owner', async ({ page }) => {
     await page.goto('/secretaria/reuniones/nueva');
     await expect(page).not.toHaveURL('/login');
-    await expect(
-      page.getByText('Órgano').or(page.getByText('reunión')).first()
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Preparar una sesión societaria')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: /Crear convocatoria/i })).toBeVisible();
   });
 });
 

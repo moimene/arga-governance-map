@@ -187,7 +187,7 @@ export default function Plantillas() {
         </h1>
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
           {isSociedadMode
-            ? `Biblioteca filtrada por jurisdicción ${jurisdictionLabel(selectedJurisdiction)} y preparada para crear expedientes de la sociedad.`
+            ? `Biblioteca documental filtrada por jurisdicción ${jurisdictionLabel(selectedJurisdiction)}. Las plantillas alimentan documentos demo/operativos o sirven de referencia del proceso; no crean expedientes por sí solas.`
             : "Ciclo de vida: Borrador → Revisada → Aprobada → Activa → Archivada"}
         </p>
       </div>
@@ -214,7 +214,7 @@ export default function Plantillas() {
                 <span>{selectedEntity.status}</span>
               </div>
               <p className="mt-2 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-                El tramitador arranca desde estas plantillas y conserva el ámbito de la sociedad para resolver variables, órgano competente y rule pack aplicable.
+                El ámbito de sociedad se conserva para resolver variables, órgano competente y rule pack aplicable. La generación final queda separada en el carril documental; este módulo mantiene la traza societaria y la salida demo/operativa.
               </p>
             </div>
 

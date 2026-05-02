@@ -92,6 +92,22 @@ export const LEGAL_TEMPLATE_COVERAGE_REQUIREMENTS: LegalTemplateCoverageRequirem
     critical: true,
   },
   {
+    key: "acta-co-aprobacion",
+    label: "Acta decisión conjunta",
+    tipo: "ACTA_DECISION_CONJUNTA",
+    adoptionMode: "CO_APROBACION",
+    fixtureId: "legal-fixture-acta-decision-conjunta-es",
+    critical: true,
+  },
+  {
+    key: "acta-solidario",
+    label: "Acta órgano admin. solidario",
+    tipo: "ACTA_ORGANO_ADMIN",
+    adoptionMode: "SOLIDARIO",
+    fixtureId: "legal-fixture-acta-organo-admin-solidario-es",
+    critical: true,
+  },
+  {
     key: "informe-preceptivo",
     label: "Informe preceptivo",
     tipo: "INFORME_PRECEPTIVO",

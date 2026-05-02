@@ -130,7 +130,7 @@ export default function IncidenteStepper() {
       });
       toast.success(
         needsNotif
-          ? `Incidente creado. Notificación ${authority} programada con deadline 72h.`
+          ? `Incidente creado. Marcado para notificación ${authority} con deadline 72h.`
           : "Incidente creado correctamente."
       );
       navigate(`/grc/incidentes/${(created as { id: string }).id}`);
@@ -148,8 +148,8 @@ export default function IncidenteStepper() {
           Nuevo incidente regulatorio
         </h1>
         <p className="text-sm text-[var(--g-text-secondary)] mt-0.5">
-          Registra el incidente y, si supera el umbral, se generará la notificación
-          al regulador automáticamente.
+          Registra el incidente y, si supera el umbral, lo marca para intake de notificación
+          regulatoria en GRC.
         </p>
       </div>
 
@@ -316,15 +316,14 @@ export default function IncidenteStepper() {
                 <AlertTriangle className="h-5 w-5 text-[var(--status-error)] shrink-0 mt-0.5" />
                 <div className="text-sm">
                   <div className="font-semibold text-[var(--g-text-primary)] mb-0.5">
-                    Se generará notificación automática a <strong>{authority}</strong>
+                    Se marcará notificación a <strong>{authority}</strong>
                   </div>
                   <div className="text-[var(--g-text-secondary)]">
                     Deadline:{" "}
                     <strong className="text-[var(--status-error)]">
                       72 horas desde la detección
                     </strong>
-                    . El trigger de Supabase creará el registro en{" "}
-                    <code className="text-xs">regulatory_notifications</code>.
+                    . La creación del registro regulatorio depende del flujo GRC aprobado, no de un write cross-module.
                   </div>
                 </div>
               </div>
@@ -335,8 +334,8 @@ export default function IncidenteStepper() {
                 className="p-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                Para el tipo <strong>{form.incident_type}</strong>, no se genera notificación
-                automática a regulador.
+                Para el tipo <strong>{form.incident_type}</strong>, no se marca notificación
+                a regulador.
               </div>
             )}
           </div>
@@ -378,11 +377,11 @@ export default function IncidenteStepper() {
                 <Clock className="h-5 w-5 text-[var(--status-error)] shrink-0 mt-0.5" />
                 <div className="text-sm">
                   <div className="font-semibold text-[var(--g-text-primary)] mb-0.5">
-                    Notificación automática a {authority}
+                    Intake de notificación a {authority}
                   </div>
                   <div className="text-[var(--g-text-secondary)]">
-                    Al confirmar, el sistema generará la notificación con deadline de{" "}
-                    <strong className="text-[var(--status-error)]">72 horas</strong>.
+                    Al confirmar, el incidente quedará marcado con deadline de{" "}
+                    <strong className="text-[var(--status-error)]">72 horas</strong> para el flujo owner de GRC.
                   </div>
                 </div>
               </div>

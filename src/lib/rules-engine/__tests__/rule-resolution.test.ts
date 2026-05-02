@@ -40,8 +40,37 @@ describe("rule-resolution", () => {
     expect(normalized.lifecycleStatus).toBe("ACTIVE");
     expect(normalized.materia).toBe("APROBACION_CUENTAS");
     expect(normalized.organoTipo).toBe("JUNTA_GENERAL");
+    expect(normalized.persistedPayloadHash).toBeNull();
     expect(normalized.payloadHash).toMatch(/^[a-f0-9]{8,}$/);
     expect(normalized.warnings).toContain("Versión normalizada desde is_active legacy; falta lifecycle jurídico completo.");
+  });
+
+  it("prioriza el payload versionado si difiere del catalogo rule_packs", () => {
+    const normalized = normalizeRulePackVersion({
+      id: "version-garantia",
+      pack_id: "AUTORIZACION_GARANTIA",
+      version: "1.1.0",
+      payload_hash: "sha256-cloud",
+      payload: {
+        id: "AUTORIZACION_GARANTIA",
+        materia: "AUTORIZACION_GARANTIA",
+        clase: "ORDINARIA",
+        organoTipo: "CONSEJO",
+      },
+      status: "ACTIVE",
+      rule_packs: {
+        id: "AUTORIZACION_GARANTIA",
+        materia: "AUTORIZACION_GARANTIA",
+        organo_tipo: "JUNTA_GENERAL",
+      },
+    });
+
+    expect(normalized.organoTipo).toBe("CONSEJO");
+    expect(normalized.payloadHash).toBe("sha256-cloud");
+    expect(normalized.persistedPayloadHash).toBe("sha256-cloud");
+    expect(normalized.warnings).toContain(
+      "Conflicto metadata rule_packs/payload en organo_tipo: catalogo=JUNTA_GENERAL, payload=CONSEJO; se usa payload versionado."
+    );
   });
 
   it("bloquea cuando existe materia pero no hay versión ACTIVE", () => {

@@ -108,4 +108,17 @@ describe("legal-template-coverage", () => {
     expect(socio?.state).toBe("fixture_pending_load");
     expect(socio?.cloudTemplateIds).toEqual([]);
   });
+
+  it("expone fixtures locales pendientes de carga para CO_APROBACION y SOLIDARIO", () => {
+    const rows = buildLegalTemplateCoverage([]);
+
+    expect(rows.find((row) => row.key === "acta-co-aprobacion")?.state).toBe("fixture_pending_load");
+    expect(rows.find((row) => row.key === "acta-co-aprobacion")?.fixtureTemplateId).toBe(
+      "legal-fixture-acta-decision-conjunta-es"
+    );
+    expect(rows.find((row) => row.key === "acta-solidario")?.state).toBe("fixture_pending_load");
+    expect(rows.find((row) => row.key === "acta-solidario")?.fixtureTemplateId).toBe(
+      "legal-fixture-acta-organo-admin-solidario-es"
+    );
+  });
 });

@@ -47,6 +47,9 @@ test.describe('Demo-Operable commercial shell', () => {
     await expect(page.getByText('Consola de decisión del Consejo')).toBeVisible();
     await expect(page.getByText('DEMO MODE')).toBeVisible();
     await expect(page.getByText('Sandbox verificable')).toBeVisible();
+    await expect(page.getByText('Postura de plataforma')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Operativo Secretaría Societaria/i })).toBeVisible();
+    await expect(page.getByText('000049 en HOLD')).toBeVisible();
     await expect(page.getByText('Casos de consejo')).toBeVisible();
     await expect(page.getByText('Entorno sandbox controlado')).toBeVisible();
 

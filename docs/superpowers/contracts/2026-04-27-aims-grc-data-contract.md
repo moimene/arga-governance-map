@@ -143,3 +143,117 @@ Verification:
 - Tests:
 - Build:
 ```
+
+## Cierre 2026-04-30 — P0 readiness no_schema
+
+Se ha completado una tanda P0 de UX ejecutiva para AIMS-GRC sin mover schema:
+
+- GRC Compass añade `Readiness ejecutivo P0` con seis superficies realmente conectadas en frontend: GDPR/canal interno vía vistas GDPR, DORA/ICT, Cyber, ERM/Auditoría, Trabajo/Alertas/Excepciones y Packs país.
+- AI Governance añade `AIMS P0 readiness` con dominios: inventario, evaluaciones AI Act, incidentes, controles derivados, evidencias operativas y migración `ai_* -> aims_*`.
+- Ambos paneles usan contratos locales puros y no crean queries, tablas, columnas, RPC, RLS, storage ni tipos nuevos.
+- TPRM y Penal/Anticorrupción salen del readiness principal porque no tienen pantalla GRC específica conectada; quedan como backlog visible `No conectado ahora`. AIMS queda marcado como `legacy-ai` hasta activar backbone `aims_*`.
+- Evidence/legal hold sigue fuera de la tanda: `000049` permanece en HOLD y `finalEvidence=false`.
+
+Data contract:
+
+- Screen/hook: `/grc`, `/ai-governance`.
+- Posture: `legacy_read` + contrato local derivado.
+- Tables used: GRC dashboard mantiene queries existentes; AIMS dashboard mantiene `ai_systems`, `ai_risk_assessments`, `ai_incidents`.
+- Source of truth: Cloud para datos vivos existentes; contrato local para readiness P0.
+- Migration required: no.
+- Types affected: no.
+- RLS/RPC/storage affected: no.
+- Event/link contract: solo visible como postura; sin writes.
+- Evidence level: `REFERENCE` / operativa demo; no evidencia final productiva.
+- Parity risk: bajo para UX actual; medio para writes futuros a `governance_module_events` / `governance_module_links`.
+
+Verification:
+
+- `bun run db:check-target`: pass.
+- `bun test src/lib/grc/__tests__/dashboard-readiness.test.ts src/lib/aims/__tests__/readiness.test.ts src/lib/arga-console/__tests__/platform-readiness.test.ts`: pass, 11/11.
+- `bunx eslint` focalizado sobre dashboards, contratos y smoke: pass.
+- `bunx tsc --noEmit --pretty false`: pass.
+- `PLAYWRIGHT_PORT=5189 bunx playwright test e2e/16-sanitization-smoke.spec.ts e2e/10-grc.spec.ts --project=chromium --reporter=list`: pass, 11/11.
+
+## Cierre 2026-05-02 — Slice 1 AIMS standalone y handoffs read-only
+
+Slice 1 avanza solo el carril **AIMS 360**. No fusiona AIMS con GRC ni con Secretaria, no aplica migraciones y no escribe contratos compartidos.
+
+### Mapa de pantallas AIMS conectadas
+
+| Pantalla/ruta | Owner | Hooks usados | Tablas usadas | Postura `ai_*` / `aims_*` | Fuente de verdad | Operacion | Handoffs candidatos |
+|---|---|---|---|---|---|---|---|
+| `/ai-governance` | AIMS 360 | `useAiSystemsList`, `useAiIncidentsList`, `useAllAssessments` | `ai_systems`, `ai_incidents`, `ai_risk_assessments` | `legacy_read`; no lee `aims_*` | Supabase Cloud legacy `ai_*` + contrato local `src/lib/aims/readiness.ts` | Read-only | Navegacion AIMS; referencia Secretaria con `evidence=REFERENCE` |
+| `/ai-governance/sistemas` | AIMS 360 | `useAiSystemsList` | `ai_systems` | `legacy_read`; `aims_*` candidato futuro | `ai_systems` | Read-only | Drilldown owner AIMS |
+| `/ai-governance/sistemas/:id` | AIMS 360 | `useAiSystemById`, `useAssessmentsBySystem`, `useComplianceChecksBySystem`, `useAiIncidentsBySystem` | `ai_systems`, `ai_risk_assessments`, `ai_compliance_checks`, `ai_incidents` | `legacy_read`; no mezcla backbone | `ai_systems` como owner; hijas `ai_*` por `system_id` | Read-only | Referencia contextual a evaluaciones/incidentes AIMS |
+| `/ai-governance/evaluaciones` | AIMS 360 | `useAllAssessments` | `ai_risk_assessments`, `ai_systems` | `legacy_read` tenant-scoped por join a `ai_systems` | `ai_risk_assessments` | Read-only | `AIMS_TECHNICAL_FILE_GAP` -> `/grc/risk-360` |
+| `/ai-governance/incidentes` | AIMS 360 | `useAiIncidentsList` | `ai_incidents`, `ai_systems` | `legacy_read` | `ai_incidents` | Read-only | `AIMS_INCIDENT_MATERIAL` -> `/grc/incidentes`; `AIMS_INCIDENT_MATERIAL` -> `/secretaria/reuniones/nueva` |
+
+### Contrato de handoffs Slice 1
+
+| Handoff | Source owner | Target owner | Ruta actual | Evento canonico | Evidencia | Mutacion |
+|---|---|---|---|---|---|---|
+| Gap expediente tecnico -> control/workflow GRC | AIMS 360 | GRC Compass | `/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=:id` | `AIMS_TECHNICAL_FILE_GAP` | `NOT_EVIDENCE` | Solo route handoff |
+| Incidente IA material -> GRC | AIMS 360 | GRC Compass | `/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=:id` | `AIMS_INCIDENT_MATERIAL` | `NOT_EVIDENCE` | Solo route handoff |
+| Incidente IA material -> Secretaria | AIMS 360 | Secretaria Societaria | `/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=:id` | `AIMS_INCIDENT_MATERIAL` | `NOT_EVIDENCE` | Solo route handoff; Secretaria decide agenda/acto |
+| Certificacion/acuerdo Secretaria -> referencia AIMS | Secretaria Societaria | AIMS 360 | `/secretaria/actas?source=aims&handoff=SECRETARIA_CERTIFICATION_REFERENCE&evidence=REFERENCE` | `SECRETARIA_CERTIFICATION_ISSUED` | `REFERENCE` explicito | Solo referencia; AIMS no recalcula validez societaria |
+
+Reglas aplicadas:
+
+- AIMS no crea riesgos, controles, action plans ni incidentes GRC directamente.
+- AIMS no crea acuerdos, actas, certificaciones ni reuniones de Secretaria.
+- No hay writes a `governance_module_events` ni `governance_module_links`.
+- `000049` sigue en HOLD; ninguna pantalla declara evidencia/legal hold como final productiva.
+- `aims_*` sigue siendo backbone candidato por pantalla/workflow, no fuente usada por las pantallas conectadas actuales.
+
+Data contract:
+
+- Screen/hook: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`; hooks `useAiSystems*`, `useAiAssessments*`, `useAiIncidents*`.
+- Posture: `legacy_read` para todas las pantallas conectadas.
+- Tables used: `ai_systems`, `ai_risk_assessments`, `ai_compliance_checks`, `ai_incidents`.
+- Source of truth: Supabase Cloud legacy `ai_*`; contrato local `src/lib/aims/readiness.ts` para mapa/readiness.
+- Migration required: no.
+- Types affected: no.
+- RLS/RPC/storage affected: no.
+- Event/link contract: rutas read-only alineadas con `AIMS_TECHNICAL_FILE_GAP`, `AIMS_INCIDENT_MATERIAL`, `SECRETARIA_CERTIFICATION_ISSUED`; sin writes.
+- Evidence level: `NOT_EVIDENCE` para gaps/incidentes; `REFERENCE` explicito para referencias Secretaria -> AIMS.
+- Parity risk: bajo para UI actual; medio para futuros writes a `governance_module_events` / `governance_module_links`; medio para migracion `ai_* -> aims_*`.
+
+Verification:
+
+- `bun run db:check-target`: pass.
+- `bun test src/lib/aims/**`: pass, 5/5.
+- `bun test src/lib/arga-console/__tests__/platform-readiness.test.ts`: pass, 6/6.
+- `bunx tsc --noEmit --pretty false`: pass.
+- `bun run lint`: pass con warnings existentes; 0 errores.
+- `bun run build`: pass con warnings existentes de Browserslist/chunk size.
+- `PLAYWRIGHT_PORT=5192 bunx playwright test e2e/16-sanitization-smoke.spec.ts --project=chromium --reporter=list`: pass, 4/4.
+
+## Slice 1 GRC 2026-05-02 - Screen posture no_schema
+
+Documento rector:
+
+- `docs/superpowers/contracts/2026-05-02-grc-screen-posture-contract.md`
+
+Resultado:
+
+- GRC declara 27 pantallas/rutas frontend con owner, tablas/hooks, postura legacy frente a `grc_*`, fuente de verdad, modo de mutacion y handoffs candidatos.
+- Solo `/grc/incidentes/nuevo` queda como `owner-write`, limitado a la tabla GRC-owned `incidents`.
+- Las rutas placeholder (`thresholds`, `DPO`, `SOC`, `audit program`) quedan como `backlog_placeholder`.
+- TPRM y Penal/Anticorrupcion permanecen fuera del mapa conectado y solo aparecen como backlog no conectado.
+- AIMS -> GRC queda implementado como navegacion read-only hacia `/grc/risk-360` o `/grc/incidentes`.
+- GRC -> Secretaria queda implementado como navegacion read-only hacia `/secretaria/reuniones/nueva`; Secretaria decide cualquier acto formal.
+- Sin writes a `governance_module_events` ni `governance_module_links`.
+
+Data contract:
+
+- Screen/hook: `src/lib/grc/dashboard-readiness.ts`, `/grc`, `/grc/risk-360`, `/grc/incidentes`, `/grc/incidentes/:id`, `/grc/m/audit/operate/findings`, AIMS evaluaciones/incidentes handoff links.
+- Posture: `legacy_read`, `legacy_write`, `tgms_handoff`, `local_demo_read`, `backlog_placeholder`.
+- Tables used: `risks`, `incidents`, `regulatory_notifications`, `exceptions`, `action_plans`, `findings`, `obligations`, `country_packs`, `pack_rules`, `grc_module_nav`, `bcm_bia`, `bcm_plans`, `vulnerabilities`, target route `policies`.
+- Source of truth: Cloud operational GRC legacy tables; local constants for GDPR demo; no `grc_*` source of truth adopted.
+- Migration required: no.
+- Types affected: local TypeScript contract only; no Supabase type regeneration.
+- RLS/RPC/storage affected: no.
+- Event/link contract: route-only candidates for `GRC_INCIDENT_MATERIAL`, `GRC_FINDING_BOARD_ESCALATION`, `AIMS_TECHNICAL_FILE_GAP`, `AIMS_INCIDENT_MATERIAL`.
+- Evidence level: `REFERENCE`; no final evidence or legal hold.
+- Parity risk: low for UI/read-only; medium for future shared event/link writes.

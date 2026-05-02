@@ -140,7 +140,7 @@ La plataforma no es cuatro módulos separados. Es un único sistema de gobernanz
 
 ---
 
-## 5. Narrativa de presentación ante ARGA (MAPFRE)
+## 5. Narrativa de presentación ante ARGA
 
 ### Lo que ven hoy (V1)
 > "La consola captura y hace visible toda la actividad de gobierno del Grupo ARGA: quién decide qué, con qué autorización, bajo qué obligación regulatoria, y con qué evidencia. Real-time. Trazable. Auditable. Y coherente entre los cuatro frentes que gestionan sus equipos de gobernanza, cumplimiento, secretaría y transformación digital."

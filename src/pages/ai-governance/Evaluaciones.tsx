@@ -1,6 +1,7 @@
-import { useNavigate } from "react-router-dom";
-import { ClipboardCheck, ArrowRight } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ClipboardCheck, ArrowRight, Route } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
+import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
 
 const ASSESSMENT_STATUS_CHIP: Record<string, string> = {
   APROBADO:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
@@ -52,6 +53,7 @@ export default function Evaluaciones() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Score</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Fecha</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">GRC</th>
                 <th className="px-6 py-3 w-10" />
               </tr>
             </thead>
@@ -59,6 +61,7 @@ export default function Evaluaciones() {
               {assessments.map((ass) => {
                 const statusCls = ASSESSMENT_STATUS_CHIP[ass.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]";
                 const frameCls = FRAMEWORK_BADGE[ass.framework ?? ""] ?? "bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]";
+                const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (
                   <tr
                     key={ass.id}
@@ -114,6 +117,21 @@ export default function Evaluaciones() {
                       >
                         {ass.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {hasGrcHandoff ? (
+                        <Link
+                          to={`/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=${ass.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)]"
+                          style={{ borderRadius: "var(--g-radius-md)" }}
+                        >
+                          <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                          Abrir intake GRC
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-[var(--g-text-secondary)]">Sin gap activo</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <ArrowRight className="h-4 w-4 text-[var(--g-text-secondary)]" />

@@ -317,3 +317,65 @@ Verificacion:
 - `bunx tsc --noEmit --pretty false`: verde.
 - `bun run build`: verde; warnings conocidos de Browserslist/chunk size.
 - `e2e/16-sanitization-smoke.spec.ts` en Vite aislado `5182`: verde, 3/3.
+
+## Tanda posterior — Hardening smoke puerto/sesion
+
+Fecha: 2026-04-30
+
+Se ha endurecido la infraestructura de smoke sin tocar schema ni Supabase:
+
+- `playwright.config.ts` soporta `PLAYWRIGHT_PORT` y arranca Vite en `127.0.0.1` con `--strictPort`.
+- Cuando `PLAYWRIGHT_PORT` esta definido, Playwright no reutiliza servidores existentes para evitar falsos positivos contra otra app local.
+- `e2e/auth.setup.ts` normaliza el `storageState` al origin activo cuando se usa `PLAYWRIGHT_BASE_URL`.
+- `e2e/16-sanitization-smoke.spec.ts` restaura la sesion demo si una ruta redirige a `/login` o renderiza la pantalla de login por `storageState` stale/origen distinto.
+- El fallo observado en Secretaria fue clasificado como fragilidad de sesion E2E, no como fallo de schema, RLS, RPC o datos Cloud.
+
+Contrato de datos de esta tanda:
+
+- Tablas leidas/escritas nuevas: ninguna.
+- Source of truth: Cloud para las rutas ya probadas; infraestructura Playwright para sesion/puerto.
+- Migracion requerida: no.
+- Tipos/RLS/RPC/storage: no modificados.
+- Cross-module contracts: ninguno nuevo.
+- Riesgo de paridad: bajo; no se observo bloqueo Supabase.
+
+Verificacion:
+
+- `bun run db:check-target`: verde contra `governance_OS`.
+- Unit tests focalizados Secretaria/doc-gen/sanitizacion: verde, 61/61.
+- `bunx tsc --noEmit --pretty false`: verde.
+- `bunx eslint playwright.config.ts e2e/auth.setup.ts e2e/16-sanitization-smoke.spec.ts`: verde.
+- `PLAYWRIGHT_PORT=5186 bunx playwright test e2e/16-sanitization-smoke.spec.ts --project=chromium --reporter=list`: verde, 3/3.
+- `bun run build`: verde; warning conocido de Browserslist/chunk size.
+
+## Tanda posterior — Revalidacion UX/Supabase focalizada
+
+Fecha: 2026-04-30
+
+Se ha ejecutado un lote ampliado para validar que el thaw controlado permite seguir trabajando en UX sin abrir paquetes Supabase:
+
+- Navegacion completa de Secretaria.
+- Flujo documental DOCX.
+- Smoke AIMS/GRC y Secretaria contra Cloud actual.
+- Consumo contextual de plantillas desde gestor hacia tramitador.
+- Build final.
+
+El unico fallo observado fue de infraestructura E2E: `storageState` podia quedar ligado a un origin de puerto anterior cuando se ejecutaban smokes con Vite en puertos aislados. Se corrigio en `e2e/auth.setup.ts` normalizando el storage state al `PLAYWRIGHT_BASE_URL` activo. No hubo error de schema, RLS, RPC, storage ni datos Cloud.
+
+Contrato de datos de esta tanda:
+
+- Tablas leidas/escritas nuevas: ninguna.
+- Source of truth: Cloud para rutas ya probadas.
+- Migracion requerida: no.
+- Tipos/RLS/RPC/storage: no modificados.
+- Cross-module contracts: ninguno nuevo.
+- Riesgo de paridad: bajo; no se observo bloqueo Supabase.
+
+Verificacion:
+
+- `bun run db:check-target`: verde contra `governance_OS`.
+- `bunx tsc --noEmit --pretty false`: verde.
+- `bunx eslint e2e/auth.setup.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts`: verde.
+- `bun test src/lib/secretaria/__tests__/agreement-document-contract.test.ts src/lib/secretaria/__tests__/final-evidence-readiness-contract.test.ts src/lib/doc-gen/__tests__ src/lib/secretaria/__tests__/sanitized-flow-contracts.test.ts`: verde, 40/40.
+- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5199 bunx playwright test e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts --project=chromium --reporter=list`: verde, 12/12.
+- `bun run build`: verde; warnings conocidos de Browserslist/chunk size.

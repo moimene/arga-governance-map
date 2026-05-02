@@ -5,6 +5,7 @@ import {
   type MeetingVoteCompleteness,
   type MeetingVoteValue,
 } from "./meeting-vote-completeness";
+import type { DualEvaluationComparison } from "@/lib/secretaria/dual-evaluation";
 import type {
   AdoptionMode,
   ConflictoInteres,
@@ -17,6 +18,16 @@ import type {
   TipoSocial,
   VotacionOutput,
 } from "./types";
+
+export interface MeetingAdoptionRuleTrace {
+  source: "V2_CLOUD" | "PROTOTYPE_FALLBACK";
+  rule_pack_id: string | null;
+  rule_pack_version_id: string | null;
+  rule_pack_version: string | null;
+  payload_hash: string | null;
+  ruleset_snapshot_id: string | null;
+  warnings: string[];
+}
 
 export interface MeetingAdoptionVoter {
   id: string;
@@ -63,6 +74,8 @@ export interface VoteSummary {
 export interface MeetingAdoptionSnapshot {
   schema_version: "meeting-adoption-snapshot.v2";
   agenda_item_index: number;
+  agreement_id?: string | null;
+  resolution_id?: string | null;
   resolution_text: string;
   materia: string;
   materia_clase: MateriaClase;
@@ -111,6 +124,8 @@ export interface MeetingAdoptionSnapshot {
     explain: ExplainNode[];
     result?: PactosEvalOutput;
   };
+  rule_trace?: MeetingAdoptionRuleTrace;
+  dual_evaluation?: DualEvaluationComparison;
   evaluated_at: string;
 }
 

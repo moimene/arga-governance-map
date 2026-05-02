@@ -53,7 +53,9 @@ type Agreement360Contract = {
   body_id?: string | null;
   agreement_kind: string;
   matter_class: string;
-  adoption_mode: string;
+  adoption_mode: 'MEETING' | 'UNIVERSAL' | 'NO_SESSION' |
+                 'UNIPERSONAL_SOCIO' | 'UNIPERSONAL_ADMIN' |
+                 'CO_APROBACION' | 'SOLIDARIO';
   status: string;
   compliance_snapshot?: Record<string, unknown> | null;
   compliance_explain?: Record<string, unknown> | null;
@@ -65,7 +67,8 @@ Reglas:
 
 - No crear otro identificador owner paralelo para el mismo acto.
 - Si un punto de reunion materializa un acuerdo, debe enlazar `meeting_resolutions.agreement_id`.
-- Si se usa JSON temporal (`execution_mode`, `quorum_data`), debe documentarse como puente demo o contrato transitorio.
+- Si se usa JSON temporal (`quorum_data`), debe documentarse como puente demo o contrato transitorio.
+- `execution_mode` sigue documentado como puente hasta que el paquete v2.1 lo promueva formalmente en Cloud/local/types; al ocurrir, este contrato debe actualizarlo a contrato permanente.
 
 ## Convocatorias
 
@@ -131,6 +134,23 @@ Niveles:
 | `AUDIT_VERIFIED` | Cadena auditada o verificable |
 
 UI debe mostrar el nivel real, no uno aspiracional.
+
+### Boundary con el carril Document Assembly
+
+Desde 2026-05-02, Secretaria no se considera owner del generador documental final. Secretaria es owner de los datos canonicos del acto y puede emitir una solicitud hacia un carril independiente de ensamblado documental.
+
+Contrato rector:
+
+- `docs/superpowers/contracts/2026-05-02-secretaria-document-generation-boundary.md`
+- `src/lib/secretaria/document-generation-boundary.ts`
+
+Reglas:
+
+- Secretaria conserva `agreements.id`, actas, certificaciones, snapshots, rule traces y postura demo/operativa.
+- El futuro `Document Assembly Pipeline` sera owner del `document_model`, render DOCX/PDF, controles de plantilla, validacion post-render y, si se aprueba, integracion documental productiva.
+- El flujo actual `doc-gen` queda como bridge demo/operativo mientras no exista el carril independiente.
+- La solicitud saliente de Secretaria nunca puede declarar `evidence_status` distinto de `DEMO_OPERATIVA`.
+- Acta, certificacion, acuerdo sin sesion, decision unipersonal, documento registral y subsanacion deben converger en `agreement_ids` antes de generar documentos derivados.
 
 ### Gate futuro de promocion a evidencia final productiva
 
@@ -314,7 +334,9 @@ Este corte refuerza el flujo de reunion sin tocar schema.
 
 Contrato runtime:
 
-- Snapshot owner: `meetings.quorum_data.point_snapshots`.
+- Snapshot explicable UI/demo: `meetings.quorum_data.point_snapshots`.
+- Snapshot juridico versionado, cuando hay traza Cloud V2 completa:
+  `rule_evaluation_results`.
 - Snapshot por acuerdo materializado: `agreements.compliance_snapshot` y `agreements.compliance_explain`.
 - Resolucion owner: `meeting_resolutions` conserva texto, punto, estado y `agreement_id`.
 - Voto owner: `meeting_votes` conserva sentido de voto, conflicto y motivo.
@@ -328,16 +350,299 @@ Reglas de motor fijadas:
 - `mayoria_consejeros` se calcula con votos favorables frente a total de miembros, no con presencia.
 - El voto de calidad elimina `majority_not_achieved` solo cuando se usa validamente para desempatar.
 - El voto de calidad queda deshabilitado para `COMISION_DELEGADA`; en Consejo se toma de `governing_bodies.quorum_rule.voto_calidad_presidente` si existe.
+- Una fila `rule_evaluation_results` solo se inserta si el punto tiene
+  `agreement_id`, `rule_pack_version_id`, `payload_hash` y
+  `ruleset_snapshot_id`.
+- Si el punto usa fallback tecnico, la traza queda como
+  `PROTOTYPE_FALLBACK` en el snapshot explicable y no se presenta como WORM.
 
 Data contract:
 
-- Tables used: `meetings`, `governing_bodies`, `meeting_attendees`, `meeting_resolutions`, `meeting_votes`, `agreements`; pactos via hooks existentes.
-- Source of truth: Cloud; `quorum_data.point_snapshots` es puente JSON explicable.
+- Tables used: `meetings`, `governing_bodies`, `meeting_attendees`, `meeting_resolutions`, `meeting_votes`, `agreements`, `rule_evaluation_results`; pactos via hooks existentes.
+- Source of truth: Cloud; `rule_evaluation_results` es el destino versionado
+  para puntos V2 completos y `quorum_data.point_snapshots` queda como puente
+  JSON explicable.
 - Migration required: no.
 - Types affected: no generated Supabase types.
 - RLS/RPC/storage affected: no.
 - Cross-module contracts: none new.
-- Parity risk: medium; snapshot por punto aun no tiene WORM/gate hash dedicado y las escrituras cliente no son transaccionales.
+- Parity risk: medium; faltan datos Cloud reales de asistentes/capital y limpieza
+  de duplicados `ACTIVE` antes de retirar fallbacks V1.
+
+## Gestor de plantillas — revision legal read-only
+
+Este corte incorpora una clasificacion pura de revision legal para no confundir
+`ACTIVA` con aprobacion legal formal.
+
+Contrato runtime:
+
+- Clasificador owner: `src/lib/secretaria/legal-template-review.ts`.
+- UI owner: `/secretaria/gestor-plantillas`.
+- Fuente runtime: `plantillas_protegidas` leida via hooks existentes.
+- Fixtures locales: solo puente no persistente; no sustituyen fuente Cloud ni aprobacion legal.
+- Huecos criticos expuestos: `ACTA_DECISION_CONJUNTA` para `CO_APROBACION` y
+  `ACTA_ORGANO_ADMIN` para `SOLIDARIO`.
+- Fixtures locales nuevos: `legal-fixture-acta-decision-conjunta-es` y
+  `legal-fixture-acta-organo-admin-solidario-es`; ambos quedan como
+  `fixture_pending_load`, no como aprobacion Cloud.
+
+Reglas fijadas:
+
+- Una plantilla activa solo es aprobada legalmente si tiene aprobacion formal y
+  no presenta banderas de version tecnica, referencia, owner o duplicidad.
+- `MODELO_ACUERDO` requiere referencia legal explicita y metadatos de organo /
+  `AdoptionMode` para pasar revision.
+- Versiones `0.x`, version ausente o version no semver se tratan como tecnicas.
+- Fixtures locales se muestran como `fixture_bridge`, nunca como aprobacion legal.
+
+Data contract:
+
+- Tables used: `plantillas_protegidas` read-only.
+- Source of truth: Cloud; fixtures locales solo fallback visual/test.
+- Migration required: no.
+- Types affected: no generated Supabase types.
+- RLS/RPC/storage affected: no.
+- Cross-module contracts: none new.
+- Parity risk: low for UI/read-only; medium for future legal approval workflow.
+
+## Prototipo operativo — campanas y reunion desde convocatoria
+
+Este corte empieza la transicion de demo a prototipo: la logica critica deja de
+estar embebida solo en pantallas y pasa a contratos puros testeables.
+
+Campanas de grupo:
+
+- Motor owner: `src/lib/secretaria/group-campaign-engine.ts`.
+- UI consumer: `/secretaria/procesos-grupo`.
+- Contrato: `CampaignTemplate` + `CampaignParams` + `CampaignSocietyInput`
+  generan expedientes derivados, `AdoptionMode`, rule pack, alertas, deadlines
+  y payload de lanzamiento.
+- Invariante: sociedad cotizada no bloquea; se anade alerta LMV y se mantiene el
+  flujo societario.
+- Invariante: consejo, administrador unico, mancomunados, solidarios y socio
+  unico no se aplanan.
+
+Convocatoria a reunion:
+
+- Motor owner: `src/lib/secretaria/meeting-scheduler.ts`.
+- Hooks owner: `useMeetingForConvocatoria()` y
+  `useCreateMeetingFromConvocatoria()` en `src/hooks/useReunionSecretaria.ts`.
+- UI consumer: `/secretaria/convocatorias/:id`.
+- Owner record: `meetings.id`.
+- Bridge JSON: `meetings.quorum_data.source_links`.
+- Regla: la programacion es idempotente por `convocatoria_id`; si ya existe
+  reunion vinculada se abre la existente.
+- Regla: no se programa reunion sin `body_id` ni `fecha_1`.
+- Regla Cloud confirmada: la reunion creada desde convocatoria usa
+  `meetings.status = CONVOCADA`; `PROGRAMADA` queda como etiqueta UI legacy y
+  no se inserta porque no pasa el constraint Cloud actual.
+
+Data contract:
+
+- Tables used: `convocatorias`, `meetings`, `governing_bodies` read; `meetings`
+  write only when the user ejecuta "Programar reunion".
+- Source of truth: Cloud.
+- Migration required: no.
+- Types affected: no generated Supabase types.
+- RLS/RPC/storage affected: no.
+- Evidence level: owner record operativo; no evidencia final productiva.
+- Cross-module contracts: none new.
+- Parity risk: medium; depends on existing INSERT permission for `meetings`.
+
+## Prototipo operativo — trazabilidad legal acta/certificacion/tramitador
+
+Este corte refuerza la explicabilidad legal de la cadena posterior a la reunion
+sin tocar schema.
+
+Superficies:
+
+- Acta: `/secretaria/actas/:id`.
+- Certificacion: panel de certificaciones dentro del acta.
+- Tramitador: `/secretaria/tramitador/nuevo?certificacion=...`.
+- Reuniones: paso de votacion/cierre con lenguaje de expediente Acuerdo 360.
+
+Reglas de lenguaje fijadas:
+
+- `agreement_id` no se muestra al usuario legal como requisito tecnico; se
+  explica como expediente Acuerdo 360 canonico.
+- Las referencias por punto se muestran como referencia temporal del punto, no
+  como evidencia final.
+- "Materializar" se reemplaza por "crear expediente Acuerdo 360".
+- `Bundle demo` se reemplaza por evidencia demo/operativa.
+- `fn_generar_acta`, `audit_log`, `tenant activo` y `WORM` no aparecen como
+  instrucciones de usuario en estos flujos.
+- Evidencia sigue siendo demo/operativa y no evidencia final productiva.
+
+Data contract:
+
+- Tables used: no nuevas; flujos existentes leen/escriben `minutes`,
+  `certifications`, `agreements`, `registry_filings` y trazas operativas ya
+  documentadas.
+- Source of truth: Cloud.
+- Migration required: no.
+- Types affected: no generated Supabase types.
+- RLS/RPC/storage affected: no.
+- Cross-module contracts: none new.
+- Parity risk: low for copy/e2e; evidence final remains future contract.
+
+## Prototipo operativo — golden path legal completo
+
+Este corte cierra una prueba unica de prototipo para el equipo legal:
+`Convocatoria -> Reunion -> Votacion -> Acta -> Certificacion -> Tramitador -> Documento`.
+
+Superficies:
+
+- Convocatoria: `/secretaria/convocatorias/:id`.
+- Reunion: `/secretaria/reuniones/:id`.
+- Acta: `/secretaria/actas/:id`.
+- Tramitador: `/secretaria/tramitador/nuevo?certificacion=...`.
+- Documento: generacion DOCX de convocatoria, informe PRE, acta y documento
+  registral cuando el acuerdo seleccionado lo permite.
+
+Reglas fijadas:
+
+- La reunion se abre desde la convocatoria y conserva el origen en
+  `meetings.quorum_data.source_links`.
+- El paso de votacion mantiene snapshot por punto, denominador, conflictos y
+  pactos como contexto legal explicable.
+- Si un organo demo no tiene `condiciones_persona` vigentes ni asistentes
+  persistidos, el prototipo muestra y usa un censo demo no persistido para
+  quorum/votacion. No se presenta como censo legal productivo.
+- Si Cloud no devuelve un rule pack compatible para una materia de reunion, el
+  prototipo puede usar `src/lib/secretaria/prototype-rule-pack-fallback.ts` para
+  mantener el circuito operativo. Ese fallback:
+  - queda marcado como `prototype_rule_pack_fallback_used`;
+  - usa `source_of_truth = none`;
+  - no sustituye rule pack aprobado;
+  - no habilita evidencia final productiva.
+- Si Cloud no devuelve un rule pack registral activo para el acuerdo
+  seleccionado en el tramitador, el prototipo puede usar
+  `src/lib/secretaria/prototype-registry-rule-fallback.ts`. Ese fallback:
+  - queda marcado como `prototype_fallback = true`;
+  - usa `source_of_truth = none`;
+  - solo habilita continuidad UX del prototipo;
+  - no sustituye validacion registral/legal productiva ni rule pack aprobado.
+- El cierre de reunion reutiliza el acta existente si ya hay una para esa
+  reunion; evita duplicados en pruebas repetidas y mantiene el enlace
+  estable hacia certificacion/tramitador.
+- La generacion documental desde Capa 3 normaliza valores precargados y
+  editados antes de validar/generar, de modo que el boton `Generar DOCX`
+  consume el mismo contrato matriz plantilla -> proceso -> variables -> fuentes
+  que el resto del gestor documental.
+- La certificacion se emite como evidencia demo/operativa si no existe una
+  certificacion previa navegable.
+- Ningun documento generado se declara evidencia final productiva.
+
+Data contract:
+
+- Tables used: `convocatorias`, `meetings`, `meeting_attendees`,
+  `meeting_resolutions`, `meeting_votes`, `minutes`, `certifications`,
+  `agreements`, `registry_filings`, `evidence_bundles`.
+- Source of truth: Cloud.
+- Owner records: convocatoria, reunion, acta, certificacion, acuerdo y tramite
+  registral.
+- Shared records: none new.
+- Migration required: no.
+- Types affected: no generated Supabase types.
+- RLS/RPC/storage affected: no.
+- Evidence level: evidencia demo/operativa; no evidencia final productiva.
+- Cross-module contracts: none new.
+- Parity risk: medium; la prueba depende de permisos Cloud existentes para
+  escrituras UI ya soportadas por el prototipo y de la cobertura Cloud real de
+  rule packs. El fallback tecnico solo reduce friccion de prototipo; no cierra
+  la deuda de aprobacion legal ni de paridad.
+
+## Plan de retirada de fallbacks — paso de prototipo a produccion
+
+El mapa operativo vive en
+`src/lib/secretaria/fallback-retirement-plan.ts` y es puro/testeable. No consulta
+Supabase ni activa migraciones. Su funcion es fijar que fallbacks existen, que
+rule pack o plantilla Cloud deben sustituirlos y cuando puede considerarse
+eliminado el fallback.
+
+Fallbacks P0 actualmente inventariados:
+
+- Plazos de convocatoria hardcodeados (`checkNoticePeriodByType`) -> rule packs
+  Cloud con `convocatoria.antelacionDias` por materia y forma social.
+- Quorum/mayoria genericos (`computeQuorumStatus`) -> rule packs Cloud con
+  `constitucion` y `votacion` por materia, organo y tipo social.
+- Fixtures locales de plantillas -> `plantillas_protegidas` Cloud aprobadas por
+  Legal, con hash/protecciones/version formal.
+- Hueco `CO_APROBACION` -> plantilla `ACTA_DECISION_CONJUNTA` Cloud aprobada.
+- Hueco `SOLIDARIO` -> plantilla `ACTA_ORGANO_ADMIN` Cloud aprobada.
+- `meetings.quorum_data.point_snapshots` como puente explicable -> escritura
+  append-only en `rule_evaluation_results` cuando el punto tenga V2 Cloud
+  completo (`rule_pack_version_id`, `payload_hash`, `ruleset_snapshot_id` y
+  `agreement_id`).
+- `MODELO_ACUERDO` activo sin aprobacion formal -> modelo Cloud aprobado con
+  referencia LSC, organo, `AdoptionMode` y semver final.
+- Censo demo no persistido -> `meeting_attendees` + mandatos/capital Cloud
+  completos.
+- `prototype-rule-pack-fallback.ts` -> `rule_pack_versions` activo compatible
+  por materia/clase/organo.
+- `prototype-registry-rule-fallback.ts` -> `rule_pack_versions.payload.postAcuerdo`
+  activo por materia.
+
+Rule packs v2.1 priorizados para seed controlado:
+
+- P0: `DELEGACION_FACULTADES`, `DIVIDENDO_A_CUENTA`,
+  `OPERACION_VINCULADA`, `AUTORIZACION_GARANTIA`.
+- P1: `COOPTACION`, `CUENTAS_CONSOLIDADAS`, `INFORME_GESTION`,
+  `EJECUCION_AUMENTO_DELEGADO`, `TRASLADO_DOMICILIO`,
+  `PODERES_APODERADOS`, `NOMBRAMIENTO_AUDITOR`, `APROBACION_PRESUPUESTO`.
+- P2: `WEB_CORPORATIVA`, `AUTOCARTERA`, `DISOLUCION_LIQUIDADORES`,
+  `RATIFICACION_ACTOS`.
+
+Decision de nomenclatura 2026-05-01: `AUTORIZACION_GARANTIA` es el pack/materia
+canonico para garantias intragrupo en el prototipo. `GARANTIA_PRESTAMO` queda
+como alias legacy aceptado con warning por `src/lib/secretaria/p0-controlled-thaw.ts`,
+no como equivalencia silenciosa. Antes de retirar fallbacks deben limpiarse
+duplicados `ACTIVE` y mantenerse el payload versionado como fuente juridica si
+hay discrepancia con el catalogo.
+
+Criterio de fallback eliminado:
+
+1. `rule_pack_versions` existe activo con hash verificable.
+2. El motor V2 consume el pack y produce explain/snapshot.
+3. La plantilla Cloud relacionada esta aprobada por Legal.
+4. El fixture/fallback equivalente esta retirado o marcado deprecated.
+5. La funcion V1 equivalente se convirtio en wrapper V2 o fue eliminada.
+
+Hasta que los cinco criterios se cumplan, el flujo puede ser prototipo operativo
+pero no produccion juridica defendible.
+
+Doble evaluacion V1/V2:
+
+- Contrato puro: `src/lib/secretaria/dual-evaluation.ts`.
+- Convocatorias:
+  - V1 mantiene el criterio operativo de recordatorio de plazo.
+  - V2 calcula regla Cloud, required days, canales, documentos y explain.
+  - La comparacion se guarda en `convocatorias.rule_trace.dual_evaluation` y
+    `convocatorias.reminders_trace.notice_period.dual_evaluation`.
+- Reuniones:
+  - V1 operativo conserva el resultado actual del prototipo con fallback tecnico
+    si es necesario.
+  - V2 estricto calcula con Cloud rule packs compatibles, sin crear fallback.
+  - La comparacion se guarda en
+    `meetings.quorum_data.point_snapshots[*].dual_evaluation`.
+  - La fila WORM versionada se inserta en `rule_evaluation_results` solo si la
+    traza del punto es `V2_CLOUD`; los puntos `PROTOTYPE_FALLBACK` no generan
+    evidencia final.
+- Divergencia no bloquea. Se trata como warning para revision legal/tecnica y
+  como entrada para decidir cuando retirar fallbacks.
+
+Data contract:
+
+- Tables used: `rule_packs`, `rule_pack_versions`, `rule_param_overrides`;
+  trazas existentes `convocatorias.rule_trace`,
+  `convocatorias.reminders_trace`, `meetings.quorum_data`.
+- Source of truth: Cloud para V2; V1 fallback operativo hasta retirada.
+- Migration required: no.
+- Types affected: no generated Supabase types.
+- RLS/RPC/storage affected: no.
+- Cross-module contracts: none new.
+- Parity risk: medium; las divergencias son telemetry operativa, no evidencia
+  final ni aprobacion legal.
 
 ## Data contract de cierre Secretaria
 

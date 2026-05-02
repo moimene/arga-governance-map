@@ -14,6 +14,8 @@ No es un freeze funcional del producto. Es un gate de integracion: el producto p
   - `20260427000101` / `supabase_sanitization_advisors`
 - El carril vivo de control del entorno queda en `docs/superpowers/plans/2026-04-29-supabase-environment-control-lane.md`.
 - El snapshot de paridad vigente queda en `docs/superpowers/plans/2026-04-29-supabase-parity-inventory.md`.
+- Los paquetes para reactivar migraciones controladas quedan en `docs/superpowers/plans/2026-04-29-migration-corridors-briefing.md`.
+- El diagnostico P0 de thaw controlado queda en `docs/superpowers/plans/2026-04-30-p0-controlled-thaw-diagnostic.md`: postura `no_schema`, sin migracion inmediata.
 - El smoke funcional vigente queda en `docs/superpowers/plans/2026-04-29-lane-smoke-verification.md`.
 - Tipos generados actuales incluyen `aims_*`, `grc_*`, `governance_module_*`, trazas de reglas y lifecycle de rule packs.
 - El advisor de seguridad restante es `auth_leaked_password_protection`, configuracion Auth fuera de SQL.
@@ -219,6 +221,14 @@ Solo despues de los contratos:
 - Board Pack -> lectura compuesta, sin mutar owners.
 
 Regla: el modulo owner muta su estado. El shell o consola solo compone, enlaza y enruta.
+
+### Reencuadre 2026-05-01
+
+Se abre un carril separado para AIMS y otro para GRC. Ambos siguen compartiendo arquitectura de integracion con Secretaria y consola general, pero no se fusionan en un unico contexto. El plan operativo vive en:
+
+- `docs/superpowers/plans/2026-05-01-aims-grc-parallel-lanes.md`
+
+Implicacion inmediata: cualquier mejora de AIMS o GRC debe declarar pantalla, owner, tablas, source posture, contrato cross-module y evidencia sin escribir fuera del modulo owner.
 
 ## Verificacion obligatoria
 

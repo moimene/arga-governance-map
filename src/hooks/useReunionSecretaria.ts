@@ -16,6 +16,11 @@ import {
   type PreparedAgreementSource,
 } from "@/lib/secretaria/meeting-agenda";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
+import {
+  buildMeetingScheduleFromConvocatoria,
+  type ConvocatoriaForMeetingSchedule,
+} from "@/lib/secretaria/meeting-scheduler";
+import { buildRuleEvaluationResultInsert } from "@/lib/rules-engine/rule-evaluation-persistence";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 
 export interface MeetingSecretariaRow {
@@ -85,8 +90,46 @@ export interface SaveMeetingResolutionInput {
   }>;
 }
 
+export interface SavedMeetingResolutionPoint {
+  agenda_item_index: number;
+  resolution_id: string;
+  agreement_id: string | null;
+  adoption_snapshot?: MeetingAdoptionSnapshot;
+}
+
+export interface MeetingForConvocatoria {
+  id: string;
+  slug: string | null;
+  body_id: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  status: string;
+  meeting_type: string;
+  location: string | null;
+  quorum_data: Record<string, unknown> | null;
+}
+
+export interface MeetingMinuteLink {
+  id: string;
+  meeting_id: string;
+  created_at: string;
+  signed_at: string | null;
+  is_locked: boolean | null;
+}
+
 function dateOnly(value?: string | null) {
   return value ? String(value).slice(0, 10) : null;
+}
+
+function enrichMeetingPointSnapshot(
+  snapshot: MeetingAdoptionSnapshot,
+  links: { agreementId?: string | null; resolutionId?: string | null },
+): MeetingAdoptionSnapshot {
+  return {
+    ...snapshot,
+    agreement_id: links.agreementId ?? null,
+    resolution_id: links.resolutionId ?? null,
+  };
 }
 
 export function useReunionesList(entityId?: string | null) {
@@ -144,6 +187,108 @@ export function useReunionesList(entityId?: string | null) {
   });
 }
 
+function nextDateIso(date: string) {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
+async function findMeetingForConvocatoria(
+  tenantId: string,
+  convocatoriaId: string,
+  convocatoria?: ConvocatoriaForMeetingSchedule | null,
+) {
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as MeetingForConvocatoria[];
+  return rows.find((meeting) => {
+    const links = extractMeetingSourceLinks(meeting.quorum_data);
+    return links.convocatoria_id === convocatoriaId || (links.convocatoria_ids ?? []).includes(convocatoriaId);
+  }) ?? findMeetingByBodyAndDate(rows, convocatoria) ?? null;
+}
+
+function findMeetingByBodyAndDate(
+  rows: MeetingForConvocatoria[],
+  convocatoria?: ConvocatoriaForMeetingSchedule | null,
+) {
+  const date = dateOnly(convocatoria?.fecha_1);
+  if (!convocatoria?.body_id || !date) return null;
+  return rows.find((meeting) => meeting.body_id === convocatoria.body_id && dateOnly(meeting.scheduled_start) === date) ?? null;
+}
+
+export function useMeetingForConvocatoria(
+  convocatoriaId: string | undefined,
+  convocatoria?: ConvocatoriaForMeetingSchedule | null,
+) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!tenantId && !!convocatoriaId,
+    queryKey: [
+      "secretaria",
+      tenantId,
+      "meetings",
+      "by-convocatoria",
+      convocatoriaId,
+      convocatoria?.body_id ?? "no-body",
+      dateOnly(convocatoria?.fecha_1) ?? "no-date",
+    ],
+    queryFn: async (): Promise<MeetingForConvocatoria | null> => {
+      if (!tenantId || !convocatoriaId) return null;
+      const linked = await findMeetingForConvocatoria(tenantId, convocatoriaId, convocatoria);
+      if (linked || !convocatoria?.body_id || !convocatoria.fecha_1) return linked;
+
+      const date = dateOnly(convocatoria.fecha_1);
+      if (!date) return linked;
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data")
+        .eq("tenant_id", tenantId)
+        .eq("body_id", convocatoria.body_id)
+        .gte("scheduled_start", `${date}T00:00:00.000Z`)
+        .lt("scheduled_start", nextDateIso(date))
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return ((data ?? []) as MeetingForConvocatoria[])[0] ?? null;
+    },
+    staleTime: 20_000,
+  });
+}
+
+export function useCreateMeetingFromConvocatoria() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (convocatoria: ConvocatoriaForMeetingSchedule): Promise<{ id: string; reused: boolean }> => {
+      if (!tenantId) throw new Error("Tenant no disponible");
+
+      const existing = await findMeetingForConvocatoria(tenantId, convocatoria.id, convocatoria);
+      if (existing) return { id: existing.id, reused: true };
+
+      const payload = buildMeetingScheduleFromConvocatoria(convocatoria);
+      const { data, error } = await supabase
+        .from("meetings")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      return { id: (data as { id: string }).id, reused: false };
+    },
+    onSuccess: (_result, convocatoria) => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "by-convocatoria", convocatoria.id] });
+    },
+  });
+}
+
 export function useReunionById(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -196,6 +341,28 @@ export function useReunionResolutions(meetingId: string | undefined) {
       if (error) throw error;
       return (data ?? []) as MeetingResolution[];
     },
+  });
+}
+
+export function useMinuteForMeeting(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!tenantId && !!meetingId,
+    queryKey: ["actas", tenantId, "byMeeting", meetingId],
+    queryFn: async (): Promise<MeetingMinuteLink | null> => {
+      if (!tenantId || !meetingId) return null;
+      const { data, error } = await supabase
+        .from("minutes")
+        .select("id, meeting_id, created_at, signed_at, is_locked")
+        .eq("tenant_id", tenantId)
+        .eq("meeting_id", meetingId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as MeetingMinuteLink | null) ?? null;
+    },
+    staleTime: 10_000,
   });
 }
 
@@ -399,8 +566,8 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (rows: SaveMeetingResolutionInput[]) => {
-      if (!meetingId || !tenantId) return;
+    mutationFn: async (rows: SaveMeetingResolutionInput[]): Promise<SavedMeetingResolutionPoint[]> => {
+      if (!meetingId || !tenantId) return [];
       const { data: meetingData, error: meetingErr } = await supabase
         .from("meetings")
         .select("scheduled_start, body_id, governing_bodies(entity_id)")
@@ -526,7 +693,7 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
         .eq("meeting_id", meetingId)
         .eq("tenant_id", tenantId);
       if (delErr) throw delErr;
-      if (materializedRows.length === 0) return;
+      if (materializedRows.length === 0) return [];
       const resolutionRows = materializedRows.map(
         ({ votes: _votes, adoption_snapshot: _adoptionSnapshot, agreement_origin: _agreementOrigin, ...resolution }) =>
           resolution
@@ -540,7 +707,52 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
       const insertedByIndex = new Map(
         (inserted ?? []).map((resolution) => [resolution.agenda_item_index, resolution.id])
       );
-      const voteRows = materializedRows.flatMap((row) => {
+      const enrichedRows = materializedRows.map((row) => {
+        const resolutionId = insertedByIndex.get(row.agenda_item_index) ?? null;
+        return {
+          ...row,
+          resolution_id: resolutionId,
+          adoption_snapshot: row.adoption_snapshot
+            ? enrichMeetingPointSnapshot(row.adoption_snapshot, {
+                agreementId: row.agreement_id,
+                resolutionId,
+              })
+            : undefined,
+        };
+      });
+
+      const agreementSnapshotUpdates = enrichedRows.filter(
+        (row) => row.agreement_id && row.adoption_snapshot
+      );
+      if (agreementSnapshotUpdates.length > 0) {
+        await Promise.all(
+          agreementSnapshotUpdates.map(async (row) => {
+            const { error: agreementSnapshotErr } = await supabase
+              .from("agreements")
+              .update({
+                compliance_snapshot: row.adoption_snapshot,
+                compliance_explain: {
+                  agreement_360: {
+                    version: "agreement-360.v1",
+                    source: "meeting_resolutions",
+                    meeting_id: meetingId,
+                    agenda_item_index: row.agenda_item_index,
+                    agreement_id: row.agreement_id,
+                    resolution_id: row.resolution_id,
+                    materialized: true,
+                  },
+                  societary_validity: row.adoption_snapshot?.societary_validity,
+                  pacto_compliance: row.adoption_snapshot?.pacto_compliance,
+                },
+              })
+              .eq("tenant_id", tenantId)
+              .eq("id", row.agreement_id!);
+            if (agreementSnapshotErr) throw agreementSnapshotErr;
+          })
+        );
+      }
+
+      const voteRows = enrichedRows.flatMap((row) => {
         const resolutionId = insertedByIndex.get(row.agenda_item_index);
         if (!resolutionId) return [];
         return (row.votes ?? []).map((vote) => ({
@@ -554,10 +766,37 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
         const { error: votesErr } = await supabase.from("meeting_votes").insert(voteRows);
         if (votesErr) throw votesErr;
       }
+
+      const evaluationRows = (
+        await Promise.all(
+          enrichedRows.map((row) =>
+            row.adoption_snapshot
+              ? buildRuleEvaluationResultInsert({
+                  tenantId,
+                  agreementId: row.agreement_id,
+                  snapshot: row.adoption_snapshot,
+                })
+              : Promise.resolve(null)
+          )
+        )
+      ).filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+      if (evaluationRows.length > 0) {
+        const { error: evalErr } = await supabase.from("rule_evaluation_results").insert(evaluationRows);
+        if (evalErr) throw evalErr;
+      }
+
+      return enrichedRows.map((row) => ({
+        agenda_item_index: row.agenda_item_index,
+        resolution_id: row.resolution_id!,
+        agreement_id: row.agreement_id ?? null,
+        adoption_snapshot: row.adoption_snapshot,
+      }));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["meeting_resolutions", tenantId, meetingId] });
       qc.invalidateQueries({ queryKey: ["meeting_votes", tenantId, meetingId] });
+      qc.invalidateQueries({ queryKey: ["rule_evaluation_results", tenantId] });
       qc.invalidateQueries({ queryKey: ["agreements", tenantId] });
       qc.invalidateQueries({ queryKey: ["agreement", tenantId] });
     },

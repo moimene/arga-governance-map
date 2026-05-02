@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useIncident, type RegulatoryNotificationLite } from "@/hooks/useIncidents";
 import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Send } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Send, Route } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const SEV_CHIP: Record<string, string> = {
@@ -108,6 +108,7 @@ export default function IncidenteDetalle() {
 
   const regNots: RegulatoryNotificationLite[] = incident.regulatory_notifications ?? [];
   const pendingNots = regNots.filter((n) => n.status === "Pendiente");
+  const secretariaEscalationTo = `/secretaria/reuniones/nueva?source=grc&source_table=incidents&source_id=${incident.id}&event=GRC_INCIDENT_MATERIAL`;
 
   return (
     <div className="p-6 space-y-5">
@@ -157,6 +158,32 @@ export default function IncidenteDetalle() {
           </div>
         </div>
       </header>
+
+      <div
+        className="flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4 md:flex-row md:items-center md:justify-between"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <div className="flex items-start gap-3">
+          <Route className="mt-0.5 h-5 w-5 text-[var(--g-brand-3308)]" />
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Escalado societario propuesto
+            </h2>
+            <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
+              Handoff read-only a Secretaría para valorar agenda o reunión. GRC no crea
+              acuerdos, actas ni certificaciones desde esta pantalla.
+            </p>
+          </div>
+        </div>
+        <Link
+          to={secretariaEscalationTo}
+          className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Proponer a Secretaría
+          <ArrowLeft className="h-4 w-4 rotate-180" />
+        </Link>
+      </div>
 
       {/* Active countdowns for pending notifications */}
       {pendingNots.length > 0 && (

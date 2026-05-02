@@ -23,8 +23,6 @@ import {
   BorderStyle,
   TabStopType,
   ShadingType,
-  BookmarkStart,
-  BookmarkEnd,
 } from "docx";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -39,7 +37,7 @@ const FONT_FALLBACK = "Arial";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface EditableField {
-  /** Machine key, used as bookmark name */
+  /** Machine key used for traceability in the generation context. */
   key: string;
   /** Human label shown above the field */
   label: string;
@@ -184,8 +182,6 @@ function buildParagraphs(sections: ParsedSection[]): Paragraph[] {
 
 // ── Editable fields (capa3) ──────────────────────────────────────────────────
 
-let _bookmarkCounter = 0;
-
 function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
   if (!fields || fields.length === 0) return [];
 
@@ -224,7 +220,6 @@ function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
   );
 
   for (const field of fields) {
-    const bmId = ++_bookmarkCounter;
     const displayValue = field.value || field.placeholder || `[${field.label.toUpperCase()}]`;
 
     result.push(
@@ -253,7 +248,6 @@ function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
           left: { style: BorderStyle.SINGLE, size: 8, color: BRAND_GREEN },
         },
         children: [
-          new BookmarkStart(`field_${field.key}`, bmId),
           new TextRun({
             text: ` ${displayValue} `,
             size: 20,
@@ -261,7 +255,6 @@ function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
             color: field.value ? TEXT_PRIMARY : "666666",
             italics: !field.value,
           }),
-          new BookmarkEnd(bmId),
         ],
         indent: { left: 360 },
       })
@@ -269,6 +262,47 @@ function buildEditableFieldParagraphs(fields: EditableField[]): Paragraph[] {
   }
 
   return result;
+}
+
+function stableDateFromGeneratedAt(generatedAt: string): Date {
+  const normalized = generatedAt.includes("T")
+    ? generatedAt
+    : `${generatedAt}T00:00:00.000Z`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return new Date("2000-01-01T00:00:00.000Z");
+  return parsed;
+}
+
+async function stabilizeDocxPackage(buffer: ArrayBuffer, generatedAt: string): Promise<Uint8Array> {
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(buffer);
+  const fixedDate = stableDateFromGeneratedAt(generatedAt);
+  const fixedIso = fixedDate.toISOString();
+
+  const core = zip.file("docProps/core.xml");
+  if (core) {
+    const xml = await core.async("string");
+    const stableXml = xml
+      .replace(
+        /<dcterms:created xsi:type="dcterms:W3CDTF">[^<]*<\/dcterms:created>/,
+        `<dcterms:created xsi:type="dcterms:W3CDTF">${fixedIso}</dcterms:created>`,
+      )
+      .replace(
+        /<dcterms:modified xsi:type="dcterms:W3CDTF">[^<]*<\/dcterms:modified>/,
+        `<dcterms:modified xsi:type="dcterms:W3CDTF">${fixedIso}</dcterms:modified>`,
+      );
+    zip.file("docProps/core.xml", stableXml, { date: fixedDate });
+  }
+
+  for (const file of Object.values(zip.files)) {
+    file.date = fixedDate;
+  }
+
+  const stableBuffer = await zip.generateAsync({
+    type: "arraybuffer",
+    compression: "DEFLATE",
+  });
+  return new Uint8Array(stableBuffer);
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -433,8 +467,13 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
     ],
   });
 
-  const buffer = await Packer.toArrayBuffer(doc);
-  return new Uint8Array(buffer);
+  const blobCapable = typeof window !== "undefined" && typeof Blob !== "undefined";
+  const packed = blobCapable ? await Packer.toBlob(doc) : null;
+  const buffer =
+    packed && typeof packed.arrayBuffer === "function"
+      ? await packed.arrayBuffer()
+      : await Packer.toArrayBuffer(doc);
+  return stabilizeDocxPackage(buffer, generatedAt);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { Route } from "lucide-react";
 
 type AuditFindingActionPlan = {
   id: string;
@@ -104,12 +105,22 @@ export default function AuditFindings() {
                     </div>
                   )}
                 </div>
-                <Link
-                  to={`/hallazgos/${f.code}`}
-                  className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline shrink-0"
-                >
-                  Ver en TGMS →
-                </Link>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <Link
+                    to={`/secretaria/reuniones/nueva?source=grc&source_table=findings&source_id=${f.id}&event=GRC_FINDING_BOARD_ESCALATION`}
+                    className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-muted)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <Route className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+                    Proponer a Secretaría
+                  </Link>
+                  <Link
+                    to={`/hallazgos/${f.code}`}
+                    className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+                  >
+                    Ver en TGMS →
+                  </Link>
+                </div>
               </div>
             </div>
           );

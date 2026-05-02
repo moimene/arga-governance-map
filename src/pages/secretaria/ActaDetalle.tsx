@@ -12,6 +12,7 @@ import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertifi
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 
@@ -63,7 +64,7 @@ function snapshotStatusClass(snapshot: MeetingAdoptionSnapshot) {
 function readinessLabel(value?: string) {
   switch (value) {
     case "FINAL_READY":
-      return "Acuerdo 360 enlazado; evidencia no final productiva";
+      return "Expediente Acuerdo 360 enlazado; evidencia demo/operativa, no final productiva";
     case "CERTIFIABLE_WITH_POINT_REFS":
       return "Certificable con enlace pendiente";
     case "BLOCKED":
@@ -166,12 +167,12 @@ export default function ActaDetalle() {
         snapshot,
         origin: "MEETING_FLOOR",
       });
-      toast.success("Acuerdo 360 materializado", {
+      toast.success("Expediente Acuerdo 360 creado", {
         description: `Expediente ${result.agreementId.slice(0, 8)} enlazado al punto ${result.agendaItemIndex}.`,
       });
     } catch (error) {
       const description = error instanceof Error ? error.message : String(error);
-      toast.error("No se pudo materializar el Acuerdo 360", { description });
+      toast.error("No se pudo crear el expediente Acuerdo 360", { description });
     } finally {
       setMaterializingPoint(null);
     }
@@ -271,7 +272,7 @@ export default function ActaDetalle() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link2 className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
                   <span className="font-semibold text-[var(--g-text-primary)]">
-                    Estado Agreement 360:
+                    Estado Acuerdo 360:
                   </span>
                   <span>{readinessLabel(certificationPlan?.evidenceReadiness)}</span>
                 </div>
@@ -279,7 +280,7 @@ export default function ActaDetalle() {
                   <div className="mt-2 flex gap-2 text-[var(--g-text-secondary)]">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" />
                     <span>
-                      Hay acuerdos adoptados sin `agreement_id` materializado. La certificación puede conservar la referencia estable por punto, pero la tramitación o postura probatoria documental explicable debe enlazarse al Acuerdo 360 canónico.
+                      Hay acuerdos adoptados sin expediente Acuerdo 360 canónico. La certificación conserva una referencia temporal del punto, pero la tramitación registral o la postura probatoria documental explicable debe enlazarse al expediente Acuerdo 360.
                     </span>
                   </div>
                 ) : null}
@@ -353,12 +354,12 @@ export default function ActaDetalle() {
                           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                             <div>
                               <span className="font-semibold text-[var(--g-text-primary)]">
-                                {reference.materializedAgreement ? "Acuerdo 360" : "Referencia estable"}
+                                {reference.materializedAgreement ? "Acuerdo 360" : "Referencia temporal del punto"}
                               </span>
                               <span className="ml-2 font-mono">{reference.ref}</span>
                               {!reference.materializedAgreement ? (
                                 <div className="mt-1">
-                              Pendiente de materializar como expediente canónico; no constituye evidencia final productiva.
+                              Pendiente de crear o enlazar como expediente Acuerdo 360; no constituye evidencia final productiva.
                                 </div>
                               ) : null}
                             </div>
@@ -387,8 +388,8 @@ export default function ActaDetalle() {
                                   <Link2 className="h-3.5 w-3.5" />
                                 )}
                                 {materializingPoint === snapshot.agenda_item_index
-                                  ? "Materializando..."
-                                  : "Materializar Acuerdo 360"}
+                                  ? "Creando..."
+                                  : "Crear expediente Acuerdo 360"}
                               </button>
                             ) : null}
                           </div>
@@ -457,6 +458,10 @@ export default function ActaDetalle() {
             <div className="divide-y divide-[var(--g-border-subtle)]">
               {certs && certs.length > 0 ? (
                 certs.map((c) => {
+                  const tramitadorAgreementId =
+                    certificationAgreementRefs[0] ??
+                    [c.agreement_id, ...(c.agreements_certified ?? [])].find(isUuidReference) ??
+                    null;
                   const certFallback = buildCertificationFallback({
                     entity,
                     body,
@@ -496,12 +501,12 @@ export default function ActaDetalle() {
                             }`}
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            {c.evidence_id ? "Bundle demo vinculado" : "Evidencia operativa pendiente"}
+                            {c.evidence_id ? "Evidencia demo/operativa vinculada" : "Evidencia operativa pendiente"}
                           </span>
                         </div>
                         {c.signature_status === "SIGNED" && !c.evidence_id ? (
                           <div className="max-w-[260px] text-right text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
-                            Genere la certificación DOCX para vincular evidencia demo/operativa antes de continuar la tramitación. Pendiente de audit/retention/legal hold.
+                            Genere la certificación DOCX para vincular evidencia demo/operativa antes de continuar la tramitación. Pendiente de controles productivos de auditoría, conservación y legal hold.
                           </div>
                         ) : null}
                         <ProcessDocxButton
@@ -533,9 +538,12 @@ export default function ActaDetalle() {
                         <button
                           type="button"
                           onClick={() => {
+                            const agreementParam = tramitadorAgreementId
+                              ? `&agreement=${encodeURIComponent(tramitadorAgreementId)}`
+                              : "";
                             const target = acta.entity_id
-                              ? `/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}&scope=sociedad&entity=${encodeURIComponent(acta.entity_id)}`
-                              : scope.createScopedTo(`/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}`);
+                              ? `/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}${agreementParam}&scope=sociedad&entity=${encodeURIComponent(acta.entity_id)}`
+                              : scope.createScopedTo(`/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}${agreementParam}`);
                             navigate(target);
                           }}
                           className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"

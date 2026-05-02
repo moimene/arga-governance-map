@@ -10,6 +10,7 @@
  * - ORGANO   → governing_bodies + body_mandates (presidente, secretario, members)
  * - REUNION  → meetings + agenda + participants
  * - EXPEDIENTE → agreements table (the agreement itself)
+ * - CAP_TABLE → capital_holdings + parte_votante_current
  * - MOTOR    → compliance snapshot from Motor de Reglas LSC
  * - SISTEMA  → runtime values (fecha, hora, usuario, etc.)
  * - USUARIO  → values from capa3 form (resolved separately)
@@ -32,6 +33,7 @@ export interface ResolverContext {
   bodyId?: string;
   meetingId?: string;
   complianceSnapshot?: Record<string, unknown>;
+  now?: Date | string;
 }
 
 export interface ResolvedVariables {
@@ -71,6 +73,7 @@ type ResolutionRow = {
   status?: string | null;
 };
 type MeetingWithJoins = {
+  status?: string | null;
   date?: string | null;
   scheduled_date?: string | null;
   start_time?: string | null;
@@ -100,6 +103,17 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   if (error || !data) return {};
 
   return {
+    name: data.name,
+    tax_id: data.tax_id,
+    registration_number: data.registration_number,
+    address: data.address,
+    registry_location: data.registry_location,
+    registry_volume: data.registry_volume,
+    registry_folio: data.registry_folio,
+    registry_sheet: data.registry_sheet,
+    registry_inscription: data.registry_inscription,
+    city: data.city,
+    entity_type_detail: data.entity_type_detail,
     denominacion_social: data.name,
     cif: data.tax_id || data.registration_number,
     domicilio_social: data.address,
@@ -143,6 +157,9 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
   }));
 
   return {
+    name: bodyTyped.name,
+    established_date: bodyTyped.established_date,
+    legal_basis: bodyTyped.legal_basis,
     nombre_comision: bodyTyped.name,
     organo_nombre: bodyTyped.name,
     organo_convocante: bodyTyped.name,   // alias used in JGA acta templates
@@ -203,6 +220,18 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
   const meetingDate = meetingTyped.date || meetingTyped.scheduled_date;
 
   return {
+    status: meetingTyped.status,
+    date: meetingTyped.date,
+    scheduled_date: meetingTyped.scheduled_date,
+    start_time: meetingTyped.start_time,
+    end_time: meetingTyped.end_time,
+    location: meetingTyped.location,
+    convocation_date: meetingTyped.convocation_date,
+    publication_medium: meetingTyped.publication_medium,
+    publication_date: meetingTyped.publication_date,
+    notice_days: meetingTyped.notice_days,
+    second_call_date: meetingTyped.second_call_date,
+    second_call_time: meetingTyped.second_call_time,
     fecha: meetingDate,
     hora_inicio: meetingTyped.start_time || "—",
     hora_fin: meetingTyped.end_time || "—",
@@ -252,14 +281,24 @@ async function resolveAgreementVars(agreementId: string, tenantId: string): Prom
   if (error || !data) return {};
 
   return {
-    tipo_junta: data.agreement_kind,
-    tipo_junta_texto: data.agreement_kind === "ORDINARIA" ? "Ordinaria" : "Extraordinaria",
-    materia: data.matter_class,
-    modo_adopcion: data.adoption_mode,
+    id: data.id,
+    agreement_kind: data.agreement_kind,
+    matter_class: data.matter_class,
+    adoption_mode: data.adoption_mode,
+    status: data.status,
     proposal_text: data.proposal_text,
     decision_text: data.decision_text,
     decision_date: data.decision_date,
     statutory_basis: data.statutory_basis,
+    tipo_junta: data.agreement_kind,
+    tipo_junta_texto: data.agreement_kind === "ORDINARIA" ? "Ordinaria" : "Extraordinaria",
+    materia: data.matter_class,
+    modo_adopcion: data.adoption_mode,
+    texto_acuerdo_certificado: data.decision_text || data.proposal_text,
+    resultado_adopcion_texto:
+      data.status === "ADOPTED" ? "Adoptado" :
+      data.status === "REJECTED" ? "Rechazado" :
+      data.status || "Pendiente",
     documentos_disponibles: [],  // Would come from related documents
     complemento_convocatoria: false,
     documentos_adjuntos: [],
@@ -291,12 +330,14 @@ function resolveMotorVars(snapshot?: Record<string, unknown>): Record<string, un
     snapshot_hash: snapshot.snapshot_hash || snapshot.gate_hash || "—",
     resultado_gate: snapshot.ok ? "CONFORME" : "NO CONFORME",
     quorum_observado: snapshot.quorumPresente || "—",
+    quorum_pct: snapshot.quorumPresente || "—",
     quorum_requerido: snapshot.quorumRequerido || "—",
     quorum_fuente: "LSC",
     quorum_referencia_legal: snapshot.quorumReferencia || "art. 193 LSC",
     convocatoria_ordinal: snapshot.primeraConvocatoria !== false ? "primera" : "segunda",
     quorum_primera_convocatoria: snapshot.primeraConvocatoria !== false,
     quorum_rama: snapshot.quorumRama || null,
+    quorum_rama_pct: snapshot.quorumRama || null,
     convocatoria_ordinal_detalle: snapshot.convocatoriaDetalle || null,
     puntos_votacion: snapshot.votaciones || [],
     materias_indelegables_warning: snapshot.materiasIndelegablesWarning || false,
@@ -308,12 +349,15 @@ function resolveMotorVars(snapshot?: Record<string, unknown>): Record<string, un
 
 // ── System resolver ──────────────────────────────────────────────────────────
 
-function resolveSystemVars(): Record<string, unknown> {
-  const now = new Date();
+function resolveSystemVars(nowInput?: Date | string): Record<string, unknown> {
+  const now = nowInput
+    ? new Date(nowInput)
+    : new Date();
+  const iso = Number.isNaN(now.getTime()) ? new Date().toISOString() : now.toISOString();
   return {
-    fecha_emision: now.toISOString().split("T")[0],
-    fecha_generacion: now.toISOString(),
-    tsq_token: `TSQ-${Date.now().toString(36).toUpperCase()}`,
+    fecha_emision: iso.split("T")[0],
+    fecha_generacion: iso,
+    tsq_token: `TSQ-${iso.replace(/\D/g, "").slice(0, 17)}`,
     firma_qes_ref: null, // Filled after QES signing
     ocsp_status: null,
     firma_qes_timestamp: null,
@@ -399,21 +443,100 @@ async function resolveCapTableVars(entityId: string, tenantId: string): Promise<
 
 // ── Fuente normalizer ────────────────────────────────────────────────────────
 
-// DB stores dotted-path fuente values like "entities.name" or "governing_bodies.id"
-// but the source map keys are uppercase category names. Normalize before lookup.
-function normalizeFuente(fuente: string): string {
-  if (fuente.startsWith("entities."))          return "ENTIDAD";
-  if (fuente.startsWith("governing_bodies."))  return "ORGANO";
-  if (fuente.startsWith("meetings."))          return "REUNION";
-  if (fuente.startsWith("agreements.") || fuente === "agreement") return "EXPEDIENTE";
+// DB stores dotted-path fuente values like "entities.name" or legacy singular
+// paths like "agreement.adoption_mode". Normalize before source lookup.
+export function normalizeFuente(fuente: string): string {
+  const raw = fuente.trim();
+  const lower = raw.toLowerCase();
+
+  if (!raw) return "";
+  if (["entidad", "entity", "entities"].includes(lower) || lower.startsWith("entities.") || lower.startsWith("entity.")) {
+    return "ENTIDAD";
+  }
   if (
-    fuente.startsWith("capital_holdings.") ||
-    fuente.startsWith("cap_table.") ||
-    fuente.startsWith("parte_votante.") ||
-    fuente.startsWith("socios.")
+    ["organo", "órgano", "governing_body", "governing_bodies", "body", "bodies"].includes(lower) ||
+    lower.startsWith("governing_bodies.") ||
+    lower.startsWith("governing_body.") ||
+    lower.startsWith("body.") ||
+    lower.startsWith("bodies.") ||
+    lower.startsWith("body_mandates.") ||
+    lower.startsWith("mandate.") ||
+    lower.startsWith("mandates.") ||
+    lower.startsWith("persons.") ||
+    lower.startsWith("person.")
+  ) {
+    return "ORGANO";
+  }
+  if (
+    ["reunion", "reunión", "meeting", "meetings", "convocatoria", "convocatorias"].includes(lower) ||
+    lower.startsWith("meetings.") ||
+    lower.startsWith("meeting.") ||
+    lower.startsWith("meeting_participants.") ||
+    lower.startsWith("meeting_agenda.") ||
+    lower.startsWith("meeting_resolutions.") ||
+    lower.startsWith("convocatoria.") ||
+    lower.startsWith("convocatorias.")
+  ) {
+    return "REUNION";
+  }
+  if (
+    ["expediente", "agreement", "agreements", "registry_filing", "registry_filings", "tramitador"].includes(lower) ||
+    lower.startsWith("agreement.") ||
+    lower.startsWith("agreements.") ||
+    lower.startsWith("registry_filing.") ||
+    lower.startsWith("registry_filings.") ||
+    lower.startsWith("tramitador.")
+  ) {
+    return "EXPEDIENTE";
+  }
+  if (
+    ["cap_table", "capital_holdings", "parte_votante", "socios", "shareholders"].includes(lower) ||
+    lower.startsWith("capital_holdings.") ||
+    lower.startsWith("cap_table.") ||
+    lower.startsWith("parte_votante.") ||
+    lower.startsWith("socios.") ||
+    lower.startsWith("shareholder.") ||
+    lower.startsWith("shareholders.")
   ) return "CAP_TABLE";
+  if (
+    ["motor", "ley", "estatutos", "pacto", "pacto_parasocial", "reglamento", "rule_pack"].includes(lower) ||
+    lower.startsWith("rule_pack.") ||
+    lower.startsWith("evaluar") ||
+    lower.startsWith("calcular")
+  ) {
+    return "MOTOR";
+  }
+  if (
+    ["sistema", "qtsp", "ead_trust"].includes(lower) ||
+    lower.startsWith("qtsp.") ||
+    lower.startsWith("firma_qes") ||
+    lower.startsWith("tsq")
+  ) {
+    return "SISTEMA";
+  }
+  if (["usuario", "user", "capa3"].includes(lower)) return "USUARIO";
   // Already uppercase category key or unknown — pass through uppercased
-  return fuente.toUpperCase();
+  return raw.toUpperCase();
+}
+
+function directFuenteValue(source: Record<string, unknown>, fuente: string): unknown {
+  const raw = fuente.trim();
+  const equality = raw.match(/^[^.]+\.([a-zA-Z0-9_]+)\s*==\s*['"]([^'"]+)['"]$/);
+  if (equality) {
+    const [, field, expected] = equality;
+    return source[field] === expected;
+  }
+
+  const parts = raw.split(".");
+  if (parts.length < 2) return undefined;
+
+  const field = parts[parts.length - 1];
+  if (field in source) return source[field];
+
+  const pathAfterCategory = parts.slice(1).join(".");
+  if (pathAfterCategory in source) return source[pathAfterCategory];
+
+  return undefined;
 }
 
 // ── Main resolver ────────────────────────────────────────────────────────────
@@ -455,7 +578,7 @@ export async function resolveVariables(
   ]);
 
   const motorVars = resolveMotorVars(context.complianceSnapshot);
-  const systemVars = resolveSystemVars();
+  const systemVars = resolveSystemVars(context.now);
 
   // Source map
   const sourceMap: Record<string, Record<string, unknown>> = {
@@ -471,13 +594,14 @@ export async function resolveVariables(
 
   // Resolve each variable
   for (const v of capa2) {
-    const source = sourceMap[normalizeFuente(v.fuente)] || {};
-    const value = source[v.variable];
+    const normalizedFuente = normalizeFuente(v.fuente);
+    const source = sourceMap[normalizedFuente] || {};
+    const value = source[v.variable] ?? directFuenteValue(source, v.fuente);
 
     if (value !== undefined && value !== null) {
       values[v.variable] = value;
       resolved.push(v.variable);
-    } else if (v.fuente === "USUARIO") {
+    } else if (normalizedFuente === "USUARIO") {
       // USUARIO variables are expected to come from capa3 form
       unresolved.push(v.variable);
     } else {

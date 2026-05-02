@@ -38,10 +38,11 @@ function StepTipoAcuerdo({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="coaprobacion-materia" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Clase de materia
         </label>
         <select
+          id="coaprobacion-materia"
           value={materia}
           onChange={(e) => setMateria(e.target.value)}
           className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
@@ -57,10 +58,11 @@ function StepTipoAcuerdo({
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="coaprobacion-texto" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Texto de la propuesta
         </label>
         <textarea
+          id="coaprobacion-texto"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           rows={5}
@@ -95,10 +97,11 @@ function StepConfiguracion({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+          <label htmlFor="coaprobacion-k" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
             Mínimo de firmas requeridas (k)
           </label>
           <input
+            id="coaprobacion-k"
             type="number"
             min={1}
             max={n}
@@ -109,10 +112,11 @@ function StepConfiguracion({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+          <label htmlFor="coaprobacion-n" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
             Total de administradores (n)
           </label>
           <input
+            id="coaprobacion-n"
             type="number"
             min={k}
             value={n}
@@ -123,10 +127,11 @@ function StepConfiguracion({
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="coaprobacion-ventana" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Ventana de consenso
         </label>
         <select
+          id="coaprobacion-ventana"
           value={ventana}
           onChange={(e) => setVentana(e.target.value)}
           className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
@@ -187,6 +192,7 @@ function StepFirmas({
 
       <div className="flex gap-2">
         <input
+          aria-label="Nombre del administrador firmante"
           type="text"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
@@ -195,6 +201,7 @@ function StepFirmas({
           style={{ borderRadius: "var(--g-radius-md)" }}
         />
         <input
+          aria-label="Fecha de firma del administrador"
           type="date"
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}

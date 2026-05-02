@@ -4,7 +4,7 @@ import {
   CheckCircle2, Clock, AlertTriangle, Eye, Lock,
   Layers, Variable, Edit3, ArrowRight, BookOpen,
   Building2, Filter, FolderOpen, Play, Search,
-  Database, FileCode2,
+  Database, FileCode2, BadgeCheck, Scale, ListChecks,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,6 +17,14 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import { buildLegalTemplateCoverage, type LegalTemplateCoverageState } from "@/lib/secretaria/legal-template-coverage";
+import {
+  buildLegalTemplateReviewRows,
+  matchesLegalTemplateReviewFilter,
+  summarizeLegalTemplateReview,
+  type LegalTemplateReviewFilter,
+  type LegalTemplateReviewRow,
+  type LegalTemplateReviewStatus,
+} from "@/lib/secretaria/legal-template-review";
 import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-fixtures";
 import { toast } from "sonner";
 
@@ -35,6 +43,8 @@ const TIPO_LABELS: Record<string, string> = {
   ACTA_SESION: "Acta de sesión",
   ACTA_CONSIGNACION: "Acta de consignación",
   ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
+  ACTA_DECISION_CONJUNTA: "Acta decisión conjunta",
+  ACTA_ORGANO_ADMIN: "Acta órgano de administración",
   CERTIFICACION: "Certificación de acuerdos",
   CONVOCATORIA: "Convocatoria",
   CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
@@ -52,6 +62,8 @@ const EXPECTED_TEMPLATE_TYPES = [
   "ACTA_SESION",
   "ACTA_CONSIGNACION",
   "ACTA_ACUERDO_ESCRITO",
+  "ACTA_DECISION_CONJUNTA",
+  "ACTA_ORGANO_ADMIN",
   "CERTIFICACION",
   "INFORME_PRECEPTIVO",
   "INFORME_DOCUMENTAL_PRE",
@@ -115,6 +127,43 @@ const COVERAGE_STATE_STYLE: Record<LegalTemplateCoverageState, { className: stri
     className: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
     icon: AlertTriangle,
   },
+};
+
+const LEGAL_REVIEW_STATUS_STYLE: Record<LegalTemplateReviewStatus, { className: string; icon: ElementType }> = {
+  legally_approved: {
+    className: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+    icon: BadgeCheck,
+  },
+  operational_unapproved: {
+    className: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+    icon: AlertTriangle,
+  },
+  needs_review: {
+    className: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
+    icon: Scale,
+  },
+  fixture_bridge: {
+    className: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
+    icon: FileCode2,
+  },
+  in_workflow: {
+    className: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
+    icon: Clock,
+  },
+};
+
+const LEGAL_REVIEW_FILTER_LABELS: Record<LegalTemplateReviewFilter, string> = {
+  ALL: "Todas las revisiones",
+  LEGAL_APPROVED: "Aprobadas legalmente",
+  REVISION_LEGAL: "Requieren revisión legal",
+  LEGAL_REPORT_APPROVED: "Informe: aprobadas",
+  LEGAL_REPORT_APPROVED_VARIANTS: "Informe: aprobadas con variantes",
+  MISSING_APPROVAL: "Sin aprobación formal",
+  DRAFT_VERSION: "Versión técnica",
+  MISSING_REFERENCE: "Sin referencia legal",
+  MISSING_OWNER: "Sin órgano o modo",
+  DUPLICATE_MATTER: "Duplicadas por materia",
+  LOCAL_FIXTURE: "Fixtures locales",
 };
 
 function jurisdictionLabel(code?: string | null) {
@@ -225,6 +274,21 @@ function CoverageStateBadge({ state, label }: { state: LegalTemplateCoverageStat
   );
 }
 
+function LegalReviewBadge({ review }: { review?: LegalTemplateReviewRow }) {
+  if (!review) return null;
+  const config = LEGAL_REVIEW_STATUS_STYLE[review.status];
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold ${config.className}`}
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      <Icon className="h-3 w-3" />
+      {review.label}
+    </span>
+  );
+}
+
 function SectionToggle({
   title,
   icon: Icon,
@@ -260,10 +324,12 @@ function SectionToggle({
 
 function PlantillaDetailPanel({
   plantilla,
+  review,
   onUseTemplate,
   scopeContextLabel,
 }: {
   plantilla: PlantillaProtegidaRow;
+  review?: LegalTemplateReviewRow;
   onUseTemplate: (plantilla: PlantillaProtegidaRow) => void;
   scopeContextLabel?: string | null;
 }) {
@@ -329,7 +395,10 @@ function PlantillaDetailPanel({
               </div>
             )}
           </div>
-          <EstadoBadge estado={estado} />
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <EstadoBadge estado={estado} />
+            <LegalReviewBadge review={review} />
+          </div>
         </div>
 
         {/* Transition button */}
@@ -382,6 +451,72 @@ function PlantillaDetailPanel({
           <p className="mt-2 text-xs text-[var(--status-warning)]">
             Fixture local no persistido: sirve para probar cobertura durante el freeze Supabase y debe sustituirse por plantilla Cloud aprobada.
           </p>
+        ) : null}
+
+        {review ? (
+          <div
+            className="mt-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--g-brand-3308)]">
+              <Scale className="h-3.5 w-3.5" />
+              Revisión legal
+            </div>
+            {review.reasons.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-xs text-[var(--g-text-secondary)]">
+                {review.reasons.map((reason) => (
+                  <li key={reason} className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-[var(--status-warning)]" />
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+                Plantilla activa con aprobación legal formal y sin incidencias de revisión detectadas.
+              </p>
+            )}
+            {review.approvalPlan ? (
+              <div className="mt-3 grid gap-2 border-t border-[var(--g-border-subtle)] pt-3 text-xs text-[var(--g-text-secondary)] sm:grid-cols-2">
+                <div>
+                  <span className="font-medium text-[var(--g-text-primary)]">Resultado informe:</span>{" "}
+                  {review.approvalDecision}
+                </div>
+                <div>
+                  <span className="font-medium text-[var(--g-text-primary)]">Versión propuesta:</span>{" "}
+                  {review.proposedVersion}
+                </div>
+                {review.approvalPlan.variantRequired ? (
+                  <div className="sm:col-span-2">
+                    <span className="font-medium text-[var(--g-text-primary)]">Variante requerida:</span>{" "}
+                    {review.approvalPlan.variantRequired}
+                  </div>
+                ) : null}
+                <div className="sm:col-span-2">
+                  <span className="font-medium text-[var(--g-text-primary)]">Alcance:</span>{" "}
+                  {review.approvalPlan.summary}
+                </div>
+                {review.approvalPlan.variablesToAdd?.length ? (
+                  <div className="sm:col-span-2">
+                    <span className="font-medium text-[var(--g-text-primary)]">Variables a preparar:</span>{" "}
+                    {review.approvalPlan.variablesToAdd.join(", ")}
+                  </div>
+                ) : null}
+                {review.approvalPlan.capa3ToChange?.length ? (
+                  <div className="sm:col-span-2">
+                    <span className="font-medium text-[var(--g-text-primary)]">Capa 3:</span>{" "}
+                    {review.approvalPlan.capa3ToChange.join(", ")}
+                  </div>
+                ) : null}
+                {review.approvalPlan.notes ? (
+                  <div className="sm:col-span-2">
+                    <span className="font-medium text-[var(--g-text-primary)]">Nota:</span>{" "}
+                    {review.approvalPlan.notes}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {plantilla.fecha_aprobacion && (
@@ -576,6 +711,7 @@ export default function GestorPlantillas() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterEstado, setFilterEstado] = useState<string>("ALL");
   const [filterTipo, setFilterTipo] = useState<string>("ALL");
+  const [filterReview, setFilterReview] = useState<LegalTemplateReviewFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
@@ -594,15 +730,31 @@ export default function GestorPlantillas() {
     return rows.filter((plantilla) => templateAppliesToJurisdiction(plantilla, selectedJurisdiction));
   }, [isSociedadMode, plantillas, selectedJurisdiction]);
 
+  const legalReviewRows = useMemo(
+    () => buildLegalTemplateReviewRows(scopedPlantillas),
+    [scopedPlantillas],
+  );
+
+  const legalReviewById = useMemo(
+    () => new Map(legalReviewRows.map((row) => [row.templateId, row])),
+    [legalReviewRows],
+  );
+
+  const legalReviewSummary = useMemo(
+    () => summarizeLegalTemplateReview(legalReviewRows),
+    [legalReviewRows],
+  );
+
   const filtered = useMemo(() => scopedPlantillas.filter((p) => {
     if (filterEstado !== "ALL" && p.estado !== filterEstado) return false;
     if (filterTipo !== "ALL" && p.tipo !== filterTipo) return false;
+    if (!matchesLegalTemplateReviewFilter(legalReviewById.get(p.id), filterReview)) return false;
     if (searchQuery.trim()) {
       const query = normalizeSearch(searchQuery);
       if (!normalizeSearch(plantillaSearchText(p)).includes(query)) return false;
     }
     return true;
-  }), [filterEstado, filterTipo, scopedPlantillas, searchQuery]);
+  }), [filterEstado, filterReview, filterTipo, legalReviewById, scopedPlantillas, searchQuery]);
 
   const selected = filtered.find((p) => p.id === selectedId) ?? null;
 
@@ -616,9 +768,6 @@ export default function GestorPlantillas() {
 
   // Stats
   const totalActivas = scopedPlantillas.filter((p) => p.estado === "ACTIVA").length;
-  const totalRevisadas = scopedPlantillas.filter((p) => p.estado === "REVISADA").length;
-  const totalBorradores = scopedPlantillas.filter((p) => p.estado === "BORRADOR").length;
-  const conContenido = scopedPlantillas.filter((p) => !!p.capa1_inmutable).length;
   const coverageRows = buildLegalTemplateCoverage(scopedCloudPlantillas, { jurisdiction: selectedJurisdiction });
   const coverageCloudActive = coverageRows.filter((row) => row.state === "cloud_active").length;
   const coverageCloudPending = coverageRows.filter((row) => row.state === "cloud_pending").length;
@@ -705,7 +854,7 @@ export default function GestorPlantillas() {
       ) : null}
 
       {/* KPI summary bar */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-6">
         <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-center" style={{ borderRadius: "var(--g-radius-lg)" }}>
           <div className="text-2xl font-bold text-[var(--g-text-primary)]">{scopedPlantillas.length}</div>
           <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Total</div>
@@ -715,16 +864,79 @@ export default function GestorPlantillas() {
           <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Activas</div>
         </div>
         <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-center" style={{ borderRadius: "var(--g-radius-lg)" }}>
-          <div className="text-2xl font-bold text-[var(--g-brand-3308)]">{conContenido}</div>
-          <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Con contenido</div>
+          <div className="text-2xl font-bold text-[var(--g-brand-3308)]">{legalReviewSummary.legallyApproved}</div>
+          <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Aprobadas Legal</div>
         </div>
         <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-center" style={{ borderRadius: "var(--g-radius-lg)" }}>
-          <div className="text-2xl font-bold text-[var(--status-warning)]">{totalRevisadas + totalBorradores}</div>
-          <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Pendientes</div>
+          <div className="text-2xl font-bold text-[var(--status-warning)]">{legalReviewSummary.needsReview}</div>
+          <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Revisión Legal</div>
+        </div>
+        <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-center" style={{ borderRadius: "var(--g-radius-lg)" }}>
+          <div className="text-2xl font-bold text-[var(--status-warning)]">{legalReviewSummary.missingApproval}</div>
+          <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Sin Aprobación</div>
         </div>
         <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-center" style={{ borderRadius: "var(--g-radius-lg)" }}>
           <div className="text-2xl font-bold text-[var(--g-brand-3308)]">{coberturaCriticaPendiente}</div>
           <div className="text-[11px] uppercase tracking-widest text-[var(--g-text-secondary)]">Huecos</div>
+        </div>
+      </div>
+
+      <div
+        className="mb-6 overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-5 py-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            <ListChecks className="h-3.5 w-3.5" />
+            Panel de revisión legal
+          </div>
+          <h2 className="mt-1 text-base font-semibold text-[var(--g-text-primary)]">
+            Activa operativa frente a aprobada legalmente
+          </h2>
+          <p className="mt-1 max-w-4xl text-xs text-[var(--g-text-secondary)]">
+            Una plantilla `ACTIVA` puede operar en demo. Para considerarla aprobada legalmente debe tener aprobación formal, versión final, referencia legal y metadatos de órgano/modo cuando aplica.
+          </p>
+        </div>
+        <div className="grid gap-0 divide-y divide-[var(--g-border-subtle)] lg:grid-cols-[1.1fr_1fr] lg:divide-x lg:divide-y-0">
+          <dl className="grid grid-cols-2 gap-0 divide-x divide-y divide-[var(--g-border-subtle)] sm:grid-cols-4">
+            <div className="p-4">
+              <dt className="text-xs text-[var(--g-text-secondary)]">Aprobadas legal</dt>
+              <dd className="mt-1 text-xl font-semibold text-[var(--g-text-primary)]">{legalReviewSummary.legallyApproved}</dd>
+            </div>
+            <div className="p-4">
+              <dt className="text-xs text-[var(--g-text-secondary)]">Activas sin aprobación</dt>
+              <dd className="mt-1 text-xl font-semibold text-[var(--g-text-primary)]">{legalReviewSummary.operationalUnapproved}</dd>
+            </div>
+            <div className="p-4">
+              <dt className="text-xs text-[var(--g-text-secondary)]">Versiones técnicas</dt>
+              <dd className="mt-1 text-xl font-semibold text-[var(--g-text-primary)]">{legalReviewSummary.draftVersion}</dd>
+            </div>
+            <div className="p-4">
+              <dt className="text-xs text-[var(--g-text-secondary)]">Duplicadas materia</dt>
+              <dd className="mt-1 text-xl font-semibold text-[var(--g-text-primary)]">{legalReviewSummary.duplicateMatter}</dd>
+            </div>
+          </dl>
+          <div className="space-y-2 p-4 text-sm">
+            <div className="flex items-start gap-2 text-[var(--g-text-secondary)]">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+              <span>{legalReviewSummary.missingReference} plantilla(s) sin referencia legal explícita.</span>
+            </div>
+            <div className="flex items-start gap-2 text-[var(--g-text-secondary)]">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+              <span>{legalReviewSummary.missingOwner} modelo(s) sin órgano competente o AdoptionMode.</span>
+            </div>
+            <div className="flex items-start gap-2 text-[var(--g-text-secondary)]">
+              <FileCode2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+              <span>{legalReviewSummary.fixtureBridge} fixture(s) locales como puente no persistente.</span>
+            </div>
+            <div className="flex items-start gap-2 text-[var(--g-text-secondary)]">
+              <Scale className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+              <span>
+                Informe legal final: {legalReviewSummary.legalReportApproved} aprobada(s) y{" "}
+                {legalReviewSummary.legalReportApprovedWithVariants} aprobada(s) con variantes.
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -803,7 +1015,7 @@ export default function GestorPlantillas() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_auto_auto] lg:items-end">
+      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end">
         <label className="block">
           <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--g-text-secondary)]">
             <Search className="h-3.5 w-3.5" />
@@ -849,6 +1061,22 @@ export default function GestorPlantillas() {
             <option value="ALL">Todos los estados</option>
             {estados.map((e) => (
               <option key={e} value={e}>{ESTADO_CONFIG[e]?.label || e}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[var(--g-text-secondary)]">
+            <Scale className="h-3.5 w-3.5" />
+            Revisión legal
+          </span>
+          <select
+            value={filterReview}
+            onChange={(e) => setFilterReview(e.target.value as LegalTemplateReviewFilter)}
+            className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {(Object.keys(LEGAL_REVIEW_FILTER_LABELS) as LegalTemplateReviewFilter[]).map((filter) => (
+              <option key={filter} value={filter}>{LEGAL_REVIEW_FILTER_LABELS[filter]}</option>
             ))}
           </select>
         </label>
@@ -906,6 +1134,7 @@ export default function GestorPlantillas() {
                 const organoLabel = p.organo_tipo ? ORGANO_LABELS[p.organo_tipo] : null;
                 const hasCapa1 = !!p.capa1_inmutable;
                 const localFixture = isLocalFixture(p);
+                const review = legalReviewById.get(p.id);
 
                 return (
                   <button
@@ -932,6 +1161,7 @@ export default function GestorPlantillas() {
                       <span>v{p.version}</span>
                     </div>
                     <div className="mt-1.5 flex items-center gap-1.5">
+                      <LegalReviewBadge review={review} />
                       {localFixture ? (
                         <span className="flex items-center gap-1 text-[10px] font-semibold text-[var(--g-brand-3308)]">
                           <FileCode2 className="h-3 w-3" /> Fixture local
@@ -966,6 +1196,7 @@ export default function GestorPlantillas() {
           {selected ? (
             <PlantillaDetailPanel
               plantilla={selected}
+              review={legalReviewById.get(selected.id)}
               onUseTemplate={handleUseTemplate}
               scopeContextLabel={isSociedadMode && selectedEntity ? `Se usará en el contexto de ${selectedEntityName}` : null}
             />

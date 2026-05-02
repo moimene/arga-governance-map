@@ -172,13 +172,22 @@ export function ProcessDocxButton({
   }
 
   async function handleGenerateWithCapa3() {
-    const errors = validateCapa3(capa3Fields, capa3Values);
+    const resolved = resolveTemplateProcessMatrix(selectedTemplate, {
+      processHint: input.kind,
+      variables: input.variables,
+      capa3Values,
+    });
+    const normalizedCapa3Values = resolved?.capa3Draft.values ?? {
+      ...(matrixResolution?.initialCapa3Values ?? {}),
+      ...capa3Values,
+    };
+    const errors = validateCapa3(capa3Fields, normalizedCapa3Values);
     if (Object.keys(errors).length > 0) {
       setCapa3Errors(errors);
       return;
     }
     setCapa3Errors({});
-    const ok = await runGenerate(capa3Values);
+    const ok = await runGenerate(normalizedCapa3Values);
     if (ok) setCaptureOpen(false);
   }
 

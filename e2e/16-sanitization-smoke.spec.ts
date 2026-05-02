@@ -37,9 +37,23 @@ async function expectNoFatalUi(page: Page) {
   }
 }
 
+async function restoreDemoSessionIfNeeded(page: Page, path: string) {
+  const isLoginUrl = /\/login/.test(page.url());
+  const loginButton = page.getByRole('button', { name: 'Acceder como demo' });
+  const isLoginScreen = await loginButton.isVisible().catch(() => false);
+
+  if (!isLoginUrl && !isLoginScreen) return;
+
+  await loginButton.click();
+  await page.waitForURL('/', { timeout: 20_000 });
+  await page.goto(path);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+}
+
 async function visitRoute(page: Page, path: string, signals: RegExp[]) {
   await page.goto(path);
   await page.waitForLoadState('networkidle').catch(() => undefined);
+  await restoreDemoSessionIfNeeded(page, path);
   await expect(page.locator('main').first()).toBeVisible({ timeout: 15_000 });
   await expectAnySignal(page, signals);
   await expectNoFatalUi(page);
@@ -77,11 +91,11 @@ async function openFirstDataRow(
 test.describe('Sanitization smoke — AIMS-GRC', () => {
   test('pantallas core renderizan contra Cloud actual', async ({ page }) => {
     const routes: Array<{ path: string; signals: RegExp[] }> = [
-      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i] },
+      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i, /AIMS P0 readiness/i] },
       { path: '/ai-governance/sistemas', signals: [/Sistemas IA/i, /Buscar sistema/i] },
       { path: '/ai-governance/evaluaciones', signals: [/Evaluaciones/i, /Evaluaci[oó]n/i] },
       { path: '/ai-governance/incidentes', signals: [/Incidentes IA/i, /Incidente/i] },
-      { path: '/grc', signals: [/GRC Compass/i, /Riesgos cr[ií]ticos/i] },
+      { path: '/grc', signals: [/GRC Compass/i, /Riesgos cr[ií]ticos/i, /Readiness ejecutivo P0/i, /Mapa de pantallas GRC/i] },
       { path: '/grc/risk-360', signals: [/Risk 360/i, /Riesgo/i] },
       { path: '/grc/packs', signals: [/Packs por Pa[ií]s/i, /Pack/i] },
       { path: '/grc/mywork', signals: [/Mi Trabajo/i, /Trabajo/i] },
@@ -94,6 +108,15 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
         await visitRoute(page, route.path, route.signals);
       });
     }
+  });
+
+  test('AIMS declara postura por pantalla y handoffs sin writes cross-module', async ({ page }) => {
+    await visitRoute(page, '/ai-governance', [/AIMS P0 readiness/i]);
+    await expect(page.getByText('Mapa de pantallas AIMS')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Handoffs read-only')).toBeVisible();
+    await expect(page.getByText('legacy_read').first()).toBeVisible();
+    await expect(page.getByText('SECRETARIA_CERTIFICATION_ISSUED')).toBeVisible();
+    await expect(page.getByText(/No escriben en governance_module_events ni governance_module_links/i)).toBeVisible();
   });
 });
 

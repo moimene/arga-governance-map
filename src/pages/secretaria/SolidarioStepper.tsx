@@ -29,10 +29,11 @@ function StepTipoAcuerdo({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-materia" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Clase de materia
         </label>
         <select
+          id="solidario-materia"
           value={materia}
           onChange={(e) => setMateria(e.target.value)}
           className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
@@ -48,10 +49,11 @@ function StepTipoAcuerdo({
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-texto" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Texto de la propuesta
         </label>
         <textarea
+          id="solidario-texto"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           rows={5}
@@ -94,10 +96,11 @@ function StepAdminActuante({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-admin-id" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           ID del administrador actuante
         </label>
         <input
+          id="solidario-admin-id"
           type="text"
           value={adminId}
           onChange={(e) => setAdminId(e.target.value)}
@@ -108,10 +111,11 @@ function StepAdminActuante({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-admin-nombre" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Nombre del administrador
         </label>
         <input
+          id="solidario-admin-nombre"
           type="text"
           value={adminNombre}
           onChange={(e) => setAdminNombre(e.target.value)}
@@ -122,10 +126,11 @@ function StepAdminActuante({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-vigencia-desde" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Vigencia del cargo desde
         </label>
         <input
+          id="solidario-vigencia-desde"
           type="date"
           value={vigenciaDesde}
           onChange={(e) => setVigenciaDesde(e.target.value)}
@@ -135,11 +140,12 @@ function StepAdminActuante({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+        <label htmlFor="solidario-materia-restringida" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Materias con restricción estatutaria (requieren cofirma)
         </label>
         <div className="flex gap-2 mb-2">
           <input
+            id="solidario-materia-restringida"
             type="text"
             value={newMateria}
             onChange={(e) => setNewMateria(e.target.value)}
@@ -168,6 +174,7 @@ function StepAdminActuante({
                 {m}
                 <button
                   type="button"
+                  aria-label={`Eliminar restricción ${m}`}
                   onClick={() => setMateriasRestringidas(materiasRestringidas.filter((_, j) => j !== i))}
                   className="ml-0.5 text-[var(--status-error)]"
                 >

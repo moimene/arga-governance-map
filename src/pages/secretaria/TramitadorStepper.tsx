@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
@@ -8,7 +8,7 @@ import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/ho
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
-import { useCertificationRegistryIntake } from "@/hooks/useTramitador";
+import { useCertificationRegistryIntake, useTramitacionById } from "@/hooks/useTramitador";
 import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
@@ -16,6 +16,7 @@ import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
 import { validateCapa3 } from "@/components/secretaria/Capa3Form";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";
+import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { persistRegistryFilingCertificationLink } from "@/lib/secretaria/registry-certification-link";
 
@@ -98,6 +99,7 @@ function buildRegistryVariables({
     materia_acuerdo: agreement.agreement_kind,
     clase_materia: agreement.matter_class,
     agreement_id: agreement.id,
+    snapshot_hash: registryFilingId ?? agreement.id,
     modo_adopcion: agreement.adoption_mode,
     estado_acuerdo: statusLabel(agreement.status),
     instrumento_requerido: instrumentRequired,
@@ -193,7 +195,158 @@ function buildSubsanacionFallback({
   ].join("\n");
 }
 
-export default function TramitadorStepper() {
+type TramitacionDetalleRow = {
+  filing_number?: string | null;
+  filing_via?: string | null;
+  presentation_date?: string | null;
+  status?: string | null;
+  estimated_resolution?: string | null;
+  inscription_number?: string | null;
+  borme_ref?: string | null;
+  psm_ref?: string | null;
+  siger_ref?: string | null;
+  conservatoria_ref?: string | null;
+  jucerja_ref?: string | null;
+  deeds?: {
+    notary?: string | null;
+    deed_date?: string | null;
+    status?: string | null;
+  } | null;
+};
+
+function formatDetailDate(value?: string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function TramitacionDetalle({ id }: { id: string }) {
+  const { data, isLoading, error } = useTramitacionById(id);
+  const filing = data as TramitacionDetalleRow | null | undefined;
+  const refs = [
+    filing?.inscription_number && ["Inscripción", filing.inscription_number],
+    filing?.borme_ref && ["BORME", filing.borme_ref],
+    filing?.psm_ref && ["PSM", filing.psm_ref],
+    filing?.siger_ref && ["SIGER", filing.siger_ref],
+    filing?.conservatoria_ref && ["Conservatoria", filing.conservatoria_ref],
+    filing?.jucerja_ref && ["JUCERJA", filing.jucerja_ref],
+  ].filter(Boolean) as [string, string][];
+
+  return (
+    <main
+      className="min-h-screen bg-[var(--g-surface-page)] p-6 text-[var(--g-text-primary)]"
+      style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}
+    >
+      <div className="mx-auto max-w-5xl space-y-6">
+        <Link
+          to="/secretaria/tramitador"
+          className="inline-flex items-center text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+        >
+          ← Volver al tramitador
+        </Link>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+            Secretaría · Expediente registral
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
+            {filing?.filing_number ?? "Tramitación registral"}
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Vista owner read-only del expediente existente. Las altas, subsanaciones y documentos se gestionan desde el
+            stepper de tramitación, manteniendo la fuente de verdad en Secretaría.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-[var(--g-text-secondary)]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Cargando expediente…
+          </div>
+        ) : error ? (
+          <div
+            className="border border-[var(--status-error)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--status-error)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            No se pudo cargar la tramitación: {error instanceof Error ? error.message : String(error)}
+          </div>
+        ) : !filing ? (
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 text-sm text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            No existe una tramitación registrada para este identificador.
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <section
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Estado y presentación</h2>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["Estado", statusLabel(filing.status ?? "—")],
+                  ["Vía", filing.filing_via ?? "—"],
+                  ["Presentación", formatDetailDate(filing.presentation_date)],
+                  ["Resolución estimada", formatDetailDate(filing.estimated_resolution)],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-[var(--g-text-secondary)]">{label}</dt>
+                    <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Instrumento</h2>
+              <dl className="mt-4 space-y-3">
+                <div>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Notaría</dt>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{filing.deeds?.notary ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Fecha escritura</dt>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{formatDetailDate(filing.deeds?.deed_date)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Estado instrumento</dt>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                    {statusLabel(filing.deeds?.status ?? "—")}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 lg:col-span-2"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Referencias registrales</h2>
+              {refs.length > 0 ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {refs.map(([label, value]) => (
+                    <div key={label} className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+                      <div className="text-xs text-[var(--g-text-secondary)]">{label}</div>
+                      <div className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--g-text-secondary)]">Sin referencias registrales informadas.</p>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function TramitadorNuevo() {
   const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -201,6 +354,7 @@ export default function TramitadorStepper() {
   const requestedPlantillaId = searchParams.get("plantilla");
   const requestedTemplateType = searchParams.get("tipo");
   const requestedCertificationId = searchParams.get("certificacion");
+  const requestedAgreementId = searchParams.get("agreement");
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const isSociedadScoped = Boolean(scopedEntityId);
@@ -257,11 +411,21 @@ export default function TramitadorStepper() {
   );
 
   const [selectedAgreementId, setSelectedAgreementId] = useState<string | null>(null);
-  const { data: selectedAgreement } = useAgreementById(selectedAgreementId || undefined);
+  const defaultAgreementId =
+    requestedAgreementId ??
+    (certificationIntake?.agreementIds.length === 1 ? certificationIntake.agreementIds[0] : null);
+  const effectiveSelectedAgreementId = selectedAgreementId ?? defaultAgreementId;
+  const { data: selectedAgreement } = useAgreementById(effectiveSelectedAgreementId || undefined);
 
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
     selectedAgreement?.agreement_kind
   );
+  const registryRulePackData = rulePackData ?? (
+    selectedAgreement && !rulesLoading
+      ? buildPrototypeRegistryRulePackFallback(selectedAgreement)
+      : null
+  );
+  const usingPrototypeRegistryRuleFallback = Boolean(selectedAgreement && !rulesLoading && !rulePackData);
 
   const [selectedModeloId, setSelectedModeloId] = useState<string | null>(null);
   const [modeloCapa3Open, setModeloCapa3Open] = useState(false);
@@ -300,7 +464,14 @@ export default function TramitadorStepper() {
   const [registryFilingId, setRegistryFilingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!requestedAgreementId || selectedAgreementId) return;
+    setSelectedAgreementId(requestedAgreementId);
+  }, [requestedAgreementId, selectedAgreementId]);
+
+  useEffect(() => {
     if (!selectedAgreementId) return;
+    if (certificationIntake && certifiedAgreementIds.has(selectedAgreementId)) return;
+    if (requestedAgreementId === selectedAgreementId) return;
     if (displayedAgreements.some((agreement) => agreement.id === selectedAgreementId)) return;
     setSelectedAgreementId(null);
     setSelectedModeloId(null);
@@ -318,7 +489,7 @@ export default function TramitadorStepper() {
     setRegistryLinkSaved(false);
     setRegistryLinkMessage(null);
     setRegistryFilingId(null);
-  }, [displayedAgreements, selectedAgreementId]);
+  }, [certificationIntake, certifiedAgreementIds, displayedAgreements, requestedAgreementId, selectedAgreementId]);
 
   useEffect(() => {
     if (requestedCertificationId) return;
@@ -328,6 +499,10 @@ export default function TramitadorStepper() {
 
   useEffect(() => {
     if (!certificationIntake || selectedAgreementId) return;
+    if (certificationIntake.agreementIds.length === 1) {
+      setSelectedAgreementId(certificationIntake.agreementIds[0]);
+      return;
+    }
     const matches = displayedAgreements.filter((agreement) =>
       certificationIntake.agreementIds.includes(agreement.id)
     );
@@ -348,10 +523,10 @@ export default function TramitadorStepper() {
     setModeloCapa3Errors({});
   }, [selectedModeloId]);
 
-  const isDeedRequired = rulePackData?.payload.instrumentoRequerido === "ESCRITURA";
+  const isDeedRequired = registryRulePackData?.payload.instrumentoRequerido === "ESCRITURA";
   const filingType = (() => {
-    if (!rulePackData) return null;
-    const payload = rulePackData.payload as Record<string, unknown>;
+    if (!registryRulePackData) return null;
+    const payload = registryRulePackData.payload as Record<string, unknown>;
     if (typeof payload.filing_type === "string" && payload.filing_type.trim()) {
       return payload.filing_type;
     }
@@ -362,7 +537,7 @@ export default function TramitadorStepper() {
     ) {
       return payload.registry_filing_types[0];
     }
-    return rulePackData.payload.instrumentoRequerido;
+    return registryRulePackData.payload.instrumentoRequerido;
   })();
   const selectedAgreementEntity = selectedAgreement?.entity_id
     ? entities.find((entity) => entity.id === selectedAgreement.entity_id) ?? null
@@ -481,7 +656,7 @@ export default function TramitadorStepper() {
         certificacion_gate_hash: certificationIntake.gateHash ?? "",
       }
     : {};
-  const registryDocVariables = selectedAgreement && rulePackData
+  const registryDocVariables = selectedAgreement && registryRulePackData
     ? {
         ...buildRegistryVariables({
           agreement: selectedAgreement,
@@ -491,13 +666,13 @@ export default function TramitadorStepper() {
           filingChannel,
           filingStatus,
           filingType,
-          instrumentRequired: rulePackData.payload.instrumentoRequerido,
+          instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
           registryFilingId,
         }),
         ...certificationRegistryVariables,
       }
     : null;
-  const registryDocFallback = selectedAgreement && rulePackData
+  const registryDocFallback = selectedAgreement && registryRulePackData
     ? buildRegistryFallback({
       agreement: selectedAgreement,
       entityName: selectedAgreementEntityName,
@@ -506,10 +681,10 @@ export default function TramitadorStepper() {
       filingChannel,
       filingStatus,
       filingType,
-      instrumentRequired: rulePackData.payload.instrumentoRequerido,
+      instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
     })
     : "";
-  const subsanacionDocVariables = selectedAgreement && rulePackData
+  const subsanacionDocVariables = selectedAgreement && registryRulePackData
     ? {
         ...buildRegistryVariables({
           agreement: selectedAgreement,
@@ -519,7 +694,7 @@ export default function TramitadorStepper() {
           filingChannel,
           filingStatus,
           filingType,
-          instrumentRequired: rulePackData.payload.instrumentoRequerido,
+          instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
           registryFilingId,
           isSubsanacion: true,
           subsanacionMotivo,
@@ -541,7 +716,12 @@ export default function TramitadorStepper() {
     certifiedAgreementIds.has(selectedAgreement?.id ?? "");
   const certificationEvidenceReady = !certificationIntake || certificationIntake.hasEvidenceBundle;
   const selectedAgreementVisible = Boolean(
-    selectedAgreement && displayedAgreements.some((agreement) => agreement.id === selectedAgreement.id),
+    selectedAgreement &&
+      (
+        displayedAgreements.some((agreement) => agreement.id === selectedAgreement.id) ||
+        Boolean(certificationIntake && certifiedAgreementIds.has(selectedAgreement.id)) ||
+        requestedAgreementId === selectedAgreement.id
+      ),
   );
   const step1CanAdvance = Boolean(
     selectedAgreement &&
@@ -589,7 +769,7 @@ export default function TramitadorStepper() {
   };
 
   async function handleRegisterDeed() {
-    if (!tenantId || !selectedAgreement || !rulePackData) {
+    if (!tenantId || !selectedAgreement || !registryRulePackData) {
       toast.error("No se pudo preparar la escritura para este acuerdo.");
       return;
     }
@@ -673,8 +853,8 @@ export default function TramitadorStepper() {
           setRegistryLinkSaved(true);
           setRegistryLinkMessage(
             linkResult.evidenceArtifactCreated
-              ? "Vínculo certificación-tramitación añadido al bundle operativo demo, pendiente de audit/retention/legal hold."
-              : "Vínculo certificación-tramitación registrado en audit_log.",
+              ? "Vínculo certificación-tramitación añadido a la evidencia demo/operativa, pendiente de controles productivos de auditoría, conservación y legal hold."
+              : "Vínculo certificación-tramitación registrado en la trazabilidad operativa.",
           );
         } else {
           setRegistryLinkSaved(false);
@@ -701,8 +881,8 @@ export default function TramitadorStepper() {
   }
 
   async function handleSubsanacionSubmit() {
-    if (!selectedAgreementId || !tenantId) {
-      toast.error("No se puede enviar la subsanación sin acuerdo y tenant activos.");
+    if (!effectiveSelectedAgreementId || !tenantId) {
+      toast.error("No se puede enviar la subsanación sin acuerdo y contexto activos.");
       return;
     }
     setSubsanacionSaving(true);
@@ -713,7 +893,7 @@ export default function TramitadorStepper() {
           .from("registry_filings")
           .select("id")
           .eq("tenant_id", tenantId)
-          .eq("agreement_id", selectedAgreementId)
+          .eq("agreement_id", effectiveSelectedAgreementId)
           .order("created_at", { ascending: false })
           .limit(1);
         if (existingError) throw existingError;
@@ -776,19 +956,19 @@ export default function TramitadorStepper() {
                     {" "}· {certificationIntake.references.length} referencia(s) certificada(s).
                   </>
                 ) : (
-                  <span>No se ha encontrado la certificación indicada en el tenant activo.</span>
+                  <span>No se ha encontrado la certificación indicada en el contexto activo.</span>
                 )}
               </div>
               {certificationIntake?.pointReferences.length ? (
                 <div className="mt-2 text-xs text-[var(--g-text-secondary)]">
                   {certificationIntake.unresolvedPointReferences.length > 0 ? (
                     <>
-                      Hay {certificationIntake.unresolvedPointReferences.length} referencia(s) por punto sin `agreement_id`.
-                      Para presentar al registro, materialice el expediente canónico desde el acta.
+                      Hay {certificationIntake.unresolvedPointReferences.length} referencia(s) por punto sin expediente Acuerdo 360 canónico.
+                      Para presentar al registro, cree o enlace el expediente canónico desde el acta.
                     </>
                   ) : (
                     <>
-                      Las {certificationIntake.pointReferences.length} referencia(s) por punto ya se resuelven a Acuerdo 360 canónico sin alterar la certificación original.
+                      Las {certificationIntake.pointReferences.length} referencia(s) por punto ya enlazan con expediente Acuerdo 360 sin alterar la certificación original.
                     </>
                   )}
                 </div>
@@ -814,14 +994,14 @@ export default function TramitadorStepper() {
                   }`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
-                  {certificationIntake.hasEvidenceBundle ? "Bundle demo vinculado" : "Evidencia operativa pendiente"}
+                  {certificationIntake.hasEvidenceBundle ? "Evidencia demo/operativa vinculada" : "Evidencia operativa pendiente"}
                 </span>
                 {certificationIntake.resolvedPointAgreementIds.length > 0 ? (
                   <span
                     className="bg-[var(--g-sec-100)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g-brand-3308)]"
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
-                    Refs resueltas
+                    Refs. enlazadas
                   </span>
                 ) : null}
               </div>
@@ -898,7 +1078,7 @@ export default function TramitadorStepper() {
                 type="button"
                 onClick={() => handleSelectAgreement(agreement.id)}
                 className={`w-full text-left flex items-center justify-between px-4 py-3 border transition-colors ${
-                  selectedAgreementId === agreement.id
+                  effectiveSelectedAgreementId === agreement.id
                     ? "border-[var(--g-brand-3308)] bg-[var(--g-sec-100)]"
                     : includedInCertification
                       ? "border-[var(--g-sec-300)] bg-[var(--g-surface-subtle)]"
@@ -940,8 +1120,20 @@ export default function TramitadorStepper() {
   );
 
   // Step 2: Inscription analysis
-  const step2Body = selectedAgreement && rulePackData ? (
+  const step2Body = selectedAgreement && registryRulePackData ? (
     <div className="space-y-4">
+      {usingPrototypeRegistryRuleFallback ? (
+        <div
+          className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <span>
+            Tramitación con fallback técnico de prototipo. Cloud no aporta rule pack registral activo para esta materia;
+            no constituye validación legal productiva.
+          </span>
+        </div>
+      ) : null}
       <div
         className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-subtle)]"
       >
@@ -954,19 +1146,19 @@ export default function TramitadorStepper() {
             <span className="text-sm text-[var(--g-text-secondary)]">Inscribible:</span>
             <span
               className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                rulePackData.payload.inscribible
+                registryRulePackData.payload.inscribible
                   ? "bg-[var(--status-success)]/10 text-[var(--status-success)]"
                   : "bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
               }`}
             >
-              {rulePackData.payload.inscribible ? "Sí" : "No"}
+              {registryRulePackData.payload.inscribible ? "Sí" : "No"}
             </span>
           </div>
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--g-text-secondary)]">Instrumento requerido:</span>
             <span className="px-2 py-0.5 text-xs font-medium text-[var(--g-text-primary)]">
-              {rulePackData.payload.instrumentoRequerido}
+              {registryRulePackData.payload.instrumentoRequerido}
             </span>
           </div>
 
@@ -974,23 +1166,23 @@ export default function TramitadorStepper() {
             <span className="text-sm text-[var(--g-text-secondary)]">Publicación requerida:</span>
             <span
               className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                rulePackData.payload.publicacionRequerida
+                registryRulePackData.payload.publicacionRequerida
                   ? "bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
                   : "bg-[var(--status-success)]/10 text-[var(--status-success)]"
               }`}
             >
-              {rulePackData.payload.publicacionRequerida ? "Sí" : "No"}
+              {registryRulePackData.payload.publicacionRequerida ? "Sí" : "No"}
             </span>
           </div>
         </div>
       </div>
 
-      {rulePackData.payload.plazoInscripcion && (
+      {registryRulePackData.payload.plazoInscripcion && (
         <div
           className="px-4 py-2 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          Plazo de inscripción: {rulePackData.payload.plazoInscripcion} días
+          Plazo de inscripción: {registryRulePackData.payload.plazoInscripcion} días
         </div>
       )}
 
@@ -1124,11 +1316,11 @@ export default function TramitadorStepper() {
 
   // Step 3: Instrument data (only if ESCRITURA or INSTANCIA)
   const showInstrumentForm =
-    rulePackData && rulePackData.payload.instrumentoRequerido !== "NINGUNO";
+    registryRulePackData && registryRulePackData.payload.instrumentoRequerido !== "NINGUNO";
 
   const step3Body = showInstrumentForm ? (
     <div className="space-y-4">
-      {rulePackData?.payload.instrumentoRequerido === "ESCRITURA" && (
+      {registryRulePackData?.payload.instrumentoRequerido === "ESCRITURA" && (
         <>
           <div>
             <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
@@ -1175,7 +1367,7 @@ export default function TramitadorStepper() {
         </>
       )}
 
-      {rulePackData?.payload.instrumentoRequerido === "INSTANCIA" && (
+      {registryRulePackData?.payload.instrumentoRequerido === "INSTANCIA" && (
         <div
           className="px-4 py-3 text-sm text-[var(--g-text-secondary)]"
           style={{
@@ -1305,7 +1497,7 @@ export default function TramitadorStepper() {
                   ? "Evidencia operativa pendiente: genere y archive la certificación DOCX desde el acta antes de registrar la escritura."
                   : registryLinkSaved
                   ? registryLinkMessage ?? "Vínculo registrado."
-                  : "Al registrar la escritura se añadirá un evento en audit_log y, si existe bundle operativo demo, una referencia documental WORM pendiente de audit/retention/legal hold."}
+                  : "Al registrar la escritura se añadirá trazabilidad operativa y, si existe evidencia demo/operativa, una referencia documental pendiente de controles productivos de auditoría, conservación y legal hold."}
               </div>
             </div>
           ) : null}
@@ -1335,8 +1527,13 @@ export default function TramitadorStepper() {
           </div>
         </div>
 
-        {selectedAgreement && rulePackData && registryDocVariables && showInstrumentForm ? (
+        {selectedAgreement && registryRulePackData && registryDocVariables && showInstrumentForm ? (
           <div className="mt-4 border-t border-[var(--g-border-subtle)] pt-4">
+            <p className="mb-3 text-xs text-[var(--g-text-secondary)]">
+              Salida documental auxiliar del prototipo. El futuro carril Document Assembly recibirá
+              los datos canónicos del trámite; este DOCX mantiene estado demo/operativo y no
+              constituye evidencia final productiva.
+            </p>
             <ProcessDocxButton
               label="Documento registral DOCX"
               variant="outline"
@@ -1492,4 +1689,9 @@ export default function TramitadorStepper() {
       />
     </>
   );
+}
+
+export default function TramitadorStepper() {
+  const { id } = useParams();
+  return id ? <TramitacionDetalle id={id} /> : <TramitadorNuevo />;
 }

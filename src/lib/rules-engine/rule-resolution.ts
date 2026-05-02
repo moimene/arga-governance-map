@@ -42,6 +42,7 @@ export interface RawRulePackVersionRow {
   effective_to?: unknown;
   created_at?: unknown;
   approved_at?: unknown;
+  payload_hash?: unknown;
   rule_packs?: RawRulePackRelation | RawRulePackRelation[] | null;
 }
 
@@ -57,6 +58,7 @@ export interface CanonicalRulePackVersion {
   nombre: string | null;
   descripcion: string | null;
   payload: unknown;
+  persistedPayloadHash: string | null;
   payloadHash: string;
   effectiveFrom: string | null;
   effectiveTo: string | null;
@@ -107,6 +109,18 @@ function payloadRecord(payload: unknown): Record<string, unknown> {
   return isRecord(payload) ? payload : {};
 }
 
+function addMetadataConflictWarning(
+  warnings: string[],
+  field: string,
+  relationValue: string | null,
+  payloadValue: string | null
+) {
+  if (!relationValue || !payloadValue || relationValue === payloadValue) return;
+  warnings.push(
+    `Conflicto metadata rule_packs/payload en ${field}: catalogo=${relationValue}, payload=${payloadValue}; se usa payload versionado.`
+  );
+}
+
 function normalizeStatusText(value: string): RuleLifecycleStatus | null {
   const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
   if (["DRAFT", "BORRADOR"].includes(normalized)) return "DRAFT";
@@ -146,6 +160,13 @@ export function normalizeRulePackVersion(row: RawRulePackVersionRow): CanonicalR
   const packId = firstString(row.pack_id, row.rule_pack_id, relation?.id, row.id, payloadObj.id) ?? "UNKNOWN_PACK";
   const version = firstString(row.version, row.version_tag, row.version_number, payloadObj.version) ?? "UNKNOWN_VERSION";
   const warnings: string[] = [];
+  const relationMateria = firstString(row.materia, row.materia_clase, relation?.materia, relation?.materia_clase);
+  const payloadMateria = firstString(payloadObj.materia, payloadObj.id);
+  const relationClase = firstString(row.clase, relation?.clase);
+  const payloadClase = firstString(payloadObj.clase);
+  const relationOrganoTipo = firstString(row.organo_tipo, relation?.organo_tipo);
+  const payloadOrganoTipo = firstString(payloadObj.organoTipo, payloadObj.organo_tipo);
+  const persistedPayloadHash = firstString(row.payload_hash);
 
   if (sourceShape === "LEGACY_IS_ACTIVE") {
     warnings.push("Versión normalizada desde is_active legacy; falta lifecycle jurídico completo.");
@@ -156,6 +177,9 @@ export function normalizeRulePackVersion(row: RawRulePackVersionRow): CanonicalR
   if (!payload) {
     warnings.push("La versión no contiene payload/params de rule pack.");
   }
+  addMetadataConflictWarning(warnings, "materia", relationMateria, payloadMateria);
+  addMetadataConflictWarning(warnings, "clase", relationClase, payloadClase);
+  addMetadataConflictWarning(warnings, "organo_tipo", relationOrganoTipo, payloadOrganoTipo);
 
   return {
     versionId: firstString(row.id) ?? `${packId}@${version}`,
@@ -163,13 +187,14 @@ export function normalizeRulePackVersion(row: RawRulePackVersionRow): CanonicalR
     version,
     lifecycleStatus,
     isProductionUsable: lifecycleStatus === "ACTIVE",
-    materia: firstString(row.materia, row.materia_clase, relation?.materia, relation?.materia_clase, payloadObj.materia, payloadObj.id),
-    clase: firstString(row.clase, relation?.clase, payloadObj.clase),
-    organoTipo: firstString(row.organo_tipo, relation?.organo_tipo, payloadObj.organoTipo, payloadObj.organo_tipo),
+    materia: firstString(payloadMateria, relationMateria),
+    clase: firstString(payloadClase, relationClase),
+    organoTipo: firstString(payloadOrganoTipo, relationOrganoTipo),
     nombre: firstString(row.nombre, relation?.nombre, payloadObj.nombre),
     descripcion: firstString(row.descripcion, relation?.descripcion, payloadObj.descripcion),
     payload,
-    payloadHash: calcularRulesetSnapshotId({ packId, version, payload }),
+    persistedPayloadHash,
+    payloadHash: persistedPayloadHash ?? calcularRulesetSnapshotId({ packId, version, payload }),
     effectiveFrom: firstString(row.effective_from),
     effectiveTo: firstString(row.effective_to),
     createdAt: firstString(row.created_at, row.approved_at),

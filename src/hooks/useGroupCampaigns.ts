@@ -479,7 +479,7 @@ async function createLiveRecord(
       return { liveTable: "agreements", liveRecordId: agreementId };
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("no_session_expedientes")
       .insert({
         tenant_id: tenantId,
@@ -502,7 +502,7 @@ async function createLiveRecord(
       .single();
 
     if (error) throw error;
-    return { liveTable: "no_session_expedientes", liveRecordId: (data as { id: string }).id };
+    return { liveTable: "agreements", liveRecordId: agreementId };
   }
 
   const agreementId = await createAgreement(tenantId, campaignId, expediente, step, bodyId);
@@ -524,6 +524,7 @@ function liveRecordHref(table: string | null, id: string | null) {
   if (table === "convocatorias") return `/secretaria/convocatorias/${id}`;
   if (table === "no_session_expedientes") return `/secretaria/acuerdos-sin-sesion/${id}`;
   if (table === "unipersonal_decisions") return `/secretaria/decisiones-unipersonales/${id}`;
+  if (table === "group_campaign_post_tasks") return `/secretaria/procesos-grupo?postTask=${id}`;
   return null;
 }
 
@@ -593,15 +594,18 @@ async function fetchLiveRecords(tenantId: string, steps: CampaignStepRow[], post
   if (noSessionIds.length > 0) {
     const { data, error } = await supabase
       .from("no_session_expedientes")
-      .select("id, estado, ventana_fin, propuesta_texto")
+      .select("id, agreement_id, estado, ventana_fin, propuesta_texto")
       .eq("tenant_id", tenantId)
       .in("id", noSessionIds);
 
     if (error) throw error;
-    for (const row of (data ?? []) as { id: string; estado: string | null; ventana_fin: string | null; propuesta_texto: string | null }[]) {
+    for (const row of (data ?? []) as { id: string; agreement_id: string | null; estado: string | null; ventana_fin: string | null; propuesta_texto: string | null }[]) {
       liveRecords.set(
         `no_session_expedientes:${row.id}`,
-        makeLiveRecord("no_session_expedientes", row.id, row.estado, row.propuesta_texto, row.ventana_fin),
+        {
+          ...makeLiveRecord("no_session_expedientes", row.id, row.estado, row.propuesta_texto, row.ventana_fin),
+          href: row.agreement_id ? `/secretaria/acuerdos/${row.agreement_id}` : liveRecordHref("no_session_expedientes", row.id),
+        },
       );
     }
   }

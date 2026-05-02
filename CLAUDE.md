@@ -11,12 +11,12 @@ Guía para IA y desarrolladores que retoman este proyecto. Leer antes de tocar c
 | Repo | Rol | Contiene |
 |---|---|---|
 | **`arga-governance-map`** (este repo) | **Código fuente** | App React/TypeScript, hooks, SQL, tests |
-| **`TGMS_mapfre_mockup`** | **Workspace de planificación** | Specs, planes, prompts Lovable, investigación de negocio |
+| **Workspace TGMS de planificación** | **Planificación** | Specs, planes, prompts Lovable, investigación de negocio |
 
-**Regla:** Todo desarrollo de código va en este repo. Los planes y specs viven en `TGMS_mapfre_mockup/docs/superpowers/`.
+**Regla:** Todo desarrollo de código va en este repo. Los planes y specs de referencia viven en el workspace TGMS de planificación y, cuando ya se consolidan para ejecución, en `docs/superpowers/` de este repo.
 
-### ARGA = MAPFRE (pseudónimo de negocio)
-"Grupo ARGA Seguros" es el nombre ficticio que representa a MAPFRE en el demostrador. Los órganos de gobierno de MAPFRE deben verse reflejados en él. **Nunca usar "MAPFRE" directamente en código, datos demo ni commits.** Todos los datos demo, seeds, personas, órganos y entidades deben ser coherentes con la estructura corporativa de ARGA.
+### ARGA = pseudónimo operativo del cliente asegurador objetivo
+"Grupo ARGA Seguros" es el nombre ficticio del grupo asegurador usado en el prototipo. **Nunca usar el nombre real del cliente directamente en código, datos demo, seeds, docs de producto ni commits.** Todos los datos demo, personas, órganos y entidades deben ser coherentes con la estructura corporativa de ARGA.
 
 ### Estructura corporativa ARGA (dato demo)
 - **ARGA Seguros S.A.** — SA **cotizada** (equivalente IBEX 35). El motor de reglas NO debe bloquear cotizadas (DL-2 resuelta: evalúa LSC + advertencias LMV).
@@ -53,27 +53,85 @@ Los módulos GRC Compass (`/grc/*`), Secretaría Societaria (`/secretaria/*`) y 
 En código, ambos modos están en este repo. La segregación a repos independientes por módulo es **trabajo futuro, no prioridad actual**.
 
 ### Modelo comercial
-- Clientes grandes (tipo MAPFRE): shell TGMS completo + todos los módulos
+- Clientes grandes: shell TGMS completo + todos los módulos
 - Clientes medianos/pequeños: uno o varios módulos Garrigues sin shell TGMS
 
-### Prioridad actual: demo MAPFRE al máximo nivel funcional
+### Prioridad actual: prototipo operativo avanzado demo-ready
 - ✅ Código y datos demo pulidos
-- ✅ Flujos UX completos y navegables
+- ✅ Flujos reales y navegables donde ya hay tablas/RPC/hooks conectados
+- ✅ Secretaría Societaria es prototipo operativo avanzado, no solo demo
 - ❌ No segregar módulos a repos separados todavía
-- ❌ No construir infraestructura enterprise (RLS real, BYOK, WORM) — eso es fase posterior
+- ❌ No abrir infraestructura enterprise nueva sin paquete product-complete aprobado
 
 ---
 
 ## Qué es este proyecto
 
 **TGMS Platform** — plataforma de gobernanza corporativa para grupos aseguradores multinacionales.
-- Cliente demo: **Grupo ARGA Seguros** (ficcional, reconocible para MAPFRE)
-- Propósito: demo funcional para validar la filosofía ante MAPFRE antes de iniciar desarrollo real
+- Cliente demo/prototipo: **Grupo ARGA Seguros**.
+- Propósito: prototipo operativo avanzado para validar filosofía, flujos reales y separación de ownership antes de desarrollo productivo completo.
 
 **Supabase:** proyecto `governance_OS`, ID `hzqwefkwsxopwrmtksbg`, región eu-central-1
 **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
 **Tenant demo:** `tenant_id = "00000000-0000-0000-0000-000000000001"`
-**Entidad demo:** `entity_id = "00000000-0000-0000-0000-000000000010"` (ARGA Seguros S.A.)
+**Entidad canónica Cloud:** `entity_id = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (ARGA Seguros S.A.). El UUID `00000000-0000-0000-0000-000000000010` aparece en seeds/planes legacy y no debe tratarse como fuente canónica sin verificar.
+
+---
+
+## Sincronización operativa — 2026-05-02
+
+### Guardrails activos
+
+- Antes de cualquier trabajo Supabase: `bun run db:check-target`.
+- No aplicar migraciones, no ejecutar `db push`, no regenerar tipos Supabase.
+- No crear tablas/columnas ni tocar RLS, RPC, storage o policies.
+- No promover evidence/legal hold como final: `000049_grc_evidence_legal_hold` permanece en HOLD.
+- No escribir en `governance_module_events` ni `governance_module_links`.
+- No mezclar `ai_*` legacy con `aims_*` backbone, ni `grc_*` futuro con tablas legacy, sin decisión explícita.
+- Si una tarea necesita schema, parar y documentar tabla/RPC/policy/storage exacto.
+
+### Ownership actual
+
+| Carril | Owns | Puede hacer ahora | No debe hacer |
+|---|---|---|---|
+| Secretaría | actos societarios formales, acuerdos, actas, certificaciones, generación documental | flujos reales ya conectados, Acuerdo 360, referencia de evidencia etiquetada | crear incidentes/riesgos/controles GRC o actos desde AIMS/GRC |
+| GRC Compass | riesgos, controles, incidentes, findings, action plans, compliance workflows | flujos GRC owner y handoffs read-only | crear actos Secretaría o inventario AIMS |
+| AIMS 360 | sistemas IA, evaluaciones AI Act/ISO 42001, incidentes IA, technical file posture | lectura/UX conectada sobre `ai_*` y handoffs read-only | crear riesgos/controles GRC o actos Secretaría |
+| TGMS Console | composición, rutas y readiness | read model, búsqueda y rutas a owners | mutar estados owner o absorber módulos |
+| Evidence backbone | referencias, bundles/stubs y auditoría | etiquetar postura `reference`/`pending` | declarar evidencia final productiva mientras `000049` esté HOLD |
+
+### Handoffs seguros
+
+- AIMS technical file gap → `/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP`.
+- AIMS incident material → `/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL`.
+- GRC incident material → `/secretaria/reuniones/nueva?source=grc&event=GRC_INCIDENT_MATERIAL`.
+- Secretaría certification/agreement → referencia AIMS/GRC solo si la postura probatoria está etiquetada.
+- Todas estas rutas son handoffs read-only; no insertan en `governance_module_events` ni `governance_module_links`.
+
+### Cambios semánticos recientes
+
+- `/secretaria/reuniones/nueva` es intake read-only para crear una reunión formal desde el owner adecuado, normalmente convocatoria; no crea reuniones/actas desde handoffs externos.
+- `/secretaria/reuniones/:id` sigue siendo el stepper operativo de reunión conectada.
+- `/secretaria/tramitador/nuevo` es el alta operativa.
+- `/secretaria/tramitador/:id` es detalle read-only de expediente registral existente.
+- `regulatory_notifications` usa `notification_deadline`, no `deadline`.
+- `evidence-spine` en consola/readiness está en `pending`, no `verifiable`.
+
+### Cierre supervisado Ruflo
+
+- Documento de control: `docs/superpowers/plans/2026-05-02-ruflo-supervised-consolidation.md`.
+- Inventario de congelación: `docs/superpowers/plans/2026-05-02-demo-complete-inventory.md`.
+- Demo/prototype pack: `docs/superpowers/plans/2026-05-02-demo-pack.md`.
+- Memory key: `patterns/ruflo_supervised_handoffs_demo_complete_2026_05_02`.
+
+### Verificación última conocida
+
+- `bun run db:check-target`: pass contra `governance_OS`.
+- `bun test`: pass, 582 pass, 66 skipped.
+- `bunx tsc --noEmit --pretty false`: pass.
+- `bun run lint`: pass, 0 errores, 24 warnings conocidos.
+- `bun run build`: pass, warnings conocidos de Browserslist/chunk size.
+- e2e ampliado: 39/39 pass con `e2e/05-secretaria-reuniones.spec.ts`, `10`, `11`, `12`, `14`, `16`, `17`, `18`, `19-cross-module-handoffs`.
 
 ---
 
@@ -621,10 +679,10 @@ Eliminados los casts `as { approval_workflow?: ... }` y `as { document_url?: ...
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
 
-**Documentos de referencia (rutas absolutas — NO están en este repo):**
-- Spec: `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/specs/2026-04-18-secretaria-societaria-design.md`
-- Plan v1 (T1–T12, con deuda UX): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation.md`
-- Plan v2 (T1–T14, UX corregida): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md`
+**Documentos de referencia (workspace TGMS de planificación — NO están en este repo):**
+- Spec: `docs/superpowers/specs/2026-04-18-secretaria-societaria-design.md`
+- Plan v1 (T1–T12, con deuda UX): `docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation.md`
+- Plan v2 (T1–T14, UX corregida): `docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md`
 - Plan maestro pendientes: `docs/superpowers/plans/2026-04-19-plan-maestro-pendientes.md`
 
 ---
@@ -793,22 +851,45 @@ export function useXxx(param?: string) {
   <Route path="/secretaria/convocatorias/nueva"          element={<ConvocatoriasStepper />} />
   <Route path="/secretaria/convocatorias/:id"            element={<ConvocatoriaDetalle />} />
   <Route path="/secretaria/reuniones"                    element={<ReunionesLista />} />
+  <Route path="/secretaria/reuniones/nueva"              element={<ReunionStepper />} />        {/* intake read-only / handoff */}
   <Route path="/secretaria/reuniones/:id"                element={<ReunionStepper />} />
-  <Route path="/secretaria/decisiones-unipersonales"     element={<DecisionesUnipersonales />} />
-  <Route path="/secretaria/decisiones-unipersonales/:id" element={<DecisionDetalle />} />
+  <Route path="/secretaria/actas"                        element={<ActasLista />} />
+  <Route path="/secretaria/actas/:id"                    element={<ActaDetalle />} />
+  <Route path="/secretaria/tramitador"                   element={<TramitadorLista />} />
+  <Route path="/secretaria/tramitador/nuevo"             element={<TramitadorStepper />} />
+  <Route path="/secretaria/tramitador/:id"               element={<TramitadorStepper />} />      {/* detalle read-only */}
   <Route path="/secretaria/acuerdos-sin-sesion"                  element={<AcuerdosSinSesion />} />
   <Route path="/secretaria/acuerdos-sin-sesion/nuevo"            element={<AcuerdoSinSesionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/co-aprobacion"    element={<CoAprobacionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/solidario"        element={<SolidarioStepper />} />
+  <Route path="/secretaria/acuerdos-sin-sesion/expediente"       element={<ExpedienteSinSesionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/:id"              element={<AcuerdoSinSesionDetalle />} />
-  <Route path="/secretaria/tramitador"                   element={<TramitadorLista />} />
-  <Route path="/secretaria/tramitador/nuevo"             element={<TramitadorStepper />} />
-  <Route path="/secretaria/tramitador/:id"               element={<TramitadorStepper />} />
-  <Route path="/secretaria/actas"                        element={<ActasLista />} />
-  <Route path="/secretaria/actas/:id"                    element={<ActaDetalle />} />
+  <Route path="/secretaria/decisiones-unipersonales"             element={<DecisionesUnipersonales />} />
+  <Route path="/secretaria/decisiones-unipersonales/nueva"       element={<DecisionUnipersonalStepper />} />
+  <Route path="/secretaria/decisiones-unipersonales/:id"         element={<DecisionDetalle />} />
   <Route path="/secretaria/libros"                       element={<LibrosObligatorios />} />
+  <Route path="/secretaria/libro-socios"                 element={<LibroSocios />} />
   <Route path="/secretaria/plantillas"                   element={<Plantillas />} />
+  <Route path="/secretaria/plantillas-tracker"           element={<PlantillasTracker />} />
+  <Route path="/secretaria/gestor-plantillas"            element={<GestorPlantillas />} />
+  <Route path="/secretaria/calendario"                   element={<Calendario />} />
+  <Route path="/secretaria/procesos-grupo"               element={<ProcesosGrupo />} />
   <Route path="/secretaria/acuerdos/:id"                 element={<ExpedienteAcuerdo />} />
+  <Route path="/secretaria/acuerdos/:id/generar"         element={<GenerarDocumentoStepper />} />
+  <Route path="/secretaria/reuniones/:id/board-pack"     element={<BoardPackPreview />} />
+  <Route path="/secretaria/board-pack"                   element={<BoardPack />} />
+  <Route path="/secretaria/board-pack/:id"               element={<BoardPack />} />
+  <Route path="/secretaria/multi-jurisdiccion"           element={<MatrizJurisdiccional />} />
+  <Route path="/secretaria/sociedades"                   element={<SociedadesList />} />
+  <Route path="/secretaria/sociedades/nueva"             element={<SociedadNuevaStepper />} />
+  <Route path="/secretaria/sociedades/:id"               element={<SociedadDetalle />} />
+  <Route path="/secretaria/sociedades/:id/socio/nuevo"   element={<AnadirSocioStepper />} />
+  <Route path="/secretaria/sociedades/:id/transmision"   element={<TransmisionStepper />} />
+  <Route path="/secretaria/sociedades/:id/admin/nuevo"   element={<DesignarAdminStepper />} />
+  <Route path="/secretaria/sociedades/:id/reglas"        element={<ReglasAplicables />} />
+  <Route path="/secretaria/personas"                     element={<PersonasList />} />
+  <Route path="/secretaria/personas/nueva"               element={<PersonaNuevaStepper />} />
+  <Route path="/secretaria/personas/:id"                 element={<PersonaDetalle />} />
 </Route>
 ```
 
@@ -825,11 +906,11 @@ src/
     ConvocatoriaDetalle.tsx         T4
     ConvocatoriasStepper.tsx        T4   7 pasos, motor V2 integrado
     ReunionesLista.tsx              T5
-    ReunionStepper.tsx              T5   6 pasos, crea agreements
+    ReunionStepper.tsx              T5   :id 6 pasos conectados; /nueva intake read-only para handoffs
     ActasLista.tsx                  T6
     ActaDetalle.tsx                 T6
     TramitadorLista.tsx             T7
-    TramitadorStepper.tsx           T7   5 pasos, motor rule packs A4
+    TramitadorStepper.tsx           T7   /nuevo 5 pasos; :id detalle read-only con useTramitacionById
     AcuerdosSinSesion.tsx           T8
     AcuerdoSinSesionStepper.tsx     T8
     AcuerdoSinSesionDetalle.tsx     T8
@@ -904,7 +985,7 @@ src/
 - Actas: `ACTA-CDA-001`, `ACTA-CAU-001`
 - Certificación: `CERT-001` (acuerdo PR-008, firmante: Lucía Martín)
 - Tramitaciones: `TRAM-001` (notarial ES, EN_TRAMITE), `TRAM-002` (SIGER MX, PRESENTADA), `TRAM-003` (PSM MX, SUBSANACION)
-- Acuerdos sin sesión: `ASOC-001` (APROBADO), `ASOC-002` (VOTING_OPEN, deadline 20/04/2026)
+- Acuerdos sin sesión: `ASOC-001` (APROBADO), `ASOC-002` (VOTING_OPEN, fecha límite 20/04/2026)
 - Decisiones unipersonales: `DEC-SU-001` (FIRMADA), `DEC-AU-001` (BORRADOR)
 - Libros: 3 libros (alerta legalización < 30/04/2026)
 - Plantillas: `TPL-001`, `TPL-002`, `TPL-003`
@@ -914,6 +995,13 @@ src/
 
 ## No hacer
 
+- No aplicar migraciones, no `db push`, no regenerar tipos Supabase.
+- No crear columnas/tablas ni tocar RLS/RPC/storage/policies.
+- No tocar Supabase sin ejecutar antes `bun run db:check-target`.
+- No escribir en `governance_module_events` ni `governance_module_links`.
+- No declarar evidence/legal hold como final productivo; `000049` sigue HOLD.
+- No mezclar `ai_*` con `aims_*` ni tablas legacy GRC con `grc_*` sin contrato aprobado.
+- No usar el nombre real del cliente en código, datos demo, seeds, docs de producto ni commits.
 - No usar colores Tailwind nativos (`text-white`, `bg-gray-*`, `bg-amber-*`, `bg-green-*`) en componentes Garrigues
 - No usar hex directamente en className o style — siempre tokens `var(--g-*)` o `var(--status-*)`
 - No usar `--g-brand` (incorrecto) → usar `--g-brand-3308`
@@ -932,26 +1020,34 @@ src/
 ## Testing
 
 ```bash
-# Tests unitarios (299/299 pass)
-npx vitest run
+# Target Supabase obligatorio antes de cualquier trabajo Supabase
+bun run db:check-target
 
-# Type check (0 errors)
-npx tsc --noEmit
+# Tests unitarios
+bun test
 
-# Build (2219 modules, ~6.5s)
-npx vite build --outDir /tmp/tgms-dist
+# Type check
+bunx tsc --noEmit --pretty false
+
+# Lint y build
+bun run lint
+bun run build
+
+# E2E focalizado de cierre operativo
+PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
-**Nota:** `vite build` al `dist/` por defecto puede fallar con EPERM por permisos del folder. Usar `--outDir /tmp/tgms-dist`.
+**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 24 warnings conocidos, `build` pass, e2e ampliado 39/39.
 
 ## Supabase Cloud
 
 - **Proyecto:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
 - **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
 - **Tenant:** `00000000-0000-0000-0000-000000000001`
-- **Entidad ARGA Seguros:** `00000000-0000-0000-0000-000000000010`
-- **Migraciones aplicadas:** 000001–000010 + seeds (rule packs, demo data, ETD stubs)
-- **RLS:** Habilitado en todas las tablas de dominio con tenant scoping
+- **Entidad ARGA Seguros canónica Cloud:** `6d7ed736-f263-4531-a59d-c6ca0cd41602`
+- **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)
+- **Migraciones:** historial amplio ya aplicado en Cloud; en el cierre actual no aplicar nuevas migraciones.
+- **RLS/RPC/storage/policies:** existen superficies previas; no tocarlas sin paquete product-complete aprobado.
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 
 ## Skill routing

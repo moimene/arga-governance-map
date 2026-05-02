@@ -32,6 +32,7 @@ import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { findMissingVariables, renderTemplate } from "@/lib/doc-gen/template-renderer";
 import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
+import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
 import { generateDocx, downloadDocx, computeContentHash } from "@/lib/doc-gen/docx-generator";
 import type { EditableField } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
@@ -152,13 +153,7 @@ export default function GenerarDocumentoStepper() {
       if (plantilla.capa2_variables && agreement) {
         setIsResolving(true);
         try {
-          const context: ResolverContext = {
-            agreementId: agreement.id,
-            tenantId: tenantId ?? "",
-            entityId: agreement.entity_id,
-            bodyId: agreement.body_id,
-            meetingId: agreement.parent_meeting_id,
-          };
+          const context: ResolverContext = buildAgreementResolverContext(agreement, tenantId ?? "");
           const result = await resolveVariables(
             plantilla.capa2_variables as Capa2Variable[],
             context

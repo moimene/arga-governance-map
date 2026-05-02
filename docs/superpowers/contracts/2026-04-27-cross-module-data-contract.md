@@ -183,6 +183,53 @@ Reglas:
 | `governance_module_events/links` | Contrato definido; writes sujetos a probes y tests |
 | Evidence/legal hold | Parcial; `000049` en HOLD |
 
+## Reencuadre 2026-05-01 - Carriles paralelos AIMS/GRC
+
+Se confirma que AIMS 360 y GRC Compass avanzan como carriles separados, no como un unico modulo AIMS-GRC. La arquitectura compartida se mantiene mediante contratos, eventos, links, evidencia y consola ejecutiva, no mediante duplicacion de modelos.
+
+Documento rector del reencuadre:
+
+- `docs/superpowers/plans/2026-05-01-aims-grc-parallel-lanes.md`
+
+Regla operativa:
+
+- AIMS puede ser standalone sobre su modelo owner.
+- GRC puede ser standalone sobre su modelo owner.
+- En TGMS completo, ambos se conectan con Secretaria y la consola por handoffs owner-first.
+- Secretaria formaliza decisiones societarias; GRC gestiona riesgo/cumplimiento; AIMS gestiona sistemas IA; la consola compone y enruta.
+
+## Slice 1 GRC 2026-05-02 - Handoffs route-only
+
+Se incorpora el contrato pantalla por pantalla de GRC:
+
+- `docs/superpowers/contracts/2026-05-02-grc-screen-posture-contract.md`
+
+Handoffs habilitados en UI sin persistencia compartida:
+
+| Source owner | Target owner | Ruta | Evento futuro | Mutacion actual |
+|---|---|---|---|---|
+| GRC | Secretaria | `/secretaria/reuniones/nueva?source=grc&event=GRC_INCIDENT_MATERIAL` | `GRC_INCIDENT_MATERIAL` | Route-only |
+| GRC | Secretaria | `/secretaria/reuniones/nueva?source=grc&event=GRC_FINDING_BOARD_ESCALATION` | `GRC_FINDING_BOARD_ESCALATION` | Route-only |
+| AIMS | GRC | `/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP` | `AIMS_TECHNICAL_FILE_GAP` | Route-only |
+| AIMS | GRC | `/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL` | `AIMS_INCIDENT_MATERIAL` | Route-only |
+
+Estas rutas no insertan en `governance_module_events`, no insertan en `governance_module_links` y no cambian estado owner. Cualquier write probe futuro requiere paquete de contrato, Cloud/type parity, tests y aprobacion explicita.
+
+## Slice 1 AIMS 2026-05-02 - Handoffs route-only
+
+Se incorpora el mapa pantalla por pantalla de AIMS en `src/lib/aims/readiness.ts` y en `/ai-governance`. Todas las pantallas conectadas actuales quedan declaradas como `legacy_read` sobre `ai_*`; `aims_*` sigue siendo backbone candidato por pantalla o workflow futuro.
+
+Handoffs habilitados en UI sin persistencia compartida:
+
+| Source owner | Target owner | Ruta | Evento futuro | Evidencia | Mutacion actual |
+|---|---|---|---|---|---|
+| AIMS | GRC | `/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP` | `AIMS_TECHNICAL_FILE_GAP` | `NOT_EVIDENCE` | Route-only |
+| AIMS | GRC | `/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL` | `AIMS_INCIDENT_MATERIAL` | `NOT_EVIDENCE` | Route-only |
+| AIMS | Secretaria | `/secretaria/reuniones/nueva?source=aims&handoff=AIMS_INCIDENT_MATERIAL` | `AIMS_INCIDENT_MATERIAL` | `NOT_EVIDENCE` | Route-only; no crea reunion/acuerdo/acta |
+| Secretaria | AIMS | `/secretaria/actas?source=aims&handoff=SECRETARIA_CERTIFICATION_REFERENCE&evidence=REFERENCE` | `SECRETARIA_CERTIFICATION_ISSUED` | `REFERENCE` explicito | Route-only/reference-only |
+
+La referencia Secretaria -> AIMS solo es admisible cuando la postura probatoria esta visible. En Slice 1 se limita a `REFERENCE`; no se presenta como evidencia final, legal hold ni bundle probatorio completo. Estas rutas no insertan en `governance_module_events`, no insertan en `governance_module_links` y no cambian estado owner.
+
 ## Plantilla de cierre
 
 ```md

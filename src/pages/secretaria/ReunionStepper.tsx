@@ -10,7 +10,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useActiveConflicts } from "@/hooks/useConflicts";
@@ -20,6 +20,7 @@ import {
   useBodyMembers,
   useGenerarActa,
   useMeetingAgendaSources,
+  useMinuteForMeeting,
   useOpenMeeting,
   useReplaceAttendees,
   useReunionAttendees,
@@ -36,8 +37,8 @@ import {
   evaluateMeetingVoteCompleteness,
   evaluarConstitucion,
   type MeetingAdoptionSnapshot,
+  type MeetingAdoptionRuleTrace,
   type MateriaClase,
-  type RulePack,
   type RuleParamOverride,
   type RuleResolution,
   type TipoOrgano,
@@ -49,9 +50,19 @@ import {
   type AgendaPointOrigin,
 } from "@/lib/secretaria/meeting-agenda";
 import {
+  buildMeetingAdoptionDoubleEvaluation,
+  type DualEvaluationComparison,
+} from "@/lib/secretaria/dual-evaluation";
+import {
   patchQuorumDataSourceLinks,
   sourceLinksFromAgendaPoints,
 } from "@/lib/secretaria/meeting-links";
+import {
+  isMeetingRulePackPayload,
+  resolveCloudMeetingRulePacksStrict,
+  resolvePrototypeMeetingRulePacks,
+  uniqueMeetingRuleSpecs,
+} from "@/lib/secretaria/prototype-rule-pack-fallback";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
@@ -94,6 +105,7 @@ function formatMeetingVoterName(voter: MeetingVoterRow) {
 }
 
 const AGENDA_MATERIAS = [
+  { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA" },
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA" },
   { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA" },
   { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA" },
@@ -102,19 +114,6 @@ const AGENDA_MATERIAS = [
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA" },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL" },
 ] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isRulePackPayload(payload: unknown): payload is RulePack {
-  return (
-    isRecord(payload) &&
-    isRecord(payload.convocatoria) &&
-    isRecord(payload.constitucion) &&
-    isRecord(payload.votacion)
-  );
-}
 
 function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
   const seen = new Set<string>();
@@ -167,10 +166,6 @@ function materiaClaseFromMateria(materia: string): MateriaClase {
 
 function labelMateria(materia: string) {
   return AGENDA_MATERIAS.find((m) => m.value === materia)?.label ?? materia;
-}
-
-function selectedRulePacks(resolutions: RuleResolution[]) {
-  return resolutions.map((resolution) => resolution.rulePack?.payload).filter(isRulePackPayload);
 }
 
 function selectedOverrides(resolutions: RuleResolution[]) {
@@ -475,12 +470,16 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   if (members.length === 0) {
     return (
       <div
-        className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
+        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+          Censo demo de prototipo no persistido
+        </p>
         <p className="text-sm text-[var(--g-text-secondary)]">
-          No hay miembros vigentes en este órgano. Verifica que el órgano tenga condiciones de
-          persona activas.
+          No hay miembros vigentes en este órgano. El flujo continuará con un censo demo no
+          persistido para probar quórum, votación, acta y certificación. Para producción debe
+          cargarse el censo legal del órgano antes de celebrar la sesión.
         </p>
       </div>
     );
@@ -668,13 +667,14 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       tipo: debate.tipo ?? materiaClaseFromMateria(materia),
     };
   });
-  const ruleSpecs =
+  const ruleSpecs = uniqueMeetingRuleSpecs(
     debates.length > 0
       ? debates.map((debate) => ({
           materia: debate.materia ?? "APROBACION_CUENTAS",
           clase: normalizeMateriaClase(debate.tipo),
         }))
-      : [{ materia: "APROBACION_CUENTAS", clase: "ORDINARIA" as MateriaClase }];
+      : [{ materia: "APROBACION_CUENTAS", clase: "ORDINARIA" as MateriaClase }]
+  );
   const tipoSocial = toTipoSocial(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
@@ -686,10 +686,14 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     entityId,
     organoTipo,
   });
-  const packs = selectedRulePacks(ruleResolutions);
+  const prototypeRuleContext = resolvePrototypeMeetingRulePacks(ruleSpecs, ruleResolutions, organoTipo);
+  const packs = prototypeRuleContext.packs;
   const overrides = selectedOverrides(ruleResolutions);
-  const presentes = attendees.filter((a) => a.attendance_type !== "AUSENTE").length;
-  const total = members.length > 0 ? members.length : attendees.length;
+  const usesDemoCensus = members.length === 0 && attendees.length === 0;
+  const presentes = usesDemoCensus
+    ? DEMO_VOTERS.length
+    : attendees.filter((a) => a.attendance_type !== "AUSENTE").length;
+  const total = usesDemoCensus ? DEMO_VOTERS.length : members.length > 0 ? members.length : attendees.length;
   const attendeeCapital = attendees.reduce(
     (sum, attendee) =>
       attendee.attendance_type === "AUSENTE" ? sum : sum + Number(attendee.capital_representado ?? 0),
@@ -745,9 +749,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         organo_tipo: organoTipo,
         tipo_social: tipoSocial,
         materia_clase: materiaClase,
-        rule_pack_ids: ruleResolutions
-          .map((resolution) => resolution.rulePack?.packId)
-          .filter((packId): packId is string => Boolean(packId)),
+        rule_pack_ids: packs.map((pack) => pack.id),
+        prototype_rule_pack_fallback_ids: prototypeRuleContext.fallbackPackIds,
         explain: constitutionResult.explain,
         warnings: constitutionResult.warnings,
         blocking_issues: constitutionResult.blocking_issues,
@@ -804,6 +807,33 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
             No hay capital/derechos de voto informados en la lista de asistentes. El motor usa el
             número de asistentes como aproximación demo; para una junta real debe cargarse capital,
             derechos de voto y clases afectadas.
+          </p>
+        </div>
+      )}
+
+      {usesDemoCensus && (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Quórum calculado con censo demo no persistido porque no hay miembros vigentes ni
+            asistentes guardados para este órgano. Este fallback solo sirve para prototipo.
+          </p>
+        </div>
+      )}
+
+      {prototypeRuleContext.hasFallback && (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Rule pack Cloud no resuelto para {prototypeRuleContext.fallbackPackIds.length} materia(s).
+            El prototipo usa un fallback tecnico documentado para mantener el circuito operativo;
+            no sustituye un rule pack aprobado ni habilita evidencia final productiva.
           </p>
         </div>
       )}
@@ -934,6 +964,7 @@ interface DebatePunto {
 }
 
 function DebatesStep({ meetingId }: { meetingId?: string }) {
+  const { tenantId } = useTenantContext();
   const { data: meeting } = useReunionById(meetingId);
   const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
   const existingQD = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
@@ -988,7 +1019,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
     const debatesForSave = debates
       .filter((debate) => debate.punto.trim())
       .map((debate, index) => ({
@@ -996,14 +1027,30 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         origin: debate.origin ?? "MEETING_FLOOR",
         source_index: debate.source_index ?? index + 1,
       }));
+    let latestQD = existingQD ?? null;
+    if (meetingId && tenantId) {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("quorum_data")
+        .eq("id", meetingId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      latestQD = (data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? latestQD;
+    }
     const qd: Record<string, unknown> = {
-      ...patchQuorumDataSourceLinks(existingQD ?? null, sourceLinksFromAgendaPoints(debatesForSave)),
+      ...patchQuorumDataSourceLinks(latestQD, sourceLinksFromAgendaPoints(debatesForSave)),
       debates: debatesForSave,
     };
-    updateQuorum.mutate(qd, {
-      onSuccess: () => toast.success("Agenda y debate guardados"),
-      onError: (e) => toast.error(e instanceof Error ? e.message : "Error al guardar debates"),
-    });
+    try {
+      await updateQuorum.mutateAsync(qd);
+      toast.success("Agenda y debate guardados");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al guardar debates");
+    }
   }
 
   return (
@@ -1167,6 +1214,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const saveResolutions = useSaveMeetingResolutions(meetingId);
   const updateQuorumData = useUpdateQuorumData(meetingId);
   const [resolutionsSaved, setResolutionsSaved] = useState(false);
+  const [snapshotOnlySaved, setSnapshotOnlySaved] = useState(false);
   const [selectedPointIndex, setSelectedPointIndex] = useState(0);
   const [votesByPoint, setVotesByPoint] = useState<
     Record<number, Record<string, Pick<VoterRow, "vote" | "conflict_flag" | "conflict_reason">>>
@@ -1249,8 +1297,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             shares_represented: v.shares_represented,
             voting_rights: v.voting_rights,
             vote: "" as VoteValue,
-            conflict_flag: false,
-            conflict_reason: "",
+            conflict_flag: v.person_id ? activeConflictPersonIds.has(v.person_id) : false,
+            conflict_reason: v.person_id && activeConflictPersonIds.has(v.person_id)
+              ? "Conflicto activo registrado en el expediente"
+              : "",
           }))
         : DEMO_VOTERS;
 
@@ -1261,12 +1311,20 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             cur.id === next.id ||
             (next.person_id !== null && cur.person_id === next.person_id)
         );
+        const forcedConflict = next.person_id ? activeConflictPersonIds.has(next.person_id) : false;
         return existing
-          ? { ...next, vote: existing.vote, conflict_flag: existing.conflict_flag, conflict_reason: existing.conflict_reason }
+          ? {
+              ...next,
+              vote: existing.vote,
+              conflict_flag: forcedConflict || existing.conflict_flag,
+              conflict_reason: forcedConflict
+                ? existing.conflict_reason || next.conflict_reason || "Conflicto activo registrado en el expediente"
+                : existing.conflict_reason,
+            }
           : next;
       })
     );
-  }, [meetingContext]);
+  }, [activeConflictPersonIds, meetingContext]);
 
   const agendaPoints = useMemo(() => {
     const debates = (
@@ -1328,17 +1386,22 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const quorumData = meetingRaw?.quorum_data ?? null;
   const savedQuorumForVote = quorumData?.quorum as { reached?: boolean } | undefined;
   const quorumReachedForVote = savedQuorumForVote?.reached === true;
-  const ruleSpecsForVotes = agendaPoints.map((point) => ({
-    materia: point.materia ?? defaultMateriaForTitle(point.punto),
-    clase: normalizeMateriaClase(point.tipo),
-  }));
+  const ruleSpecsForVotes = uniqueMeetingRuleSpecs(
+    agendaPoints.map((point) => ({
+      materia: point.materia ?? defaultMateriaForTitle(point.punto),
+      clase: normalizeMateriaClase(point.tipo),
+    }))
+  );
   const { data: ruleResolutions = [] } = useRuleResolutions({
     materias: ruleSpecsForVotes,
     entityId,
     organoTipo,
   });
   const { data: pactosVigentes = [] } = usePactosVigentes(entityId ?? undefined);
-  const votePacks = selectedRulePacks(ruleResolutions);
+  const voteRuleContext = resolvePrototypeMeetingRulePacks(ruleSpecsForVotes, ruleResolutions, organoTipo);
+  const strictVoteRuleContext = resolveCloudMeetingRulePacksStrict(ruleSpecsForVotes, ruleResolutions, organoTipo);
+  const votePacks = voteRuleContext.packs;
+  const strictVotePacks = strictVoteRuleContext.packs;
   const voteOverrides = selectedOverrides(ruleResolutions);
 
   const selectedPoint = agendaPoints[selectedPointIndex] ?? agendaPoints[0];
@@ -1359,17 +1422,23 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   }
 
   function update(id: string, patch: Partial<VoterRow>) {
+    const voter = voters.find((item) => item.id === id);
+    const forcedConflict = voter?.person_id ? activeConflictPersonIds.has(voter.person_id) : false;
     setVotesByPoint((prev) => {
       const currentPoint = prev[selectedPointIndex] ?? {};
       const existing = currentPoint[id] ?? { vote: "" as VoteValue, conflict_flag: false, conflict_reason: "" };
+      const nextConflictFlag = forcedConflict ? true : patch.conflict_flag ?? existing.conflict_flag;
+      const nextConflictReason = forcedConflict
+        ? (patch.conflict_reason ?? existing.conflict_reason) || "Conflicto activo registrado en el expediente"
+        : patch.conflict_reason ?? existing.conflict_reason;
       return {
         ...prev,
         [selectedPointIndex]: {
           ...currentPoint,
           [id]: {
             vote: patch.vote ?? existing.vote,
-            conflict_flag: patch.conflict_flag ?? existing.conflict_flag,
-            conflict_reason: patch.conflict_reason ?? existing.conflict_reason,
+            conflict_flag: nextConflictFlag,
+            conflict_reason: nextConflictReason,
           },
         },
       };
@@ -1378,7 +1447,55 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
 
   const currentVoters = pointRows();
 
-  function buildSnapshotForPoint(pointIndex: number) {
+  function missingStrictSpecLabelsForPoint(pointIndex: number) {
+    const point = agendaPoints[pointIndex] ?? agendaPoints[0];
+    const materia = point.materia ?? defaultMateriaForTitle(point.punto);
+    const clase = normalizeMateriaClase(point.tipo);
+    return strictVoteRuleContext.missingSpecs
+      .filter((spec) => spec.materia === materia && spec.clase === clase)
+      .map((spec) => `${organoTipo}:${spec.materia}:${spec.clase}`);
+  }
+
+  function ruleResolutionForPoint(pointIndex: number): RuleResolution | null {
+    const point = agendaPoints[pointIndex] ?? agendaPoints[0];
+    const materia = point.materia ?? defaultMateriaForTitle(point.punto);
+    const clase = normalizeMateriaClase(point.tipo);
+    return ruleResolutions.find((resolution) => {
+      const pack = resolution.rulePack;
+      if (!pack || !isMeetingRulePackPayload(pack.payload)) return false;
+      const materiaMatches = pack.materia === materia || pack.packId === materia;
+      const claseMatches = !pack.clase || pack.clase === clase;
+      const organoMatches = !pack.organoTipo || pack.organoTipo === organoTipo;
+      return materiaMatches && claseMatches && organoMatches;
+    }) ?? null;
+  }
+
+  function ruleTraceForPoint(pointIndex: number): MeetingAdoptionRuleTrace {
+    const resolution = ruleResolutionForPoint(pointIndex);
+    if (resolution?.rulePack && resolution.rulesetSnapshotId) {
+      return {
+        source: "V2_CLOUD",
+        rule_pack_id: resolution.rulePack.packId,
+        rule_pack_version_id: resolution.rulePack.versionId,
+        rule_pack_version: resolution.rulePack.version,
+        payload_hash: resolution.rulePack.payloadHash,
+        ruleset_snapshot_id: resolution.rulesetSnapshotId,
+        warnings: resolution.warnings,
+      };
+    }
+
+    return {
+      source: "PROTOTYPE_FALLBACK",
+      rule_pack_id: null,
+      rule_pack_version_id: null,
+      rule_pack_version: null,
+      payload_hash: null,
+      ruleset_snapshot_id: null,
+      warnings: missingStrictSpecLabelsForPoint(pointIndex).map((label) => `missing_cloud_rule_pack:${label}`),
+    };
+  }
+
+  function buildSnapshotForPoint(pointIndex: number, mode: "operational" | "cloud_strict" = "operational") {
     const point = agendaPoints[pointIndex] ?? agendaPoints[0];
     const rowsForPoint = pointRows(pointIndex);
     const materia = point.materia ?? defaultMateriaForTitle(point.punto);
@@ -1397,7 +1514,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           : Math.max(totalWeight, 1)
         : Math.max(rowsForPoint.length, 1);
 
-    return buildMeetingAdoptionSnapshot({
+    const snapshot = buildMeetingAdoptionSnapshot({
       agendaItemIndex: pointIndex + 1,
       resolutionText: point.punto || "Acuerdo de la sesión",
       materia,
@@ -1418,14 +1535,45 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       })),
       totalMiembros: Math.max(voters.length, rowsForPoint.length, 1),
       capitalTotal,
-      packs: votePacks,
+      packs: mode === "cloud_strict" ? strictVotePacks : votePacks,
       overrides: voteOverrides,
       pactos: pactosVigentes,
       votoCalidadHabilitado,
     });
+
+    if (mode === "operational" && voteRuleContext.hasFallback) {
+      const warning = `prototype_rule_pack_fallback_used:${voteRuleContext.fallbackPackIds.join(",")}`;
+      snapshot.societary_validity.warnings = [
+        ...snapshot.societary_validity.warnings,
+        warning,
+      ];
+      snapshot.societary_validity.voting.warnings = [
+        ...snapshot.societary_validity.voting.warnings,
+        warning,
+      ];
+    }
+
+    if (mode === "operational") {
+      snapshot.rule_trace = ruleTraceForPoint(pointIndex);
+    }
+
+    return snapshot;
+  }
+
+  function buildDualEvaluationForPoint(pointIndex: number): DualEvaluationComparison {
+    const operationalSnapshot = buildSnapshotForPoint(pointIndex, "operational");
+    const cloudSnapshot = buildSnapshotForPoint(pointIndex, "cloud_strict");
+    const missingSpecs = missingStrictSpecLabelsForPoint(pointIndex);
+    return buildMeetingAdoptionDoubleEvaluation({
+      operationalSnapshot,
+      cloudSnapshot,
+      cloudRulePackMissing: missingSpecs.length > 0,
+      cloudMissingSpecs: missingSpecs,
+    });
   }
 
   const currentSnapshot = buildSnapshotForPoint(selectedPointIndex);
+  const currentDualEvaluation = buildDualEvaluationForPoint(selectedPointIndex);
   const currentVoteCompleteness = evaluateMeetingVoteCompleteness(currentVoters);
   const favor = currentSnapshot.vote_summary.favor;
   const contra = currentSnapshot.vote_summary.contra;
@@ -1435,9 +1583,28 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   );
 
   const hasResolutions = existingResolutions.length > 0 || resolutionsSaved;
+  const linkedAgreementCount = existingResolutions.filter((resolution) => resolution.agreement_id).length;
+  const existingPointSnapshots = ((quorumData?.point_snapshots ?? []) as MeetingAdoptionSnapshot[]);
+  const hasCertifiableExistingSnapshot = existingPointSnapshots.some(
+    (snapshot) => snapshot.societary_validity.ok && snapshot.status_resolucion === "ADOPTED"
+  );
+  const hasBlockedExistingSnapshot =
+    existingPointSnapshots.length > 0 && !hasCertifiableExistingSnapshot;
+  const hasRejectedExistingResolution = existingResolutions.some(
+    (resolution) => resolution.status !== "ADOPTED"
+  );
+  const canRecalculateExistingResolutions =
+    existingResolutions.length > 0 &&
+    (linkedAgreementCount === 0 || hasBlockedExistingSnapshot || hasRejectedExistingResolution);
 
   async function handleSaveResolutions() {
-    const snapshots = agendaPoints.map((_, i) => buildSnapshotForPoint(i));
+    const snapshots = agendaPoints.map((_, i) => {
+      const operationalSnapshot = buildSnapshotForPoint(i, "operational");
+      return {
+        ...operationalSnapshot,
+        dual_evaluation: buildDualEvaluationForPoint(i),
+      };
+    });
     const rows = agendaPoints.map((point, i) => {
       const rowsForPoint = pointRows(i);
       const snapshot = snapshots[i];
@@ -1455,7 +1622,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         votes: rowsForPoint
           .filter((v) => v.vote !== "")
           .map((v) => ({
-            attendee_id: v.id,
+            attendee_id: v.person_id ? v.id : null,
             vote_value: v.vote,
             conflict_flag: v.conflict_flag,
             reason: v.conflict_reason.trim() || null,
@@ -1464,6 +1631,17 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     });
 
     try {
+      const savedPoints = await saveResolutions.mutateAsync(rows);
+      const agreementIdByAgendaIndex = new Map(
+        savedPoints.map((point) => [point.agenda_item_index, point.agreement_id])
+      );
+      const enrichedSnapshots = snapshots.map((snapshot) => {
+        const savedPoint = savedPoints.find(
+          (point) => point.agenda_item_index === snapshot.agenda_item_index
+        );
+        return savedPoint?.adoption_snapshot ?? snapshot;
+      });
+
       await updateQuorumData.mutateAsync({
         ...patchQuorumDataSourceLinks(
           (quorumData ?? {}) as Record<string, unknown>,
@@ -1477,21 +1655,22 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               source_table: point.source_table ?? null,
               source_id: point.source_id ?? null,
               source_index: point.source_index ?? index + 1,
-              agreement_id: point.agreement_id ?? null,
+              agreement_id: agreementIdByAgendaIndex.get(index + 1) ?? point.agreement_id ?? null,
               group_campaign_id: point.group_campaign_id ?? null,
               group_campaign_step: point.group_campaign_step ?? null,
             }))
           )
         ),
-        point_snapshots: snapshots,
+        point_snapshots: enrichedSnapshots,
       });
-      await saveResolutions.mutateAsync(rows);
-      const materialized = snapshots.filter((snapshot) => snapshot.societary_validity.ok && snapshot.status_resolucion === "ADOPTED").length;
+      const materialized = savedPoints.filter((point) => Boolean(point.agreement_id)).length;
+      setSnapshotOnlySaved(false);
       toast.success(
         `${rows.length} resolución(es) registrada(s); ${materialized} acuerdo(s) 360 materializado(s)`
       );
       setResolutionsSaved(true);
     } catch (e) {
+      setSnapshotOnlySaved(false);
       toast.error(e instanceof Error ? e.message : "Error al registrar resoluciones");
     }
   }
@@ -1556,6 +1735,20 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           {selectedPoint?.agreement_id ? " · propuesta preparada vinculada" : ""}
         </p>
       </div>
+
+      {voteRuleContext.hasFallback && (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Esta votacion usa fallback tecnico de prototipo porque no hay rule pack Cloud
+            aplicable para todos los puntos. El snapshot queda marcado con warning y no se
+            considera validacion legal productiva.
+          </p>
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -1702,6 +1895,24 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             <h3 className="mb-3 text-sm font-semibold text-[var(--g-text-primary)]">
               Evaluación de adopción por punto
             </h3>
+            <div
+              className={`mb-3 border px-3 py-2 text-xs ${
+                currentDualEvaluation.converged
+                  ? "border-[var(--g-sec-300)] bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                  : "border-[var(--status-warning)] bg-[var(--g-surface-muted)] text-[var(--g-text-primary)]"
+              }`}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <span className="font-semibold">Doble evaluación V1/V2:</span>{" "}
+              {currentDualEvaluation.converged
+                ? "convergente."
+                : "divergente; se conserva el resultado operativo del prototipo y se registra el contraste Cloud estricto."}
+              {currentDualEvaluation.divergence ? (
+                <span className="ml-1 text-[var(--g-text-secondary)]">
+                  {currentDualEvaluation.divergence.message}
+                </span>
+              ) : null}
+            </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div
                 className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3"
@@ -1786,7 +1997,18 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       )}
 
       <div className="border-t border-[var(--g-border-subtle)] pt-4">
-        {hasResolutions ? (
+        {snapshotOnlySaved ? (
+          <div
+            className="flex items-center gap-3 border border-[var(--status-warning)] bg-[var(--g-surface-muted)] px-4 py-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+            <p className="text-sm font-medium text-[var(--g-text-primary)]">
+              Snapshot legal actualizado para prototipo; la resolución owner queda pendiente de
+              normalización. Puede continuar al cierre y certificar con referencia temporal del punto.
+            </p>
+          </div>
+        ) : hasResolutions && !canRecalculateExistingResolutions ? (
           <div
             className="flex items-center gap-3 border border-[var(--status-success)] bg-[var(--g-sec-100)] px-4 py-3"
             style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1794,11 +2016,27 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--status-success)]" />
             <p className="text-sm font-medium text-[var(--g-text-primary)]">
               {existingResolutions.length > 0 ? existingResolutions.length : "Las"} resoluciones
-              ya están registradas; {existingResolutions.filter((resolution) => resolution.agreement_id).length} acuerdo(s)
-              360 vinculado(s). Continúa al paso de cierre.
+              ya están registradas; {linkedAgreementCount} expediente(s)
+              Acuerdo 360 vinculado(s). Continúa al paso de cierre.
             </p>
           </div>
-        ) : (
+        ) : null}
+
+        {canRecalculateExistingResolutions && !snapshotOnlySaved ? (
+          <div
+            className="mb-3 flex items-start gap-3 border border-[var(--status-warning)] bg-[var(--g-surface-muted)] px-4 py-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+            <p className="text-sm text-[var(--g-text-secondary)]">
+              Hay resoluciones operativas sin expediente Acuerdo 360 o con snapshot no
+              proclamable. Puede recalcular la votación para crear o actualizar el expediente
+              canónico con el snapshot legal actual.
+            </p>
+          </div>
+        ) : null}
+
+        {(!hasResolutions || canRecalculateExistingResolutions) && !snapshotOnlySaved ? (
           <button
             type="button"
             onClick={handleSaveResolutions}
@@ -1817,9 +2055,11 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Registrar resolución y materializar acuerdo 360
+            {canRecalculateExistingResolutions
+              ? "Recalcular resolución y crear expediente Acuerdo 360"
+              : "Registrar resolución y crear expediente Acuerdo 360"}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -1941,12 +2181,21 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const { data: meeting } = useReunionById(meetingId);
   const { data: attendees } = useReunionAttendees(meetingId);
   const { data: resolutions = [], isLoading: resLoading } = useReunionResolutions(meetingId);
+  const { data: existingMinute } = useMinuteForMeeting(meetingId);
   const generarActa = useGenerarActa();
   const [minuteId, setMinuteId] = useState<string | null>(null);
   const materializedAgreementCount = resolutions.filter((resolution) => resolution.agreement_id).length;
+  const adoptedWithoutAgreement = resolutions.filter(
+    (resolution) => resolution.status === "ADOPTED" && !resolution.agreement_id
+  );
+  const canGenerateMinute =
+    resolutions.length > 0 && adoptedWithoutAgreement.length === 0 && !existingMinute?.id;
 
   function handleConfirmar() {
-    if (!meetingId) return;
+    if (!meetingId || adoptedWithoutAgreement.length > 0) {
+      toast.error("No se puede generar el acta: hay acuerdos adoptados sin expediente Acuerdo 360.");
+      return;
+    }
     const content = buildActaContent(meeting, attendees, resolutions);
     generarActa.mutate(
       { meetingId, content },
@@ -1974,8 +2223,8 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
               Acta generada en borrador
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-              {resolutions.length} resolución(es) registrada(s), {materializedAgreementCount} acuerdo(s)
-              360 vinculados. Procede a firmar el acta y emitir la certificación.
+              {resolutions.length} resolución(es) registrada(s), {materializedAgreementCount} expediente(s)
+              Acuerdo 360 vinculados. Procede a firmar el acta y emitir la certificación.
             </p>
           </div>
         </div>
@@ -1995,10 +2244,35 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        Revisa las resoluciones y sus acuerdos 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
-        acta en borrador mediante{" "}
-        <span className="font-medium text-[var(--g-text-primary)]">fn_generar_acta</span>.
+        Revisa las resoluciones y sus expedientes Acuerdo 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
+        acta en borrador mediante el proceso interno de Secretaría.
       </p>
+
+      {existingMinute?.id ? (
+        <div
+          className="flex items-start justify-between gap-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <div>
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Esta reunión ya tiene acta operativa
+            </p>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              El prototipo reutiliza el acta existente para evitar duplicados y mantener trazabilidad
+              estable entre reunión, acuerdo, certificación y tramitador.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/secretaria/actas/${existingMinute.id}`)}
+            className="inline-flex shrink-0 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <FileText className="h-4 w-4" />
+            Ver acta existente
+          </button>
+        </div>
+      ) : null}
 
       {resLoading ? (
         <div className="flex items-center gap-2 text-[var(--g-text-secondary)]">
@@ -2013,7 +2287,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
             No hay resoluciones registradas. Vuelve al paso de votaciones y usa «Registrar resolución
-            y materializar acuerdo 360» antes de cerrar la sesión.
+            y crear expediente Acuerdo 360» antes de cerrar la sesión.
           </p>
         </div>
       ) : (
@@ -2023,7 +2297,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         >
           <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
-              Resoluciones y acuerdos 360 ({resolutions.length})
+              Resoluciones y expedientes Acuerdo 360 ({resolutions.length})
             </p>
           </div>
           <ul className="divide-y divide-[var(--g-border-subtle)]">
@@ -2057,6 +2331,20 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         </div>
       )}
 
+      {adoptedWithoutAgreement.length > 0 ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Hay {adoptedWithoutAgreement.length} resolución(es) aprobada(s) sin expediente
+            Acuerdo 360. Vuelve al paso de votaciones y recalcula la resolución antes de generar
+            el acta.
+          </p>
+        </div>
+      ) : null}
+
       <div
         className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
         style={{ borderRadius: "var(--g-radius-md)" }}
@@ -2071,8 +2359,15 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
       <button
         type="button"
         onClick={handleConfirmar}
-        disabled={generarActa.isPending || resolutions.length === 0}
+        disabled={generarActa.isPending || !canGenerateMinute}
         aria-busy={generarActa.isPending}
+        title={
+          existingMinute?.id
+            ? "La reunión ya tiene un acta operativa vinculada"
+            : adoptedWithoutAgreement.length > 0
+              ? "Recalcula las resoluciones adoptadas sin Acuerdo 360 antes de generar el acta"
+              : undefined
+        }
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
@@ -2135,8 +2430,99 @@ function buildSteps(meetingId?: string): StepDef[] {
   ];
 }
 
+function ReunionIntake() {
+  const [searchParams] = useSearchParams();
+  const source = searchParams.get("source");
+  const event = searchParams.get("event") ?? searchParams.get("handoff");
+  const sourceId = searchParams.get("source_id") ?? searchParams.get("ai_incident");
+  const isCrossModule = source === "grc" || source === "aims";
+  const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
+
+  return (
+    <main
+      className="min-h-screen bg-[var(--g-surface-page)] p-6 text-[var(--g-text-primary)]"
+      style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}
+    >
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+            Secretaría · Intake de reunión
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
+            Preparar una sesión societaria
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Las reuniones duraderas se crean desde una convocatoria emitida para conservar órgano, sociedad, fecha y
+            trazabilidad legal. Esta entrada recoge el contexto y enruta al flujo propietario sin crear actos ni estados
+            cross-module.
+          </p>
+        </div>
+
+        {isCrossModule ? (
+          <section
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-warning)]" />
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Handoff read-only desde {sourceLabel}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+                  Evento propuesto: <span className="font-medium text-[var(--g-text-primary)]">{event ?? "sin evento"}</span>
+                  {sourceId ? (
+                    <>
+                      {" "}
+                      · Referencia: <span className="font-medium text-[var(--g-text-primary)]">{sourceId}</span>
+                    </>
+                  ) : null}
+                  . Secretaría decide si lo incorpora a una convocatoria, orden del día o expediente. No se escriben
+                  `governance_module_events`, `governance_module_links`, reuniones, acuerdos ni actas desde este intake.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section
+          className="grid gap-4 md:grid-cols-2"
+          aria-label="Opciones para crear una reunión"
+        >
+          <Link
+            to="/secretaria/convocatorias/nueva"
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <FileText className="h-5 w-5 text-[var(--g-brand-3308)]" />
+            <h2 className="mt-3 text-sm font-semibold text-[var(--g-text-primary)]">Crear convocatoria</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Camino recomendado: emite convocatoria, genera o reutiliza la reunión vinculada y continúa con asistentes,
+              quórum, votaciones y acta.
+            </p>
+          </Link>
+
+          <Link
+            to="/secretaria/convocatorias"
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <Users className="h-5 w-5 text-[var(--g-brand-3308)]" />
+            <h2 className="mt-3 text-sm font-semibold text-[var(--g-text-primary)]">Abrir convocatoria existente</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Selecciona una convocatoria emitida para entrar en la sesión asociada sin perder el contexto societario.
+            </p>
+          </Link>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function ReunionStepper() {
   const { id } = useParams();
+  if (!id) return <ReunionIntake />;
+
   return (
     <StepperShell
       eyebrow="Secretaría · Reunión"
