@@ -12,7 +12,8 @@ Cerrar Slice 1 del carril GRC sin schema: inventariar cada pantalla frontend GRC
 - AIMS no crea riesgos, controles ni planes GRC; solo navega a intake owner.
 - Secretaria decide si una propuesta GRC se convierte en agenda, reunion, acuerdo, acta o certificacion.
 - Sin writes a `governance_module_events` ni `governance_module_links`.
-- TPRM y Penal/Anticorrupcion permanecen como backlog no conectado.
+- TPRM permanece como backlog no conectado.
+- Penal/Anticorrupcion se activa como vista GRC conectada sobre `risks`, `obligations` y `controls`, sin tabla dedicada.
 
 ## Handoffs read-only
 
@@ -29,6 +30,9 @@ Cerrar Slice 1 del carril GRC sin schema: inventariar cada pantalla frontend GRC
 |---|---|---|---|---|---|---|
 | `/grc` | GRC | `risks`, `incidents`, `exceptions`, `regulatory_notifications`; `useGrcKpis` | `legacy_read`; `grc_*` candidato | Cloud operational GRC + contrato local | Read-only | AIMS->GRC, GRC->Secretaria |
 | `/grc/risk-360` | GRC | `risks`, `obligations`, `findings`; `useRisks` | `legacy_read`; `grc_*` candidato | `risks` | Read-only | AIMS gap -> GRC intake |
+| `/grc/risk-360/nuevo` | GRC | `risks`; `useCreateRisk` | `legacy_write` owner | `risks` | Owner-write | No |
+| `/grc/risk-360/:id/editar` | GRC | `risks`; `useRiskById`, `useUpdateRisk` | `legacy_write` owner | `risks` | Owner-write | No |
+| `/grc/penal-anticorrupcion` | GRC | `risks`, `obligations`, `controls`; `useRisks`, `useObligationsList`, `useAllControlsByObligationIds` | `legacy_read`; `grc_*` candidato | Taxonomia sobre tablas GRC existentes | Read-only | GRC finding -> Secretaria |
 | `/grc/packs` | GRC | `country_packs`, `pack_rules`; `useCountryPacks` | `legacy_read` | `country_packs`, `pack_rules` | Read-only | No |
 | `/grc/packs/:countryCode` | GRC | `country_packs`, `pack_rules`, `incidents`, `risks`, `regulatory_notifications`; `useCountryPackDetail` | `legacy_read` | Pack + KPIs GRC existentes | Read-only | No |
 | `/grc/incidentes` | GRC | `incidents`, `obligations`, `regulatory_notifications`; `useIncidents` | `legacy_read` | `incidents` | Read-only | AIMS incident -> GRC intake; GRC incident -> Secretaria |
@@ -60,23 +64,25 @@ Cerrar Slice 1 del carril GRC sin schema: inventariar cada pantalla frontend GRC
 | Dominio | Estado | Razon |
 |---|---|---|
 | TPRM | No conectado | No hay pantalla TPRM especifica conectada en frontend GRC actual. |
-| Penal / Anticorrupcion | No conectado | No hay modulo penal/anticorrupcion conectado en rutas GRC actuales. |
+| Penal / Anticorrupcion | Conectado read-only | Vista GRC sobre `risks`, `obligations` y `controls`; writes de riesgo pasan por `/grc/risk-360/nuevo?module=penal`. |
 
 ## Data contract
 
-- Tables used: `risks`, `controls` via existing TGMS hooks only where linked, `incidents`, `regulatory_notifications`, `exceptions`, `action_plans`, `findings`, `obligations`, `country_packs`, `pack_rules`, `grc_module_nav`, `bcm_bia`, `bcm_plans`, `vulnerabilities`, and target handoff `policies`.
+- Tables used: `risks`, `controls` via existing TGMS/GRC hooks where linked, `incidents`, `regulatory_notifications`, `exceptions`, `action_plans`, `findings`, `obligations`, `country_packs`, `pack_rules`, `grc_module_nav`, `bcm_bia`, `bcm_plans`, `vulnerabilities`, and target handoff `policies`.
 - Source of truth: Cloud operational legacy GRC tables for connected data; local constants only for GDPR demo screens; no `grc_*` adoption in this slice.
 - Migration required: no.
 - Types affected: no generated Supabase types; local TypeScript contracts only.
 - Cross-module contracts: route-only handoffs for `GRC_INCIDENT_MATERIAL`, `GRC_FINDING_BOARD_ESCALATION`, `AIMS_TECHNICAL_FILE_GAP`, `AIMS_INCIDENT_MATERIAL`.
 - Evidence posture: reference/readiness only; no final evidence or legal hold.
-- Parity risk: low for read-only routes; medium for any future write probe to `governance_module_events` or `governance_module_links`.
+- Parity risk: low for read-only routes; medium for `risks` legacy writes until `grc_*` adoption is decided; medium for any future write probe to `governance_module_events` or `governance_module_links`.
 
 ## Code references
 
 - `src/lib/grc/dashboard-readiness.ts`
 - `src/pages/grc/Dashboard.tsx`
 - `src/pages/grc/Risk360.tsx`
+- `src/pages/grc/RiskEditor.tsx`
+- `src/pages/grc/PenalAnticorrupcion.tsx`
 - `src/pages/grc/IncidentesList.tsx`
 - `src/pages/grc/IncidenteDetalle.tsx`
 - `src/pages/grc/modules/audit/Findings.tsx`

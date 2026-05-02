@@ -38,10 +38,8 @@ describe("grc dashboard readiness contract", () => {
 
   it("keeps non-connected domains out of the primary readiness panel", () => {
     expect(GRC_P0_DOMAINS.map((domain) => domain.id)).not.toContain("tprm");
-    expect(GRC_P0_DOMAINS.map((domain) => domain.id)).not.toContain("penal-anticorrupcion");
     expect(GRC_NOT_CONNECTED_BACKLOG.map((domain) => domain.id)).toEqual([
       "tprm",
-      "penal-anticorrupcion",
     ]);
   });
 
@@ -53,13 +51,13 @@ describe("grc dashboard readiness contract", () => {
       gap: 0,
       legacySources: 2,
       connectedSources: 4,
-      connectedRoutes: 21,
+      connectedRoutes: 24,
       averageCoverage: 75,
     });
   });
 
   it("maps every connected GRC frontend screen with owner, source posture and access mode", () => {
-    expect(GRC_SCREEN_POSTURES).toHaveLength(27);
+    expect(GRC_SCREEN_POSTURES).toHaveLength(30);
 
     for (const screen of GRC_SCREEN_POSTURES) {
       expect(screen.owner).toBe("GRC Compass");
@@ -73,15 +71,23 @@ describe("grc dashboard readiness contract", () => {
     }
   });
 
-  it("keeps write posture limited to GRC-owned incident creation", () => {
+  it("keeps write posture limited to GRC-owned incident and risk workflows", () => {
     const ownerWriteScreens = GRC_SCREEN_POSTURES.filter((screen) => screen.accessMode === "owner-write");
 
-    expect(ownerWriteScreens.map((screen) => screen.route)).toEqual(["/grc/incidentes/nuevo"]);
-    expect(ownerWriteScreens[0].tables).toEqual(["incidents"]);
-    expect(ownerWriteScreens[0].sourcePosture).toBe("legacy_write");
+    expect(ownerWriteScreens.map((screen) => screen.route)).toEqual([
+      "/grc/risk-360/nuevo",
+      "/grc/risk-360/:id/editar",
+      "/grc/incidentes/nuevo",
+    ]);
+    expect(ownerWriteScreens.map((screen) => screen.tables.join(","))).toEqual([
+      "risks",
+      "risks",
+      "incidents",
+    ]);
+    expect(ownerWriteScreens.every((screen) => screen.sourcePosture === "legacy_write")).toBe(true);
   });
 
-  it("does not treat TPRM or penal anticorruption as connected screens", () => {
+  it("keeps TPRM out while penal anticorruption is connected as a legacy read view", () => {
     const connectedIdsAndRoutes = GRC_SCREEN_POSTURES.flatMap((screen) => [
       screen.id,
       screen.route,
@@ -89,26 +95,23 @@ describe("grc dashboard readiness contract", () => {
     ]).join(" ").toLowerCase();
 
     expect(connectedIdsAndRoutes).not.toContain("tprm");
-    expect(connectedIdsAndRoutes).not.toContain("anticorrup");
-    expect(GRC_NOT_CONNECTED_BACKLOG.map((domain) => domain.id)).toEqual([
-      "tprm",
-      "penal-anticorrupcion",
-    ]);
+    expect(connectedIdsAndRoutes).toContain("anticorrup");
+    expect(GRC_NOT_CONNECTED_BACKLOG.map((domain) => domain.id)).toEqual(["tprm"]);
   });
 
   it("summarizes screen posture without database access", () => {
     expect(getGrcScreenPostureSummary()).toEqual({
-      total: 27,
-      withTables: 20,
-      withHandoffCandidates: 10,
+      total: 30,
+      withTables: 23,
+      withHandoffCandidates: 11,
       byAccessMode: {
-        "read-only": 22,
-        "owner-write": 1,
+        "read-only": 23,
+        "owner-write": 3,
         backlog: 4,
       },
       bySourcePosture: {
-        legacy_read: 18,
-        legacy_write: 1,
+        legacy_read: 19,
+        legacy_write: 3,
         tgms_handoff: 1,
         local_demo_read: 3,
         backlog_placeholder: 4,

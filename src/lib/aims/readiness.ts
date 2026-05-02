@@ -169,6 +169,22 @@ export const aimsScreenPostures: AimsScreenPosture[] = [
     migrationRequired: false,
     notes: "AIMS registra la señal IA; GRC gestiona riesgo operativo y Secretaría decide escalado formal.",
   },
+  {
+    route: "/ai-governance/incidentes/nuevo",
+    screen: "Alta de Incidente IA",
+    owner: "AIMS 360",
+    hooks: ["useCreateAiIncident", "useAiSystemsList"],
+    tables: ["ai_incidents", "ai_systems"],
+    posture: "legacy_write",
+    sourceOfTruth: "ai_incidents con system_id a ai_systems",
+    operation: "owner-write",
+    crossModuleHandoffs: [
+      "Post-alta, AIMS_INCIDENT_MATERIAL -> /grc/incidentes si aplica",
+      "Post-alta, AIMS_INCIDENT_MATERIAL -> /secretaria/reuniones/nueva si aplica",
+    ],
+    migrationRequired: false,
+    notes: "Probe de permisos alcanzo FK segura; no escribe GRC ni Secretaria.",
+  },
 ];
 
 export const aimsReadOnlyHandoffs: AimsHandoffAffordance[] = [

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -50,5 +50,24 @@ export function useAiIncidentsBySystem(systemId: string | undefined) {
       return (data ?? []) as AiIncident[];
     },
     enabled: !!systemId && !!tenantId,
+  });
+}
+
+export function useCreateAiIncident() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<AiIncident>) => {
+      const { data, error } = await supabase
+        .from("ai_incidents")
+        .insert({ ...payload, tenant_id: tenantId! })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as AiIncident;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ai_incidents"] });
+    },
   });
 }

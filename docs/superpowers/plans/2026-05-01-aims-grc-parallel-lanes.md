@@ -144,9 +144,9 @@ Postura actual:
 Estado AIMS 2026-05-02:
 
 - Completado mapa de pantallas conectadas en `src/lib/aims/readiness.ts` y visible en `/ai-governance`.
-- Rutas declaradas: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/nuevo`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`.
-- Postura: `legacy_read` sobre `ai_*` en pantallas de lectura; `legacy_write` owner-write para alta de sistemas en `ai_systems`; sin lectura ni escritura de `aims_*` en UI conectada actual.
-- Mutacion actual: AIMS puede crear sistemas IA propios; no crea riesgos/controles GRC ni actos Secretaria.
+- Rutas declaradas: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/nuevo`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`, `/ai-governance/incidentes/nuevo`.
+- Postura: `legacy_read` sobre `ai_*` en pantallas de lectura; `legacy_write` owner-write para alta de sistemas en `ai_systems` e incidentes en `ai_incidents`; sin lectura ni escritura de `aims_*` en UI conectada actual.
+- Mutacion actual: AIMS puede crear sistemas IA e incidentes IA propios; no crea riesgos/controles GRC ni actos Secretaria. Evaluaciones sigue bloqueado por RLS de INSERT en `ai_risk_assessments`.
 - Docs de contrato: `docs/superpowers/contracts/2026-04-27-aims-grc-data-contract.md` y `docs/superpowers/contracts/2026-04-27-cross-module-data-contract.md`.
 
 ### Slice 2 - Handoffs read-only
@@ -207,11 +207,13 @@ Lane closure:
 ## Avance 2026-05-02 - Slice 1 GRC
 
 - GRC tiene mapa pantalla por pantalla en `docs/superpowers/contracts/2026-05-02-grc-screen-posture-contract.md`.
-- Contrato local puro en `src/lib/grc/dashboard-readiness.ts` con 27 rutas/pantallas, source posture y modo de mutacion.
+- Contrato local puro en `src/lib/grc/dashboard-readiness.ts` con 30 rutas/pantallas, source posture y modo de mutacion.
 - `/grc` muestra resumen ejecutivo del screen posture sin nuevas queries.
 - AIMS -> GRC queda como handoff read-only hacia `/grc/risk-360` y `/grc/incidentes`.
 - GRC incidente/hallazgo -> Secretaria queda como handoff read-only hacia `/secretaria/reuniones/nueva`.
-- TPRM y Penal/Anticorrupcion siguen backlog no conectado.
+- Risk 360 añade alta/edicion owner-write sobre `risks`.
+- Penal/Anticorrupcion queda conectado como vista read-only sobre `risks`, `obligations` y `controls`.
+- TPRM sigue backlog no conectado.
 - Sin migrations, sin Supabase typegen, sin RLS/RPC/storage, sin writes a eventos/links y sin promocion de evidence/legal hold.
 
 ## Avance 2026-05-02 - Reactivacion AIMS/GRC no_schema
@@ -219,7 +221,11 @@ Lane closure:
 - AIMS reactiva el alta real de sistemas IA en `/ai-governance/sistemas/nuevo`.
 - La ruta usa `useCreateAiSystem` y escribe solo en `ai_systems` con `tenant_id` del contexto.
 - El contrato local marca esta pantalla como `legacy_write` y `owner-write`.
-- Las pruebas e2e renderizan el formulario, pero no ejecutan submit contra Cloud dentro del smoke.
+- AIMS reactiva el alta de incidentes IA en `/ai-governance/incidentes/nuevo` sobre `ai_incidents`.
+- AIMS evaluaciones queda bloqueado por RLS: `ai_risk_assessments` necesita policy INSERT tenant-scoped por `ai_systems.tenant_id`.
+- Las pruebas e2e renderizan los formularios, pero no ejecutan submit contra Cloud dentro del smoke.
 - GRC mantiene owner-write ya existente para incidentes en `/grc/incidentes/nuevo`.
-- Risk360, penal/anticorrupcion y TPRM no se activan como writes nuevos en esta tanda; penal/anticorrupcion requiere ruta+datos o paquete de schema si no basta con `risks`.
+- GRC reactiva alta/edicion de riesgos en `/grc/risk-360/nuevo` y `/grc/risk-360/:id/editar`; escribe solo `risks`.
+- Penal/anticorrupcion queda conectado como vista GRC sobre `risks`, `obligations` y `controls`; puede crear riesgos con `module_id=penal` desde Risk 360.
+- TPRM sigue backlog no conectado.
 - `supabase link --project-ref hzqwefkwsxopwrmtksbg` corrigio el enlace local del CLI; `db:check-target` vuelve a pasar. `supabase/.temp/` queda ignorado por Git.

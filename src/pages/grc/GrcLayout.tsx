@@ -8,6 +8,7 @@ import {
   FileWarning,
   ChevronLeft,
   ShieldCheck,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard",       to: "/grc",           icon: LayoutDashboard, end: true },
   { label: "Risk 360",        to: "/grc/risk-360",  icon: Activity },
+  { label: "Penal / Anticorr.", to: "/grc/penal-anticorrupcion", icon: Scale },
   { label: "Packs por País",  to: "/grc/packs",     icon: Globe2 },
   { label: "Mi Trabajo",      to: "/grc/mywork",    icon: Briefcase },
   { label: "Alertas",         to: "/grc/alertas",   icon: AlertTriangle },

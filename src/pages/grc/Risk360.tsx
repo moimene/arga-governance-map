@@ -1,6 +1,6 @@
 import { useRisks, type RiskRow } from "@/hooks/useRisks";
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity, Route } from "lucide-react";
+import { Activity, Pencil, PlusCircle, Route } from "lucide-react";
 
 const SCORE_BG = (score: number) => {
   if (score >= 20) return "bg-[var(--status-error)]";
@@ -15,6 +15,7 @@ const MODULE_LABEL: Record<string, string> = {
   gdpr: "GDPR",
   cyber: "CYBER",
   audit: "AUDIT",
+  penal: "PENAL",
 };
 
 export default function Risk360() {
@@ -57,14 +58,24 @@ export default function Risk360() {
             </p>
           </div>
         </div>
-        {findingFilter && (
+        <div className="flex items-center gap-3">
+          {findingFilter && (
+            <Link
+              to="/grc/risk-360"
+              className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+            >
+              Limpiar filtro
+            </Link>
+          )}
           <Link
-            to="/grc/risk-360"
-            className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+            to="/grc/risk-360/nuevo"
+            className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            Limpiar filtro
+            <PlusCircle className="h-4 w-4" />
+            Nuevo riesgo
           </Link>
-        )}
+        </div>
       </header>
 
       {handoffSource === "aims" && handoff && (
@@ -230,6 +241,13 @@ export default function Risk360() {
                       {r.findings.code}
                     </Link>
                   )}
+                  <Link
+                    to={`/grc/risk-360/${r.id}/editar`}
+                    className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Editar
+                  </Link>
                 </div>
               </div>
             ))}

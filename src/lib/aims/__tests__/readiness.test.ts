@@ -73,6 +73,7 @@ describe("buildAimsReadiness", () => {
       "/ai-governance/sistemas/:id",
       "/ai-governance/evaluaciones",
       "/ai-governance/incidentes",
+      "/ai-governance/incidentes/nuevo",
     ]);
 
     for (const screen of aimsScreenPostures) {
@@ -87,7 +88,13 @@ describe("buildAimsReadiness", () => {
     expect(createSystem?.posture).toBe("legacy_write");
     expect(createSystem?.operation).toBe("owner-write");
 
-    for (const screen of aimsScreenPostures.filter((screen) => screen.route !== "/ai-governance/sistemas/nuevo")) {
+    const createIncident = aimsScreenPostures.find(
+      (screen) => screen.route === "/ai-governance/incidentes/nuevo",
+    );
+    expect(createIncident?.posture).toBe("legacy_write");
+    expect(createIncident?.operation).toBe("owner-write");
+
+    for (const screen of aimsScreenPostures.filter((screen) => screen.operation !== "owner-write")) {
       expect(screen.posture).toBe("legacy_read");
       expect(screen.operation).toBe("read-only");
     }

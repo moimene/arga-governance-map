@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, Route } from "lucide-react";
+import { AlertTriangle, PlusCircle, Route } from "lucide-react";
 import { useAiIncidentsList } from "@/hooks/useAiIncidents";
 import { isAimsMaterialIncidentCandidate } from "@/lib/aims/readiness";
 
@@ -26,14 +26,25 @@ export default function AiIncidentes() {
   return (
     <div className="p-6 max-w-[1100px] mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <AlertTriangle className="h-5 w-5 text-[var(--status-error)]" />
-          <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Incidentes de IA</h1>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="h-5 w-5 text-[var(--status-error)]" />
+            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Incidentes de IA</h1>
+          </div>
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            Registro de incidentes, sesgos y fallos en sistemas IA del inventario
+          </p>
         </div>
-        <p className="text-sm text-[var(--g-text-secondary)]">
-          Registro de incidentes, sesgos y fallos en sistemas IA del inventario
-        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/ai-governance/incidentes/nuevo")}
+          className="inline-flex shrink-0 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Nuevo incidente
+        </button>
       </div>
 
       {/* Stats rápidas */}

@@ -99,6 +99,8 @@ const SectionRouter = lazy(() =>
 );
 const GrcDashboardPage = lazy(() => import("@/pages/grc/Dashboard"));
 const Risk360 = lazy(() => import("@/pages/grc/Risk360"));
+const RiskEditor = lazy(() => import("@/pages/grc/RiskEditor"));
+const PenalAnticorrupcion = lazy(() => import("@/pages/grc/PenalAnticorrupcion"));
 const PacksPage = lazy(() => import("@/pages/grc/PacksPage"));
 const PackDetalle = lazy(() => import("@/pages/grc/PackDetalle"));
 const IncidentesList = lazy(() => import("@/pages/grc/IncidentesList"));
@@ -119,6 +121,7 @@ const SistemaNuevo = lazy(() => import("@/pages/ai-governance/SistemaNuevo"));
 const SistemaDetalle = lazy(() => import("@/pages/ai-governance/SistemaDetalle"));
 const Evaluaciones = lazy(() => import("@/pages/ai-governance/Evaluaciones"));
 const AiIncidentes = lazy(() => import("@/pages/ai-governance/Incidentes"));
+const AiIncidenteNuevo = lazy(() => import("@/pages/ai-governance/IncidenteNuevo"));
 
 // ── Fallback compartido para Suspense ────────────────────────────────────────
 function ModuleFallback() {
@@ -241,6 +244,9 @@ const App = () => (
                 >
                   <Route path="/grc"                      element={<Suspense fallback={<ModuleFallback />}><GrcDashboardPage /></Suspense>} />
                   <Route path="/grc/risk-360"             element={<Suspense fallback={<ModuleFallback />}><Risk360 /></Suspense>} />
+                  <Route path="/grc/risk-360/nuevo"       element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
+                  <Route path="/grc/risk-360/:id/editar"  element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
+                  <Route path="/grc/penal-anticorrupcion" element={<Suspense fallback={<ModuleFallback />}><PenalAnticorrupcion /></Suspense>} />
                   <Route path="/grc/packs"                element={<Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense>} />
                   <Route path="/grc/packs/:countryCode"   element={<Suspense fallback={<ModuleFallback />}><PackDetalle /></Suspense>} />
                   <Route path="/grc/incidentes"           element={<Suspense fallback={<ModuleFallback />}><IncidentesList /></Suspense>} />
@@ -271,6 +277,7 @@ const App = () => (
                   <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
                   <Route path="/ai-governance/evaluaciones" element={<Suspense fallback={<ModuleFallback />}><Evaluaciones /></Suspense>} />
                   <Route path="/ai-governance/incidentes"   element={<Suspense fallback={<ModuleFallback />}><AiIncidentes /></Suspense>} />
+                  <Route path="/ai-governance/incidentes/nuevo" element={<Suspense fallback={<ModuleFallback />}><AiIncidenteNuevo /></Suspense>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

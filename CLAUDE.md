@@ -95,8 +95,8 @@ En código, ambos modos están en este repo. La segregación a repos independien
 | Carril | Owns | Puede hacer ahora | No debe hacer |
 |---|---|---|---|
 | Secretaría | actos societarios formales, acuerdos, actas, certificaciones, generación documental | flujos reales ya conectados, Acuerdo 360, referencia de evidencia etiquetada | crear incidentes/riesgos/controles GRC o actos desde AIMS/GRC |
-| GRC Compass | riesgos, controles, incidentes, findings, action plans, compliance workflows | flujos GRC owner y handoffs read-only | crear actos Secretaría o inventario AIMS |
-| AIMS 360 | sistemas IA, evaluaciones AI Act/ISO 42001, incidentes IA, technical file posture | lectura/UX conectada sobre `ai_*`, alta owner de sistemas IA en `/ai-governance/sistemas/nuevo`, handoffs read-only | crear riesgos/controles GRC o actos Secretaría |
+| GRC Compass | riesgos, controles, incidentes, findings, action plans, compliance workflows | flujos GRC owner, alta/edición de riesgos en `/grc/risk-360/*`, Penal/Anticorrupción como vista conectada, handoffs read-only | crear actos Secretaría o inventario AIMS |
+| AIMS 360 | sistemas IA, evaluaciones AI Act/ISO 42001, incidentes IA, technical file posture | lectura/UX conectada sobre `ai_*`, alta owner de sistemas IA e incidentes IA, handoffs read-only | crear riesgos/controles GRC o actos Secretaría |
 | TGMS Console | composición, rutas y readiness | read model, búsqueda y rutas a owners | mutar estados owner o absorber módulos |
 | Evidence backbone | referencias, bundles/stubs y auditoría | etiquetar postura `reference`/`pending` | declarar evidencia final productiva mientras `000049` esté HOLD |
 
@@ -115,6 +115,10 @@ En código, ambos modos están en este repo. La segregación a repos independien
 - `/secretaria/tramitador/nuevo` es el alta operativa.
 - `/secretaria/tramitador/:id` es detalle read-only de expediente registral existente.
 - `/ai-governance/sistemas/nuevo` reactiva el alta de sistemas IA como `legacy_write` owner-write sobre `ai_systems`; no usa `aims_*` ni escribe en GRC/Secretaría.
+- `/ai-governance/incidentes/nuevo` reactiva el alta de incidentes IA como `legacy_write` owner-write sobre `ai_incidents`; los escalados siguen siendo handoffs.
+- `/ai-governance/evaluaciones/nuevo` no se activa aún: el probe de INSERT en `ai_risk_assessments` falla por RLS `42501`.
+- `/grc/risk-360/nuevo` y `/grc/risk-360/:id/editar` son owner-write sobre `risks`; no escriben columnas generadas `inherent_score`/`residual_score`.
+- `/grc/penal-anticorrupcion` queda conectado como vista GRC sobre `risks`, `obligations` y `controls`; TPRM sigue backlog.
 - `regulatory_notifications` usa `notification_deadline`, no `deadline`.
 - `evidence-spine` en consola/readiness está en `pending`, no `verifiable`.
 
@@ -125,14 +129,14 @@ En código, ambos modos están en este repo. La segregación a repos independien
 - Reactivación AIMS/GRC: `docs/superpowers/plans/2026-05-02-aims-grc-reactivation-log.md`.
 - Demo/prototype pack: `docs/superpowers/plans/2026-05-02-demo-pack.md`.
 - Memory key: `patterns/ruflo_supervised_handoffs_demo_complete_2026_05_02`.
-- Memory key: `patterns/aims_grc_reactivation_no_schema_2026_05_02`.
+- Memory key: `patterns/aims_grc_reactivation_forms_penal_no_schema_2026_05_02`.
 
 ### Verificación última conocida
 
 - `bun run db:check-target`: pass contra `governance_OS`.
 - `bun test`: pass, 582 pass, 66 skipped.
 - `bunx tsc --noEmit --pretty false`: pass.
-- `bun run lint`: pass, 0 errores, 24 warnings conocidos.
+- `bun run lint`: pass, 0 errores, 23 warnings conocidos.
 - `bun run build`: pass, warnings conocidos de Browserslist/chunk size.
 - e2e ampliado: 39/39 pass con `e2e/05-secretaria-reuniones.spec.ts`, `10`, `11`, `12`, `14`, `16`, `17`, `18`, `19-cross-module-handoffs`.
 
@@ -1040,7 +1044,7 @@ bun run build
 PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
-**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/16-sanitization-smoke.spec.ts` 4/4 incluyendo `/ai-governance/sistemas/nuevo`.
+**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/10-grc.spec.ts` + `e2e/16-sanitization-smoke.spec.ts` 16/16 incluyendo AIMS incidentes, GRC riesgos y Penal/Anticorrupción.
 
 ## Supabase Cloud
 

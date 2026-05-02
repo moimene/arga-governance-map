@@ -151,7 +151,7 @@ Se ha completado una tanda P0 de UX ejecutiva para AIMS-GRC sin mover schema:
 - GRC Compass añade `Readiness ejecutivo P0` con seis superficies realmente conectadas en frontend: GDPR/canal interno vía vistas GDPR, DORA/ICT, Cyber, ERM/Auditoría, Trabajo/Alertas/Excepciones y Packs país.
 - AI Governance añade `AIMS P0 readiness` con dominios: inventario, evaluaciones AI Act, incidentes, controles derivados, evidencias operativas y migración `ai_* -> aims_*`.
 - Ambos paneles usan contratos locales puros y no crean queries, tablas, columnas, RPC, RLS, storage ni tipos nuevos.
-- TPRM y Penal/Anticorrupción salen del readiness principal porque no tienen pantalla GRC específica conectada; quedan como backlog visible `No conectado ahora`. AIMS queda marcado como `legacy-ai` hasta activar backbone `aims_*`.
+- TPRM sale del readiness principal porque no tiene pantalla GRC específica conectada. Penal/Anticorrupción fue reactivado despues como vista GRC sobre `risks`, `obligations` y `controls`. AIMS queda marcado como `legacy-ai` hasta activar backbone `aims_*`.
 - Evidence/legal hold sigue fuera de la tanda: `000049` permanece en HOLD y `finalEvidence=false`.
 
 Data contract:
@@ -239,10 +239,10 @@ Documento rector:
 
 Resultado:
 
-- GRC declara 27 pantallas/rutas frontend con owner, tablas/hooks, postura legacy frente a `grc_*`, fuente de verdad, modo de mutacion y handoffs candidatos.
-- Solo `/grc/incidentes/nuevo` queda como `owner-write`, limitado a la tabla GRC-owned `incidents`.
+- GRC declara 30 pantallas/rutas frontend con owner, tablas/hooks, postura legacy frente a `grc_*`, fuente de verdad, modo de mutacion y handoffs candidatos.
+- `/grc/incidentes/nuevo`, `/grc/risk-360/nuevo` y `/grc/risk-360/:id/editar` quedan como `owner-write`, limitados a tablas GRC-owned.
 - Las rutas placeholder (`thresholds`, `DPO`, `SOC`, `audit program`) quedan como `backlog_placeholder`.
-- TPRM y Penal/Anticorrupcion permanecen fuera del mapa conectado y solo aparecen como backlog no conectado.
+- TPRM permanece fuera del mapa conectado; Penal/Anticorrupcion queda conectado como vista read-only sin tabla dedicada.
 - AIMS -> GRC queda implementado como navegacion read-only hacia `/grc/risk-360` o `/grc/incidentes`.
 - GRC -> Secretaria queda implementado como navegacion read-only hacia `/secretaria/reuniones/nueva`; Secretaria decide cualquier acto formal.
 - Sin writes a `governance_module_events` ni `governance_module_links`.
@@ -292,3 +292,33 @@ Verification:
 - `bun run lint`: pass, 0 errores, 23 warnings conocidos.
 - `bun run build`: pass.
 - `PLAYWRIGHT_PORT=5192 bunx playwright test e2e/16-sanitization-smoke.spec.ts --project=chromium --reporter=list`: pass, 4/4.
+
+## Reactivacion AIMS/GRC 2026-05-02 - Forms y Penal no_schema
+
+Resultado:
+
+- AIMS añade `/ai-governance/incidentes/nuevo` con write owner a `ai_incidents`.
+- AIMS no añade formulario de evaluaciones porque el probe seguro de INSERT en `ai_risk_assessments` devolvio `42501 new row violates row-level security policy`.
+- GRC añade `/grc/risk-360/nuevo` y `/grc/risk-360/:id/editar` sobre `risks`.
+- GRC añade `/grc/penal-anticorrupcion` como vista conectada sobre `risks`, `obligations` y `controls`.
+- `risks.module_id='penal'` paso probe seguro con FK; no requiere columna nueva para arrancar taxonomia penal.
+
+Data contract:
+
+- Screen/hook: `/ai-governance/incidentes/nuevo`, `/grc/risk-360/nuevo`, `/grc/risk-360/:id/editar`, `/grc/penal-anticorrupcion`.
+- Posture: `legacy_write` para AIMS incidentes y GRC riesgos; `legacy_read` para Penal/Anticorrupcion.
+- Tables used: `ai_incidents`, `ai_systems`, `risks`, `obligations`, `controls`.
+- Source of truth: `ai_incidents` para incidentes IA; `risks` para riesgos GRC; `obligations`/`controls` como referencias de taxonomia penal.
+- Migration required: no para superficies implementadas.
+- Types affected: no typegen; local TypeScript only.
+- RLS/RPC/storage affected: no cambios. Bloqueo detectado: `ai_risk_assessments` necesita policy INSERT tenant-scoped por `ai_systems.tenant_id`.
+- Event/link contract: route-only handoffs unchanged; no writes to `governance_module_events` / `governance_module_links`.
+- Evidence level: `NOT_EVIDENCE` para formularios; `REFERENCE` en handoffs.
+- Parity risk: medium for future `ai_* -> aims_*` and `risks -> grc_*`; low for current owner-write surfaces.
+
+Schema need bloqueante:
+
+- Tabla: `ai_risk_assessments`.
+- Necesidad exacta: policy RLS de INSERT para usuario autenticado/demo tenant-scoped, validando que `system_id` pertenece a un `ai_systems.tenant_id` accesible por el tenant activo.
+- Tipo/RPC/storage: no requeridos para el formulario; solo RLS/policy.
+- Accion: no activar alta de evaluaciones hasta paquete aprobado.

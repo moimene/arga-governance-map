@@ -18,6 +18,20 @@ test.describe('GRC Compass', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
+  test('nuevo riesgo GRC renderiza formulario owner-write', async ({ page }) => {
+    await page.goto('/grc/risk-360/nuevo');
+    await expect(page).not.toHaveURL('/login');
+    await expect(page.getByText('Nuevo riesgo').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('legacy_write · risks')).toBeVisible();
+  });
+
+  test('Penal / Anticorrupción renderiza como vista conectada', async ({ page }) => {
+    await page.goto('/grc/penal-anticorrupcion');
+    await expect(page).not.toHaveURL('/login');
+    await expect(page.getByText('Penal / Anticorrupción').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Source: risks/i)).toBeVisible();
+  });
+
   test('handoff AIMS a Risk 360 se muestra como intake read-only', async ({ page }) => {
     await page.goto('/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP');
     await expect(page).not.toHaveURL('/login');
