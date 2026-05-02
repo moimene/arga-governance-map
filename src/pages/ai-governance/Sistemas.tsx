@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cpu, Search, ArrowRight } from "lucide-react";
+import { Cpu, Search, ArrowRight, PlusCircle } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 
 const RISK_COLORS: Record<string, string> = {
@@ -50,6 +50,15 @@ export default function Sistemas() {
             Clasificación según niveles de riesgo EU AI Act
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => navigate("/ai-governance/sistemas/nuevo")}
+          className="inline-flex shrink-0 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Nuevo sistema
+        </button>
       </div>
 
       {/* Filtros */}

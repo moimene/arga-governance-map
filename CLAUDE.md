@@ -96,7 +96,7 @@ En código, ambos modos están en este repo. La segregación a repos independien
 |---|---|---|---|
 | Secretaría | actos societarios formales, acuerdos, actas, certificaciones, generación documental | flujos reales ya conectados, Acuerdo 360, referencia de evidencia etiquetada | crear incidentes/riesgos/controles GRC o actos desde AIMS/GRC |
 | GRC Compass | riesgos, controles, incidentes, findings, action plans, compliance workflows | flujos GRC owner y handoffs read-only | crear actos Secretaría o inventario AIMS |
-| AIMS 360 | sistemas IA, evaluaciones AI Act/ISO 42001, incidentes IA, technical file posture | lectura/UX conectada sobre `ai_*` y handoffs read-only | crear riesgos/controles GRC o actos Secretaría |
+| AIMS 360 | sistemas IA, evaluaciones AI Act/ISO 42001, incidentes IA, technical file posture | lectura/UX conectada sobre `ai_*`, alta owner de sistemas IA en `/ai-governance/sistemas/nuevo`, handoffs read-only | crear riesgos/controles GRC o actos Secretaría |
 | TGMS Console | composición, rutas y readiness | read model, búsqueda y rutas a owners | mutar estados owner o absorber módulos |
 | Evidence backbone | referencias, bundles/stubs y auditoría | etiquetar postura `reference`/`pending` | declarar evidencia final productiva mientras `000049` esté HOLD |
 
@@ -114,6 +114,7 @@ En código, ambos modos están en este repo. La segregación a repos independien
 - `/secretaria/reuniones/:id` sigue siendo el stepper operativo de reunión conectada.
 - `/secretaria/tramitador/nuevo` es el alta operativa.
 - `/secretaria/tramitador/:id` es detalle read-only de expediente registral existente.
+- `/ai-governance/sistemas/nuevo` reactiva el alta de sistemas IA como `legacy_write` owner-write sobre `ai_systems`; no usa `aims_*` ni escribe en GRC/Secretaría.
 - `regulatory_notifications` usa `notification_deadline`, no `deadline`.
 - `evidence-spine` en consola/readiness está en `pending`, no `verifiable`.
 
@@ -121,8 +122,10 @@ En código, ambos modos están en este repo. La segregación a repos independien
 
 - Documento de control: `docs/superpowers/plans/2026-05-02-ruflo-supervised-consolidation.md`.
 - Inventario de congelación: `docs/superpowers/plans/2026-05-02-demo-complete-inventory.md`.
+- Reactivación AIMS/GRC: `docs/superpowers/plans/2026-05-02-aims-grc-reactivation-log.md`.
 - Demo/prototype pack: `docs/superpowers/plans/2026-05-02-demo-pack.md`.
 - Memory key: `patterns/ruflo_supervised_handoffs_demo_complete_2026_05_02`.
+- Memory key: `patterns/aims_grc_reactivation_no_schema_2026_05_02`.
 
 ### Verificación última conocida
 
@@ -1037,7 +1040,7 @@ bun run build
 PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
-**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 24 warnings conocidos, `build` pass, e2e ampliado 39/39.
+**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/16-sanitization-smoke.spec.ts` 4/4 incluyendo `/ai-governance/sistemas/nuevo`.
 
 ## Supabase Cloud
 

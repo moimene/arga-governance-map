@@ -144,9 +144,9 @@ Postura actual:
 Estado AIMS 2026-05-02:
 
 - Completado mapa de pantallas conectadas en `src/lib/aims/readiness.ts` y visible en `/ai-governance`.
-- Rutas declaradas: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`.
-- Postura de todas las rutas: `legacy_read` sobre `ai_*`; sin lectura de `aims_*` en UI conectada actual.
-- Mutacion actual: read-only en las pantallas tocadas; AIMS no crea riesgos/controles GRC ni actos Secretaria.
+- Rutas declaradas: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/nuevo`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`.
+- Postura: `legacy_read` sobre `ai_*` en pantallas de lectura; `legacy_write` owner-write para alta de sistemas en `ai_systems`; sin lectura ni escritura de `aims_*` en UI conectada actual.
+- Mutacion actual: AIMS puede crear sistemas IA propios; no crea riesgos/controles GRC ni actos Secretaria.
 - Docs de contrato: `docs/superpowers/contracts/2026-04-27-aims-grc-data-contract.md` y `docs/superpowers/contracts/2026-04-27-cross-module-data-contract.md`.
 
 ### Slice 2 - Handoffs read-only
@@ -213,3 +213,13 @@ Lane closure:
 - GRC incidente/hallazgo -> Secretaria queda como handoff read-only hacia `/secretaria/reuniones/nueva`.
 - TPRM y Penal/Anticorrupcion siguen backlog no conectado.
 - Sin migrations, sin Supabase typegen, sin RLS/RPC/storage, sin writes a eventos/links y sin promocion de evidence/legal hold.
+
+## Avance 2026-05-02 - Reactivacion AIMS/GRC no_schema
+
+- AIMS reactiva el alta real de sistemas IA en `/ai-governance/sistemas/nuevo`.
+- La ruta usa `useCreateAiSystem` y escribe solo en `ai_systems` con `tenant_id` del contexto.
+- El contrato local marca esta pantalla como `legacy_write` y `owner-write`.
+- Las pruebas e2e renderizan el formulario, pero no ejecutan submit contra Cloud dentro del smoke.
+- GRC mantiene owner-write ya existente para incidentes en `/grc/incidentes/nuevo`.
+- Risk360, penal/anticorrupcion y TPRM no se activan como writes nuevos en esta tanda; penal/anticorrupcion requiere ruta+datos o paquete de schema si no basta con `risks`.
+- `supabase link --project-ref hzqwefkwsxopwrmtksbg` corrigio el enlace local del CLI; `db:check-target` vuelve a pasar. `supabase/.temp/` queda ignorado por Git.

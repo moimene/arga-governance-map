@@ -93,6 +93,7 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
     const routes: Array<{ path: string; signals: RegExp[] }> = [
       { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i, /AIMS P0 readiness/i] },
       { path: '/ai-governance/sistemas', signals: [/Sistemas IA/i, /Buscar sistema/i] },
+      { path: '/ai-governance/sistemas/nuevo', signals: [/Nuevo sistema IA/i, /Nombre del sistema/i] },
       { path: '/ai-governance/evaluaciones', signals: [/Evaluaciones/i, /Evaluaci[oó]n/i] },
       { path: '/ai-governance/incidentes', signals: [/Incidentes IA/i, /Incidente/i] },
       { path: '/grc', signals: [/GRC Compass/i, /Riesgos cr[ií]ticos/i, /Readiness ejecutivo P0/i, /Mapa de pantallas GRC/i] },

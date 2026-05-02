@@ -39,6 +39,9 @@ dist-ssr
 # Environment variables
 .env
 
+# Supabase CLI local link/cache
+supabase/.temp/
+
 # Working docs (no committable)
 docs/BORRADORES\ INTERMEDIOS/
 Plantillas_Oleada1_Revision_Legal.docx

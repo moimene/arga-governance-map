@@ -115,6 +115,7 @@ const AiLayout = lazy(() =>
 );
 const AiDashboard = lazy(() => import("@/pages/ai-governance/Dashboard"));
 const Sistemas = lazy(() => import("@/pages/ai-governance/Sistemas"));
+const SistemaNuevo = lazy(() => import("@/pages/ai-governance/SistemaNuevo"));
 const SistemaDetalle = lazy(() => import("@/pages/ai-governance/SistemaDetalle"));
 const Evaluaciones = lazy(() => import("@/pages/ai-governance/Evaluaciones"));
 const AiIncidentes = lazy(() => import("@/pages/ai-governance/Incidentes"));
@@ -266,6 +267,7 @@ const App = () => (
                 >
                   <Route path="/ai-governance"              element={<Suspense fallback={<ModuleFallback />}><AiDashboard /></Suspense>} />
                   <Route path="/ai-governance/sistemas"     element={<Suspense fallback={<ModuleFallback />}><Sistemas /></Suspense>} />
+                  <Route path="/ai-governance/sistemas/nuevo" element={<Suspense fallback={<ModuleFallback />}><SistemaNuevo /></Suspense>} />
                   <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
                   <Route path="/ai-governance/evaluaciones" element={<Suspense fallback={<ModuleFallback />}><Evaluaciones /></Suspense>} />
                   <Route path="/ai-governance/incidentes"   element={<Suspense fallback={<ModuleFallback />}><AiIncidentes /></Suspense>} />

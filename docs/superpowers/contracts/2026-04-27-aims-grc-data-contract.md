@@ -185,6 +185,7 @@ Slice 1 avanza solo el carril **AIMS 360**. No fusiona AIMS con GRC ni con Secre
 |---|---|---|---|---|---|---|---|
 | `/ai-governance` | AIMS 360 | `useAiSystemsList`, `useAiIncidentsList`, `useAllAssessments` | `ai_systems`, `ai_incidents`, `ai_risk_assessments` | `legacy_read`; no lee `aims_*` | Supabase Cloud legacy `ai_*` + contrato local `src/lib/aims/readiness.ts` | Read-only | Navegacion AIMS; referencia Secretaria con `evidence=REFERENCE` |
 | `/ai-governance/sistemas` | AIMS 360 | `useAiSystemsList` | `ai_systems` | `legacy_read`; `aims_*` candidato futuro | `ai_systems` | Read-only | Drilldown owner AIMS |
+| `/ai-governance/sistemas/nuevo` | AIMS 360 | `useCreateAiSystem` | `ai_systems` | `legacy_write`; `aims_*` no usado | `ai_systems` | Owner-write | Sin handoff; alta propietaria AIMS |
 | `/ai-governance/sistemas/:id` | AIMS 360 | `useAiSystemById`, `useAssessmentsBySystem`, `useComplianceChecksBySystem`, `useAiIncidentsBySystem` | `ai_systems`, `ai_risk_assessments`, `ai_compliance_checks`, `ai_incidents` | `legacy_read`; no mezcla backbone | `ai_systems` como owner; hijas `ai_*` por `system_id` | Read-only | Referencia contextual a evaluaciones/incidentes AIMS |
 | `/ai-governance/evaluaciones` | AIMS 360 | `useAllAssessments` | `ai_risk_assessments`, `ai_systems` | `legacy_read` tenant-scoped por join a `ai_systems` | `ai_risk_assessments` | Read-only | `AIMS_TECHNICAL_FILE_GAP` -> `/grc/risk-360` |
 | `/ai-governance/incidentes` | AIMS 360 | `useAiIncidentsList` | `ai_incidents`, `ai_systems` | `legacy_read` | `ai_incidents` | Read-only | `AIMS_INCIDENT_MATERIAL` -> `/grc/incidentes`; `AIMS_INCIDENT_MATERIAL` -> `/secretaria/reuniones/nueva` |
@@ -200,6 +201,7 @@ Slice 1 avanza solo el carril **AIMS 360**. No fusiona AIMS con GRC ni con Secre
 
 Reglas aplicadas:
 
+- AIMS puede crear sistemas IA en `ai_systems` desde su ruta owner.
 - AIMS no crea riesgos, controles, action plans ni incidentes GRC directamente.
 - AIMS no crea acuerdos, actas, certificaciones ni reuniones de Secretaria.
 - No hay writes a `governance_module_events` ni `governance_module_links`.
@@ -208,8 +210,8 @@ Reglas aplicadas:
 
 Data contract:
 
-- Screen/hook: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`; hooks `useAiSystems*`, `useAiAssessments*`, `useAiIncidents*`.
-- Posture: `legacy_read` para todas las pantallas conectadas.
+- Screen/hook: `/ai-governance`, `/ai-governance/sistemas`, `/ai-governance/sistemas/nuevo`, `/ai-governance/sistemas/:id`, `/ai-governance/evaluaciones`, `/ai-governance/incidentes`; hooks `useAiSystems*`, `useAiAssessments*`, `useAiIncidents*`.
+- Posture: `legacy_read` para pantallas de lectura; `legacy_write` owner-write para `/ai-governance/sistemas/nuevo`.
 - Tables used: `ai_systems`, `ai_risk_assessments`, `ai_compliance_checks`, `ai_incidents`.
 - Source of truth: Supabase Cloud legacy `ai_*`; contrato local `src/lib/aims/readiness.ts` para mapa/readiness.
 - Migration required: no.
@@ -217,7 +219,7 @@ Data contract:
 - RLS/RPC/storage affected: no.
 - Event/link contract: rutas read-only alineadas con `AIMS_TECHNICAL_FILE_GAP`, `AIMS_INCIDENT_MATERIAL`, `SECRETARIA_CERTIFICATION_ISSUED`; sin writes.
 - Evidence level: `NOT_EVIDENCE` para gaps/incidentes; `REFERENCE` explicito para referencias Secretaria -> AIMS.
-- Parity risk: bajo para UI actual; medio para futuros writes a `governance_module_events` / `governance_module_links`; medio para migracion `ai_* -> aims_*`.
+- Parity risk: bajo para UI actual; medio para owner-writes legacy hasta definir adopcion `aims_*`; medio para futuros writes a `governance_module_events` / `governance_module_links`; medio para migracion `ai_* -> aims_*`.
 
 Verification:
 
@@ -257,3 +259,36 @@ Data contract:
 - Event/link contract: route-only candidates for `GRC_INCIDENT_MATERIAL`, `GRC_FINDING_BOARD_ESCALATION`, `AIMS_TECHNICAL_FILE_GAP`, `AIMS_INCIDENT_MATERIAL`.
 - Evidence level: `REFERENCE`; no final evidence or legal hold.
 - Parity risk: low for UI/read-only; medium for future shared event/link writes.
+
+## Reactivacion AIMS 2026-05-02 - Owner-write no_schema
+
+Resultado:
+
+- AIMS reactiva `/ai-governance/sistemas/nuevo`.
+- La pantalla usa `useCreateAiSystem` y escribe solo en `ai_systems`.
+- El mapa local `src/lib/aims/readiness.ts` declara la ruta como `legacy_write` y `owner-write`.
+- `/ai-governance/sistemas` enlaza a la alta owner AIMS.
+- El e2e smoke renderiza la ruta nueva sin ejecutar submit contra Cloud.
+
+Data contract:
+
+- Screen/hook: `/ai-governance/sistemas/nuevo`, `useCreateAiSystem`.
+- Posture: `legacy_write`.
+- Tables used: `ai_systems`.
+- Source of truth: `ai_systems`.
+- Migration required: no.
+- Types affected: no typegen; local TypeScript only.
+- RLS/RPC/storage affected: no.
+- Event/link contract: none; no writes to `governance_module_events` / `governance_module_links`.
+- Evidence level: `NOT_EVIDENCE`.
+- Parity risk: medium for future `ai_* -> aims_*`; low for current owner-write UI.
+
+Verification:
+
+- `bun run db:check-target`: pass.
+- `bun test src/lib/aims/**`: pass, 5/5.
+- `bun test`: pass, 582/582, 66 skipped.
+- `bunx tsc --noEmit --pretty false`: pass.
+- `bun run lint`: pass, 0 errores, 23 warnings conocidos.
+- `bun run build`: pass.
+- `PLAYWRIGHT_PORT=5192 bunx playwright test e2e/16-sanitization-smoke.spec.ts --project=chromium --reporter=list`: pass, 4/4.

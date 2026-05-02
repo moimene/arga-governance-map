@@ -69,6 +69,7 @@ describe("buildAimsReadiness", () => {
     expect(aimsScreenPostures.map((screen) => screen.route)).toEqual([
       "/ai-governance",
       "/ai-governance/sistemas",
+      "/ai-governance/sistemas/nuevo",
       "/ai-governance/sistemas/:id",
       "/ai-governance/evaluaciones",
       "/ai-governance/incidentes",
@@ -76,10 +77,19 @@ describe("buildAimsReadiness", () => {
 
     for (const screen of aimsScreenPostures) {
       expect(screen.owner).toBe("AIMS 360");
-      expect(screen.posture).toBe("legacy_read");
-      expect(screen.operation).toBe("read-only");
       expect(screen.migrationRequired).toBe(false);
       expect(screen.tables.every((table) => table.startsWith("ai_"))).toBe(true);
+    }
+
+    const createSystem = aimsScreenPostures.find(
+      (screen) => screen.route === "/ai-governance/sistemas/nuevo",
+    );
+    expect(createSystem?.posture).toBe("legacy_write");
+    expect(createSystem?.operation).toBe("owner-write");
+
+    for (const screen of aimsScreenPostures.filter((screen) => screen.route !== "/ai-governance/sistemas/nuevo")) {
+      expect(screen.posture).toBe("legacy_read");
+      expect(screen.operation).toBe("read-only");
     }
   });
 
