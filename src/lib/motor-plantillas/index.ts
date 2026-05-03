@@ -8,6 +8,11 @@ export {
   buildCapa3AiAllowedFields,
   suggestCapa3Draft,
 } from "./capa3-draft-assistant";
+export {
+  invokeAnthropicCapa3DraftProvider,
+  sanitizeCapa3ProviderInput,
+  suggestCapa3DraftWithAnthropicFallback,
+} from "./anthropic-capa3-provider";
 export { generateProcessDocxWithMotor } from "./process-generator";
 export { validatePostRenderDocument } from "./post-render-validation";
 export {

@@ -10,6 +10,7 @@ Importar siempre desde `@/lib/motor-plantillas`:
 - `prepareDocumentComposition(req, capa3Values, options)`
 - `composeDocument(req, capa3Values, options)`
 - `suggestCapa3Draft(input)`
+- `suggestCapa3DraftWithAnthropicFallback(input)`
 - `buildCapa3AiAllowedFields(fields)`
 - `generateProcessDocxWithMotor(input)`
 - `validatePostRenderDocument(input)`
@@ -54,6 +55,13 @@ sugerencias como pendientes de revision humana. En ausencia de proveedor de
 modelo configurado usa `capa3-local-demo-assistant@0.1.0`, un fallback local
 determinista para demo. Un proveedor IA real debe vivir server-side y devolver
 solo los campos permitidos.
+
+`suggestCapa3DraftWithAnthropicFallback()` intenta primero la Edge Function
+`anthropic-capa3-draft-assistant` y vuelve al fallback local si no esta
+desplegada o no tiene secreto. La funcion espera `ANTHROPIC_API_KEY` en el
+entorno server-side y permite sobrescribir modelo con `ANTHROPIC_MODEL`; el
+default local de la funcion es `claude-opus-4-7`. Nunca leer claves
+desde frontend ni desde repos externos.
 
 ## No-schema posture
 

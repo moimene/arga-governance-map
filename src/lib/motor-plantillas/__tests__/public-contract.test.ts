@@ -5,12 +5,15 @@ import {
   buildCapa3AiAllowedFields,
   composeDocument,
   generateProcessDocxWithMotor,
+  invokeAnthropicCapa3DraftProvider,
   prepareDocumentComposition,
   probeReviewStateSchema,
+  sanitizeCapa3ProviderInput,
   staticReviewStateSchemaGate,
   transitionReviewState,
   validatePostRenderDocument,
   suggestCapa3Draft,
+  suggestCapa3DraftWithAnthropicFallback,
 } from "../index";
 
 describe("motor-plantillas public contract", () => {
@@ -19,6 +22,9 @@ describe("motor-plantillas public contract", () => {
     expect(typeof composeDocument).toBe("function");
     expect(typeof generateProcessDocxWithMotor).toBe("function");
     expect(typeof suggestCapa3Draft).toBe("function");
+    expect(typeof suggestCapa3DraftWithAnthropicFallback).toBe("function");
+    expect(typeof invokeAnthropicCapa3DraftProvider).toBe("function");
+    expect(typeof sanitizeCapa3ProviderInput).toBe("function");
     expect(typeof buildCapa3AiAllowedFields).toBe("function");
     expect(typeof prepareDocumentComposition).toBe("function");
     expect(typeof validatePostRenderDocument).toBe("function");

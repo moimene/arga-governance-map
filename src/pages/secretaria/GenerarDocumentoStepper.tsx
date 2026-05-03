@@ -49,7 +49,7 @@ import {
   composeDocument,
   prepareDocumentComposition,
   buildCapa3AiAllowedFields,
-  suggestCapa3Draft,
+  suggestCapa3DraftWithAnthropicFallback,
   type ComposeDocumentResult,
 } from "@/lib/motor-plantillas";
 import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
@@ -263,7 +263,7 @@ export default function GenerarDocumentoStepper() {
     if (!selectedPlantilla) return;
     setIsDraftingCapa3(true);
     try {
-      const result = await suggestCapa3Draft({
+      const result = await suggestCapa3DraftWithAnthropicFallback({
         fields: normalizedCapa3Fields,
         currentValues: normalizedCapa3Values,
         baseVariables: {

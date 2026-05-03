@@ -7,7 +7,7 @@ import type { ProcessDocumentGenerationInput } from "@/lib/doc-gen/process-docum
 import {
   buildCapa3AiAllowedFields,
   generateProcessDocxWithMotor,
-  suggestCapa3Draft,
+  suggestCapa3DraftWithAnthropicFallback,
 } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
 import { validateCapa3 } from "./Capa3Form";
@@ -192,7 +192,7 @@ export function ProcessDocxButton({
         variables: input.variables,
         capa3Values,
       });
-      const result = await suggestCapa3Draft({
+      const result = await suggestCapa3DraftWithAnthropicFallback({
         fields: capa3Fields,
         currentValues: capa3Values,
         baseVariables: {
@@ -206,7 +206,7 @@ export function ProcessDocxButton({
       setDraftAssistApplied(result.suggestions.length > 0);
       setDraftAssistSummary(
         result.suggestions.length > 0
-          ? `${result.suggestions.length} sugerencia(s) aplicadas · revisión humana obligatoria.`
+          ? `${result.suggestions.length} sugerencia(s) aplicadas · ${result.modelName} · revisión humana obligatoria.`
           : "No hay campos vacíos con contexto suficiente para sugerir.",
       );
       setCapa3Errors({});
