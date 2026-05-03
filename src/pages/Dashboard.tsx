@@ -6,6 +6,7 @@ import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hoo
 import { useModuleStatus } from "@/hooks/useModuleStatus";
 import { DemoOperablePanel } from "@/components/arga-console/DemoOperablePanel";
 import { ErpConsolePanel } from "@/components/arga-console/ErpConsolePanel";
+import { ReadinessHeader } from "@/components/arga-console/ReadinessHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KpiCard } from "@/components/KpiCard";
@@ -64,18 +65,22 @@ export default function Dashboard() {
   const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
 
   return (
-    <div className="mx-auto max-w-[1440px] p-6">
-      <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="mx-auto max-w-screen-2xl p-4 sm:p-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Buen día, Lucía</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Vista de <span className="font-medium text-foreground">{scope}</span> — operación al {new Date().toLocaleDateString("es-ES")}.
           </p>
         </div>
-        <Button onClick={start} className="gap-2 shadow-sm">
+        <Button onClick={start} className="gap-2 shadow-sm sm:self-end">
           <Play className="h-4 w-4 fill-current" />
           {label}
         </Button>
+      </div>
+
+      <div className="mb-6">
+        <ReadinessHeader />
       </div>
 
       <div className="mb-6">
@@ -87,7 +92,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div key={animKey} className="grid grid-cols-5 gap-4 animate-fade-in">
+      <div key={animKey} className="grid grid-cols-2 gap-4 animate-fade-in sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard label="Entidades activas" value={kpis?.entidades ?? data.entidades} icon={Building} tone="primary" to="/entidades" />
         <KpiCard label="Mandatos próximos a vencer" value={kpis?.mandatosVencimiento ?? data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
         <KpiCard label="Políticas pendientes de revisión" value={kpis?.politicasPendientes ?? data.politicasPendientes} icon={FileWarning} tone="warning" to="/politicas" />
@@ -96,10 +101,10 @@ export default function Dashboard() {
       </div>
 
       {/* Mid row */}
-      <div className="mt-6 grid grid-cols-12 gap-6">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Alertas críticas */}
         <Card className={cn(
-          "col-span-8 overflow-hidden",
+          "overflow-hidden lg:col-span-8",
           alerts.length > 0 ? "border-l-4 border-l-destructive" : "border-l-4 border-l-status-active",
         )}>
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
@@ -142,7 +147,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Próximas reuniones */}
-        <Card className="col-span-4 overflow-hidden">
+        <Card className="overflow-hidden lg:col-span-4">
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
@@ -176,9 +181,9 @@ export default function Dashboard() {
       </div>
 
       {/* Bottom row */}
-      <div className="mt-6 grid grid-cols-12 gap-6">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Handoffs cross-module */}
-        <Card className="col-span-6 overflow-hidden">
+        <Card className="overflow-hidden lg:col-span-6">
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-primary" />
@@ -211,7 +216,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Mini governance map */}
-        <Card className="col-span-3 overflow-hidden">
+        <Card className="overflow-hidden lg:col-span-3">
           <div className="flex items-center gap-2 border-b border-border px-5 py-3">
             <Network className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Governance Map</h2>
@@ -253,7 +258,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Actividad */}
-        <Card className="col-span-3 overflow-hidden">
+        <Card className="overflow-hidden lg:col-span-3">
           <div className="flex items-center gap-2 border-b border-border px-5 py-3">
             <Activity className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold">Actividad reciente</h2>
