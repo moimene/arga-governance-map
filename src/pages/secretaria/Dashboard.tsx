@@ -310,6 +310,31 @@ type NoSessionAgendaRow = {
   voting_deadline: string | null;
 };
 
+function humanizeToken(value?: string | null) {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\p{L}/gu, (char) => char.toUpperCase());
+}
+
+function filingViaLabel(value?: string | null) {
+  const raw = (value ?? "").trim().toUpperCase();
+  if (!raw) return "";
+  if (raw === "ELECTRONICA" || raw === "ELECTRONICO" || raw === "TELEMATICA" || raw === "TELEMATICO") {
+    return "electrónico";
+  }
+  if (raw === "NOTARIAL") return "notarial";
+  if (raw === "PRESENCIAL") return "presencial";
+  return humanizeToken(value).toLowerCase();
+}
+
+function filingAgendaTitle(filing: FilingAgendaRow) {
+  if (filing.filing_number) return filing.filing_number;
+  const via = filingViaLabel(filing.filing_via);
+  return via ? `Trámite ${via}` : "Trámite registral";
+}
+
 function useSecretariaAgenda(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -389,7 +414,7 @@ function useSecretariaAgenda(entityId?: string | null) {
           items.push({
             id: f.id,
             tipo: "tramitacion",
-            titulo: `${f.filing_number ?? "s/n"} · ${f.filing_via ?? ""}`.trim(),
+            titulo: filingAgendaTitle(f),
             fecha: f.presentation_date,
             estado: f.status,
             sublabel: "Tramitación registral",
@@ -540,7 +565,7 @@ function parityRiskLabel(risk: SecretariaFlowParityRisk) {
 function flowEvidenceLabel(level: string) {
   const labels: Record<string, string> = {
     none: "sin evidencia final productiva",
-    OWNER_RECORD: "registro owner",
+    OWNER_RECORD: "registro fuente",
     GENERATED: "generado; no final productivo",
     ARCHIVED: "archivado demo/operativo",
     BUNDLED: "bundle operativo demo",
@@ -559,6 +584,19 @@ function formatAgendaDate(value?: string | null) {
   });
 }
 
+function isPastAgendaDate(value?: string | null) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date.getTime() < today.getTime();
+}
+
+function countLabel(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function attentionCount(kpis?: KpiCounts) {
   if (!kpis) return 0;
   return (
@@ -567,6 +605,28 @@ function attentionCount(kpis?: KpiCounts) {
     kpis.libros_alerta +
     kpis.acuerdos_compliance_pendiente
   );
+}
+
+function attentionHeadline(count: number) {
+  if (count === 0) return "Sin bloqueos operativos relevantes";
+  return countLabel(count, "asunto requiere revisión", "asuntos requieren revisión");
+}
+
+function agendaPriorityTitle(item?: AgendaItem) {
+  if (!item) return "Agenda sin vencimientos inmediatos";
+  if (item.tipo === "tramitacion") return `Trámite abierto: ${item.titulo}`;
+  return isPastAgendaDate(item.fecha)
+    ? `Hito pendiente: ${item.titulo}`
+    : `Próximo hito: ${item.titulo}`;
+}
+
+function agendaPriorityDetail(item?: AgendaItem) {
+  if (!item) return "No hay convocatorias, reuniones ni votaciones próximas en la vista actual.";
+  const dateLabel = formatAgendaDate(item.fecha);
+  if (item.tipo === "tramitacion") return `${item.sublabel}; pendiente desde ${dateLabel}.`;
+  return isPastAgendaDate(item.fecha)
+    ? `${item.sublabel}; pendiente desde ${dateLabel}.`
+    : `${item.sublabel}; ${dateLabel}.`;
 }
 
 function priorityToneClass(tone: "ok" | "attention" | "neutral") {
@@ -700,36 +760,32 @@ export default function SecretariaDashboard() {
               Prioridad ahora
             </div>
             <h2 className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">
-              {openAttention > 0 ? `${openAttention} asunto(s) requieren revisión` : "Sin bloqueos operativos relevantes"}
+              {attentionHeadline(openAttention)}
             </h2>
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
-              Esta sección resume dónde conviene entrar primero. Cada fila abre el owner correspondiente.
+              Esta sección resume dónde conviene entrar primero. Cada fila abre la pantalla responsable.
             </p>
           </div>
           <PriorityRow
             icon={Clock}
-            title={nextAgenda ? `Próximo hito: ${nextAgenda.titulo}` : "Agenda sin vencimientos inmediatos"}
-            detail={
-              nextAgenda
-                ? `${nextAgenda.sublabel}, ${formatAgendaDate(nextAgenda.fecha)}`
-                : "No hay convocatorias, reuniones ni votaciones próximas en la vista actual."
-            }
+            title={agendaPriorityTitle(nextAgenda)}
+            detail={agendaPriorityDetail(nextAgenda)}
             action={nextAgenda ? "Abrir" : "Ver calendario"}
             tone={nextAgenda ? "attention" : "ok"}
             onClick={() => navigateSecretaria(nextAgenda?.nav_to ?? "/secretaria/calendario")}
           />
           <PriorityRow
             icon={FileSignature}
-            title={`${kpis?.actas_sin_firmar ?? 0} acta(s) pendientes de firma`}
-            detail="Completa firma y certificación solo desde Secretaría. No se promueve evidencia final productiva."
+            title={countLabel(kpis?.actas_sin_firmar ?? 0, "acta pendiente de firma", "actas pendientes de firma")}
+            detail="Completa firma y certificación desde Secretaría, sin presentarlo como evidencia productiva final."
             action="Revisar actas"
             tone={kpis && kpis.actas_sin_firmar > 0 ? "attention" : "ok"}
             onClick={() => navigateSecretaria("/secretaria/actas")}
           />
           <PriorityRow
             icon={Gavel}
-            title={`${kpis?.tramitaciones_subsanacion ?? 0} subsanación(es) registrales`}
-            detail="Las tramitaciones se mantienen en el flujo societario. El estado PROMOTED prepara descarga humana."
+            title={countLabel(kpis?.tramitaciones_subsanacion ?? 0, "subsanación registral", "subsanaciones registrales")}
+            detail="La tramitación sigue dentro del flujo societario. El documento queda aprobado para descarga humana."
             action="Abrir tramitador"
             tone={kpis && kpis.tramitaciones_subsanacion > 0 ? "attention" : "ok"}
             onClick={() => navigateSecretaria("/secretaria/tramitador")}
@@ -958,7 +1014,7 @@ export default function SecretariaDashboard() {
                 </span>
               </div>
               <div className="text-xs text-[var(--g-text-secondary)]">
-                Owner: {flow.ownerTables.length ? flow.ownerTables.slice(0, 2).join(", ") : "lectura compuesta"}
+                Fuente: {flow.ownerTables.length ? flow.ownerTables.slice(0, 2).join(", ") : "lectura compuesta"}
                 {flow.ownerTables.length > 2 ? "…" : ""}
               </div>
               <div className="text-xs text-[var(--g-text-secondary)]">
@@ -1043,7 +1099,7 @@ export default function SecretariaDashboard() {
               status={kpis && kpis.actas_sin_firmar > 0 ? "WARNING" : "OK"}
               note={
                 kpis && kpis.actas_sin_firmar > 0
-                  ? `${kpis.actas_sin_firmar} acta(s) en borrador`
+                  ? countLabel(kpis.actas_sin_firmar, "acta en borrador", "actas en borrador")
                   : "Todas firmadas"
               }
             />
@@ -1052,7 +1108,7 @@ export default function SecretariaDashboard() {
               status={kpis && kpis.tramitaciones_subsanacion > 0 ? "ERROR" : "OK"}
               note={
                 kpis && kpis.tramitaciones_subsanacion > 0
-                  ? `${kpis.tramitaciones_subsanacion} expediente(s)`
+                  ? countLabel(kpis.tramitaciones_subsanacion, "expediente registral", "expedientes registrales")
                   : "Ninguna"
               }
             />
@@ -1061,7 +1117,7 @@ export default function SecretariaDashboard() {
               status={kpis && kpis.libros_alerta > 0 ? "WARNING" : "OK"}
               note={
                 kpis && kpis.libros_alerta > 0
-                  ? `${kpis.libros_alerta} libro(s) con alerta`
+                  ? countLabel(kpis.libros_alerta, "libro con alerta", "libros con alerta")
                   : "Al día"
               }
             />
@@ -1069,23 +1125,23 @@ export default function SecretariaDashboard() {
             <ComplianceRow
               label="Pactos parasociales"
               status={crossModule && crossModule.pactos_vigentes > 0 ? "OK" : "OK"}
-              note={`${crossModule?.pactos_vigentes ?? 0} vigente(s) — evaluación activa`}
+              note={`${countLabel(crossModule?.pactos_vigentes ?? 0, "pacto vigente", "pactos vigentes")} — evaluación activa`}
             />
             <ComplianceRow
               label="Señales GRC read-only"
               status={crossModule && crossModule.incidents_open > 0 ? "WARNING" : "OK"}
               note={
                 crossModule && crossModule.incidents_open > 0
-                  ? `${crossModule.incidents_open} incidencia(s) abiertas; intake en GRC`
+                  ? `${countLabel(crossModule.incidents_open, "incidencia abierta", "incidencias abiertas")}; entrada en GRC`
                   : "Sin incidencias abiertas"
               }
             />
             <ComplianceRow
-              label="Políticas owner pendientes"
+              label="Políticas pendientes en GRC"
               status={crossModule && crossModule.policies_pendientes > 0 ? "WARNING" : "OK"}
               note={
                 crossModule && crossModule.policies_pendientes > 0
-                  ? `${crossModule.policies_pendientes} política(s) en revisión; no estado legal`
+                  ? `${countLabel(crossModule.policies_pendientes, "política en revisión", "políticas en revisión")}; no es estado legal`
                   : "Todas aprobadas"
               }
             />
