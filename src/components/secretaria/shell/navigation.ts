@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   FileSignature,
+  FileSearch,
   FileText,
   Gavel,
   Globe,
@@ -53,6 +54,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
+      { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
 ];
@@ -108,6 +110,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
+      { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
 ];
@@ -133,6 +136,7 @@ export function getSecretariaSectionLabel(pathname: string, mode: SecretariaMode
   if (/^\/secretaria\/reuniones\/nueva/.test(pathname)) return "Reuniones";
   if (/^\/secretaria\/procesos-grupo/.test(pathname)) return "Campañas de grupo";
   if (/^\/secretaria\/tramitador\/nuevo/.test(pathname)) return "Tramitador registral";
+  if (/^\/secretaria\/documentos\/pendientes-revision/.test(pathname)) return "Documentos pendientes de revision";
   if (/^\/secretaria\/acuerdos\/[^/]+\/generar/.test(pathname)) return "Generar documento";
   if (/^\/secretaria\/acuerdos\/[^/]+/.test(pathname)) return "Expediente";
 

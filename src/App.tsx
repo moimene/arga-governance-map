@@ -73,6 +73,7 @@ const Calendario = lazy(() => import("@/pages/secretaria/Calendario"));
 const ProcesosGrupo = lazy(() => import("@/pages/secretaria/ProcesosGrupo"));
 const ExpedienteAcuerdo = lazy(() => import("@/pages/secretaria/ExpedienteAcuerdo"));
 const GenerarDocumentoStepper = lazy(() => import("@/pages/secretaria/GenerarDocumentoStepper"));
+const DocumentosPendientesRevision = lazy(() => import("@/pages/secretaria/DocumentosPendientesRevision"));
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
@@ -216,6 +217,7 @@ const App = () => (
                   <Route path="/secretaria/procesos-grupo" element={<Suspense fallback={<ModuleFallback />}><ProcesosGrupo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id" element={<Suspense fallback={<ModuleFallback />}><ExpedienteAcuerdo /></Suspense>} />
                   <Route path="/secretaria/acuerdos/:id/generar" element={<Suspense fallback={<ModuleFallback />}><GenerarDocumentoStepper /></Suspense>} />
+                  <Route path="/secretaria/documentos/pendientes-revision" element={<Suspense fallback={<ModuleFallback />}><DocumentosPendientesRevision /></Suspense>} />
                   <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />
                   <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />

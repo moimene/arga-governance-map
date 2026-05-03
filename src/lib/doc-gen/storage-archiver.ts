@@ -10,6 +10,7 @@ export interface ArchiveResult {
 
 export interface ArchiveMetadata {
   processKind?: string;
+  evidenceStatus?: "DEMO_OPERATIVA";
   recordId?: string;
   templateId?: string | null;
   templateTipo?: string;
@@ -100,6 +101,7 @@ export async function archiveDocxToStorage(
       created_at: archivedAt,
       agreement_id: agreementId,
       tenant_id: tenantId,
+      evidence_status: metadata.evidenceStatus ?? "DEMO_OPERATIVA",
       artifacts: [
         {
           type: "DOCX",

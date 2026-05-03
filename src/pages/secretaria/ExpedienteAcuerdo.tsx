@@ -31,6 +31,7 @@ import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
 
 interface RuleEvaluationResult {
   id: string;
@@ -184,16 +185,21 @@ export default function ExpedienteAcuerdo() {
               Generar documento
             </button>
             {a.document_url && (
-              <a
-                href={a.document_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
-                Ver documento archivado
-              </a>
+              <div className="flex flex-col gap-1">
+                <a
+                  href={a.document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                  Ver documento archivado
+                </a>
+                <span className="text-xs text-[var(--g-text-secondary)]">
+                  Promocion a expediente pendiente de {REVIEW_STATE_VIEW}.
+                </span>
+              </div>
             )}
           </div>
         )}

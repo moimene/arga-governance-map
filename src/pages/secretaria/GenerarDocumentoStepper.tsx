@@ -29,18 +29,25 @@ import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
-import { findMissingVariables, renderTemplate } from "@/lib/doc-gen/template-renderer";
-import { resolveVariables, mergeVariables } from "@/lib/doc-gen/variable-resolver";
+import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
-import { generateDocx, downloadDocx, computeContentHash } from "@/lib/doc-gen/docx-generator";
-import type { EditableField } from "@/lib/doc-gen/docx-generator";
+import { downloadDocx } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
+import {
+  buildSecretariaDocumentGenerationRequest,
+  type SecretariaDocumentType,
+} from "@/lib/secretaria/document-generation-boundary";
+import {
+  composeDocument,
+  prepareDocumentComposition,
+  type ComposeDocumentResult,
+} from "@/lib/motor-plantillas";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -56,6 +63,23 @@ function hasResolvedValue(value: unknown) {
   if (value === undefined || value === null) return false;
   if (typeof value === "string" && value.trim() === "") return false;
   return true;
+}
+
+function inferDocumentTypeForComposer(
+  plantilla: PlantillaProtegidaRow,
+  adoptionMode?: string | null,
+): SecretariaDocumentType {
+  const tipo = plantilla.tipo;
+  const mode = adoptionMode?.toUpperCase() ?? "";
+  if (tipo === "ACTA_ACUERDO_ESCRITO" || mode === "NO_SESSION" || mode === "CO_APROBACION" || mode === "SOLIDARIO") {
+    return "ACUERDO_SIN_SESION";
+  }
+  if (tipo === "ACTA_CONSIGNACION" || mode.startsWith("UNIPERSONAL")) {
+    return "DECISION_UNIPERSONAL";
+  }
+  if (tipo === "INFORME_DOCUMENTAL_PRE") return "INFORME_DOCUMENTAL_PRE";
+  if (tipo === "INFORME_PRECEPTIVO") return "INFORME_DOCUMENTAL_PRE";
+  return "INFORME_DOCUMENTAL_PRE";
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -94,6 +118,7 @@ export default function GenerarDocumentoStepper() {
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
   const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
+  const [compositionResult, setCompositionResult] = useState<ComposeDocumentResult | null>(null);
 
   const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
@@ -143,11 +168,30 @@ export default function GenerarDocumentoStepper() {
     [capa3Values, normalizedCapa3Fields],
   );
 
+  const buildComposerRequest = useCallback(
+    async (plantilla: PlantillaProtegidaRow) => {
+      if (!agreement || !tenantId) throw new Error("No hay acuerdo o tenant para componer el documento.");
+      const documentType = inferDocumentTypeForComposer(plantilla, agreement.adoption_mode);
+      return buildSecretariaDocumentGenerationRequest({
+        documentType,
+        tenantId,
+        entityId: agreement.entity_id,
+        agreementIds: [agreement.id],
+        templateId: plantilla.id,
+        expectedAdoptionMode: agreement.adoption_mode as Parameters<typeof buildSecretariaDocumentGenerationRequest>[0]["expectedAdoptionMode"],
+      });
+    },
+    [agreement, tenantId],
+  );
+
   // ── Step 1: Select plantilla ─────────────────────────────────────────────
 
   const handleSelectPlantilla = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
       setSelectedPlantilla(plantilla);
+      setCompositionResult(null);
+      setDocxBuffer(null);
+      setContentHash("");
 
       // Auto-resolve variables
       if (plantilla.capa2_variables && agreement) {
@@ -180,35 +224,28 @@ export default function GenerarDocumentoStepper() {
 
   // ── Step 4: Render preview ───────────────────────────────────────────────
 
-  const handleRenderPreview = useCallback(() => {
+  const handleRenderPreview = useCallback(async () => {
     if (!selectedPlantilla?.capa1_inmutable) {
       setRenderError("La plantilla no tiene contenido capa1.");
       return;
     }
 
-    const mergedVars = mergeVariables(resolvedVars, normalizedCapa3Values);
-    const result = renderTemplate({
-      template: selectedPlantilla.capa1_inmutable,
-      variables: mergedVars,
-    });
-    const requiredTemplateMisses = findMissingVariables(selectedPlantilla.capa1_inmutable, mergedVars)
-      .filter((variable) => missingRequiredCapa2.includes(variable) || missingRequiredCapa2.includes(variable.split(".")[0]));
-
-    if (requiredTemplateMisses.length > 0) {
-      setRenderError(`Faltan variables obligatorias: ${requiredTemplateMisses.join(", ")}`);
-      setStep(1);
-      return;
-    }
-
-    if (result.ok) {
-      setRenderedText(result.text);
+    try {
+      const request = await buildComposerRequest(selectedPlantilla);
+      const prepared = await prepareDocumentComposition(request, normalizedCapa3Values, {
+        plantilla: selectedPlantilla,
+        baseVariables: resolvedVars,
+      });
+      setResolvedVars(prepared.capa2.values);
+      setUnresolvedVars(Array.from(new Set([...prepared.capa2.unresolved, ...prepared.unresolvedVariables])));
+      setRenderedText(prepared.renderedText);
       setRenderError(null);
-    } else {
-      setRenderError(result.error || "Error al renderizar la plantilla.");
+    } catch (e) {
+      setRenderError(e instanceof Error ? e.message : "Error al renderizar la plantilla.");
     }
 
     setStep(3);
-  }, [selectedPlantilla, resolvedVars, normalizedCapa3Values, missingRequiredCapa2]);
+  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars]);
 
   const handleSignQES = useCallback(async () => {
     if (!docxBuffer || !selectedPlantilla || !agreement) {
@@ -253,7 +290,11 @@ export default function GenerarDocumentoStepper() {
         ? qesResult.signedDocumentData
         : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
       const result = await archiveDocxToStorage(archiveBuffer, agreement.id, filename, tenantId ?? "", {
-        processKind: "DOCUMENTO_REGISTRAL",
+        processKind: compositionResult?.request.document_type ?? inferDocumentTypeForComposer(
+          selectedPlantilla,
+          agreement.adoption_mode,
+        ),
+        evidenceStatus: "DEMO_OPERATIVA",
         recordId: agreement.id,
         templateId: selectedPlantilla?.id ?? null,
         templateTipo: selectedPlantilla?.tipo,
@@ -290,7 +331,7 @@ export default function GenerarDocumentoStepper() {
       setArchiveError(errorMsg);
       setArchiveStatus("error");
     }
-  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash]);
+  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash, compositionResult]);
 
   // ── Step 5: Generate DOCX ───────────────────────────────────────────────
 
@@ -299,35 +340,18 @@ export default function GenerarDocumentoStepper() {
 
     setIsGenerating(true);
     try {
-      const hash = await computeContentHash(renderedText);
-      setContentHash(hash);
-      const title = renderedText.split("\n")[0] || selectedPlantilla.tipo;
-
-      const editableFields: EditableField[] = normalizedCapa3Fields.map(
-        (f) => ({
-          key: f.campo,
-          label: f.descripcion || f.campo,
-          value: normalizedCapa3Values[f.campo] || undefined,
-        })
-      );
-
-      const buffer = await generateDocx({
-        renderedText,
-        title,
-        subtitle: agreement?.entity_id ? undefined : undefined,
-        templateTipo: selectedPlantilla.tipo,
-        templateVersion: selectedPlantilla.version,
-        contentHash: hash,
-        entityName: resolvedVars.denominacion_social as string,
-        generatedAt: new Date().toISOString().split("T")[0],
-        editableFields: editableFields.length > 0 ? editableFields : undefined,
+      const request = await buildComposerRequest(selectedPlantilla);
+      const result = await composeDocument(request, normalizedCapa3Values, {
+        plantilla: selectedPlantilla,
+        baseVariables: resolvedVars,
+        archiveDraft: false,
       });
 
-      // Save buffer for later archival
-      setDocxBuffer(buffer);
+      setCompositionResult(result);
+      setContentHash(result.contentHash);
+      setDocxBuffer(result.docxBuffer);
 
-      const filename = `${selectedPlantilla.tipo}_${agreement?.id?.slice(0, 8) || "doc"}_${new Date().toISOString().split("T")[0]}.docx`;
-      downloadDocx(buffer, filename);
+      downloadDocx(result.docxBuffer, result.filename);
       setGenerated(true);
       setSigningStatus("idle");
       setSigningError(null);
@@ -341,7 +365,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedPlantilla, renderedText, agreement, resolvedVars, normalizedCapa3Fields, normalizedCapa3Values]);
+  }, [selectedPlantilla, renderedText, buildComposerRequest, normalizedCapa3Values, resolvedVars]);
 
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -585,13 +609,14 @@ export default function GenerarDocumentoStepper() {
 
                 {missingRequiredCapa2.length > 0 ? (
                   <div
-                    className="flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-card)] px-4 py-2 text-xs text-[var(--status-error)]"
-                    role="alert"
+                    className="flex items-start gap-2 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-4 py-2 text-xs text-[var(--status-warning)]"
+                    role="status"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span>
-                      Variables obligatorias no resueltas: {missingRequiredCapa2.join(", ")}.
+                      Variables Capa 2 no resueltas: {missingRequiredCapa2.join(", ")}. El composer
+                      las conservara como advertencias de post-render.
                     </span>
                   </div>
                 ) : null}
@@ -609,8 +634,7 @@ export default function GenerarDocumentoStepper() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    disabled={missingRequiredCapa2.length > 0}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     Siguiente
@@ -693,8 +717,8 @@ export default function GenerarDocumentoStepper() {
 
             {renderError ? (
               <div
-                className="px-4 py-3 text-sm text-[var(--status-error)]"
-                style={{ borderRadius: "var(--g-radius-md)", background: "hsl(0 84% 60% / 0.08)" }}
+                className="border border-[var(--status-error)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--status-error)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 {renderError}
               </div>
@@ -747,12 +771,45 @@ export default function GenerarDocumentoStepper() {
         {/* ──────── Step 4: Generated + Signing ──────── */}
         {step === 4 && (
           <div className="space-y-4 py-6">
-            <div className="flex items-center gap-3 px-4 py-3 bg-[var(--status-success)]/10 text-[var(--status-success)] rounded-lg">
+            <div
+              className="flex items-center gap-3 px-4 py-3 bg-[var(--status-success)]/10 text-[var(--status-success)]"
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <span className="text-sm font-medium">Documento generado correctamente</span>
             </div>
 
-            <div className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-subtle)]">
+            {compositionResult ? (
+              <div
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+                style={{ borderRadius: "var(--g-radius-lg)" }}
+              >
+                <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Resultado del composer
+                </h3>
+                <div className="mt-3 grid gap-2 text-xs text-[var(--g-text-secondary)] sm:grid-cols-2">
+                  <p>
+                    <span className="font-medium text-[var(--g-text-primary)]">Boundary:</span>{" "}
+                    {compositionResult.request.document_type} · {compositionResult.request.evidence_status}
+                  </p>
+                  <p>
+                    <span className="font-medium text-[var(--g-text-primary)]">Plantilla:</span>{" "}
+                    {compositionResult.template.tipo} v{compositionResult.template.version}
+                  </p>
+                  <p className="font-mono">
+                    Hash {compositionResult.contentHash.slice(0, 16)}
+                  </p>
+                  <p>
+                    Validacion post-render: {compositionResult.postRenderValidation.ok ? "OK" : "Bloqueada"}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            <div
+              className="border border-[var(--g-border-subtle)] p-4 bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <Lock className="h-4 w-4" />
                 Firma Cualificada (QES)
@@ -786,7 +843,10 @@ export default function GenerarDocumentoStepper() {
 
               {signingStatus === "signed" && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)] rounded">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="text-sm font-medium">Solicitud QES activada correctamente</span>
                   </div>
@@ -805,7 +865,10 @@ export default function GenerarDocumentoStepper() {
 
               {signingStatus === "error" && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--status-error)]/10 text-[var(--status-error)] rounded">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-error)]/10 text-[var(--status-error)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
                     <AlertTriangle className="h-4 w-4" />
                     <span className="text-sm font-medium">Error al firmar</span>
                   </div>
@@ -821,7 +884,10 @@ export default function GenerarDocumentoStepper() {
               )}
             </div>
 
-            <div className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-subtle)]">
+            <div
+              className="border border-[var(--g-border-subtle)] p-4 bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <FileCheck2 className="h-4 w-4" />
                 Archivar en Supabase Storage
@@ -854,7 +920,10 @@ export default function GenerarDocumentoStepper() {
 
               {archiveStatus === "archived" && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)] rounded">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="text-sm font-medium">Documento archivado correctamente</span>
                   </div>
@@ -929,7 +998,10 @@ export default function GenerarDocumentoStepper() {
 
               {archiveStatus === "error" && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--status-error)]/10 text-[var(--status-error)] rounded">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-error)]/10 text-[var(--status-error)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
                     <AlertTriangle className="h-4 w-4" />
                     <span className="text-sm font-medium">Error al archivar</span>
                   </div>
@@ -960,6 +1032,7 @@ export default function GenerarDocumentoStepper() {
                   setArchiveError(null);
                   setDocxBuffer(null);
                   setQesResult(null);
+                  setCompositionResult(null);
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}

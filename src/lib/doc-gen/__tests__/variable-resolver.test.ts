@@ -29,6 +29,14 @@ vi.mock("@/integrations/supabase/client", () => {
         data: getStore().rows[table] ?? null,
         error: null,
       })),
+      then: (
+        onFulfilled?: (value: { data: unknown; error: null }) => unknown,
+        onRejected?: (reason: unknown) => unknown,
+      ) =>
+        Promise.resolve({
+          data: getStore().rows[table] ?? [],
+          error: null,
+        }).then(onFulfilled, onRejected),
     };
 
     return query;
@@ -102,11 +110,11 @@ describe("variable-resolver", () => {
       name: "Consejo de Administracion",
       established_date: "2020-01-01",
       legal_basis: "Estatutos sociales",
-      body_mandates: [
-        { role: "Presidente", persons: { name: "Antonio Rios" } },
-        { role: "Secretario", persons: { name: "Lucia Paredes" } },
-      ],
     };
+    mockDb.rows.condiciones_persona = [
+      { tipo_condicion: "Presidente", persons: { full_name: "Antonio Rios" } },
+      { tipo_condicion: "Secretario", persons: { full_name: "Lucia Paredes" } },
+    ];
 
     const result = await resolveVariables(
       [

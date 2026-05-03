@@ -7,7 +7,7 @@
  *
  * Sources:
  * - ENTIDAD  → entities table (denominacion_social, cif, domicilio, etc.)
- * - ORGANO   → governing_bodies + body_mandates (presidente, secretario, members)
+ * - ORGANO   → governing_bodies + condiciones_persona (presidente, secretario, members)
  * - REUNION  → meetings + agenda + participants
  * - EXPEDIENTE → agreements table (the agreement itself)
  * - CAP_TABLE → capital_holdings + parte_votante_current
@@ -48,14 +48,15 @@ export interface ResolvedVariables {
 type PersonRow = { name?: string | null; full_name?: string | null };
 type BodyMandateRow = {
   role?: string | null;
+  tipo_condicion?: string | null;
   person_name?: string | null;
   persons?: PersonRow | null;
 };
 type BodyWithMandates = {
+  id?: string | null;
   name: string;
   established_date?: string | null;
   legal_basis?: string | null;
-  body_mandates?: BodyMandateRow[];
 };
 type AgendaItemRow = { order_index?: number | null; title?: string | null; description?: string | null };
 type ParticipantRow = {
@@ -103,27 +104,24 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   if (error || !data) return {};
 
   return {
-    name: data.name,
-    tax_id: data.tax_id,
+    name: data.common_name || data.legal_name,
+    tax_id: data.tax_id || data.registration_number,
     registration_number: data.registration_number,
-    address: data.address,
-    registry_location: data.registry_location,
-    registry_volume: data.registry_volume,
-    registry_folio: data.registry_folio,
-    registry_sheet: data.registry_sheet,
-    registry_inscription: data.registry_inscription,
-    city: data.city,
-    entity_type_detail: data.entity_type_detail,
-    denominacion_social: data.name,
-    cif: data.tax_id || data.registration_number,
-    domicilio_social: data.address,
-    registro_mercantil: data.registry_location,
-    tomo: data.registry_volume,
-    folio: data.registry_folio,
-    hoja: data.registry_sheet,
-    inscripcion: data.registry_inscription,
-    lugar: data.city || data.address,
-    tipo_social: data.entity_type_detail, // SA, SL
+    legal_name: data.legal_name,
+    common_name: data.common_name,
+    jurisdiction: data.jurisdiction,
+    legal_form: data.legal_form,
+    entity_type_detail: data.tipo_social || data.legal_form,
+    denominacion_social: data.legal_name || data.common_name,
+    cif: data.tax_id || data.registration_number || "—",
+    domicilio_social: data.address || "—",
+    registro_mercantil: data.registry_location || "—",
+    tomo: data.registry_volume || "—",
+    folio: data.registry_folio || "—",
+    hoja: data.registry_sheet || "—",
+    inscripcion: data.registry_inscription || "—",
+    lugar: data.city || data.address || "—",
+    tipo_social: data.tipo_social || data.legal_form, // SA, SL
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
   };
 }
@@ -133,7 +131,7 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
 async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data: body, error } = await supabase
     .from("governing_bodies")
-    .select("*, body_mandates(*, persons(*))")
+    .select("*")
     .eq("id", bodyId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -141,7 +139,17 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
   if (error || !body) return {};
 
   const bodyTyped = body as unknown as BodyWithMandates;
-  const mandates = bodyTyped.body_mandates ?? [];
+  const { data: rawMandates } = await supabase
+    .from("condiciones_persona")
+    .select("id, tipo_condicion, persons(full_name)")
+    .eq("body_id", bodyId)
+    .eq("tenant_id", tenantId)
+    .eq("estado", "VIGENTE")
+    .order("tipo_condicion", { ascending: true });
+  const mandates = ((rawMandates ?? []) as BodyMandateRow[]).map((mandate) => ({
+    ...mandate,
+    role: mandate.role ?? mandate.tipo_condicion ?? null,
+  }));
 
   // Find presidente and secretario by role
   const presidenteMandate = mandates.find((m) =>
@@ -152,7 +160,7 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
   );
 
   const miembros = mandates.map((m) => ({
-    nombre: m.persons?.name || m.person_name || "—",
+    nombre: m.persons?.full_name || m.persons?.name || m.person_name || "—",
     cargo: m.role || "Vocal",
   }));
 
@@ -163,10 +171,10 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
     nombre_comision: bodyTyped.name,
     organo_nombre: bodyTyped.name,
     organo_convocante: bodyTyped.name,   // alias used in JGA acta templates
-    presidente: presidenteMandate?.persons?.name || presidenteMandate?.person_name || "—",
-    secretario: secretarioMandate?.persons?.name || secretarioMandate?.person_name || "—",
+    presidente: presidenteMandate?.persons?.full_name || presidenteMandate?.persons?.name || presidenteMandate?.person_name || "—",
+    secretario: secretarioMandate?.persons?.full_name || secretarioMandate?.persons?.name || secretarioMandate?.person_name || "—",
     cargo_convocante: presidenteMandate?.role || "Presidente",
-    convocante_nombre: presidenteMandate?.persons?.name || "—",
+    convocante_nombre: presidenteMandate?.persons?.full_name || presidenteMandate?.persons?.name || "—",
     miembros_totales: mandates.length,
     miembros: miembros,
     fecha_constitucion_comision: bodyTyped.established_date || "—",
