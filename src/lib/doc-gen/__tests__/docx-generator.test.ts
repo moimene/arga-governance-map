@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { generateDocx } from "../docx-generator";
+import { buildPrintableDocumentHtml, generateDocx } from "../docx-generator";
 
 function sha256(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -27,5 +27,19 @@ describe("docx-generator", () => {
     expect(first.length).toBeGreaterThan(0);
     expect(sha256(first)).toBe(sha256(second));
     expect(Buffer.compare(Buffer.from(first), Buffer.from(second))).toBe(0);
+  });
+
+  it("genera HTML imprimible escapando contenido de plantilla", () => {
+    const html = buildPrintableDocumentHtml({
+      title: "ACTA <DEMO>",
+      renderedText: "ACTA DEMO\n\nTexto con <script>alert('x')</script>",
+      contentHash: "abc1234567890",
+      generatedAt: "2026-05-03",
+    });
+
+    expect(html).toContain("ACTA &lt;DEMO&gt;");
+    expect(html).toContain("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain("Hash: abc1234567890");
   });
 });

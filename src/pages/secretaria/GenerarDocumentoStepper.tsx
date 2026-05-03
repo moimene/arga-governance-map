@@ -17,6 +17,7 @@ import {
   Edit3,
   Eye,
   Download,
+  Printer,
   CheckCircle2,
   AlertTriangle,
   Loader2,
@@ -32,7 +33,7 @@ import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
 import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
-import { downloadDocx } from "@/lib/doc-gen/docx-generator";
+import { downloadDocx, printRenderedDocument } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
@@ -105,7 +106,6 @@ export default function GenerarDocumentoStepper() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
-  const [generated, setGenerated] = useState(false);
   const [contentHash, setContentHash] = useState<string>("");
   const [signingStatus, setSigningStatus] = useState<"idle" | "pending" | "signed" | "error">(
     "idle"
@@ -116,6 +116,7 @@ export default function GenerarDocumentoStepper() {
   );
   const [archiveUrl, setArchiveUrl] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [documentActionError, setDocumentActionError] = useState<string | null>(null);
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
   const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
@@ -285,7 +286,10 @@ export default function GenerarDocumentoStepper() {
     setArchiveError(null);
 
     try {
-      const filename = `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}`;
+      const filename = (
+        compositionResult?.document.filename ??
+        `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}.docx`
+      ).replace(/\.docx$/i, "");
       const archiveBuffer = qesResult?.signedDocumentData
         ? qesResult.signedDocumentData
         : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
@@ -351,8 +355,7 @@ export default function GenerarDocumentoStepper() {
       setContentHash(result.contentHash);
       setDocxBuffer(result.docxBuffer);
 
-      downloadDocx(result.docxBuffer, result.filename);
-      setGenerated(true);
+      setDocumentActionError(null);
       setSigningStatus("idle");
       setSigningError(null);
       setQesResult(null);
@@ -366,6 +369,37 @@ export default function GenerarDocumentoStepper() {
       setIsGenerating(false);
     }
   }, [selectedPlantilla, renderedText, buildComposerRequest, normalizedCapa3Values, resolvedVars]);
+
+  const handleDownloadDocument = useCallback(() => {
+    if (!docxBuffer || !compositionResult) {
+      setDocumentActionError("Documento no generado aún.");
+      return;
+    }
+
+    downloadDocx(docxBuffer, compositionResult.document.filename);
+    setDocumentActionError(null);
+  }, [docxBuffer, compositionResult]);
+
+  const handlePrintDocument = useCallback(() => {
+    if (!compositionResult) {
+      setDocumentActionError("Documento no generado aún.");
+      return;
+    }
+
+    try {
+      printRenderedDocument({
+        title: compositionResult.title,
+        subtitle: agreement.entities?.name ?? undefined,
+        renderedText: compositionResult.document.renderedText,
+        filename: compositionResult.document.filename,
+        contentHash: compositionResult.document.contentHash,
+        generatedAt: compositionResult.document.generatedAt,
+      });
+      setDocumentActionError(null);
+    } catch (error) {
+      setDocumentActionError(error instanceof Error ? error.message : "No se pudo imprimir el documento.");
+    }
+  }, [compositionResult, agreement.entities?.name]);
 
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -813,6 +847,52 @@ export default function GenerarDocumentoStepper() {
               style={{ borderRadius: "var(--g-radius-lg)" }}
             >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documento generado
+              </h3>
+              <p className="text-xs text-[var(--g-text-secondary)] mb-4">
+                El documento ya existe como artefacto DOCX demo-operativo. Desde aquí puedes descargar
+                el archivo, abrir una vista imprimible o continuar con firma y archivo.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadDocument}
+                  disabled={!docxBuffer || !compositionResult}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-card)] transition-colors disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  aria-label="Descargar documento DOCX"
+                >
+                  <Download className="h-4 w-4" />
+                  {qesResult?.signedDocumentData ? "Descargar DOCX firmado" : "Descargar DOCX"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintDocument}
+                  disabled={!compositionResult}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-card)] transition-colors disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  aria-label="Imprimir documento o exportar como PDF"
+                >
+                  <Printer className="h-4 w-4" />
+                  Imprimir / PDF
+                </button>
+              </div>
+              {compositionResult ? (
+                <p className="mt-3 font-mono text-[10px] text-[var(--g-text-secondary)]">
+                  {compositionResult.document.filename} · {compositionResult.document.documentId}
+                </p>
+              ) : null}
+              {documentActionError ? (
+                <p className="mt-3 text-xs text-[var(--status-error)]">{documentActionError}</p>
+              ) : null}
+            </div>
+
+            <div
+              className="border border-[var(--g-border-subtle)] p-4 bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
+              <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <Lock className="h-4 w-4" />
                 Firma Cualificada (QES)
               </h3>
@@ -1024,7 +1104,6 @@ export default function GenerarDocumentoStepper() {
                 type="button"
                 onClick={() => {
                   setStep(0);
-                  setGenerated(false);
                   setRenderedText("");
                   setCapa3Values({});
                   setSelectedPlantilla(null);
@@ -1035,6 +1114,7 @@ export default function GenerarDocumentoStepper() {
                   setDocxBuffer(null);
                   setQesResult(null);
                   setCompositionResult(null);
+                  setDocumentActionError(null);
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}

@@ -70,9 +70,25 @@ export interface PreparedDocumentComposition {
   filename: string;
 }
 
+export interface GeneratedDocumentArtifact {
+  documentId: string;
+  filename: string;
+  mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  buffer: Uint8Array;
+  renderedText: string;
+  contentHash: string;
+  templateId: string;
+  templateTipo: string;
+  templateVersion: string;
+  evidenceStatus: "DEMO_OPERATIVA";
+  generatedAt: string;
+  status: "GENERATED";
+}
+
 export interface ComposeDocumentResult extends PreparedDocumentComposition {
   contentHash: string;
   docxBuffer: Uint8Array;
+  document: GeneratedDocumentArtifact;
   archive: MotorPlantillasArchiveResult;
 }
 

@@ -48,6 +48,9 @@ async function smoke(
   });
 
   expect(result.docxBuffer.length).toBeGreaterThan(0);
+  expect(result.document.buffer).toBe(result.docxBuffer);
+  expect(result.document.filename).toBe(result.filename);
+  expect(result.document.evidenceStatus).toBe("DEMO_OPERATIVA");
   expect(result.contentHash).toMatch(/^[0-9a-f]{64}$/);
   expect(result.renderedText).not.toContain("{{");
   expect(result.unresolvedVariables).toEqual([]);

@@ -68,6 +68,15 @@ export interface DocxGeneratorInput {
   editableFields?: EditableField[];
 }
 
+export interface PrintableDocumentInput {
+  title: string;
+  renderedText: string;
+  subtitle?: string;
+  filename?: string;
+  contentHash?: string;
+  generatedAt?: string;
+}
+
 // ── Text parsing ─────────────────────────────────────────────────────────────
 
 interface ParsedSection {
@@ -492,7 +501,11 @@ export async function computeContentHash(text: string): Promise<string> {
  * Trigger a browser download of the DOCX buffer.
  */
 export function downloadDocx(buffer: Uint8Array, filename: string): void {
-  const blob = new Blob([buffer.buffer as ArrayBuffer], {
+  const exactBuffer = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
+  const blob = new Blob([exactBuffer], {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
   const url = URL.createObjectURL(blob);
@@ -504,4 +517,112 @@ export function downloadDocx(buffer: Uint8Array, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function paragraphHtml(text: string) {
+  const escaped = escapeHtml(text.trim());
+  if (!escaped) return "<p class=\"spacer\">&nbsp;</p>";
+  const isHeading =
+    escaped.length >= 3 &&
+    escaped === escaped.toUpperCase() &&
+    /^[A-ZÁÉÍÓÚÑÜ\s()—–\-.]+$/.test(escaped);
+  return isHeading ? `<h2>${escaped}</h2>` : `<p>${escaped}</p>`;
+}
+
+export function buildPrintableDocumentHtml(input: PrintableDocumentInput) {
+  const generatedAt = input.generatedAt ?? new Date().toISOString();
+  const lines = input.renderedText.split("\n");
+  return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(input.filename ?? input.title)}</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body {
+      color: #4a4a49;
+      font-family: Montserrat, Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+    }
+    header {
+      border-bottom: 2px solid #004438;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+    }
+    h1 {
+      color: #004438;
+      font-size: 15pt;
+      margin: 0 0 6px;
+      text-align: center;
+    }
+    h2 {
+      color: #004438;
+      font-size: 11pt;
+      margin: 18px 0 8px;
+    }
+    p {
+      margin: 0 0 8px;
+      text-align: justify;
+    }
+    .meta {
+      color: #50564f;
+      font-size: 8pt;
+      text-align: center;
+    }
+    .spacer { margin-bottom: 4px; }
+    footer {
+      border-top: 1px solid #009a77;
+      color: #50564f;
+      font-size: 7.5pt;
+      margin-top: 24px;
+      padding-top: 8px;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>${escapeHtml(input.title)}</h1>
+    ${input.subtitle ? `<div class="meta">${escapeHtml(input.subtitle)}</div>` : ""}
+  </header>
+  <main>
+    ${lines.map(paragraphHtml).join("\n    ")}
+  </main>
+  <footer>
+    Generado: ${escapeHtml(generatedAt)}
+    ${input.contentHash ? ` · Hash: ${escapeHtml(input.contentHash.slice(0, 16))}` : ""}
+  </footer>
+</body>
+</html>`;
+}
+
+export function printRenderedDocument(input: PrintableDocumentInput): void {
+  if (typeof window === "undefined") {
+    throw new Error("La impresion requiere un navegador.");
+  }
+
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+  if (!printWindow) {
+    throw new Error("No se pudo abrir la ventana de impresion.");
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(buildPrintableDocumentHtml(input));
+  printWindow.document.close();
+  printWindow.focus();
+  window.setTimeout(() => {
+    printWindow.print();
+  }, 100);
 }

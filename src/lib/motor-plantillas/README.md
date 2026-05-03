@@ -29,8 +29,13 @@ Orden de ejecucion:
 6. fusiona variables;
 7. renderiza Handlebars;
 8. valida post-render;
-9. genera DOCX;
+9. genera artefacto documental DOCX tipado;
 10. archiva borrador demo/operativo solo si `archiveDraft: true`.
+
+El resultado incluye `document`, que representa el documento generado con
+`filename`, `mimeType`, `buffer`, `renderedText`, `contentHash`, plantilla y
+`evidenceStatus`. La descarga, impresion y firma son acciones posteriores
+sobre ese artefacto; generar no implica descargar automaticamente.
 
 ## No-schema posture
 

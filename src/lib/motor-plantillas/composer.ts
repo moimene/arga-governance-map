@@ -26,6 +26,7 @@ import { validatePostRenderDocument } from "./post-render-validation";
 import type {
   ComposeDocumentOptions,
   ComposeDocumentResult,
+  GeneratedDocumentArtifact,
   MotorPlantillasArchiveResult,
   PreparedDocumentComposition,
 } from "./types";
@@ -457,6 +458,28 @@ async function archivePreparedDocument(
   };
 }
 
+function buildGeneratedDocumentArtifact(
+  prepared: PreparedDocumentComposition,
+  buffer: Uint8Array,
+  contentHash: string,
+  options: ComposeDocumentOptions,
+): GeneratedDocumentArtifact {
+  return {
+    documentId: `${prepared.request.request_id}:${contentHash.slice(0, 16)}`,
+    filename: prepared.filename,
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer,
+    renderedText: prepared.renderedText,
+    contentHash,
+    templateId: prepared.template.id,
+    templateTipo: prepared.template.tipo,
+    templateVersion: prepared.template.version,
+    evidenceStatus: "DEMO_OPERATIVA",
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
+    status: "GENERATED",
+  };
+}
+
 export async function composeDocument(
   req: SecretariaDocumentGenerationRequest,
   capa3Values: Record<string, unknown> = {},
@@ -482,12 +505,14 @@ export async function composeDocument(
       prepared.capa3Values,
     ),
   });
+  const document = buildGeneratedDocumentArtifact(prepared, buffer, contentHash, options);
   const archive = await archivePreparedDocument(prepared, buffer, contentHash, options);
 
   return {
     ...prepared,
     contentHash,
     docxBuffer: buffer,
+    document,
     archive,
   };
 }

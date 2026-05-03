@@ -20,6 +20,7 @@ export type {
   ComposeDocumentArchiveParams,
   ComposeDocumentOptions,
   ComposeDocumentResult,
+  GeneratedDocumentArtifact,
   MotorPlantillasArchiveResult,
   MotorPlantillasIssue,
   PreparedDocumentComposition,
