@@ -1,4 +1,4 @@
-import { Download, FileText, Loader2, X } from "lucide-react";
+import { Download, FileText, Loader2, Sparkles, X } from "lucide-react";
 import { Capa3Form } from "./Capa3Form";
 import { normalizeCapa3Draft, type NormalizedCapa3Field } from "@/lib/secretaria/capa3-fields";
 
@@ -11,6 +11,10 @@ interface Capa3CaptureDialogProps {
   errors?: Record<string, string>;
   loading?: boolean;
   submitLabel?: string;
+  draftAssistLabel?: string;
+  draftAssistSummary?: string | null;
+  draftAssistLoading?: boolean;
+  onDraftAssist?: () => void | Promise<void>;
   onChange: (values: Record<string, string>) => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -25,6 +29,10 @@ export function Capa3CaptureDialog({
   errors = {},
   loading = false,
   submitLabel = "Generar DOCX",
+  draftAssistLabel = "Sugerir borrador",
+  draftAssistSummary = null,
+  draftAssistLoading = false,
+  onDraftAssist,
   onChange,
   onClose,
   onSubmit,
@@ -66,6 +74,37 @@ export function Capa3CaptureDialog({
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+          {onDraftAssist ? (
+            <div
+              className="mb-4 flex flex-col gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-3 text-sm text-[var(--g-text-primary)] sm:flex-row sm:items-center sm:justify-between"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <div>
+                <p className="font-medium">Asistente de borrador Capa 3</p>
+                <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+                  Propone valores editables; no modifica la plantilla legal.
+                </p>
+                {draftAssistSummary ? (
+                  <p className="mt-1 text-xs text-[var(--g-brand-3308)]">{draftAssistSummary}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void onDraftAssist();
+                }}
+                disabled={draftAssistLoading || loading}
+                aria-busy={draftAssistLoading}
+                className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {draftAssistLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {draftAssistLoading ? "Sugiriendo..." : draftAssistLabel}
+              </button>
+            </div>
+          ) : null}
           <Capa3Form
             fields={fields}
             values={normalizedValues}

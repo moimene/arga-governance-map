@@ -23,6 +23,7 @@ import {
   Loader2,
   Shield,
   Lock,
+  Sparkles,
 } from "lucide-react";
 import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
@@ -47,6 +48,8 @@ import {
 import {
   composeDocument,
   prepareDocumentComposition,
+  buildCapa3AiAllowedFields,
+  suggestCapa3Draft,
   type ComposeDocumentResult,
 } from "@/lib/motor-plantillas";
 import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
@@ -121,6 +124,9 @@ export default function GenerarDocumentoStepper() {
   const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
   const [compositionResult, setCompositionResult] = useState<ComposeDocumentResult | null>(null);
+  const [isDraftingCapa3, setIsDraftingCapa3] = useState(false);
+  const [capa3AssistantSummary, setCapa3AssistantSummary] = useState<string | null>(null);
+  const [capa3AssistantApplied, setCapa3AssistantApplied] = useState(false);
 
   const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
@@ -180,9 +186,12 @@ export default function GenerarDocumentoStepper() {
         agreementIds: [agreement.id],
         templateId: plantilla.id,
         expectedAdoptionMode: agreement.adoption_mode as Parameters<typeof buildSecretariaDocumentGenerationRequest>[0]["expectedAdoptionMode"],
+        aiAssist: capa3AssistantApplied
+          ? { enabled: true, allowed_fields: buildCapa3AiAllowedFields(normalizedCapa3Fields) }
+          : null,
       });
     },
-    [agreement, tenantId],
+    [agreement, capa3AssistantApplied, normalizedCapa3Fields, tenantId],
   );
 
   // ── Step 1: Select plantilla ─────────────────────────────────────────────
@@ -193,6 +202,8 @@ export default function GenerarDocumentoStepper() {
       setCompositionResult(null);
       setDocxBuffer(null);
       setContentHash("");
+      setCapa3AssistantSummary(null);
+      setCapa3AssistantApplied(false);
 
       // Auto-resolve variables
       if (plantilla.capa2_variables && agreement) {
@@ -247,6 +258,39 @@ export default function GenerarDocumentoStepper() {
 
     setStep(3);
   }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars]);
+
+  const handleDraftCapa3 = useCallback(async () => {
+    if (!selectedPlantilla) return;
+    setIsDraftingCapa3(true);
+    try {
+      const result = await suggestCapa3Draft({
+        fields: normalizedCapa3Fields,
+        currentValues: normalizedCapa3Values,
+        baseVariables: {
+          ...resolvedVars,
+          agreement_id: agreement.id,
+          entity_id: agreement.entity_id,
+          denominacion_social: agreement.entities?.common_name ?? "",
+          materia_acuerdo: agreement.agreement_kind,
+          modo_adopcion: agreement.adoption_mode,
+          contenido_acuerdo: agreement.decision_text ?? agreement.proposal_text ?? "",
+          texto_decision: agreement.decision_text ?? agreement.proposal_text ?? "",
+        },
+        documentType: inferDocumentTypeForComposer(selectedPlantilla, agreement.adoption_mode),
+        templateTipo: selectedPlantilla.tipo,
+      });
+      setCapa3Values(result.values);
+      setCapa3AssistantApplied(result.suggestions.length > 0);
+      setCapa3AssistantSummary(
+        result.suggestions.length > 0
+          ? `${result.suggestions.length} sugerencia(s) aplicadas · ${result.modelName}.`
+          : "No hay campos vacíos con contexto suficiente para sugerir.",
+      );
+      setCapa3Errors({});
+    } finally {
+      setIsDraftingCapa3(false);
+    }
+  }, [agreement, normalizedCapa3Fields, normalizedCapa3Values, resolvedVars, selectedPlantilla]);
 
   const handleSignQES = useCallback(async () => {
     if (!docxBuffer || !selectedPlantilla || !agreement) {
@@ -691,6 +735,36 @@ export default function GenerarDocumentoStepper() {
             <p className="text-xs text-[var(--g-text-secondary)]">
               Complete los campos que requiere esta plantilla. Los campos obligatorios deben rellenarse antes de generar.
             </p>
+
+            {normalizedCapa3Fields.length > 0 ? (
+              <div
+                className="flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <div>
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Asistente de borrador Capa 3
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+                    Sugiere valores editables con whitelist; Capa 1 permanece inmutable.
+                  </p>
+                  {capa3AssistantSummary ? (
+                    <p className="mt-1 text-xs text-[var(--g-brand-3308)]">{capa3AssistantSummary}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDraftCapa3()}
+                  disabled={isDraftingCapa3}
+                  aria-busy={isDraftingCapa3}
+                  className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {isDraftingCapa3 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {isDraftingCapa3 ? "Sugiriendo..." : "Sugerir borrador"}
+                </button>
+              </div>
+            ) : null}
 
             <Capa3Form
               fields={normalizedCapa3Fields}

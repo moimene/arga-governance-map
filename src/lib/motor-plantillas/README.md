@@ -9,6 +9,8 @@ Importar siempre desde `@/lib/motor-plantillas`:
 - `MOTOR_PLANTILLAS_VERSION`
 - `prepareDocumentComposition(req, capa3Values, options)`
 - `composeDocument(req, capa3Values, options)`
+- `suggestCapa3Draft(input)`
+- `buildCapa3AiAllowedFields(fields)`
 - `generateProcessDocxWithMotor(input)`
 - `validatePostRenderDocument(input)`
 - `transitionReviewState(input)`
@@ -43,6 +45,15 @@ rapidos existentes (`ProcessDocxButton`). Construye el request boundary,
 compone con `composeDocument()`, descarga el DOCX como antes y reutiliza el
 archivado heredado de `doc-gen`. Los documentos registrales y subsanaciones
 permanecen en fallback legacy hasta que entren en scope.
+
+## Draft Assistant Capa 3
+
+`suggestCapa3Draft()` propone valores para campos editables con whitelist
+`capa3.<campo>`. No altera Capa 1, no inventa una plantilla y siempre marca las
+sugerencias como pendientes de revision humana. En ausencia de proveedor de
+modelo configurado usa `capa3-local-demo-assistant@0.1.0`, un fallback local
+determinista para demo. Un proveedor IA real debe vivir server-side y devolver
+solo los campos permitidos.
 
 ## No-schema posture
 

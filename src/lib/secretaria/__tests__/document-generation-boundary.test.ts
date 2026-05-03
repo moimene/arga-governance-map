@@ -385,7 +385,7 @@ describe("document-generation-boundary — ai_assist", () => {
     expect((await validateSecretariaDocumentGenerationRequest(reqDisabled)).ok).toBe(true);
   });
 
-  it("ai_assist enabled requires exact whitelist (no extra fields)", async () => {
+  it("ai_assist enabled accepts narrative whitelist and rejects non-whitelisted fields", async () => {
     const ok = await buildSecretariaDocumentGenerationRequest({
       documentType: "ACTA",
       tenantId: DEMO_TENANT,
@@ -427,6 +427,24 @@ describe("document-generation-boundary — ai_assist", () => {
       await validateSecretariaDocumentGenerationRequest(disallowed),
       "AI_ASSIST_FIELD_NOT_ALLOWED",
     );
+  });
+
+  it("ai_assist enabled accepts explicit Capa 3 field whitelist", async () => {
+    const req = await buildSecretariaDocumentGenerationRequest({
+      documentType: "ACTA",
+      tenantId: DEMO_TENANT,
+      entityId: DEMO_ENTITY,
+      agreementIds: ["agreement-1"],
+      meetingId: "meeting-1",
+      minuteId: "minute-1",
+      templateProfileId: "ACTA_V1",
+      aiAssist: {
+        enabled: true,
+        allowed_fields: ["capa3.deliberaciones_texto", "capa3.incidencias_no_criticas"],
+      },
+    });
+
+    expect((await validateSecretariaDocumentGenerationRequest(req)).ok).toBe(true);
   });
 
   it("ai_assist enabled with missing whitelist field is blocked", async () => {

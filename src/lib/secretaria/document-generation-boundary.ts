@@ -99,6 +99,7 @@ const AI_ALLOWED_FIELDS_DEFAULT = [
   "narrativa.deliberaciones",
   "narrativa.incidencias_no_criticas",
 ] as const;
+const AI_ALLOWED_CAPA3_FIELD_PATTERN = /^capa3\.[a-zA-Z_][a-zA-Z0-9_.-]{0,119}$/;
 
 // =============================================================================
 // Doc type rules
@@ -347,18 +348,21 @@ function validateAIAssist(
   }
 
   const allowed = new Set(ai.allowed_fields.map((s) => s.trim()));
-  for (const f of AI_ALLOWED_FIELDS_DEFAULT) {
-    if (!allowed.has(f)) {
-      pushIssue(issues, {
-        code: "AI_ASSIST_WHITELIST_MISSING",
-        severity: "BLOCKING",
-        field_path: "ai_assist.allowed_fields",
-        message: `Si ai_assist.enabled=true, debe incluir el campo permitido mínimo ${f}.`,
-      });
-    }
+  const hasNarrativeWhitelist = AI_ALLOWED_FIELDS_DEFAULT.every((f) => allowed.has(f));
+  const hasCapa3Whitelist = Array.from(allowed).some((f) => AI_ALLOWED_CAPA3_FIELD_PATTERN.test(f));
+  if (!hasNarrativeWhitelist && !hasCapa3Whitelist) {
+    pushIssue(issues, {
+      code: "AI_ASSIST_WHITELIST_MISSING",
+      severity: "BLOCKING",
+      field_path: "ai_assist.allowed_fields",
+      message: "Si ai_assist.enabled=true, debe incluir la whitelist narrativa minima o campos capa3.<campo>.",
+    });
   }
   for (const f of allowed) {
-    if (!(AI_ALLOWED_FIELDS_DEFAULT as readonly string[]).includes(f)) {
+    if (
+      !(AI_ALLOWED_FIELDS_DEFAULT as readonly string[]).includes(f) &&
+      !AI_ALLOWED_CAPA3_FIELD_PATTERN.test(f)
+    ) {
       pushIssue(issues, {
         code: "AI_ASSIST_FIELD_NOT_ALLOWED",
         severity: "BLOCKING",

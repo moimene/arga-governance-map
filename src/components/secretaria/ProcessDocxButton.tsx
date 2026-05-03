@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import { DocumentPreflightError, selectProcessTemplate } from "@/lib/doc-gen/process-documents";
 import type { ProcessDocumentGenerationInput } from "@/lib/doc-gen/process-documents";
-import { generateProcessDocxWithMotor } from "@/lib/motor-plantillas";
+import {
+  buildCapa3AiAllowedFields,
+  generateProcessDocxWithMotor,
+  suggestCapa3Draft,
+} from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
 import { validateCapa3 } from "./Capa3Form";
 import { Capa3CaptureDialog } from "./Capa3CaptureDialog";
@@ -52,6 +56,9 @@ export function ProcessDocxButton({
   const [captureOpen, setCaptureOpen] = useState(false);
   const [capa3Values, setCapa3Values] = useState<Record<string, string>>({});
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
+  const [draftAssistLoading, setDraftAssistLoading] = useState(false);
+  const [draftAssistSummary, setDraftAssistSummary] = useState<string | null>(null);
+  const [draftAssistApplied, setDraftAssistApplied] = useState(false);
 
   const plantillasForGeneration = useMemo(
     () => withLegalTeamTemplateFixtures(plantillas),
@@ -122,6 +129,9 @@ export function ProcessDocxButton({
           ...(input.variables ?? {}),
         },
         capa3Values: normalizedCapa3Values,
+        aiAssist: draftAssistApplied
+          ? { enabled: true, allowed_fields: buildCapa3AiAllowedFields(capa3Fields) }
+          : null,
       });
       if (result.archive.archived) {
         toast.success("Documento Word generado y archivado como evidencia demo/operativa", {
@@ -166,10 +176,43 @@ export function ProcessDocxButton({
     if (capa3Fields.length > 0) {
       setCapa3Values(matrixResolution?.initialCapa3Values ?? {});
       setCapa3Errors({});
+      setDraftAssistSummary(null);
+      setDraftAssistApplied(false);
       setCaptureOpen(true);
       return;
     }
     await runGenerate();
+  }
+
+  async function handleDraftAssist() {
+    setDraftAssistLoading(true);
+    try {
+      const resolved = resolveTemplateProcessMatrix(selectedTemplate, {
+        processHint: input.kind,
+        variables: input.variables,
+        capa3Values,
+      });
+      const result = await suggestCapa3Draft({
+        fields: capa3Fields,
+        currentValues: capa3Values,
+        baseVariables: {
+          ...(resolved?.variables ?? {}),
+          ...(input.variables ?? {}),
+        },
+        documentType: input.kind,
+        templateTipo: selectedTemplate?.tipo,
+      });
+      setCapa3Values(result.values);
+      setDraftAssistApplied(result.suggestions.length > 0);
+      setDraftAssistSummary(
+        result.suggestions.length > 0
+          ? `${result.suggestions.length} sugerencia(s) aplicadas · revisión humana obligatoria.`
+          : "No hay campos vacíos con contexto suficiente para sugerir.",
+      );
+      setCapa3Errors({});
+    } finally {
+      setDraftAssistLoading(false);
+    }
   }
 
   async function handleGenerateWithCapa3() {
@@ -219,6 +262,9 @@ export function ProcessDocxButton({
         values={capa3Values}
         errors={capa3Errors}
         loading={generating}
+        draftAssistLoading={draftAssistLoading}
+        draftAssistSummary={draftAssistSummary}
+        onDraftAssist={capa3Fields.length > 0 ? handleDraftAssist : undefined}
         onChange={(values) => {
           setCapa3Values(values);
           setCapa3Errors({});

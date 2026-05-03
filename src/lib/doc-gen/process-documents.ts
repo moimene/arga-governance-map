@@ -6,6 +6,7 @@ import { archiveDocxToStorage } from "./storage-archiver";
 import { resolveProcessDocumentFinalEvidenceReadiness } from "./process-document-readiness";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import type { SecretariaAIAssist } from "@/lib/secretaria/document-generation-boundary";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import {
   compareOperationalTemplateFreshness,
@@ -51,6 +52,7 @@ export interface ProcessDocumentGenerationInput {
   archive?: ProcessDocumentArchiveOptions | false;
   templateCriteria?: ProcessDocumentTemplateCriteria;
   preferredTemplateId?: string | null;
+  aiAssist?: SecretariaAIAssist;
 }
 
 export interface ProcessDocumentArchiveOptions {

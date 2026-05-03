@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MOTOR_PLANTILLAS_VERSION,
   allowedReviewStateTransitions,
+  buildCapa3AiAllowedFields,
   composeDocument,
   generateProcessDocxWithMotor,
   prepareDocumentComposition,
@@ -9,6 +10,7 @@ import {
   staticReviewStateSchemaGate,
   transitionReviewState,
   validatePostRenderDocument,
+  suggestCapa3Draft,
 } from "../index";
 
 describe("motor-plantillas public contract", () => {
@@ -16,6 +18,8 @@ describe("motor-plantillas public contract", () => {
     expect(MOTOR_PLANTILLAS_VERSION).toBe("motor-plantillas@1.0.0-beta");
     expect(typeof composeDocument).toBe("function");
     expect(typeof generateProcessDocxWithMotor).toBe("function");
+    expect(typeof suggestCapa3Draft).toBe("function");
+    expect(typeof buildCapa3AiAllowedFields).toBe("function");
     expect(typeof prepareDocumentComposition).toBe("function");
     expect(typeof validatePostRenderDocument).toBe("function");
     expect(typeof transitionReviewState).toBe("function");

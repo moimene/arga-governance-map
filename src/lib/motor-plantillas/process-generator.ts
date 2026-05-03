@@ -158,6 +158,7 @@ async function buildMotorRequestForProcess(
     templateId,
     expectedOrganoTipo: input.templateCriteria?.organoTipo as SecretariaOrganoTipo | null | undefined,
     expectedAdoptionMode: input.templateCriteria?.adoptionMode as SecretariaAdoptionMode | null | undefined,
+    aiAssist: input.aiAssist ?? null,
   });
 }
 
