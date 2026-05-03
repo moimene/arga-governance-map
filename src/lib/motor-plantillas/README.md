@@ -77,18 +77,18 @@ entorno server-side y permite sobrescribir modelo con `ANTHROPIC_MODEL`; el
 default local de la funcion es `claude-opus-4-7`. Nunca leer claves
 desde frontend ni desde repos externos.
 
-## No-schema posture
+## Schema posture
 
 El motor no escribe `review_state` en ninguna tabla existente. La revision se
 modela con state machine pura y schema gate. Hasta aplicar una migracion
 aprobada, la UI debe mostrar la revision como bloqueada.
 
 Los borradores editables se persisten en Cloud mediante
-`secretaria_document_drafts` cuando el schema esta disponible. La migracion
-propuesta es
-`supabase/migrations/proposed/2026-05-03_000051_secretaria_document_drafts.sql`.
-Hasta autorizarla, `probeDocumentDraftSchema()` bloquea la persistencia y la UI
-no debe configurar DOCX/firma/archivo desde un borrador no guardado.
+`secretaria_document_drafts`. La migracion local trazable es
+`supabase/migrations/20260503115719_create_secretaria_document_drafts.sql`.
+`probeDocumentDraftSchema()` sigue actuando como schema gate: si una Cloud futura
+no tiene la tabla o pierde columnas del contrato, la UI bloquea configurar
+DOCX/firma/archivo desde un borrador no guardado.
 
 ## Template operability
 
