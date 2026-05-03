@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.secretaria_document_drafts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   document_request_id text NOT NULL,
+  draft_key_sha256 text NOT NULL,
   request_hash_sha256 text NOT NULL,
   document_type text NOT NULL,
   agreement_id uuid NULL REFERENCES public.agreements(id) ON DELETE SET NULL,
@@ -42,11 +43,14 @@ CREATE TABLE IF NOT EXISTS public.secretaria_document_drafts (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  UNIQUE (tenant_id, document_request_id, version)
+  UNIQUE (tenant_id, draft_key_sha256, version)
 );
 
 CREATE INDEX IF NOT EXISTS idx_secretaria_document_drafts_tenant_state
   ON public.secretaria_document_drafts (tenant_id, draft_state, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_secretaria_document_drafts_key
+  ON public.secretaria_document_drafts (tenant_id, draft_key_sha256, version DESC);
 
 CREATE INDEX IF NOT EXISTS idx_secretaria_document_drafts_agreement
   ON public.secretaria_document_drafts (agreement_id, updated_at DESC)

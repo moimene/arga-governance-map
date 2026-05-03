@@ -24,6 +24,8 @@ import {
   Shield,
   Lock,
   Sparkles,
+  Save,
+  CloudOff,
 } from "lucide-react";
 import { useAgreement } from "@/hooks/useAgreementCompliance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
@@ -49,9 +51,12 @@ import {
   finalizeEditableDocumentDraft,
   prepareDocumentComposition,
   buildCapa3AiAllowedFields,
+  loadLatestEditableDocumentDraft,
+  saveEditableDocumentDraft,
   suggestCapa3DraftWithAnthropicFallback,
   type ComposeDocumentResult,
   type PreparedDocumentComposition,
+  type SaveEditableDocumentDraftResult,
 } from "@/lib/motor-plantillas";
 import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
 
@@ -64,6 +69,8 @@ const STEPS = [
   { key: "borrador", label: "Borrador", icon: Eye },
   { key: "generar", label: "Generar", icon: Download },
 ] as const;
+
+type DraftPersistenceStatus = "idle" | "saving" | "saved" | "dirty" | "blocked" | "error";
 
 function hasResolvedValue(value: unknown) {
   if (value === undefined || value === null) return false;
@@ -125,6 +132,9 @@ export default function GenerarDocumentoStepper() {
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
   const [preparedDraft, setPreparedDraft] = useState<PreparedDocumentComposition | null>(null);
   const [editableDraftText, setEditableDraftText] = useState("");
+  const [draftPersistenceStatus, setDraftPersistenceStatus] = useState<DraftPersistenceStatus>("idle");
+  const [draftPersistenceMessage, setDraftPersistenceMessage] = useState<string | null>(null);
+  const [draftCloudId, setDraftCloudId] = useState<string | null>(null);
   const [compositionResult, setCompositionResult] = useState<ComposeDocumentResult | null>(null);
   const [isDraftingCapa3, setIsDraftingCapa3] = useState(false);
   const [capa3AssistantSummary, setCapa3AssistantSummary] = useState<string | null>(null);
@@ -200,6 +210,62 @@ export default function GenerarDocumentoStepper() {
     [agreement, capa3AssistantApplied, normalizedCapa3Fields, tenantId],
   );
 
+  const applyDraftPersistenceResult = useCallback(
+    (result: SaveEditableDocumentDraftResult, successMessage: string) => {
+      if (result.ok) {
+        setDraftPersistenceStatus("saved");
+        setDraftPersistenceMessage(successMessage);
+        setDraftCloudId(result.draft?.id ?? null);
+        return true;
+      }
+
+      const missing = result.schemaGate.missing.slice(0, 6).join(", ");
+      if (!result.schemaGate.supported && result.schemaGate.missing.length > 0) {
+        setDraftPersistenceStatus("blocked");
+        setDraftCloudId(null);
+        setDraftPersistenceMessage(
+          `Persistencia Cloud no disponible: falta ${result.schemaGate.table} (${missing}).`,
+        );
+        return false;
+      }
+
+      setDraftPersistenceStatus("error");
+      setDraftCloudId(null);
+      setDraftPersistenceMessage(result.error ?? "No se pudo guardar el borrador en Cloud.");
+      return false;
+    },
+    [],
+  );
+
+  const persistEditableDraft = useCallback(
+    async (
+      source: PreparedDocumentComposition,
+      bodyText: string,
+      draftState: "EDITABLE_DRAFT" | "DRAFT_CONFIGURED",
+      contentHashSha256?: string | null,
+    ) => {
+      setDraftPersistenceStatus("saving");
+      setDraftPersistenceMessage(
+        draftState === "DRAFT_CONFIGURED"
+          ? "Guardando borrador configurado en Cloud..."
+          : "Guardando borrador editable en Cloud...",
+      );
+      const result = await saveEditableDocumentDraft({
+        prepared: source,
+        renderedBodyText: bodyText,
+        draftState,
+        contentHashSha256,
+      });
+      return applyDraftPersistenceResult(
+        result,
+        draftState === "DRAFT_CONFIGURED"
+          ? "Borrador configurado guardado en Cloud."
+          : "Borrador editable guardado en Cloud.",
+      );
+    },
+    [applyDraftPersistenceResult],
+  );
+
   // ── Step 1: Select plantilla ─────────────────────────────────────────────
 
   const handleSelectPlantilla = useCallback(
@@ -208,6 +274,9 @@ export default function GenerarDocumentoStepper() {
       setCompositionResult(null);
       setPreparedDraft(null);
       setEditableDraftText("");
+      setDraftPersistenceStatus("idle");
+      setDraftPersistenceMessage(null);
+      setDraftCloudId(null);
       setDocxBuffer(null);
       setContentHash("");
       setCapa3AssistantSummary(null);
@@ -261,12 +330,33 @@ export default function GenerarDocumentoStepper() {
       setPreparedDraft(prepared);
       setEditableDraftText(prepared.renderedBodyText);
       setRenderError(null);
+
+      setDraftPersistenceStatus("saving");
+      setDraftPersistenceMessage("Comprobando borrador Cloud...");
+      const existingDraft = await loadLatestEditableDocumentDraft({ prepared });
+      if (existingDraft.ok && existingDraft.draft) {
+        setEditableDraftText(existingDraft.draft.rendered_body_text);
+        setDraftPersistenceStatus("saved");
+        setDraftCloudId(existingDraft.draft.id);
+        setDraftPersistenceMessage("Borrador Cloud recuperado.");
+      } else if (!existingDraft.ok) {
+        const missing = existingDraft.schemaGate.missing.slice(0, 6).join(", ");
+        setDraftPersistenceStatus(existingDraft.schemaGate.supported ? "error" : "blocked");
+        setDraftCloudId(null);
+        setDraftPersistenceMessage(
+          existingDraft.schemaGate.supported
+            ? existingDraft.error ?? "No se pudo consultar el borrador Cloud."
+            : `Persistencia Cloud no disponible: falta ${existingDraft.schemaGate.table} (${missing}).`,
+        );
+      } else {
+        await persistEditableDraft(prepared, prepared.renderedBodyText, "EDITABLE_DRAFT");
+      }
     } catch (e) {
       setRenderError(e instanceof Error ? e.message : "Error al renderizar la plantilla.");
     }
 
     setStep(3);
-  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars]);
+  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, persistEditableDraft]);
 
   const handleDraftCapa3 = useCallback(async () => {
     if (!selectedPlantilla) return;
@@ -294,6 +384,9 @@ export default function GenerarDocumentoStepper() {
       setCompositionResult(null);
       setDocxBuffer(null);
       setContentHash("");
+      setDraftPersistenceStatus("idle");
+      setDraftPersistenceMessage(null);
+      setDraftCloudId(null);
       setCapa3AssistantApplied(result.suggestions.length > 0);
       setCapa3AssistantSummary(
         result.suggestions.length > 0
@@ -407,6 +500,16 @@ export default function GenerarDocumentoStepper() {
         baseVariables: resolvedVars,
         archiveDraft: false,
       });
+      const persisted = await persistEditableDraft(
+        result,
+        result.renderedBodyText,
+        "DRAFT_CONFIGURED",
+        result.contentHash,
+      );
+      if (!persisted) {
+        setRenderError("No se puede configurar el DOCX hasta guardar el borrador en Cloud.");
+        return;
+      }
 
       setCompositionResult(result);
       setContentHash(result.contentHash);
@@ -424,7 +527,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [editableDraftText, preparedDraft, resolvedVars, selectedPlantilla]);
+  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {
@@ -789,6 +892,9 @@ export default function GenerarDocumentoStepper() {
                 setCompositionResult(null);
                 setDocxBuffer(null);
                 setContentHash("");
+                setDraftPersistenceStatus("idle");
+                setDraftPersistenceMessage(null);
+                setDraftCloudId(null);
               }}
             />
 
@@ -864,9 +970,26 @@ export default function GenerarDocumentoStepper() {
                   <label htmlFor="editable-document-draft" className="text-sm font-medium text-[var(--g-text-primary)]">
                     Texto del borrador
                   </label>
-                  <span className="font-mono text-[10px] text-[var(--g-text-secondary)]">
-                    {editableDraftLength} caracteres
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[10px] text-[var(--g-text-secondary)]">
+                      {editableDraftLength} caracteres
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void persistEditableDraft(preparedDraft, editableDraftText, "EDITABLE_DRAFT")}
+                      disabled={draftPersistenceStatus === "saving" || editableDraftLength === 0}
+                      aria-busy={draftPersistenceStatus === "saving"}
+                      className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      {draftPersistenceStatus === "saving" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5" />
+                      )}
+                      Guardar borrador
+                    </button>
+                  </div>
                 </div>
                 <textarea
                   id="editable-document-draft"
@@ -877,6 +1000,8 @@ export default function GenerarDocumentoStepper() {
                     setCompositionResult(null);
                     setDocxBuffer(null);
                     setContentHash("");
+                    setDraftPersistenceStatus("dirty");
+                    setDraftPersistenceMessage("Cambios pendientes de guardar en Cloud.");
                   }}
                   aria-invalid={!!renderError}
                   aria-describedby={renderError ? "editable-draft-error editable-draft-meta" : "editable-draft-meta"}
@@ -895,7 +1020,28 @@ export default function GenerarDocumentoStepper() {
                     <span className="font-medium text-[var(--g-text-primary)]">Trazabilidad del sistema</span>
                     <span className="font-mono">{preparedDraft.request.request_id.slice(0, 12)}</span>
                     <span>{preparedDraft.request.evidence_status}</span>
+                    {draftCloudId ? <span className="font-mono">draft {draftCloudId.slice(0, 8)}</span> : null}
                   </div>
+                  {draftPersistenceMessage ? (
+                    <p
+                      className={`mt-2 flex items-start gap-2 text-xs ${
+                        draftPersistenceStatus === "blocked" || draftPersistenceStatus === "error"
+                          ? "text-[var(--status-error)]"
+                          : draftPersistenceStatus === "dirty"
+                          ? "text-[var(--status-warning)]"
+                          : "text-[var(--g-text-secondary)]"
+                      }`}
+                    >
+                      {draftPersistenceStatus === "blocked" || draftPersistenceStatus === "error" ? (
+                        <CloudOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      ) : draftPersistenceStatus === "saving" ? (
+                        <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+                      ) : (
+                        <Save className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <span>{draftPersistenceMessage}</span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -920,7 +1066,14 @@ export default function GenerarDocumentoStepper() {
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={isGenerating || !!renderError || !preparedDraft || editableDraftLength === 0}
+                disabled={
+                  isGenerating ||
+                  !!renderError ||
+                  !preparedDraft ||
+                  editableDraftLength === 0 ||
+                  draftPersistenceStatus === "saving" ||
+                  draftPersistenceStatus === "blocked"
+                }
                 className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
                 aria-busy={isGenerating}
@@ -1243,6 +1396,9 @@ export default function GenerarDocumentoStepper() {
                   setStep(0);
                   setPreparedDraft(null);
                   setEditableDraftText("");
+                  setDraftPersistenceStatus("idle");
+                  setDraftPersistenceMessage(null);
+                  setDraftCloudId(null);
                   setCapa3Values({});
                   setSelectedPlantilla(null);
                   setSigningStatus("idle");

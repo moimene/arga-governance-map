@@ -10,6 +10,15 @@ export {
   suggestCapa3Draft,
 } from "./capa3-draft-assistant";
 export {
+  buildEditableDocumentDraftPayload,
+  computeEditableDocumentDraftKey,
+  DOCUMENT_DRAFTS_TABLE,
+  loadLatestEditableDocumentDraft,
+  probeDocumentDraftSchema,
+  saveEditableDocumentDraft,
+  staticDocumentDraftSchemaGate,
+} from "./document-draft-persistence";
+export {
   invokeAnthropicCapa3DraftProvider,
   sanitizeCapa3ProviderInput,
   suggestCapa3DraftWithAnthropicFallback,
@@ -40,6 +49,15 @@ export type {
   ReviewStateTransitionResult,
   ValidatePostRenderInput,
 } from "./types";
+export type {
+  DocumentDraftSchemaGate,
+  EditableDocumentDraftRow,
+  EditableDocumentDraftState,
+  LoadEditableDocumentDraftInput,
+  LoadEditableDocumentDraftResult,
+  SaveEditableDocumentDraftInput,
+  SaveEditableDocumentDraftResult,
+} from "./document-draft-persistence";
 export type {
   Capa3DraftAssistantMode,
   Capa3DraftAssistantProvider,

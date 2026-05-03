@@ -9,6 +9,9 @@ Importar siempre desde `@/lib/motor-plantillas`:
 - `MOTOR_PLANTILLAS_VERSION`
 - `prepareDocumentComposition(req, capa3Values, options)`
 - `finalizeEditableDocumentDraft(prepared, editedBodyText, options)`
+- `saveEditableDocumentDraft(input)`
+- `loadLatestEditableDocumentDraft(input)`
+- `probeDocumentDraftSchema()`
 - `composeDocument(req, capa3Values, options)`
 - `suggestCapa3Draft(input)`
 - `suggestCapa3DraftWithAnthropicFallback(input)`
@@ -80,11 +83,12 @@ El motor no escribe `review_state` en ninguna tabla existente. La revision se
 modela con state machine pura y schema gate. Hasta aplicar una migracion
 aprobada, la UI debe mostrar la revision como bloqueada.
 
-Los borradores editables tampoco se persisten en Cloud con el schema actual.
-La tabla propuesta es `secretaria_document_drafts` en
+Los borradores editables se persisten en Cloud mediante
+`secretaria_document_drafts` cuando el schema esta disponible. La migracion
+propuesta es
 `supabase/migrations/proposed/2026-05-03_000051_secretaria_document_drafts.sql`.
-Hasta autorizarla, la edicion posterior a Capa 3 vive en memoria de UI y solo
-se convierte en artefacto cuando se genera DOCX, firma o archivo.
+Hasta autorizarla, `probeDocumentDraftSchema()` bloquea la persistencia y la UI
+no debe configurar DOCX/firma/archivo desde un borrador no guardado.
 
 ## Template operability
 

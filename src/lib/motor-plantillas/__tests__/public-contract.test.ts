@@ -2,13 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   MOTOR_PLANTILLAS_VERSION,
   allowedReviewStateTransitions,
+  buildEditableDocumentDraftPayload,
   buildCapa3AiAllowedFields,
+  computeEditableDocumentDraftKey,
   composeDocument,
+  DOCUMENT_DRAFTS_TABLE,
   finalizeEditableDocumentDraft,
   generateProcessDocxWithMotor,
   invokeAnthropicCapa3DraftProvider,
+  loadLatestEditableDocumentDraft,
   prepareDocumentComposition,
+  probeDocumentDraftSchema,
   probeReviewStateSchema,
+  saveEditableDocumentDraft,
+  staticDocumentDraftSchemaGate,
   sanitizeCapa3ProviderInput,
   staticReviewStateSchemaGate,
   transitionReviewState,
@@ -20,8 +27,15 @@ import {
 describe("motor-plantillas public contract", () => {
   it("expone una fachada publica estable", () => {
     expect(MOTOR_PLANTILLAS_VERSION).toBe("motor-plantillas@1.0.0-beta");
+    expect(DOCUMENT_DRAFTS_TABLE).toBe("secretaria_document_drafts");
     expect(typeof composeDocument).toBe("function");
     expect(typeof finalizeEditableDocumentDraft).toBe("function");
+    expect(typeof buildEditableDocumentDraftPayload).toBe("function");
+    expect(typeof computeEditableDocumentDraftKey).toBe("function");
+    expect(typeof loadLatestEditableDocumentDraft).toBe("function");
+    expect(typeof probeDocumentDraftSchema).toBe("function");
+    expect(typeof saveEditableDocumentDraft).toBe("function");
+    expect(typeof staticDocumentDraftSchemaGate).toBe("function");
     expect(typeof generateProcessDocxWithMotor).toBe("function");
     expect(typeof suggestCapa3Draft).toBe("function");
     expect(typeof suggestCapa3DraftWithAnthropicFallback).toBe("function");
