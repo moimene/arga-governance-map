@@ -4,6 +4,7 @@ export {
   prepareDocumentComposition,
   templateTypesForDocumentType,
 } from "./composer";
+export { generateProcessDocxWithMotor } from "./process-generator";
 export { validatePostRenderDocument } from "./post-render-validation";
 export {
   allowedReviewStateTransitions,

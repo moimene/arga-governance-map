@@ -3,6 +3,7 @@ import {
   MOTOR_PLANTILLAS_VERSION,
   allowedReviewStateTransitions,
   composeDocument,
+  generateProcessDocxWithMotor,
   prepareDocumentComposition,
   probeReviewStateSchema,
   staticReviewStateSchemaGate,
@@ -14,6 +15,7 @@ describe("motor-plantillas public contract", () => {
   it("expone una fachada publica estable", () => {
     expect(MOTOR_PLANTILLAS_VERSION).toBe("motor-plantillas@1.0.0-beta");
     expect(typeof composeDocument).toBe("function");
+    expect(typeof generateProcessDocxWithMotor).toBe("function");
     expect(typeof prepareDocumentComposition).toBe("function");
     expect(typeof validatePostRenderDocument).toBe("function");
     expect(typeof transitionReviewState).toBe("function");

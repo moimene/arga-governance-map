@@ -1,6 +1,9 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Building2 } from "lucide-react";
-import { useDecisionUnipersById } from "@/hooks/useDecisionesUnipers";
+import {
+  useAgreementForUnipersonalDecision,
+  useDecisionUnipersById,
+} from "@/hooks/useDecisionesUnipers";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -25,6 +28,9 @@ function buildDecisionVariables(
 ) {
   const adoptionMode = decisionAdoptionMode(d.decision_type);
   return {
+    entity_id: d.entity_id,
+    decision_id: d.id,
+    unipersonal_decision_id: d.id,
     denominacion_social: entity,
     jurisdiccion: jurisdiction,
     tipo_social: legalForm,
@@ -72,6 +78,7 @@ export default function DecisionDetalle() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
   const { data, isLoading } = useDecisionUnipersById(id);
+  const { data: linkedAgreement } = useAgreementForUnipersonalDecision(id);
 
   if (isLoading) {
     return (
@@ -129,7 +136,12 @@ export default function DecisionDetalle() {
             subtitle: entity,
             entityName: entity,
             templateTypes: ["ACTA_CONSIGNACION", "ACTA_ACUERDO_ESCRITO", "MODELO_ACUERDO"],
-            variables: docVariables,
+            variables: {
+              ...docVariables,
+              agreement_id: linkedAgreement?.id ?? "",
+              agreement_ids: linkedAgreement?.id ? [linkedAgreement.id] : [],
+            },
+            archive: { agreementId: linkedAgreement?.id },
             templateCriteria: {
               jurisdiction,
               adoptionMode,

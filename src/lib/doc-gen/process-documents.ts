@@ -194,7 +194,9 @@ function readStringVariable(variables: Record<string, unknown> | undefined, keys
   return null;
 }
 
-function inferTemplateCriteria(input: ProcessDocumentGenerationInput): ProcessDocumentTemplateCriteria {
+export function inferProcessTemplateCriteria(
+  input: ProcessDocumentGenerationInput,
+): ProcessDocumentTemplateCriteria {
   return {
     jurisdiction:
       input.templateCriteria?.jurisdiction ??
@@ -303,7 +305,7 @@ export function buildProcessDocumentTraceFooterLines(
   variables: Record<string, unknown>,
   archive?: ProcessDocumentArchiveResult | null,
 ) {
-  const agreementTrace = buildAgreementTrace(input, variables);
+  const agreementTrace = buildProcessAgreementTrace(input, variables);
   const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
 
   return [
@@ -317,7 +319,7 @@ export function buildProcessDocumentTraceFooterLines(
   ];
 }
 
-function buildAgreementTrace(
+export function buildProcessAgreementTrace(
   input: ProcessDocumentGenerationInput,
   variables: Record<string, unknown>,
 ) {
@@ -452,7 +454,7 @@ async function resolveAgreementIdsForProcess(
   };
 }
 
-async function archiveProcessDocx(params: {
+export async function archiveProcessDocx(params: {
   input: ProcessDocumentGenerationInput;
   buffer: Uint8Array;
   filename: string;
@@ -651,7 +653,7 @@ async function archiveConvocatoriaDocx(params: {
   };
 }
 
-async function persistProcessArchiveLink(
+export async function persistProcessArchiveLink(
   input: ProcessDocumentGenerationInput,
   archive: ProcessDocumentArchiveResult,
 ) {
@@ -684,7 +686,7 @@ async function persistProcessArchiveLink(
 export async function generateProcessDocx(
   input: ProcessDocumentGenerationInput,
 ): Promise<ProcessDocumentGenerationResult> {
-  const templateCriteria = inferTemplateCriteria(input);
+  const templateCriteria = inferProcessTemplateCriteria(input);
   const plantilla = selectProcessTemplate(
     input.plantillas,
     input.templateTypes,
@@ -759,7 +761,7 @@ export async function generateProcessDocx(
   await persistProcessArchiveLink(input, archive).catch(() => undefined);
 
   downloadDocx(buffer, filename);
-  const agreementTrace = buildAgreementTrace(input, variables);
+  const agreementTrace = buildProcessAgreementTrace(input, variables);
   const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
   const finalEvidenceReadiness = resolveProcessDocumentFinalEvidenceReadiness({
     agreementTrace,

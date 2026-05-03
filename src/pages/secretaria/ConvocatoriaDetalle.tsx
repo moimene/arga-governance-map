@@ -26,6 +26,8 @@ function scheduleReasonLabel(reason: string) {
 
 type ConvocatoriaDocContext = {
   id: string;
+  body_id?: string | null;
+  entity_id?: string | null;
   tipo_convocatoria?: string | null;
   body_name?: string | null;
   body_type?: string | null;
@@ -70,6 +72,9 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     `Advertencias aceptadas: ${(conv.accepted_warnings ?? []).length}`,
   ];
   return {
+    convocatoria_id: conv.id,
+    body_id: conv.body_id ?? "",
+    entity_id: conv.entity_id ?? "",
     convocatoria: conv,
     tipo_junta: conv.tipo_convocatoria ?? "ORDINARIA",
     tipo_junta_texto: conv.tipo_convocatoria ?? "Ordinaria",

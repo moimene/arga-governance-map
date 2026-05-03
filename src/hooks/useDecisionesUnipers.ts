@@ -83,6 +83,24 @@ export function useDecisionUnipersById(id: string | undefined) {
   });
 }
 
+export function useAgreementForUnipersonalDecision(decisionId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!decisionId && !!tenantId,
+    queryKey: ["agreements", tenantId, "byUnipersonalDecision", decisionId],
+    queryFn: async (): Promise<{ id: string; status: string; document_url: string | null } | null> => {
+      const { data, error } = await supabase
+        .from("agreements")
+        .select("id, status, document_url")
+        .eq("tenant_id", tenantId!)
+        .eq("unipersonal_decision_id", decisionId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as { id: string; status: string; document_url: string | null } | null) ?? null;
+    },
+  });
+}
+
 export interface CreateUnipersonalDecisionInput {
   entityId: string;
   decisionType: "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";

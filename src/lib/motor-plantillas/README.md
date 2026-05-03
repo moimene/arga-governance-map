@@ -9,6 +9,7 @@ Importar siempre desde `@/lib/motor-plantillas`:
 - `MOTOR_PLANTILLAS_VERSION`
 - `prepareDocumentComposition(req, capa3Values, options)`
 - `composeDocument(req, capa3Values, options)`
+- `generateProcessDocxWithMotor(input)`
 - `validatePostRenderDocument(input)`
 - `transitionReviewState(input)`
 - `probeReviewStateSchema()`
@@ -36,6 +37,12 @@ El resultado incluye `document`, que representa el documento generado con
 `filename`, `mimeType`, `buffer`, `renderedText`, `contentHash`, plantilla y
 `evidenceStatus`. La descarga, impresion y firma son acciones posteriores
 sobre ese artefacto; generar no implica descargar automaticamente.
+
+`generateProcessDocxWithMotor()` es el adaptador de compatibilidad para botones
+rapidos existentes (`ProcessDocxButton`). Construye el request boundary,
+compone con `composeDocument()`, descarga el DOCX como antes y reutiliza el
+archivado heredado de `doc-gen`. Los documentos registrales y subsanaciones
+permanecen en fallback legacy hasta que entren en scope.
 
 ## No-schema posture
 

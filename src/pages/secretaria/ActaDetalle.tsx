@@ -130,6 +130,9 @@ export default function ActaDetalle() {
         ? "No hay acuerdos societariamente proclamables para certificar"
         : null;
   const actaVariables = {
+    entity_id: m.entity_id,
+    meeting_id: m.meeting_id,
+    minute_id: m.id,
     denominacion_social: entity,
     organo_nombre: body,
     organo_convocante: body,
@@ -520,6 +523,9 @@ export default function ActaDetalle() {
                             templateTypes: ["CERTIFICACION"],
                             variables: {
                               ...actaVariables,
+                              entity_id: m.entity_id,
+                              meeting_id: m.meeting_id,
+                              minute_id: m.id,
                               contenido_certificacion: c.content ?? "",
                               acuerdos_certificados_count: c.agreements_certified?.length ?? 0,
                               agreement_ids: c.agreements_certified ?? [],

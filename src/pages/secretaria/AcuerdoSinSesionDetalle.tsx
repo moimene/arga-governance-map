@@ -33,6 +33,7 @@ function buildNoSessionVariables(
   ].join("\n");
 
   return {
+    entity_id: r.entity_id ?? r.governing_bodies?.entity_id ?? "",
     denominacion_social: entity,
     organo_convocante: body,
     organo_nombre: body,
@@ -199,6 +200,7 @@ export default function AcuerdoSinSesionDetalle() {
               variables: {
                 ...docVariables,
                 agreement_id: linkedAgreement?.id ?? "",
+                agreement_ids: linkedAgreement?.id ? [linkedAgreement.id] : [],
               },
               templateCriteria: {
                 jurisdiction,

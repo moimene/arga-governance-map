@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
-import { DocumentPreflightError, generateProcessDocx, selectProcessTemplate } from "@/lib/doc-gen/process-documents";
+import { DocumentPreflightError, selectProcessTemplate } from "@/lib/doc-gen/process-documents";
 import type { ProcessDocumentGenerationInput } from "@/lib/doc-gen/process-documents";
+import { generateProcessDocxWithMotor } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
 import { validateCapa3 } from "./Capa3Form";
 import { Capa3CaptureDialog } from "./Capa3CaptureDialog";
@@ -112,7 +113,7 @@ export function ProcessDocxButton({
         capa3Values: mergedCapa3Values,
       });
       const normalizedCapa3Values = resolved?.capa3Draft.values ?? mergedCapa3Values;
-      const result = await generateProcessDocx({
+      const result = await generateProcessDocxWithMotor({
         ...input,
         tenantId,
         plantillas: plantillasForGeneration,
