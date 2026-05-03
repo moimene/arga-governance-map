@@ -1,51 +1,19 @@
 import { NavLink } from "react-router-dom";
-import {
-  AlertOctagon,
-  BookOpen,
-  Brain,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Compass,
-  LayoutDashboard,
-  Settings,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { useTour } from "@/context/TourContext";
-
-interface Item {
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  badge?: { text: string; tone: "critical" | "warning" };
-  sii?: boolean;
-}
-
-const top: Item[] = [
-  { label: "Inicio", to: "/", icon: LayoutDashboard },
-];
-
-const modules: Item[] = [
-  { label: "GRC Compass", to: "/grc", icon: Compass },
-  { label: "Secretaría", to: "/secretaria", icon: ClipboardList },
-  { label: "AI Governance", to: "/ai-governance", icon: Brain },
-];
-
-const sii: Item[] = [
-  { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon, badge: { text: "2", tone: "warning" }, sii: true },
-];
-
-const adminItems: Item[] = [
-  { label: "Administración", to: "/admin", icon: Settings },
-];
-
-const helpItems: Item[] = [
-  { label: "Documentación", to: "/documentacion", icon: BookOpen },
-];
+import { useSidebarMobile } from "./SidebarMobileContext";
+import {
+  topItems,
+  moduleItems,
+  siiItems,
+  adminItems,
+  helpItems,
+  type SidebarItem,
+} from "./sidebar-nav-items";
 
 const STORAGE_KEY = "sidebar_collapsed";
 
@@ -71,7 +39,7 @@ function useCollapsed() {
   return { collapsed, toggle };
 }
 
-function ItemRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
+function ItemRow({ item, collapsed }: { item: SidebarItem; collapsed: boolean }) {
   const Icon = item.icon;
   const content = (
     <NavLink
@@ -112,8 +80,7 @@ function ItemRow({ item, collapsed }: { item: Item; collapsed: boolean }) {
   );
 }
 
-export function Sidebar() {
-  const { collapsed, toggle } = useCollapsed();
+function SidebarBody({ collapsed }: { collapsed: boolean }) {
   const { start, step, completed } = useTour();
   const tourLabel = step > 0 ? "Continuar tour" : completed ? "Repetir tour" : "Iniciar tour";
 
@@ -131,10 +98,80 @@ export function Sidebar() {
   );
 
   return (
+    <>
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 scrollbar-thin">
+        {topItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+
+        {!collapsed && (
+          <div className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-widest text-sidebar-muted">
+            Módulos
+          </div>
+        )}
+        {collapsed && <div className="my-2 mx-3 border-t border-sidebar-border" />}
+        {moduleItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+
+        <div className="my-2 mx-3 border-t border-sidebar-border" />
+        {siiItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+        <div className="my-2 mx-3 border-t border-sidebar-border" />
+
+        {adminItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+      </nav>
+
+      <div className="border-t border-sidebar-border bg-sidebar/60 px-2 py-3">
+        {!collapsed && (
+          <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground-active/80">
+            Ayuda y Onboarding
+          </div>
+        )}
+        <div className="space-y-1">
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>{replayBtn}</TooltipTrigger>
+              <TooltipContent side="right">{tourLabel}</TooltipContent>
+            </Tooltip>
+          ) : (
+            replayBtn
+          )}
+          {helpItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
+        </div>
+      </div>
+
+      {!collapsed && (
+        <div className="border-t border-sidebar-border px-4 py-3 text-[12px] text-sidebar-muted">
+          v1.0 beta
+        </div>
+      )}
+    </>
+  );
+}
+
+export function MobileSidebar() {
+  const { open, setOpen } = useSidebarMobile();
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent
+        side="left"
+        className="w-[280px] border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+      >
+        <TooltipProvider delayDuration={0}>
+          <div className="flex h-full flex-col">
+            <SidebarBody collapsed={false} />
+          </div>
+        </TooltipProvider>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function Sidebar() {
+  const { collapsed, toggle } = useCollapsed();
+  return (
     <TooltipProvider delayDuration={0}>
       <aside
+        data-testid="desktop-sidebar"
+        aria-label="Navegación principal"
         className={cn(
-          "flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
+          "hidden lg:flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
           collapsed ? "w-16" : "w-[260px]",
         )}
       >
@@ -147,50 +184,7 @@ export function Sidebar() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
-
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3 scrollbar-thin">
-          {top.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
-
-          {!collapsed && (
-            <div className="px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-widest text-sidebar-muted">
-              Módulos
-            </div>
-          )}
-          {collapsed && <div className="my-2 mx-3 border-t border-sidebar-border" />}
-          {modules.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
-
-          <div className="my-2 mx-3 border-t border-sidebar-border" />
-          {sii.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
-          <div className="my-2 mx-3 border-t border-sidebar-border" />
-
-          {adminItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
-        </nav>
-
-        {/* Help & Onboarding — destacado, separado en la parte inferior */}
-        <div className="border-t border-sidebar-border bg-sidebar/60 px-2 py-3">
-          {!collapsed && (
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground-active/80">
-              Ayuda y Onboarding
-            </div>
-          )}
-          <div className="space-y-1">
-            {collapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{replayBtn}</TooltipTrigger>
-                <TooltipContent side="right">{tourLabel}</TooltipContent>
-              </Tooltip>
-            ) : (
-              replayBtn
-            )}
-            {helpItems.map((it) => <ItemRow key={it.to} item={it} collapsed={collapsed} />)}
-          </div>
-        </div>
-
-        {!collapsed && (
-          <div className="border-t border-sidebar-border px-4 py-3 text-[12px] text-sidebar-muted">
-            v1.0 beta
-          </div>
-        )}
+        <SidebarBody collapsed={collapsed} />
       </aside>
     </TooltipProvider>
   );
