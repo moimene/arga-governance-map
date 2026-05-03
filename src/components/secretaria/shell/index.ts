@@ -1,5 +1,5 @@
 export { SecretariaHeader } from "./SecretariaHeader";
-export { SecretariaSidebar } from "./SecretariaSidebar";
+export { SecretariaMobileSidebar, SecretariaSidebar } from "./SecretariaSidebar";
 export { useSecretariaScope } from "./useSecretariaScope";
 export type {
   SecretariaEntityOption,

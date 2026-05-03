@@ -1,12 +1,13 @@
 import { forwardRef } from "react";
-import { Building2, Network } from "lucide-react";
+import { Building2, Menu, Network } from "lucide-react";
 import type { SecretariaScopeController } from "./types";
 
 interface SecretariaHeaderProps {
   scope: SecretariaScopeController;
+  onOpenMobileNav?: () => void;
 }
 
-export const SecretariaHeader = forwardRef<HTMLElement, SecretariaHeaderProps>(({ scope }, ref) => {
+export const SecretariaHeader = forwardRef<HTMLElement, SecretariaHeaderProps>(({ scope, onOpenMobileNav }, ref) => {
   const Icon = scope.mode === "sociedad" ? Building2 : Network;
   const scopeLabel = scope.mode === "sociedad" ? scope.selectedEntity?.legalName ?? "Sociedad" : "Grupo ARGA Seguros";
   const scopeMeta =
@@ -19,10 +20,21 @@ export const SecretariaHeader = forwardRef<HTMLElement, SecretariaHeaderProps>((
   return (
     <header
       ref={ref}
-      className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-6 py-4"
+      className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-4 sm:px-6"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 space-y-2">
+        <div className="flex min-w-0 gap-3">
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            aria-label="Abrir navegación de Secretaría"
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] lg:hidden"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          <div className="min-w-0 space-y-2">
           <nav
             aria-label="Ruta de navegación"
             className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--g-text-secondary)]"
@@ -48,6 +60,7 @@ export const SecretariaHeader = forwardRef<HTMLElement, SecretariaHeaderProps>((
               </p>
               <p className="truncate text-sm text-[var(--g-text-secondary)]">{scopeMeta}</p>
             </div>
+          </div>
           </div>
         </div>
 

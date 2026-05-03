@@ -16,8 +16,6 @@ import {
   TrendingUp,
   ShieldAlert,
   HandshakeIcon,
-  Calendar,
-  Plus,
   FileText,
   Repeat2,
 } from "lucide-react";
@@ -490,10 +488,9 @@ function KpiCard({ icon: Icon, label, value, tone = "primary", sublabel, onClick
       type="button"
       onClick={onClick}
       aria-label={sublabel ? `${label}: ${value} — ${sublabel}` : `${label}: ${value}`}
-      className="flex w-full flex-col items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-left transition-all hover:border-[var(--g-brand-3308)]"
+      className="flex w-full flex-col items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3.5 text-left transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-surface-subtle)]/40"
       style={{
         borderRadius: "var(--g-radius-lg)",
-        boxShadow: "var(--g-shadow-card)",
         transition: "var(--g-transition-normal)",
       }}
     >
@@ -503,7 +500,7 @@ function KpiCard({ icon: Icon, label, value, tone = "primary", sublabel, onClick
           {label}
         </span>
       </div>
-      <div className="text-3xl font-bold text-[var(--g-text-primary)]">{value}</div>
+      <div className="text-2xl font-semibold text-[var(--g-text-primary)]">{value}</div>
       {sublabel ? (
         <div className="text-xs text-[var(--g-text-secondary)]">{sublabel}</div>
       ) : null}
@@ -554,6 +551,100 @@ function flowEvidenceLabel(level: string) {
   return labels[level] ?? "postura por revisar";
 }
 
+function formatAgendaDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+  return new Date(value).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function attentionCount(kpis?: KpiCounts) {
+  if (!kpis) return 0;
+  return (
+    kpis.actas_sin_firmar +
+    kpis.tramitaciones_subsanacion +
+    kpis.libros_alerta +
+    kpis.acuerdos_compliance_pendiente
+  );
+}
+
+function priorityToneClass(tone: "ok" | "attention" | "neutral") {
+  if (tone === "ok") return "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]";
+  if (tone === "attention") return "bg-[var(--g-surface-muted)] text-[var(--g-text-primary)]";
+  return "bg-[var(--g-surface-page)] text-[var(--g-text-secondary)]";
+}
+
+function PriorityRow({
+  icon: Icon,
+  title,
+  detail,
+  action,
+  tone,
+  onClick,
+}: {
+  icon: React.ElementType;
+  title: string;
+  detail: string;
+  action: string;
+  tone: "ok" | "attention" | "neutral";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 border-t border-[var(--g-border-subtle)] px-5 py-4 text-left transition-colors first:border-t-0 hover:bg-[var(--g-surface-subtle)]/45"
+    >
+      <span
+        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center ${priorityToneClass(tone)}`}
+        style={{ borderRadius: "var(--g-radius-md)" }}
+        aria-hidden="true"
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{detail}</span>
+      </span>
+      <span className="shrink-0 text-xs font-medium text-[var(--g-link)]">{action}</span>
+    </button>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  helper,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  helper: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-left transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-surface-subtle)]/45"
+      style={{ borderRadius: "var(--g-radius-lg)" }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+        aria-hidden="true"
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{helper}</span>
+      </span>
+    </button>
+  );
+}
+
 export default function SecretariaDashboard() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
@@ -564,58 +655,157 @@ export default function SecretariaDashboard() {
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
   const flowSummary = summarizeSecretariaSanitizedFlows();
 
+  const nextAgenda = agenda?.[0];
+  const openAttention = attentionCount(kpis);
+  const scopeLine =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? `Vista filtrada por ${scope.selectedEntity.legalName}`
+      : "Vista de grupo: cartera societaria ARGA";
+
   return (
-    <div className="mx-auto max-w-[1440px] p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          Módulo Garrigues · Secretaría Societaria
+    <div className="mx-auto max-w-screen-2xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+            Secretaría Societaria
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            Mesa de trabajo del secretario
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Lo importante aparece primero: próximos hitos, documentos pendientes y bloqueos legales.
+            Los contratos técnicos quedan plegados para no competir con la operación diaria.
+          </p>
         </div>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          Dashboard
-        </h1>
-        <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-          Ciclo completo: convocatorias, reuniones, actas, certificaciones, tramitación registral,
-          decisiones unipersonales y acuerdos sin sesión — conforme a LSC (ES), CSC (PT), Lei das SA
-          (BR) y LGSM (MX).
-        </p>
         <div
-          className="mt-3 inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
+          className="inline-flex w-fit items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
-          {scope.mode === "sociedad" && scope.selectedEntity
-            ? `Vista filtrada por sociedad: ${scope.selectedEntity.legalName}`
-            : "Vista de grupo: datos agregados de la cartera societaria"}
+          <span
+            className="h-2 w-2 bg-[var(--status-success)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+            aria-hidden="true"
+          />
+          {scopeLine}
         </div>
       </div>
 
-      {/* Acciones rápidas */}
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {[
-          ...(scope.mode === "grupo"
-            ? [{ label: "Campaña cuentas grupo", icon: Repeat2, path: "/secretaria/procesos-grupo" }]
-            : []),
-          { label: "Nueva convocatoria", icon: Bell,         path: "/secretaria/convocatorias/nueva" },
-          { label: "Nueva reunión",      icon: Users,        path: "/secretaria/reuniones/nueva" },
-          { label: "Nuevo acuerdo",      icon: ScrollText,   path: "/secretaria/acuerdos-sin-sesion/nuevo" },
-          { label: "Generar documento",  icon: FileText,     path: "/secretaria/tramitador/nuevo" },
-        ].map(({ label, icon: Icon, path }) => (
-          <button
-            key={path}
-            type="button"
-            onClick={() => navigateSecretaria(path)}
-            className="flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-3 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:border-[var(--g-brand-3308)] hover:bg-[var(--g-sec-100)] hover:text-[var(--g-brand-3308)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            <Icon className="h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.75fr)]">
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="px-5 py-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+              Prioridad ahora
+            </div>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">
+              {openAttention > 0 ? `${openAttention} asunto(s) requieren revisión` : "Sin bloqueos operativos relevantes"}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Esta sección resume dónde conviene entrar primero. Cada fila abre el owner correspondiente.
+            </p>
+          </div>
+          <PriorityRow
+            icon={Clock}
+            title={nextAgenda ? `Próximo hito: ${nextAgenda.titulo}` : "Agenda sin vencimientos inmediatos"}
+            detail={
+              nextAgenda
+                ? `${nextAgenda.sublabel}, ${formatAgendaDate(nextAgenda.fecha)}`
+                : "No hay convocatorias, reuniones ni votaciones próximas en la vista actual."
+            }
+            action={nextAgenda ? "Abrir" : "Ver calendario"}
+            tone={nextAgenda ? "attention" : "ok"}
+            onClick={() => navigateSecretaria(nextAgenda?.nav_to ?? "/secretaria/calendario")}
+          />
+          <PriorityRow
+            icon={FileSignature}
+            title={`${kpis?.actas_sin_firmar ?? 0} acta(s) pendientes de firma`}
+            detail="Completa firma y certificación solo desde Secretaría. No se promueve evidencia final productiva."
+            action="Revisar actas"
+            tone={kpis && kpis.actas_sin_firmar > 0 ? "attention" : "ok"}
+            onClick={() => navigateSecretaria("/secretaria/actas")}
+          />
+          <PriorityRow
+            icon={Gavel}
+            title={`${kpis?.tramitaciones_subsanacion ?? 0} subsanación(es) registrales`}
+            detail="Las tramitaciones se mantienen en el flujo societario. El estado PROMOTED prepara descarga humana."
+            action="Abrir tramitador"
+            tone={kpis && kpis.tramitaciones_subsanacion > 0 ? "attention" : "ok"}
+            onClick={() => navigateSecretaria("/secretaria/tramitador")}
+          />
+        </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="mb-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+              Empezar un flujo
+            </div>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Accesos de uso frecuente, separados de las métricas para que la pantalla respire.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {[
+              ...(scope.mode === "grupo"
+                ? [{
+                    label: "Campaña de cuentas del grupo",
+                    helper: "Coordina varias sociedades desde un solo proceso.",
+                    icon: Repeat2,
+                    path: "/secretaria/procesos-grupo",
+                  }]
+                : []),
+              {
+                label: "Nueva convocatoria",
+                helper: "Prepara una reunión con órgano, fechas y orden del día.",
+                icon: Bell,
+                path: "/secretaria/convocatorias/nueva",
+              },
+              {
+                label: "Nueva reunión",
+                helper: "Abre asistencia, quórum, debates, votaciones y acta.",
+                icon: Users,
+                path: "/secretaria/reuniones/nueva",
+              },
+              {
+                label: "Generar documento",
+                helper: "Usa el motor de plantillas y deja el borrador en revisión.",
+                icon: FileText,
+                path: "/secretaria/tramitador/nuevo",
+              },
+            ].map(({ label, helper, icon, path }) => (
+              <QuickAction
+                key={path}
+                label={label}
+                helper={helper}
+                icon={icon}
+                onClick={() => navigateSecretaria(path)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">Indicadores esenciales</h2>
+            <p className="text-sm text-[var(--g-text-secondary)]">
+              Cinco señales para orientar la mañana, no un cuadro de mando exhaustivo.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigateSecretaria("/secretaria/calendario")}
+            className="w-fit text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+          >
+            Ver calendario completo
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           icon={Bell}
           label="Convocatorias próximas"
@@ -659,82 +849,69 @@ export default function SecretariaDashboard() {
           onClick={() => navigateSecretaria("/secretaria/plantillas-tracker")}
         />
       </div>
+      </section>
 
-      {/* KPIs secundarios */}
-      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <KpiCard
-          icon={ScrollText}
-          label="Acuerdos sin sesión · Votando"
-          value={kpiLoading ? "…" : kpis?.acuerdos_sin_sesion_votando ?? 0}
-          tone="warning"
-          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
-        />
-        <KpiCard
-          icon={Building2}
-          label="Decisiones unipersonales · Borrador"
-          value={kpiLoading ? "…" : kpis?.decisiones_unipersonales_borrador ?? 0}
-          tone="neutral"
-          onClick={() => navigateSecretaria("/secretaria/decisiones-unipersonales")}
-        />
-        <KpiCard
-          icon={Users}
-          label="Reuniones esta semana"
-          value={kpiLoading ? "…" : kpis?.reuniones_semana ?? 0}
-          tone="primary"
-          onClick={() => navigateSecretaria("/secretaria/reuniones")}
-        />
-        <KpiCard
-          icon={Scale}
-          label="Acuerdos pendientes compliance"
-          value={kpiLoading ? "…" : kpis?.acuerdos_compliance_pendiente ?? 0}
-          tone={kpis && kpis.acuerdos_compliance_pendiente > 0 ? "warning" : "neutral"}
-          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
-        />
-      </div>
-
-      {/* KPIs cross-módulo */}
-      <p className="mt-4 text-xs text-[var(--g-text-secondary)]">
-        Señales read-only de carriles owner; Secretaría solo las enruta para intake o agenda, sin crear incidentes ni hallazgos.
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <KpiCard
-          icon={HandshakeIcon}
-          label="Pactos parasociales vigentes"
-          value={crossModule?.pactos_vigentes ?? "…"}
-          sublabel={scope.mode === "sociedad" && scope.selectedEntity ? scope.selectedEntity.name : "Grupo ARGA"}
-          tone="primary"
-          onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
-        />
-        <KpiCard
-          icon={ShieldAlert}
-          label="Señales GRC · incidentes"
-          value={crossModule?.incidents_open ?? "…"}
-          sublabel="Read-only"
-          tone={crossModule && crossModule.incidents_open > 0 ? "warning" : "neutral"}
-          onClick={() => navigate("/grc/incidentes")}
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          label="Señales GRC · hallazgos"
-          value={crossModule?.findings_criticos ?? "…"}
-          sublabel="Read-only"
-          tone={crossModule && crossModule.findings_criticos > 0 ? "error" : "neutral"}
-          onClick={() => navigate("/grc/m/audit/operate/findings")}
-        />
-        <KpiCard
-          icon={Calendar}
-          label="Calendario de vencimientos"
-          value="→"
-          sublabel="Ver todos los plazos"
-          tone="primary"
-          onClick={() => navigateSecretaria("/secretaria/calendario")}
-        />
-      </div>
-
-      <div
-        className="mt-8 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      <details
+        className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)" }}
       >
+        <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-[var(--g-text-primary)]">
+          Ver señales adicionales y contratos técnicos
+        </summary>
+        <div className="border-t border-[var(--g-border-subtle)] p-5">
+          <p className="mb-4 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Estas señales sirven para contexto y handoffs. Secretaría no crea incidentes, hallazgos ni estados GRC.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              icon={ScrollText}
+              label="Acuerdos sin sesión votando"
+              value={kpiLoading ? "…" : kpis?.acuerdos_sin_sesion_votando ?? 0}
+              tone="warning"
+              onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
+            />
+            <KpiCard
+              icon={Building2}
+              label="Decisiones en borrador"
+              value={kpiLoading ? "…" : kpis?.decisiones_unipersonales_borrador ?? 0}
+              tone="neutral"
+              onClick={() => navigateSecretaria("/secretaria/decisiones-unipersonales")}
+            />
+            <KpiCard
+              icon={Scale}
+              label="Pendientes compliance"
+              value={kpiLoading ? "…" : kpis?.acuerdos_compliance_pendiente ?? 0}
+              tone={kpis && kpis.acuerdos_compliance_pendiente > 0 ? "warning" : "neutral"}
+              onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
+            />
+            <KpiCard
+              icon={HandshakeIcon}
+              label="Pactos vigentes"
+              value={crossModule?.pactos_vigentes ?? "…"}
+              sublabel={scope.mode === "sociedad" && scope.selectedEntity ? scope.selectedEntity.name : "Grupo ARGA"}
+              tone="primary"
+              onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
+            />
+            <KpiCard
+              icon={ShieldAlert}
+              label="GRC incidentes"
+              value={crossModule?.incidents_open ?? "…"}
+              sublabel="Read-only"
+              tone={crossModule && crossModule.incidents_open > 0 ? "warning" : "neutral"}
+              onClick={() => navigate("/grc/incidentes")}
+            />
+            <KpiCard
+              icon={AlertTriangle}
+              label="GRC hallazgos"
+              value={crossModule?.findings_criticos ?? "…"}
+              sublabel="Read-only"
+              tone={crossModule && crossModule.findings_criticos > 0 ? "error" : "neutral"}
+              onClick={() => navigate("/grc/m/audit/operate/findings")}
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-[var(--g-border-subtle)]">
         <div className="flex flex-col gap-3 border-b border-[var(--g-border-subtle)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
@@ -748,16 +925,16 @@ export default function SecretariaDashboard() {
               Cloud es fuente de verdad. Sin migraciones, tipos, RLS, RPC ni storage en esta tanda.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div className="border border-[var(--g-border-subtle)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
               <div className="text-xs text-[var(--g-text-secondary)]">Listos</div>
               <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.ready}/{flowSummary.total}</div>
             </div>
-            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+            <div className="border border-[var(--g-border-subtle)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
               <div className="text-xs text-[var(--g-text-secondary)]">Parciales</div>
               <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.partial}</div>
             </div>
-            <div className="border-l border-[var(--g-border-subtle)] pl-3">
+            <div className="border border-[var(--g-border-subtle)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
               <div className="text-xs text-[var(--g-text-secondary)]">Riesgo alto</div>
               <div className="font-semibold text-[var(--g-text-primary)]">{flowSummary.highRisk}</div>
             </div>
@@ -794,6 +971,7 @@ export default function SecretariaDashboard() {
           ))}
         </div>
       </div>
+      </details>
 
       {/* Agenda / Actividad reciente */}
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">

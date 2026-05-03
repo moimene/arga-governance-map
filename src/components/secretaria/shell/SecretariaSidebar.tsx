@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronLeft } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/secretaria/GlobalSearch";
 import { getNavGroups } from "./navigation";
@@ -11,16 +12,18 @@ interface SecretariaSidebarProps {
   scope: SecretariaScopeController;
 }
 
-export const SecretariaSidebar = forwardRef<HTMLElement, SecretariaSidebarProps>(({ scope }, ref) => {
+interface SecretariaSidebarContentProps {
+  scope: SecretariaScopeController;
+  onNavigate?: () => void;
+}
+
+function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarContentProps) {
   const navigate = useNavigate();
   const groups = getNavGroups(scope.mode);
   const hasSelectedEntity = Boolean(scope.selectedEntity);
 
   return (
-    <aside
-      ref={ref}
-      className="flex w-[var(--sidebar-width)] shrink-0 flex-col bg-[hsl(var(--sidebar-background))]"
-    >
+    <>
       <div className="flex min-h-16 items-center gap-3 border-b border-[hsl(var(--sidebar-border))] px-4">
         <BookOpen className="h-5 w-5 text-[hsl(var(--sidebar-foreground))]" />
         <div className="flex min-w-0 flex-col leading-tight">
@@ -76,6 +79,7 @@ export const SecretariaSidebar = forwardRef<HTMLElement, SecretariaSidebarProps>
                     key={item.to}
                     to={scope.createScopedTo(itemTo)}
                     end={item.end}
+                    onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
                         "mb-0.5 flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]",
@@ -99,7 +103,10 @@ export const SecretariaSidebar = forwardRef<HTMLElement, SecretariaSidebarProps>
       <div className="border-t border-[hsl(var(--sidebar-border))] p-2">
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            onNavigate?.();
+            navigate("/");
+          }}
           aria-label="Volver al shell TGMS"
           className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[hsl(var(--sidebar-foreground))]/70 transition-colors hover:bg-[hsl(var(--sidebar-accent))]/60 hover:text-[hsl(var(--sidebar-foreground))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
@@ -108,8 +115,40 @@ export const SecretariaSidebar = forwardRef<HTMLElement, SecretariaSidebarProps>
           <span>Volver a TGMS</span>
         </button>
       </div>
+    </>
+  );
+}
+
+export const SecretariaSidebar = forwardRef<HTMLElement, SecretariaSidebarProps>(({ scope }, ref) => {
+  return (
+    <aside
+      ref={ref}
+      className="hidden w-[var(--sidebar-width)] shrink-0 flex-col bg-[hsl(var(--sidebar-background))] lg:flex"
+      aria-label="Navegación de Secretaría Societaria"
+    >
+      <SecretariaSidebarContent scope={scope} />
     </aside>
   );
 });
 
 SecretariaSidebar.displayName = "SecretariaSidebar";
+
+interface SecretariaMobileSidebarProps {
+  scope: SecretariaScopeController;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function SecretariaMobileSidebar({ scope, open, onOpenChange }: SecretariaMobileSidebarProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="left"
+        className="garrigues-module w-[min(320px,calc(100vw-2rem))] border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] p-0 text-[hsl(var(--sidebar-foreground))]"
+      >
+        <SheetTitle className="sr-only">Navegación de Secretaría Societaria</SheetTitle>
+        <SecretariaSidebarContent scope={scope} onNavigate={() => onOpenChange(false)} />
+      </SheetContent>
+    </Sheet>
+  );
+}
