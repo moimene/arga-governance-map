@@ -117,6 +117,47 @@ describe("agreement 360 meeting materialization", () => {
     expect(payload?.compliance_snapshot).toMatchObject({ agenda_item_index: 2 });
   });
 
+  it("conserva proyeccion normativa de Acuerdo 360 en compliance_snapshot y explain", () => {
+    const payload = buildMeetingAgreementPayload({
+      ...baseInput,
+      snapshot: snapshot({
+        rule_trace: {
+          source: "V2_CLOUD",
+          rule_pack_id: "NOMBRAMIENTO_AUDITOR",
+          rule_pack_version_id: "rpv-1",
+          rule_pack_version: "1.0.0",
+          payload_hash: "payload-hash",
+          ruleset_snapshot_id: "ruleset-snapshot-1",
+          warnings: ["cotizada_warning"],
+        },
+      }),
+      origin: "MEETING_FLOOR",
+      materializedAt: "2026-04-27T11:00:00.000Z",
+    });
+
+    expect(payload?.compliance_snapshot).toMatchObject({
+      normative_snapshot_id: "ruleset-snapshot-1",
+      normative_profile: {
+        snapshot_id: "ruleset-snapshot-1",
+        source_layers: ["LEY", "ESTATUTOS", "PACTO_PARASOCIAL", "SISTEMA"],
+      },
+    });
+    expect(payload?.compliance_explain).toMatchObject({
+      normative_snapshot: {
+        snapshot_id: "ruleset-snapshot-1",
+        rule_trace: {
+          meeting_rule_pack_id: "NOMBRAMIENTO_AUDITOR",
+          meeting_ruleset_snapshot_id: "ruleset-snapshot-1",
+        },
+      },
+    });
+    expect(payload?.execution_mode).toMatchObject({
+      agreement_360: {
+        normative_snapshot_id: "ruleset-snapshot-1",
+      },
+    });
+  });
+
   it("no materializa resoluciones rechazadas o no proclamables", () => {
     const rejected = snapshot({
       status_resolucion: "REJECTED",

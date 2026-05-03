@@ -4,7 +4,7 @@ import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
-  Landmark, Route, ScrollText,
+  Landmark, Route, ScrollText, Scale, GitBranch,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedad } from "@/hooks/useSociedades";
@@ -14,6 +14,8 @@ import { useAdministradores, CARGO_LABELS } from "@/hooks/useCargos";
 import { useEntityBodies } from "@/hooks/useEntities";
 import { useRepresentaciones, SCOPE_LABELS } from "@/hooks/useRepresentacionesCanonical";
 import { useAuthorityEvidence, CARGO_CERT_LABELS } from "@/hooks/useAuthorityEvidence";
+import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
+import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
 type TabId =
   | "perfil"
@@ -23,7 +25,8 @@ type TabId =
   | "organos"
   | "admins"
   | "representaciones"
-  | "autoridad";
+  | "autoridad"
+  | "marco";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "perfil",           label: "Perfil",              icon: Building2 },
@@ -34,6 +37,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "admins",           label: "Administradores",     icon: UserCheck },
   { id: "representaciones", label: "Representaciones",    icon: Scroll },
   { id: "autoridad",        label: "Autoridad",           icon: ShieldCheck },
+  { id: "marco",            label: "Marco normativo",     icon: Scale },
 ];
 
 function tipoSocialLabel(value: string | null | undefined) {
@@ -166,6 +170,8 @@ export default function SociedadDetalle() {
 
       <SociedadDecisionModel s={s} model={model} />
 
+      <SociedadNormativeOverview entityId={s.id} onOpen={() => setTab("marco")} />
+
       <SociedadQuickActions entityId={s.id} scopedTo={scope.createScopedTo} />
 
       {/* Tabs */}
@@ -200,7 +206,184 @@ export default function SociedadDetalle() {
         {tab === "admins"           && <TabAdmins entityId={s.id} />}
         {tab === "representaciones" && <TabRepresentaciones entityId={s.id} />}
         {tab === "autoridad"        && <TabAutoridad entityId={s.id} />}
+        {tab === "marco"            && <TabMarcoNormativo entityId={s.id} />}
       </div>
+    </div>
+  );
+}
+
+function normativeStatusClass(status: NormativeFrameworkStatus | null | undefined) {
+  if (status === "COMPLETO") return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
+  if (status === "CONFLICTO") return "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+  if (status === "DESACTUALIZADO") return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+  return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+}
+
+function NormativeStatusBadge({ status }: { status: NormativeFrameworkStatus | null | undefined }) {
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold ${normativeStatusClass(status)}`}
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      {status ?? "PENDIENTE"}
+    </span>
+  );
+}
+
+function SociedadNormativeOverview({ entityId, onOpen }: { entityId: string; onOpen: () => void }) {
+  const { data: profile, isLoading } = useEntityNormativeProfile(entityId);
+  const activeSources = profile?.sources.filter((source) => source.status === "ACTIVE").length ?? 0;
+  const sourceLayers = profile
+    ? Array.from(new Set(profile.sources.map((source) => source.layer))).join(" · ")
+    : "—";
+
+  return (
+    <section
+      className="mb-5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <Scale className="mt-0.5 h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Marco normativo societario
+              </h2>
+              <NormativeStatusBadge status={profile?.status ?? (isLoading ? undefined : "INCOMPLETO")} />
+            </div>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Cada acuerdo queda anclado a fuentes legales, estatutos, pactos, reglamentos,
+              rule packs y requisitos de formalizacion. Fuentes activas: {activeSources}.
+            </p>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              {sourceLayers}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="inline-flex items-center justify-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <GitBranch className="h-3.5 w-3.5" />
+          Ver ancla normativa
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function TabMarcoNormativo({ entityId }: { entityId: string }) {
+  const { data: profile, isLoading, error } = useEntityNormativeProfile(entityId);
+
+  if (isLoading) return <div className="p-4 text-sm text-[var(--g-text-secondary)]">Cargando marco normativo…</div>;
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-[var(--status-error)]">
+        No se pudo cargar el marco normativo.
+      </div>
+    );
+  }
+  if (!profile) {
+    return (
+      <div className="p-4 text-sm text-[var(--g-text-secondary)]">
+        No hay perfil normativo proyectable para esta sociedad.
+      </div>
+    );
+  }
+
+  return <NormativeFrameworkPanel profile={profile} />;
+}
+
+function NormativeFrameworkPanel({ profile }: { profile: EntityNormativeProfile }) {
+  return (
+    <div
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">Ancla normativa de sociedad</h2>
+            <NormativeStatusBadge status={profile.status} />
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Perfil {profile.profile_hash} · {profile.jurisdiction ?? "sin jurisdiccion"} ·{" "}
+            {profile.company_form ?? "sin tipo social"} · version {profile.profile_version}
+          </p>
+        </div>
+        <div className="text-right text-xs text-[var(--g-text-secondary)]">
+          <div>Fuentes: {profile.sources.length}</div>
+          <div>Rule packs: {profile.rule_trace.rule_pack_version_ids.length}</div>
+          <div>Pactos: {profile.rule_trace.pacto_ids.length}</div>
+        </div>
+      </div>
+
+      {(profile.blockers.length > 0 || profile.warnings.length > 0) && (
+        <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <NormativeNotice title="Bloqueos" items={profile.blockers} empty="Sin bloqueos estructurales." tone="error" />
+          <NormativeNotice title="Advertencias" items={profile.warnings} empty="Sin advertencias." tone="warning" />
+        </div>
+      )}
+
+      <div className="mt-6 overflow-hidden border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+        <table className="min-w-full divide-y divide-[var(--g-border-subtle)]">
+          <thead>
+            <tr className="bg-[var(--g-surface-subtle)]">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">Prioridad</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">Fuente</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">Plano</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">Referencia</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">Estado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--g-border-subtle)]">
+            {profile.sources.map((source) => (
+              <tr key={source.id} className="hover:bg-[var(--g-surface-subtle)]/50">
+                <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">{source.priority}</td>
+                <td className="px-4 py-3">
+                  <div className="text-sm font-semibold text-[var(--g-text-primary)]">{source.layer}</div>
+                  <div className="text-xs text-[var(--g-text-secondary)]">{source.label}</div>
+                </td>
+                <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">{source.plane}</td>
+                <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">
+                  {source.reference ?? source.materia ?? "—"}
+                </td>
+                <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">{source.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function NormativeNotice({
+  title,
+  items,
+  empty,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  empty: string;
+  tone: "warning" | "error";
+}) {
+  const markerClass = tone === "error" ? "bg-[var(--status-error)]" : "bg-[var(--status-warning)]";
+  return (
+    <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4" style={{ borderRadius: "var(--g-radius-md)" }}>
+      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+        <span className={`h-2 w-2 ${markerClass}`} style={{ borderRadius: "var(--g-radius-full)" }} />
+        {title}
+      </div>
+      <ul className="mt-2 space-y-1 text-sm text-[var(--g-text-secondary)]">
+        {(items.length > 0 ? items : [empty]).map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
     </div>
   );
 }

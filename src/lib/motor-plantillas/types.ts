@@ -7,6 +7,7 @@ import type {
 } from "@/lib/secretaria/document-generation-boundary";
 import type { ResolverContext, ResolvedVariables } from "@/lib/doc-gen/variable-resolver";
 import type { ArchiveMetadata, ArchiveResult } from "@/lib/doc-gen/storage-archiver";
+import type { AgreementNormativeSnapshot } from "@/lib/secretaria/normative-framework";
 
 export type MotorPlantillasIssue = SecretariaValidationIssue;
 
@@ -53,6 +54,7 @@ export interface ComposeDocumentOptions {
   subtitle?: string;
   entityName?: string | null;
   filenamePrefix?: string;
+  normativeSnapshot?: AgreementNormativeSnapshot | null;
 }
 
 export interface PreparedDocumentComposition {
@@ -66,6 +68,7 @@ export interface PreparedDocumentComposition {
   renderedBodyText: string;
   systemTraceText: string;
   renderedText: string;
+  normativeSnapshot?: AgreementNormativeSnapshot | null;
   unresolvedVariables: string[];
   postRenderValidation: SecretariaValidationResult;
   title: string;

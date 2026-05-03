@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildSecretariaDocumentGenerationRequest } from "@/lib/secretaria/document-generation-boundary";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import type { AgreementNormativeSnapshot } from "@/lib/secretaria/normative-framework";
 import { composeDocument, finalizeEditableDocumentDraft, prepareDocumentComposition } from "../composer";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
@@ -12,6 +13,73 @@ function fixture(id: string): PlantillaProtegidaRow {
   const template = LEGAL_TEAM_TEMPLATE_FIXTURES.find((item) => item.id === id);
   if (!template) throw new Error(`Fixture no encontrada: ${id}`);
   return template;
+}
+
+function normativeSnapshot(): AgreementNormativeSnapshot {
+  return {
+    schema_version: "agreement-normative-snapshot.v1",
+    snapshot_id: "normative-snapshot:agreement-demo:nf_demo",
+    profile_id: "normative-profile:entity-demo:nf_demo",
+    profile_hash: "nf_demo",
+    profile_version: "1",
+    entity_id: ENTITY_ID,
+    agreement_id: AGREEMENT_ID,
+    agreement_kind: "APROBACION_CUENTAS",
+    matter_class: "ORDINARIA",
+    adoption_mode: "MEETING",
+    agreement_status: "ADOPTED",
+    framework_status: "COMPLETO",
+    evaluated_at: "2026-05-03T10:00:00.000Z",
+    sources: [
+      {
+        id: "source-ley",
+        layer: "LEY",
+        plane: "SOCIETARIO",
+        label: "Ley de Sociedades de Capital",
+        reference: "LSC",
+        version: "2026.05",
+        status: "ACTIVE",
+        priority: 10,
+        source_id: "jrs-demo",
+        materia: "GENERAL",
+        notes: [],
+      },
+      {
+        id: "source-sistema",
+        layer: "SISTEMA",
+        plane: "SISTEMA",
+        label: "Motor de plantillas",
+        reference: "motor-plantillas@1.0.0-beta",
+        version: "1",
+        status: "ACTIVE",
+        priority: 70,
+        source_id: null,
+        materia: "TRAZABILIDAD",
+        notes: [],
+      },
+    ],
+    formalization_requirements: [
+      {
+        kind: "CERTIFICACION",
+        status: "REQUIRED",
+        label: "Certificacion del acuerdo",
+        reason: "Todo acuerdo promovido debe poder certificarse.",
+        source_layers: ["LEY"],
+      },
+    ],
+    warnings: [],
+    blockers: [],
+    rule_trace: {
+      jurisdiction_rule_set_ids: ["jrs-demo"],
+      rule_pack_version_ids: ["rpv-demo"],
+      override_ids: [],
+      pacto_ids: [],
+      meeting_rule_pack_id: "APROBACION_CUENTAS",
+      meeting_rule_pack_version: "1.0.0",
+      meeting_ruleset_snapshot_id: "ruleset-demo",
+      meeting_payload_hash: "payload-demo",
+    },
+  };
 }
 
 async function smoke(
@@ -60,6 +128,53 @@ async function smoke(
 }
 
 describe("motor-plantillas composer smoke", () => {
+  it("incluye el marco normativo societario en la traza post-render", async () => {
+    const template = fixture("legal-fixture-convocatoria-consejo-es");
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "CONVOCATORIA",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      convocatoriaId: "conv-1",
+      agreementIds: [AGREEMENT_ID],
+      templateId: template.id,
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+
+    const result = await composeDocument(
+      request,
+      {
+        lugar: "Madrid",
+        fecha_primera_convocatoria: "2026-06-01",
+        hora_primera_convocatoria: "10:00",
+        orden_dia_texto: "Aprobacion de cuentas",
+        firma_organo_administracion: "El Presidente",
+      },
+      {
+        plantilla: template,
+        resolveCapa2: false,
+        archiveDraft: false,
+        generatedAt: "2026-05-03",
+        normativeSnapshot: normativeSnapshot(),
+        baseVariables: {
+          denominacion_social: "ARGA Seguros, S.A.",
+          cif: "A00000000",
+          domicilio_social: "Madrid",
+          registro_mercantil: "Madrid",
+          organo_nombre: "Consejo de Administracion",
+          fecha: "2026-06-01",
+          presidente: "Antonio Rios",
+          secretario: "Lucia Paredes",
+        },
+      },
+    );
+
+    expect(result.systemTraceText).toContain("MARCO NORMATIVO SOCIETARIO");
+    expect(result.systemTraceText).toContain("normative-snapshot:agreement-demo:nf_demo");
+    expect(result.renderedText).toContain("Estado marco normativo: COMPLETO");
+    expect(result.document.renderedText).toContain("Fuentes aplicadas: LEY, SISTEMA");
+    expect(result.normativeSnapshot?.profile_hash).toBe("nf_demo");
+  });
+
   it("finaliza un borrador editable con hash y DOCX del texto revisado", async () => {
     const template = fixture("legal-fixture-convocatoria-consejo-es");
     const request = await buildSecretariaDocumentGenerationRequest({

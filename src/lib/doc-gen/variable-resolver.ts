@@ -321,6 +321,12 @@ function resolveMotorVars(snapshot?: Record<string, unknown>): Record<string, un
       snapshot_rule_pack_id: "—",
       snapshot_rule_pack_version: "—",
       snapshot_hash: "—",
+      normative_snapshot_id: "—",
+      normative_profile_id: "—",
+      normative_profile_hash: "—",
+      normative_framework_status: "PENDIENTE",
+      normative_source_layers: [],
+      formalization_requirements: [],
       resultado_gate: "PENDIENTE",
       quorum_observado: "—",
       quorum_requerido: "—",
@@ -331,11 +337,24 @@ function resolveMotorVars(snapshot?: Record<string, unknown>): Record<string, un
       puntos_votacion: [],
     };
   }
+  const normativeProfile =
+    snapshot.normative_profile &&
+    typeof snapshot.normative_profile === "object" &&
+    !Array.isArray(snapshot.normative_profile)
+      ? snapshot.normative_profile as Record<string, unknown>
+      : {};
 
   return {
     snapshot_rule_pack_id: snapshot.rulePackId || snapshot.snapshot_rule_pack_id || "—",
     snapshot_rule_pack_version: snapshot.rulePackVersion || snapshot.snapshot_rule_pack_version || "—",
     snapshot_hash: snapshot.snapshot_hash || snapshot.gate_hash || "—",
+    normative_snapshot_id: snapshot.normative_snapshot_id || normativeProfile.snapshot_id || "—",
+    normative_profile_id: snapshot.normative_profile_id || normativeProfile.profile_id || "—",
+    normative_profile_hash: snapshot.normative_profile_hash || normativeProfile.profile_hash || "—",
+    normative_framework_status:
+      snapshot.normative_framework_status || normativeProfile.framework_status || "PENDIENTE",
+    normative_source_layers: normativeProfile.source_layers || [],
+    formalization_requirements: normativeProfile.formalization || [],
     resultado_gate: snapshot.ok ? "CONFORME" : "NO CONFORME",
     quorum_observado: snapshot.quorumPresente || "—",
     quorum_pct: snapshot.quorumPresente || "—",

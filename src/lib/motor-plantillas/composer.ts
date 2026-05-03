@@ -17,6 +17,10 @@ import type { Capa2Variable } from "@/lib/doc-gen/variable-resolver";
 import { computeContentHash, generateDocx } from "@/lib/doc-gen/docx-generator";
 import type { EditableField } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
+import {
+  compactAgreementNormativeSnapshot,
+  type AgreementNormativeSnapshot,
+} from "@/lib/secretaria/normative-framework";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
 import {
   isOperationalTemplate,
@@ -83,7 +87,32 @@ function titleFromRenderedText(renderedText: string, fallback: string) {
     .find(Boolean) ?? fallback;
 }
 
-function traceFooter(req: SecretariaDocumentGenerationRequest, template: PlantillaProtegidaRow) {
+function normativeTraceLines(snapshot?: AgreementNormativeSnapshot | null) {
+  if (!snapshot) return [];
+  const sourceLayers = Array.from(new Set(snapshot.sources.map((source) => source.layer))).join(", ") || "N/A";
+  const formalization =
+    snapshot.formalization_requirements.map((item) => item.kind).join(", ") || "N/A";
+  const warnings = snapshot.warnings.length > 0 ? snapshot.warnings.join(" | ") : "N/A";
+  const blockers = snapshot.blockers.length > 0 ? snapshot.blockers.join(" | ") : "N/A";
+  return [
+    "",
+    "MARCO NORMATIVO SOCIETARIO",
+    `Snapshot normativo: ${snapshot.snapshot_id}`,
+    `Perfil normativo: ${snapshot.profile_id}`,
+    `Hash perfil normativo: ${snapshot.profile_hash}`,
+    `Estado marco normativo: ${snapshot.framework_status}`,
+    `Fuentes aplicadas: ${sourceLayers}`,
+    `Formalizacion prevista: ${formalization}`,
+    `Warnings marco normativo: ${warnings}`,
+    `Bloqueos marco normativo: ${blockers}`,
+  ];
+}
+
+function traceFooter(
+  req: SecretariaDocumentGenerationRequest,
+  template: PlantillaProtegidaRow,
+  normativeSnapshot?: AgreementNormativeSnapshot | null,
+) {
   return [
     "",
     "TRAZABILIDAD DOCUMENTAL",
@@ -93,11 +122,33 @@ function traceFooter(req: SecretariaDocumentGenerationRequest, template: Plantil
     `Generation lane: ${req.generation_lane}`,
     `Plantilla: ${template.tipo} v${template.version}`,
     `Agreement IDs: ${req.agreement_ids.length > 0 ? req.agreement_ids.join(", ") : "N/A"}`,
+    ...normativeTraceLines(normativeSnapshot),
   ].join("\n");
 }
 
-function appendTraceFooter(bodyText: string, req: SecretariaDocumentGenerationRequest, template: PlantillaProtegidaRow) {
-  return `${bodyText.trim()}${traceFooter(req, template)}`;
+function appendTraceFooter(
+  bodyText: string,
+  req: SecretariaDocumentGenerationRequest,
+  template: PlantillaProtegidaRow,
+  normativeSnapshot?: AgreementNormativeSnapshot | null,
+) {
+  return `${bodyText.trim()}${traceFooter(req, template, normativeSnapshot)}`;
+}
+
+function withNormativeSnapshot(context: ResolverContext, snapshot?: AgreementNormativeSnapshot | null): ResolverContext {
+  const compact = compactAgreementNormativeSnapshot(snapshot);
+  if (!compact) return context;
+  return {
+    ...context,
+    complianceSnapshot: {
+      ...(context.complianceSnapshot ?? {}),
+      normative_profile: compact,
+      normative_snapshot_id: compact.snapshot_id,
+      normative_profile_id: compact.profile_id,
+      normative_profile_hash: compact.profile_hash,
+      normative_framework_status: compact.framework_status,
+    },
+  };
 }
 
 function capa3Issues(
@@ -323,7 +374,11 @@ export async function prepareDocumentComposition(
     throw new Error(`Plantilla ${template.id} sin capa1_inmutable.`);
   }
 
-  const resolverContext = await buildResolverContextForRequest(req, options);
+  const normativeSnapshot = options.normativeSnapshot ?? null;
+  const resolverContext = withNormativeSnapshot(
+    await buildResolverContextForRequest(req, options),
+    normativeSnapshot,
+  );
   const capa2 =
     options.resolveCapa2 === false
       ? { values: {}, resolved: [], unresolved: [], errors: [] }
@@ -362,7 +417,7 @@ export async function prepareDocumentComposition(
   }
 
   const renderedBodyText = rendered.text.trim();
-  const systemTraceText = traceFooter(req, template);
+  const systemTraceText = traceFooter(req, template, normativeSnapshot);
   const renderedWithTrace = `${renderedBodyText}${systemTraceText}`;
   const postRenderValidation = validatePostRenderDocument({
     documentType: req.document_type,
@@ -389,6 +444,7 @@ export async function prepareDocumentComposition(
     renderedBodyText,
     systemTraceText,
     renderedText: renderedWithTrace,
+    normativeSnapshot,
     unresolvedVariables: rendered.unresolvedVariables,
     postRenderValidation,
     title: options.title ?? titleFromRenderedText(rendered.text, template.tipo),
@@ -452,6 +508,16 @@ async function archivePreparedDocument(
       contentHash,
       signedBy: "SISTEMA",
       archivedBufferKind: "ORIGINAL_DOCX",
+      normativeSnapshotId: prepared.normativeSnapshot?.snapshot_id ?? null,
+      normativeProfileId: prepared.normativeSnapshot?.profile_id ?? null,
+      normativeProfileHash: prepared.normativeSnapshot?.profile_hash ?? null,
+      normativeFrameworkStatus: prepared.normativeSnapshot?.framework_status ?? null,
+      normativeSourceLayers: prepared.normativeSnapshot
+        ? Array.from(new Set(prepared.normativeSnapshot.sources.map((source) => source.layer)))
+        : [],
+      formalizationRequirements: prepared.normativeSnapshot
+        ? prepared.normativeSnapshot.formalization_requirements.map((item) => item.kind)
+        : [],
     },
   });
 
@@ -536,7 +602,13 @@ export async function finalizeEditableDocumentDraft(
     throw new Error("El borrador editable esta vacio.");
   }
 
-  const renderedText = appendTraceFooter(renderedBodyText, prepared.request, prepared.template);
+  const normativeSnapshot = options.normativeSnapshot ?? prepared.normativeSnapshot ?? null;
+  const renderedText = appendTraceFooter(
+    renderedBodyText,
+    prepared.request,
+    prepared.template,
+    normativeSnapshot,
+  );
   const postRenderValidation = validatePostRenderDocument({
     documentType: prepared.request.document_type,
     renderedText,
@@ -554,8 +626,9 @@ export async function finalizeEditableDocumentDraft(
   const reviewedPrepared: PreparedDocumentComposition = {
     ...prepared,
     renderedBodyText,
-    systemTraceText: traceFooter(prepared.request, prepared.template),
+    systemTraceText: traceFooter(prepared.request, prepared.template, normativeSnapshot),
     renderedText,
+    normativeSnapshot,
     postRenderValidation,
     title: options.title ?? titleFromRenderedText(renderedBodyText, prepared.template.tipo),
   };

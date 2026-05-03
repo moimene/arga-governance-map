@@ -6,6 +6,19 @@ Guía para IA y desarrolladores que retoman este proyecto. Leer antes de tocar c
 
 ## Contexto de trabajo — leer primero
 
+### Política actual — worktree único operativo
+
+Desde 2026-05-03, el desarrollo activo se consolida en un único worktree:
+
+`/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map` en rama `main`.
+
+Reglas:
+- Todas las conversaciones y carriles deben trabajar sobre este repo/worktree y sincronizar mediante commits/push a `origin/main`.
+- No trabajar en `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map-aims360` salvo lectura histórica o extracción puntual aprobada.
+- No abrir nuevos worktrees para carriles paralelos sin autorización explícita.
+- Los worktrees `.claude/worktrees/*` y temporales `/private/tmp/arga-governance-map*` son históricos/auxiliares. No son fuente de verdad.
+- Si hay cambios pendientes en otro worktree, no fusionarlos en bloque: primero inventariar, extraer por patch revisado y verificar en este worktree principal.
+
 ### Dos repositorios, roles distintos
 
 | Repo | Rol | Contiene |

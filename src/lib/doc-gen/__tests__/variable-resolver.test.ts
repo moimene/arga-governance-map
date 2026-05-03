@@ -139,6 +139,8 @@ describe("variable-resolver", () => {
         { variable: "quorum_referencia_legal", fuente: "LEY", condicion: "SIEMPRE" },
         { variable: "quorum_pct", fuente: "evaluarConstitucion().quorum_pct", condicion: "SIEMPRE" },
         { variable: "snapshot_hash", fuente: "calcularRulesetSnapshotHash()", condicion: "SIEMPRE" },
+        { variable: "normative_profile_hash", fuente: "MOTOR", condicion: "SIEMPRE" },
+        { variable: "normative_framework_status", fuente: "MOTOR", condicion: "SIEMPRE" },
       ],
       {
         agreementId: "agr-1",
@@ -148,6 +150,10 @@ describe("variable-resolver", () => {
           quorumPresente: 75,
           gate_hash: "hash-demo",
           ok: true,
+          normative_profile: {
+            profile_hash: "nf-demo",
+            framework_status: "COMPLETO",
+          },
         },
       },
     );
@@ -156,6 +162,8 @@ describe("variable-resolver", () => {
       quorum_referencia_legal: "art. 193 LSC",
       quorum_pct: 75,
       snapshot_hash: "hash-demo",
+      normative_profile_hash: "nf-demo",
+      normative_framework_status: "COMPLETO",
     });
     expect(result.unresolved).toEqual([]);
   });

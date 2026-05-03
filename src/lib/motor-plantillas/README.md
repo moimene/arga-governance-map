@@ -61,6 +61,23 @@ Los flujos productivos interactivos deben usar el editor de borrador previo a
 DOCX; los botones rapidos quedan como compatibilidad hasta migrarlos a ese
 contrato.
 
+## Marco normativo societario
+
+`ComposeDocumentOptions.normativeSnapshot` permite pasar el snapshot construido
+desde el perfil normativo de sociedad. El composer no lo mezcla con Capa 1:
+lo inyecta en `ResolverContext.complianceSnapshot.normative_profile` para
+variables MOTOR y lo imprime en el bloque post-render `MARCO NORMATIVO
+SOCIETARIO`. Ese bloque entra en el hash del contenido, en el DOCX y en los
+metadatos del evidence bundle cuando se archiva.
+
+El snapshot se proyecta desde fuentes Cloud existentes: `jurisdiction_rule_sets`,
+`rule_pack_versions`, `rule_param_overrides`, `pactos_parasociales` y datos de
+`entities`. Estatutos y reglamentos quedan como fuentes esperadas si no hay
+repositorio estructurado, sin bloquear la generacion documental. Acuerdo 360
+tambien conserva una proyeccion normativa minima dentro de
+`agreements.compliance_snapshot` y `agreements.compliance_explain` al
+materializar resoluciones de reunion.
+
 ## Draft Assistant Capa 3
 
 `suggestCapa3Draft()` propone valores para campos editables con whitelist

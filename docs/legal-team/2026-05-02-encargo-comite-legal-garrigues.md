@@ -171,13 +171,15 @@ Si una plantilla declara una fuente fuera de esta lista, marcar como **PENDIENTE
 
 ---
 
-## 6. Bloque B — Revisión del SQL packet (16 mejoras)
+## 6. Bloque B — Revisión del paquete de mejoras (16 plantillas)
 
-### 6.1. Qué es el packet
+### 6.1. Documento que el Comité abre
 
-Archivo: `/docs/legal-team/sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql` (94.5 KB / 2191 líneas).
+**Archivo legible-por-humanos:** `docs/legal-team/2026-05-02-bloque-B-revision-castellano.md`
 
-Contiene una transacción `BEGIN..COMMIT` con **16 instrucciones INSERT** que crean nuevas filas en `plantillas_protegidas` (estado `BORRADOR`, versión `+1`) sobre las 16 plantillas que el Comité ya tenía firmadas. Las filas originales `ACTIVA` quedan inalteradas para rollback.
+Ese es el documento que el Comité Legal lee, revisa y firma para Bloque B. Contiene las 16 plantillas categorizadas, el texto íntegro de las 3 con Capa 1 nueva, la pregunta jurídica explícita, las opciones de decisión y el formato de respuesta esperado.
+
+**El SQL packet** (`sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql`, 94.5 KB) es el equivalente técnico para uso de ingeniería tras la decisión legal. **El Comité NO necesita abrirlo.** Su trabajo se cierra en el documento castellano.
 
 ### 6.2. Las 16 plantillas afectadas
 

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSociedad } from "@/hooks/useSociedades";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { normalizeSocietyFormForRuleSet } from "@/lib/secretaria/normative-framework";
 
 export type ReglasSource = "LEY" | "ESTATUTOS" | "PACTO" | "REGLAMENTO";
 
@@ -53,6 +54,9 @@ export function useReglasAplicables(entityId: string | undefined) {
   const { tenantId } = useTenantContext();
   const { data: sociedad } = useSociedad(entityId);
   const { data: pactos } = usePactosVigentes(entityId);
+  const companyForm = normalizeSocietyFormForRuleSet(sociedad?.tipo_social ?? sociedad?.legal_form, {
+    listed: sociedad?.es_cotizada,
+  });
 
   return useQuery({
     enabled: !!entityId && !!sociedad && !!tenantId,
@@ -62,19 +66,20 @@ export function useReglasAplicables(entityId: string | undefined) {
       entityId,
       sociedad?.jurisdiction ?? null,
       sociedad?.tipo_social ?? null,
+      companyForm ?? null,
       (pactos ?? []).length,
     ],
     queryFn: async (): Promise<ReglasPack[]> => {
       const out: ReglasPack[] = [];
 
       // 1) LEY — jurisdiction_rule_sets vigentes
-      if (sociedad?.jurisdiction && sociedad?.tipo_social) {
+      if (sociedad?.jurisdiction && companyForm) {
         const { data: jrs, error: jrsErr } = await supabase
           .from("jurisdiction_rule_sets")
           .select("id, jurisdiction, company_form, rule_set_version, legal_reference")
           .eq("tenant_id", tenantId!)
           .eq("jurisdiction", sociedad.jurisdiction)
-          .eq("company_form", sociedad.tipo_social);
+          .eq("company_form", companyForm);
         if (jrsErr) throw jrsErr;
         for (const r of (jrs ?? []) as JurisdictionRuleSetRow[]) {
           out.push({

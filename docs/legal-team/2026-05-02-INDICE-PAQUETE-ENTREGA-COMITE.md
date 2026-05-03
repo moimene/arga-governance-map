@@ -54,15 +54,27 @@ Tabla maestra: las 37 plantillas ACTIVAS Cloud con sus UUIDs, versiones, aprobad
 
 ---
 
-## 3. Recursos para Bloque B — revisión del SQL packet
+## 3. Recursos para Bloque B — revisión del paquete de mejoras
 
-### 3.1. Paquete SQL propuesto
+### 3.1. Documento de revisión legal (LEER ESTE) — castellano
+
+**`2026-05-02-bloque-B-revision-castellano.md`**
+
+**Este es el documento que el Comité Legal debe abrir y firmar para Bloque B.** Contiene las 16 plantillas categorizadas en:
+- 3 plantillas con texto Capa 1 NUEVO (texto íntegro presentado para validación)
+- 13 plantillas con commit formal sin cambio sustantivo (ratificación del Comité sobre el estado actual)
+
+Trae la pregunta jurídica explícita, las opciones de decisión y el formato de respuesta esperado.
+
+### 3.2. Anexo técnico — paquete SQL (NO leer si no eres ingeniería)
 
 **`sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql`**
 
-94.5 KB. Contiene 16 INSERT en una transacción `BEGIN..COMMIT` que aplica las 16 plantillas mejoradas como nuevas versiones de las ACTIVAS ya firmadas. **Estado: PROPUESTO, no aplicado.** El Comité lo revisa y autoriza/rechaza.
+94.5 KB. Contiene 16 INSERT en una transacción `BEGIN..COMMIT`. **Es la versión técnica del Bloque B para uso de ingeniería tras la decisión legal.** El Comité Legal NO tiene que abrirlo — su trabajo se cierra en el documento castellano (sección 3.1).
 
-### 3.2. Entregable bruto previo (referencia histórica)
+Estado: PROPUESTO, no aplicado. Ingeniería lo ejecuta con credencial admin solo tras la autorización del Comité.
+
+### 3.3. Entregable bruto previo (referencia histórica)
 
 **`2026-05-02-paquete-17-plantillas-entregable-legal.md`**
 

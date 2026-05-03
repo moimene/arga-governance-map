@@ -25,9 +25,11 @@ import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompli
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
+import type { AgreementNormativeSnapshot, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -104,6 +106,7 @@ export default function ExpedienteAcuerdo() {
   const { data: agreement, isLoading } = useAgreement(id);
   const { data: compliance } = useAgreementCompliance(id);
   const { data: verification, isLoading: verificationLoading } = useQTSPVerification(id);
+  const { data: normativeSnapshot, isLoading: normativeLoading } = useAgreementNormativeSnapshot(agreement);
   const { primaryRole, displayName } = useCurrentUserRole();
 
   const { data: ruleEvaluations = [] } = useQuery({
@@ -314,6 +317,8 @@ export default function ExpedienteAcuerdo() {
               </p>
             ) : null}
           </Card>
+
+          <NormativeSnapshotCard snapshot={normativeSnapshot} isLoading={normativeLoading} />
 
           <Card icon={<Building2 className="h-4 w-4" />} title="Instrumentación y registro">
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -587,6 +592,97 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
         {label}
       </span>
     </div>
+  );
+}
+
+function normativeStatusTone(status: NormativeFrameworkStatus | null | undefined) {
+  if (status === "COMPLETO") return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
+  if (status === "CONFLICTO") return "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+  if (status === "DESACTUALIZADO") return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+  return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+}
+
+function NormativeSnapshotCard({
+  snapshot,
+  isLoading,
+}: {
+  snapshot: AgreementNormativeSnapshot | null;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <Card icon={<Scale className="h-4 w-4" />} title="Marco normativo del acuerdo">
+        <p className="text-sm text-[var(--g-text-secondary)]">Calculando ancla normativa…</p>
+      </Card>
+    );
+  }
+
+  if (!snapshot) {
+    return (
+      <Card icon={<Scale className="h-4 w-4" />} title="Marco normativo del acuerdo">
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          No hay perfil normativo proyectable para este acuerdo.
+        </p>
+      </Card>
+    );
+  }
+
+  const sourceLayers = Array.from(new Set(snapshot.sources.map((source) => source.layer)));
+  const activeSources = snapshot.sources.filter((source) => source.status === "ACTIVE");
+
+  return (
+    <Card icon={<Scale className="h-4 w-4" />} title="Marco normativo del acuerdo">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center px-2.5 py-1 text-[11px] font-semibold ${normativeStatusTone(snapshot.framework_status)}`}
+              style={{ borderRadius: "var(--g-radius-full)" }}
+            >
+              {snapshot.framework_status}
+            </span>
+            <span className="text-xs text-[var(--g-text-secondary)]">
+              {snapshot.profile_hash}
+            </span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--g-text-secondary)]">
+            Snapshot {snapshot.snapshot_id}. El documento, la revisión y la promoción al expediente
+            conservan esta traza como fuente de control.
+          </p>
+        </div>
+        <div className="text-right text-xs text-[var(--g-text-secondary)]">
+          <div>Fuentes activas: {activeSources.length}</div>
+          <div>Capas: {sourceLayers.join(" · ") || "—"}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {snapshot.formalization_requirements.map((requirement) => (
+          <span
+            key={requirement.kind}
+            className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+            title={requirement.reason}
+          >
+            {requirement.label}
+          </span>
+        ))}
+      </div>
+
+      {snapshot.warnings.length > 0 ? (
+        <div
+          className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)]/60 p-3 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-sm)" }}
+        >
+          <div className="mb-1 font-semibold text-[var(--g-text-primary)]">Advertencias</div>
+          <ul className="list-inside list-disc space-y-0.5">
+            {snapshot.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Card>
   );
 }
 

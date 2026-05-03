@@ -23,6 +23,12 @@ export interface ArchiveMetadata {
   qesSignatoryIds?: string[];
   qesSignedAt?: string;
   archivedBufferKind?: "ORIGINAL_DOCX" | "QTSP_SIGNED_DOCX";
+  normativeSnapshotId?: string | null;
+  normativeProfileId?: string | null;
+  normativeProfileHash?: string | null;
+  normativeFrameworkStatus?: string | null;
+  normativeSourceLayers?: string[];
+  formalizationRequirements?: string[];
 }
 
 function canonicalJson(value: unknown): string {

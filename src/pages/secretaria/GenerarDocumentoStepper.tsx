@@ -28,6 +28,7 @@ import {
   CloudOff,
 } from "lucide-react";
 import { useAgreement } from "@/hooks/useAgreementCompliance";
+import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
@@ -105,6 +106,7 @@ export default function GenerarDocumentoStepper() {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
+  const { data: normativeSnapshot } = useAgreementNormativeSnapshot(agreement);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
   const requestedPlantillaId = searchParams.get("plantilla");
 
@@ -324,6 +326,7 @@ export default function GenerarDocumentoStepper() {
       const prepared = await prepareDocumentComposition(request, normalizedCapa3Values, {
         plantilla: selectedPlantilla,
         baseVariables: resolvedVars,
+        normativeSnapshot,
       });
       setResolvedVars(prepared.capa2.values);
       setUnresolvedVars(Array.from(new Set([...prepared.capa2.unresolved, ...prepared.unresolvedVariables])));
@@ -356,7 +359,7 @@ export default function GenerarDocumentoStepper() {
     }
 
     setStep(3);
-  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, persistEditableDraft]);
+  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
 
   const handleDraftCapa3 = useCallback(async () => {
     if (!selectedPlantilla) return;
@@ -462,6 +465,16 @@ export default function GenerarDocumentoStepper() {
         qesSignatoryIds: qesResult?.signatoryIds,
         qesSignedAt: qesResult?.signed_at,
         archivedBufferKind: qesResult?.signedDocumentData ? "QTSP_SIGNED_DOCX" : "ORIGINAL_DOCX",
+        normativeSnapshotId: normativeSnapshot?.snapshot_id ?? null,
+        normativeProfileId: normativeSnapshot?.profile_id ?? null,
+        normativeProfileHash: normativeSnapshot?.profile_hash ?? null,
+        normativeFrameworkStatus: normativeSnapshot?.framework_status ?? null,
+        normativeSourceLayers: normativeSnapshot
+          ? Array.from(new Set(normativeSnapshot.sources.map((source) => source.layer)))
+          : [],
+        formalizationRequirements: normativeSnapshot
+          ? normativeSnapshot.formalization_requirements.map((item) => item.kind)
+          : [],
       });
 
       if (result.ok) {
@@ -486,7 +499,7 @@ export default function GenerarDocumentoStepper() {
       setArchiveError(errorMsg);
       setArchiveStatus("error");
     }
-  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash, compositionResult]);
+  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash, compositionResult, normativeSnapshot]);
 
   // ── Step 5: Configure draft and generate DOCX ───────────────────────────
 
@@ -499,6 +512,7 @@ export default function GenerarDocumentoStepper() {
         plantilla: selectedPlantilla,
         baseVariables: resolvedVars,
         archiveDraft: false,
+        normativeSnapshot,
       });
       const persisted = await persistEditableDraft(
         result,
@@ -527,7 +541,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla]);
+  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, normativeSnapshot]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {

@@ -67,3 +67,10 @@ export type {
   SuggestCapa3DraftInput,
   SuggestCapa3DraftResult,
 } from "./capa3-draft-assistant";
+export type {
+  AgreementNormativeSnapshot,
+  EntityNormativeProfile,
+  FormalizationRequirement,
+  NormativeFrameworkStatus,
+  NormativeSource,
+} from "../secretaria/normative-framework";

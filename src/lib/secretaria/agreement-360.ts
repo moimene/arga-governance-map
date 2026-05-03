@@ -1,4 +1,8 @@
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import {
+  compactAgreementNormativeSnapshot,
+  type AgreementNormativeSnapshot,
+} from "@/lib/secretaria/normative-framework";
 
 export type AgreementOrigin =
   | "PREPARED"
@@ -19,6 +23,7 @@ export interface MeetingAgreementMaterializationInput {
   requiredMajorityCode?: string | null;
   origin?: AgreementOrigin;
   materializedAt?: string;
+  normativeSnapshot?: AgreementNormativeSnapshot | null;
 }
 
 export interface MeetingAgreementResetInput extends MeetingAgreementMaterializationInput {
@@ -79,6 +84,54 @@ export function isInscribableAgreementMatter(materia: string, matterClass: strin
   return INSCRIBABLE_MATTERS.has(materia) || matterClass === "ESTRUCTURAL";
 }
 
+function compactNormativeSnapshotForMeeting(input: MeetingAgreementMaterializationInput) {
+  const provided = compactAgreementNormativeSnapshot(input.normativeSnapshot);
+  if (provided) return provided;
+
+  const trace = input.snapshot.rule_trace;
+  const inscribable = isInscribableAgreementMatter(input.snapshot.materia, input.snapshot.materia_clase);
+  return {
+    schema_version: "agreement-normative-snapshot.v1",
+    snapshot_id:
+      trace?.ruleset_snapshot_id ??
+      `meeting-adoption:${input.meetingId}:${input.snapshot.agenda_item_index}:${input.snapshot.evaluated_at}`,
+    profile_id:
+      `agreement-360:${input.entityId}:${input.snapshot.voting_context.tipo_social}:${input.snapshot.voting_context.organo_tipo}`,
+    profile_hash: trace?.payload_hash ?? trace?.ruleset_snapshot_id ?? input.snapshot.evaluated_at,
+    profile_version: trace?.rule_pack_version ?? "meeting-adoption-snapshot.v2",
+    framework_status: input.snapshot.societary_validity.ok ? "COMPLETO" : "CONFLICTO",
+    entity_id: input.entityId,
+    agreement_id: null,
+    agreement_kind: input.snapshot.materia,
+    matter_class: input.snapshot.materia_clase,
+    adoption_mode: input.snapshot.voting_context.adoption_mode,
+    evaluated_at: input.snapshot.evaluated_at,
+    source_layers: ["LEY", "ESTATUTOS", "PACTO_PARASOCIAL", "SISTEMA"],
+    formalization: inscribable
+      ? ["CERTIFICACION", "LIBRO_ACTAS", "ESCRITURA_PUBLICA", "INSCRIPCION_REGISTRAL", "EVIDENCIA_QTSP"]
+      : ["CERTIFICACION", "LIBRO_ACTAS", "EVIDENCIA_QTSP"],
+    warnings: [
+      ...(input.snapshot.societary_validity.warnings ?? []),
+      ...(input.snapshot.pacto_compliance.warnings ?? []),
+      ...(trace?.warnings ?? []),
+    ],
+    blockers: [
+      ...(input.snapshot.societary_validity.blocking_issues ?? []),
+      ...(input.snapshot.pacto_compliance.blocking_issues ?? []),
+    ],
+    rule_trace: {
+      jurisdiction_rule_set_ids: trace?.ruleset_snapshot_id ? [trace.ruleset_snapshot_id] : [],
+      rule_pack_version_ids: trace?.rule_pack_version_id ? [trace.rule_pack_version_id] : [],
+      override_ids: [],
+      pacto_ids: [],
+      meeting_rule_pack_id: trace?.rule_pack_id ?? null,
+      meeting_rule_pack_version: trace?.rule_pack_version ?? null,
+      meeting_ruleset_snapshot_id: trace?.ruleset_snapshot_id ?? null,
+      meeting_payload_hash: trace?.payload_hash ?? null,
+    },
+  };
+}
+
 export function isMaterializableMeetingAgreement(snapshot: MeetingAdoptionSnapshot | null | undefined) {
   return (
     snapshot?.status_resolucion === "ADOPTED" &&
@@ -108,6 +161,17 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
   const resolutionText = textForAgreement(input);
   const decisionDate = dateOnly(input.scheduledStart) ?? dateOnly(input.snapshot.evaluated_at) ?? dateOnly(now);
   const requiredMajorityCode = normalizeRequiredMajorityCode(input);
+  const normativeSnapshot = compactNormativeSnapshotForMeeting(input);
+  const complianceSnapshot = normativeSnapshot
+    ? {
+        ...input.snapshot,
+        normative_profile: normativeSnapshot,
+        normative_snapshot_id: normativeSnapshot.snapshot_id,
+        normative_profile_id: normativeSnapshot.profile_id,
+        normative_profile_hash: normativeSnapshot.profile_hash,
+        normative_framework_status: normativeSnapshot.framework_status,
+      }
+    : input.snapshot;
 
   const agreement360 = {
     version: AGREEMENT_360_VERSION,
@@ -117,6 +181,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
     agenda_item_index: input.snapshot.agenda_item_index,
     materialized_at: now,
     materialized: true,
+    normative_snapshot_id: normativeSnapshot?.snapshot_id ?? null,
   };
 
   return {
@@ -133,11 +198,12 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
     decision_text: resolutionText,
     decision_date: decisionDate,
     required_majority_code: requiredMajorityCode,
-    compliance_snapshot: input.snapshot,
+    compliance_snapshot: complianceSnapshot,
     compliance_explain: {
       agreement_360: agreement360,
       societary_validity: input.snapshot.societary_validity,
       pacto_compliance: input.snapshot.pacto_compliance,
+      normative_snapshot: normativeSnapshot,
     },
     execution_mode: {
       mode: "MEETING",
@@ -155,6 +221,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     (input.snapshot.status_resolucion !== "ADOPTED"
       ? "resolution_not_adopted"
       : "societary_validity_not_proclaimable");
+  const normativeSnapshot = compactNormativeSnapshotForMeeting(input);
   const agreement360 = {
     version: AGREEMENT_360_VERSION,
     origin: input.origin ?? "MEETING_FLOOR",
@@ -164,7 +231,18 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     materialized_at: now,
     materialized: false,
     reason,
+    normative_snapshot_id: normativeSnapshot?.snapshot_id ?? null,
   };
+  const complianceSnapshot = normativeSnapshot
+    ? {
+        ...input.snapshot,
+        normative_profile: normativeSnapshot,
+        normative_snapshot_id: normativeSnapshot.snapshot_id,
+        normative_profile_id: normativeSnapshot.profile_id,
+        normative_profile_hash: normativeSnapshot.profile_hash,
+        normative_framework_status: normativeSnapshot.framework_status,
+      }
+    : input.snapshot;
 
   return {
     agreement_kind: input.snapshot.materia,
@@ -174,11 +252,12 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     decision_date: null,
     proposal_text: textForAgreement(input),
     required_majority_code: normalizeRequiredMajorityCode(input),
-    compliance_snapshot: input.snapshot,
+    compliance_snapshot: complianceSnapshot,
     compliance_explain: {
       agreement_360: agreement360,
       societary_validity: input.snapshot.societary_validity,
       pacto_compliance: input.snapshot.pacto_compliance,
+      normative_snapshot: normativeSnapshot,
     },
     execution_mode: {
       mode: "MEETING",
