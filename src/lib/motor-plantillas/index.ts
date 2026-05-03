@@ -1,6 +1,7 @@
 export { MOTOR_PLANTILLAS_VERSION } from "./VERSION";
 export {
   composeDocument,
+  finalizeEditableDocumentDraft,
   prepareDocumentComposition,
   templateTypesForDocumentType,
 } from "./composer";

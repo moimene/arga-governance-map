@@ -4,6 +4,7 @@ import {
   allowedReviewStateTransitions,
   buildCapa3AiAllowedFields,
   composeDocument,
+  finalizeEditableDocumentDraft,
   generateProcessDocxWithMotor,
   invokeAnthropicCapa3DraftProvider,
   prepareDocumentComposition,
@@ -20,6 +21,7 @@ describe("motor-plantillas public contract", () => {
   it("expone una fachada publica estable", () => {
     expect(MOTOR_PLANTILLAS_VERSION).toBe("motor-plantillas@1.0.0-beta");
     expect(typeof composeDocument).toBe("function");
+    expect(typeof finalizeEditableDocumentDraft).toBe("function");
     expect(typeof generateProcessDocxWithMotor).toBe("function");
     expect(typeof suggestCapa3Draft).toBe("function");
     expect(typeof suggestCapa3DraftWithAnthropicFallback).toBe("function");

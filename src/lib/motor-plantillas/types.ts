@@ -63,6 +63,8 @@ export interface PreparedDocumentComposition {
   capa2: ResolvedVariables;
   capa3Values: Record<string, string>;
   mergedVariables: Record<string, unknown>;
+  renderedBodyText: string;
+  systemTraceText: string;
   renderedText: string;
   unresolvedVariables: string[];
   postRenderValidation: SecretariaValidationResult;

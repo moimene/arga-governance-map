@@ -1,7 +1,7 @@
 /**
  * GenerarDocumentoStepper — 5-step wizard for document generation
  *
- * Flow: Select plantilla → Review variables → Fill capa3 → Preview → Generate
+ * Flow: Select plantilla → Review variables → Fill capa3 → Editable draft → Generate
  *
  * Route: /secretaria/acuerdos/:id/generar
  */
@@ -46,11 +46,12 @@ import {
   type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
 import {
-  composeDocument,
+  finalizeEditableDocumentDraft,
   prepareDocumentComposition,
   buildCapa3AiAllowedFields,
   suggestCapa3DraftWithAnthropicFallback,
   type ComposeDocumentResult,
+  type PreparedDocumentComposition,
 } from "@/lib/motor-plantillas";
 import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
 
@@ -60,7 +61,7 @@ const STEPS = [
   { key: "plantilla", label: "Plantilla", icon: FileCheck2 },
   { key: "variables", label: "Variables", icon: FileText },
   { key: "editables", label: "Editables", icon: Edit3 },
-  { key: "preview", label: "Vista previa", icon: Eye },
+  { key: "borrador", label: "Borrador", icon: Eye },
   { key: "generar", label: "Generar", icon: Download },
 ] as const;
 
@@ -105,7 +106,6 @@ export default function GenerarDocumentoStepper() {
   const [resolvedVars, setResolvedVars] = useState<Record<string, unknown>>({});
   const [unresolvedVars, setUnresolvedVars] = useState<string[]>([]);
   const [capa3Values, setCapa3Values] = useState<Record<string, string>>({});
-  const [renderedText, setRenderedText] = useState("");
   const [renderError, setRenderError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
@@ -123,6 +123,8 @@ export default function GenerarDocumentoStepper() {
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
   const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
+  const [preparedDraft, setPreparedDraft] = useState<PreparedDocumentComposition | null>(null);
+  const [editableDraftText, setEditableDraftText] = useState("");
   const [compositionResult, setCompositionResult] = useState<ComposeDocumentResult | null>(null);
   const [isDraftingCapa3, setIsDraftingCapa3] = useState(false);
   const [capa3AssistantSummary, setCapa3AssistantSummary] = useState<string | null>(null);
@@ -174,6 +176,10 @@ export default function GenerarDocumentoStepper() {
     () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values).values,
     [capa3Values, normalizedCapa3Fields],
   );
+  const editableDraftLength = useMemo(
+    () => editableDraftText.trim().length,
+    [editableDraftText],
+  );
 
   const buildComposerRequest = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
@@ -200,6 +206,8 @@ export default function GenerarDocumentoStepper() {
     async (plantilla: PlantillaProtegidaRow) => {
       setSelectedPlantilla(plantilla);
       setCompositionResult(null);
+      setPreparedDraft(null);
+      setEditableDraftText("");
       setDocxBuffer(null);
       setContentHash("");
       setCapa3AssistantSummary(null);
@@ -250,7 +258,8 @@ export default function GenerarDocumentoStepper() {
       });
       setResolvedVars(prepared.capa2.values);
       setUnresolvedVars(Array.from(new Set([...prepared.capa2.unresolved, ...prepared.unresolvedVariables])));
-      setRenderedText(prepared.renderedText);
+      setPreparedDraft(prepared);
+      setEditableDraftText(prepared.renderedBodyText);
       setRenderError(null);
     } catch (e) {
       setRenderError(e instanceof Error ? e.message : "Error al renderizar la plantilla.");
@@ -280,6 +289,11 @@ export default function GenerarDocumentoStepper() {
         templateTipo: selectedPlantilla.tipo,
       });
       setCapa3Values(result.values);
+      setPreparedDraft(null);
+      setEditableDraftText("");
+      setCompositionResult(null);
+      setDocxBuffer(null);
+      setContentHash("");
       setCapa3AssistantApplied(result.suggestions.length > 0);
       setCapa3AssistantSummary(
         result.suggestions.length > 0
@@ -381,15 +395,14 @@ export default function GenerarDocumentoStepper() {
     }
   }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash, compositionResult]);
 
-  // ── Step 5: Generate DOCX ───────────────────────────────────────────────
+  // ── Step 5: Configure draft and generate DOCX ───────────────────────────
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedPlantilla || !renderedText) return;
+    if (!selectedPlantilla || !preparedDraft) return;
 
     setIsGenerating(true);
     try {
-      const request = await buildComposerRequest(selectedPlantilla);
-      const result = await composeDocument(request, normalizedCapa3Values, {
+      const result = await finalizeEditableDocumentDraft(preparedDraft, editableDraftText, {
         plantilla: selectedPlantilla,
         baseVariables: resolvedVars,
         archiveDraft: false,
@@ -398,7 +411,6 @@ export default function GenerarDocumentoStepper() {
       setCompositionResult(result);
       setContentHash(result.contentHash);
       setDocxBuffer(result.docxBuffer);
-
       setDocumentActionError(null);
       setSigningStatus("idle");
       setSigningError(null);
@@ -412,7 +424,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedPlantilla, renderedText, buildComposerRequest, normalizedCapa3Values, resolvedVars]);
+  }, [editableDraftText, preparedDraft, resolvedVars, selectedPlantilla]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {
@@ -769,7 +781,15 @@ export default function GenerarDocumentoStepper() {
             <Capa3Form
               fields={normalizedCapa3Fields}
               values={normalizedCapa3Values}
-              onChange={(vals) => { setCapa3Values(vals); setCapa3Errors({}); }}
+              onChange={(vals) => {
+                setCapa3Values(vals);
+                setCapa3Errors({});
+                setPreparedDraft(null);
+                setEditableDraftText("");
+                setCompositionResult(null);
+                setDocxBuffer(null);
+                setContentHash("");
+              }}
             />
 
             {Object.keys(capa3Errors).length > 0 && (
@@ -811,36 +831,79 @@ export default function GenerarDocumentoStepper() {
                 className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                Vista previa
+                Crear borrador
                 <Eye className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         )}
 
-        {/* ──────── Step 3: Preview ──────── */}
+        {/* ──────── Step 3: Editable draft ──────── */}
         {step === 3 && (
           <div className="space-y-4">
             <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Vista previa del documento
+              Borrador editable del documento
             </h2>
 
             {renderError ? (
               <div
+                id="editable-draft-error"
                 className="border border-[var(--status-error)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--status-error)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 {renderError}
               </div>
+            ) : null}
+
+            {preparedDraft ? (
+              <div
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+                style={{ borderRadius: "var(--g-radius-lg)" }}
+              >
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <label htmlFor="editable-document-draft" className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Texto del borrador
+                  </label>
+                  <span className="font-mono text-[10px] text-[var(--g-text-secondary)]">
+                    {editableDraftLength} caracteres
+                  </span>
+                </div>
+                <textarea
+                  id="editable-document-draft"
+                  value={editableDraftText}
+                  onChange={(event) => {
+                    setEditableDraftText(event.target.value);
+                    setRenderError(null);
+                    setCompositionResult(null);
+                    setDocxBuffer(null);
+                    setContentHash("");
+                  }}
+                  aria-invalid={!!renderError}
+                  aria-describedby={renderError ? "editable-draft-error editable-draft-meta" : "editable-draft-meta"}
+                  className="min-h-[420px] w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm leading-relaxed text-[var(--g-text-primary)] outline-none transition-colors focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]"
+                  style={{
+                    borderRadius: "var(--g-radius-md)",
+                    fontFamily: "'Montserrat', 'Inter', sans-serif",
+                  }}
+                />
+                <div
+                  id="editable-draft-meta"
+                  className="mt-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+                    <span className="font-medium text-[var(--g-text-primary)]">Trazabilidad del sistema</span>
+                    <span className="font-mono">{preparedDraft.request.request_id.slice(0, 12)}</span>
+                    <span>{preparedDraft.request.evidence_status}</span>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div
-                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6 max-h-[500px] overflow-y-auto text-sm leading-relaxed text-[var(--g-text-primary)] whitespace-pre-wrap"
-                style={{
-                  borderRadius: "var(--g-radius-lg)",
-                  fontFamily: "'Montserrat', 'Inter', sans-serif",
-                }}
+                className="border border-[var(--status-warning)] bg-[var(--g-surface-muted)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {renderedText}
+                El borrador debe regenerarse desde Capa 3 antes de crear el DOCX.
               </div>
             )}
 
@@ -857,7 +920,7 @@ export default function GenerarDocumentoStepper() {
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={isGenerating || !!renderError}
+                disabled={isGenerating || !!renderError || !preparedDraft || editableDraftLength === 0}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
                 aria-busy={isGenerating}
@@ -865,12 +928,12 @@ export default function GenerarDocumentoStepper() {
                 {isGenerating ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Generando...
+                    Configurando...
                   </>
                 ) : (
                   <>
                     <Download className="h-3.5 w-3.5" />
-                    Generar DOCX
+                    Configurar borrador
                   </>
                 )}
               </button>
@@ -886,7 +949,7 @@ export default function GenerarDocumentoStepper() {
               style={{ borderRadius: "var(--g-radius-lg)" }}
             >
               <CheckCircle2 className="h-5 w-5 shrink-0" />
-              <span className="text-sm font-medium">Documento generado correctamente</span>
+              <span className="text-sm font-medium">Borrador configurado correctamente</span>
             </div>
 
             {compositionResult ? (
@@ -922,11 +985,11 @@ export default function GenerarDocumentoStepper() {
             >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Documento generado
+                  Artefacto DOCX del borrador
               </h3>
               <p className="text-xs text-[var(--g-text-secondary)] mb-4">
-                El documento ya existe como artefacto DOCX demo-operativo. Desde aquí puedes descargar
-                el archivo, abrir una vista imprimible o continuar con firma y archivo.
+                El borrador revisado ya tiene hash y artefacto DOCX demo-operativo. Desde aquí puedes
+                descargar el archivo, abrir una vista imprimible o continuar con firma y archivo.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
@@ -1178,7 +1241,8 @@ export default function GenerarDocumentoStepper() {
                 type="button"
                 onClick={() => {
                   setStep(0);
-                  setRenderedText("");
+                  setPreparedDraft(null);
+                  setEditableDraftText("");
                   setCapa3Values({});
                   setSelectedPlantilla(null);
                   setSigningStatus("idle");

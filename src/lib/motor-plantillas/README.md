@@ -8,6 +8,7 @@ Importar siempre desde `@/lib/motor-plantillas`:
 
 - `MOTOR_PLANTILLAS_VERSION`
 - `prepareDocumentComposition(req, capa3Values, options)`
+- `finalizeEditableDocumentDraft(prepared, editedBodyText, options)`
 - `composeDocument(req, capa3Values, options)`
 - `suggestCapa3Draft(input)`
 - `suggestCapa3DraftWithAnthropicFallback(input)`
@@ -41,11 +42,21 @@ El resultado incluye `document`, que representa el documento generado con
 `evidenceStatus`. La descarga, impresion y firma son acciones posteriores
 sobre ese artefacto; generar no implica descargar automaticamente.
 
+Para la aplicacion real, el flujo interactivo recomendado es
+`prepareDocumentComposition()` -> edicion humana del cuerpo del borrador ->
+`finalizeEditableDocumentDraft()`. La funcion de finalizacion reaplica el bloque
+de trazabilidad de sistema, reejecuta validacion post-render, recalcula el hash
+sobre el texto revisado y genera DOCX desde ese borrador configurado. No muta la
+plantilla ni usa IA para Capa 1.
+
 `generateProcessDocxWithMotor()` es el adaptador de compatibilidad para botones
 rapidos existentes (`ProcessDocxButton`). Construye el request boundary,
 compone con `composeDocument()`, descarga el DOCX como antes y reutiliza el
 archivado heredado de `doc-gen`. Los documentos registrales y subsanaciones
 permanecen en fallback legacy hasta que entren en scope.
+Los flujos productivos interactivos deben usar el editor de borrador previo a
+DOCX; los botones rapidos quedan como compatibilidad hasta migrarlos a ese
+contrato.
 
 ## Draft Assistant Capa 3
 
@@ -68,6 +79,12 @@ desde frontend ni desde repos externos.
 El motor no escribe `review_state` en ninguna tabla existente. La revision se
 modela con state machine pura y schema gate. Hasta aplicar una migracion
 aprobada, la UI debe mostrar la revision como bloqueada.
+
+Los borradores editables tampoco se persisten en Cloud con el schema actual.
+La tabla propuesta es `secretaria_document_drafts` en
+`supabase/migrations/proposed/2026-05-03_000051_secretaria_document_drafts.sql`.
+Hasta autorizarla, la edicion posterior a Capa 3 vive en memoria de UI y solo
+se convierte en artefacto cuando se genera DOCX, firma o archivo.
 
 ## Template operability
 

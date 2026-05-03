@@ -96,6 +96,10 @@ function traceFooter(req: SecretariaDocumentGenerationRequest, template: Plantil
   ].join("\n");
 }
 
+function appendTraceFooter(bodyText: string, req: SecretariaDocumentGenerationRequest, template: PlantillaProtegidaRow) {
+  return `${bodyText.trim()}${traceFooter(req, template)}`;
+}
+
 function capa3Issues(
   fields: ReturnType<typeof normalizeCapa3Fields>,
   values: Record<string, string>,
@@ -357,7 +361,9 @@ export async function prepareDocumentComposition(
     throw new Error(rendered.error || "Error al renderizar la plantilla.");
   }
 
-  const renderedWithTrace = `${rendered.text.trim()}${traceFooter(req, template)}`;
+  const renderedBodyText = rendered.text.trim();
+  const systemTraceText = traceFooter(req, template);
+  const renderedWithTrace = `${renderedBodyText}${systemTraceText}`;
   const postRenderValidation = validatePostRenderDocument({
     documentType: req.document_type,
     renderedText: renderedWithTrace,
@@ -380,6 +386,8 @@ export async function prepareDocumentComposition(
     capa2,
     capa3Values: normalizedCapa3,
     mergedVariables,
+    renderedBodyText,
+    systemTraceText,
     renderedText: renderedWithTrace,
     unresolvedVariables: rendered.unresolvedVariables,
     postRenderValidation,
@@ -480,12 +488,11 @@ function buildGeneratedDocumentArtifact(
   };
 }
 
-export async function composeDocument(
-  req: SecretariaDocumentGenerationRequest,
-  capa3Values: Record<string, unknown> = {},
+async function buildComposeResultFromPrepared(
+  prepared: PreparedDocumentComposition,
   options: ComposeDocumentOptions = {},
+  includeEditableFields = true,
 ): Promise<ComposeDocumentResult> {
-  const prepared = await prepareDocumentComposition(req, capa3Values, options);
   const contentHash = await computeContentHash(prepared.renderedText);
   const buffer = await generateDocx({
     renderedText: prepared.renderedText,
@@ -500,10 +507,12 @@ export async function composeDocument(
         ? prepared.mergedVariables.denominacion_social
         : undefined),
     generatedAt: options.generatedAt ?? new Date().toISOString().split("T")[0],
-    editableFields: buildEditableFields(
-      normalizeCapa3Fields(prepared.template.capa3_editables),
-      prepared.capa3Values,
-    ),
+    editableFields: includeEditableFields
+      ? buildEditableFields(
+          normalizeCapa3Fields(prepared.template.capa3_editables),
+          prepared.capa3Values,
+        )
+      : undefined,
   });
   const document = buildGeneratedDocumentArtifact(prepared, buffer, contentHash, options);
   const archive = await archivePreparedDocument(prepared, buffer, contentHash, options);
@@ -515,4 +524,50 @@ export async function composeDocument(
     document,
     archive,
   };
+}
+
+export async function finalizeEditableDocumentDraft(
+  prepared: PreparedDocumentComposition,
+  editedBodyText: string,
+  options: ComposeDocumentOptions = {},
+): Promise<ComposeDocumentResult> {
+  const renderedBodyText = editedBodyText.trim();
+  if (!renderedBodyText) {
+    throw new Error("El borrador editable esta vacio.");
+  }
+
+  const renderedText = appendTraceFooter(renderedBodyText, prepared.request, prepared.template);
+  const postRenderValidation = validatePostRenderDocument({
+    documentType: prepared.request.document_type,
+    renderedText,
+    capa1Template: prepared.template.capa1_inmutable,
+    agreementIds: prepared.request.agreement_ids,
+    unresolvedVariables: prepared.unresolvedVariables,
+  });
+  if (!postRenderValidation.ok) {
+    const blocking = postRenderValidation.issues.filter((issue) => issue.severity === "BLOCKING");
+    throw new Error(
+      `Post-render validation blocked: ${blocking.map((issue) => `${issue.code}@${issue.field_path}`).join(", ")}`,
+    );
+  }
+
+  const reviewedPrepared: PreparedDocumentComposition = {
+    ...prepared,
+    renderedBodyText,
+    systemTraceText: traceFooter(prepared.request, prepared.template),
+    renderedText,
+    postRenderValidation,
+    title: options.title ?? titleFromRenderedText(renderedBodyText, prepared.template.tipo),
+  };
+
+  return buildComposeResultFromPrepared(reviewedPrepared, options, false);
+}
+
+export async function composeDocument(
+  req: SecretariaDocumentGenerationRequest,
+  capa3Values: Record<string, unknown> = {},
+  options: ComposeDocumentOptions = {},
+): Promise<ComposeDocumentResult> {
+  const prepared = await prepareDocumentComposition(req, capa3Values, options);
+  return buildComposeResultFromPrepared(prepared, options, true);
 }

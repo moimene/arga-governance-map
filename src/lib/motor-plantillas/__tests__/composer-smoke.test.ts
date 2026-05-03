@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildSecretariaDocumentGenerationRequest } from "@/lib/secretaria/document-generation-boundary";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
-import { composeDocument } from "../composer";
+import { composeDocument, finalizeEditableDocumentDraft, prepareDocumentComposition } from "../composer";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
 const ENTITY_ID = "00000000-0000-0000-0000-000000000010";
@@ -60,6 +60,57 @@ async function smoke(
 }
 
 describe("motor-plantillas composer smoke", () => {
+  it("finaliza un borrador editable con hash y DOCX del texto revisado", async () => {
+    const template = fixture("legal-fixture-convocatoria-consejo-es");
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "CONVOCATORIA",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      convocatoriaId: "conv-1",
+      templateId: template.id,
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+    const prepared = await prepareDocumentComposition(
+      request,
+      {
+        lugar: "Madrid",
+        fecha_primera_convocatoria: "2026-06-01",
+        hora_primera_convocatoria: "10:00",
+        orden_dia_texto: "Aprobacion de cuentas\nDelegacion de facultades",
+        firma_organo_administracion: "El Presidente",
+      },
+      {
+        plantilla: template,
+        resolveCapa2: false,
+        archiveDraft: false,
+        generatedAt: "2026-05-03",
+        baseVariables: {
+          denominacion_social: "ARGA Seguros, S.A.",
+          cif: "A00000000",
+          domicilio_social: "Madrid",
+          registro_mercantil: "Madrid",
+          organo_nombre: "Consejo de Administracion",
+          fecha: "2026-06-01",
+          presidente: "Antonio Rios",
+          secretario: "Lucia Paredes",
+        },
+      },
+    );
+
+    const reviewed = await finalizeEditableDocumentDraft(
+      prepared,
+      `${prepared.renderedBodyText}\n\nACLARACION OPERATIVA\nTexto incorporado por revision humana antes de generar el DOCX.`,
+      { archiveDraft: false, generatedAt: "2026-05-03" },
+    );
+
+    expect(reviewed.renderedBodyText).toContain("ACLARACION OPERATIVA");
+    expect(reviewed.renderedText).toContain("TRAZABILIDAD DOCUMENTAL");
+    expect(reviewed.document.renderedText).toContain("Texto incorporado por revision humana");
+    expect(reviewed.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(reviewed.docxBuffer.length).toBeGreaterThan(0);
+    expect(reviewed.archive.skippedReason).toBe("archive_disabled");
+  });
+
   it("selecciona BORRADOR revisado cuando es la version operativa mas reciente", async () => {
     const base = fixture("legal-fixture-convocatoria-consejo-es");
     const active: PlantillaProtegidaRow = {
