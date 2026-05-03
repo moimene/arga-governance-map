@@ -1,13 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-
-interface SidebarMobileContextValue {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  toggle: () => void;
-}
-
-const SidebarMobileContext = createContext<SidebarMobileContextValue | null>(null);
+import { SidebarMobileContext } from "./sidebar-mobile-context-value";
 
 export function SidebarMobileProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -25,12 +18,4 @@ export function SidebarMobileProvider({ children }: { children: ReactNode }) {
       {children}
     </SidebarMobileContext.Provider>
   );
-}
-
-export function useSidebarMobile() {
-  const ctx = useContext(SidebarMobileContext);
-  if (!ctx) {
-    return { open: false, setOpen: () => {}, toggle: () => {} } satisfies SidebarMobileContextValue;
-  }
-  return ctx;
 }

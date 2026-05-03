@@ -6,7 +6,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { NotificationsBell } from "./NotificationsBell";
 import { UserMenu } from "./UserMenu";
 import { Link, useLocation } from "react-router-dom";
-import { useSidebarMobile } from "./SidebarMobileContext";
+import { useSidebarMobile } from "./useSidebarMobile";
 
 export function Header() {
   const { pathname } = useLocation();

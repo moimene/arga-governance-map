@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useEffect, useState } from "react";
 import { useTour } from "@/context/TourContext";
-import { useSidebarMobile } from "./SidebarMobileContext";
+import { useSidebarMobile } from "./useSidebarMobile";
 import {
   topItems,
   moduleItems,

@@ -12,9 +12,8 @@ test.describe('TGMS Console — responsive 390px', () => {
     expect(overflow).toBe(true);
 
     // Hamburguesa visible
-    await expect(
-      page.getByRole('button', { name: /Abrir menú de navegación/i }),
-    ).toBeVisible();
+    const menuButton = page.getByRole('button', { name: /Abrir menú de navegación/i });
+    await expect(menuButton).toBeVisible();
 
     // Aside desktop oculto
     await expect(
@@ -24,5 +23,13 @@ test.describe('TGMS Console — responsive 390px', () => {
     // Literales ejecutivos
     await expect(page.getByText('TGMS Console no muta owners').first()).toBeVisible();
     await expect(page.getByText('000049 en HOLD').first()).toBeVisible();
+
+    // Drawer mobile operativo y auto-cierre al navegar
+    await menuButton.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Governance Map/i })).toBeVisible();
+    await page.getByRole('link', { name: /Governance Map/i }).click();
+    await expect(page).toHaveURL(/\/governance-map/);
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 });
