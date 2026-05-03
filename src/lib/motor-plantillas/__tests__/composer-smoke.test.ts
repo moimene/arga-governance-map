@@ -57,6 +57,62 @@ async function smoke(
 }
 
 describe("motor-plantillas composer smoke", () => {
+  it("selecciona BORRADOR revisado cuando es la version operativa mas reciente", async () => {
+    const base = fixture("legal-fixture-convocatoria-consejo-es");
+    const active: PlantillaProtegidaRow = {
+      ...base,
+      id: "composer-convocatoria-activa",
+      version: "1.1.0",
+      estado: "ACTIVA",
+    };
+    const reviewedDraft: PlantillaProtegidaRow = {
+      ...base,
+      id: "composer-convocatoria-borrador-revisado",
+      version: "1.2.0",
+      estado: "BORRADOR",
+      aprobada_por: "Comite Legal ARGA - Secretaria Societaria (demo-operativo)",
+      fecha_aprobacion: "2026-05-02",
+    };
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "CONVOCATORIA",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      convocatoriaId: "conv-1",
+      templateProfileId: "CONVOCATORIA",
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+
+    const result = await composeDocument(
+      request,
+      {
+        lugar: "Madrid",
+        fecha_primera_convocatoria: "2026-06-01",
+        hora_primera_convocatoria: "10:00",
+        orden_dia_texto: "Aprobacion de cuentas\nDelegacion de facultades",
+        firma_organo_administracion: "El Presidente",
+      },
+      {
+        plantillas: [active, reviewedDraft],
+        resolveCapa2: false,
+        archiveDraft: false,
+        generatedAt: "2026-05-03",
+        baseVariables: {
+          denominacion_social: "ARGA Seguros, S.A.",
+          cif: "A00000000",
+          domicilio_social: "Madrid",
+          registro_mercantil: "Madrid",
+          organo_nombre: "Consejo de Administracion",
+          fecha: "2026-06-01",
+          presidente: "Antonio Rios",
+          secretario: "Lucia Paredes",
+        },
+      },
+    );
+
+    expect(result.template.id).toBe("composer-convocatoria-borrador-revisado");
+    expect(result.renderedText).not.toContain("{{");
+  });
+
   it("genera CONVOCATORIA sin variables huerfanas", async () => {
     const result = await smoke(
       fixture("legal-fixture-convocatoria-consejo-es"),

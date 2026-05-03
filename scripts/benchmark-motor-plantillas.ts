@@ -7,6 +7,10 @@ import { buildSecretariaDocumentGenerationRequest } from "../src/lib/secretaria/
 import { composeDocument } from "../src/lib/motor-plantillas";
 import type { PlantillaProtegidaRow } from "../src/hooks/usePlantillasProtegidas";
 import type { SecretariaDocumentType } from "../src/lib/secretaria/document-generation-boundary";
+import {
+  isOperationalTemplate,
+  OPERATIONAL_TEMPLATE_QUERY_STATES,
+} from "../src/lib/doc-gen/template-operability";
 
 const PROJECT_ROOT = new URL("..", import.meta.url).pathname;
 const OUTPUT_FILE = join(
@@ -138,11 +142,11 @@ async function main() {
     .from("plantillas_protegidas")
     .select("*")
     .eq("tenant_id", TENANT_ID)
-    .eq("estado", "ACTIVA")
+    .in("estado", [...OPERATIONAL_TEMPLATE_QUERY_STATES])
     .order("tipo", { ascending: true });
   if (error) throw new Error(JSON.stringify(error));
 
-  const templates = (data ?? []) as PlantillaProtegidaRow[];
+  const templates = ((data ?? []) as PlantillaProtegidaRow[]).filter(isOperationalTemplate);
   const rows: Array<{ id: string; tipo: string; version: string; p50: number; p95: number; runs: number; error?: string }> = [];
 
   for (const template of templates) {
@@ -184,7 +188,7 @@ async function main() {
   const markdown = [
     "# Motor Plantillas baseline — 2026-05-03",
     "",
-    `Templates ACTIVE measured: ${templates.length}`,
+    `Templates operational measured: ${templates.length}`,
     `Iterations per template: ${ITERATIONS}`,
     `Overall p50 of template p50: ${percentile(allDurations, 50).toFixed(1)} ms`,
     `Overall p95 of template p50: ${percentile(allDurations, 95).toFixed(1)} ms`,
@@ -197,6 +201,7 @@ async function main() {
     "",
     "Notes:",
     "- Read-only benchmark.",
+    "- Operational means ACTIVA/APROBADA or BORRADOR with aprobada_por and fecha_aprobacion.",
     "- Archive disabled; evidence_status remains DEMO_OPERATIVA.",
     "- Capa 2 uses synthetic deterministic variables to isolate composer/render/DOCX cost.",
   ].join("\n");

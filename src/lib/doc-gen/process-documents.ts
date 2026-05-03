@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import {
+  compareOperationalTemplateFreshness,
+  isOperationalTemplate,
+} from "./template-operability";
+import {
   buildAgreementDocumentTraceFooterLines,
   buildDocumentEvidencePostureFooterLines,
   resolveDocumentEvidencePosture,
@@ -122,10 +126,6 @@ function normalizeFilenamePart(value: string) {
     .slice(0, 80);
 }
 
-function isUsableTemplate(template: PlantillaProtegidaRow) {
-  return ["ACTIVA", "APROBADA"].includes(template.estado) && !!template.capa1_inmutable?.trim();
-}
-
 function normalizeCode(value?: string | null) {
   return value?.trim().toUpperCase() || null;
 }
@@ -218,12 +218,11 @@ export function selectProcessTemplate(
   preferredTemplateId?: string | null,
 ): PlantillaProtegidaRow | null {
   const typePriority = new Map(templateTypes.map((type, index) => [type, index]));
-  const statusPriority: Record<string, number> = { ACTIVA: 0, APROBADA: 1 };
   const preferredTemplate = preferredTemplateId
     ? plantillas.find((template) =>
       template.id === preferredTemplateId &&
       typePriority.has(template.tipo) &&
-      isUsableTemplate(template) &&
+      isOperationalTemplate(template) &&
       templateMetadataMatches(template, criteria)
     ) ?? null
     : null;
@@ -234,7 +233,7 @@ export function selectProcessTemplate(
     plantillas
       .filter((template) =>
         typePriority.has(template.tipo) &&
-        isUsableTemplate(template) &&
+        isOperationalTemplate(template) &&
         templateMetadataMatches(template, criteria)
       )
       .sort((a, b) => {
@@ -242,7 +241,7 @@ export function selectProcessTemplate(
         if (typeDiff !== 0) return typeDiff;
         const specificityDiff = templateSpecificityScore(a, criteria) - templateSpecificityScore(b, criteria);
         if (specificityDiff !== 0) return specificityDiff;
-        return (statusPriority[a.estado] ?? 99) - (statusPriority[b.estado] ?? 99);
+        return compareOperationalTemplateFreshness(a, b);
       })[0] ?? null
   );
 }

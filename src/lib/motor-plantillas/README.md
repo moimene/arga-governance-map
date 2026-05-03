@@ -38,6 +38,13 @@ El motor no escribe `review_state` en ninguna tabla existente. La revision se
 modela con state machine pura y schema gate. Hasta aplicar una migracion
 aprobada, la UI debe mostrar la revision como bloqueada.
 
+## Template operability
+
+La carga de plantillas acepta `ACTIVA` y `APROBADA`. Para el carril demo del
+paquete legal 2026-05-02 tambien acepta `BORRADOR` solo si trae
+`aprobada_por`, `fecha_aprobacion` y Capa 1. Esto permite consumir nuevas
+versiones revisadas sin promoverlas destructivamente a `ACTIVA`.
+
 ## Evidence posture
 
 `evidence_status` sigue siendo siempre `DEMO_OPERATIVA`. El motor no emite ni

@@ -48,6 +48,7 @@ import {
   prepareDocumentComposition,
   type ComposeDocumentResult,
 } from "@/lib/motor-plantillas";
+import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -135,7 +136,6 @@ export default function GenerarDocumentoStepper() {
     if (!agreement) return [];
     const agreementJurisdiction = agreement.entities?.jurisdiction ?? "ES";
     return plantillas.filter((p) => {
-      const statusOk = p.estado === "ACTIVA" || p.estado === "APROBADA";
       const templateJurisdiction = p.jurisdiccion?.toUpperCase();
       const jurisdiccionOk =
         !templateJurisdiction ||
@@ -152,7 +152,7 @@ export default function GenerarDocumentoStepper() {
         !p.organo_tipo ||
         !agreement.governing_bodies?.body_type ||
         p.organo_tipo === agreement.governing_bodies.body_type;
-      return statusOk && jurisdiccionOk && materiaOk && adoptionOk && organoOk;
+      return isOperationalTemplate(p) && jurisdiccionOk && materiaOk && adoptionOk && organoOk;
     });
   }, [plantillas, agreement]);
   const requestedPlantilla = useMemo(
@@ -483,7 +483,7 @@ export default function GenerarDocumentoStepper() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <AlertTriangle className="h-4 w-4" />
-                No hay plantillas compatibles en estado APROBADA o ACTIVA.
+                No hay plantillas operativas compatibles.
               </div>
             ) : (
               <div className="space-y-2">
@@ -505,7 +505,7 @@ export default function GenerarDocumentoStepper() {
                         )}
                       </div>
                       <div className="text-xs text-[var(--g-text-secondary)] mt-0.5">
-                        v{p.version} — {p.estado}
+                        v{p.version} — {isLegallyReviewedDraft(p) ? "BORRADOR revisado" : p.estado}
                         {p.referencia_legal && ` — ${p.referencia_legal}`}
                       </div>
                     </div>
@@ -515,11 +515,13 @@ export default function GenerarDocumentoStepper() {
                           ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                           : p.estado === "APROBADA"
                           ? "bg-[var(--g-brand-bright)] text-[var(--g-text-inverse)]"
+                          : isLegallyReviewedDraft(p)
+                          ? "bg-[var(--status-info)] text-[var(--g-text-inverse)]"
                           : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
                       }`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      {p.estado}
+                      {isLegallyReviewedDraft(p) ? "REVISADO" : p.estado}
                     </span>
                   </button>
                 ))}

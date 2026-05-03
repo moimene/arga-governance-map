@@ -18,6 +18,10 @@ import { computeContentHash, generateDocx } from "@/lib/doc-gen/docx-generator";
 import type { EditableField } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
+import {
+  isOperationalTemplate,
+  OPERATIONAL_TEMPLATE_QUERY_STATES,
+} from "@/lib/doc-gen/template-operability";
 import { validatePostRenderDocument } from "./post-render-validation";
 import type {
   ComposeDocumentOptions,
@@ -25,8 +29,6 @@ import type {
   MotorPlantillasArchiveResult,
   PreparedDocumentComposition,
 } from "./types";
-
-const STATUS_PRIORITY: Record<string, number> = { ACTIVA: 0, APROBADA: 1 };
 
 export function templateTypesForDocumentType(documentType: SecretariaDocumentType): string[] {
   switch (documentType) {
@@ -71,10 +73,6 @@ function toFilenamePart(value: string) {
 
 function toExactArrayBuffer(buffer: Uint8Array): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-}
-
-function hasTemplateContent(template: PlantillaProtegidaRow) {
-  return ["ACTIVA", "APROBADA"].includes(template.estado) && !!template.capa1_inmutable?.trim();
 }
 
 function titleFromRenderedText(renderedText: string, fallback: string) {
@@ -151,7 +149,7 @@ async function loadTemplateByRequest(
         criteria,
         req.template_id,
       );
-    if (selected && hasTemplateContent(selected)) return selected;
+    if (selected && isOperationalTemplate(selected)) return selected;
     throw new Error("No hay plantilla utilizable para el request documental.");
   }
 
@@ -163,7 +161,7 @@ async function loadTemplateByRequest(
       .eq("tenant_id", req.tenant_id)
       .maybeSingle();
     if (error) throw error;
-    if (data && hasTemplateContent(data as PlantillaProtegidaRow)) {
+    if (data && isOperationalTemplate(data as PlantillaProtegidaRow)) {
       return data as PlantillaProtegidaRow;
     }
   }
@@ -172,13 +170,11 @@ async function loadTemplateByRequest(
     .from("plantillas_protegidas")
     .select("*")
     .eq("tenant_id", req.tenant_id)
-    .in("estado", ["ACTIVA", "APROBADA"]);
+    .in("estado", [...OPERATIONAL_TEMPLATE_QUERY_STATES]);
   if (error) throw error;
 
   const selected = selectProcessTemplate(
-    ((data ?? []) as PlantillaProtegidaRow[]).sort(
-      (a, b) => (STATUS_PRIORITY[a.estado] ?? 99) - (STATUS_PRIORITY[b.estado] ?? 99),
-    ),
+    (data ?? []) as PlantillaProtegidaRow[],
     req.template_profile_id
       ? [req.template_profile_id, ...templateTypes]
       : templateTypes,

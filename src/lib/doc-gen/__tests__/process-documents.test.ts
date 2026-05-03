@@ -76,6 +76,37 @@ describe("process-documents", () => {
     expect(selected?.id).toBe("activa");
   });
 
+  it("acepta BORRADOR con revision legal formal y version mas reciente", () => {
+    const selected = selectProcessTemplate(
+      [
+        template({ id: "activa-actual", tipo: "CONVOCATORIA", estado: "ACTIVA", version: "1.1.0" }),
+        template({
+          id: "borrador-revisado",
+          tipo: "CONVOCATORIA",
+          estado: "BORRADOR",
+          version: "1.2.0",
+          aprobada_por: "Comite Legal ARGA - Secretaria Societaria (demo-operativo)",
+          fecha_aprobacion: "2026-05-02",
+        }),
+      ],
+      ["CONVOCATORIA"],
+    );
+
+    expect(selected?.id).toBe("borrador-revisado");
+  });
+
+  it("ignora BORRADOR sin metadatos de aprobacion formal", () => {
+    const selected = selectProcessTemplate(
+      [
+        template({ id: "borrador-sin-firma", tipo: "CONVOCATORIA", estado: "BORRADOR", version: "1.3.0" }),
+        template({ id: "activa-actual", tipo: "CONVOCATORIA", estado: "ACTIVA", version: "1.1.0" }),
+      ],
+      ["CONVOCATORIA"],
+    );
+
+    expect(selected?.id).toBe("activa-actual");
+  });
+
   it("no selecciona plantillas solo revisadas para documentos finales", () => {
     const selected = selectProcessTemplate(
       [
