@@ -91,13 +91,13 @@ async function openFirstDataRow(
 test.describe('Sanitization smoke — AIMS-GRC', () => {
   test('pantallas core renderizan contra Cloud actual', async ({ page }) => {
     const routes: Array<{ path: string; signals: RegExp[] }> = [
-      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i, /AIMS P0 readiness/i] },
+      { path: '/ai-governance', signals: [/AI Governance/i, /Sistemas IA activos/i, /Readiness de demo AIMS/i] },
       { path: '/ai-governance/sistemas', signals: [/Sistemas IA/i, /Buscar sistema/i] },
       { path: '/ai-governance/sistemas/nuevo', signals: [/Nuevo sistema IA/i, /Nombre del sistema/i] },
       { path: '/ai-governance/evaluaciones', signals: [/Evaluaciones/i, /Evaluaci[oó]n/i] },
       { path: '/ai-governance/incidentes', signals: [/Incidentes IA/i, /Incidente/i] },
       { path: '/ai-governance/incidentes/nuevo', signals: [/Nuevo incidente IA/i, /Sistema IA afectado/i] },
-      { path: '/grc', signals: [/GRC Compass/i, /Riesgos cr[ií]ticos/i, /Readiness ejecutivo P0/i, /Mapa de pantallas GRC/i] },
+      { path: '/grc', signals: [/Mesa de trabajo GRC/i, /Riesgos cr[ií]ticos/i, /Readiness ejecutivo P0/i, /Contexto técnico y contratos/i] },
       { path: '/grc/risk-360', signals: [/Risk 360/i, /Riesgo/i] },
       { path: '/grc/risk-360/nuevo', signals: [/Nuevo riesgo/i, /Código/i] },
       { path: '/grc/penal-anticorrupcion', signals: [/Penal/i, /Anticorrupci[oó]n/i] },
@@ -115,12 +115,12 @@ test.describe('Sanitization smoke — AIMS-GRC', () => {
   });
 
   test('AIMS declara postura por pantalla y handoffs sin writes cross-module', async ({ page }) => {
-    await visitRoute(page, '/ai-governance', [/AIMS P0 readiness/i]);
-    await expect(page.getByText('Mapa de pantallas AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Handoffs read-only')).toBeVisible();
-    await expect(page.getByText('legacy_read').first()).toBeVisible();
+    await visitRoute(page, '/ai-governance', [/Readiness de demo AIMS/i]);
+    await expect(page.getByText('Contexto técnico AIMS')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Handoffs de solo lectura' })).toBeVisible();
+    await expect(page.getByText('solo lectura demo').first()).toBeVisible();
     await expect(page.getByText('SECRETARIA_CERTIFICATION_ISSUED')).toBeVisible();
-    await expect(page.getByText(/No escriben en governance_module_events ni governance_module_links/i)).toBeVisible();
+    await expect(page.getByText(/AIMS enruta contexto, no toma decisiones/i)).toBeVisible();
   });
 });
 

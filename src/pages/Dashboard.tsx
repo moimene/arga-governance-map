@@ -27,6 +27,9 @@ import {
   ClipboardList,
   Brain,
   GitBranch,
+  FileCheck2,
+  FolderOpen,
+  Search,
 } from "lucide-react";
 import { recentActivity } from "@/data/dashboard";
 import { scopeData } from "@/data/scopeData";
@@ -63,6 +66,77 @@ export default function Dashboard() {
     new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const label = step > 0 ? "Continuar tour" : completed ? "↺ Repetir Tour" : "Iniciar Tour del Sistema";
+  const firstAlert = alerts[0];
+  const executivePriorities = [
+    firstAlert
+      ? {
+          id: "alert",
+          tone: firstAlert.type === "error" ? "Crítico" : "Atención",
+          title: firstAlert.title,
+          body: firstAlert.body ?? "Revisar la alerta y decidir responsable.",
+          to: firstAlert.route ?? "/notificaciones",
+          icon: AlertTriangle,
+        }
+      : {
+          id: "nominal",
+          tone: "Nominal",
+          title: `Sin alertas críticas en ${scope}`,
+          body: "Mantener vigilancia y preparar la siguiente revisión ejecutiva.",
+          to: "/notificaciones",
+          icon: CheckCircle,
+        },
+    {
+      id: "grc",
+      tone: (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "Regulatorio" : "GRC",
+      title: "Riesgo y plazos regulatorios",
+      body: `${moduleStatus?.grc.incidentesDoraAbiertos ?? 0} incidentes DORA abiertos y ${moduleStatus?.grc.notificacionesUrgentes ?? 0} notificaciones en plazo corto.`,
+      to: "/grc",
+      icon: Compass,
+    },
+    {
+      id: "ai",
+      tone: (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "AI Act" : "AIMS",
+      title: "Sistemas IA que necesitan criterio",
+      body: `${moduleStatus?.aiGovernance.altosNoAprobados ?? 0} sistemas de riesgo alto sin evaluación aprobada.`,
+      to: "/ai-governance",
+      icon: Brain,
+    },
+    {
+      id: "secretaria",
+      tone: "Secretaría",
+      title: "Actos societarios pendientes",
+      body: `${moduleStatus?.secretaria.acuerdosPendientes ?? 0} acuerdos pendientes y ${moduleStatus?.secretaria.convocatoriasEmitidas ?? 0} convocatorias emitidas.`,
+      to: "/secretaria",
+      icon: ClipboardList,
+    },
+  ];
+
+  const startFlows = [
+    {
+      label: "Preparar reunión societaria",
+      body: "Secretaría conserva expediente, quorum, acta y certificación.",
+      to: "/secretaria/reuniones/nueva",
+      icon: Calendar,
+    },
+    {
+      label: "Revisar cola GRC",
+      body: "Riesgos, excepciones, alertas y escalados regulatorios.",
+      to: "/grc/mywork",
+      icon: ShieldAlert,
+    },
+    {
+      label: "Auditar sistema IA",
+      body: "Inventario, evaluación AI Act e incidentes materiales.",
+      to: "/ai-governance/sistemas",
+      icon: Brain,
+    },
+    {
+      label: "Buscar evidencia o política",
+      body: "Atajo a módulos responsables sin mutar datos desde la consola.",
+      to: "/documentacion",
+      icon: Search,
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 sm:p-6">
@@ -79,6 +153,86 @@ export default function Dashboard() {
         </Button>
       </div>
 
+      <div className="mb-6 grid gap-4 xl:grid-cols-[1.25fr_0.9fr]">
+        <Card className="overflow-hidden border-[var(--t-border-default)] bg-[var(--t-surface-card)]">
+          <div className="flex flex-col gap-2 border-b border-[var(--t-border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--t-brand)]">
+                Mesa ejecutiva
+              </p>
+              <h2 className="text-base font-semibold text-[var(--t-text-primary)]">
+                Qué requiere atención ahora
+              </h2>
+            </div>
+            <span className="w-fit rounded-md bg-[var(--t-surface-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--t-brand)]">
+              TGMS compone, cada módulo responsable escribe
+            </span>
+          </div>
+          <div className="divide-y divide-[var(--t-border-subtle)]">
+            {executivePriorities.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.id}
+                  to={item.to}
+                  className="flex min-h-[96px] items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--t-surface-subtle)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2"
+                >
+                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--t-surface-subtle)] text-[var(--t-brand)]">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-[var(--t-text-primary)]">{item.title}</span>
+                      <span className="rounded-md border border-[var(--t-border-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--t-text-secondary)]">
+                        {item.tone}
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-[var(--t-text-secondary)]">{item.body}</span>
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--t-text-secondary)]" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden border-[var(--t-border-default)] bg-[var(--t-surface-card)]">
+          <div className="border-b border-[var(--t-border-subtle)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--t-brand)]">
+              Empezar un flujo
+            </p>
+            <h2 className="text-base font-semibold text-[var(--t-text-primary)]">
+              Acciones con responsable claro
+            </h2>
+          </div>
+          <div className="grid divide-y divide-[var(--t-border-subtle)]">
+            {startFlows.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--t-surface-subtle)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2"
+                >
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--t-brand)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-[var(--t-text-primary)]">{item.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[var(--t-text-secondary)]">{item.body}</span>
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--t-text-secondary)]" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <FolderOpen className="h-4 w-4 text-[var(--t-brand)]" />
+        <h2 className="text-sm font-semibold text-[var(--t-text-primary)]">Postura y demo operable</h2>
+        <span className="text-xs text-[var(--t-text-secondary)]">Estados explícitos: operativo, solo lectura, demo y HOLD.</span>
+      </div>
+
       <div className="mb-6">
         <ReadinessHeader />
       </div>
@@ -92,6 +246,10 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs */}
+      <div className="mb-3 flex items-center gap-2">
+        <FileCheck2 className="h-4 w-4 text-[var(--t-brand)]" />
+        <h2 className="text-sm font-semibold text-[var(--t-text-primary)]">Indicadores esenciales</h2>
+      </div>
       <div key={animKey} className="grid grid-cols-2 gap-4 animate-fade-in sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard label="Entidades activas" value={kpis?.entidades ?? data.entidades} icon={Building} tone="primary" to="/entidades" />
         <KpiCard label="Mandatos próximos a vencer" value={kpis?.mandatosVencimiento ?? data.mandatosVencimiento} icon={Clock} tone="warning" to="/organos" />
@@ -189,7 +347,7 @@ export default function Dashboard() {
               <GitBranch className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold">Handoffs cross-module</h2>
             </div>
-            <span className="text-xs text-muted-foreground">Contratos owner-first</span>
+            <span className="text-xs text-muted-foreground">Contratos con responsable claro</span>
           </div>
           <ul>
             {consoleJourneys.map((journey) => (

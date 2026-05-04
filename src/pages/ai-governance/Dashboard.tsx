@@ -12,6 +12,7 @@ import {
   GitBranch,
   ListChecks,
   Route,
+  PlusCircle,
   ShieldCheck,
 } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
@@ -30,6 +31,12 @@ const RISK_COLORS: Record<string, string> = {
   Alto:        "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
   Limitado:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   Mínimo:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+};
+
+const AI_STATUS_LABEL: Record<string, string> = {
+  ACTIVO: "Activo",
+  EN_EVALUACION: "En evaluación",
+  RETIRADO: "Retirado",
 };
 
 function RiskBadge({ level }: { level: string | null }) {
@@ -167,23 +174,48 @@ function ReadinessDomainCard({ domain }: { domain: AimsReadinessDomain }) {
 
 function ScreenPostureTable() {
   return (
-    <div
+    <details
       className="mt-5 overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
       style={{ borderRadius: "var(--g-radius-lg)" }}
     >
-      <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] px-4 py-3">
+      <summary className="flex cursor-pointer items-center gap-2 border-b border-[var(--g-border-subtle)] px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
         <ListChecks className="h-4 w-4 text-[var(--g-brand-3308)]" />
         <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-          Mapa de pantallas AIMS
+          Contexto técnico AIMS
         </h3>
         <span
           className="ml-auto bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--g-text-primary)]"
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
-          legacy_read
+          solo lectura demo
         </span>
+      </summary>
+      <div className="grid gap-3 p-4 md:hidden">
+        {aimsScreenPostures.map((screen) => (
+          <div
+            key={screen.route}
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--g-text-primary)]">{screen.screen}</p>
+                <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">{screen.route}</p>
+              </div>
+              <span
+                className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g-text-secondary)]"
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                {screen.operation}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-[var(--g-text-secondary)]">
+              {screen.crossModuleHandoffs.join("; ")}
+            </p>
+          </div>
+        ))}
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[900px]">
           <thead>
             <tr className="bg-[var(--g-surface-subtle)]">
@@ -191,7 +223,7 @@ function ScreenPostureTable() {
                 Pantalla
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Datos owner
+                Datos responsables
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                 Operación
@@ -220,7 +252,7 @@ function ScreenPostureTable() {
                     {screen.operation}
                   </span>
                   <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                    Sin migración ni writes cross-module.
+                    Sin migración ni escrituras cross-module.
                   </p>
                 </td>
                 <td className="px-4 py-3 align-top">
@@ -233,7 +265,7 @@ function ScreenPostureTable() {
           </tbody>
         </table>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -265,7 +297,7 @@ function HandoffAffordances() {
                 </span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
-                {handoff.trigger}. {handoff.targetOwner} conserva la decisión owner; AIMS solo enruta.
+                {handoff.trigger}. {handoff.targetOwner} conserva la decisión; AIMS solo enruta.
               </p>
               <p className="mt-2 font-mono text-[11px] text-[var(--g-text-secondary)]">{handoff.contractEvent}</p>
             </div>
@@ -305,14 +337,51 @@ export default function AiDashboard() {
 
   const readiness = buildAimsReadiness({ systems, assessments, incidents });
   const loading = loadingSystems || loadingIncidents || loadingAssessments;
+  const materialIncidents = incidents.filter(
+    (incident) =>
+      ["CRITICO", "CRÍTICO", "ALTO"].includes(incident.severity ?? "") &&
+      ["ABIERTO", "EN_INVESTIGACION"].includes(incident.status ?? "")
+  ).length;
+  const priorityItems = [
+    {
+      label: "Alto riesgo sin evaluación aprobada",
+      value: altosNoEvaluados,
+      body: "Cerrar evaluación AI Act antes de presentar el sistema como controlado.",
+      to: "/ai-governance/evaluaciones",
+      icon: ClipboardCheck,
+      tone: altosNoEvaluados > 0 ? "text-[var(--status-error)]" : "text-[var(--status-success)]",
+    },
+    {
+      label: "Incidentes materiales de IA",
+      value: materialIncidents,
+      body: "Revisar severidad, causa raíz y posible handoff a GRC o Secretaría.",
+      to: "/ai-governance/incidentes",
+      icon: AlertTriangle,
+      tone: materialIncidents > 0 ? "text-[var(--status-warning)]" : "text-[var(--status-success)]",
+    },
+    {
+      label: "Inventario activo",
+      value: activos,
+      body: `${systems.length} sistemas registrados en AIMS con clasificación de riesgo.`,
+      to: "/ai-governance/sistemas",
+      icon: Cpu,
+      tone: "text-[var(--status-info)]",
+    },
+  ];
+  const quickActions = [
+    { label: "Nuevo sistema IA", body: "Alta gestionada en AIMS.", to: "/ai-governance/sistemas/nuevo", icon: PlusCircle },
+    { label: "Revisar evaluaciones", body: "Cobertura AI Act, findings y expediente técnico.", to: "/ai-governance/evaluaciones", icon: ClipboardCheck },
+    { label: "Registrar incidente IA", body: "Incidente gestionado con severidad y sistema asociado.", to: "/ai-governance/incidentes/nuevo", icon: AlertTriangle },
+    { label: "Proponer riesgo GRC", body: "Handoff de solo lectura para que GRC decida el riesgo.", to: "/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP", icon: Route },
+  ];
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto">
+    <div className="mx-auto max-w-[1320px] p-4 sm:p-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <Brain className="h-5 w-5 text-[var(--g-brand-3308)]" />
-          <h1 className="text-xl font-bold text-[var(--g-text-primary)]">AI Governance</h1>
+          <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Mesa de trabajo AI Governance</h1>
           <span
             className="text-xs font-medium text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)] px-2 py-0.5"
             style={{ borderRadius: "var(--g-radius-sm)" }}
@@ -320,10 +389,86 @@ export default function AiDashboard() {
             EU AI Act
           </span>
         </div>
-        <p className="text-sm text-[var(--g-text-secondary)]">
-          Inventario, evaluación de riesgos e incidentes de sistemas de IA — Grupo ARGA Seguros
+        <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+          Sistemas IA, evaluaciones e incidentes materiales. AIMS conserva el alta y actualización; GRC y Secretaría reciben handoffs de solo lectura.
         </p>
       </div>
+
+      <section className="mb-6 grid gap-4 xl:grid-cols-[1.2fr_0.9fr]">
+        <div
+          className="overflow-hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+              Prioridad ahora
+            </p>
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
+              Sistemas, evaluaciones e incidentes que requieren criterio
+            </h2>
+          </div>
+          <div className="divide-y divide-[var(--g-border-subtle)]">
+            {priorityItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className="flex min-h-[92px] items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                >
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</span>
+                      <span className={`text-sm font-bold tabular-nums ${item.tone}`}>{loading ? "..." : item.value}</span>
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-[var(--g-text-secondary)]">{item.body}</span>
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          className="overflow-hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+              Empezar un flujo
+            </p>
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
+              Acciones del officer AIMS
+            </h2>
+          </div>
+          <div className="divide-y divide-[var(--g-border-subtle)]">
+            {quickActions.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                >
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[var(--g-text-secondary)]">{item.body}</span>
+                  </span>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -379,7 +524,7 @@ export default function AiDashboard() {
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-5 w-5 text-[var(--g-brand-3308)]" />
                   <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                    AIMS P0 readiness
+                    Readiness de demo AIMS
                   </h2>
                   <span
                     className="text-[10px] font-bold uppercase text-[var(--g-text-inverse)] bg-[var(--g-brand-3308)] px-2 py-0.5"
@@ -389,8 +534,8 @@ export default function AiDashboard() {
                   </span>
                 </div>
                 <p className="mt-2 max-w-3xl text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                  Read model local sobre tablas <span className="font-semibold text-[var(--g-text-primary)]">ai_*</span>.
-                  No abre schema, no escribe contratos nuevos y prepara la transición compatible hacia AIMS.
+                  Inventario, evaluaciones e incidentes ya son navegables. La migración técnica queda
+                  como contexto, no como tarea principal del officer.
                 </p>
               </div>
               <div
@@ -408,10 +553,10 @@ export default function AiDashboard() {
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  Source posture: {readiness.sourcePosture}
+                  Estado de fuentes: datos demo conectados
                 </p>
                 <p className="mt-1 text-[11px] text-[var(--g-text-secondary)]">
-                  Contrato: {readiness.contractId}
+                  Contrato: demostrador AIMS P0
                 </p>
               </div>
             </div>
@@ -428,26 +573,26 @@ export default function AiDashboard() {
                 style={{ borderRadius: "var(--g-radius-lg)" }}
               >
                 <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-                  Data contract
+                  Contrato de datos
                 </h3>
                 <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <dt className="text-[11px] text-[var(--g-text-secondary)]">Fuentes</dt>
                     <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">
-                      {readiness.sourceTables.join(", ")}
+                      Inventario, evaluaciones e incidentes
                     </dd>
                   </div>
                   <div>
                     <dt className="text-[11px] text-[var(--g-text-secondary)]">Mutación</dt>
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">Read-only en dashboard</dd>
+                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">Solo lectura en dashboard</dd>
                   </div>
                   <div>
                     <dt className="text-[11px] text-[var(--g-text-secondary)]">Migración</dt>
-                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">ai_* → aims_*</dd>
+                    <dd className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">Pendiente, sin schema nuevo</dd>
                   </div>
                 </dl>
                 <p className="mt-3 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                  {readiness.migrationPath}
+                  La compatibilidad técnica futura se mantiene como contrato, sin nuevas escrituras en esta rebanada.
                 </p>
               </div>
 
@@ -478,11 +623,11 @@ export default function AiDashboard() {
               <div className="flex items-center gap-2">
                 <Route className="h-4 w-4 text-[var(--g-brand-3308)]" />
                 <h3 className="text-xs font-semibold uppercase text-[var(--g-text-primary)]">
-                  Handoffs read-only
+                  Handoffs de solo lectura
                 </h3>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--g-text-secondary)]">
-                Rutas de entrada a módulos owner. No escriben en governance_module_events ni governance_module_links.
+                Rutas de entrada a módulos responsables. AIMS enruta contexto, no toma decisiones de GRC ni de Secretaría.
               </p>
               <HandoffAffordances />
             </div>
@@ -566,7 +711,39 @@ export default function AiDashboard() {
                 Ver todos <ArrowRight className="h-3 w-3" />
               </a>
             </div>
-            <table className="w-full">
+            <div className="divide-y divide-[var(--g-border-subtle)] md:hidden">
+              {systems.slice(0, 5).map((sys) => (
+                <Link
+                  key={sys.id}
+                  to={`/ai-governance/sistemas/${sys.id}`}
+                  className="block px-5 py-4 transition-colors hover:bg-[var(--g-surface-subtle)]/50"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--g-text-primary)]">{sys.name}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">{sys.vendor ?? "Proveedor no informado"}</p>
+                    </div>
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <RiskBadge level={sys.risk_level} />
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${
+                        sys.status === "ACTIVO"
+                          ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                          : sys.status === "EN_EVALUACION"
+                          ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                          : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {AI_STATUS_LABEL[sys.status] ?? sys.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <table className="hidden w-full md:table">
               <thead>
                 <tr className="bg-[var(--g-surface-subtle)]">
                   <th className="px-6 py-3 text-left text-xs font-medium text-[var(--g-text-primary)] uppercase tracking-wider">Sistema</th>
@@ -601,7 +778,7 @@ export default function AiDashboard() {
                         }`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
                       >
-                        {sys.status}
+                        {AI_STATUS_LABEL[sys.status] ?? sys.status}
                       </span>
                     </td>
                   </tr>

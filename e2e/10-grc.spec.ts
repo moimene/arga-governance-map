@@ -6,8 +6,8 @@ test.describe('GRC Compass', () => {
     await expect(
       page.getByText('GRC').or(page.getByText('Riesgo').or(page.getByText('Incidente'))).first()
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Mapa de pantallas GRC')).toBeVisible();
-    await expect(page.getByText('Backlog visible, no conectado')).toBeVisible();
+    await expect(page.getByText('Contexto técnico y contratos')).toBeVisible();
+    await expect(page.getByText(/No conectado ahora:/).first()).toBeVisible();
   });
 
   test('Risk 360 renderiza sin crash', async ({ page }) => {
@@ -35,8 +35,8 @@ test.describe('GRC Compass', () => {
   test('handoff AIMS a Risk 360 se muestra como intake read-only', async ({ page }) => {
     await page.goto('/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP');
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Intake read-only desde AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/no escribe eventos ni links/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Entrada desde AIMS' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/abrir riesgo, control o plan de acción en GRC/i)).toBeVisible();
   });
 
   test('lista de incidentes carga datos demo', async ({ page }) => {
@@ -49,8 +49,8 @@ test.describe('GRC Compass', () => {
   test('handoff AIMS a incidentes GRC se muestra sin write cross-module', async ({ page }) => {
     await page.goto('/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL');
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Intake read-only desde AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/no escribe en contratos cross-module/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Entrada desde AIMS' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/conserva la trazabilidad de la decisión/i)).toBeVisible();
   });
 
   test('stepper nuevo incidente renderiza paso 1', async ({ page }) => {

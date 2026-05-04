@@ -1,6 +1,7 @@
+import type { ElementType, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, Clock, Bell } from "lucide-react";
+import { AlertTriangle, Bell, Clock } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { Link } from "react-router-dom";
 import { useTenantContext } from "@/context/TenantContext";
@@ -31,6 +32,12 @@ type ExceptionRow = {
   obligation_id: string | null;
   obligations?: { code?: string | null; title?: string | null } | null;
 };
+
+const DATE_FORMATTER = new Intl.DateTimeFormat("es-ES", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
 
 function useAlerts() {
   const { tenantId } = useTenantContext();
@@ -69,28 +76,43 @@ function useAlerts() {
   });
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Sin fecha" : DATE_FORMATTER.format(date);
+}
+
+function deadlineText(value?: string | null) {
+  const label = deadlineLabel(value ?? null);
+  if (label === "—") return "Sin plazo informado";
+  return label === "VENCIDA" ? "Plazo vencido" : label;
+}
+
 function AlertCard({
   icon: Icon,
   title,
   count,
   children,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   title: string;
   count: number;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div
-      className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)]"
+    <section
+      className="min-w-0 border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
       style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      aria-label={title}
     >
-      <div className="px-5 py-4 border-b border-[var(--g-border-subtle)] flex items-center gap-2">
-        <Icon className="h-4 w-4 text-[var(--g-brand-3308)]" />
-        <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">{title}</h2>
+      <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] px-4 py-4 sm:px-5">
+        <Icon className="h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" aria-hidden="true" />
+        <h2 className="min-w-0 flex-1 text-sm font-semibold text-[var(--g-text-primary)]">
+          {title}
+        </h2>
         {count > 0 && (
           <span
-            className="ml-auto inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+            className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs font-semibold bg-[var(--status-error)] text-[var(--g-text-inverse)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
             {count}
@@ -98,60 +120,98 @@ function AlertCard({
         )}
       </div>
       <div className="divide-y divide-[var(--g-border-subtle)]">{children}</div>
-    </div>
+    </section>
   );
 }
 
 export default function Alertas() {
   const { data, isLoading } = useAlerts();
+  const regCount = data?.regNots.length ?? 0;
+  const bcmCount = data?.bcmTests.length ?? 0;
+  const exceptionCount = data?.exceptions.length ?? 0;
+  const totalCount = regCount + bcmCount + exceptionCount;
 
   return (
-    <div className="p-6 space-y-6">
-      <header className="flex items-center gap-2">
-        <Bell className="h-5 w-5 text-[var(--g-brand-3308)]" />
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Alertas</h1>
-          <p className="text-sm text-[var(--g-text-secondary)]">
-            Deadlines regulatorios, tests BCM y excepciones pendientes.
-          </p>
+    <div className="min-w-0 space-y-6 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
+          <Bell className="mt-1 h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-[var(--g-text-primary)] sm:text-2xl">
+              Alertas
+            </h1>
+            <p className="max-w-2xl text-sm leading-6 text-[var(--g-text-secondary)]">
+              Plazos, pruebas de continuidad y excepciones que pueden requerir intervención del equipo GRC.
+            </p>
+          </div>
         </div>
+        <Link
+          to="/grc/mywork"
+          className="inline-flex h-10 w-full items-center justify-center bg-[var(--g-brand-3308)] px-4 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] sm:w-auto"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Abrir bandeja GRC
+        </Link>
       </header>
 
+      <section className="grid gap-3 sm:grid-cols-4" aria-label="Prioridad de alertas">
+        {[
+          { label: "Total", value: totalCount, helper: "Alertas activas" },
+          { label: "Notificaciones", value: regCount, helper: "Plazos regulatorios" },
+          { label: "Continuidad", value: bcmCount, helper: "Pruebas próximas" },
+          { label: "Excepciones", value: exceptionCount, helper: "Pendientes de decisión" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="text-2xl font-bold text-[var(--g-text-primary)]">{item.value}</div>
+            <div className="text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</div>
+            <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">{item.helper}</p>
+          </div>
+        ))}
+      </section>
+
       {isLoading && (
-        <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando alertas…</div>
+        <div className="text-sm text-[var(--g-text-secondary)] animate-pulse">Cargando alertas...</div>
       )}
 
-      {/* Regulatory notifications */}
       <AlertCard
         icon={Clock}
-        title="Deadlines regulatorios pendientes"
-        count={data?.regNots.length ?? 0}
+        title="Notificaciones regulatorias pendientes"
+        count={regCount}
       >
         {data?.regNots.length === 0 ? (
-          <div className="px-5 py-4 text-sm text-[var(--g-text-secondary)]">
+          <div className="px-4 py-4 text-sm text-[var(--g-text-secondary)] sm:px-5">
             Sin notificaciones pendientes.
           </div>
         ) : (
-          data?.regNots.map((n) => {
-            const dl = deadlineLabel(n.notification_deadline);
-            const isVencida = dl === "VENCIDA";
+          data?.regNots.map((notification) => {
+            const label = deadlineText(notification.notification_deadline);
+            const isOverdue = label === "Plazo vencido";
             return (
-              <div key={n.id} className="px-5 py-3 flex items-start gap-3">
-                <Clock
-                  className={`h-4 w-4 shrink-0 mt-0.5 ${isVencida ? "text-[var(--status-error)]" : "text-[var(--status-warning)]"}`}
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-[var(--g-text-primary)]">
-                    {n.authority} · {n.notification_type}
-                  </div>
-                  <div className="text-xs text-[var(--g-text-secondary)]">
-                    Incidente: {n.incidents?.code ?? n.incident_id} — {n.incidents?.title}
+              <div key={notification.id} className="flex flex-col gap-3 px-4 py-3 sm:px-5 md:flex-row md:items-start">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <Clock
+                    className={`mt-0.5 h-4 w-4 shrink-0 ${isOverdue ? "text-[var(--status-error)]" : "text-[var(--status-warning)]"}`}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <div className="break-words text-sm font-semibold text-[var(--g-text-primary)]">
+                      {notification.authority} · {notification.notification_type}
+                    </div>
+                    <div className="mt-1 break-words text-xs leading-5 text-[var(--g-text-secondary)]">
+                      {notification.incidents?.code
+                        ? `${notification.incidents.code} · ${notification.incidents.title}`
+                        : "Incidente sin detalle vinculado"}
+                    </div>
                   </div>
                 </div>
                 <span
-                  className={`text-xs font-semibold shrink-0 ${isVencida ? "text-[var(--status-error)]" : "text-[var(--status-warning)]"}`}
+                  className={`shrink-0 text-xs font-semibold ${isOverdue ? "text-[var(--status-error)]" : "text-[var(--status-warning)]"}`}
                 >
-                  {dl}
+                  {label}
                 </span>
               </div>
             );
@@ -159,66 +219,71 @@ export default function Alertas() {
         )}
       </AlertCard>
 
-      {/* BCM tests */}
       <AlertCard
         icon={AlertTriangle}
-        title="Tests BCM próximos (30 días)"
-        count={data?.bcmTests.length ?? 0}
+        title="Pruebas de continuidad próximas"
+        count={bcmCount}
       >
         {data?.bcmTests.length === 0 ? (
-          <div className="px-5 py-4 text-sm text-[var(--g-text-secondary)]">
-            Sin tests BCM próximos.
+          <div className="px-4 py-4 text-sm text-[var(--g-text-secondary)] sm:px-5">
+            Sin pruebas próximas.
           </div>
         ) : (
-          data?.bcmTests.map((p) => (
-            <div key={p.id} className="px-5 py-3 flex items-center gap-3 text-sm">
-              <span className="font-medium text-[var(--g-text-primary)]">{p.plan_code}</span>
-              <span
-                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
-                style={{ borderRadius: "var(--g-radius-full)" }}
-              >
-                {p.plan_type}
-              </span>
-              <span className="flex-1 text-[var(--g-text-secondary)]">
-                Próximo test: <strong>{p.next_test_date}</strong>
-              </span>
-              {p.test_result && (
-                <span className="text-xs text-[var(--g-text-secondary)]">{p.test_result}</span>
+          data?.bcmTests.map((plan) => (
+            <div key={plan.id} className="flex flex-col gap-3 px-4 py-3 text-sm sm:px-5 md:flex-row md:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-medium text-[var(--g-text-primary)]">
+                    {plan.plan_code}
+                  </span>
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-full)" }}
+                  >
+                    {plan.plan_type ?? "Plan de continuidad"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                  Próxima prueba: <strong>{formatDate(plan.next_test_date)}</strong>
+                </p>
+              </div>
+              {plan.test_result && (
+                <span className="text-xs text-[var(--g-text-secondary)]">{plan.test_result}</span>
               )}
             </div>
           ))
         )}
       </AlertCard>
 
-      {/* Exceptions */}
       <AlertCard
         icon={AlertTriangle}
-        title="Excepciones pendientes de aprobación"
-        count={data?.exceptions.length ?? 0}
+        title="Excepciones pendientes de decisión"
+        count={exceptionCount}
       >
         {data?.exceptions.length === 0 ? (
-          <div className="px-5 py-4 text-sm text-[var(--g-text-secondary)]">
+          <div className="px-4 py-4 text-sm text-[var(--g-text-secondary)] sm:px-5">
             Sin excepciones pendientes.
           </div>
         ) : (
-          data?.exceptions.map((e) => (
-            <div key={e.id} className="px-5 py-3 flex items-center gap-3 text-sm">
-              <span className="font-mono text-xs text-[var(--g-text-secondary)] w-28 shrink-0">
-                {e.code}
-              </span>
-              <span className="flex-1 text-[var(--g-text-primary)]">
-                {e.obligations?.code ? `${e.obligations.code} · ${e.obligations.title}` : "Obligación no vinculada"}
-              </span>
-              {e.expires_at && (
-                <span className="text-xs text-[var(--g-text-secondary)]">
-                  Expira: {e.expires_at}
-                </span>
-              )}
+          data?.exceptions.map((exception) => (
+            <div key={exception.id} className="flex flex-col gap-3 px-4 py-3 text-sm sm:px-5 md:flex-row md:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-xs text-[var(--g-text-secondary)]">{exception.code}</div>
+                <div className="mt-1 break-words text-sm text-[var(--g-text-primary)]">
+                  {exception.obligations?.code
+                    ? `${exception.obligations.code} · ${exception.obligations.title}`
+                    : "Obligación no vinculada"}
+                </div>
+                <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                  Vencimiento: {formatDate(exception.expires_at)}
+                </p>
+              </div>
               <Link
                 to="/grc/excepciones"
-                className="text-xs text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
+                className="inline-flex h-9 w-full items-center justify-center border border-[var(--g-border-subtle)] bg-transparent px-3 text-xs font-medium text-[var(--g-link)] transition-colors hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] sm:w-auto"
+                style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                Ver →
+                Ver excepciones
               </Link>
             </div>
           ))

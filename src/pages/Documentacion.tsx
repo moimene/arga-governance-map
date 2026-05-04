@@ -6,13 +6,12 @@ import { cn } from "@/lib/utils";
 import {
   AlertOctagon,
   ArrowRight,
-  BarChart3,
   Building,
+  CheckCircle,
   Eye,
   FileText,
   Globe,
   HelpCircle,
-  CheckCircle,
   Key,
   Leaf,
   Link as LinkIcon,
@@ -22,6 +21,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 
 const sections = [
@@ -46,7 +46,7 @@ const modulos = [
   { icon: Building, title: "Entidades", desc: "Registro maestro de las sociedades del grupo.", to: "/entidades" },
   { icon: Users, title: "Órganos y Reuniones", desc: "Composición, reglamentos, agenda y actas.", to: "/organos" },
   { icon: FileText, title: "Políticas y Normativa", desc: "Catálogo único con versiones, ámbito y revisión.", to: "/politicas" },
-  { icon: ShieldCheck, title: "Obligaciones y Controles", desc: "Trazabilidad obligación → control → evidencia.", to: "/obligaciones" },
+  { icon: ShieldCheck, title: "Obligaciones y Controles", desc: "Trazabilidad obligación -> control -> evidencia.", to: "/obligaciones" },
   { icon: Key, title: "Delegaciones y Poderes", desc: "Quién, qué, hasta cuándo — con alertas de vencimiento.", to: "/delegaciones" },
   { icon: ShieldAlert, title: "Hallazgos y Acciones", desc: "Observaciones, severidades, planes de remediación.", to: "/hallazgos" },
   { icon: Scale, title: "Conflictos e Integridad", desc: "Attestations anuales y operaciones vinculadas.", to: "/conflictos" },
@@ -85,6 +85,74 @@ const glosario = [
   { term: "Scope", def: "Ámbito de visión: Grupo, Región, País, Entidad.", example: { label: "Switcher arriba", to: "/" } },
 ];
 
+const quickRoutes = [
+  {
+    icon: Network,
+    title: "Entender una relación",
+    desc: "Abre el mapa y localiza entidad, órgano, norma o hallazgo.",
+    to: "/governance-map",
+  },
+  {
+    icon: AlertOctagon,
+    title: "Acceder al canal SII",
+    desc: "Entra por la zona segregada y revisa casos admitidos.",
+    to: "/sii",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Seguir una obligación",
+    desc: "Consulta obligación, control asociado y evidencia disponible.",
+    to: "/obligaciones",
+  },
+];
+
+function navigateToSection(id: string, setActive: (value: string) => void) {
+  setActive(id);
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function SectionNav({ active, onNavigate, testId }: { active: string; onNavigate: (id: string) => void; testId: string }) {
+  return (
+    <nav data-testid={testId} className="space-y-1">
+      {sections.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => onNavigate(s.id)}
+          className={cn(
+            "block w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2",
+            active === s.id
+              ? "bg-[var(--t-brand)] text-[var(--t-text-inverse)]"
+              : "text-[var(--t-text-primary)] hover:bg-[var(--t-surface-subtle)]",
+          )}
+        >
+          {s.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function ModuleCard({ icon: Icon, title, desc, to }: { icon: LucideIcon; title: string; desc: string; to: string }) {
+  return (
+    <Card className="flex min-w-0 items-start gap-4 border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-5">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--t-surface-subtle)] text-[var(--t-brand)]">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-base font-semibold text-[var(--t-text-primary)]">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">{desc}</p>
+        <Link
+          to={to}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--t-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2"
+        >
+          Ir al módulo <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 export default function Documentacion() {
   const [active, setActive] = useState("que-es");
   const [showCompleted, setShowCompleted] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("tgms.tour.justFinished") === "true");
@@ -94,59 +162,94 @@ export default function Documentacion() {
     if (typeof window !== "undefined") window.localStorage.removeItem("tgms.tour.justFinished");
   };
 
+  const onNavigate = (id: string) => navigateToSection(id, setActive);
+
   return (
-    <div className="mx-auto max-w-[1440px] p-6">
+    <div className="mx-auto max-w-[1440px] px-4 py-5 text-[var(--t-text-primary)] sm:px-6 lg:px-8">
       {showCompleted && (
-        <Card className="mb-6 flex items-start gap-3 border-l-4 border-l-status-active bg-status-active-bg p-4">
-          <CheckCircle className="mt-0.5 h-6 w-6 shrink-0 text-status-active" />
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-status-active">Has completado el tour de TGMS</h3>
-            <p className="mt-1 text-sm text-foreground">
-              Has recorrido las 10 áreas del sistema: desde el Dashboard hasta el canal SII. Explora la documentación para conocer la filosofía del sistema y el marco regulatorio que lo sustenta.
+        <Card className="mb-6 flex items-start gap-3 border-[var(--t-border-default)] border-l-4 border-l-[var(--t-status-success)] bg-[var(--t-surface-card)] p-4">
+          <CheckCircle className="mt-0.5 h-6 w-6 shrink-0 text-[var(--t-status-success)]" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-[var(--t-text-primary)]">Has completado el tour de TGMS</h3>
+            <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">
+              Has recorrido las áreas principales del sistema. Usa esta guía para conectar módulos, términos y marcos regulatorios.
             </p>
-            <Link to="/" onClick={dismissCompleted} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-status-active hover:underline">
+            <Link to="/" onClick={dismissCompleted} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--t-brand)] hover:underline">
               Volver al Dashboard <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-          <button onClick={dismissCompleted} className="text-status-active hover:underline text-xs">cerrar</button>
+          <button type="button" onClick={dismissCompleted} className="text-xs font-semibold text-[var(--t-brand)] hover:underline">
+            cerrar
+          </button>
         </Card>
       )}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Internal sidebar */}
-        <aside className="col-span-3">
-          <Card className="sticky top-20 p-2">
-            <nav className="space-y-0.5">
-              {sections.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    setActive(s.id);
-                    document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className={cn(
-                    "block w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
-                    active === s.id ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent",
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </nav>
+
+      <header>
+        <div className="text-xs font-semibold uppercase tracking-wider text-[var(--t-brand)]">Total Governance Management System</div>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-[var(--t-text-primary)] sm:text-4xl">Centro de ayuda TGMS</h1>
+        <p className="mt-2 max-w-3xl text-base leading-7 text-[var(--t-text-secondary)]">
+          Referencia rápida para entender el modelo de gobernanza, navegar los módulos y localizar el marco regulatorio que sustenta la demo ARGA.
+        </p>
+      </header>
+
+      <section className="mt-5 grid gap-3 md:grid-cols-3">
+        {quickRoutes.map((route) => {
+          const Icon = route.icon;
+          return (
+            <Link
+              key={route.title}
+              to={route.to}
+              className="group rounded-lg border border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4 transition-colors hover:bg-[var(--t-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--t-surface-subtle)] text-[var(--t-brand)]">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-[var(--t-text-primary)]">{route.title}</span>
+                  <span className="mt-1 block text-sm leading-6 text-[var(--t-text-secondary)]">{route.desc}</span>
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </section>
+
+      <div className="sticky top-14 z-20 -mx-4 mt-5 border-y border-[var(--t-border-default)] bg-[var(--t-surface-card)] px-4 py-2 lg:hidden">
+        <div data-testid="doc-mobile-nav" className="flex gap-2 overflow-x-auto pb-1">
+          {sections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onNavigate(s.id)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--t-border-focus)] focus-visible:ring-offset-2",
+                active === s.id
+                  ? "border-[var(--t-brand)] bg-[var(--t-brand)] text-[var(--t-text-inverse)]"
+                  : "border-[var(--t-border-default)] bg-[var(--t-surface-card)] text-[var(--t-text-primary)]",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <Card className="sticky top-20 border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-2">
+            <SectionNav active={active} onNavigate={onNavigate} testId="doc-desktop-nav" />
           </Card>
         </aside>
 
-        <div className="col-span-9 space-y-12">
-          {/* ¿Qué es? */}
-          <section id="que-es" className="scroll-mt-20">
-            <div className="text-xs font-semibold uppercase tracking-wider text-primary">Total Governance Management System</div>
-            <h1 className="mt-1 text-4xl font-bold tracking-tight">¿Qué es TGMS?</h1>
-            <p className="mt-2 text-lg text-muted-foreground">Plataforma central de gobernanza de grupo</p>
-
-            <p className="mt-6 text-base leading-relaxed text-foreground">
+        <main className="min-w-0 space-y-12">
+          <section id="que-es" className="scroll-mt-28">
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">¿Qué es TGMS?</h2>
+            <p className="mt-2 text-base leading-7 text-[var(--t-text-secondary)]">
               TGMS existe para responder de forma auditable las preguntas que importan:
             </p>
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
                 "¿Qué norma aplica a esta entidad y por qué?",
                 "¿Qué órgano aprobó esta decisión y qué obligaciones activa?",
@@ -154,66 +257,52 @@ export default function Documentacion() {
                 "¿Qué hallazgo cuestiona la evidencia?",
                 "¿Qué excepción local fue autorizada y quién la aprobó?",
                 "¿Qué delegación estaba vigente en la fecha del acto?",
-              ].map((q, i) => (
-                <Card key={i} className="flex items-start gap-3 p-4">
-                  <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                  <span className="text-sm font-medium text-foreground">{q}</span>
+              ].map((q) => (
+                <Card key={q} className="flex min-w-0 items-start gap-3 border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4">
+                  <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--t-brand)]" />
+                  <span className="text-sm font-medium leading-6 text-[var(--t-text-primary)]">{q}</span>
                 </Card>
               ))}
             </div>
 
-            <p className="mt-6 rounded-md border-l-4 border-primary bg-accent/40 p-4 text-sm italic text-foreground">
+            <p className="mt-6 rounded-md border-l-4 border-[var(--t-brand)] bg-[var(--t-surface-subtle)] p-4 text-sm italic leading-6 text-[var(--t-text-primary)]">
               El valor no está en subir PDFs al Consejo, sino en tener trazabilidad extremo a extremo entre decisión, norma, obligación, control, evidencia y remediación.
             </p>
           </section>
 
-          {/* Principios */}
-          <section id="principios" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight">Principios del sistema</h2>
-            <div className="mt-4 grid grid-cols-3 gap-4">
+          <section id="principios" className="scroll-mt-28">
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">Principios del sistema</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {principios.map((p) => (
-                <Card key={p.title} className="p-5">
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <p.icon className="h-5 w-5 text-primary" />
+                <Card key={p.title} className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-5">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[var(--t-surface-subtle)] text-[var(--t-brand)]">
+                    <p.icon className="h-5 w-5" />
                   </div>
-                  <h3 className="text-base font-semibold">{p.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{p.desc}</p>
+                  <h3 className="text-base font-semibold text-[var(--t-text-primary)]">{p.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">{p.desc}</p>
                 </Card>
               ))}
             </div>
           </section>
 
-          {/* Módulos */}
-          <section id="modulos" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight">Módulos</h2>
-            <div className="mt-4 grid grid-cols-2 gap-4">
+          <section id="modulos" className="scroll-mt-28">
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">Módulos</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               {modulos.map((m) => (
-                <Card key={m.title} className="flex items-start gap-4 p-5">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <m.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold">{m.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{m.desc}</p>
-                    <Link to={m.to} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                      Ir al módulo <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-                </Card>
+                <ModuleCard key={m.title} {...m} />
               ))}
             </div>
           </section>
 
-          {/* Marco regulatorio */}
-          <section id="marco" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight">Marco regulatorio</h2>
-            <p className="mt-1 text-sm text-muted-foreground">TGMS está alineado con los siguientes marcos:</p>
+          <section id="marco" className="scroll-mt-28">
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">Marco regulatorio</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">TGMS está alineado con los siguientes marcos:</p>
             <TooltipProvider delayDuration={200}>
               <div className="mt-4 flex flex-wrap gap-2">
                 {frameworks.map((f) => (
                   <Tooltip key={f.name}>
                     <TooltipTrigger asChild>
-                      <span className="inline-flex cursor-help items-center rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary hover:text-primary">
+                      <span className="inline-flex cursor-help items-center rounded-full border border-[var(--t-border-default)] bg-[var(--t-surface-card)] px-3 py-1.5 text-sm font-medium text-[var(--t-text-primary)] hover:border-[var(--t-brand)] hover:text-[var(--t-brand)]">
                         {f.name}
                       </span>
                     </TooltipTrigger>
@@ -224,39 +313,50 @@ export default function Documentacion() {
             </TooltipProvider>
           </section>
 
-          {/* Glosario */}
-          <section id="glosario" className="scroll-mt-20">
-            <h2 className="text-2xl font-semibold tracking-tight">Glosario</h2>
-            <Card className="mt-4 overflow-hidden">
+          <section id="glosario" className="scroll-mt-28">
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--t-text-primary)]">Glosario</h2>
+            <Card className="mt-4 hidden overflow-hidden border-[var(--t-border-default)] bg-[var(--t-surface-card)] md:block">
               <table className="w-full text-sm">
-                <thead className="bg-secondary/50">
+                <thead className="bg-[var(--t-surface-muted)]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Término</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Definición</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ejemplo</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--t-text-secondary)]">Término</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--t-text-secondary)]">Definición</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--t-text-secondary)]">Ejemplo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {glosario.map((g) => (
-                    <tr key={g.term} className="border-t border-border">
-                      <td className="px-4 py-3 font-semibold text-foreground">{g.term}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{g.def}</td>
+                    <tr key={g.term} className="border-t border-[var(--t-border-subtle)]">
+                      <td className="px-4 py-3 font-semibold text-[var(--t-text-primary)]">{g.term}</td>
+                      <td className="px-4 py-3 leading-6 text-[var(--t-text-secondary)]">{g.def}</td>
                       <td className="px-4 py-3">
-                        <Link to={g.example.to} className="text-primary hover:underline">{g.example.label}</Link>
+                        <Link to={g.example.to} className="text-[var(--t-brand)] hover:underline">{g.example.label}</Link>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </Card>
+
+            <div className="mt-4 grid gap-3 md:hidden">
+              {glosario.map((g) => (
+                <Card key={g.term} className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4">
+                  <h3 className="text-sm font-semibold text-[var(--t-text-primary)]">{g.term}</h3>
+                  <p className="mt-1 text-sm leading-6 text-[var(--t-text-secondary)]">{g.def}</p>
+                  <Link to={g.example.to} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--t-brand)] hover:underline">
+                    {g.example.label} <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </Card>
+              ))}
+            </div>
           </section>
 
           <div className="pt-6 text-center">
-            <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-[var(--t-brand)] hover:underline">
               Volver al Dashboard <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );
