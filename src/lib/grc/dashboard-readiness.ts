@@ -1,5 +1,10 @@
 export type GrcReadinessStatus = "ready" | "watch" | "gap";
 export type GrcSourcePosture = "legacy" | "frontend_connected";
+export type GrcComplianceArea =
+  | "Riesgo y control"
+  | "Regulatorio y privacidad"
+  | "Tecnología y resiliencia"
+  | "Assurance y escalado";
 export type GrcScreenSourcePosture =
   | "legacy_read"
   | "legacy_write"
@@ -43,6 +48,20 @@ export type GrcP0Domain = {
   route: string;
   nextStep: string;
   connectedRoutes: string[];
+};
+
+export type GrcComplianceMonitorDomain = {
+  id: string;
+  label: string;
+  area: GrcComplianceArea;
+  readiness: GrcReadinessStatus;
+  route: string;
+  executiveSignal: string;
+  nextAction: string;
+  sourceTables: string[];
+  sourcePosture: GrcScreenSourcePosture;
+  sourceOfTruth: string;
+  handoffCandidateIds: string[];
 };
 
 export const GRC_P0_DOMAINS: GrcP0Domain[] = [
@@ -187,6 +206,224 @@ export const GRC_HANDOFF_CANDIDATES: GrcHandoffCandidate[] = [
     targetRoute: "/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL",
     contractEvent: "AIMS_INCIDENT_MATERIAL",
     mutation: "read-only-route",
+  },
+];
+
+export const GRC_COMPLIANCE_AREAS: GrcComplianceArea[] = [
+  "Riesgo y control",
+  "Regulatorio y privacidad",
+  "Tecnología y resiliencia",
+  "Assurance y escalado",
+];
+
+export const GRC_COMPLIANCE_MONITORS: GrcComplianceMonitorDomain[] = [
+  {
+    id: "regulatory-obligations",
+    label: "Inventario normativo y obligaciones",
+    area: "Regulatorio y privacidad",
+    readiness: "ready",
+    route: "/obligaciones",
+    executiveSignal: "Obligaciones, políticas y vencimientos regulatorios trazables.",
+    nextAction: "Mantener el mapa de obligaciones como entrada común de controles y alertas.",
+    sourceTables: ["obligations", "policies", "regulatory_notifications"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "obligations and policies are the current GRC regulatory source of truth.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "controls-assurance",
+    label: "Controles, evidencias y efectividad",
+    area: "Riesgo y control",
+    readiness: "watch",
+    route: "/controles",
+    executiveSignal: "Diseño de controles, evidencias asociadas y postura de test.",
+    nextAction: "Separar controles críticos, evidencias faltantes y controles con excepción aprobada.",
+    sourceTables: ["controls", "evidences", "exceptions"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "controls and evidences remain the connected control assurance read model.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "risk-rcsa",
+    label: "RCSA / Riesgos y scoring",
+    area: "Riesgo y control",
+    readiness: "ready",
+    route: "/grc/risk-360",
+    executiveSignal: "Riesgos GRC con scoring inherente/residual y edición owner-write.",
+    nextAction: "Usar alta/edición de riesgos GRC para completar riesgos de cumplimiento pendientes.",
+    sourceTables: ["risks", "obligations", "findings"],
+    sourcePosture: "legacy_write",
+    sourceOfTruth: "risks is the current owner-write GRC risk source of truth.",
+    handoffCandidateIds: ["aims-gap-grc"],
+  },
+  {
+    id: "incident-regulatory",
+    label: "Incidentes y notificación regulatoria",
+    area: "Regulatorio y privacidad",
+    readiness: "ready",
+    route: "/grc/incidentes",
+    executiveSignal: "Incidentes, severidad, materialidad y deadline regulatorio.",
+    nextAction: "Convertir incidentes mayores en paquetes de escalado y notificación.",
+    sourceTables: ["incidents", "regulatory_notifications"],
+    sourcePosture: "legacy_write",
+    sourceOfTruth: "incidents is the current owner-write incident source; regulatory_notifications is read model.",
+    handoffCandidateIds: ["grc-incident-secretaria"],
+  },
+  {
+    id: "dora-ict",
+    label: "DORA / ICT risk",
+    area: "Tecnología y resiliencia",
+    readiness: "ready",
+    route: "/grc/m/dora",
+    executiveSignal: "Incidentes ICT, continuidad, RTO y notificación DORA.",
+    nextAction: "Alinear incidentes mayores con umbrales DORA y evidencias de resiliencia.",
+    sourceTables: ["incidents", "bcm_bia", "bcm_plans", "regulatory_notifications"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "DORA module reads existing incident, BCM and regulatory notification tables.",
+    handoffCandidateIds: ["grc-incident-secretaria"],
+  },
+  {
+    id: "cyber-remediation",
+    label: "Cyber y vulnerabilidades",
+    area: "Tecnología y resiliencia",
+    readiness: "watch",
+    route: "/grc/m/cyber",
+    executiveSignal: "Vulnerabilidades críticas, incidentes cyber y excepciones compensatorias.",
+    nextAction: "Priorizar CVE críticas y enlazarlas a controles o excepciones aprobadas.",
+    sourceTables: ["vulnerabilities", "incidents", "exceptions"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "Cyber workbench reads vulnerabilities, incidents and exceptions.",
+    handoffCandidateIds: ["grc-incident-secretaria"],
+  },
+  {
+    id: "bcm-operational-resilience",
+    label: "BCM / Resiliencia operacional",
+    area: "Tecnología y resiliencia",
+    readiness: "watch",
+    route: "/grc/m/dora/operate/bcm",
+    executiveSignal: "Procesos críticos, BIA, RTO/RPO y continuidad operativa.",
+    nextAction: "Completar dependencias críticas y pruebas de continuidad por proceso.",
+    sourceTables: ["bcm_bia", "bcm_plans"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "BCM module reads the current business impact and continuity planning tables.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "privacy-gdpr",
+    label: "GDPR / Privacidad operativa",
+    area: "Regulatorio y privacidad",
+    readiness: "watch",
+    route: "/grc/m/gdpr",
+    executiveSignal: "ROPA, DPIA, DSAR y gobierno DPO como flujo de privacidad.",
+    nextAction: "Elevar privacidad de demo conectada a cola operativa con owners y deadlines.",
+    sourceTables: ["obligations", "policies"],
+    sourcePosture: "local_demo_read",
+    sourceOfTruth: "GDPR nested module is connected as frontend demo/read model over current obligations and policies.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "tprm-outsourcing",
+    label: "TPRM / Outsourcing",
+    area: "Riesgo y control",
+    readiness: "gap",
+    route: "/grc/packs",
+    executiveSignal: "Terceros, outsourcing crítico y due diligence no tienen workbench propio todavía.",
+    nextAction: "Definir tabla/contrato de terceros antes de prometer workflows owner-write.",
+    sourceTables: [],
+    sourcePosture: "backlog_placeholder",
+    sourceOfTruth: "Backlog; no dedicated TPRM table or screen is connected in this slice.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "penal-anticorruption",
+    label: "Penal / Anticorrupción",
+    area: "Riesgo y control",
+    readiness: "watch",
+    route: "/grc/penal-anticorrupcion",
+    executiveSignal: "Mapa de riesgos penales, obligaciones y controles con taxonomía GRC.",
+    nextAction: "Pasar de vista taxonómica a flujo de evaluación y evidencias por delito/riesgo.",
+    sourceTables: ["risks", "obligations", "controls"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "Penal/anticorruption is currently a GRC taxonomy over risks, obligations and controls.",
+    handoffCandidateIds: ["grc-finding-secretaria"],
+  },
+  {
+    id: "audit-remediation",
+    label: "Auditoría interna y planes",
+    area: "Assurance y escalado",
+    readiness: "ready",
+    route: "/grc/m/audit",
+    executiveSignal: "Hallazgos, planes de acción y estado de remediación.",
+    nextAction: "Agrupar hallazgos críticos por comité y fecha comprometida.",
+    sourceTables: ["findings", "action_plans"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "findings and action_plans remain the connected audit remediation source.",
+    handoffCandidateIds: ["grc-finding-secretaria"],
+  },
+  {
+    id: "exceptions-waivers",
+    label: "Excepciones y controles compensatorios",
+    area: "Riesgo y control",
+    readiness: "watch",
+    route: "/grc/excepciones",
+    executiveSignal: "Excepciones pendientes, vencimientos y compensating controls.",
+    nextAction: "Distinguir excepción aceptable, excepción vencida y riesgo que requiere plan.",
+    sourceTables: ["exceptions", "controls", "obligations"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "exceptions is the connected waiver register for GRC.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "policy-lifecycle",
+    label: "Ciclo de políticas",
+    area: "Regulatorio y privacidad",
+    readiness: "watch",
+    route: "/politicas",
+    executiveSignal: "Políticas, aprobaciones, versiones y obligaciones derivadas.",
+    nextAction: "Separar políticas vigentes, pendientes de revisión y obligaciones sin control.",
+    sourceTables: ["policies", "obligations", "controls"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "policies is the current policy inventory source shared with TGMS shell.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "country-packs",
+    label: "Packs país y jurisdicción",
+    area: "Regulatorio y privacidad",
+    readiness: "ready",
+    route: "/grc/packs",
+    executiveSignal: "Cobertura territorial y navegación por jurisdicción.",
+    nextAction: "Usar packs como vista territorial mientras se formaliza matriz multi-país productiva.",
+    sourceTables: ["country_packs", "pack_rules"],
+    sourcePosture: "legacy_read",
+    sourceOfTruth: "Country packs are the current jurisdictional GRC navigation contract.",
+    handoffCandidateIds: [],
+  },
+  {
+    id: "board-escalation",
+    label: "Escalado a órganos",
+    area: "Assurance y escalado",
+    readiness: "watch",
+    route: "/grc/alertas",
+    executiveSignal: "Incidentes y hallazgos que requieren propuesta de agenda Secretaría.",
+    nextAction: "Mantener handoff de solo lectura; Secretaría decide si crea acto formal.",
+    sourceTables: ["incidents", "findings"],
+    sourcePosture: "tgms_handoff",
+    sourceOfTruth: "GRC owns source events; Secretaría owns formal corporate acts.",
+    handoffCandidateIds: ["grc-incident-secretaria", "grc-finding-secretaria"],
+  },
+  {
+    id: "aims-intake",
+    label: "Intake desde AIMS",
+    area: "Assurance y escalado",
+    readiness: "watch",
+    route: "/grc/risk-360",
+    executiveSignal: "Gaps AI Act/ISO e incidentes IA llegan como contexto de intake GRC.",
+    nextAction: "Convertir manualmente el intake en riesgo/control GRC cuando proceda.",
+    sourceTables: ["risks", "incidents"],
+    sourcePosture: "tgms_handoff",
+    sourceOfTruth: "AIMS owns AI systems/evaluations/incidents; GRC owns risk/control workflow.",
+    handoffCandidateIds: ["aims-gap-grc", "aims-incident-grc"],
   },
 ];
 
@@ -596,6 +833,39 @@ export function getGrcP0ReadinessSummary(domains: GrcP0Domain[] = GRC_P0_DOMAINS
       domains.reduce((total, domain) => total + domain.coverage, 0) / domains.length
     ),
   };
+}
+
+export function getGrcComplianceMonitorSummary(
+  monitors: GrcComplianceMonitorDomain[] = GRC_COMPLIANCE_MONITORS,
+) {
+  return monitors.reduce(
+    (summary, monitor) => {
+      summary.total += 1;
+      summary.byReadiness[monitor.readiness] += 1;
+      summary.byArea[monitor.area] += 1;
+      if (monitor.sourceTables.length > 0) summary.withSourceTables += 1;
+      if (monitor.handoffCandidateIds.length > 0) summary.withHandoffs += 1;
+      if (monitor.sourcePosture === "backlog_placeholder") summary.backlog += 1;
+      return summary;
+    },
+    {
+      total: 0,
+      withSourceTables: 0,
+      withHandoffs: 0,
+      backlog: 0,
+      byReadiness: {
+        ready: 0,
+        watch: 0,
+        gap: 0,
+      },
+      byArea: {
+        "Riesgo y control": 0,
+        "Regulatorio y privacidad": 0,
+        "Tecnología y resiliencia": 0,
+        "Assurance y escalado": 0,
+      },
+    },
+  );
 }
 
 export function getGrcScreenPostureSummary(screens: GrcScreenPosture[] = GRC_SCREEN_POSTURES) {

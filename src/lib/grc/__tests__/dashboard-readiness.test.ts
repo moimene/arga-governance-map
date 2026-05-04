@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  GRC_COMPLIANCE_AREAS,
+  GRC_COMPLIANCE_MONITORS,
   GRC_HANDOFF_CANDIDATES,
   GRC_NOT_CONNECTED_BACKLOG,
   GRC_P0_DOMAINS,
   GRC_SCREEN_POSTURES,
+  getGrcComplianceMonitorSummary,
   getGrcHandoffCandidate,
   getGrcP0ReadinessSummary,
   getGrcScreenPostureSummary,
@@ -54,6 +57,72 @@ describe("grc dashboard readiness contract", () => {
       connectedRoutes: 24,
       averageCoverage: 75,
     });
+  });
+
+  it("declares a broad compliance monitoring map without pretending TPRM is connected", () => {
+    expect(GRC_COMPLIANCE_AREAS).toEqual([
+      "Riesgo y control",
+      "Regulatorio y privacidad",
+      "Tecnología y resiliencia",
+      "Assurance y escalado",
+    ]);
+    expect(GRC_COMPLIANCE_MONITORS.map((monitor) => monitor.id)).toEqual([
+      "regulatory-obligations",
+      "controls-assurance",
+      "risk-rcsa",
+      "incident-regulatory",
+      "dora-ict",
+      "cyber-remediation",
+      "bcm-operational-resilience",
+      "privacy-gdpr",
+      "tprm-outsourcing",
+      "penal-anticorruption",
+      "audit-remediation",
+      "exceptions-waivers",
+      "policy-lifecycle",
+      "country-packs",
+      "board-escalation",
+      "aims-intake",
+    ]);
+
+    const tprm = GRC_COMPLIANCE_MONITORS.find((monitor) => monitor.id === "tprm-outsourcing");
+    expect(tprm?.readiness).toBe("gap");
+    expect(tprm?.sourcePosture).toBe("backlog_placeholder");
+    expect(tprm?.sourceTables).toEqual([]);
+  });
+
+  it("summarizes compliance monitoring posture without database access", () => {
+    expect(getGrcComplianceMonitorSummary()).toEqual({
+      total: 16,
+      withSourceTables: 15,
+      withHandoffs: 8,
+      backlog: 1,
+      byReadiness: {
+        ready: 6,
+        watch: 9,
+        gap: 1,
+      },
+      byArea: {
+        "Riesgo y control": 5,
+        "Regulatorio y privacidad": 5,
+        "Tecnología y resiliencia": 3,
+        "Assurance y escalado": 3,
+      },
+    });
+  });
+
+  it("keeps compliance monitor handoffs inside declared route-only contracts", () => {
+    const declaredCandidateIds = GRC_HANDOFF_CANDIDATES.map((candidate) => candidate.id);
+
+    for (const monitor of GRC_COMPLIANCE_MONITORS) {
+      expect(["ready", "watch", "gap"]).toContain(monitor.readiness);
+      expect(monitor.executiveSignal.length).toBeGreaterThan(20);
+      expect(monitor.nextAction.length).toBeGreaterThan(20);
+      expect(monitor.route).toMatch(/^\/(grc|politicas|obligaciones|controles)/);
+      for (const handoffId of monitor.handoffCandidateIds) {
+        expect(declaredCandidateIds).toContain(handoffId);
+      }
+    }
   });
 
   it("maps every connected GRC frontend screen with owner, source posture and access mode", () => {

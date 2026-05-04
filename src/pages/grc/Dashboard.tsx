@@ -1,10 +1,14 @@
 import { useGrcKpis } from "@/hooks/useGrcDashboard";
 import {
+  GRC_COMPLIANCE_AREAS,
+  GRC_COMPLIANCE_MONITORS,
   GRC_HANDOFF_CANDIDATES,
   GRC_NOT_CONNECTED_BACKLOG,
   GRC_P0_DOMAINS,
   GRC_SCREEN_POSTURES,
+  type GrcComplianceMonitorDomain,
   type GrcP0Domain,
+  getGrcComplianceMonitorSummary,
   getGrcHandoffCandidate,
   getGrcP0ReadinessSummary,
   getGrcScreenPostureSummary,
@@ -94,6 +98,145 @@ const ACCESS_CHIP = {
   "owner-write": "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   backlog: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
 };
+
+function ComplianceMonitorRow({ monitor }: { monitor: GrcComplianceMonitorDomain }) {
+  const StatusIcon = READINESS_ICON[monitor.readiness];
+  const handoffLabels = monitor.handoffCandidateIds
+    .map((id) => getGrcHandoffCandidate(id)?.contractEvent)
+    .filter(Boolean);
+
+  return (
+    <Link
+      to={monitor.route}
+      className="block border-t border-[var(--g-border-subtle)] px-4 py-3 transition-colors first:border-t-0 hover:bg-[var(--g-surface-subtle)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+    >
+      <div className="flex items-start gap-3">
+        <StatusIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-[var(--g-text-primary)]">
+              {monitor.label}
+            </span>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium ${READINESS_CHIP[monitor.readiness]}`}
+              style={{ borderRadius: "var(--g-radius-full)" }}
+            >
+              {READINESS_LABEL[monitor.readiness]}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
+            {monitor.executiveSignal}
+          </p>
+          <p className="mt-2 text-xs leading-5 text-[var(--g-text-primary)]">
+            Siguiente acción: {monitor.nextAction}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span
+              className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-full)" }}
+            >
+              {SOURCE_POSTURE_LABEL[monitor.sourcePosture]}
+            </span>
+            <span
+              className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-full)" }}
+            >
+              {monitor.sourceTables.length > 0 ? monitor.sourceTables.join(", ") : "schema pendiente"}
+            </span>
+            {handoffLabels.length > 0 && (
+              <span
+                className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                Handoff: {handoffLabels.join(", ")}
+              </span>
+            )}
+          </div>
+        </div>
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+      </div>
+    </Link>
+  );
+}
+
+function ComplianceMonitorPanel() {
+  const summary = getGrcComplianceMonitorSummary();
+
+  return (
+    <section
+      className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)]"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="border-b border-[var(--g-border-subtle)] px-5 py-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-5 w-5 text-[var(--g-brand-3308)]" />
+              <h2 className="text-lg font-semibold text-[var(--g-text-primary)]">
+                Monitor de cumplimiento GRC
+              </h2>
+            </div>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--g-text-secondary)]">
+              GRC debe vigilar obligaciones, riesgos, controles, incidentes, excepciones,
+              auditoría, privacidad, resiliencia y handoffs. Esta vista separa lo conectado,
+              lo que requiere foco y los gaps que no deben ocultarse.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: "Dominios", value: summary.total },
+              { label: "Listos", value: summary.byReadiness.ready },
+              { label: "En foco", value: summary.byReadiness.watch },
+              { label: "Gaps", value: summary.byReadiness.gap },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <div className="text-xs font-medium text-[var(--g-text-secondary)]">
+                  {item.label}
+                </div>
+                <div className="text-xl font-bold text-[var(--g-text-primary)]">
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 divide-y divide-[var(--g-border-subtle)] lg:grid-cols-2 lg:divide-x lg:divide-y-0 xl:grid-cols-4">
+        {GRC_COMPLIANCE_AREAS.map((area) => {
+          const monitors = GRC_COMPLIANCE_MONITORS.filter((monitor) => monitor.area === area);
+          return (
+            <div key={area} className="min-w-0">
+              <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+                  {area}
+                </div>
+                <div className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+                  {monitors.length} dominios de supervisión
+                </div>
+              </div>
+              <div>
+                {monitors.map((monitor) => (
+                  <ComplianceMonitorRow key={monitor.id} monitor={monitor} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-5 py-3 text-xs leading-5 text-[var(--g-text-secondary)]">
+        Fuente de verdad: tablas GRC conectadas actuales y contratos locales. TPRM queda marcado como gap,
+        y los handoffs a Secretaría/AIMS son rutas de solo lectura, sin escrituras cross-module.
+      </div>
+    </section>
+  );
+}
 
 function ReadinessDomainCard({ domain }: { domain: GrcP0Domain }) {
   const StatusIcon = READINESS_ICON[domain.readiness];
@@ -308,6 +451,8 @@ export default function GrcDashboard() {
           </div>
         </div>
       </section>
+
+      <ComplianceMonitorPanel />
 
       {/* KPIs */}
       <div className="flex items-center gap-2">

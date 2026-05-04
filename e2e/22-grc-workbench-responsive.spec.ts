@@ -37,6 +37,8 @@ test.describe('GRC Compass — responsive workbench', () => {
         timeout: 10_000,
       });
       await expect(page.getByText('Riesgos, incidentes y plazos que requieren decisión')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Monitor de cumplimiento GRC' })).toBeVisible();
+      await expect(page.getByText('TPRM / Outsourcing')).toBeVisible();
       await expect(page.getByText('Contexto técnico y contratos')).toBeVisible();
       await expectNoHorizontalOverflow(page);
     });
