@@ -35,6 +35,7 @@ export const STATUS_LABEL: Record<string, string> = {
   ARCHIVADA:    "Archivada",
 
   // Convocatorias
+  EMITIDA:      "Emitida",
   ENVIADA:      "Enviada",
   CONFIRMADA:   "Confirmada",
 
@@ -52,7 +53,7 @@ export const STATUS_LABEL: Record<string, string> = {
   ADOPTED:      "Adoptado",
   CERTIFIED:    "Certificado",
   INSTRUMENTED: "Instrumentado",
-  FILED:        "Tramitado",
+  FILED:        "Preparado para registro",
   REGISTERED:   "Inscrito",
   PUBLISHED:    "Publicado",
   REJECTED_REGISTRY: "Denegado en registro",

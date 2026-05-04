@@ -74,7 +74,7 @@ const TIMELINE_LABEL: Record<string, string> = {
   ADOPTED:      "Adoptado",
   CERTIFIED:    "Certificado",
   INSTRUMENTED: "Instrumentado",
-  FILED:        "Presentado al registro",
+  FILED:        "Preparado para registro",
   REGISTERED:   "Inscrito",
   PUBLISHED:    "Publicado",
 };

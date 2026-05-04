@@ -861,7 +861,7 @@ function TramitadorNuevo() {
           setRegistryLinkMessage(
             linkResult.errors[0] ?? "La escritura se guardó, pero no se pudo registrar el vínculo probatorio.",
           );
-          toast.warning("Escritura registrada con vínculo probatorio pendiente", {
+          toast.warning("Escritura registrada en expediente con vínculo probatorio pendiente", {
             description: linkResult.errors[0],
           });
         }
@@ -882,7 +882,7 @@ function TramitadorNuevo() {
 
   async function handleSubsanacionSubmit() {
     if (!effectiveSelectedAgreementId || !tenantId) {
-      toast.error("No se puede enviar la subsanación sin acuerdo y contexto activos.");
+      toast.error("No se puede preparar la subsanación sin acuerdo y contexto activos.");
       return;
     }
     setSubsanacionSaving(true);
@@ -915,7 +915,7 @@ function TramitadorNuevo() {
       await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
     } catch (error) {
       const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
-      toast.error("No se pudo enviar la respuesta de subsanación", { description });
+      toast.error("No se pudo registrar la respuesta de subsanación", { description });
     } finally {
       setSubsanacionSaving(false);
     }
@@ -1422,7 +1422,8 @@ function TramitadorNuevo() {
             background: "var(--g-surface-subtle)",
           }}
         >
-          Canal "{filingChannel}" seleccionado. La presentación se enviará automáticamente.
+          Canal "{filingChannel}" seleccionado. El expediente queda preparado para presentación;
+          este entorno demo no realiza envío telemático al Registro.
         </div>
       )}
     </div>
@@ -1443,9 +1444,9 @@ function TramitadorNuevo() {
         <CheckCircle2 className="h-5 w-5" />
         <span className="text-sm font-medium">
           {deedSaved
-            ? "Escritura registrada"
+            ? "Escritura registrada en expediente"
             : isDeedRequired
-              ? "Pendiente de registrar escritura"
+              ? "Pendiente de registrar escritura en expediente"
               : "Expediente en seguimiento"}
         </span>
       </div>
@@ -1567,9 +1568,9 @@ function TramitadorNuevo() {
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-success)]" />
               <div>
-                <p className="text-sm font-semibold text-[var(--g-text-primary)]">Subsanación enviada</p>
+                <p className="text-sm font-semibold text-[var(--g-text-primary)]">Subsanación preparada</p>
                 <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-                  La respuesta ha sido registrada. El trámite vuelve a estado presentada.
+                  La respuesta ha quedado registrada en el expediente demo. No se realiza envío registral.
                 </p>
               </div>
             </div>
@@ -1616,7 +1617,7 @@ function TramitadorNuevo() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 {subsanacionSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-                {subsanacionSaving ? "Enviando…" : "Enviar respuesta de subsanación"}
+                {subsanacionSaving ? "Registrando…" : "Preparar respuesta de subsanación"}
               </button>
               {selectedAgreement && subsanacionDocVariables ? (
                 <ProcessDocxButton

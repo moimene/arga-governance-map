@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { FileSignature, Lock, Unlock, FolderOpen, Loader2 } from "lucide-react";
 import { useActasList } from "@/hooks/useActas";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -114,7 +114,13 @@ export default function ActasLista() {
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
-                    {a.body_name ?? "—"}
+                    <Link
+                      to={actaDetailPath(a.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                    >
+                      {a.body_name ?? "Acta"}
+                    </Link>
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {a.entity_name ?? "—"}

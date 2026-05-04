@@ -96,6 +96,11 @@ function tipoLabel(value?: string | null) {
   return TIPO_LABEL[value] ?? value.replace(/_/g, " ");
 }
 
+function estadoLabel(value?: string | null) {
+  if (!value) return "Estado pendiente";
+  return ESTADO_LABEL[value as keyof typeof ESTADO_LABEL] ?? value.replace(/_/g, " ");
+}
+
 function materiaLabel(value?: string | null) {
   return value ? value.replace(/_/g, " ") : "—";
 }
@@ -147,7 +152,7 @@ export default function Plantillas() {
       { id: plantilla.id, nuevo_estado: transition.nextState },
       {
         onSuccess: () => {
-          toast.success(`Plantilla transicionada a ${ESTADO_LABEL[transition.nextState as keyof typeof ESTADO_LABEL]}`);
+          toast.success(`Plantilla transicionada a ${estadoLabel(transition.nextState)}`);
           setSelected(null);
         },
         onError: () => {
@@ -287,12 +292,13 @@ export default function Plantillas() {
 
       {/* Materia filter (Modelos tab only) */}
       {activeTab === 'modelos' && (
-        <div className="mb-4 flex items-center gap-3">
-          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia:</label>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia</label>
           <select
+            aria-label="Filtrar modelos por materia"
             value={filterMateria}
             onChange={(e) => setFilterMateria(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+            className="min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
             style={{ borderRadius: 'var(--g-radius-md)' }}
           >
             <option value="">Todas</option>
@@ -304,10 +310,105 @@ export default function Plantillas() {
       )}
 
       {/* Master-Detail Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* Tabla Master */}
         <div
-          className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          data-testid="plantillas-mobile-list"
+          className="space-y-3 lg:hidden"
+        >
+          {isLoading ? (
+            <div
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-6 text-center text-sm text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              Cargando plantillas...
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-6 text-center"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <FolderOpen className="mx-auto mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
+              <p className="text-sm font-medium text-[var(--g-text-secondary)]">
+                {activeTab === 'modelos' && filterMateria
+                  ? `Sin modelos para la materia "${materiaLabel(filterMateria)}".`
+                  : activeTab === 'modelos'
+                  ? isSociedadMode
+                    ? 'No hay modelos de acuerdo aplicables a esta sociedad.'
+                    : 'No hay modelos de acuerdo disponibles.'
+                  : isSociedadMode
+                  ? 'Sin plantillas protegidas aplicables a esta sociedad.'
+                  : 'Sin plantillas protegidas.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate(scope.createScopedTo('/secretaria/gestor-plantillas'))}
+                className="mt-4 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                style={{ borderRadius: 'var(--g-radius-md)' }}
+              >
+                <FileText className="h-4 w-4" />
+                Crear nueva plantilla
+              </button>
+            </div>
+          ) : (
+            filteredData.map((plantilla) => (
+              <button
+                key={plantilla.id}
+                type="button"
+                onClick={() => setSelected(plantilla)}
+                aria-pressed={selected?.id === plantilla.id}
+                className={`block w-full border border-[var(--g-border-subtle)] px-4 py-4 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 ${
+                  selected?.id === plantilla.id ? "bg-[var(--g-surface-subtle)]" : "bg-[var(--g-surface-card)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-sm font-semibold text-[var(--g-text-primary)]">
+                      {activeTab === 'modelos'
+                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.tipo)
+                        : tipoLabel(plantilla.tipo)}
+                    </h2>
+                    <p className="mt-1 break-words text-xs text-[var(--g-text-secondary)]">
+                      {activeTab === 'modelos'
+                        ? tipoLabel(plantilla.tipo)
+                        : materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia)}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 px-2 py-1 text-[11px] font-medium ${
+                      ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
+                      "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                    }`}
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    {estadoLabel(plantilla.estado)}
+                  </span>
+                </div>
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Jurisdicción</dt>
+                    <dd className="mt-1 text-[var(--g-text-primary)]">{jurisdictionLabel(plantilla.jurisdiccion)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Versión</dt>
+                    <dd className="mt-1 text-[var(--g-text-primary)]">v{plantilla.version}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Acción</dt>
+                    <dd className="mt-1 text-[var(--g-text-primary)]">
+                      {plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo"}
+                    </dd>
+                  </div>
+                </dl>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div
+          data-testid="plantillas-desktop-table"
+          className="hidden overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] lg:block"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
           <table className="w-full">
@@ -317,13 +418,13 @@ export default function Plantillas() {
                   {activeTab === 'modelos' ? 'Materia' : 'Tipo'}
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                  {activeTab === 'modelos' ? 'Variante' : 'Materia'}
+                  {activeTab === 'modelos' ? 'Uso' : 'Materia'}
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   Jurisdicción
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                  v.
+                  Versión
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   Estado
@@ -382,8 +483,8 @@ export default function Plantillas() {
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? (plantilla.contenido_template?.substring(0, 40) ?? '—')
-                        : (plantilla.materia || "—")}
+                        ? (plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo")
+                        : materiaLabel(plantilla.materia)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {jurisdictionLabel(plantilla.jurisdiccion)}
@@ -399,7 +500,7 @@ export default function Plantillas() {
                         }`}
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
-                        {ESTADO_LABEL[plantilla.estado as keyof typeof ESTADO_LABEL] || plantilla.estado}
+                        {estadoLabel(plantilla.estado)}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -485,7 +586,7 @@ export default function Plantillas() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {ESTADO_LABEL[selected.estado as keyof typeof ESTADO_LABEL] || selected.estado}
+                      {estadoLabel(selected.estado)}
                     </span>
                   </div>
                 </div>
@@ -504,56 +605,64 @@ export default function Plantillas() {
 
                 {/* Capa 1 Inmutable */}
                 {selected.capa1_inmutable && (
-                  <div className="mb-4">
-                    {activeTab === 'modelos' && (
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
-                        Variables del sistema
-                      </div>
-                    )}
-                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                      Capa 1 (Inmutable)
+                  <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                      Contenido base protegido
+                    </summary>
+                    <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Detalle técnico · Capa 1
                     </div>
                     <pre
-                      className="mt-2 max-h-[120px] overflow-y-auto rounded bg-[var(--g-surface-subtle)] p-2 font-mono text-[11px] text-[var(--g-text-secondary)]"
+                      className="mt-2 max-h-[120px] overflow-y-auto bg-[var(--g-surface-subtle)] p-2 font-mono text-[11px] text-[var(--g-text-secondary)]"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
                       {selected.capa1_inmutable.substring(0, 300)}
                       {selected.capa1_inmutable.length > 300 ? "…" : ""}
                     </pre>
-                  </div>
+                  </details>
                 )}
 
                 {/* Capa 2 Variables */}
                 {selected.capa2_variables && Array.isArray(selected.capa2_variables) && selected.capa2_variables.length > 0 && (
-                  <div className="mb-4">
-                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                      Variables (Capa 2)
+                  <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                      Variables automáticas
+                    </summary>
+                    <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Detalle técnico · Capa 2
                     </div>
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
                       {selected.capa2_variables.map((v, i) => (
-                        <div key={i} className="rounded bg-[var(--g-surface-subtle)] px-2 py-1">
+                        <div
+                          key={i}
+                          className="bg-[var(--g-surface-subtle)] px-2 py-1"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
                           <span className="font-mono font-medium">{v.variable}</span>
                           {" — "}
                           <span className="text-[10px]">{v.fuente}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
 
                 {/* Capa 3 Editables (Modelos de acuerdo) */}
                 {selected.capa3_editables && selected.capa3_editables.length > 0 && (
-                  <div className="mb-4">
-                    {activeTab === 'modelos' && (
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
-                        Campos del secretario
-                      </div>
-                    )}
-                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                      Campos del secretario (Capa 3)
+                  <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                      Campos para completar
+                    </summary>
+                    <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Detalle técnico · Capa 3
                     </div>
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
                       {selected.capa3_editables.map((v, i) => (
-                        <div key={i} className="rounded bg-[var(--g-surface-muted)] px-2 py-1">
+                        <div
+                          key={i}
+                          className="bg-[var(--g-surface-muted)] px-2 py-1"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
                           <span className="font-mono font-medium">{v.campo}</span>
                           {v.obligatoriedad === 'OBLIGATORIO' && (
                             <span className="ml-2 text-[var(--status-error)]">*</span>
@@ -564,7 +673,7 @@ export default function Plantillas() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
 
                 {/* Aprobación */}
@@ -612,7 +721,9 @@ export default function Plantillas() {
                     <div className="mt-2 space-y-1">
                       {selected.version_history.map((h, i) => (
                         <div key={i} className="text-xs text-[var(--g-text-secondary)]">
-                          <span className="font-medium text-[var(--g-text-primary)]">{h.from} → {h.to}</span>
+                          <span className="font-medium text-[var(--g-text-primary)]">
+                            {estadoLabel(h.from)} → {estadoLabel(h.to)}
+                          </span>
                           {" · "}{new Date(h.at).toLocaleDateString("es-ES")}
                           {h.by && h.by !== "system" && ` · ${h.by}`}
                         </div>

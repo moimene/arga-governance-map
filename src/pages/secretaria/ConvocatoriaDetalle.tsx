@@ -17,6 +17,35 @@ function getTraceArray(trace: Record<string, unknown> | null, key: string): unkn
   return Array.isArray(value) ? value : [];
 }
 
+function getTraceRecord(trace: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
+  const value = trace?.[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+type TraceDocument = {
+  id?: string;
+  nombre?: string;
+  document_name?: string;
+  descripcion?: string;
+};
+
+function getTraceDocuments(trace: Record<string, unknown> | null) {
+  const documents = getTraceRecord(trace, "documents");
+  const included = documents?.included_required;
+  const missing = documents?.missing_required;
+  const uploaded = documents?.uploaded_references;
+
+  return {
+    included: Array.isArray(included) ? included as TraceDocument[] : [],
+    missing: Array.isArray(missing) ? missing as TraceDocument[] : [],
+    uploaded: Array.isArray(uploaded) ? uploaded as TraceDocument[] : [],
+  };
+}
+
+function documentLabel(doc: TraceDocument) {
+  return doc.nombre ?? doc.document_name ?? doc.descripcion ?? doc.id ?? "Documento";
+}
+
 function scheduleReasonLabel(reason: string) {
   if (reason === "body_id_missing") return "Falta órgano social asociado a la convocatoria.";
   if (reason === "fecha_1_missing") return "Falta fecha de primera convocatoria.";
@@ -273,6 +302,8 @@ export default function ConvocatoriaDetalle() {
       ? requestedPlantillaId
       : null;
   const meetingValidation = validateMeetingScheduleFromConvocatoria(conv);
+  const agenda = agendaItems(conv);
+  const documentTrace = getTraceDocuments(conv.reminders_trace);
 
   const openOrScheduleMeeting = async () => {
     try {
@@ -403,6 +434,63 @@ export default function ConvocatoriaDetalle() {
             <KV label="2ª convocatoria reforzada" value={conv.is_second_call ? "Sí" : "No"} />
             <KV label="Urgente" value={conv.urgente ? "Sí" : "No"} />
             <KV label="Fundamento estatutario" value={conv.statutory_basis ?? "—"} />
+          </Card>
+
+          <Card title="Orden del día" icon={FileText}>
+            {agenda.length > 0 ? (
+              <ol className="space-y-3">
+                {agenda.map((item, index) => (
+                  <li key={`${item.materia ?? "punto"}-${index}`} className="text-sm">
+                    <div className="font-medium text-[var(--g-text-primary)]">
+                      {index + 1}. {item.titulo ?? "Punto del orden del día"}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--g-text-secondary)]">
+                      <span>{item.materia ?? "Materia sin clasificar"}</span>
+                      <span>{item.tipo ?? "ORDINARIA"}</span>
+                      {item.inscribible ? <span>Inscribible</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="text-sm text-[var(--g-text-secondary)]">Orden del día pendiente de detalle.</div>
+            )}
+          </Card>
+
+          <Card title="Índice documental PRE" icon={FileText}>
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              <KV label="Incluidos" value={documentTrace.included.length} />
+              <KV label="Pendientes" value={documentTrace.missing.length} />
+              <KV label="Referencias" value={documentTrace.uploaded.length + (attachments?.length ?? 0)} />
+            </div>
+            {documentTrace.missing.length > 0 ? (
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--status-warning)]">
+                  Pendientes de trazabilidad
+                </div>
+                <ul className="space-y-1 text-sm text-[var(--g-text-secondary)]">
+                  {documentTrace.missing.map((doc, index) => (
+                    <li key={`${doc.id ?? documentLabel(doc)}-${index}`}>· {documentLabel(doc)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
+                Sin documentos PRE pendientes en la traza de recordatorios.
+              </p>
+            )}
+            {documentTrace.included.length > 0 || documentTrace.uploaded.length > 0 ? (
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+                  Documentos incorporados o referenciados
+                </div>
+                <ul className="space-y-1 text-sm text-[var(--g-text-secondary)]">
+                  {[...documentTrace.included, ...documentTrace.uploaded].map((doc, index) => (
+                    <li key={`${doc.id ?? documentLabel(doc)}-${index}`}>· {documentLabel(doc)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </Card>
 
           <Card title="Canales de publicación" icon={MapPin}>
