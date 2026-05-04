@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aimsReadOnlyHandoffs,
   aimsScreenPostures,
+  buildAimsComplianceMonitors,
   buildAimsReadiness,
   isAimsMaterialIncidentCandidate,
   isAimsTechnicalFileGapCandidate,
@@ -44,6 +45,23 @@ describe("buildAimsReadiness", () => {
       "controls",
       "operational-evidence",
       "migration",
+    ]);
+    expect(summary.complianceMonitors.map((monitor) => monitor.id)).toEqual([
+      "governance-accountability",
+      "inventory-classification",
+      "prohibited-practices",
+      "high-risk-obligations",
+      "technical-documentation",
+      "data-governance",
+      "transparency-user-information",
+      "human-oversight",
+      "accuracy-robustness-cybersecurity",
+      "provider-vendor-third-party",
+      "post-market-monitoring",
+      "incident-reporting-escalation",
+      "fundamental-rights-dpia",
+      "iso-42001-management-system",
+      "evidence-recordkeeping",
     ]);
     expect(summary.domains.find((domain) => domain.id === "migration")?.metric).toBe("Sin schema nuevo");
     expect(summary.standaloneReady).toBe(true);
@@ -155,5 +173,41 @@ describe("buildAimsReadiness", () => {
         severity: "CRITICO",
       }),
     ).toBe(false);
+  });
+
+  it("monitoriza dominios amplios de compliance AIMS sin schema nuevo", () => {
+    const monitors = buildAimsComplianceMonitors({
+      systems: [
+        { id: "sys-1", status: "ACTIVO", risk_level: "Alto", vendor: "Proveedor A" },
+        { id: "sys-2", status: "ACTIVO", risk_level: "Inaceptable" },
+      ],
+      assessments: [
+        { id: "assess-1", system_id: "sys-1", status: "EN_REVISION", score: 74 },
+        { id: "assess-2", system_id: "sys-2", status: "APROBADO", score: 92 },
+      ],
+      incidents: [
+        { id: "incident-1", status: "ABIERTO", severity: "CRITICO" },
+      ],
+      complianceChecks: [
+        {
+          id: "check-data",
+          requirement_code: "AIA-10",
+          requirement_title: "Data governance",
+          status: "NO_CONFORME",
+        },
+        {
+          id: "check-human",
+          requirement_code: "AIA-14",
+          requirement_title: "Supervisión humana",
+          status: "CONFORME",
+        },
+      ],
+    });
+
+    expect(monitors.find((monitor) => monitor.id === "data-governance")?.status).toBe("gap");
+    expect(monitors.find((monitor) => monitor.id === "human-oversight")?.status).toBe("ready");
+    expect(monitors.find((monitor) => monitor.id === "prohibited-practices")?.status).toBe("gap");
+    expect(monitors.find((monitor) => monitor.id === "incident-reporting-escalation")?.handoff).toBe("AIMS_INCIDENT_MATERIAL");
+    expect(monitors.every((monitor) => monitor.route.startsWith("/ai-governance"))).toBe(true);
   });
 });

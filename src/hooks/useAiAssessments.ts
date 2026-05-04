@@ -87,6 +87,23 @@ export function useComplianceChecksBySystem(systemId: string | undefined) {
   });
 }
 
+export function useAllComplianceChecks() {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["ai_compliance_checks", tenantId, "all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_compliance_checks")
+        .select("*, ai_systems!inner(tenant_id)")
+        .eq("ai_systems.tenant_id", tenantId!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as (AiComplianceCheck & { ai_systems: { tenant_id: string } | null })[];
+    },
+    enabled: !!tenantId,
+  });
+}
+
 export function useCreateAssessment() {
   const qc = useQueryClient();
   return useMutation({

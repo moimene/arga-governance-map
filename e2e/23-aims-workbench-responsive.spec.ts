@@ -37,6 +37,7 @@ test.describe('AIMS / AI Governance — responsive workbench', () => {
         timeout: 10_000,
       });
       await expect(page.getByText('Sistemas, evaluaciones e incidentes que requieren criterio')).toBeVisible();
+      await expect(page.getByText('Monitor de cumplimiento')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('Readiness de demo AIMS')).toBeVisible({ timeout: 10_000 });
       await expectNoHorizontalOverflow(page);
     });
