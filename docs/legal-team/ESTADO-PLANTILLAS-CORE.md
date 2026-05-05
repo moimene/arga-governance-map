@@ -44,54 +44,54 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 1 | CONVOCATORIA / CONVOCATORIA_JUNTA | `76c3260e-2be6-4969-8b21-e3d6b720e38f` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 2 | CONVOCATORIA_SL_NOTIFICACION / NOTIFICACION_CONVOCATORIA_SL | `1e1a7755-de14-4fdc-a913-e19fbe48d64c` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 1 | CONVOCATORIA / CONVOCATORIA_JUNTA | `8dcfc85c-9422-4456-aa31-ceea5da6d64d` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 2 | CONVOCATORIA_SL_NOTIFICACION / NOTIFICACION_CONVOCATORIA_SL | `1d7d5671-2588-4071-a9f6-e9b377d337bc` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 
 ### 2.2. Actas de sesión (2)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 3 | ACTA_SESION / JUNTA_GENERAL | `53b34d3e-a87d-4378-928a-b03d339cb65c` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 4 | ACTA_SESION / CONSEJO_ADMIN | `36c28a8c-cbe1-4692-90fd-768a83c26480` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 3 | ACTA_SESION / JUNTA_GENERAL | `b9c17ef0-cf3d-4ba8-a753-7f4dafc2793e` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 4 | ACTA_SESION / CONSEJO_ADMIN | `77191407-4d5b-4279-b09e-041985026aa4` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 
 ### 2.3. Actas de órganos especiales (3)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
 | 5 | COMISION_DELEGADA / ACTAS_ORGANOS_DELEGADOS | (resolver UUID con SQL inventario) | 1.0.0 | ✅ | Núcleo estable, sin upgrade pendiente |
-| 6 | ACTA_DECISION_CONJUNTA / CO_APROBACION | `1e3b82a7-fffc-4a72-8851-b1e0f1649093` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 7 | ACTA_ORGANO_ADMIN / ADMIN_SOLIDARIO | `b2409fb5-eb14-480b-89f4-66c72f1cbc5d` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 6 | ACTA_DECISION_CONJUNTA / CO_APROBACION | `ae44ec3b-ba47-4fd7-a119-5ac70346fdc0` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 7 | ACTA_ORGANO_ADMIN / ADMIN_SOLIDARIO | `b5f436c9-e8e6-4a01-92e7-25fe51ed83f3` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 
 ### 2.4. Acuerdos sin sesión y unipersonales (3)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 8 | ACTA_ACUERDO_ESCRITO / ACUERDO_SIN_SESION | `1b1118a6-577d-45ed-96ee-77be89358aa0` | 1.2.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 9 | ACTA_CONSIGNACION / DECISION_SOCIO_UNICO | `6f43fcce-4893-4636-b1d2-551ba6db92fb` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 10 | ACTA_CONSIGNACION / DECISION_ADMIN_UNICO | `56bcbb33-b603-4025-9393-c5ad84ba3808` | 1.1.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 8 | ACTA_ACUERDO_ESCRITO / ACUERDO_SIN_SESION | `2c15640c-de2f-41ea-aa8d-304147124a6e` | 1.3.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 9 | ACTA_CONSIGNACION / DECISION_SOCIO_UNICO | `2d9134d5-7935-4f3c-a6de-de1c6fc35227` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 10 | ACTA_CONSIGNACION / DECISION_ADMIN_UNICO | `383d7f4c-1df6-42a2-bc5c-df3a4e1685fe` | 1.2.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 
 ### 2.5. Certificación (1)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 11 | CERTIFICACION / CERTIFICACION_ACUERDOS | `ca3df363-139a-41aa-8c21-37c7a68bddc7` | 1.2.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 11 | CERTIFICACION / CERTIFICACION_ACUERDOS | `79bc76c7-512e-4734-9849-31cdc73b0e84` | 1.3.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 
 ### 2.6. Informes (3)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 12 | INFORME_PRECEPTIVO / CONVOCATORIA_PRE | `4c2644ec-474e-486e-9893-28b5167a6bfc` | 1.0.1 | ✅ | Operativa, mejora pendiente vía Path B |
-| 13 | INFORME_DOCUMENTAL_PRE / EXPEDIENTE_PRE | `438fa893-9704-48ee-91b3-9966e6f4df63` | 1.0.1 | ✅ | Operativa, mejora pendiente vía Path B |
+| 12 | INFORME_PRECEPTIVO / CONVOCATORIA_PRE | `24e1b9cb-9c4c-49a2-9259-d49b5b6647a1` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 13 | INFORME_DOCUMENTAL_PRE / EXPEDIENTE_PRE | `62da5ae6-1cff-4a7c-8032-29e489d3e877` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 | 14 | INFORME_GESTION / GESTION_SOCIEDAD | `944ff8d4-27e5-453e-82b5-8597b97a7300` | 1.0.0 | ✅ | Núcleo estable, **gap menor**: Capa 3 vacía |
 
 ### 2.7. Modelos de acuerdo firmados (6)
 
 | # | Plantilla | UUID Cloud | Versión | Firmada | Estado |
 |---|---|---|---|---|---|
-| 15 | MODELO_ACUERDO / APROBACION_CUENTAS | `affa4219-9b3d-4ded-8c5a-2ed304738c4f` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 16 | MODELO_ACUERDO / FORMULACION_CUENTAS | `389b0205-8639-49a6-aa5c-777413ea8471` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 17 | MODELO_ACUERDO / DELEGACION_FACULTADES | `0b1beb86-5a19-45ba-8d0c-68e176844ac2` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
-| 18 | MODELO_ACUERDO / OPERACION_VINCULADA | `73669c41-0c1e-4616-bfc6-ca9b67277623` | 1.0.0 | ✅ | Operativa, mejora pendiente vía Path B |
+| 15 | MODELO_ACUERDO / APROBACION_CUENTAS | `c8da1e61-ef2a-4a5c-895b-a5d100916ecf` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 16 | MODELO_ACUERDO / FORMULACION_CUENTAS | `c90edc8c-4655-46b5-a708-31543faadd2e` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 17 | MODELO_ACUERDO / DELEGACION_FACULTADES | `d3e08b42-a67e-4b33-9bbb-2689b5d8d4cf` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
+| 18 | MODELO_ACUERDO / OPERACION_VINCULADA | `64fa1683-8cb8-4c4c-b8d6-e09f91cafa59` | 1.1.0 | ✅ | Path B promovida a ACTIVA; predecesora archivada |
 | 19 | MODELO_ACUERDO / ACTIVOS_ESENCIALES | (resolver UUID) | 1.0.0 | ✅ | Núcleo estable, sin upgrade pendiente |
 | 20 | MODELO_ACUERDO / AUTORIZACION_GARANTIA | (resolver UUID) | 1.0.0 | ✅ | Núcleo estable, sin upgrade pendiente |
 
@@ -148,7 +148,7 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 **Material de trabajo:** `2026-05-02-bloque-B-revision-castellano.md` (lo que el Comité abre)
 **Anexo técnico:** `sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql` (para ingeniería tras decisión)
 **Plazo:** 1 semana de revisión legal, ejecución posterior
-**Estado actual:** autorizado y aplicado el 2026-05-04 como 16 nuevas filas `BORRADOR` mediante `scripts/apply-path-b-templates.ts --apply`. No se archivó ni promovió ninguna versión `ACTIVA`; la promoción `BORRADOR → ACTIVA` queda como paso separado con visto bueno operativo.
+**Estado actual:** cerrado. Autorizado y aplicado el 2026-05-04 como 16 nuevas filas `BORRADOR`; promovido el 2026-05-05 mediante `sql-drafts/2026-05-05-promote-path-b-templates.sql`. La promoción archivó exactamente 16 predecesoras `ACTIVA` y promovió exactamente 16 sucesoras Path B a `ACTIVA`. Probe posterior: 37 activas, 0 borradores, 0 bloqueos.
 
 ### Track 3 — Sprint B Motor v1 + Composer (Ingeniería, conversación nueva)
 
@@ -173,10 +173,10 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 | 2 plantillas registrales (DOCUMENTO_REGISTRAL, SUBSANACION_REGISTRAL) | Categoría adicional para envío al Registro Mercantil | **Módulo opcional futuro**. Demo termina en `PROMOTED` (preparado para Registro), no envía |
 | INFORME_GESTION con Capa 3 vacía | Gap menor en plantilla activa | Backlog. No bloquea demo |
 | Cleanups técnicos Fase 4 | No críticos | Fuentes y duplicidades quedan cubiertas por resolver + tests; Capa 3 se normalizó en las 17 filas cerradas |
-| Promoción de las 16 mejoras Path B de BORRADOR a ACTIVA | Operativa post-aplicación | Las 16 filas `BORRADOR` ya existen; requiere visto bueno operativo explícito para archivar versiones anteriores y promover nuevas |
+| Promoción de las 16 mejoras Path B de BORRADOR a ACTIVA | Operativa post-aplicación | ✅ Cerrada el 2026-05-05: 16 predecesoras archivadas, 16 sucesoras ACTIVA, 0 borradores Path B |
 | 8 duplicados ACTIVE en `rule_pack_versions` | Heredado del cierre Secretaría previo | Requiere credencial admin Cloud |
 
-**Cero gaps críticos para demo end-to-end** respecto al núcleo de plantillas activas. Path B sigue siendo mejora versionada, no bloqueante.
+**Cero gaps críticos para demo end-to-end** respecto al núcleo de plantillas activas. Path B queda incorporado como versión activa demo-operativa.
 
 ---
 
@@ -186,7 +186,7 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 |---|---|
 | **S0 (2026-05-04)** | Path A aplicado sobre Cloud como cierre demo-operativo. Probe final: 0 pendientes. |
 | **S1 (2026-05-04)** | Path B autorizado y aplicado como 16 nuevas versiones `BORRADOR`; sin promoción automática. |
-| **S2** | Decidir promoción operativa Path B: archivar versiones anteriores y promover nuevas a `ACTIVA`, o conservarlas como borrador. |
+| **S2 (2026-05-05)** | Path B promovido: 16 sucesoras `ACTIVA`, 16 predecesoras `ARCHIVADA`, probe Cloud verde. |
 | **S3** | Sustituir firma demo-operativa por firma nominal profesional si el Comité Legal lo requiere para producción. |
 | **S4** | Cerrar documentación final de producto, manteniendo frontera `PROMOTED` = preparado para registro, sin envío registral real. |
 
@@ -207,6 +207,7 @@ Si tienes que profundizar en alguna parte, abre estos archivos. **No son documen
 | `prompts/01-version-bump-validator.md` | Coordinador Comité en Harvey Space | Valida transiciones de versión durante el cierre |
 | `prompts/02-pre-export-probe.md` | Coordinador Comité en Harvey Space | Bloquea exportación si hay incumplimientos |
 | `sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql` | Ingeniería tras decisión legal | Anexo técnico del Path B — el Comité no lo abre |
+| `sql-drafts/2026-05-05-promote-path-b-templates.sql` | Ingeniería | Promoción transaccional Path B: archiva predecesoras y activa sucesoras con guards de conteo |
 | `2026-05-02-paquete-17-plantillas-entregable-legal.md` | Histórico | Entregable bruto previo del equipo legal antes del descubrimiento del mismatch |
 | `2026-05-02-brief-corregido-17-plantillas-legacy.md` | Histórico | Brief técnico complementario, redundante con el encargo formal |
 | `2026-05-02-plantillas-mapping-uuid-cierre.md` | Histórico | Mapping consolidado UUID-cierre. Información integrada en este documento (sección 2). Conservar como referencia técnica |

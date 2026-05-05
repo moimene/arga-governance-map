@@ -236,7 +236,7 @@ function generateEvidenceHash(
 // ============================================================
 
 function generateTSQToken(hash: string): string {
-  const combined = `TSQ:${hash}:${new Date().toISOString()}`;
+  const combined = `TSQ:${hash}`;
   const digest = combined
     .split('')
     .reduce((acc, char) => {

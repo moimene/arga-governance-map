@@ -84,4 +84,12 @@ Este cierre no equivale a firma nominal profesional productiva. Si el módulo pa
 **Script:** `scripts/apply-path-b-templates.ts --apply`  
 **Resultado:** 16 nuevas filas `BORRADOR` insertadas en `plantillas_protegidas`.
 
-La aplicación no archivó ni promovió versiones activas. Ese paso queda separado para evitar dejar sin versión `ACTIVA` cualquiera de las 16 plantillas durante el periodo de revisión operativa.
+La aplicación inicial no archivó ni promovió versiones activas. Ese paso quedó separado para evitar dejar sin versión `ACTIVA` cualquiera de las 16 plantillas durante el periodo de revisión operativa.
+
+## 9. Promoción operativa Path B
+
+**Fecha de promoción:** 2026-05-05
+**SQL:** `docs/legal-team/sql-drafts/2026-05-05-promote-path-b-templates.sql`
+**Resultado:** 16 predecesoras `ACTIVA` archivadas y 16 sucesoras Path B promovidas a `ACTIVA`.
+
+La promoción se ejecutó con guards transaccionales de conteo. La operación aborta si no existen exactamente 16 sucesoras `BORRADOR`, si falta una predecesora `ACTIVA`, o si al final quedase más de una `ACTIVA` por pareja `tipo`/`materia`. Probe posterior: `secretaria-p0-cloud-smoke.ts --readonly-only` verde con 37 plantillas activas, 0 borradores y 0 bloqueos.

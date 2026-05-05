@@ -241,6 +241,22 @@ async function findExisting(row: ParsedRow) {
   return data ?? [];
 }
 
+async function findPromoted(row: ParsedRow) {
+  const { data, error } = await supabase
+    .from("plantillas_protegidas")
+    .select("id,tipo,materia,version,estado,aprobada_por,fecha_aprobacion")
+    .eq("tenant_id", row.tenant_id as string)
+    .eq("tipo", row.tipo as string)
+    .eq("materia", row.materia as string)
+    .eq("version", row.version as string)
+    .eq("estado", "ACTIVA")
+    .eq("aprobada_por", row.aprobada_por as string)
+    .eq("fecha_aprobacion", row.fecha_aprobacion as string);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 async function main() {
   const apply = process.argv.includes("--apply");
   const sql = readFileSync(SQL_PATH, "utf8");
@@ -270,9 +286,36 @@ async function main() {
 
   let inserted = 0;
   let updated = 0;
+  const draftExistingByRow = await Promise.all(rows.map(findExisting));
+  const promotedByRow = await Promise.all(rows.map(findPromoted));
+  const draftExistingCount = draftExistingByRow.reduce((sum, items) => sum + items.length, 0);
+  const promotedCount = promotedByRow.reduce((sum, items) => sum + items.length, 0);
 
-  for (const row of rows) {
-    const existing = await findExisting(row);
+  if (promotedCount > 0) {
+    if (promotedCount === EXPECTED_ROWS && draftExistingCount === 0) {
+      console.log(JSON.stringify({
+        applied: false,
+        alreadyPromoted: true,
+        pathBRows: promotedCount,
+        rows: promotedByRow.flat().map((row) => ({
+          tipo: row.tipo,
+          materia: row.materia,
+          version: row.version,
+          estado: row.estado,
+        })),
+      }, null, 2));
+      return;
+    }
+
+    throw new Error(
+      `Path B packet is partially promoted (${promotedCount} active, ${draftExistingCount} draft). ` +
+        "Resolve the Cloud inventory before reapplying.",
+    );
+  }
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const existing = draftExistingByRow[index];
     if (existing.length > 1) {
       throw new Error(`Duplicate existing BORRADOR rows for ${row.tipo}/${row.materia} ${row.version}.`);
     }

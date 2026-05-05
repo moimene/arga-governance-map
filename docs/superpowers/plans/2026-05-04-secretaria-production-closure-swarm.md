@@ -11,7 +11,7 @@ Estado: cierre funcional avanzado; smoke Cloud transaccional P0 verde, harness t
 
 Secretaria ya no esta bloqueada por pantallas aisladas ni por falta de contratos backend basicos. El modulo tiene flujos funcionales cableados, Fases 1-4 de logica y plantillas con 777+ tests registrados, y el cierre P0 actual eleva la verificacion local a 845 tests passing / 59 skipped en Vitest. Las plantillas activas estan cerradas en Cloud para uso demo-operativo, migracion `000051` aplicada/verificada en Cloud y hardening incremental `000052`/`000053`/`000054`/`000055`/`000056` aplicado/verificado en Cloud.
 
-El siguiente limite no es React/UX. El smoke transaccional de exito ya pasa contra Cloud dentro de `BEGIN/ROLLBACK`: voto no-session, replay idempotente, cierre/materializacion, certificacion y transmision de capital. El harness tenant A/B tambien pasa con claims `authenticated`, no `service_role`: positivos same-tenant y denegaciones cross-tenant para voto, cierre/materializacion, certificacion, transmision, cierre de vencidos, plantilla ajena y capability negativa. Ademas, el smoke `--auth-user-isolation` crea un usuario Supabase Auth temporal, inicia sesion con password real, valida tenant/person/capability contra `user_profiles` y limpia 0 residuos. El probe read-only de plantillas tambien pasa contra Cloud: 37 activas, 16 borradores, 0 bloqueos. El E2E destructivo ARGA test de navegador tambien pasa para no-session y transmision de capital tras autorizacion expresa para mutar el entorno test.
+El siguiente limite no es React/UX. El smoke transaccional de exito ya pasa contra Cloud dentro de `BEGIN/ROLLBACK`: voto no-session, replay idempotente, cierre/materializacion, certificacion y transmision de capital. El harness tenant A/B tambien pasa con claims `authenticated`, no `service_role`: positivos same-tenant y denegaciones cross-tenant para voto, cierre/materializacion, certificacion, transmision, cierre de vencidos, plantilla ajena y capability negativa. Ademas, el smoke `--auth-user-isolation` crea un usuario Supabase Auth temporal, inicia sesion con password real, valida tenant/person/capability contra `user_profiles` y limpia 0 residuos. El probe read-only de plantillas tambien pasa contra Cloud tras promover Path B: 37 activas, 0 borradores, 0 bloqueos. El E2E destructivo ARGA test de navegador tambien pasa para no-session y transmision de capital tras autorizacion expresa para mutar el entorno test.
 
 ## Actualizacion 2026-05-05 - post-000056
 
@@ -43,8 +43,8 @@ Se cerro el ciclo P0 de reunion real:
 | Certificacion no-session | Verde Cloud | `fn_generar_certificacion_acuerdo_sin_sesion` desplegada; `000052` exige `CERTIFICATION` y autoridad de la persona autenticada salvo service/admin; smoke certifica desde `agreements.id` sin `minute_id`; harness A/B deniega agreement ajeno. | E2E destructivo con usuarios fixture reales. |
 | Capital/transmision | Verde Cloud | `fn_registrar_transmision_capital` desplegada; `000052` exige rol operador y valida que destino pertenece al tenant; `000054` corrige `audit_log.object_id` uuid; smoke ejecuta movimientos WORM con rollback; harness A/B deniega destino ajeno. | E2E destructivo controlado con tenant/run aislado. |
 | RLS/RPC tenant guard | Verde Cloud | Tenant obligatorio, role/capability checks, persona/plantilla/destino tenant checks. Harness `--tenant-isolation` pasa con claims `authenticated` y table check de `capital_holdings`; `--auth-user-isolation` pasa con usuario Supabase Auth temporal y `user_profiles` real. | Ampliar a navegador destructivo y mas tablas UI. |
-| Plantillas activas | Verde demo-operativo | `secretaria-p0-cloud-smoke.ts --readonly-only`: 37 activas, 16 borradores, 0 bloqueos; `ESTADO-PLANTILLAS-CORE.md`: 37 activas, 0 activas sin firma, 0 versiones no semver. | Decision Path B: mantener BORRADOR excluido o promover con aprobacion explicita. |
-| Path B plantillas | Pendiente operativo | 16 filas `BORRADOR` aplicadas; no se archivaron ni promovieron versiones activas. | Decision: promover a `ACTIVA` o mantener como mejora no bloqueante. |
+| Plantillas activas | Verde demo-operativo | `secretaria-p0-cloud-smoke.ts --readonly-only`: 37 activas, 0 borradores, 0 bloqueos; `ESTADO-PLANTILLAS-CORE.md`: Path B promovido, 16 predecesoras archivadas, 16 sucesoras activas. | Mantener probe read-only antes de demo externa. |
+| Path B plantillas | Verde | 16 filas `BORRADOR` aplicadas el 2026-05-04 y promovidas el 2026-05-05 mediante `docs/legal-team/sql-drafts/2026-05-05-promote-path-b-templates.sql`. | Cerrado; `scripts/apply-path-b-templates.ts --apply` ahora detecta `alreadyPromoted` y no reabre drafts. |
 | E2E Secretaria no destructivo | Verde | Golden path `e2e/18`, watchdog `e2e/30` y responsive `e2e/21` pasan. Incluye reunion con censo real, no-session, certificacion directa interceptada, tramitador, generador documental y transmision UI. | Repetir antes de demo externa. |
 | E2E destructivo ARGA test | Verde con autorizacion expresa | `SECRETARIA_E2E_MUTATE_ARGA=1 bunx playwright test e2e/32-secretaria-arga-real-destructive.spec.ts --project=chromium --reporter=list`: 3/3 pass. | No usar como patron para cliente real; mantenerlo opt-in y solo sobre entorno test. |
 | Copy/QTSP/frontera registral | Verde registrado | Sin proveedor QTSP alternativo; frontera demo `PROMOTED`/`FILED` = preparado, no enviado al RM. | Mantener grep/copy check en cierre final. |
@@ -57,7 +57,7 @@ Se cerro el ciclo P0 de reunion real:
 | E2E destructivo controlado | P0 | Golden path destructivo de navegador autorizado sobre ARGA test para no-session y transmision; guard opt-in obligatorio. | Verde para demo/test; para produccion real preferir tenant fixture aislado. |
 | RLS tenant A/B | P0 | Confirmar aislamiento de lectura/escritura y denegacion cruzada en tablas y RPCs criticas. | Verde para RPCs P0 y `capital_holdings` via `--tenant-isolation`; verde con usuario Supabase Auth real via `--auth-user-isolation`. |
 | Datos fixture | P0 | Crear dataset minimo reusable para JG anual, consejo con conflicto, no-session, certificacion y capital. | Parcial: fixture SQL rollback para no-session/certificacion/capital; pendiente JG/consejo UI real. |
-| Validacion cierre plantillas | P0/P1 | Revalidar 37 activas y comprobar que las 16 Path B `BORRADOR` no aparecen como productivas salvo promocion explicita. | Verde read-only Cloud: 37 activas, 16 borradores, 0 bloqueos. |
+| Validacion cierre plantillas | P0/P1 | Revalidar 37 activas y comprobar que Path B esta incorporado sin duplicados activos. | Verde read-only Cloud: 37 activas, 0 borradores, 0 bloqueos. |
 | Regresion build/test/E2E | P0 | Preflight P0 verde: target, smoke transaccional, tenant A/B, usuario Auth real, template inventory, typecheck, tests P0, lint, build, E2E golden path, responsive/watchdog y destructive opt-in. Full Vitest 845 pass / 59 skipped. | Repetir antes de demo externa. |
 
 ## Matriz funcional de cierre
@@ -73,7 +73,7 @@ Se cerro el ciclo P0 de reunion real:
 | Solidario -> documento | Cableado con sociedad, organo, plantilla, motor y acuerdo. | Administrador vigente real y smoke de actuante/documento. |
 | Decision unipersonal -> documento | Routing restringido a `ACTA_CONSIGNACION`. | E2E con cap table/estado unipersonal aislado. |
 | Capital/transmision -> cap table | RPC transaccional desplegada y endurecida; hotfix `000054` aplicado; tenant A/B verde. | E2E destructivo con residuo WORM aislado por tenant/run. |
-| Plantillas -> composer | 37 activas cerradas demo-operativas. | Composer/selectores no deben usar BORRADOR Path B como version productiva sin promocion. |
+| Plantillas -> composer | 37 activas cerradas demo-operativas, Path B incluido. | Mantener smoke de inventario; no quedan BORRADOR Path B productivos. |
 | Tenant isolation | Guard RPC desplegado, harness tenant A/B verde y usuario Supabase Auth real verde. | Ampliar a navegador destructivo sobre tablas UI ricas. |
 
 ## Backlog de cierre
@@ -114,7 +114,7 @@ Se cerro el ciclo P0 de reunion real:
    - Persistir `rule_evaluation_results` solo con traza Cloud V2 completa.
 
 5. Decision Path B.
-   - Promover las 16 mejoras o documentar que quedan fuera del demo productivo.
+   - Cerrada el 2026-05-05: 16 sucesoras promovidas a `ACTIVA`, 16 predecesoras archivadas.
 
 ### P2 - Produccion real o modulo futuro
 
@@ -132,7 +132,7 @@ Secretaria puede declararse demo-production-ready solo cuando se cumpla todo:
 3. Smoke Cloud transaccional pasa con fixture temporal y cleanup verificado: `secretaria_p0_cloud_smoke_rollback_ok`.
 4. E2E destructivo controlado pasa. Estado demo/test actual: ARGA opt-in pasa con autorizacion expresa; para cliente real debe usarse tenant fixture aislado.
 5. RLS tenant A/B pasa para tablas y RPCs criticas. Estado actual: verde para RPCs P0 y `capital_holdings` con claims controlados; verde para usuario Supabase Auth temporal con `user_profiles` real.
-6. 37 plantillas activas siguen cerradas; Path B queda promovido con aprobacion o explicitamente excluido. Estado actual: probe read-only Cloud verde con 37 activas, 16 borradores y 0 bloqueos.
+6. 37 plantillas activas siguen cerradas; Path B queda promovido con aprobacion. Estado actual: probe read-only Cloud verde con 37 activas, 0 borradores y 0 bloqueos.
 7. Preflight local completo pasa: typecheck, tests P0, lint, build y E2E Secretaria.
 8. No aparece el nombre real del cliente en codigo/datos demo/commits; QTSP unico: EAD Trust.
 9. Copy registral mantiene la frontera demo: preparado para Registro, sin envio real.
@@ -187,7 +187,7 @@ bunx playwright test e2e/*secretaria*.spec.ts --project=chromium --workers=1 --r
 
 Plantillas Cloud activas:
 
-El probe read-only canonico vive dentro de `scripts/secretaria-p0-cloud-smoke.ts --readonly-only`. Consulta `plantillas_protegidas`, ejecuta `auditTemplateInventory()` y falla si una plantilla activa tiene bloqueos de firma, semver, metadatos o contenido critico. Estado 2026-05-04: 37 activas, 16 borradores, 0 bloqueos.
+El probe read-only canonico vive dentro de `scripts/secretaria-p0-cloud-smoke.ts --readonly-only`. Consulta `plantillas_protegidas`, ejecuta `auditTemplateInventory()` y falla si una plantilla activa tiene bloqueos de firma, semver, metadatos o contenido critico. Estado 2026-05-05 tras promocion Path B: 37 activas, 0 borradores, 0 bloqueos.
 
 ## Comandos ya formalizados
 
