@@ -192,6 +192,29 @@ export function evaluarVotacion(
       input.materias.some(m => p.materia === m || p.clase === input.materiaClase)
     );
 
+    if (matchedPack && !matchedPack.modosAdopcionPermitidos.includes('NO_SESSION')) {
+      const errorNode: ExplainNode = {
+        regla: 'Gate 0: NO_SESSION no permitido',
+        fuente: 'LEY',
+        resultado: 'BLOCKING',
+        mensaje: `La materia ${matchedPack.materia} no admite adopción sin sesión en el rule pack activo`,
+      };
+      explainNodes.push(errorNode);
+      blockingIssues.push('no_session_not_allowed_for_matter');
+      severity = 'BLOCKING';
+
+      return {
+        etapa: 'VOTACION',
+        ok: false,
+        severity,
+        explain: explainNodes,
+        blocking_issues: blockingIssues,
+        warnings,
+        acuerdoProclamable: false,
+        mayoriaAlcanzada: false,
+      };
+    }
+
     const noSessionOutput = evaluarProcesoSinSesion(input.noSessionInput, matchedPack);
 
     explainNodes.push({
@@ -228,6 +251,30 @@ export function evaluarVotacion(
 
   if (matchedPacks.length === 0) {
     warnings.push(`No rule packs matched for materias: ${input.materias.join(', ')}`);
+  }
+
+  const organCompatiblePacks = matchedPacks.filter(p => p.organoTipo === input.organoTipo);
+  if (matchedPacks.length > 0 && organCompatiblePacks.length === 0) {
+    const errorNode: ExplainNode = {
+      regla: 'Gate 0: Competencia órgano-materia',
+      fuente: 'LEY',
+      resultado: 'BLOCKING',
+      mensaje: `La materia ${input.materias.join(', ')} no está permitida para el órgano ${input.organoTipo}`,
+    };
+    explainNodes.push(errorNode);
+    blockingIssues.push('organ_matter_not_allowed');
+    severity = 'BLOCKING';
+
+    return {
+      etapa: 'VOTACION',
+      ok: false,
+      severity,
+      explain: explainNodes,
+      blocking_issues: blockingIssues,
+      warnings,
+      acuerdoProclamable: false,
+      mayoriaAlcanzada: false,
+    };
   }
 
   // ================================================================

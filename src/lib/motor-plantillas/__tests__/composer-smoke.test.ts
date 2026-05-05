@@ -282,6 +282,32 @@ describe("motor-plantillas composer smoke", () => {
     expect(result.renderedText).not.toContain("{{");
   });
 
+  it("rechaza una plantilla forzada incompatible con el tipo documental y modo de adopcion", async () => {
+    const wrongTemplate = fixture("legal-fixture-acta-consejo-es");
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "ACUERDO_SIN_SESION",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      agreementIds: [AGREEMENT_ID],
+      templateId: wrongTemplate.id,
+      expectedAdoptionMode: "NO_SESSION",
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+
+    await expect(
+      prepareDocumentComposition(
+        request,
+        {},
+        {
+          plantilla: wrongTemplate,
+          resolveCapa2: false,
+          archiveDraft: false,
+          generatedAt: "2026-05-03",
+        },
+      ),
+    ).rejects.toThrow(/no es compatible/i);
+  });
+
   it("genera CONVOCATORIA sin variables huerfanas", async () => {
     const result = await smoke(
       fixture("legal-fixture-convocatoria-consejo-es"),

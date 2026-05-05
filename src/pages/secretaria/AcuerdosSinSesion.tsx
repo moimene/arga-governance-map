@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ScrollText, Plus, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
@@ -18,13 +18,13 @@ const SELECT_CLASS =
 
 export default function AcuerdosSinSesion() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useAcuerdosSinSesionList(scopedEntityId);
   const closeExpired = useCloseExpiredVotaciones();
 
-  // Auto-close expired VOTING_OPEN processes on page load (G6)
-  useEffect(() => {
+  function handleCloseExpired() {
     closeExpired.mutate(undefined, {
       onSuccess: (count) => {
         if (count && count > 0) {
@@ -32,11 +32,30 @@ export default function AcuerdosSinSesion() {
             `${count} proceso${count > 1 ? "s" : ""} cerrado${count > 1 ? "s" : ""} por vencimiento del plazo.`,
             { duration: 5000 }
           );
+        } else {
+          toast.info("No hay votaciones vencidas pendientes de cierre.", { duration: 4000 });
         }
       },
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : "No se pudieron cerrar las votaciones vencidas.");
+      },
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
+
+  useEffect(() => {
+    const plantillaId = searchParams.get("plantilla");
+    const tipo = searchParams.get("tipo")?.trim().toUpperCase();
+    if (!plantillaId && !tipo) return;
+
+    const nextPath =
+      tipo === "ACTA_DECISION_CONJUNTA"
+        ? "/secretaria/acuerdos-sin-sesion/co-aprobacion"
+        : tipo === "ACTA_ORGANO_ADMIN"
+          ? "/secretaria/acuerdos-sin-sesion/solidario"
+          : "/secretaria/acuerdos-sin-sesion/nuevo";
+    const qs = searchParams.toString();
+    navigate(scope.createScopedTo(`${nextPath}${qs ? `?${qs}` : ""}`), { replace: true });
+  }, [navigate, scope, searchParams]);
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
@@ -62,6 +81,15 @@ export default function AcuerdosSinSesion() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCloseExpired}
+            disabled={closeExpired.isPending}
+            className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {closeExpired.isPending ? "Cerrando..." : "Cerrar vencidas"}
+          </button>
           <button
             type="button"
             onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/nuevo"))}

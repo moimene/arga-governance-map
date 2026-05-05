@@ -52,8 +52,15 @@ export function getTemplateUsageTarget(plantilla: PlantillaProtegidaRow): Templa
   }
 
   if (entry?.processId === "acuerdo_sin_sesion") {
+    const adoptionMode = safeString(plantilla.adoption_mode).trim().toUpperCase();
+    const route =
+      adoptionMode === "CO_APROBACION"
+        ? "/secretaria/acuerdos-sin-sesion/co-aprobacion"
+        : adoptionMode === "SOLIDARIO"
+          ? "/secretaria/acuerdos-sin-sesion/solidario"
+          : "/secretaria/acuerdos-sin-sesion/nuevo";
     return {
-      to: `/secretaria/acuerdos-sin-sesion?${templateParam}&tipo=${encodeURIComponent(tipo)}`,
+      to: `${route}?${templateParam}&tipo=${encodeURIComponent(tipo)}`,
       label: "Elegir acuerdo",
       hint: "El acta escrita se genera desde el expediente sin sesión para conservar respuestas, plazos y traza.",
     };

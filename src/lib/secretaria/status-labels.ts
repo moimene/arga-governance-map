@@ -5,7 +5,7 @@ export const STATUS_LABEL: Record<string, string> = {
   INACTIVE:     "Inactiva",
   Inactive:     "Inactiva",
   ELEVATED:     "Elevada a público",
-  SUBMITTED:    "Presentada",
+  SUBMITTED:    "Preparada para tramitación",
 
   // Acuerdos sin sesión
   BORRADOR:     "Borrador",
@@ -15,7 +15,7 @@ export const STATUS_LABEL: Record<string, string> = {
 
   // Tramitador
   PREPARADA:    "Preparada",
-  PRESENTADA:   "Presentada",
+  PRESENTADA:   "Preparada para tramitación",
   EN_TRAMITE:   "En trámite",
   SUBSANACION:  "Subsanación",
   INSCRITA:     "Inscrita",
@@ -41,7 +41,7 @@ export const STATUS_LABEL: Record<string, string> = {
 
   // Libros obligatorios — legalización
   PENDIENTE:    "Pendiente",
-  PRESENTADO:   "Presentado",
+  PRESENTADO:   "Preparado para legalización",
   LEGALIZADO:   "Legalizado",
 
   // Decisiones unipersonales

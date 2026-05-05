@@ -10,6 +10,74 @@
 
 ---
 
+## Addendum 2026-05-04 — cierre demo-operativo aplicado
+
+El Path A de las 17 plantillas legacy se ha cerrado en Cloud para uso demo-operativo mediante `scripts/close-legacy-templates-phase4.ts --apply`, sin migraciones y sin crear nuevas filas. El cierre ha actualizado filas existentes en `plantillas_protegidas` con:
+
+- `aprobada_por = "Comite Legal Garrigues - Secretaria Societaria (demo-operativo)"`
+- `fecha_aprobacion = 2026-05-04`
+- `approved_by_role = COMITE_LEGAL`
+- versiones semver normalizadas
+- `organo_tipo`, `adoption_mode` y `referencia_legal` completos en los 17 `MODELO_ACUERDO`
+- Capa 1 reescrita o adaptada en las plantillas críticas y de metadatos NULL cuando era necesario
+- Capa 3 normalizada y alineada con `capa3-validator.ts`
+
+Probe post-cierre:
+
+| Probe | Resultado |
+|---|---:|
+| ACTIVAS sin `aprobada_por`/`fecha_aprobacion` | 0 |
+| ACTIVAS con versión no semver | 0 |
+| `MODELO_ACUERDO` activo con `organo_tipo`/`adoption_mode`/`referencia_legal` null | 0 |
+| Issues bloqueantes de `template-inventory-audit.ts` sobre las 17 legacy | 0 |
+
+**Requisito actualizado para el Comité Legal:** ya no se pide cerrar operativamente las 17 legacy. El Comité debe revisar el paquete como control de calidad y, si el uso pasa de demo-operativo a producción, sustituir la firma colectiva demo por firma nominal profesional completa. El estado `PROMOTED` sigue significando preparado para registro, sin envío telemático real al Registro Mercantil.
+
+## Addendum 2026-05-04 — informe Garrigues recibido sobre FUSION_ESCISION
+
+Se ha recibido el documento `/Users/moisesmenendez/Downloads/Cierre_Legal_De_Plantillas_Críticas_TGMS.docx`. Aunque el nombre del archivo alude a plantillas críticas en plural, su contenido cierra específicamente `MODELO_ACUERDO / FUSION_ESCISION` (`e3697ad9-e0c2-4baf-9144-c80a11808c07`).
+
+La recomendación Garrigues queda incorporada al cierre trazable:
+
+- referencia legal ampliada a RDL 5/2023, Libro Primero, Título II, con desglose de proyecto común, experto independiente, acuerdo de Junta, publicidad e inscripción;
+- `organo_tipo = JUNTA_GENERAL` y `adoption_mode = MEETING`;
+- Capa 1 con referencia expresa a RDL 5/2023 y bloque condicional `{{#if requiere_experto}}`;
+- Capa 3 con `articulos_aplicables` y `requiere_experto` obligatorios, y `nombre_experto` / `fecha_nombramiento_experto` opcionales.
+
+El detalle queda registrado en `docs/legal-team/2026-05-04-cierre-garrigues-fusion-escision.md`. Esta limitación inicial queda superada por el entregable completo Path A recibido posteriormente.
+
+## Addendum 2026-05-04 — entregable completo Path A recibido
+
+Se ha recibido el documento `/Users/moisesmenendez/Downloads/ENTREGABLE_COMPLETO_CIERRE_LEGAL_17_PLANTILLAS_LEGACY_PATH_A.docx`, que cubre el cierre legal completo de las 17 plantillas legacy Path A. El addendum ejecutivo queda registrado en `docs/legal-team/2026-05-04-cierre-garrigues-path-a-17-plantillas.md`.
+
+Ingeniería ha alineado el script trazable `scripts/close-legacy-templates-phase4.ts` con los matices del entregable completo:
+
+- cierre de las 3 críticas documentado por Garrigues;
+- `SEGUROS_RESPONSABILIDAD` con referencia D&O ampliada, `modalidad_cobertura` obligatoria y bloque de conflicto intra-grupo reforzado;
+- `COMITES_INTERNOS` con `articulos_lsc_comite` obligatorio;
+- referencias ampliadas en `POLITICA_REMUNERACION`, `POLITICAS_CORPORATIVAS` y `NOMBRAMIENTO_AUDITOR`;
+- mantenimiento de la frontera demo: preparación registral demo, sin envío real al Registro Mercantil.
+
+El cierre sigue siendo demo-operativo. La firma nominal profesional productiva queda como paso separado si el Comité Legal lo exige.
+
+## Addendum 2026-05-04 — decisión Path B recibida y aplicada
+
+Se ha recibido decisión formal de aprobación íntegra del Path B: 3 plantillas con texto Capa 1 nuevo y 13 plantillas con bump formal sin cambio sustantivo. La decisión queda documentada en `docs/legal-team/2026-05-04-decision-comite-path-b-16-mejoras.md`.
+
+Ingeniería ha aplicado el Path B sobre Cloud mediante `scripts/apply-path-b-templates.ts --apply`, previa ejecución limpia de `bun run db:check-target`. Resultado:
+
+| Probe | Resultado |
+|---|---:|
+| Nuevas filas Path B insertadas | 16 |
+| Filas Path B actualizadas | 0 |
+| Filas Path B en `BORRADOR` post-aplicación | 16 |
+| Versiones `ACTIVA` archivadas en este paso | 0 |
+| Migraciones / cambios de schema | 0 |
+
+La aplicación mantiene intactas las versiones `ACTIVA` anteriores. La promoción `BORRADOR → ACTIVA` y el archivado de versiones previas quedan como decisión operativa separada.
+
+---
+
 ## 1. Resumen ejecutivo
 
 El sistema TGMS Secretaría Societaria genera documentos a partir de **plantillas protegidas** estructuradas en tres capas (texto inmutable, variables auto-resueltas, campos editables). Hay actualmente **37 plantillas ACTIVAS** en producción demo. Tras una auditoría técnica, se identifican **dos bloques de trabajo** que requieren intervención del Comité Legal:

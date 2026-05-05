@@ -52,7 +52,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-import { normalizeFuente, resolveVariables } from "../variable-resolver";
+import { mergeVariables, normalizeFuente, resolveVariables } from "../variable-resolver";
 
 describe("variable-resolver", () => {
   const mockDb = getMockDb();
@@ -63,14 +63,46 @@ describe("variable-resolver", () => {
   });
 
   it("normaliza fuentes legacy singulares y fuentes juridicas a categorias canonicas", () => {
+    expect(normalizeFuente("ENTIDAD")).toBe("ENTIDAD");
+    expect(normalizeFuente("entities.name")).toBe("ENTIDAD");
     expect(normalizeFuente("agreement.adoption_mode")).toBe("EXPEDIENTE");
     expect(normalizeFuente("agreements.status")).toBe("EXPEDIENTE");
+    expect(normalizeFuente("governing_bodies.presidente")).toBe("ORGANO");
     expect(normalizeFuente("meeting.status == 'APROBADA'")).toBe("REUNION");
     expect(normalizeFuente("mandate.role")).toBe("ORGANO");
     expect(normalizeFuente("persons.full_name")).toBe("ORGANO");
     expect(normalizeFuente("LEY")).toBe("MOTOR");
     expect(normalizeFuente("rule_pack.materia")).toBe("MOTOR");
     expect(normalizeFuente("QTSP.signature_reference")).toBe("SISTEMA");
+  });
+
+  it("resuelve fuente canónica entities.name y fallback legacy ENTIDAD sin fallar silenciosamente", async () => {
+    mockDb.rows.entities = {
+      common_name: "ARGA Seguros",
+      legal_name: "ARGA Seguros, S.A.",
+      tax_id: "A-00000000",
+      registration_number: "M-000001",
+      jurisdiction: "ES",
+      legal_form: "SA",
+      tipo_social: "SA",
+    };
+
+    const result = await resolveVariables(
+      [
+        { variable: "denominacion_social", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+        { variable: "nombre_corto", fuente: "entities.name", condicion: "SIEMPRE" },
+        { variable: "tipo_social", fuente: "entities.tipo_social", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
+    );
+
+    expect(result.values).toMatchObject({
+      denominacion_social: "ARGA Seguros, S.A.",
+      nombre_corto: "ARGA Seguros",
+      tipo_social: "SA",
+    });
+    expect(result.unresolved).toEqual([]);
+    expect(mockDb.calls).toContain("entities");
   });
 
   it("resuelve agreement.* aunque la variable de plantilla use un nombre distinto", async () => {
@@ -129,6 +161,32 @@ describe("variable-resolver", () => {
       presidente: "Antonio Rios",
       secretario: "Lucia Paredes",
       organo_nombre: "Consejo de Administracion",
+    });
+    expect(result.unresolved).toEqual([]);
+  });
+
+  it("resuelve governing_bodies.presidente y governing_bodies.secretario desde fuentes canónicas del órgano", async () => {
+    mockDb.rows.governing_bodies = {
+      name: "Consejo de Administracion",
+      established_date: "2020-01-01",
+      legal_basis: "Estatutos sociales",
+    };
+    mockDb.rows.condiciones_persona = [
+      { tipo_condicion: "Presidente", persons: { full_name: "Antonio Rios", tax_id: "00000001A" } },
+      { tipo_condicion: "Secretario", persons: { full_name: "Lucia Paredes", tax_id: "00000002B" } },
+    ];
+
+    const result = await resolveVariables(
+      [
+        { variable: "presidente", fuente: "governing_bodies.presidente", condicion: "SIEMPRE" },
+        { variable: "secretario", fuente: "governing_bodies.secretario", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", bodyId: "body-1" },
+    );
+
+    expect(result.values).toMatchObject({
+      presidente: "Antonio Rios",
+      secretario: "Lucia Paredes",
     });
     expect(result.unresolved).toEqual([]);
   });
@@ -216,5 +274,24 @@ describe("variable-resolver", () => {
       tsq_token: "TSQ-20260502103045123",
     });
     expect(result.unresolved).toEqual([]);
+  });
+
+  it.each([
+    ["AUMENTO_CAPITAL", "ENTIDAD"],
+    ["DISTRIBUCION_DIVIDENDOS", "ENTIDAD"],
+    ["MODIFICACION_ESTATUTOS", "entities.name"],
+    ["NOMBRAMIENTO_AUDITOR", "entities.legal_name"],
+    ["REDUCCION_CAPITAL", "entities.entity_type_detail"],
+  ])("normaliza fuente de entidad para %s", (_materia, fuente) => {
+    expect(normalizeFuente(fuente)).toBe("ENTIDAD");
+  });
+
+  it.each([
+    ["CESE_CONSEJERO Consejo", { consejero_nombre: "Auto C2", nif_consejero: "AUTO-NIF" }, { consejero_nombre: "Manual C3", nif_consejero: "MANUAL-NIF" }],
+    ["CESE_CONSEJERO Junta", { consejero_nombre: "Auto C2", fecha_efectos: "2026-01-01" }, { consejero_nombre: "Manual C3", fecha_efectos: "2026-02-01" }],
+    ["NOMBRAMIENTO_CONSEJERO Consejo", { consejero_nombre: "Auto C2", plazo_mandato: 4 }, { consejero_nombre: "Manual C3", plazo_mandato: 3 }],
+    ["NOMBRAMIENTO_CONSEJERO Junta", { consejero_nombre: "Auto C2", nif_consejero: "AUTO-NIF" }, { consejero_nombre: "Manual C3", nif_consejero: "MANUAL-NIF" }],
+  ])("Capa 3 prevalece sobre Capa 2 en duplicidad %s", (_label, capa2, capa3) => {
+    expect(mergeVariables(capa2, capa3)).toMatchObject(capa3);
   });
 });

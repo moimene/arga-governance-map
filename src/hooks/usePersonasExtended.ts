@@ -62,7 +62,7 @@ export function usePersonasConCapital(bodyId: string | undefined) {
       const { data, error } = await supabase
         .from("condiciones_persona")
         .select(
-          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, persons!inner(person_type, full_name, denomination, representative_person_id)"
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id!inner(person_type, full_name, denomination, representative_person_id)"
         )
         .eq("body_id", bodyId!)
         .order("tipo_condicion", { ascending: true });
@@ -75,7 +75,7 @@ export function usePersonasConCapital(bodyId: string | undefined) {
         fecha_inicio: string | null;
         fecha_fin: string | null;
         estado: string | null;
-        persons?: {
+        person?: {
           person_type?: string | null;
           full_name?: string | null;
           denomination?: string | null;
@@ -95,10 +95,10 @@ export function usePersonasConCapital(bodyId: string | undefined) {
         porcentaje_capital: null,
         tiene_derecho_voto: null,
         clase_accion: null,
-        representative_person_id: m.persons?.representative_person_id ?? null,
-        person_type: m.persons?.person_type ?? null,
-        denomination: m.persons?.denomination ?? null,
-        full_name: m.persons?.full_name ?? null,
+        representative_person_id: m.person?.representative_person_id ?? null,
+        person_type: m.person?.person_type ?? null,
+        denomination: m.person?.denomination ?? null,
+        full_name: m.person?.full_name ?? null,
       }));
     },
   });

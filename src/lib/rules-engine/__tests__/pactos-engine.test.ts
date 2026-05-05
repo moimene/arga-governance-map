@@ -204,19 +204,66 @@ describe('evaluarPactosParasociales — Combinados', () => {
     expect(out.pactos_incumplidos).toBe(1);
   });
 
-  it('tipos no implementados (TAG_ALONG) se ignoran silenciosamente', () => {
+  it('TAG_ALONG genera warning contractual sin bloquear la operación societaria', () => {
     const tagAlong: PactoParasocial = {
       id: 'tag-1',
       titulo: 'Tag Along',
       tipo_clausula: 'TAG_ALONG',
       firmantes: [],
-      materias_aplicables: ['FUSION'],
+      materias_aplicables: ['TRANSMISION_PARTICIPACIONES'],
       estado: 'VIGENTE',
     };
-    const out = evaluarPactosParasociales([tagAlong], makeInput());
+    const out = evaluarPactosParasociales(
+      [tagAlong],
+      makeInput({ materias: ['TRANSMISION_PARTICIPACIONES'] })
+    );
     expect(out.pacto_ok).toBe(true);
-    expect(out.resultados[0].aplica).toBe(false);
+    expect(out.resultados[0].aplica).toBe(true);
+    expect(out.resultados[0].severity).toBe('WARNING');
     expect(out.blocking_issues).toHaveLength(0);
+    expect(out.warnings[0]).toContain('PACTO ADVERTENCIA');
+  });
+
+  it('SINDICACION_VOTO genera warning si hay pacto activo, pero no invalida el acuerdo', () => {
+    const sindicacion: PactoParasocial = {
+      id: 'sind-1',
+      titulo: 'Sindicación de voto Fundación ARGA',
+      tipo_clausula: 'SINDICACION_VOTO',
+      firmantes: [{ nombre: 'Fundación ARGA', tipo: 'SOCIO', capital_pct: 69.69 }],
+      materias_aplicables: ['APROBACION_CUENTAS'],
+      estado: 'VIGENTE',
+    };
+
+    const out = evaluarPactosParasociales(
+      [sindicacion],
+      makeInput({ materias: ['APROBACION_CUENTAS'], votosFavor: 300, votosContra: 700 })
+    );
+
+    expect(out.pacto_ok).toBe(true);
+    expect(out.resultados[0].severity).toBe('WARNING');
+    expect(out.pactos_incumplidos).toBe(0);
+    expect(out.warnings[0]).toContain('sindicacion');
+  });
+
+  it('DRAG_ALONG en transmisión avisa sobre derechos contractuales sin bloquear', () => {
+    const dragAlong: PactoParasocial = {
+      id: 'drag-1',
+      titulo: 'Drag Along ARGA',
+      tipo_clausula: 'DRAG_ALONG',
+      firmantes: [],
+      materias_aplicables: ['TRANSMISION_PARTICIPACIONES'],
+      estado: 'VIGENTE',
+    };
+
+    const out = evaluarPactosParasociales(
+      [dragAlong],
+      makeInput({ materias: ['TRANSMISION_PARTICIPACIONES'] })
+    );
+
+    expect(out.pacto_ok).toBe(true);
+    expect(out.resultados[0].severity).toBe('WARNING');
+    expect(out.blocking_issues).toHaveLength(0);
+    expect(out.warnings[0]).toContain('arrastre');
   });
 
   it('blocking_issues usa formato exacto: PACTO INCUMPLIDO: <titulo> (<tipo>)', () => {

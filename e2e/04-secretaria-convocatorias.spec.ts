@@ -18,7 +18,7 @@ test.describe('Secretaría — Convocatorias', () => {
     await expect(page.getByRole('button', { name: 'Convocatoria DOCX' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Reunión operativa' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Programar reunión|Abrir reunión/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Programar reunión|Abrir reunión/ }).first()).toBeVisible();
   });
 
   test('stepper nueva convocatoria — paso 1 renderiza', async ({ page }) => {

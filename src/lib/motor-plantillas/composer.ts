@@ -22,6 +22,7 @@ import {
   type AgreementNormativeSnapshot,
 } from "@/lib/secretaria/normative-framework";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
+import type { ProcessDocumentTemplateCriteria } from "@/lib/doc-gen/process-documents";
 import {
   isOperationalTemplate,
   OPERATIONAL_TEMPLATE_QUERY_STATES,
@@ -135,6 +136,42 @@ function appendTraceFooter(
   return `${bodyText.trim()}${traceFooter(req, template, normativeSnapshot)}`;
 }
 
+function templateCriteriaForRequest(
+  req: SecretariaDocumentGenerationRequest,
+): ProcessDocumentTemplateCriteria {
+  return {
+    jurisdiction: null,
+    materia: null,
+    adoptionMode: req.expected_adoption_mode ?? null,
+    organoTipo: req.expected_organo_tipo ?? null,
+  };
+}
+
+function assertTemplateCompatibleWithRequest(
+  template: PlantillaProtegidaRow,
+  req: SecretariaDocumentGenerationRequest,
+): PlantillaProtegidaRow {
+  if (req.template_id && template.id !== req.template_id) {
+    throw new Error("La plantilla seleccionada no coincide con el template_id del request documental.");
+  }
+
+  const templateTypes = templateTypesForDocumentType(req.document_type);
+  const selected = selectProcessTemplate(
+    [template],
+    req.template_profile_id
+      ? [req.template_profile_id, ...templateTypes]
+      : templateTypes,
+    templateCriteriaForRequest(req),
+    req.template_id ?? template.id,
+  );
+
+  if (!selected || selected.id !== template.id) {
+    throw new Error("La plantilla seleccionada no es compatible con el tipo documental, órgano o modo de adopción.");
+  }
+
+  return template;
+}
+
 function withNormativeSnapshot(context: ResolverContext, snapshot?: AgreementNormativeSnapshot | null): ResolverContext {
   const compact = compactAgreementNormativeSnapshot(snapshot);
   if (!compact) return context;
@@ -181,30 +218,20 @@ async function loadTemplateByRequest(
   req: SecretariaDocumentGenerationRequest,
   options: ComposeDocumentOptions,
 ): Promise<PlantillaProtegidaRow> {
-  if (options.plantilla) return options.plantilla;
+  if (options.plantilla) return assertTemplateCompatibleWithRequest(options.plantilla, req);
 
   const templateTypes = templateTypesForDocumentType(req.document_type);
-  const criteria = {
-    jurisdiction: null,
-    materia: null,
-    adoptionMode: req.expected_adoption_mode ?? null,
-    organoTipo: req.expected_organo_tipo ?? null,
-  };
+  const criteria = templateCriteriaForRequest(req);
 
   if (options.plantillas) {
-    const byId = req.template_id
-      ? options.plantillas.find((template) => template.id === req.template_id)
-      : null;
-    const selected =
-      byId ??
-      selectProcessTemplate(
-        options.plantillas,
-        req.template_profile_id
-          ? [req.template_profile_id, ...templateTypes]
-          : templateTypes,
-        criteria,
-        req.template_id,
-      );
+    const selected = selectProcessTemplate(
+      options.plantillas,
+      req.template_profile_id
+        ? [req.template_profile_id, ...templateTypes]
+        : templateTypes,
+      criteria,
+      req.template_id,
+    );
     if (selected && isOperationalTemplate(selected)) return selected;
     throw new Error("No hay plantilla utilizable para el request documental.");
   }
@@ -218,7 +245,7 @@ async function loadTemplateByRequest(
       .maybeSingle();
     if (error) throw error;
     if (data && isOperationalTemplate(data as PlantillaProtegidaRow)) {
-      return data as PlantillaProtegidaRow;
+      return assertTemplateCompatibleWithRequest(data as PlantillaProtegidaRow, req);
     }
   }
 

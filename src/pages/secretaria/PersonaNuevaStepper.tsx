@@ -51,7 +51,7 @@ export default function PersonaNuevaStepper() {
 
   useEffect(() => {
     const raw = draft.tax_id.trim();
-    if (!raw) {
+    if (!raw || !tenantId) {
       setTaxIdConflict(null);
       setCheckingTaxId(false);
       return;
@@ -63,7 +63,7 @@ export default function PersonaNuevaStepper() {
         const { data: personMatch, error: pErr } = await supabase
           .from("persons")
           .select("id, full_name")
-          .eq("tenant_id", tenantId!)
+          .eq("tenant_id", tenantId)
           .eq("tax_id", raw)
           .abortSignal(controller.signal)
           .maybeSingle();
@@ -76,7 +76,7 @@ export default function PersonaNuevaStepper() {
         const { data: entityMatch, error: eErr } = await supabase
           .from("entities")
           .select("id, common_name, legal_name")
-          .eq("tenant_id", tenantId!)
+          .eq("tenant_id", tenantId)
           .eq("person_id", personMatch.id)
           .abortSignal(controller.signal)
           .maybeSingle();
@@ -108,7 +108,7 @@ export default function PersonaNuevaStepper() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [draft.tax_id]);
+  }, [draft.tax_id, tenantId]);
 
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));

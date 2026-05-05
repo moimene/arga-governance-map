@@ -41,6 +41,18 @@ const pack = (materia = "FUSION"): RulePack => ({
   postAcuerdo: {} as ReglaPostAcuerdo,
 });
 
+const packWithMajority = (materia: string, formula: string): RulePack => ({
+  ...pack(materia),
+  votacion: {
+    mayoria: {
+      SA: majority(formula),
+      SL: majority(formula),
+      CONSEJO: majority("mayoria_consejeros"),
+    },
+    abstenciones: "no_cuentan",
+  },
+});
+
 const pactoVeto: PactoParasocial = {
   id: "pacto-veto",
   titulo: "Veto Fundacion ARGA",
@@ -182,6 +194,35 @@ describe("buildMeetingAdoptionSnapshot", () => {
     expect(snapshot.vote_completeness.complete).toBe(true);
     expect(snapshot.vote_summary.conflict_excluded).toBe(40);
     expect(snapshot.vote_summary.voting_weight).toBe(60);
+    expect(snapshot.societary_validity.ok).toBe(true);
+  });
+
+  it("mantiene quórum de constitución aunque el conflicto reduzca el denominador de voto por punto", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 2,
+      resolutionText: "Operacion vinculada con quorum limitrofe",
+      materia: "OPERACION_VINCULADA",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [
+        { id: "socio-a", vote: "FAVOR", voting_weight: 12 },
+        { id: "socio-b", vote: "FAVOR", voting_weight: 1 },
+        { id: "socio-c", vote: "CONTRA", voting_weight: 11 },
+        { id: "socio-conflict", vote: "FAVOR", voting_weight: 2, conflict_flag: true, conflict_reason: "Operacion vinculada" },
+      ],
+      totalMiembros: 4,
+      capitalTotal: 100,
+      packs: [packWithMajority("OPERACION_VINCULADA", "favor > 1/2_capital_presente")],
+    });
+
+    expect(snapshot.voting_context.quorum_reached).toBe(true);
+    expect(snapshot.vote_summary.present_weight).toBe(26);
+    expect(snapshot.vote_summary.conflict_excluded).toBe(2);
+    expect(snapshot.vote_summary.voting_weight).toBe(24);
+    expect(snapshot.vote_summary.favor).toBe(13);
+    expect(snapshot.societary_validity.majority_reached).toBe(true);
     expect(snapshot.societary_validity.ok).toBe(true);
   });
 });

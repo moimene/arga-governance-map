@@ -36,7 +36,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: `bunx vite --host 127.0.0.1 --port ${port} --strictPort`,
+          command: `bunx --bun vite --host 127.0.0.1 --port ${port} --strictPort`,
           url: baseURL,
           reuseExistingServer,
           timeout: 60_000,

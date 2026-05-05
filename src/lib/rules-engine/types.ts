@@ -442,6 +442,8 @@ export interface ConstitucionInput {
   materiaClase: MateriaClase;
   capitalConDerechoVoto: number;
   capitalPresenteRepresentado: number;
+  esJuntaUniversal?: boolean;
+  aceptacionUnanimeCelebracion?: boolean;
   asistentesPresentes?: number;
   totalMiembros?: number;
   conflictos?: ConflictoInteres[];

@@ -115,6 +115,11 @@ export function evaluarPactosParasociales(
       case 'CONSENTIMIENTO_INVERSOR':
         result = evaluarConsentimientoInversor(pacto, input);
         break;
+      case 'TAG_ALONG':
+      case 'DRAG_ALONG':
+      case 'SINDICACION_VOTO':
+        result = evaluarPactoWarningOnly(pacto, input);
+        break;
       default:
         // Tipos no implementados en MVP (TAG_ALONG, etc.)
         result = {
@@ -162,6 +167,56 @@ export function evaluarPactosParasociales(
     explain,
     blocking_issues: blockingIssues,
     warnings,
+  };
+}
+
+// ─── Evaluador: pactos warning-only ─────────────────────────────────────────
+
+function evaluarPactoWarningOnly(
+  pacto: PactoParasocial,
+  input: PactosEvalInput
+): PactoEvalResult {
+  const fuente: Fuente = 'PACTO_PARASOCIAL';
+  const materiasCoincidentes = input.materias.filter(m =>
+    pacto.materias_aplicables.includes(m)
+  );
+
+  if (materiasCoincidentes.length === 0) {
+    return {
+      pacto_id: pacto.id,
+      pacto_titulo: pacto.titulo,
+      tipo: pacto.tipo_clausula,
+      aplica: false,
+      cumple: true,
+      severity: 'OK',
+      explain: {
+        regla: `pacto_${pacto.tipo_clausula.toLowerCase()}_no_aplica`,
+        fuente,
+        referencia: pacto.documento_ref,
+        resultado: 'OK',
+        mensaje: `Pacto ${pacto.tipo_clausula} no aplica a las materias del acuerdo.`,
+      },
+    };
+  }
+
+  const mensaje = pacto.tipo_clausula === 'SINDICACION_VOTO'
+    ? 'Pacto de sindicacion de voto activo: revisar sentido de voto; advertencia contractual sin bloqueo societario.'
+    : 'Pacto de arrastre/acompanamiento activo en transmision: revisar derechos contractuales; no bloquea el asiento societario.';
+
+  return {
+    pacto_id: pacto.id,
+    pacto_titulo: pacto.titulo,
+    tipo: pacto.tipo_clausula,
+    aplica: true,
+    cumple: true,
+    severity: 'WARNING',
+    explain: {
+      regla: `pacto_${pacto.tipo_clausula.toLowerCase()}_warning`,
+      fuente,
+      referencia: pacto.documento_ref,
+      resultado: 'WARNING',
+      mensaje: `${mensaje} Materias afectadas: ${materiasCoincidentes.join(', ')}.`,
+    },
   };
 }
 

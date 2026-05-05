@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { renderTemplate } from '@/lib/doc-gen/template-renderer';
 import { evaluarCoAprobacion, evaluarSolidario } from '../votacion-engine';
 import type { CoAprobacionConfig, SolidarioConfig } from '../types';
 
@@ -99,6 +100,30 @@ describe('evaluarCoAprobacion', () => {
     expect(result.ok).toBe(false);
     expect(result.blocking_issues).toContain('co_aprobacion_firmas_duplicadas');
   });
+
+  it('administradores mancomunados k=n exigen firma de todos los administradores conjuntos', () => {
+    const config = makeCoAprobConfig({
+      k: 2,
+      n: 2,
+      firmas: [{ adminId: 'admin-1', fechaFirma: '2026-04-20T10:00:00Z', hashDocumento: 'h1' }],
+    });
+    const result = evaluarCoAprobacion(config, ADMIN_VIGENTES, FECHA_ACUERDO);
+
+    expect(result.ok).toBe(false);
+    expect(result.blocking_issues).toContain('co_aprobacion_firmas_insuficientes');
+  });
+
+  it('acta de co-aprobación puede reflejar ambas firmas QTSP como input estable', () => {
+    const rendered = renderTemplate({
+      template: 'ACTA_DECISION_CONJUNTA\nFirmas QTSP: {{firma1}} y {{firma2}}. QTSP: EAD Trust.',
+      variables: { firma1: 'QES-admin-1', firma2: 'QES-admin-2' },
+    });
+
+    expect(rendered.ok).toBe(true);
+    expect(rendered.text).toContain('QES-admin-1');
+    expect(rendered.text).toContain('QES-admin-2');
+    expect(rendered.text).toContain('EAD Trust');
+  });
 });
 
 // ─── SOLIDARIO ───────────────────────────────────────────────────────────────
@@ -146,5 +171,19 @@ describe('evaluarSolidario', () => {
     // materia=DELEGACION_FACULTADES → no restricted
     const result = evaluarSolidario(config, ADMIN_VIGENTES, 'DELEGACION_FACULTADES', FECHA_ACUERDO);
     expect(result.ok).toBe(true);
+  });
+
+  it('adopción SOLIDARIO permite actuación individual y documenta administrador actuante', () => {
+    const result = evaluarSolidario(makeSolidarioConfig({ adminActuante: 'admin-solid-1' }), ADMIN_VIGENTES, 'APROBACION_OPERACION', FECHA_ACUERDO);
+    const rendered = renderTemplate({
+      template: 'ACTA_ORGANO_ADMIN\nAdministrador actuante: {{adminActuante}}.\nCertificación: {{certificacion}}.',
+      variables: {
+        adminActuante: 'admin-solid-1',
+        certificacion: `Certifica acuerdo adoptado por ${result.ok ? 'admin-solid-1' : 'NO_VALIDO'}`,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(rendered.text).toContain('admin-solid-1');
   });
 });

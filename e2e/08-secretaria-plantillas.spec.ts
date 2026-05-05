@@ -15,10 +15,7 @@ test.describe('Plantillas', () => {
     await page.goto('/secretaria/plantillas');
     await page.getByText('Modelos de acuerdo').click();
     await expect(
-      page.getByText('APROBACION_CUENTAS')
-        .or(page.getByText('NOMBRAMIENTO_CONSEJERO'))
-        .or(page.getByText('MODELO_ACUERDO'))
-        .first()
+      page.getByRole('row', { name: /APROBACION|NOMBRAMIENTO|FUSION|COMITES/i }).first()
     ).toBeVisible({ timeout: 10_000 });
   });
 

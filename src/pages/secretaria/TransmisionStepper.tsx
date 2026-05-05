@@ -7,6 +7,7 @@ import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useTenantContext } from "@/context/TenantContext";
+import { isMissingSupabaseRpcError } from "@/lib/secretaria/supabase-rpc-fallback";
 
 interface Draft {
   source_holding_id: string;
@@ -62,6 +63,25 @@ export default function TransmisionStepper() {
       const pctOrigen = sourceHolding.porcentaje_capital ?? 0;
       const pctATransmitir = titulosOrigen > 0 ? (pctOrigen * titulosATransmitir) / titulosOrigen : 0;
       const today = draft.effective_from;
+
+      const { error: rpcError } = await supabase.rpc("fn_registrar_transmision_capital", {
+        p_tenant_id: tenantId!,
+        p_source_holding_id: sourceHolding.id,
+        p_destination_person_id: draft.destino_person_id,
+        p_titles_to_transfer: titulosATransmitir,
+        p_effective_date: today,
+        p_agreement_id: null,
+        p_support_doc_ref: null,
+        p_notas: draft.motivo || "transmision_inter_vivos",
+      });
+      if (!rpcError) {
+        toast.success("Transmisión registrada correctamente");
+        navigate(`/secretaria/sociedades/${entityId}`);
+        return;
+      }
+      if (!isMissingSupabaseRpcError(rpcError)) {
+        throw rpcError;
+      }
 
       // 1) Cerrar la holding de origen (effective_to = today)
       const { error: closeErr } = await supabase

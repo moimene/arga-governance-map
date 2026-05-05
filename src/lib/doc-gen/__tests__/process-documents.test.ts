@@ -234,10 +234,22 @@ describe("process-documents", () => {
       ["ACTA_ACUERDO_ESCRITO"],
       { jurisdiction: "ES", adoptionMode: "NO_SESSION" },
     );
+    const coAprobacion = selectProcessTemplate(
+      LEGAL_TEAM_TEMPLATE_FIXTURES,
+      ["ACTA_DECISION_CONJUNTA"],
+      { jurisdiction: "ES", adoptionMode: "CO_APROBACION" },
+    );
+    const solidario = selectProcessTemplate(
+      LEGAL_TEAM_TEMPLATE_FIXTURES,
+      ["ACTA_ORGANO_ADMIN"],
+      { jurisdiction: "ES", adoptionMode: "SOLIDARIO" },
+    );
 
     expect(socioUnico?.id).toBe("legal-fixture-acta-consignacion-socio-unico-es");
     expect(adminUnico?.id).toBe("legal-fixture-acta-consignacion-admin-unico-es");
     expect(noSession?.id).toBe("legal-fixture-acta-acuerdo-escrito-sin-sesion-es");
+    expect(coAprobacion?.id).toBe("legal-fixture-acta-decision-conjunta-es");
+    expect(solidario?.id).toBe("legal-fixture-acta-organo-admin-solidario-es");
   });
 
   it("prioriza fixtures registrales especificos frente a informes PRE genericos", () => {

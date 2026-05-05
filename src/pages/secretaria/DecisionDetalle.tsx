@@ -135,7 +135,7 @@ export default function DecisionDetalle() {
             title: `Decisión unipersonal: ${d.title}`,
             subtitle: entity,
             entityName: entity,
-            templateTypes: ["ACTA_CONSIGNACION", "ACTA_ACUERDO_ESCRITO", "MODELO_ACUERDO"],
+            templateTypes: ["ACTA_CONSIGNACION"],
             variables: {
               ...docVariables,
               agreement_id: linkedAgreement?.id ?? "",

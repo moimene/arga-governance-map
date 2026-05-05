@@ -16,6 +16,19 @@ import type {
 } from './types';
 import { resolverReglaEfectiva } from './jerarquia-normativa';
 
+type NumericQuorumKey = 'SA_1a' | 'SA_2a' | 'SL';
+
+function resolvePackQuorum(packs: RulePack[], key: NumericQuorumKey) {
+  const candidates = packs
+    .map((pack) => pack.constitucion?.quorum?.[key])
+    .filter((param): param is NonNullable<RulePack['constitucion']['quorum'][NumericQuorumKey]> =>
+      typeof param?.valor === 'number',
+    );
+
+  if (candidates.length === 0) return null;
+  return candidates.reduce((max, current) => current.valor > max.valor ? current : max);
+}
+
 /**
  * evaluarConstitucion — Assess quorum requirements and verify meeting is properly constituted
  *
@@ -65,6 +78,47 @@ export function evaluarConstitucion(
       quorumRequerido: 0,
       quorumPresente: 0,
       quorumCubierto: true,
+    };
+  }
+
+  // ================================================================
+  // Gate 1b: Junta universal — art. 178 LSC
+  // ================================================================
+  if (input.esJuntaUniversal === true || input.adoptionMode === 'UNIVERSAL') {
+    const universal = validarCapitalUniversal(
+      input.capitalPresenteRepresentado,
+      input.capitalConDerechoVoto
+    );
+    const aceptacionUnanime = input.aceptacionUnanimeCelebracion === true;
+    const ok = universal.ok && aceptacionUnanime;
+
+    const gateNode: ExplainNode = {
+      regla: 'Gate: Junta universal',
+      fuente: 'LEY',
+      referencia: 'art. 178 LSC',
+      umbral: 100,
+      valor: universal.pctPresente,
+      resultado: ok ? 'OK' : 'BLOCKING',
+      mensaje: ok
+        ? 'Junta universal valida: 100% del capital presente y aceptacion unanime de la celebracion. Se omiten umbrales de primera/segunda convocatoria.'
+        : `Junta universal no valida: ${universal.mensaje} Aceptacion unanime: ${aceptacionUnanime ? 'si' : 'no'}.`,
+    };
+    explainNodes.push(gateNode);
+
+    if (!universal.ok) blockingIssues.push('universal_capital_not_full');
+    if (!aceptacionUnanime) blockingIssues.push('universal_acceptance_missing');
+    severity = ok ? 'OK' : 'BLOCKING';
+
+    return {
+      etapa: 'CONSTITUCION',
+      ok,
+      severity,
+      explain: explainNodes,
+      blocking_issues: blockingIssues,
+      warnings,
+      quorumRequerido: 1,
+      quorumPresente: universal.pctPresente / 100,
+      quorumCubierto: ok,
     };
   }
 
@@ -159,11 +213,27 @@ export function evaluarConstitucion(
       : 0.25; // SA 2a ESPECIAL: 25%
 
     requiredQuorum = quorumPct;
-    quorumReferencia = `art. 189 LSC (SA ${input.primeraConvocatoria ? '1a' : '2a'} ${determineMateriaClase})`;
+    quorumReferencia = determineMateriaClase === 'ORDINARIA'
+      ? `art. 193 LSC (SA ${input.primeraConvocatoria ? '1a' : '2a'} ordinaria)`
+      : `art. 194 LSC (SA ${input.primeraConvocatoria ? '1a' : '2a'} materia cualificada)`;
+
+    const packQuorum = resolvePackQuorum(matchedPacks, input.primeraConvocatoria ? 'SA_1a' : 'SA_2a');
+    if (packQuorum && packQuorum.valor > requiredQuorum) {
+      requiredQuorum = packQuorum.valor;
+      quorumFuente = packQuorum.fuente;
+      quorumReferencia = packQuorum.referencia ?? quorumReferencia;
+    }
   } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
     // SL: typically 0 (sin quórum legal) unless override
     requiredQuorum = 0;
     quorumReferencia = 'art. 201 LSC (SL)';
+
+    const packQuorum = resolvePackQuorum(matchedPacks, 'SL');
+    if (packQuorum && packQuorum.valor > requiredQuorum) {
+      requiredQuorum = packQuorum.valor;
+      quorumFuente = packQuorum.fuente;
+      quorumReferencia = packQuorum.referencia ?? quorumReferencia;
+    }
   }
 
   // ================================================================

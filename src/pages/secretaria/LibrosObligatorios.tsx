@@ -21,7 +21,7 @@ const LEG_STATUS_TONE: Record<string, string> = {
 const LEG_STATUS_FILTERS = [
   { value: "", label: "Todos los estados" },
   { value: "PENDIENTE", label: "Pendientes" },
-  { value: "PRESENTADO", label: "Presentados" },
+  { value: "PRESENTADO", label: "Preparados para legalización" },
   { value: "LEGALIZADO", label: "Legalizados" },
   { value: "RECHAZADO", label: "Rechazados" },
 ];

@@ -71,6 +71,20 @@ describe("template-routing", () => {
         adoption_mode: "NO_SESSION",
       }),
     );
+    const coAprobacion = getTemplateUsageTarget(
+      template({
+        id: "acta-conjunta",
+        tipo: "ACTA_DECISION_CONJUNTA",
+        adoption_mode: "CO_APROBACION",
+      }),
+    );
+    const solidario = getTemplateUsageTarget(
+      template({
+        id: "acta-solidario",
+        tipo: "ACTA_ORGANO_ADMIN",
+        adoption_mode: "SOLIDARIO",
+      }),
+    );
     const meeting = getTemplateUsageTarget(
       template({
         id: "acta-sesion",
@@ -80,7 +94,9 @@ describe("template-routing", () => {
     );
 
     expect(unipersonal.to).toBe("/secretaria/decisiones-unipersonales?plantilla=acta-socio-unico&tipo=ACTA_CONSIGNACION");
-    expect(noSession.to).toBe("/secretaria/acuerdos-sin-sesion?plantilla=acta-escrita&tipo=ACTA_ACUERDO_ESCRITO");
+    expect(noSession.to).toBe("/secretaria/acuerdos-sin-sesion/nuevo?plantilla=acta-escrita&tipo=ACTA_ACUERDO_ESCRITO");
+    expect(coAprobacion.to).toBe("/secretaria/acuerdos-sin-sesion/co-aprobacion?plantilla=acta-conjunta&tipo=ACTA_DECISION_CONJUNTA");
+    expect(solidario.to).toBe("/secretaria/acuerdos-sin-sesion/solidario?plantilla=acta-solidario&tipo=ACTA_ORGANO_ADMIN");
     expect(meeting.to).toBe("/secretaria/actas?plantilla=acta-sesion&tipo=ACTA_SESION");
   });
 

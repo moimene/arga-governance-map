@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAgreementNormativeSnapshot,
   buildEntityNormativeProfile,
+  compactAgreementNormativeSnapshot,
   normalizeSocietyFormForNormative,
   normalizeSocietyFormForRuleSet,
 } from "../normative-framework";
@@ -151,5 +152,111 @@ describe("secretaria normative framework", () => {
       expect.arrayContaining(["CERTIFICACION", "ESCRITURA_PUBLICA", "INSCRIPCION_REGISTRAL", "EVIDENCIA_QTSP"]),
     );
     expect(snapshot.rule_trace.meeting_ruleset_snapshot_id).toBe("ruleset-snapshot-1");
+  });
+
+  it("snapshot compacto conserva perfil normativo completo y no cambia si luego cambian overrides", () => {
+    const baseProfile = buildEntityNormativeProfile({
+      tenantId: "tenant-1",
+      entity,
+      now: "2026-05-04T09:00:00.000Z",
+      jurisdictionRuleSets: [
+        {
+          id: "jrs-es-sa",
+          jurisdiction: "ES",
+          company_form: "SA",
+          rule_set_version: "2026.05",
+          legal_reference: "LSC",
+          name: "Ley de Sociedades de Capital",
+          is_active: true,
+        },
+      ],
+      rulePacks: [
+        {
+          id: "rpv-capital",
+          rule_pack_id: "AUMENTO_CAPITAL",
+          version_tag: "1.0.0",
+          status: "ACTIVE",
+          materia: "AUMENTO_CAPITAL",
+        },
+      ],
+      overrides: [
+        {
+          id: "ov-quorum-60",
+          fuente: "ESTATUTOS",
+          materia: "AUMENTO_CAPITAL",
+          clave: "constitucion.quorum.SA_1a",
+          referencia: "art. 18 estatutos ARGA",
+        },
+      ],
+      pactos: [
+        {
+          id: "pacto-fundacion-arga",
+          titulo: "Pacto Fundación ARGA",
+          tipo_clausula: "VETO",
+          materias_aplicables: ["AUMENTO_CAPITAL"],
+          estado: "VIGENTE",
+        },
+      ],
+    });
+
+    const frozenSnapshot = buildAgreementNormativeSnapshot({
+      profile: baseProfile,
+      now: "2026-05-04T10:00:00.000Z",
+      agreement: {
+        id: "agreement-capital-1",
+        entity_id: entity.id,
+        agreement_kind: "AUMENTO_CAPITAL",
+        matter_class: "ESTATUTARIA",
+        adoption_mode: "MEETING",
+        status: "ADOPTED",
+        inscribable: true,
+      },
+    });
+
+    const changedProfile = buildEntityNormativeProfile({
+      tenantId: "tenant-1",
+      entity,
+      now: "2026-05-04T11:00:00.000Z",
+      jurisdictionRuleSets: [
+        {
+          id: "jrs-es-sa",
+          jurisdiction: "ES",
+          company_form: "SA",
+          rule_set_version: "2026.05",
+          legal_reference: "LSC",
+          name: "Ley de Sociedades de Capital",
+          is_active: true,
+        },
+      ],
+      rulePacks: [],
+      overrides: [
+        {
+          id: "ov-quorum-70",
+          fuente: "ESTATUTOS",
+          materia: "AUMENTO_CAPITAL",
+          clave: "constitucion.quorum.SA_1a",
+          referencia: "art. 18 estatutos ARGA reformado",
+        },
+      ],
+      pactos: [],
+    });
+
+    const compact = compactAgreementNormativeSnapshot(frozenSnapshot);
+
+    expect(compact).toMatchObject({
+      entity_id: entity.id,
+      agreement_id: "agreement-capital-1",
+      agreement_kind: "AUMENTO_CAPITAL",
+      matter_class: "ESTATUTARIA",
+      adoption_mode: "MEETING",
+      framework_status: "COMPLETO",
+    });
+    expect(compact?.source_layers).toEqual(
+      expect.arrayContaining(["LEY", "REGISTRO", "ESTATUTOS", "PACTO_PARASOCIAL", "POLITICA", "SISTEMA"]),
+    );
+    expect(frozenSnapshot.profile_hash).toBe(baseProfile.profile_hash);
+    expect(frozenSnapshot.profile_hash).not.toBe(changedProfile.profile_hash);
+    expect(frozenSnapshot.rule_trace.override_ids).toEqual(["ov-quorum-60"]);
+    expect(frozenSnapshot.rule_trace.pacto_ids).toEqual(["pacto-fundacion-arga"]);
   });
 });

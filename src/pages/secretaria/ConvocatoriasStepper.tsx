@@ -15,7 +15,7 @@ import { useCreateConvocatoria, type AgendaItem } from "@/hooks/useConvocatorias
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
-import { validateCapa3 } from "@/components/secretaria/Capa3Form";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
 import { buildConvocatoriaNoticeDoubleEvaluation } from "@/lib/secretaria/dual-evaluation";
@@ -794,7 +794,7 @@ export default function ConvocatoriasStepper() {
         publication_channels: channels,
         agenda_items: agendaItems
           .filter((i) => i.titulo.trim().length > 0)
-          .map(({ titulo, tipo, inscribible }) => ({ titulo, tipo, inscribible })),
+          .map(({ titulo, materia, tipo, inscribible }) => ({ titulo, materia, tipo, inscribible })),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
         ...buildConvocatoriaTrace(),
       });

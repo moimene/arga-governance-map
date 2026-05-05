@@ -26,6 +26,7 @@ export interface MajorityResult {
  * - "favor >= 2/3_emitidos" — 2/3 of votes cast
  * - "favor > 1/2_emitidos" — absolute majority of votes cast
  * - "favor > 1/2_capital_presente" — majority of present capital
+ * - "favor >= 2/3_capital_presente" — 2/3 of present/concurrent capital
  * - "favor >= 2/3_capital" — 2/3 of total capital
  * - "mayoria_consejeros" — favor > total_miembros/2
  *
@@ -169,6 +170,16 @@ function evaluateFormula(
     const requerido = capital_presente / 2;
     return {
       alcanzada: favor > requerido,
+      valorRequerido: requerido,
+      valorObtenido: favor,
+    };
+  }
+
+  // 2/3 of present/concurrent capital
+  if (formula === 'favor >= 2/3_capital_presente') {
+    const requerido = (2 * capital_presente) / 3;
+    return {
+      alcanzada: favor >= requerido,
       valorRequerido: requerido,
       valorObtenido: favor,
     };

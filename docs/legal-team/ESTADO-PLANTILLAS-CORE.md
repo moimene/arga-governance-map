@@ -1,6 +1,6 @@
 # Estado plantillas societarias TGMS — fuente única de verdad
 
-> **Última actualización:** 2026-05-03
+> **Última actualización:** 2026-05-04
 > **Cliente demo:** Grupo ARGA Seguros (pseudónimo)
 > **Estado de evidencia:** demo / operativa
 >
@@ -10,7 +10,7 @@
 
 ## Resumen en una frase
 
-**Tenemos 37 plantillas operativas en demo, cubriendo 14 categorías de documento societario español; 20 ya firmadas formalmente por Comité Legal ARGA, 17 en revisión legal con Garrigues (ventana 3 semanas), sin huecos críticos para el demo.**
+**Tenemos 37 plantillas operativas en demo, cubriendo 14 categorías de documento societario español; las 37 quedan cerradas en Cloud para uso demo-operativo, con 0 plantillas ACTIVAS sin firma, 0 versiones no semver y 0 MODELO_ACUERDO activo con metadatos jurídicos nulos.**
 
 ---
 
@@ -95,27 +95,32 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 | 19 | MODELO_ACUERDO / ACTIVOS_ESENCIALES | (resolver UUID) | 1.0.0 | ✅ | Núcleo estable, sin upgrade pendiente |
 | 20 | MODELO_ACUERDO / AUTORIZACION_GARANTIA | (resolver UUID) | 1.0.0 | ✅ | Núcleo estable, sin upgrade pendiente |
 
-### 2.8. Modelos de acuerdo SIN firmar — en revisión Garrigues (17)
+### 2.8. Modelos de acuerdo cerrados en Fase 4 (17)
 
-| # | Plantilla | UUID Cloud | Versión actual → al firmar | Prioridad |
+| # | Plantilla | UUID Cloud | Versión cerrada | Estado |
 |---|---|---|---|---|
-| 21 | MODELO_ACUERDO / APROBACION_PLAN_NEGOCIO | `68da89bc-03cd-4820-80f1-8a549b0c7d78` | 0.1.0 → 1.0.0 | Media |
-| 22 | MODELO_ACUERDO / AUMENTO_CAPITAL | `2d814072-3fb0-4ffd-a181-875d9c4a5c0d` | 0.1.0 → 1.0.0 | Alta |
-| 23 | MODELO_ACUERDO / CESE_CONSEJERO (Consejo) | `ba214d42-1933-497f-a2c0-0867c7c7a55f` | 1.0.0 → 1.1.0 | Media |
-| 24 | MODELO_ACUERDO / CESE_CONSEJERO (Junta) | `433da411-ba65-410c-8375-24db637f7e75` | 1.0.0 → 1.1.0 | Media |
-| 25 | MODELO_ACUERDO / COMITES_INTERNOS | `313e7609-8b11-4ef5-a8fd-e9fdcf99d22c` | "1" → 1.0.0 | Alta — completar metadatos |
-| 26 | MODELO_ACUERDO / DISTRIBUCION_CARGOS | `a09cc4bf-c927-470a-b392-43d2db424279` | "1" → 1.0.0 | Alta — completar metadatos |
-| 27 | MODELO_ACUERDO / DISTRIBUCION_DIVIDENDOS | `395ca996-fdf0-4203-b7ae-f894d3012c8b` | 0.1.0 → 1.0.0 | Media |
-| 28 | MODELO_ACUERDO / **FUSION_ESCISION** | `e3697ad9-e0c2-4baf-9144-c80a11808c07` | "1" → 1.0.0 | **CRÍTICA — actualizar a RDL 5/2023** |
-| 29 | MODELO_ACUERDO / MODIFICACION_ESTATUTOS | `29739424-5641-42bd-8b5a-58f81ee5c471` | 0.1.0 → 1.0.0 | Alta |
-| 30 | MODELO_ACUERDO / NOMBRAMIENTO_AUDITOR | `e64ce755-9e76-4b57-8fb7-750afb94857c` | 0.1.0 → 1.0.0 | Media |
-| 31 | MODELO_ACUERDO / NOMBRAMIENTO_CONSEJERO (Consejo) | `27be9063-8977-44c7-b72c-eb26ecb3c49b` | 1.0.0 → 1.1.0 | Media |
-| 32 | MODELO_ACUERDO / NOMBRAMIENTO_CONSEJERO (Junta) | `10f90d59-39d3-4633-83ff-81140eff50d5` | 1.0.0 → 1.1.0 | Media |
-| 33 | MODELO_ACUERDO / POLITICA_REMUNERACION | `ee72efde-299b-42fc-86ba-57e29a187a7c` | "1" → 1.0.0 | Alta — completar metadatos |
-| 34 | MODELO_ACUERDO / POLITICAS_CORPORATIVAS | `b846bb03-9329-4470-840b-30d614adc613` | "1" → 1.0.0 | Alta — completar metadatos |
-| 35 | MODELO_ACUERDO / **RATIFICACION_ACTOS** | `edd5c389-0187-476c-9592-c020058fdc69` | 0.1.0 → 1.0.0 | **CRÍTICA — riesgo nulidad** |
-| 36 | MODELO_ACUERDO / REDUCCION_CAPITAL | `c06957aa-ce9d-4560-9d4e-501756ed5e4f` | 0.1.0 → 1.0.0 | Alta |
-| 37 | MODELO_ACUERDO / **SEGUROS_RESPONSABILIDAD** | `df75cda9-e558-43c7-a6a9-902e2c06ee97` | "1" → 1.0.0 | **CRÍTICA — conflicto intra-grupo ARGA** |
+| 21 | MODELO_ACUERDO / APROBACION_PLAN_NEGOCIO | `68da89bc-03cd-4820-80f1-8a549b0c7d78` | 1.0.0 | ✅ Cerrada demo-operativa |
+| 22 | MODELO_ACUERDO / AUMENTO_CAPITAL | `2d814072-3fb0-4ffd-a181-875d9c4a5c0d` | 1.0.0 | ✅ Cerrada demo-operativa |
+| 23 | MODELO_ACUERDO / CESE_CONSEJERO (Consejo) | `ba214d42-1933-497f-a2c0-0867c7c7a55f` | 1.1.0 | ✅ Cerrada demo-operativa |
+| 24 | MODELO_ACUERDO / CESE_CONSEJERO (Junta) | `433da411-ba65-410c-8375-24db637f7e75` | 1.1.0 | ✅ Cerrada demo-operativa |
+| 25 | MODELO_ACUERDO / COMITES_INTERNOS | `313e7609-8b11-4ef5-a8fd-e9fdcf99d22c` | 1.0.0 | ✅ Metadatos completos |
+| 26 | MODELO_ACUERDO / DISTRIBUCION_CARGOS | `a09cc4bf-c927-470a-b392-43d2db424279` | 1.0.0 | ✅ Metadatos completos |
+| 27 | MODELO_ACUERDO / DISTRIBUCION_DIVIDENDOS | `395ca996-fdf0-4203-b7ae-f894d3012c8b` | 1.0.0 | ✅ Cerrada demo-operativa |
+| 28 | MODELO_ACUERDO / **FUSION_ESCISION** | `e3697ad9-e0c2-4baf-9144-c80a11808c07` | 1.0.0 | ✅ RDL 5/2023 + condicional experto |
+| 29 | MODELO_ACUERDO / MODIFICACION_ESTATUTOS | `29739424-5641-42bd-8b5a-58f81ee5c471` | 1.0.0 | ✅ Cerrada demo-operativa |
+| 30 | MODELO_ACUERDO / NOMBRAMIENTO_AUDITOR | `e64ce755-9e76-4b57-8fb7-750afb94857c` | 1.0.0 | ✅ Rango Capa 3 auditor |
+| 31 | MODELO_ACUERDO / NOMBRAMIENTO_CONSEJERO (Consejo) | `27be9063-8977-44c7-b72c-eb26ecb3c49b` | 1.1.0 | ✅ Cooptación SA cubierta |
+| 32 | MODELO_ACUERDO / NOMBRAMIENTO_CONSEJERO (Junta) | `10f90d59-39d3-4633-83ff-81140eff50d5` | 1.1.0 | ✅ Plazo mandato cubierto |
+| 33 | MODELO_ACUERDO / POLITICA_REMUNERACION | `ee72efde-299b-42fc-86ba-57e29a187a7c` | 1.0.0 | ✅ Metadatos + tipo numérico |
+| 34 | MODELO_ACUERDO / POLITICAS_CORPORATIVAS | `b846bb03-9329-4470-840b-30d614adc613` | 1.0.0 | ✅ Metadatos completos |
+| 35 | MODELO_ACUERDO / **RATIFICACION_ACTOS** | `edd5c389-0187-476c-9592-c020058fdc69` | 1.0.0 | ✅ Listado de actos obligatorio |
+| 36 | MODELO_ACUERDO / REDUCCION_CAPITAL | `c06957aa-ce9d-4560-9d4e-501756ed5e4f` | 1.0.0 | ✅ Oposición acreedores cubierta |
+| 37 | MODELO_ACUERDO / **SEGUROS_RESPONSABILIDAD** | `df75cda9-e558-43c7-a6a9-902e2c06ee97` | 1.0.0 | ✅ Conflicto intra-grupo cubierto |
+
+**Aplicación Cloud:** `scripts/close-legacy-templates-phase4.ts --apply`, 17/17 filas actualizadas, sin migraciones y sin crear versiones nuevas.
+**Aprobador registrado:** `Comite Legal Garrigues - Secretaria Societaria (demo-operativo)`.
+**Límite:** cierre válido para demo-operativa; antes de producción debe sustituirse por firma nominal profesional si el Comité lo exige.
+**Informes Garrigues recibidos:** `Cierre_Legal_De_Plantillas_Críticas_TGMS.docx` cerró inicialmente `FUSION_ESCISION`; el entregable completo `ENTREGABLE_COMPLETO_CIERRE_LEGAL_17_PLANTILLAS_LEGACY_PATH_A.docx` cierra Path A para las 17 legacy. Addenda trazados en `2026-05-04-cierre-garrigues-fusion-escision.md` y `2026-05-04-cierre-garrigues-path-a-17-plantillas.md`.
 
 ---
 
@@ -125,10 +130,10 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 
 **Quién:** Comité Legal Garrigues — Secretaría Societaria
 **Qué:** Revisar contenido + completar metadatos null + firmar formalmente las 17 plantillas
-**Prioridad interna:** las 3 críticas (FUSION_ESCISION, RATIFICACION_ACTOS, SEGUROS_RESPONSABILIDAD) en semana 1
-**Material de trabajo:** carpeta `plantillas-core-revision-2026-05-02/` con 17 fichas individuales
-**Plazo:** 3 semanas desde apertura del Harvey Space
-**Estado actual:** Comité no ha empezado todavía. Esperando creación del Space + invitación.
+**Prioridad interna:** ya ejecutada en demo-operativa para las 3 críticas (FUSION_ESCISION, RATIFICACION_ACTOS, SEGUROS_RESPONSABILIDAD)
+**Material de trabajo:** carpeta `plantillas-core-revision-2026-05-02/` queda como anexo histórico; el cierre ejecutado está trazado en `scripts/close-legacy-templates-phase4.ts`; el entregable completo Garrigues recibido el 2026-05-04 cubre las 17 legacy y está resumido en `2026-05-04-cierre-garrigues-path-a-17-plantillas.md`
+**Plazo:** cerrado el 2026-05-04 para demo-operativa
+**Estado actual:** Cerrado en Cloud. Probe: 0 ACTIVAS sin firma, 0 versiones no semver, 0 MODELO_ACUERDO activo con metadatos nulos. Para producción, queda pendiente únicamente sustituir la firma demo-operativa por firma nominal profesional si el Comité Legal lo exige.
 
 ### Track 2 — Path B: aplicar 16 mejoras como nueva versión (Garrigues + Ingeniería)
 
@@ -143,7 +148,7 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 **Material de trabajo:** `2026-05-02-bloque-B-revision-castellano.md` (lo que el Comité abre)
 **Anexo técnico:** `sql-drafts/2026-05-02-plantillas-core-v2-mejoras.sql` (para ingeniería tras decisión)
 **Plazo:** 1 semana de revisión legal, ejecución posterior
-**Estado actual:** SQL packet preparado, no aplicado, esperando autorización legal
+**Estado actual:** autorizado y aplicado el 2026-05-04 como 16 nuevas filas `BORRADOR` mediante `scripts/apply-path-b-templates.ts --apply`. No se archivó ni promovió ninguna versión `ACTIVA`; la promoción `BORRADOR → ACTIVA` queda como paso separado con visto bueno operativo.
 
 ### Track 3 — Sprint B Motor v1 + Composer (Ingeniería, conversación nueva)
 
@@ -167,11 +172,11 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 |---|---|---|
 | 2 plantillas registrales (DOCUMENTO_REGISTRAL, SUBSANACION_REGISTRAL) | Categoría adicional para envío al Registro Mercantil | **Módulo opcional futuro**. Demo termina en `PROMOTED` (preparado para Registro), no envía |
 | INFORME_GESTION con Capa 3 vacía | Gap menor en plantilla activa | Backlog. No bloquea demo |
-| Cleanups técnicos (5 plantillas con `ENTIDAD` literal, 2 con vars sobrantes, 4 con duplicidad C2/C3) | No críticos | Limpiar al firmar Path A si el Comité lo hace; opcional |
-| Promoción de las 16 mejoras Path B de BORRADOR a ACTIVA | Operativa post-aplicación | Paquete separado con visto bueno legal explícito tras aplicar |
+| Cleanups técnicos Fase 4 | No críticos | Fuentes y duplicidades quedan cubiertas por resolver + tests; Capa 3 se normalizó en las 17 filas cerradas |
+| Promoción de las 16 mejoras Path B de BORRADOR a ACTIVA | Operativa post-aplicación | Las 16 filas `BORRADOR` ya existen; requiere visto bueno operativo explícito para archivar versiones anteriores y promover nuevas |
 | 8 duplicados ACTIVE en `rule_pack_versions` | Heredado del cierre Secretaría previo | Requiere credencial admin Cloud |
 
-**Cero gaps críticos para demo end-to-end** una vez Tracks 1, 2 y 3 cierren.
+**Cero gaps críticos para demo end-to-end** respecto al núcleo de plantillas activas. Path B sigue siendo mejora versionada, no bloqueante.
 
 ---
 
@@ -179,12 +184,11 @@ Lo que **NO** cubrimos por diseño (módulo opcional futuro):
 
 | Semana | Hito |
 |---|---|
-| **S0 (ahora)** | Crear Harvey Space, ejecutar View As Collaborator, invitar Comité con ZIP |
-| **S1** | Garrigues: 3 críticas Path A + decisión Path B. Ingeniería: arrancar Sprint B (consolidación API motor) |
-| **S2** | Garrigues: metadatos null Path A + materia substantiva Path A. Ingeniería: composer + post-render validation |
-| **S3** | Garrigues: cierre rutinario Path A + snapshot final. Ingeniería: refactor stepper + panel revisión |
-| **S4** | Garrigues: entrega ZIP firmas. Ingeniería: aplicar UPDATEs Path A + INSERTs Path B + promoción a ACTIVA |
-| **S5** | Probe final Cloud: `SELECT COUNT(*) WHERE estado='ACTIVA' AND aprobada_por IS NULL` debe ser 0. Núcleo cerrado. |
+| **S0 (2026-05-04)** | Path A aplicado sobre Cloud como cierre demo-operativo. Probe final: 0 pendientes. |
+| **S1 (2026-05-04)** | Path B autorizado y aplicado como 16 nuevas versiones `BORRADOR`; sin promoción automática. |
+| **S2** | Decidir promoción operativa Path B: archivar versiones anteriores y promover nuevas a `ACTIVA`, o conservarlas como borrador. |
+| **S3** | Sustituir firma demo-operativa por firma nominal profesional si el Comité Legal lo requiere para producción. |
+| **S4** | Cerrar documentación final de producto, manteniendo frontera `PROMOTED` = preparado para registro, sin envío registral real. |
 
 ---
 
@@ -196,7 +200,9 @@ Si tienes que profundizar en alguna parte, abre estos archivos. **No son documen
 |---|---|---|
 | `2026-05-02-INDICE-PAQUETE-ENTREGA-COMITE.md` | Comité Legal | Punto de entrada físico al ZIP — orienta los archivos del paquete |
 | `2026-05-02-encargo-comite-legal-garrigues.md` | Comité Legal | Encargo formal — qué se les pide, plazos, constraints |
-| `plantillas-core-revision-2026-05-02/01..17-*.md` | Comité Legal | 17 fichas individuales con contenido Cloud actual de cada plantilla a firmar (Track 1 / Path A) |
+| `plantillas-core-revision-2026-05-02/01..17-*.md` | Comité Legal | Histórico del paquete Path A anterior al cierre Fase 4 |
+| `2026-05-04-cierre-garrigues-path-a-17-plantillas.md` | Comité Legal + ingeniería | Addendum del entregable completo Path A de Garrigues para las 17 plantillas legacy |
+| `scripts/close-legacy-templates-phase4.ts` | Ingeniería + Comité Legal | Script trazable del cierre aplicado el 2026-05-04 sobre las 17 filas existentes |
 | `2026-05-02-bloque-B-revision-castellano.md` | Comité Legal | Documento legible para revisar las 16 mejoras (Track 2 / Path B) |
 | `prompts/01-version-bump-validator.md` | Coordinador Comité en Harvey Space | Valida transiciones de versión durante el cierre |
 | `prompts/02-pre-export-probe.md` | Coordinador Comité en Harvey Space | Bloquea exportación si hay incumplimientos |
@@ -215,7 +221,7 @@ Este documento se actualiza **únicamente** cuando cambia el estado material de 
 
 | Evento que dispara update | Sección a actualizar |
 |---|---|
-| Garrigues firma una plantilla del Path A | Sección 2.8 → mover fila a sección 2.7. Sección 3 Track 1 |
+| Sustitución por firma nominal productiva | Sección 2.8 y Track 1 |
 | Aplicación SQL del Path B con autorización | Sección 2 actualizar versiones afectadas. Sección 3 Track 2 |
 | Sprint B avanza milestone | Sección 3 Track 3 |
 | Cierra alguno de los 3 tracks | Sección 3 + sección 5 calendario |

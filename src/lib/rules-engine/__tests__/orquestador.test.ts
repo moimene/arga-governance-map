@@ -366,7 +366,9 @@ describe('orquestador', () => {
             primeraConvocatoria: true,
             materiaClase: 'ORDINARIA',
             capitalConDerechoVoto: 100,
-            capitalPresenteRepresentado: 75,
+            capitalPresenteRepresentado: 100,
+            esJuntaUniversal: true,
+            aceptacionUnanimeCelebracion: true,
           },
           votacion: {
             tipoSocial: 'SA',

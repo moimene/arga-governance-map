@@ -23,16 +23,16 @@ test.describe('Cross-module handoffs read-only', () => {
     await page.goto('/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=e2e-assessment');
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Intake read-only desde AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/no escribe eventos ni links/i)).toBeVisible();
+    await expect(page.getByText('Entrada desde AIMS')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/brecha en expediente técnico/i)).toBeVisible();
   });
 
   test('AIMS material incident opens GRC intake without shared writes', async ({ page }) => {
     await page.goto('/grc/incidentes?source=aims&handoff=AIMS_INCIDENT_MATERIAL&ai_incident=e2e-ai-incident');
 
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Intake read-only desde AIMS')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/no escribe en contratos cross-module/i)).toBeVisible();
+    await expect(page.getByText('Entrada desde AIMS')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/contexto de preparación/i)).toBeVisible();
   });
 
   test('AIMS material incident opens Secretaria agenda intake without creating acts', async ({ page }) => {

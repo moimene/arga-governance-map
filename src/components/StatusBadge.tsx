@@ -21,7 +21,7 @@ const toneClasses: Record<Tone, string> = {
   neutral: "bg-muted text-muted-foreground border-border",
 };
 
-export function statusToTone(status: string): Tone {
+function statusToTone(status: string): Tone {
   const s = status.toUpperCase();
   if (["VIGENTE", "ACTIVA", "EFECTIVO", "CUBIERTO", "CERRADO"].includes(s)) return "active";
   if (["EN REVISIÓN", "ASIGNADO", "EN REMEDIACIÓN", "PENDIENTE VALIDACIÓN", "EN PROCESO", "PLANIFICADA", "CONVOCADA"].includes(s)) return "warning";

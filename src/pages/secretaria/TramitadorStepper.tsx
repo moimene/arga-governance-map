@@ -13,7 +13,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
-import { validateCapa3 } from "@/components/secretaria/Capa3Form";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";
 import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
@@ -39,7 +39,7 @@ const STEPS: StepDef[] = [
   {
     n: 4,
     label: "Presentación",
-    hint: "Envío a BORME, PSM, SIGER, JUCERJA o CONSERVATORIA según jurisdicción",
+    hint: "Preparación registral demo por BORME, PSM, SIGER, JUCERJA o CONSERVATORIA según jurisdicción",
   },
   {
     n: 5,
@@ -201,6 +201,10 @@ type TramitacionDetalleRow = {
   presentation_date?: string | null;
   status?: string | null;
   estimated_resolution?: string | null;
+  notary_name?: string | null;
+  deed_date?: string | null;
+  protocol_number?: string | null;
+  elevated_at?: string | null;
   inscription_number?: string | null;
   borme_ref?: string | null;
   psm_ref?: string | null;
@@ -306,16 +310,24 @@ function TramitacionDetalle({ id }: { id: string }) {
               <dl className="mt-4 space-y-3">
                 <div>
                   <dt className="text-xs text-[var(--g-text-secondary)]">Notaría</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{filing.deeds?.notary ?? "—"}</dd>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                    {filing.notary_name ?? filing.deeds?.notary ?? "—"}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-[var(--g-text-secondary)]">Fecha escritura</dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{formatDetailDate(filing.deeds?.deed_date)}</dd>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                    {formatDetailDate(filing.deed_date ?? filing.deeds?.deed_date)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Protocolo</dt>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">{filing.protocol_number ?? "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-[var(--g-text-secondary)]">Estado instrumento</dt>
                   <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
-                    {statusLabel(filing.deeds?.status ?? "—")}
+                    {statusLabel(filing.deeds?.status ?? filing.status ?? "—")}
                   </dd>
                 </div>
               </dl>
@@ -379,9 +391,12 @@ function TramitadorNuevo() {
       : [],
     [requestedMateria, visibleAgreements],
   );
-  const baseDisplayedAgreements = requestedMateria && materiaMatchedAgreements.length > 0
-    ? materiaMatchedAgreements
-    : visibleAgreements;
+  const baseDisplayedAgreements = useMemo(
+    () => requestedMateria && materiaMatchedAgreements.length > 0
+      ? materiaMatchedAgreements
+      : visibleAgreements,
+    [materiaMatchedAgreements, requestedMateria, visibleAgreements],
+  );
   const requestedMateriaWithoutAgreement = Boolean(
     requestedMateria && !agreementsLoading && materiaMatchedAgreements.length === 0,
   );
@@ -393,11 +408,14 @@ function TramitadorNuevo() {
     () => new Set(certificationIntake?.agreementIds ?? []),
     [certificationIntake?.agreementIds],
   );
-  const displayedAgreements = requestedCertificationId
-    ? certificationIntake
-      ? baseDisplayedAgreements.filter((agreement) => certifiedAgreementIds.has(agreement.id))
-      : []
-    : baseDisplayedAgreements;
+  const displayedAgreements = useMemo(
+    () => requestedCertificationId
+      ? certificationIntake
+        ? baseDisplayedAgreements.filter((agreement) => certifiedAgreementIds.has(agreement.id))
+        : []
+      : baseDisplayedAgreements,
+    [baseDisplayedAgreements, certificationIntake, certifiedAgreementIds, requestedCertificationId],
+  );
   const certificationWithoutRegistryAgreements = Boolean(
     requestedCertificationId &&
       certificationIntake &&
@@ -433,7 +451,11 @@ function TramitadorNuevo() {
   const [modeloCapa3Errors, setModeloCapa3Errors] = useState<Record<string, string>>({});
 
   const materia = selectedAgreement?.agreement_kind ?? "";
-  const { data: modelos = [], isLoading: modelosLoading } = useModelosAcuerdo(materia);
+  const { data: modelos = [], isLoading: modelosLoading } = useModelosAcuerdo(
+    materia,
+    undefined,
+    selectedAgreement?.adoption_mode,
+  );
   const selectedModelo = useMemo(
     () => modelos.find((modelo) => modelo.id === selectedModeloId) ?? null,
     [modelos, selectedModeloId],
@@ -558,14 +580,14 @@ function TramitadorNuevo() {
       tenant_id: "cloud-modelo-acuerdo",
       tipo: "MODELO_ACUERDO",
       materia: selectedModelo.materia_acuerdo,
-      jurisdiccion: selectedAgreementEntity?.jurisdiction ?? scopedEntity?.jurisdiction ?? "ES",
-      aprobada_por: null,
-      fecha_aprobacion: null,
+      jurisdiccion: selectedModelo.jurisdiccion ?? selectedAgreementEntity?.jurisdiction ?? scopedEntity?.jurisdiction ?? "ES",
+      aprobada_por: selectedModelo.aprobada_por ?? null,
+      fecha_aprobacion: selectedModelo.fecha_aprobacion ?? null,
       protecciones: {},
       snapshot_rule_pack_required: true,
-      adoption_mode: selectedAgreement?.adoption_mode ?? null,
-      organo_tipo: null,
-      contrato_variables_version: null,
+      adoption_mode: selectedModelo.adoption_mode ?? selectedAgreement?.adoption_mode ?? null,
+      organo_tipo: selectedModelo.organo_tipo ?? null,
+      contrato_variables_version: selectedModelo.contrato_variables_version ?? null,
       created_at: "2026-04-29T00:00:00.000Z",
       approval_checklist: null,
       version_history: null,
@@ -714,7 +736,7 @@ function TramitadorNuevo() {
     : "";
   const selectedAgreementAllowedByCertification = !certificationIntake ||
     certifiedAgreementIds.has(selectedAgreement?.id ?? "");
-  const certificationEvidenceReady = !certificationIntake || certificationIntake.hasEvidenceBundle;
+  const certificationRegistryReady = !certificationIntake || certificationIntake.readyForRegistry;
   const selectedAgreementVisible = Boolean(
     selectedAgreement &&
       (
@@ -737,7 +759,7 @@ function TramitadorNuevo() {
     tenantId &&
       selectedAgreement &&
       selectedAgreementAllowedByCertification &&
-      certificationEvidenceReady &&
+      certificationRegistryReady &&
       isDeedRequired &&
       filingType &&
       instrumentData.notary.trim() &&
@@ -779,8 +801,8 @@ function TramitadorNuevo() {
       return;
     }
 
-    if (!certificationEvidenceReady) {
-      toast.error("La certificación aún no tiene evidencia demo/operativa vinculada; no constituye evidencia final productiva.");
+    if (!certificationRegistryReady) {
+      toast.error("La certificación debe estar firmada y tener evidencia demo/operativa vinculada antes de registrar la escritura.");
       return;
     }
 
@@ -1461,8 +1483,8 @@ function TramitadorNuevo() {
                 Escritura pública
               </div>
               <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                {certificationIntake && !certificationIntake.hasEvidenceBundle
-                  ? "Antes de registrar, genere y archive la certificación DOCX para vincular evidencia demo/operativa; no constituye evidencia final productiva."
+                {certificationIntake && !certificationIntake.readyForRegistry
+                  ? "Antes de registrar, firme y archive la certificación DOCX para vincular evidencia demo/operativa; no constituye evidencia final productiva."
                   : "Se guardará en el tramitador registral como elevada a público."}
               </div>
             </div>
@@ -1494,8 +1516,8 @@ function TramitadorNuevo() {
                 Vínculo probatorio operativo de certificación
               </div>
               <div className="mt-1">
-                {!certificationIntake.hasEvidenceBundle
-                  ? "Evidencia operativa pendiente: genere y archive la certificación DOCX desde el acta antes de registrar la escritura."
+                {!certificationIntake.readyForRegistry
+                  ? "Certificación pendiente: debe estar firmada y con evidencia demo/operativa archivada desde el acta antes de registrar la escritura."
                   : registryLinkSaved
                   ? registryLinkMessage ?? "Vínculo registrado."
                   : "Al registrar la escritura se añadirá trazabilidad operativa y, si existe evidencia demo/operativa, una referencia documental pendiente de controles productivos de auditoría, conservación y legal hold."}

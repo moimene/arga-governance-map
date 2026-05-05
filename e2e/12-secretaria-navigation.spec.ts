@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/base';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/secretaria', heading: 'Dashboard' },
+  { label: 'Dashboard', path: '/secretaria', heading: 'Mesa de trabajo del secretario' },
   { label: 'Sociedades', path: '/secretaria/sociedades', heading: 'Sociedades' },
   { label: 'Personas', path: '/secretaria/personas', heading: 'Personas' },
   { label: 'Board Pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
@@ -40,14 +40,14 @@ test.describe('Secretaría navigation smoke', () => {
   test('dashboard expone contratos sanitizados por flujo', async ({ page }) => {
     await page.goto('/secretaria');
 
-    await expect(page.locator('main').getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({
+    await expect(page.locator('main').getByRole('heading', { name: 'Mesa de trabajo del secretario', exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText('Sanitización Supabase')).toBeVisible();
-    await expect(page.getByText('Contratos por flujo Secretaría')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Acuerdo 360/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Board Pack/ })).toBeVisible();
-    await expect(page.getByText('Migración: no · Tipos/RLS/RPC/storage: no').first()).toBeVisible();
+    await expect(page.getByText('Prioridad ahora')).toBeVisible();
+    await expect(page.getByText('Empezar un flujo')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Nueva convocatoria/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Nueva reunión/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Generar documento/ })).toBeVisible();
   });
 
   test('cambia entre modo Sociedad y Grupo sin crash', async ({ page }) => {

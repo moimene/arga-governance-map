@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ScrollText, CheckCircle2, XCircle, MinusCircle, Mail, Loader2, AlertTriangle } from "lucide-react";
 import {
   useAcuerdoSinSesionById,
@@ -9,8 +9,12 @@ import {
 } from "@/hooks/useAcuerdosSinSesion";
 import { useERDSNotification } from "@/hooks/useERDSNotification";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { EmitirCertificacionAcuerdoButton } from "@/components/secretaria/EmitirCertificacionAcuerdoButton";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
+import { useMeetingParticipants } from "@/hooks/useBodies";
 
 function buildNoSessionVariables(
   r: NonNullable<ReturnType<typeof useAcuerdoSinSesionById>["data"]>,
@@ -92,15 +96,30 @@ function buildNoSessionFallback(
   ].join("\n");
 }
 
+function getSelectedTemplateId(executionMode: Record<string, unknown> | null | undefined) {
+  if (!executionMode || typeof executionMode !== "object") return null;
+  const direct = executionMode.selected_template_id;
+  if (typeof direct === "string" && direct) return direct;
+  const agreement360 = executionMode.agreement_360;
+  if (agreement360 && typeof agreement360 === "object" && !Array.isArray(agreement360)) {
+    const nested = (agreement360 as Record<string, unknown>).selected_template_id;
+    if (typeof nested === "string" && nested) return nested;
+  }
+  return null;
+}
+
 export default function AcuerdoSinSesionDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
   const { data, isLoading } = useAcuerdoSinSesionById(id);
   const { data: linkedAgreement } = useAgreementForNoSessionResolution(id);
-  const { sendAndTrackNotification } = useERDSNotification();
+  const { sendCertifiedNotification } = useERDSNotification();
+  const { data: bodyParticipants = [] } = useMeetingParticipants(data?.body_id);
   const castVote = useCastVote(id);
   const adoptAgreement = useAdoptNoSessionAgreement();
+  const { primaryRole } = useCurrentUserRole();
   const [erdsStatus, setErdsStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [erdsError, setErdsError] = useState<string | null>(null);
   const [erdsRef, setErdsRef] = useState<string | null>(null);
@@ -121,40 +140,64 @@ export default function AcuerdoSinSesionDetalle() {
   }
 
   const r = data;
+  const erdsRecipients = bodyParticipants
+    .filter((participant) => Boolean(participant.email?.trim()))
+    .map((participant) => ({
+      email: participant.email!.trim(),
+      name: participant.full_name ?? participant.email!.trim(),
+    }));
   const body = r.governing_bodies?.name ?? "Órgano";
   const entity = r.governing_bodies?.entities?.common_name ?? "—";
   const jurisdiction = r.governing_bodies?.entities?.jurisdiction ?? null;
   const docVariables = buildNoSessionVariables(r, body, entity);
   const docFallback = buildNoSessionFallback(r, body, entity);
   const canGenerateFinalDoc = Boolean(linkedAgreement?.id);
+  const selectedTemplateId = getSelectedTemplateId(linkedAgreement?.execution_mode) ?? searchParams.get("plantilla");
+  const generatorPath = linkedAgreement?.id
+    ? `/secretaria/acuerdos/${linkedAgreement.id}/generar${selectedTemplateId ? `?plantilla=${encodeURIComponent(selectedTemplateId)}` : ""}`
+    : null;
+  const voteResult = evaluateNoSessionResult({
+    votesFor: r.votes_for ?? 0,
+    votesAgainst: r.votes_against ?? 0,
+    abstentions: r.abstentions ?? 0,
+    totalMembers: r.total_members ?? 0,
+    matterClass: r.matter_class,
+    requiresUnanimity: r.requires_unanimity,
+  });
+  const canCloseApproved = voteResult.aprobado;
 
   function handleClose(decision: "APROBADO" | "RECHAZADO") {
-    const entityId = r.entity_id ?? r.governing_bodies?.entity_id ?? null;
-    if (!entityId) {
+    if (!(r.entity_id ?? r.governing_bodies?.entity_id)) {
       return;
     }
+    if (decision === "APROBADO" && !canCloseApproved) return;
     adoptAgreement.mutate({
       resolutionId: r.id,
-      bodyId: r.body_id,
-      entityId,
-      matterClass: r.matter_class,
-      agreementKind: r.agreement_kind,
       resultado: decision,
+      selectedTemplateId,
     });
   }
 
   const handleSendERDS = async () => {
     if (!r.id) return;
+    if (erdsRecipients.length === 0) {
+      setErdsError("No hay destinatarios vigentes con email en el órgano.");
+      setErdsStatus("error");
+      return;
+    }
     setErdsStatus("sending");
     setErdsError(null);
     try {
-      const result = await sendAndTrackNotification.mutateAsync({
-        notificationId: r.id,
-        recipientEmail: "destinatario@arga-seguros.com",
-        subject: `Notificación certificada: ${r.title}`,
-        body: r.proposal_text ?? "Se adjunta la propuesta de acuerdo para su votación.",
-      });
-      setErdsRef(result.certification.deliveryRef);
+      const refs: string[] = [];
+      for (const recipient of erdsRecipients) {
+        const result = await sendCertifiedNotification.mutateAsync({
+          recipientEmail: recipient.email,
+          subject: `Notificación certificada: ${r.title}`,
+          body: r.proposal_text ?? "Se adjunta la propuesta de acuerdo para su votación.",
+        });
+        refs.push(`${recipient.name}: ${result.deliveryRef}`);
+      }
+      setErdsRef(refs.join(" · "));
       setErdsStatus("sent");
     } catch (e) {
       setErdsError(e instanceof Error ? e.message : "Error desconocido");
@@ -187,32 +230,58 @@ export default function AcuerdoSinSesionDetalle() {
           </p>
         </div>
         {canGenerateFinalDoc ? (
-          <ProcessDocxButton
-            label="Acuerdo DOCX"
-            variant="primary"
-            input={{
-              kind: "ACUERDO_SIN_SESION",
-              recordId: r.id,
-              title: `Acuerdo sin sesión: ${r.title}`,
-              subtitle: `${body} · ${entity}`,
-              entityName: entity,
-              templateTypes: ["ACTA_ACUERDO_ESCRITO", "MODELO_ACUERDO", "INFORME_DOCUMENTAL_PRE"],
-              variables: {
-                ...docVariables,
-                agreement_id: linkedAgreement?.id ?? "",
-                agreement_ids: linkedAgreement?.id ? [linkedAgreement.id] : [],
-              },
-              templateCriteria: {
-                jurisdiction,
-                materia: r.agreement_kind,
-                adoptionMode: "NO_SESSION",
-                organoTipo: r.governing_bodies?.body_type,
-              },
-              fallbackText: docFallback,
-              filenamePrefix: "acuerdo_sin_sesion",
-              archive: { agreementId: linkedAgreement?.id },
-            }}
-          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => linkedAgreement?.id && navigate(scope.createScopedTo(`/secretaria/acuerdos/${linkedAgreement.id}`))}
+              className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Ver expediente
+            </button>
+            {generatorPath ? (
+              <button
+                type="button"
+                onClick={() => navigate(scope.createScopedTo(generatorPath))}
+                className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Generar documento
+              </button>
+            ) : null}
+            <EmitirCertificacionAcuerdoButton
+              agreementId={linkedAgreement!.id}
+              entityId={r.entity_id ?? r.governing_bodies?.entity_id ?? null}
+              bodyId={r.body_id}
+              userRole={primaryRole}
+            />
+            <ProcessDocxButton
+              label="Acuerdo DOCX"
+              variant="primary"
+              input={{
+                kind: "ACUERDO_SIN_SESION",
+                recordId: r.id,
+                title: `Acuerdo sin sesión: ${r.title}`,
+                subtitle: `${body} · ${entity}`,
+                entityName: entity,
+                templateTypes: ["ACTA_ACUERDO_ESCRITO"],
+                variables: {
+                  ...docVariables,
+                  agreement_id: linkedAgreement?.id ?? "",
+                  agreement_ids: linkedAgreement?.id ? [linkedAgreement.id] : [],
+                },
+                templateCriteria: {
+                  jurisdiction,
+                  materia: r.agreement_kind,
+                  adoptionMode: "NO_SESSION",
+                  organoTipo: r.governing_bodies?.body_type,
+                },
+                fallbackText: docFallback,
+                filenamePrefix: "acuerdo_sin_sesion",
+                archive: { agreementId: linkedAgreement?.id },
+              }}
+            />
+          </div>
         ) : (
           <div
             className="max-w-[260px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--g-text-secondary)]"
@@ -337,15 +406,33 @@ export default function AcuerdoSinSesionDetalle() {
                 Registrando voto…
               </div>
             )}
+            {castVote.isError ? (
+              <div
+                className="border border-[var(--status-error)]/40 bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--status-error)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {castVote.error instanceof Error ? castVote.error.message : "No se pudo registrar el voto."}
+              </div>
+            ) : null}
             <div className="border-t border-[var(--g-border-subtle)] pt-4">
               <p className="mb-3 text-xs text-[var(--g-text-secondary)]">
                 Cierre manual de la votación (Secretaría):
               </p>
+              <div
+                className={`mb-3 border-l-4 p-3 text-xs ${
+                  voteResult.aprobado
+                    ? "border-[var(--status-success)] bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                    : "border-[var(--status-warning)] bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {voteResult.motivo}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => handleClose("APROBADO")}
-                  disabled={adoptAgreement.isPending}
+                  disabled={adoptAgreement.isPending || !canCloseApproved}
                   className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-[var(--status-success)] text-[var(--status-success)] hover:bg-[var(--status-success)] hover:text-[var(--g-text-inverse)] transition-colors disabled:opacity-50"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
@@ -388,13 +475,14 @@ export default function AcuerdoSinSesionDetalle() {
               <button
                 type="button"
                 onClick={handleSendERDS}
-                disabled={sendAndTrackNotification.isPending}
+                disabled={sendCertifiedNotification.isPending || erdsRecipients.length === 0}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
-                aria-busy={sendAndTrackNotification.isPending}
+                aria-busy={sendCertifiedNotification.isPending}
+                title={erdsRecipients.length === 0 ? "No hay destinatarios vigentes con email en el órgano" : undefined}
               >
                 <Mail className="h-4 w-4" />
-                Enviar notificación ERDS
+                Enviar notificación ERDS{erdsRecipients.length > 0 ? ` (${erdsRecipients.length})` : ""}
               </button>
             </>
           )}

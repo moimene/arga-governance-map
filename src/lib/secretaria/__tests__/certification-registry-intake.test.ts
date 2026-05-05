@@ -22,6 +22,7 @@ describe("certification registry intake", () => {
     expect(intake.explicitAgreementIds).toEqual(["5905ee89-3fb4-4a03-9cda-7523d45f75d4"]);
     expect(intake.pointReferences).toEqual(["meeting:meeting-1:point:2"]);
     expect(intake.unresolvedPointReferences).toEqual(["meeting:meeting-1:point:2"]);
+    expect(intake.readyForRegistry).toBe(true);
     expect(intake.warnings).toContain("point_references_without_agreement_id");
     expect(intake.warnings).not.toContain("no_registry_agreement_reference");
   });
@@ -54,8 +55,23 @@ describe("certification registry intake", () => {
     });
 
     expect(intake.agreementIds).toHaveLength(0);
+    expect(intake.readyForRegistry).toBe(false);
     expect(intake.warnings).toContain("no_registry_agreement_reference");
     expect(intake.warnings).toContain("evidence_bundle_not_linked");
+  });
+
+  it("no considera lista para registro una certificacion con evidencia pero sin firma", () => {
+    const intake = buildCertificationRegistryIntake({
+      id: "cert-1",
+      signatureStatus: "PENDING",
+      evidenceId: "bundle-1",
+      agreementsCertified: ["5905ee89-3fb4-4a03-9cda-7523d45f75d4"],
+    });
+
+    expect(intake.signed).toBe(false);
+    expect(intake.hasEvidenceBundle).toBe(true);
+    expect(intake.readyForRegistry).toBe(false);
+    expect(intake.warnings).toContain("certification_not_signed");
   });
 
   it("reconoce UUIDs v4/v5 validos", () => {

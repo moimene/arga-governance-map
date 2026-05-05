@@ -12,6 +12,9 @@ import {
   type FormaAdministracion,
   type MateriaClase,
   type ComplianceResult as EngineComplianceResult,
+  type CoAprobacionConfig,
+  type SolidarioConfig,
+  type NoSessionInput,
 } from "@/lib/rules-engine";
 
 type RulePackJoinRow = {
@@ -87,6 +90,7 @@ export interface AgreementFull {
   statutory_basis: string | null;
   compliance_snapshot: Record<string, unknown> | null;
   approval_workflow: Record<string, unknown>[] | null;
+  execution_mode: Record<string, unknown> | null;
   document_url: string | null;
   created_at: string;
   entities?: { common_name: string; jurisdiction: string; legal_form: string } | null;
@@ -113,8 +117,66 @@ type MeetingRow = { id: string; body_id: string | null; scheduled_start: string 
 type ConvocatoriaRow = { fecha_emision: string | null; fecha_1: string | null; urgente: boolean | null; junta_universal: boolean | null };
 type ResolutionRow = { status: string };
 type ConflictRow = { id: string; status: string };
-type NoSessionRow = { status: string; requires_unanimity: boolean; votes_for: number; votes_against: number; abstentions: number } | null;
+type NoSessionRow = {
+  status: string;
+  requires_unanimity: boolean;
+  votes_for: number;
+  votes_against: number;
+  abstentions: number;
+  total_members?: number | null;
+  opened_at?: string | null;
+  voting_deadline?: string | null;
+  proposal_text?: string | null;
+} | null;
 type UnipersonalRow = { status: string } | null;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getExecutionConfig(a: AgreementWithEntity) {
+  const execution = isRecord(a.execution_mode) ? a.execution_mode : {};
+  return isRecord(execution.config) ? execution.config : {};
+}
+
+function buildCoAprobacionConfigFromExecution(a: AgreementWithEntity): CoAprobacionConfig | undefined {
+  const config = getExecutionConfig(a);
+  if (!isRecord(config) || !Array.isArray(config.firmas)) return undefined;
+  return {
+    k: typeof config.k === "number" ? config.k : 1,
+    n: typeof config.n === "number" ? config.n : Math.max(config.firmas.length, 1),
+    ventanaConsenso: typeof config.ventanaConsenso === "string" ? config.ventanaConsenso : "15d",
+    estatutosPermitenSinSesion: config.estatutosPermitenSinSesion !== false,
+    firmas: config.firmas
+      .filter(isRecord)
+      .map((firma) => ({
+        adminId: String(firma.adminId ?? ""),
+        fechaFirma: String(firma.fechaFirma ?? a.decision_date ?? new Date().toISOString()),
+        hashDocumento: String(firma.hashDocumento ?? `sha256-${firma.adminId ?? "firma"}`),
+      }))
+      .filter((firma) => firma.adminId),
+  };
+}
+
+function buildSolidarioConfigFromExecution(a: AgreementWithEntity): SolidarioConfig | undefined {
+  const config = getExecutionConfig(a);
+  if (!isRecord(config)) return undefined;
+  const adminActuante = typeof config.adminActuante === "string" ? config.adminActuante : "";
+  if (!adminActuante) return undefined;
+  return {
+    adminActuante,
+    restriccionesEstatutarias: Array.isArray(config.restriccionesEstatutarias)
+      ? config.restriccionesEstatutarias.filter(isRecord).map((restriccion) => ({
+        materia: String(restriccion.materia ?? ""),
+        requiereCofirma: restriccion.requiereCofirma !== false,
+        cofirmantes: Array.isArray(restriccion.cofirmantes)
+          ? restriccion.cofirmantes.map(String)
+          : undefined,
+      }))
+      : [],
+    vigenciaDesde: typeof config.vigenciaDesde === "string" ? config.vigenciaDesde : `${a.decision_date ?? new Date().toISOString().split("T")[0]}T00:00:00Z`,
+  };
+}
 
 export function useAgreement(agreementId?: string) {
   const { tenantId } = useTenantContext();
@@ -165,6 +227,25 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
   const tipoSocial = toTipoSocial(companyForm);
   const organoTipo = toTipoOrgano(a.governing_bodies?.body_type ?? null);
+  const adoptionMode = a.adoption_mode as AdoptionMode;
+  const materiaClase = toMateriaClase(a.matter_class);
+  const fechaAcuerdo = a.decision_date ? `${a.decision_date}T12:00:00Z` : new Date().toISOString();
+  let noSessionInput: NoSessionInput | undefined;
+  let coAprobacionConfig: CoAprobacionConfig | undefined;
+  let solidarioConfig: SolidarioConfig | undefined;
+  let adminVigentes: string[] | undefined;
+  let firmasPresentes: string[] | undefined;
+
+  if (adoptionMode === "CO_APROBACION") {
+    coAprobacionConfig = buildCoAprobacionConfigFromExecution(a);
+    adminVigentes = coAprobacionConfig?.firmas.map((firma) => firma.adminId);
+  }
+
+  if (adoptionMode === "SOLIDARIO") {
+    solidarioConfig = buildSolidarioConfigFromExecution(a);
+    adminVigentes = solidarioConfig ? [solidarioConfig.adminActuante] : undefined;
+    firmasPresentes = adminVigentes;
+  }
 
   // Cargar rule packs activos
   const { data: rpVersions } = await supabase
@@ -215,8 +296,67 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     }
   }
 
-  const adoptionMode = a.adoption_mode as AdoptionMode;
-  const materiaClase = toMateriaClase(a.matter_class);
+  if (adoptionMode === "NO_SESSION" && a.no_session_resolution_id) {
+    const { data: nsr } = await supabase
+      .from("no_session_resolutions")
+      .select("status, requires_unanimity, votes_for, votes_against, abstentions, total_members, opened_at, voting_deadline, proposal_text")
+      .eq("tenant_id", tenantId)
+      .eq("id", a.no_session_resolution_id)
+      .maybeSingle();
+    const n = nsr as NoSessionRow;
+    if (n) {
+      const votesFor = Number(n.votes_for ?? 0);
+      const votesAgainst = Number(n.votes_against ?? 0);
+      const abstentions = Number(n.abstentions ?? 0);
+      const totalMembers = Math.max(Number(n.total_members ?? 0), votesFor + votesAgainst + abstentions, 1);
+      const consentCapitalShare = votesFor > 0 ? 100 / votesFor : 0;
+      const respuestas = [
+        ...Array.from({ length: votesFor }, (_, index) => ({
+          person_id: `vote-for-${index + 1}`,
+          capital_participacion: consentCapitalShare,
+          porcentaje_capital: consentCapitalShare,
+          es_consejero: organoTipo === "CONSEJO",
+          sentido: "CONSENTIMIENTO" as const,
+        })),
+        ...Array.from({ length: votesAgainst }, (_, index) => ({
+          person_id: `vote-against-${index + 1}`,
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: organoTipo === "CONSEJO",
+          sentido: "OBJECION" as const,
+        })),
+        ...Array.from({ length: abstentions }, (_, index) => ({
+          person_id: `vote-abstain-${index + 1}`,
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: organoTipo === "CONSEJO",
+          sentido: "SILENCIO" as const,
+        })),
+      ];
+      noSessionInput = {
+        tipoProceso: organoTipo === "CONSEJO" ? "CIRCULACION_CONSEJO" : "UNANIMIDAD_ESCRITA_SL",
+        condicionAdopcion: n.requires_unanimity
+          ? organoTipo === "CONSEJO" ? "UNANIMIDAD_CONSEJEROS" : "UNANIMIDAD_CAPITAL"
+          : "MAYORIA_CONSEJEROS_ESCRITA",
+        organoTipo,
+        tipoSocial,
+        respuestas,
+        notificaciones: Array.from({ length: totalMembers }, (_, index) => ({
+          person_id: `destinatario-${index + 1}`,
+          canal: "DEMO_OPERATIVO",
+          estado: "ENTREGADA" as const,
+        })),
+        totalDestinatarios: totalMembers,
+        totalCapitalSocial: 100,
+        ventana: {
+          inicio: n.opened_at ?? fechaAcuerdo,
+          fin: n.voting_deadline ?? fechaAcuerdo,
+          ahora: n.status === "VOTING_OPEN" ? new Date().toISOString() : (n.voting_deadline ?? fechaAcuerdo),
+        },
+        propuestaTexto: n.proposal_text ?? a.proposal_text ?? "",
+      };
+    }
+  }
 
   const result: EngineComplianceResult = evaluarAcuerdoCompleto(
     adoptionMode,
@@ -250,6 +390,12 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
         materiaClase,
         materias: [a.agreement_kind],
         votos: { favor: 0, contra: 0, abstenciones: 0, en_blanco: 0, capital_presente: 0, capital_total: 0 },
+        noSessionInput,
+        coAprobacionConfig,
+        solidarioConfig,
+        adminVigentes,
+        firmasPresentes,
+        fechaAcuerdo,
       },
       documentacion: {
         adoptionMode,

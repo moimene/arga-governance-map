@@ -17,8 +17,12 @@ const certification: CertificationRegistryIntake = {
   references: ["agreement-1", "meeting:meeting-1:point:2"],
   agreementIds: ["agreement-1"],
   pointReferences: ["meeting:meeting-1:point:2"],
+  explicitAgreementIds: ["agreement-1"],
+  resolvedPointAgreementIds: [],
+  unresolvedPointReferences: ["meeting:meeting-1:point:2"],
   signed: true,
   hasEvidenceBundle: true,
+  readyForRegistry: true,
   warnings: ["point_references_without_agreement_id"],
 };
 

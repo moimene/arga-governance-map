@@ -23,7 +23,7 @@ test.describe('Auth', () => {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Acceder como demo' }).click();
     await page.waitForURL('/', { timeout: 20_000 });
-    await expect(page.url()).toContain('localhost:5173');
+    expect(new URL(page.url()).pathname).toBe('/');
     await expect(page.getByText('ARGA').first()).toBeVisible();
   });
 });

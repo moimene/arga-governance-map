@@ -27,8 +27,6 @@ test.describe('Secretaría Dashboard', () => {
   });
 
   test('pactos vigentes aparece en cross-module metrics', async ({ page }) => {
-    await expect(
-      page.getByText('Pacto').or(page.getByText('pacto')).first()
-    ).toBeVisible({ timeout: 15_000 });
+    await expect.poll(async () => page.locator('main').getByText(/Pactos vigentes/i).count()).toBeGreaterThan(0);
   });
 });

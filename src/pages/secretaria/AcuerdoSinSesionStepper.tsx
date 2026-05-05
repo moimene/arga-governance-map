@@ -8,6 +8,7 @@ import {
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
+import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import {
   useCreateNoSessionResolution,
   useAdoptNoSessionAgreement,
@@ -17,6 +18,7 @@ import {
 } from "@/hooks/useAcuerdosSinSesion";
 import { evaluarMayoria } from "@/lib/rules-engine/majority-evaluator";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -77,39 +79,10 @@ const VOTE_BADGE_CLASS: Record<VoteChoice, string> = {
   ABSTAIN: "bg-[var(--status-warning)]",
 };
 
-function evaluarResultado(
-  votesFor: number,
-  votesAgainst: number,
-  abstentions: number,
-  total: number,
-  matterClass: string,
-  requiresUnanimity: boolean,
-): { aprobado: boolean; motivo: string } {
-  if (requiresUnanimity) {
-    const aprobado = votesFor === total && votesAgainst === 0 && abstentions === 0;
-    return {
-      aprobado,
-      motivo: aprobado
-        ? "Unanimidad alcanzada"
-        : `Unanimidad requerida — ${votesAgainst} voto(s) en contra o ${abstentions} abstención(es)`,
-    };
-  }
-  const emitidos = votesFor + votesAgainst;
-  if (emitidos === 0) return { aprobado: false, motivo: "Sin votos emitidos" };
-  const pctFor = (votesFor / emitidos) * 100;
-  const threshold = matterClass === "ESTRUCTURAL" ? 66.67 : matterClass === "ESTATUTARIA" ? 60 : 50;
-  const aprobado = pctFor > threshold;
-  return {
-    aprobado,
-    motivo: aprobado
-      ? `Aprobado con ${pctFor.toFixed(1)}% de votos a favor (umbral: >${threshold}%)`
-      : `Rechazado — ${pctFor.toFixed(1)}% de votos a favor (umbral: >${threshold}%)`,
-  };
-}
-
 export default function AcuerdoSinSesionStepper() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const requestedPlantillaId = searchParams.get("plantilla");
   const scope = useSecretariaScope();
   const scopedEntityId =
     scope.mode === "sociedad"
@@ -119,6 +92,7 @@ export default function AcuerdoSinSesionStepper() {
   const scopedListPath = scope.createScopedTo("/secretaria/acuerdos-sin-sesion");
   const createResolution = useCreateNoSessionResolution();
   const adoptAgreement = useAdoptNoSessionAgreement();
+  const { data: requestedPlantilla } = usePlantillaProtegida(requestedPlantillaId ?? undefined);
 
   const [current, setCurrent] = useState(1);
 
@@ -217,7 +191,14 @@ export default function AcuerdoSinSesionStepper() {
 
   // ── Step 5: close ──
   const resultado = resolution
-    ? evaluarResultado(votesFor, votesAgainst, abstentions, totalVoters, matterClass, requiresUnanimity)
+    ? evaluateNoSessionResult({
+        votesFor,
+        votesAgainst,
+        abstentions,
+        totalMembers: totalVoters,
+        matterClass,
+        requiresUnanimity,
+      })
     : null;
   const [adoptedAgreementId, setAdoptedAgreementId] = useState<string | null>(null);
   const [closeDone, setCloseDone] = useState(false);
@@ -227,11 +208,8 @@ export default function AcuerdoSinSesionStepper() {
     try {
       const agreementId = await adoptAgreement.mutateAsync({
         resolutionId,
-        bodyId: selectedBodyId,
-        entityId: tenantEntityId,
-        matterClass,
-        agreementKind: agreementKind,
         resultado: decision,
+        selectedTemplateId: requestedPlantillaId,
       });
       if (agreementId) setAdoptedAgreementId(agreementId);
       setCloseDone(true);
@@ -286,14 +264,24 @@ export default function AcuerdoSinSesionStepper() {
           </p>
           <div className="mt-6 flex justify-center gap-3">
             {adoptedAgreementId && (
-              <button
-                type="button"
-                onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${adoptedAgreementId}`))}
-                className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                Ver expediente
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${adoptedAgreementId}`))}
+                  className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  Ver expediente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${adoptedAgreementId}/generar${requestedPlantillaId ? `?plantilla=${requestedPlantillaId}` : ""}`))}
+                  className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  Generar documento
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -384,6 +372,18 @@ export default function AcuerdoSinSesionStepper() {
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
             {STEPS[current - 1].hint}
           </p>
+
+          {requestedPlantillaId ? (
+            <div
+              className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <span className="font-medium text-[var(--g-text-primary)]">Plantilla seleccionada:</span>{" "}
+              {requestedPlantilla
+                ? `${requestedPlantilla.tipo} v${requestedPlantilla.version}`
+                : "se aplicará al acta del acuerdo escrito cuando se cierre el expediente."}
+            </div>
+          ) : null}
 
           {/* ── PASO 1: Tipo y órgano ── */}
           {current === 1 && (
@@ -831,7 +831,7 @@ export default function AcuerdoSinSesionStepper() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  disabled={adoptAgreement.isPending}
+                  disabled={adoptAgreement.isPending || !resultado?.aprobado}
                   onClick={() => handleCerrar("APROBADO")}
                   className={`flex-1 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors disabled:opacity-50 ${
                     resultado?.aprobado

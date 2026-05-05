@@ -33,7 +33,7 @@ export interface UpdateNotificationStatusInput {
   erdsDeliveryRef: string;
   erdsEvidenceHash: string;
   erdsDeliveredAt: string;
-  erdsStatus: 'PENDING' | 'DELIVERED' | 'FAILED' | 'COMPLETED';
+  erdsStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
 }
 
 // ============================================================
@@ -77,7 +77,7 @@ export interface NotificationStatusUpdateResult {
  *     erdsDeliveryRef: result.deliveryRef,
  *     erdsEvidenceHash: result.evidenceHash,
  *     erdsDeliveredAt: result.deliveredAt,
- *     erdsStatus: 'DELIVERED',
+ *     erdsStatus: 'COMPLETED',
  *   });
  */
 export function useERDSNotification() {
@@ -187,7 +187,6 @@ Destinatario: ${input.recipientEmail}
             erds_evidence_hash: input.erdsEvidenceHash,
             erds_delivered_at: input.erdsDeliveredAt,
             erds_status: input.erdsStatus,
-            updated_at: new Date().toISOString(),
           })
           .eq('id', input.notificationId);
 
@@ -238,7 +237,7 @@ Destinatario: ${input.recipientEmail}
         erdsDeliveryRef: certification.deliveryRef,
         erdsEvidenceHash: certification.evidenceHash,
         erdsDeliveredAt: certification.deliveredAt,
-        erdsStatus: 'DELIVERED',
+        erdsStatus: 'COMPLETED',
       });
 
       return { certification, tracking };

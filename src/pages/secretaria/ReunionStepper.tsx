@@ -82,14 +82,6 @@ interface VoterRow {
   conflict_reason: string;
 }
 
-const DEMO_VOTERS: VoterRow[] = [
-  { id: "v1", person_id: null, name: "Carlos Ruiz (Presidente)", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v2", person_id: null, name: "Lucía Martín (Secretaria)", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v3", person_id: null, name: "Ana García", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v4", person_id: null, name: "Pedro López", vote: "", conflict_flag: false, conflict_reason: "" },
-  { id: "v5", person_id: null, name: "Isabel Sánchez", vote: "", conflict_flag: false, conflict_reason: "" },
-];
-
 interface MeetingVoterRow {
   id: string;
   person_id: string | null;
@@ -356,7 +348,7 @@ const TIPO_CONDICION_LABELS: Record<string, string> = {
 };
 
 function AsistentesStep({ meetingId }: { meetingId?: string }) {
-  const { data: meeting } = useReunionById(meetingId);
+  const { data: meeting, isLoading: meetingLoading } = useReunionById(meetingId);
   const bodyId = (meeting as { body_id?: string } | null)?.body_id;
 
   const { data: members = [], isLoading: membersLoading } = useBodyMembers(bodyId);
@@ -458,11 +450,27 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     (m) => (attendance[m.person_id]?.attendance_type ?? "PRESENCIAL") !== "AUSENTE"
   ).length;
 
-  if (membersLoading) {
+  if (meetingLoading || (Boolean(bodyId) && membersLoading)) {
     return (
       <div className="flex items-center gap-2 text-[var(--g-text-secondary)]">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span className="text-sm">Cargando miembros del órgano…</span>
+      </div>
+    );
+  }
+
+  if (!bodyId) {
+    return (
+      <div
+        className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+          La reunión no tiene órgano asociado
+        </p>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          No se puede cargar la lista de asistentes hasta vincular la reunión con un órgano social.
+        </p>
       </div>
     );
   }
@@ -474,12 +482,11 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
         <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-          Censo demo de prototipo no persistido
+          No hay censo vigente del órgano
         </p>
         <p className="text-sm text-[var(--g-text-secondary)]">
-          No hay miembros vigentes en este órgano. El flujo continuará con un censo demo no
-          persistido para probar quórum, votación, acta y certificación. Para producción debe
-          cargarse el censo legal del órgano antes de celebrar la sesión.
+          No se puede celebrar la sesión hasta cargar miembros vigentes del órgano en el
+          censo societario. Registra el censo legal antes de calcular quórum, votar o generar acta.
         </p>
       </div>
     );
@@ -641,7 +648,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
 // ── Paso 3: Quórum ───────────────────────────────────────────────────────────
 
 function QuorumStep({ meetingId }: { meetingId?: string }) {
-  const { data: meeting } = useReunionById(meetingId);
+  const { data: meeting, isLoading: meetingLoading } = useReunionById(meetingId);
   const bodyId = (meeting as { body_id?: string } | null)?.body_id;
   const existingQuorum = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
   const meetingRaw = meeting as
@@ -655,8 +662,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       }
     | null;
 
-  const { data: attendees = [] } = useReunionAttendees(meetingId);
-  const { data: members = [] } = useBodyMembers(bodyId);
+  const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(meetingId);
+  const { data: members = [], isLoading: membersLoading } = useBodyMembers(bodyId);
   const updateQuorum = useUpdateQuorumData(meetingId);
 
   const debates = ((existingQuorum?.debates ?? []) as DebatePunto[]).map((debate) => {
@@ -689,11 +696,72 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   const prototypeRuleContext = resolvePrototypeMeetingRulePacks(ruleSpecs, ruleResolutions, organoTipo);
   const packs = prototypeRuleContext.packs;
   const overrides = selectedOverrides(ruleResolutions);
-  const usesDemoCensus = members.length === 0 && attendees.length === 0;
-  const presentes = usesDemoCensus
-    ? DEMO_VOTERS.length
-    : attendees.filter((a) => a.attendance_type !== "AUSENTE").length;
-  const total = usesDemoCensus ? DEMO_VOTERS.length : members.length > 0 ? members.length : attendees.length;
+  const loadingCensus = meetingLoading || attendeesLoading || (Boolean(bodyId) && membersLoading);
+  const noBody = !loadingCensus && !bodyId;
+  const noPersistentCensus = !loadingCensus && members.length === 0 && attendees.length === 0;
+  const noPersistedAttendance = !loadingCensus && members.length > 0 && attendees.length === 0;
+
+  if (loadingCensus) {
+    return (
+      <div className="flex items-center gap-2 text-[var(--g-text-secondary)]">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Cargando censo y asistencia de la sesión…</span>
+      </div>
+    );
+  }
+
+  if (noBody) {
+    return (
+      <div
+        className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+          La reunión no tiene órgano asociado
+        </p>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          Vincula la reunión con un órgano social antes de calcular quórum.
+        </p>
+      </div>
+    );
+  }
+
+  if (noPersistentCensus) {
+    return (
+      <div
+        className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+          No hay censo vigente para calcular quórum
+        </p>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          La sesión necesita miembros vigentes o asistentes persistidos. Carga el censo del órgano
+          y guarda la lista de asistencia antes de confirmar quórum.
+        </p>
+      </div>
+    );
+  }
+
+  if (noPersistedAttendance) {
+    return (
+      <div
+        className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+          No hay lista de asistentes guardada
+        </p>
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          Guarda la asistencia real de la sesión antes de calcular quórum. El motor no usa
+          asistentes implícitos ni censos ficticios para constituir una reunión.
+        </p>
+      </div>
+    );
+  }
+
+  const presentes = attendees.filter((a) => a.attendance_type !== "AUSENTE").length;
+  const total = members.length > 0 ? members.length : attendees.length;
   const attendeeCapital = attendees.reduce(
     (sum, attendee) =>
       attendee.attendance_type === "AUSENTE" ? sum : sum + Number(attendee.capital_representado ?? 0),
@@ -807,19 +875,6 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
             No hay capital/derechos de voto informados en la lista de asistentes. El motor usa el
             número de asistentes como aproximación demo; para una junta real debe cargarse capital,
             derechos de voto y clases afectadas.
-          </p>
-        </div>
-      )}
-
-      {usesDemoCensus && (
-        <div
-          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
-          <p className="text-xs text-[var(--g-text-secondary)]">
-            Quórum calculado con censo demo no persistido porque no hay miembros vigentes ni
-            asistentes guardados para este órgano. Este fallback solo sirve para prototipo.
           </p>
         </div>
       )}
@@ -968,7 +1023,10 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
   const { data: meeting } = useReunionById(meetingId);
   const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
   const existingQD = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
-  const existingDebates = (existingQD?.debates ?? []) as DebatePunto[];
+  const existingDebates = useMemo(
+    () => (existingQD?.debates ?? []) as DebatePunto[],
+    [existingQD?.debates],
+  );
 
   const updateQuorum = useUpdateQuorumData(meetingId);
 
@@ -1274,7 +1332,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
 
   const activeConflictScope = meetingId ? (meetingContext?.entityId ?? null) : undefined;
   const { data: activeConflicts = [], isLoading: activeConflictsLoading } = useActiveConflicts(activeConflictScope);
-  const [voters, setVoters] = useState<VoterRow[]>(DEMO_VOTERS);
+  const [voters, setVoters] = useState<VoterRow[]>([]);
   const activeConflictPersonIds = useMemo(
     () =>
       new Set(
@@ -1302,7 +1360,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               ? "Conflicto activo registrado en el expediente"
               : "",
           }))
-        : DEMO_VOTERS;
+        : [];
 
     setVoters((prev) =>
       nextVoters.map((next) => {
@@ -1578,7 +1636,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const favor = currentSnapshot.vote_summary.favor;
   const contra = currentSnapshot.vote_summary.contra;
   const abstencion = currentSnapshot.vote_summary.abstenciones;
-  const allPointsHaveVotes = agendaPoints.every((_, index) =>
+  const hasPersistentVoters = voters.length > 0;
+  const allPointsHaveVotes = hasPersistentVoters && agendaPoints.every((_, index) =>
     evaluateMeetingVoteCompleteness(pointRows(index)).complete
   );
 
@@ -1750,6 +1809,20 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         </div>
       )}
 
+      {!hasPersistentVoters ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            No hay asistentes persistidos con derecho a voto. Guarda la lista real de asistentes
+            antes de registrar votos o crear expedientes Acuerdo 360.
+          </p>
+        </div>
+      ) : null}
+
+      {hasPersistentVoters ? (
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -1847,6 +1920,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           </tbody>
         </table>
       </div>
+      ) : null}
 
       <div
         className="flex items-center gap-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm"
@@ -2040,10 +2114,12 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           <button
             type="button"
             onClick={handleSaveResolutions}
-            disabled={saveResolutions.isPending || updateQuorumData.isPending || !allPointsHaveVotes}
+            disabled={saveResolutions.isPending || updateQuorumData.isPending || !hasPersistentVoters || !allPointsHaveVotes}
             aria-busy={saveResolutions.isPending || updateQuorumData.isPending}
             title={
-              !allPointsHaveVotes
+              !hasPersistentVoters
+                ? "Guarda asistentes reales antes de registrar resoluciones"
+                : !allPointsHaveVotes
                 ? "Registra voto expreso de cada votante elegible y motivo de cada conflicto"
                 : undefined
             }

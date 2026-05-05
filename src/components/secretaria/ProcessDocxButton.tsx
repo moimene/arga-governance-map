@@ -10,7 +10,7 @@ import {
   suggestCapa3DraftWithAnthropicFallback,
 } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
-import { validateCapa3 } from "./Capa3Form";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { Capa3CaptureDialog } from "./Capa3CaptureDialog";
 import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-fixtures";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";

@@ -91,20 +91,18 @@ async function openConvocatoriaWithMeetingAction(page: Page) {
   await page.goto('/secretaria/convocatorias?scope=grupo');
   await expect(page.locator('tbody')).toContainText('ARGA', { timeout: 20_000 });
 
-  const preferredRows = page
-    .getByRole('row')
-    .filter({ hasText: /ARGA Seguros/ })
-    .filter({ hasText: /Consejo de Administración/ });
+  const preferredRows = page.locator('tbody tr');
   const rowCount = await preferredRows.count();
   for (let index = 0; index < Math.min(rowCount, 8); index += 1) {
     await page.goto('/secretaria/convocatorias?scope=grupo');
     await expect(page.locator('tbody')).toContainText('ARGA', { timeout: 20_000 });
-    const row = page
-      .getByRole('row')
-      .filter({ hasText: /ARGA Seguros/ })
-      .filter({ hasText: /Consejo de Administración/ })
-      .nth(index);
+    const row = page.locator('tbody tr').nth(index);
     await expect(row).toBeVisible({ timeout: 10_000 });
+    const bodyText = (await row.locator('td').nth(0).innerText()).trim();
+    const entityText = (await row.locator('td').nth(1).innerText()).trim();
+    if (bodyText !== 'Consejo de Administración' || !/^ARGA Seguros\b/.test(entityText)) {
+      continue;
+    }
     await row.click();
     if (!/\/secretaria\/convocatorias\/[^/?]+/.test(page.url())) {
       await row.dblclick();
@@ -196,15 +194,22 @@ test.describe('Secretaría — golden path prototipo legal', () => {
 
       await goStep(page, /Asistentes/, /Paso 2\. Asistentes/);
       const saveAttendance = page.getByRole('button', { name: 'Guardar asistencia' });
-      if (await saveAttendance.isVisible().catch(() => false)) {
-        await clickIfVisibleAndEnabled(page, 'Guardar asistencia');
+      if (await expect(saveAttendance).toBeAttached({ timeout: 20_000 }).then(() => true).catch(() => false)) {
+        await saveAttendance.scrollIntoViewIfNeeded();
+        await expect(saveAttendance).toBeEnabled({ timeout: 20_000 });
+        await saveAttendance.click();
+        await expect(page.getByText(/Asistencia de \d+ miembros guardada/i).first()).toBeVisible({
+          timeout: 20_000,
+        });
       } else {
-        await expect(page.getByText('Censo demo de prototipo no persistido')).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByText(/No hay censo vigente del órgano/)).toBeVisible({ timeout: 20_000 });
       }
+      await expect(page.getByText(/Censo demo de prototipo no persistido/i)).toHaveCount(0);
     });
 
     await test.step('quórum, agenda y votación', async () => {
       await goStep(page, /Quórum/, /Paso 3\. Quórum/);
+      await expect(page.getByText(/No hay lista de asistentes guardada/i)).toHaveCount(0);
       await expect(page.getByText(/Evaluación Motor V2|QUÓRUM ALCANZADO/i).first()).toBeVisible({ timeout: 20_000 });
       if (await clickIfVisibleAndEnabled(page, 'Confirmar quórum y continuar')) {
         await expect(page.getByText(/Quórum ya registrado/i).first()).toBeVisible({ timeout: 20_000 });

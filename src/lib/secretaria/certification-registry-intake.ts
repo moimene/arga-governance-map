@@ -30,6 +30,7 @@ export interface CertificationRegistryIntake {
   unresolvedPointReferences: string[];
   signed: boolean;
   hasEvidenceBundle: boolean;
+  readyForRegistry: boolean;
   warnings: string[];
 }
 
@@ -70,6 +71,7 @@ export function buildCertificationRegistryIntake(
   const signatureStatus = input.signatureStatus ?? "UNKNOWN";
   const signed = signatureStatus === "SIGNED";
   const hasEvidenceBundle = Boolean(input.evidenceId);
+  const readyForRegistry = signed && hasEvidenceBundle;
   const warnings = [
     signed ? null : "certification_not_signed",
     hasEvidenceBundle ? null : "evidence_bundle_not_linked",
@@ -95,6 +97,7 @@ export function buildCertificationRegistryIntake(
     unresolvedPointReferences,
     signed,
     hasEvidenceBundle,
+    readyForRegistry,
     warnings,
   };
 }

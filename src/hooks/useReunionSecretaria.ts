@@ -20,7 +20,6 @@ import {
   buildMeetingScheduleFromConvocatoria,
   type ConvocatoriaForMeetingSchedule,
 } from "@/lib/secretaria/meeting-scheduler";
-import { buildRuleEvaluationResultInsert } from "@/lib/rules-engine/rule-evaluation-persistence";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 
 export interface MeetingSecretariaRow {
@@ -121,16 +120,17 @@ function dateOnly(value?: string | null) {
   return value ? String(value).slice(0, 10) : null;
 }
 
-function enrichMeetingPointSnapshot(
-  snapshot: MeetingAdoptionSnapshot,
-  links: { agreementId?: string | null; resolutionId?: string | null },
-): MeetingAdoptionSnapshot {
-  return {
-    ...snapshot,
-    agreement_id: links.agreementId ?? null,
-    resolution_id: links.resolutionId ?? null,
-  };
-}
+type SaveMeetingResolutionRpcRow = SaveMeetingResolutionInput & {
+  agreement_action: "UPSERT" | "RESET" | "NONE";
+  agreement_payload?: Record<string, unknown> | null;
+};
+
+type SaveMeetingResolutionRpcResult = {
+  agenda_item_index: number;
+  resolution_id: string;
+  agreement_id: string | null;
+  adoption_snapshot?: MeetingAdoptionSnapshot | null;
+};
 
 export function useReunionesList(entityId?: string | null) {
   const { tenantId } = useTenantContext();
@@ -471,7 +471,7 @@ export function useBodyMembers(bodyId: string | undefined) {
     queryFn: async (): Promise<BodyMember[]> => {
       const { data, error } = await supabase
         .from("condiciones_persona")
-        .select("id, person_id, tipo_condicion, persons(full_name)")
+        .select("id, person_id, tipo_condicion, person:person_id(full_name)")
         .eq("body_id", bodyId!)
         .eq("estado", "VIGENTE")
         .eq("tenant_id", tenantId!);
@@ -480,13 +480,13 @@ export function useBodyMembers(bodyId: string | undefined) {
         id: string;
         person_id: string;
         tipo_condicion: string;
-        persons?: { full_name?: string | null } | null;
+        person?: { full_name?: string | null } | null;
       };
       return ((data ?? []) as Raw[]).map((r) => ({
         id: r.id,
         person_id: r.person_id,
         tipo_condicion: r.tipo_condicion,
-        full_name: r.persons?.full_name ?? "Sin nombre",
+        full_name: r.person?.full_name ?? "Sin nombre",
       }));
     },
   });
@@ -613,11 +613,11 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
         }
       });
 
-      const materializedRows = await Promise.all(
-        rows.map(async (row) => {
+      const rpcRows: SaveMeetingResolutionRpcRow[] = rows.map((row) => {
           const existingAgreementId =
             row.agreement_id ?? existingAgreementByPoint.get(row.agenda_item_index) ?? null;
-          let agreementId: string | null = existingAgreementId;
+          let agreementPayload: Record<string, unknown> | null = null;
+          let agreementAction: SaveMeetingResolutionRpcRow["agreement_action"] = "NONE";
 
           if (row.adoption_snapshot && isMaterializableMeetingAgreement(row.adoption_snapshot)) {
             if (!entityId || !bodyId) {
@@ -636,25 +636,11 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
             });
 
             if (payload) {
-              if (existingAgreementId) {
-                const { error: updateAgreementErr } = await supabase
-                  .from("agreements")
-                  .update(payload)
-                  .eq("id", existingAgreementId)
-                  .eq("tenant_id", tenantId);
-                if (updateAgreementErr) throw updateAgreementErr;
-              } else {
-                const { data: insertedAgreement, error: insertAgreementErr } = await supabase
-                  .from("agreements")
-                  .insert(payload)
-                  .select("id")
-                  .single();
-                if (insertAgreementErr) throw insertAgreementErr;
-                agreementId = (insertedAgreement as { id: string }).id;
-              }
+              agreementPayload = payload;
+              agreementAction = "UPSERT";
             }
           } else if (row.adoption_snapshot && existingAgreementId && entityId && bodyId) {
-            const payload = buildMeetingAgreementDraftResetPayload({
+            agreementPayload = buildMeetingAgreementDraftResetPayload({
               tenantId,
               entityId,
               bodyId,
@@ -665,132 +651,29 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
               requiredMajorityCode: row.required_majority_code,
               origin: row.agreement_origin ?? "MEETING_FLOOR",
             });
-            const { error: resetAgreementErr } = await supabase
-              .from("agreements")
-              .update(payload)
-              .eq("id", existingAgreementId)
-              .eq("tenant_id", tenantId);
-            if (resetAgreementErr) throw resetAgreementErr;
-            agreementId = null;
+            agreementAction = "RESET";
           }
 
-          return { ...row, agreement_id: agreementId };
-        })
-      );
-
-      const ids = (existingResolutionIds ?? []).map((row) => row.id);
-      if (ids.length > 0) {
-        const { error: votesDelErr } = await supabase
-          .from("meeting_votes")
-          .delete()
-          .in("resolution_id", ids);
-        if (votesDelErr) throw votesDelErr;
-      }
-
-      const { error: delErr } = await supabase
-        .from("meeting_resolutions")
-        .delete()
-        .eq("meeting_id", meetingId)
-        .eq("tenant_id", tenantId);
-      if (delErr) throw delErr;
-      if (materializedRows.length === 0) return [];
-      const resolutionRows = materializedRows.map(
-        ({ votes: _votes, adoption_snapshot: _adoptionSnapshot, agreement_origin: _agreementOrigin, ...resolution }) =>
-          resolution
-      );
-      const { data: inserted, error: insErr } = await supabase
-        .from("meeting_resolutions")
-        .insert(resolutionRows.map((r) => ({ ...r, meeting_id: meetingId, tenant_id: tenantId })))
-        .select("id, agenda_item_index");
-      if (insErr) throw insErr;
-
-      const insertedByIndex = new Map(
-        (inserted ?? []).map((resolution) => [resolution.agenda_item_index, resolution.id])
-      );
-      const enrichedRows = materializedRows.map((row) => {
-        const resolutionId = insertedByIndex.get(row.agenda_item_index) ?? null;
         return {
           ...row,
-          resolution_id: resolutionId,
-          adoption_snapshot: row.adoption_snapshot
-            ? enrichMeetingPointSnapshot(row.adoption_snapshot, {
-                agreementId: row.agreement_id,
-                resolutionId,
-              })
-            : undefined,
+          agreement_id: existingAgreementId,
+          agreement_action: agreementAction,
+          agreement_payload: agreementPayload,
         };
       });
 
-      const agreementSnapshotUpdates = enrichedRows.filter(
-        (row) => row.agreement_id && row.adoption_snapshot
-      );
-      if (agreementSnapshotUpdates.length > 0) {
-        await Promise.all(
-          agreementSnapshotUpdates.map(async (row) => {
-            const { error: agreementSnapshotErr } = await supabase
-              .from("agreements")
-              .update({
-                compliance_snapshot: row.adoption_snapshot,
-                compliance_explain: {
-                  agreement_360: {
-                    version: "agreement-360.v1",
-                    source: "meeting_resolutions",
-                    meeting_id: meetingId,
-                    agenda_item_index: row.agenda_item_index,
-                    agreement_id: row.agreement_id,
-                    resolution_id: row.resolution_id,
-                    materialized: true,
-                  },
-                  societary_validity: row.adoption_snapshot?.societary_validity,
-                  pacto_compliance: row.adoption_snapshot?.pacto_compliance,
-                },
-              })
-              .eq("tenant_id", tenantId)
-              .eq("id", row.agreement_id!);
-            if (agreementSnapshotErr) throw agreementSnapshotErr;
-          })
-        );
-      }
-
-      const voteRows = enrichedRows.flatMap((row) => {
-        const resolutionId = insertedByIndex.get(row.agenda_item_index);
-        if (!resolutionId) return [];
-        return (row.votes ?? []).map((vote) => ({
-          ...vote,
-          resolution_id: resolutionId,
-          tenant_id: tenantId,
-        }));
+      const { data: saved, error: saveErr } = await supabase.rpc("fn_save_meeting_resolutions", {
+        p_tenant_id: tenantId,
+        p_meeting_id: meetingId,
+        p_rows: rpcRows,
       });
+      if (saveErr) throw saveErr;
 
-      if (voteRows.length > 0) {
-        const { error: votesErr } = await supabase.from("meeting_votes").insert(voteRows);
-        if (votesErr) throw votesErr;
-      }
-
-      const evaluationRows = (
-        await Promise.all(
-          enrichedRows.map((row) =>
-            row.adoption_snapshot
-              ? buildRuleEvaluationResultInsert({
-                  tenantId,
-                  agreementId: row.agreement_id,
-                  snapshot: row.adoption_snapshot,
-                })
-              : Promise.resolve(null)
-          )
-        )
-      ).filter((row): row is NonNullable<typeof row> => Boolean(row));
-
-      if (evaluationRows.length > 0) {
-        const { error: evalErr } = await supabase.from("rule_evaluation_results").insert(evaluationRows);
-        if (evalErr) throw evalErr;
-      }
-
-      return enrichedRows.map((row) => ({
+      return ((saved ?? []) as SaveMeetingResolutionRpcResult[]).map((row) => ({
         agenda_item_index: row.agenda_item_index,
-        resolution_id: row.resolution_id!,
+        resolution_id: row.resolution_id,
         agreement_id: row.agreement_id ?? null,
-        adoption_snapshot: row.adoption_snapshot,
+        adoption_snapshot: row.adoption_snapshot ?? undefined,
       }));
     },
     onSuccess: () => {

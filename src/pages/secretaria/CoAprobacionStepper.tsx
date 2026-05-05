@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { useEntitiesList } from "@/hooks/useEntities";
+import { useBodiesByEntity } from "@/hooks/useBodies";
+import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { evaluarCoAprobacion } from "@/lib/rules-engine/votacion-engine";
 import type { CoAprobacionConfig } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -26,17 +30,93 @@ interface FirmaLocal {
   fechaFirma: string;
 }
 
+const BODY_TYPE_LABELS: Record<string, string> = {
+  JUNTA: "Junta General / Asamblea",
+  CDA: "Consejo de Administración",
+  COMISION: "Comisión",
+  COMITE: "Comité",
+};
+
 // ─── Step bodies ─────────────────────────────────────────────────────────────
 
 function StepTipoAcuerdo({
+  selectedEntityId, setSelectedEntityId,
+  selectedBodyId, setSelectedBodyId,
+  entities,
+  bodies,
+  isSociedadScoped,
+  requestedPlantillaId,
+  requestedPlantillaLabel,
   materia, setMateria,
   texto, setTexto,
 }: {
+  selectedEntityId: string | null; setSelectedEntityId: (v: string | null) => void;
+  selectedBodyId: string | null; setSelectedBodyId: (v: string | null) => void;
+  entities: Array<{ id: string; legal_name: string; jurisdiction?: string | null }>;
+  bodies: Array<{ id: string; name: string; body_type: string }>;
+  isSociedadScoped: boolean;
+  requestedPlantillaId: string | null;
+  requestedPlantillaLabel: string | null;
   materia: string; setMateria: (v: string) => void;
   texto: string; setTexto: (v: string) => void;
 }) {
   return (
     <div className="space-y-4">
+      {requestedPlantillaId ? (
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <span className="font-medium text-[var(--g-text-primary)]">Plantilla seleccionada:</span>{" "}
+          {requestedPlantillaLabel ?? "se aplicará al acta de decisión conjunta cuando se genere el documento."}
+        </div>
+      ) : null}
+
+      <div>
+        <label htmlFor="coaprobacion-entidad" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+          Sociedad
+        </label>
+        <select
+          id="coaprobacion-entidad"
+          value={selectedEntityId ?? ""}
+          disabled={isSociedadScoped}
+          onChange={(e) => {
+            setSelectedEntityId(e.target.value || null);
+            setSelectedBodyId(null);
+          }}
+          className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="">Seleccionar sociedad...</option>
+          {entities.map((entity) => (
+            <option key={entity.id} value={entity.id}>
+              {entity.legal_name} {entity.jurisdiction ? `(${entity.jurisdiction})` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="coaprobacion-organo" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+          Órgano
+        </label>
+        <select
+          id="coaprobacion-organo"
+          value={selectedBodyId ?? ""}
+          disabled={!selectedEntityId}
+          onChange={(e) => setSelectedBodyId(e.target.value || null)}
+          className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <option value="">Seleccionar órgano...</option>
+          {bodies.map((body) => (
+            <option key={body.id} value={body.id}>
+              {BODY_TYPE_LABELS[body.body_type] ?? body.body_type} - {body.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div>
         <label htmlFor="coaprobacion-materia" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
           Clase de materia
@@ -329,14 +409,29 @@ function StepEvaluacion({ result }: { result: ReturnType<typeof evaluarCoAprobac
 
 export default function CoAprobacionStepper() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const qc = useQueryClient();
   const { tenantId } = useTenantContext();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const requestedPlantillaId = searchParams.get("plantilla");
+  const { data: requestedPlantilla } = usePlantillaProtegida(requestedPlantillaId ?? undefined);
+  const { data: entities = [] } = useEntitiesList();
+  const isSociedadScoped = Boolean(scopedEntityId);
   const [current, setCurrent] = useState(1);
 
   // Step 1 state
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(scopedEntityId);
+  const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
   const [materia, setMateria] = useState("");
   const [texto, setTexto] = useState("");
+  const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
+
+  useEffect(() => {
+    if (!scopedEntityId) return;
+    setSelectedEntityId(scopedEntityId);
+    setSelectedBodyId(null);
+  }, [scopedEntityId]);
 
   // Step 2 state
   const [k, setK] = useState(2);
@@ -373,7 +468,7 @@ export default function CoAprobacionStepper() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleRegistrar() {
-    if (!tenantId || !motorResult) return;
+    if (!tenantId || !motorResult || !selectedEntityId || !selectedBodyId) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -381,15 +476,18 @@ export default function CoAprobacionStepper() {
         .from("agreements")
         .insert({
           tenant_id: tenantId,
-          entity_id: scopedEntityId,
-          agreement_kind: "CO_APROBACION",
-          matter_class: materia || "OTROS",
+          entity_id: selectedEntityId,
+          body_id: selectedBodyId,
+          agreement_kind: materia || "OTROS",
+          matter_class: materia === "OPERACION_ESTRUCTURAL" || materia === "MOD_ESTATUTOS" ? "ESTRUCTURAL" : "ORDINARIA",
           adoption_mode: "CO_APROBACION",
           proposal_text: texto,
+          decision_text: texto,
           status: motorResult.ok ? "ADOPTED" : "DRAFT",
           decision_date: new Date().toISOString().split("T")[0],
           execution_mode: {
             tipo: "CO_APROBACION",
+            selected_template_id: requestedPlantillaId,
             config: {
               k, n,
               ventanaConsenso: ventana,
@@ -400,6 +498,13 @@ export default function CoAprobacionStepper() {
                 hashDocumento: `sha256-${f.adminId}`,
               })),
             },
+            agreement_360: {
+              version: "agreement-360.v1",
+              origin: "CO_APROBACION",
+              selected_template_id: requestedPlantillaId,
+              materialized_at: new Date().toISOString(),
+              materialized: true,
+            },
           },
           compliance_snapshot: motorResult,
         })
@@ -408,10 +513,26 @@ export default function CoAprobacionStepper() {
 
       if (error) throw error;
       setSavedId(data.id);
+      qc.invalidateQueries({ queryKey: ["agreements"] });
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function canAdvance() {
+    switch (current) {
+      case 1:
+        return !!selectedEntityId && !!selectedBodyId && !!materia && texto.trim().length > 0;
+      case 2:
+        return k > 0 && n >= k && Boolean(ventana);
+      case 3:
+        return firmas.length > 0;
+      case 4:
+        return !!motorResult;
+      default:
+        return false;
     }
   }
 
@@ -420,6 +541,15 @@ export default function CoAprobacionStepper() {
       case 1:
         return (
           <StepTipoAcuerdo
+            selectedEntityId={selectedEntityId}
+            setSelectedEntityId={setSelectedEntityId}
+            selectedBodyId={selectedBodyId}
+            setSelectedBodyId={setSelectedBodyId}
+            entities={entities}
+            bodies={bodies}
+            isSociedadScoped={isSociedadScoped}
+            requestedPlantillaId={requestedPlantillaId}
+            requestedPlantillaLabel={requestedPlantilla ? `${requestedPlantilla.tipo} v${requestedPlantilla.version}` : null}
             materia={materia} setMateria={setMateria}
             texto={texto} setTexto={setTexto}
           />
@@ -456,6 +586,13 @@ export default function CoAprobacionStepper() {
                 >
                   Ver expediente →
                 </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos/${savedId}/generar${requestedPlantillaId ? `?plantilla=${requestedPlantillaId}` : ""}`))}
+                  className="text-sm text-[var(--g-brand-3308)] hover:underline"
+                >
+                  Generar documento →
+                </button>
               </div>
             ) : (
               <>
@@ -463,9 +600,6 @@ export default function CoAprobacionStepper() {
                   Se creará un acuerdo con <strong>adoption_mode = CO_APROBACION</strong> y
                   el snapshot del motor. Estado:{" "}
                   <strong>{statusLabel(motorResult?.ok ? "ADOPTED" : "DRAFT")}</strong>.
-                  {scope.mode === "sociedad" && scope.selectedEntity ? (
-                    <> Sociedad: <strong>{scope.selectedEntity.legalName}</strong>.</>
-                  ) : null}
                 </div>
                 {saveError && (
                   <div className="text-sm text-[var(--status-error)]">{saveError}</div>
@@ -473,7 +607,7 @@ export default function CoAprobacionStepper() {
                 <button
                   type="button"
                   onClick={handleRegistrar}
-                  disabled={saving || !motorResult}
+                  disabled={saving || !motorResult || !selectedEntityId || !selectedBodyId}
                   className="bg-[var(--g-brand-3308)] px-6 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
@@ -523,15 +657,19 @@ export default function CoAprobacionStepper() {
           {STEPS.map((s) => {
             const done = s.n < current;
             const active = s.n === current;
+            const locked = s.n > current;
             return (
               <button
                 key={s.n}
                 type="button"
-                onClick={() => setCurrent(s.n)}
+                onClick={() => done && setCurrent(s.n)}
+                disabled={locked}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   active
                     ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
-                    : "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50"
+                    : done
+                      ? "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50"
+                      : "text-[var(--g-text-secondary)] opacity-40"
                 }`}
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
@@ -576,8 +714,8 @@ export default function CoAprobacionStepper() {
             </button>
             <button
               type="button"
-              onClick={() => setCurrent((n) => Math.min(STEPS.length, n + 1))}
-              disabled={current === STEPS.length}
+              onClick={() => canAdvance() && setCurrent((n) => Math.min(STEPS.length, n + 1))}
+              disabled={current === STEPS.length || !canAdvance()}
               className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-40"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >

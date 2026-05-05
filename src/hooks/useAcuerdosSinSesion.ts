@@ -1,6 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import {
+  validateVoteWindow,
+  type NoSessionVoteState,
+  type VoteChoice,
+} from "@/lib/secretaria/no-session-client-guards";
+import { getRpcJsonField, isMissingSupabaseRpcError } from "@/lib/secretaria/supabase-rpc-fallback";
+
+export type { VoteChoice } from "@/lib/secretaria/no-session-client-guards";
 
 export interface NoSessionResolutionRow {
   id: string;
@@ -106,36 +114,29 @@ export function useAgreementForNoSessionResolution(resolutionId: string | undefi
   return useQuery({
     enabled: !!resolutionId && !!tenantId,
     queryKey: ["agreements", tenantId, "byNoSessionResolution", resolutionId],
-    queryFn: async (): Promise<{ id: string; status: string; document_url: string | null } | null> => {
+    queryFn: async (): Promise<{ id: string; status: string; document_url: string | null; execution_mode: Record<string, unknown> | null } | null> => {
       const { data, error } = await supabase
         .from("agreements")
-        .select("id, status, document_url")
+        .select("id, status, document_url, execution_mode")
         .eq("tenant_id", tenantId!)
         .eq("no_session_resolution_id", resolutionId!)
         .maybeSingle();
       if (error) throw error;
-      return (data as { id: string; status: string; document_url: string | null } | null) ?? null;
+      return (data as { id: string; status: string; document_url: string | null; execution_mode: Record<string, unknown> | null } | null) ?? null;
     },
   });
 }
 
-export type VoteChoice = "FOR" | "AGAINST" | "ABSTAIN";
-
 export function useCastVote(resolutionId: string | undefined) {
   const queryClient = useQueryClient();
-  const { tenantId } = useTenantContext();
+  const { tenantId, personId } = useTenantContext();
 
   return useMutation({
     mutationFn: async (choice: VoteChoice) => {
       if (!resolutionId || !tenantId) return;
-      const col =
-        choice === "FOR" ? "votes_for" :
-        choice === "AGAINST" ? "votes_against" : "abstentions";
-
-      // Read current value first (PostgREST has no atomic increment in one round-trip without RPC)
       const { data: current, error: readErr } = await supabase
         .from("no_session_resolutions")
-        .select(`${col}, requires_unanimity, votes_for, votes_against, abstentions`)
+        .select("status, requires_unanimity, votes_for, votes_against, abstentions, total_members, voting_deadline")
         .eq("id", resolutionId)
         .eq("tenant_id", tenantId)
         .eq("status", "VOTING_OPEN")
@@ -143,42 +144,31 @@ export function useCastVote(resolutionId: string | undefined) {
       if (readErr) throw readErr;
       if (!current) throw new Error("Votación no activa");
 
-      const newVal = ((current as Record<string, number>)[col] ?? 0) + 1;
-      const updates: Record<string, unknown> = { [col]: newVal };
-
-      // If unanimity required and someone votes against/abstains → close immediately
-      if (current.requires_unanimity && (choice === "AGAINST" || choice === "ABSTAIN")) {
-        updates.status = "RECHAZADO";
-        updates.closed_at = new Date().toISOString();
+      const voteWindow = validateVoteWindow(current as NoSessionVoteState);
+      if (!voteWindow.ok) {
+        throw new Error(voteWindow.reason ?? "No se pudo registrar el voto");
+      }
+      if (!personId) {
+        throw new Error("No hay persona vinculada al usuario actual para registrar el voto.");
       }
 
-      const { error } = await supabase
-        .from("no_session_resolutions")
-        .update(updates)
-        .eq("id", resolutionId)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
-    },
-  });
-}
-
-export function useCloseVotacionManual(resolutionId: string | undefined) {
-  const queryClient = useQueryClient();
-  const { tenantId } = useTenantContext();
-
-  return useMutation({
-    mutationFn: async (resultado: "APROBADO" | "RECHAZADO") => {
-      if (!resolutionId || !tenantId) return;
-      const { error } = await supabase
-        .from("no_session_resolutions")
-        .update({ status: resultado, closed_at: new Date().toISOString() })
-        .eq("id", resolutionId)
-        .eq("tenant_id", tenantId)
-        .eq("status", "VOTING_OPEN");
-      if (error) throw error;
+      const sentido =
+        choice === "FOR" ? "CONSENTIMIENTO" :
+        choice === "AGAINST" ? "OBJECION" : "SILENCIO";
+      const { error: rpcError } = await supabase.rpc("fn_no_session_cast_response", {
+        p_tenant_id: tenantId,
+        p_resolution_id: resolutionId,
+        p_person_id: personId,
+        p_sentido: sentido,
+        p_texto_respuesta: null,
+        p_firma_qes_ref: null,
+        p_notificacion_certificada_ref: null,
+      });
+      if (!rpcError) return;
+      if (isMissingSupabaseRpcError(rpcError)) {
+        throw new Error("La RPC transaccional de voto sin sesión no está disponible. No se registra voto desde fallback cliente.");
+      }
+      throw rpcError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });
@@ -234,71 +224,30 @@ export function useAdoptNoSessionAgreement() {
   return useMutation({
     mutationFn: async ({
       resolutionId,
-      bodyId,
-      entityId,
-      matterClass,
-      agreementKind,
       resultado,
+      selectedTemplateId,
     }: {
       resolutionId: string;
-      bodyId: string;
-      entityId: string;
-      matterClass: string;
-      agreementKind: string;
       resultado: "APROBADO" | "RECHAZADO";
+      selectedTemplateId?: string | null;
     }) => {
-      const { error: closeErr } = await supabase
-        .from("no_session_resolutions")
-        .update({ status: resultado, closed_at: new Date().toISOString() })
-        .eq("id", resolutionId)
-        .eq("tenant_id", tenantId!);
-      if (closeErr) throw closeErr;
-
-      if (resultado === "APROBADO") {
-        const { data: resolution, error: resolutionErr } = await supabase
-          .from("no_session_resolutions")
-          .select("title, proposal_text")
-          .eq("id", resolutionId)
-          .eq("tenant_id", tenantId!)
-          .maybeSingle();
-        if (resolutionErr) throw resolutionErr;
-        const resolutionText =
-          (resolution as { proposal_text?: string | null; title?: string | null } | null)?.proposal_text?.trim() ||
-          (resolution as { title?: string | null } | null)?.title ||
-          agreementKind;
-
-        const { data, error: agErr } = await supabase
-          .from("agreements")
-          .insert({
-            tenant_id: tenantId!,
-            entity_id: entityId,
-            body_id: bodyId,
-            agreement_kind: agreementKind,
-            matter_class: matterClass,
-            adoption_mode: "NO_SESSION",
-            status: "ADOPTED",
-            no_session_resolution_id: resolutionId,
-            proposal_text: resolutionText,
-            decision_text: resolutionText,
-            decision_date: new Date().toISOString().split("T")[0],
-            execution_mode: {
-              mode: "NO_SESSION",
-              agreement_360: {
-                version: "agreement-360.v1",
-                origin: "NO_SESSION",
-                source: "no_session_resolutions",
-                no_session_resolution_id: resolutionId,
-                materialized_at: new Date().toISOString(),
-                materialized: true,
-              },
-            },
-          })
-          .select("id")
-          .single();
-        if (agErr) throw agErr;
-        return (data as { id: string }).id;
+      const { data: rpcData, error: rpcError } = await supabase.rpc("fn_no_session_close_and_materialize_agreement", {
+        p_tenant_id: tenantId!,
+        p_resolution_id: resolutionId,
+        p_resultado: resultado,
+        p_selected_template_id: selectedTemplateId ?? null,
+      });
+      if (!rpcError) {
+        const agreementId = getRpcJsonField(rpcData, "agreement_id");
+        if (resultado === "APROBADO" && !agreementId) {
+          throw new Error("La materialización transaccional no devolvió agreement_id.");
+        }
+        return agreementId;
       }
-      return null;
+      if (isMissingSupabaseRpcError(rpcError)) {
+        throw new Error("La RPC transaccional de cierre/materialización sin sesión no está disponible. No se materializa desde fallback cliente.");
+      }
+      throw rpcError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });

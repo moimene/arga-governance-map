@@ -27,13 +27,14 @@ import {
   Save,
   CloudOff,
 } from "lucide-react";
-import { useAgreement } from "@/hooks/useAgreementCompliance";
+import { useAgreement, type AgreementFull } from "@/hooks/useAgreementCompliance";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
-import { Capa3Form, validateCapa3 } from "@/components/secretaria/Capa3Form";
+import { Capa3Form } from "@/components/secretaria/Capa3Form";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
@@ -42,12 +43,14 @@ import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
+import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
 import {
   buildSecretariaDocumentGenerationRequest,
   type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
+import { templateCompatibleWithAgreement } from "@/lib/secretaria/agreement-template-compatibility";
 import {
   finalizeEditableDocumentDraft,
   prepareDocumentComposition,
@@ -59,7 +62,7 @@ import {
   type PreparedDocumentComposition,
   type SaveEditableDocumentDraftResult,
 } from "@/lib/motor-plantillas";
-import { isLegallyReviewedDraft, isOperationalTemplate } from "@/lib/doc-gen/template-operability";
+import { isLegallyReviewedDraft } from "@/lib/doc-gen/template-operability";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -79,13 +82,76 @@ function hasResolvedValue(value: unknown) {
   return true;
 }
 
+function valueAsText(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function buildDefaultCapa3Values(
+  fields: Array<{ campo: string }>,
+  agreement: AgreementFull,
+  resolvedVars: Record<string, unknown>,
+): Record<string, string> {
+  if (fields.length === 0) return {};
+
+  const snapshot = agreement.compliance_snapshot ?? {};
+  const decisionText =
+    agreement.decision_text?.trim() ||
+    agreement.proposal_text?.trim() ||
+    valueAsText(resolvedVars.texto_decision).trim() ||
+    valueAsText(resolvedVars.contenido_acuerdo).trim();
+  const votesFor = valueAsText(snapshot.votes_for ?? resolvedVars.votes_for) || "0";
+  const votesAgainst = valueAsText(snapshot.votes_against ?? resolvedVars.votes_against) || "0";
+  const abstentions = valueAsText(snapshot.abstentions ?? resolvedVars.abstentions) || "0";
+  const totalMembers = valueAsText(snapshot.total_members ?? resolvedVars.total_members) || "0";
+  const responseSummary =
+    valueAsText(resolvedVars.relacion_respuestas_texto).trim() ||
+    [
+      `A favor: ${votesFor}`,
+      `En contra: ${votesAgainst}`,
+      `Abstenciones: ${abstentions}`,
+      `Total legitimados/votantes: ${totalMembers}`,
+    ].join("\n");
+
+  const defaults: Record<string, string> = {};
+  for (const field of fields) {
+    const key = field.campo;
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey === "tabla_respuestas" || normalizedKey.includes("respuestas")) {
+      defaults[key] = responseSummary;
+    } else if (
+      normalizedKey === "texto_acuerdo" ||
+      normalizedKey.includes("texto_acuerdo") ||
+      normalizedKey.includes("contenido_acuerdo") ||
+      normalizedKey.includes("propuesta")
+    ) {
+      defaults[key] = decisionText;
+    } else if (normalizedKey.includes("conflicto")) {
+      defaults[key] =
+        valueAsText(resolvedVars.nota_conflictos).trim() ||
+        "No constan conflictos de interés ni restricciones de voto en el expediente demo-operativo.";
+    }
+  }
+
+  return Object.fromEntries(Object.entries(defaults).filter(([, value]) => value.trim().length > 0));
+}
+
 function inferDocumentTypeForComposer(
   plantilla: PlantillaProtegidaRow,
   adoptionMode?: string | null,
 ): SecretariaDocumentType {
   const tipo = plantilla.tipo;
   const mode = adoptionMode?.toUpperCase() ?? "";
-  if (tipo === "ACTA_ACUERDO_ESCRITO" || mode === "NO_SESSION" || mode === "CO_APROBACION" || mode === "SOLIDARIO") {
+  if (
+    tipo === "ACTA_ACUERDO_ESCRITO" ||
+    tipo === "ACTA_DECISION_CONJUNTA" ||
+    tipo === "ACTA_ORGANO_ADMIN" ||
+    mode === "NO_SESSION" ||
+    mode === "CO_APROBACION" ||
+    mode === "SOLIDARIO"
+  ) {
     return "ACUERDO_SIN_SESION";
   }
   if (tipo === "ACTA_CONSIGNACION" || mode.startsWith("UNIPERSONAL")) {
@@ -96,6 +162,15 @@ function inferDocumentTypeForComposer(
   return "INFORME_DOCUMENTAL_PRE";
 }
 
+function templateTypesForAgreementAdoptionMode(adoptionMode?: string | null): string[] | null {
+  const mode = adoptionMode?.trim().toUpperCase();
+  if (mode === "NO_SESSION") return ["ACTA_ACUERDO_ESCRITO"];
+  if (mode === "CO_APROBACION") return ["ACTA_DECISION_CONJUNTA"];
+  if (mode === "SOLIDARIO") return ["ACTA_ORGANO_ADMIN"];
+  if (mode === "UNIPERSONAL_SOCIO" || mode === "UNIPERSONAL_ADMIN") return ["ACTA_CONSIGNACION"];
+  return null;
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function GenerarDocumentoStepper() {
@@ -103,9 +178,10 @@ export default function GenerarDocumentoStepper() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
-  const { tenantId } = useTenantContext();
+  const { tenantId, personId } = useTenantContext();
   const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
+  const { data: signer } = usePersonaCanonical(personId ?? undefined);
   const { data: normativeSnapshot } = useAgreementNormativeSnapshot(agreement);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
   const requestedPlantillaId = searchParams.get("plantilla");
@@ -144,6 +220,7 @@ export default function GenerarDocumentoStepper() {
 
   const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
+  const agreementEntityName = agreement?.entities?.common_name ?? undefined;
   const missingRequiredCapa2 = useMemo(() => {
     if (!selectedPlantilla) return [];
     return (selectedPlantilla.capa2_variables ?? [])
@@ -155,26 +232,8 @@ export default function GenerarDocumentoStepper() {
   // Filter plantillas compatible with this agreement
   const compatiblePlantillas = useMemo(() => {
     if (!agreement) return [];
-    const agreementJurisdiction = agreement.entities?.jurisdiction ?? "ES";
-    return plantillas.filter((p) => {
-      const templateJurisdiction = p.jurisdiccion?.toUpperCase();
-      const jurisdiccionOk =
-        !templateJurisdiction ||
-        templateJurisdiction === "GLOBAL" ||
-        templateJurisdiction === "MULTI" ||
-        templateJurisdiction === agreementJurisdiction.toUpperCase();
-      const materiaOk =
-        !p.materia_acuerdo ||
-        p.materia_acuerdo === agreement.agreement_kind ||
-        p.materia_acuerdo === agreement.matter_class;
-      const adoptionOk =
-        !p.adoption_mode || p.adoption_mode === agreement.adoption_mode;
-      const organoOk =
-        !p.organo_tipo ||
-        !agreement.governing_bodies?.body_type ||
-        p.organo_tipo === agreement.governing_bodies.body_type;
-      return isOperationalTemplate(p) && jurisdiccionOk && materiaOk && adoptionOk && organoOk;
-    });
+    const allowedTypes = templateTypesForAgreementAdoptionMode(agreement.adoption_mode);
+    return plantillas.filter((p) => templateCompatibleWithAgreement(p, agreement, allowedTypes));
   }, [plantillas, agreement]);
   const requestedPlantilla = useMemo(
     () => compatiblePlantillas.find((plantilla) => plantilla.id === requestedPlantillaId) ?? null,
@@ -192,6 +251,22 @@ export default function GenerarDocumentoStepper() {
     () => editableDraftText.trim().length,
     [editableDraftText],
   );
+
+  useEffect(() => {
+    if (!agreement || !selectedPlantilla) return;
+    const defaults = buildDefaultCapa3Values(normalizedCapa3Fields, agreement, resolvedVars);
+    if (Object.keys(defaults).length === 0) return;
+    setCapa3Values((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const [key, value] of Object.entries(defaults)) {
+        if (next[key]?.trim()) continue;
+        next[key] = value;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [agreement, normalizedCapa3Fields, resolvedVars, selectedPlantilla]);
 
   const buildComposerRequest = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
@@ -407,14 +482,18 @@ export default function GenerarDocumentoStepper() {
       setSigningError("Documento no generado aún");
       return;
     }
+    if (!personId || !signer?.full_name || !signer.email) {
+      setSigningError("No hay firmante vigente con nombre y email para solicitar QES.");
+      return;
+    }
     setSigningStatus("pending");
     setSigningError(null);
     try {
       const result = await signMutation.mutateAsync({
         documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
         documentData: docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer,
-        signatories: [{ name: "Lucía Martín", email: "lucia.martin@arga-seguros.com", surnames: "Martín García", sequence: 1 }],
-        createdBy: "secretaria-demo",
+        signatories: [{ name: signer.full_name, email: signer.email, sequence: 1 }],
+        createdBy: personId,
         agreementId: agreement.id,
         onProgress: () => {},
       });
@@ -428,7 +507,7 @@ export default function GenerarDocumentoStepper() {
       setSigningError(errorMsg);
       setSigningStatus("error");
     }
-  }, [docxBuffer, selectedPlantilla, agreement, signMutation]);
+  }, [docxBuffer, selectedPlantilla, agreement, signMutation, personId, signer]);
 
   const handleArchive = useCallback(async () => {
     if (!docxBuffer || !agreement?.id) {
@@ -562,7 +641,7 @@ export default function GenerarDocumentoStepper() {
     try {
       printRenderedDocument({
         title: compositionResult.title,
-        subtitle: agreement.entities?.name ?? undefined,
+        subtitle: agreementEntityName,
         renderedText: compositionResult.document.renderedText,
         filename: compositionResult.document.filename,
         contentHash: compositionResult.document.contentHash,
@@ -572,7 +651,7 @@ export default function GenerarDocumentoStepper() {
     } catch (error) {
       setDocumentActionError(error instanceof Error ? error.message : "No se pudo imprimir el documento.");
     }
-  }, [compositionResult, agreement.entities?.name]);
+  }, [compositionResult, agreementEntityName]);
 
   // ── Loading state ────────────────────────────────────────────────────────
 
@@ -658,7 +737,7 @@ export default function GenerarDocumentoStepper() {
               Seleccionar plantilla
             </h2>
             <p className="text-xs text-[var(--g-text-secondary)]">
-              Plantillas compatibles con el acuerdo (adopción: {agreement.adoption_mode}, jurisdicción: ES)
+              Plantillas compatibles con el acuerdo (adopción: {agreement.adoption_mode}, jurisdicción: {agreement.entities?.jurisdiction ?? "ES"})
             </p>
 
             {requestedPlantillaId ? (

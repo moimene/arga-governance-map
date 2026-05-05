@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,21 +59,21 @@ export default function ObligacionesList() {
     return m;
   }, [controls]);
 
-  const obligationStatus = (o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
+  const obligationStatus = useCallback((o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
     const cs = ctrlsByObl.get(o.id) ?? [];
     if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
     if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
     if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
     if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
     return { label: "EN PROCESO", tone: "warning", pulse: false };
-  };
+  }, [ctrlsByObl]);
 
   const filtered = useMemo(() => obligations.filter((o) => {
     const st = obligationStatus(o);
     return (framework === "all" || (o.source ?? "").toLowerCase().startsWith(framework.toLowerCase())) &&
       (status === "all" || st.label === status) &&
       (search === "" || o.title.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase()));
-  }), [obligations, ctrlsByObl, framework, status, search]);
+  }), [obligations, framework, obligationStatus, status, search]);
 
   const dora = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("dora"));
   const sol = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("solv"));

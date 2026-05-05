@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCapa3 } from "../Capa3Form";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 
 describe("validateCapa3", () => {
   it("devuelve un mapa campo -> mensaje compatible con Object.keys/Object.values", () => {

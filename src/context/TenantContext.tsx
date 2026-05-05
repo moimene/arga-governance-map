@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,
@@ -26,6 +27,7 @@ const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [entityId, setEntityId] = useState<string | null>(null);
   const [personId, setPersonId] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setTenantId(null);
       setEntityId(null);
       setPersonId(null);
@@ -47,7 +49,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     supabase
       .from("user_profiles")
       .select("tenant_id, entity_id, person_id, role_code")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
@@ -59,7 +61,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setRoleCode(data?.role_code ?? null);
         setIsLoading(false);
       });
-  }, [user?.id]);
+  }, [userId]);
 
   return (
     <TenantContext.Provider

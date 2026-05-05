@@ -68,7 +68,7 @@ function AgreementBadge({ status }: AgreementBadgeProps) {
     ADOPTED: { bg: "bg-[var(--status-success)]/10", text: "text-[var(--status-success)]", label: "Adoptado" },
     CERTIFIED: { bg: "bg-[var(--status-success)]/10", text: "text-[var(--status-success)]", label: "Certificado" },
     INSTRUMENTED: { bg: "bg-[var(--status-success)]/10", text: "text-[var(--status-success)]", label: "Instrumentado" },
-    FILED: { bg: "bg-[var(--g-surface-subtle)]", text: "text-[var(--g-text-secondary)]", label: "Presentado" },
+    FILED: { bg: "bg-[var(--g-surface-subtle)]", text: "text-[var(--g-text-secondary)]", label: "Preparado para registro" },
     PUBLISHED: { bg: "bg-[var(--g-surface-subtle)]", text: "text-[var(--g-text-secondary)]", label: "Publicado" },
   };
 
