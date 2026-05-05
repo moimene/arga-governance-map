@@ -202,6 +202,9 @@ export default function ActaDetalle() {
             {body}
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">{entity}</p>
+          <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+            Evidencia de apoyo demo/operativa; no constituye evidencia final productiva.
+          </p>
           {requestedPlantillaId ? (
             <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
               Plantilla seleccionada:
