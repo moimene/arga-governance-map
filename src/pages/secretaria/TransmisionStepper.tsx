@@ -15,9 +15,10 @@ interface Draft {
   numero_titulos: string;
   effective_from: string;
   motivo: string;
+  support_doc_ref: string;
 }
 
-const STEPS = ["Origen", "Destino", "Confirmar"];
+const STEPS = ["Origen", "Destino", "Soporte", "Confirmar"];
 
 export default function TransmisionStepper() {
   const { id: entityId } = useParams<{ id: string }>();
@@ -36,6 +37,7 @@ export default function TransmisionStepper() {
     numero_titulos: "",
     effective_from: new Date().toISOString().slice(0, 10),
     motivo: "",
+    support_doc_ref: "",
   });
 
   const sourceHolding = useMemo(() => {
@@ -51,6 +53,7 @@ export default function TransmisionStepper() {
       return !!draft.source_holding_id && Number(draft.numero_titulos) > 0 &&
         (sourceHolding ? Number(draft.numero_titulos) <= (sourceHolding.numero_titulos ?? 0) : false);
     if (step === 1) return !!draft.destino_person_id && draft.destino_person_id !== sourceHolding?.holder_person_id;
+    if (step === 2) return draft.support_doc_ref.trim().length > 0;
     return true;
   })();
 
@@ -71,7 +74,7 @@ export default function TransmisionStepper() {
         p_titles_to_transfer: titulosATransmitir,
         p_effective_date: today,
         p_agreement_id: null,
-        p_support_doc_ref: null,
+        p_support_doc_ref: draft.support_doc_ref.trim(),
         p_notas: draft.motivo || "transmision_inter_vivos",
       });
       if (!rpcError) {
@@ -120,7 +123,12 @@ export default function TransmisionStepper() {
         is_treasury: false,
         effective_from: today,
         effective_to: null,
-        metadata: { motivo: draft.motivo || "transmision_inter_vivos", origen_holding_id: sourceHolding.id },
+        metadata: {
+          motivo: draft.motivo || "transmision_inter_vivos",
+          origen_holding_id: sourceHolding.id,
+          support_doc_ref: draft.support_doc_ref.trim(),
+          gestor_documental_context: "sociedad",
+        },
       });
       if (destErr) throw destErr;
 
@@ -266,11 +274,28 @@ export default function TransmisionStepper() {
           </div>
         )}
 
-        {step === 2 && sourceHolding && (
+        {step === 2 && (
+          <div className="grid grid-cols-1 gap-4">
+            <div className="rounded-md border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-3 text-sm text-[var(--g-text-secondary)]">
+              La transmisión requiere una copia o referencia del documento soporte dentro del gestor
+              documental de la sociedad. Use una URL de expediente, referencia `evidence://...`,
+              hash documental o código interno del adjunto.
+            </div>
+            <Input
+              label="Documento soporte *"
+              value={draft.support_doc_ref}
+              onChange={(v) => update("support_doc_ref", v)}
+              placeholder="evidence://ead-trust/ARGA_SEG_TRANSMISION_2026_01 o DOC-SOC-..."
+            />
+          </div>
+        )}
+
+        {step === 3 && sourceHolding && (
           <div>
             <p className="mb-4 text-sm text-[var(--g-text-primary)]">
               Esta operación cerrará la holding de origen y creará una nueva de destino. Si hay
-              remanente, se creará una tercera holding con el saldo del transmitente.
+              remanente, se creará una tercera holding con el saldo del transmitente. La referencia
+              documental quedará vinculada como soporte de la transmisión.
             </p>
             <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Field label="Origen" value={sourceHolding.holder?.full_name ?? "—"} />
@@ -288,6 +313,7 @@ export default function TransmisionStepper() {
               />
               <Field label="Fecha efectiva" value={draft.effective_from} />
               <Field label="Motivo" value={draft.motivo || "—"} />
+              <Field label="Documento soporte" value={draft.support_doc_ref || "—"} />
             </dl>
           </div>
         )}

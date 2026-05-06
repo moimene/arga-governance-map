@@ -106,6 +106,11 @@ function nowIso() {
   return "2026-05-06T12:00:00.000Z";
 }
 
+function demoFiscalId(personId: string, index: number) {
+  const suffix = createHash("sha1").update(`arga-fiscal-id:${personId}`).digest("hex").slice(0, 6).toUpperCase();
+  return `NIF-DEMO-${String(index + 1).padStart(2, "0")}-${suffix}`;
+}
+
 function profile(entityId: string, overrides: Json = {}) {
   return {
     schema_version: "entity-normative-profile.golden-path.v1",
@@ -465,6 +470,110 @@ async function closeE2EResidue(supabase: SupabaseClient, repairs: string[]) {
   }
 }
 
+async function sanitizeFichaSocietariaData(supabase: SupabaseClient, repairs: string[]) {
+  await patchRow(supabase, repairs, "entities", ARGA_SEG, {
+    registration_number: "A-00001001",
+    materiality: "Critical",
+  });
+
+  const { data: capitalProfiles, error: capitalError } = await supabase
+    .from("entity_capital_profile")
+    .select("id,capital_escriturado,capital_desembolsado")
+    .eq("tenant_id", DEMO_TENANT)
+    .eq("entity_id", ARGA_SEG)
+    .eq("estado", "VIGENTE");
+  if (capitalError) throw new Error(`capital profile probe: ${capitalError.message}`);
+  for (const profileRow of (capitalProfiles ?? []) as Row[]) {
+    const capital = Number(profileRow.capital_escriturado ?? 0);
+    if (capital <= 0) continue;
+    if (Number(profileRow.capital_desembolsado ?? 0) === capital) continue;
+    await patchRow(supabase, repairs, "entity_capital_profile", profileRow.id, {
+      capital_desembolsado: capital,
+    });
+  }
+
+  const { data: ordClass, error: classError } = await supabase
+    .from("share_classes")
+    .select("id,name")
+    .eq("tenant_id", DEMO_TENANT)
+    .eq("entity_id", ARGA_SEG)
+    .eq("class_code", "ORD")
+    .maybeSingle();
+  if (classError) throw new Error(`share class ORD probe: ${classError.message}`);
+  if (ordClass) {
+    await patchRow(supabase, repairs, "share_classes", ordClass.id, {
+      name: "Acciones ordinarias de la misma clase",
+    });
+
+    const { data: holdings, error: holdingsError } = await supabase
+      .from("capital_holdings")
+      .select("id,share_class_id,porcentaje_capital")
+      .eq("tenant_id", DEMO_TENANT)
+      .eq("entity_id", ARGA_SEG)
+      .is("effective_to", null)
+      .gt("porcentaje_capital", 0);
+    if (holdingsError) throw new Error(`active holdings class probe: ${holdingsError.message}`);
+    for (const holding of (holdings ?? []) as Row[]) {
+      if (holding.share_class_id === ordClass.id) continue;
+      await patchRow(supabase, repairs, "capital_holdings", holding.id, {
+        share_class_id: ordClass.id,
+      });
+    }
+  }
+
+  const { data: conditions, error: conditionError } = await supabase
+    .from("condiciones_persona")
+    .select("id,person_id,fecha_fin,metadata,person:person_id(id,tax_id,person_type)")
+    .eq("tenant_id", DEMO_TENANT)
+    .eq("entity_id", ARGA_SEG)
+    .eq("estado", "VIGENTE");
+  if (conditionError) throw new Error(`conditions for ficha probe: ${conditionError.message}`);
+
+  const seenPersons = new Set<string>();
+  let personIndex = 0;
+  for (const condition of (conditions ?? []) as Array<Row & { person?: Row | null }>) {
+    if (typeof condition.fecha_fin === "string" && condition.fecha_fin < today()) {
+      await patchRow(supabase, repairs, "condiciones_persona", condition.id, {
+        fecha_fin: "2029-12-31",
+        metadata: {
+          ...(condition.metadata as Json | null ?? {}),
+          source: "arga_golden_path_consolidation",
+          normalized_vigencia_for_demo: true,
+        },
+      });
+    }
+
+    const person = condition.person;
+    const personId = String(condition.person_id ?? "");
+    if (!personId || seenPersons.has(personId)) continue;
+    seenPersons.add(personId);
+    if (person?.person_type !== "PF" || person.tax_id) continue;
+    await patchRow(supabase, repairs, "persons", personId, {
+      tax_id: demoFiscalId(personId, personIndex),
+    });
+    personIndex += 1;
+  }
+
+  const { data: representations, error: representationsError } = await supabase
+    .from("representaciones")
+    .select("id,evidence")
+    .eq("tenant_id", DEMO_TENANT)
+    .eq("entity_id", ARGA_SEG)
+    .is("effective_to", null);
+  if (representationsError) throw new Error(`representaciones evidence probe: ${representationsError.message}`);
+  for (const representation of (representations ?? []) as Row[]) {
+    const evidence = (representation.evidence ?? {}) as Json;
+    if (evidence.documento_ref) continue;
+    await patchRow(supabase, repairs, "representaciones", representation.id, {
+      evidence: {
+        ...evidence,
+        documento_ref: "evidence://ead-trust/ARGA_SEG_REPRESENTANTE_PJ_2025",
+        gestor_documental_context: "sociedad",
+      },
+    });
+  }
+}
+
 async function seedCoreConditions(supabase: SupabaseClient, repairs: string[]) {
   await ensureCondition(supabase, repairs, {
     label: "arga-jga-presidente",
@@ -743,6 +852,7 @@ async function main() {
 
   await normalizeBodies(supabase, repairs);
   await closeE2EResidue(supabase, repairs);
+  await sanitizeFichaSocietariaData(supabase, repairs);
   const { jgaSecretaryAuthority } = await seedCoreConditions(supabase, repairs);
   await rescopeLegacyAgreements(supabase, repairs);
   await normalizePolicyAgreements(supabase, repairs);

@@ -111,6 +111,44 @@ export function useAdministradores(entityId: string | undefined, soloVigentes = 
 }
 
 /**
+ * Administradores societarios de una entidad.
+ *
+ * Para una SA administrada por Consejo, los administradores son los miembros
+ * del Consejo de Administracion. Para formas no colegiadas, son los cargos
+ * ADMIN_UNICO / ADMIN_SOLIDARIO / ADMIN_MANCOMUNADO / ADMIN_PJ sin body_id.
+ * No incluye miembros de comisiones ni cargos de Junta General.
+ */
+export function useAdministradoresSocietarios(entityId: string | undefined, soloVigentes = true) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["cargos", tenantId, "administradoresSocietarios", entityId, soloVigentes],
+    queryFn: async (): Promise<CargoDetailRow[]> => {
+      let q = supabase
+        .from("condiciones_persona")
+        .select(`
+          *,
+          person:person_id(id, full_name, tax_id, person_type, denomination),
+          body:body_id(id, name, body_type),
+          representative:representative_person_id(id, full_name, tax_id)
+        `)
+        .eq("tenant_id", tenantId!)
+        .eq("entity_id", entityId!)
+        .in("tipo_condicion", [...CARGOS_ADMIN_NO_COLEGIADO, ...CARGOS_ORGANO_COLEGIADO]);
+      if (soloVigentes) q = q.eq("estado", "VIGENTE");
+      const { data, error } = await q.order("fecha_inicio", { ascending: false });
+      if (error) throw error;
+
+      return ((data ?? []) as CargoDetailRow[]).filter((cargo) => {
+        if (!cargo.body_id) return CARGOS_ADMIN_NO_COLEGIADO.includes(cargo.tipo_condicion);
+        const bodyType = cargo.body?.body_type?.toUpperCase() ?? "";
+        return bodyType === "CDA" || bodyType === "CONSEJO" || bodyType === "CONSEJO_ADMIN";
+      });
+    },
+  });
+}
+
+/**
  * Composición de un órgano colegiado (body_id NOT NULL).
  * CONSEJERO, PRESIDENTE, VICEPRESIDENTE, SECRETARIO, CONSEJERO_COORDINADOR.
  */

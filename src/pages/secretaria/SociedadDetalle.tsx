@@ -4,23 +4,23 @@ import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
-  Landmark, Route, ScrollText, Scale, GitBranch,
+  Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
-import { useAdministradores, CARGO_LABELS } from "@/hooks/useCargos";
+import { useAdministradoresSocietarios, CARGO_LABELS } from "@/hooks/useCargos";
 import { useEntityBodies } from "@/hooks/useEntities";
 import { useRepresentaciones, SCOPE_LABELS } from "@/hooks/useRepresentacionesCanonical";
 import { useAuthorityEvidence, CARGO_CERT_LABELS } from "@/hooks/useAuthorityEvidence";
 import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
+import { useReglasAplicables } from "@/hooks/useReglasAplicables";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
 type TabId =
   | "perfil"
   | "capital"
-  | "clases"
   | "socios"
   | "organos"
   | "admins"
@@ -31,7 +31,6 @@ type TabId =
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "perfil",           label: "Perfil",              icon: Building2 },
   { id: "capital",          label: "Capital",             icon: Coins },
-  { id: "clases",           label: "Clases",              icon: Layers },
   { id: "socios",           label: "Socios",              icon: Users },
   { id: "organos",          label: "Órganos",             icon: Gavel },
   { id: "admins",           label: "Administradores",     icon: UserCheck },
@@ -200,7 +199,6 @@ export default function SociedadDetalle() {
       <div>
         {tab === "perfil"           && <TabPerfil id={s.id} s={s} />}
         {tab === "capital"          && <TabCapital entityId={s.id} />}
-        {tab === "clases"           && <TabClases entityId={s.id} />}
         {tab === "socios"           && <TabSocios entityId={s.id} />}
         {tab === "organos"          && <TabOrganos entityId={s.id} />}
         {tab === "admins"           && <TabAdmins entityId={s.id} />}
@@ -277,6 +275,7 @@ function SociedadNormativeOverview({ entityId, onOpen }: { entityId: string; onO
 
 function TabMarcoNormativo({ entityId }: { entityId: string }) {
   const { data: profile, isLoading, error } = useEntityNormativeProfile(entityId);
+  const { data: reglas = [], isLoading: reglasLoading } = useReglasAplicables(entityId);
 
   if (isLoading) return <div className="p-4 text-sm text-[var(--g-text-secondary)]">Cargando marco normativo…</div>;
   if (error) {
@@ -294,10 +293,19 @@ function TabMarcoNormativo({ entityId }: { entityId: string }) {
     );
   }
 
-  return <NormativeFrameworkPanel profile={profile} />;
+  return <NormativeFrameworkPanel profile={profile} reglas={reglas} reglasLoading={reglasLoading} />;
 }
 
-function NormativeFrameworkPanel({ profile }: { profile: EntityNormativeProfile }) {
+function NormativeFrameworkPanel({
+  profile,
+  reglas,
+  reglasLoading,
+}: {
+  profile: EntityNormativeProfile;
+  reglas: NonNullable<ReturnType<typeof useReglasAplicables>["data"]>;
+  reglasLoading: boolean;
+}) {
+  const ruleRows = reglas.filter((rule) => rule.source === "LEY" && rule.materia && rule.materia !== "GENERAL");
   return (
     <div
       className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
@@ -356,6 +364,42 @@ function NormativeFrameworkPanel({ profile }: { profile: EntityNormativeProfile 
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Motor de reglas por materia
+            </h3>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--g-text-secondary)]">
+              Esta es la capa de mantenimiento de rule packs que gobierna acuerdos. Acuerdo 360
+              es el expediente trazable; los documentos son salidas del expediente; el rule pack
+              es la regla que decide quórum, mayoría, competencia, warnings y gates.
+            </p>
+          </div>
+          <span
+            className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {ruleRows.length} rule packs activos
+          </span>
+        </div>
+        <Table
+          isLoading={reglasLoading}
+          empty="Sin rule packs activos para materias societarias."
+          headers={["Materia", "Órgano", "Pack", "Versión", "Nota"]}
+        >
+          {ruleRows.slice(0, 18).map((rule) => (
+            <tr key={`${rule.source}-${rule.pack_id}-${rule.version ?? "v"}`} className="hover:bg-[var(--g-surface-subtle)]/50">
+              <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">{rule.materia}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.organo_tipo ?? "—"}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.pack_code}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.version ?? "—"}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.note ?? "—"}</td>
+            </tr>
+          ))}
+        </Table>
       </div>
     </div>
   );
@@ -417,7 +461,7 @@ function SociedadOperationalOverview({
   const { data: capital } = useCapitalProfile(entityId);
   const { data: socios = [] } = useCapitalHoldings(entityId);
   const { data: organos = [] } = useEntityBodies(entityId);
-  const { data: administradores = [] } = useAdministradores(entityId);
+  const { data: administradores = [] } = useAdministradoresSocietarios(entityId);
   const { data: autoridad = [] } = useAuthorityEvidence(entityId);
 
   const capitalValue = capital
@@ -609,33 +653,159 @@ function SociedadQuickActions({
 // ------------------------------------------------------------
 // Tab: Perfil
 // ------------------------------------------------------------
+function FieldHint({ text }: { text: string }) {
+  return (
+    <span
+      className="inline-flex items-center text-[var(--g-text-secondary)]"
+      title={text}
+      aria-label={text}
+    >
+      <HelpCircle className="h-3.5 w-3.5" />
+    </span>
+  );
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("es-ES");
+}
+
+function formatVigencia(from: string | null | undefined, to: string | null | undefined) {
+  return `${formatDate(from)} → ${to ? formatDate(to) : "vigente"}`;
+}
+
+function fiscalId(s: NonNullable<ReturnType<typeof useSociedad>["data"]>) {
+  return s.registration_number ?? s.person?.tax_id ?? "—";
+}
+
+function bodyTypeLabel(bodyType: string | null | undefined) {
+  const value = String(bodyType ?? "").toUpperCase();
+  if (value === "JUNTA") return "Junta general";
+  if (value === "CDA" || value === "CONSEJO") return "Consejo de administración";
+  if (value === "COMISION") return "Comisión del Consejo";
+  if (value === "COMITE") return "Comité";
+  return bodyType ?? "—";
+}
+
+function technicalValue(value: React.ReactNode) {
+  return <code className="text-xs text-[var(--g-text-secondary)]">{value}</code>;
+}
+
 function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof useSociedad>["data"]> }) {
-  const fields: [string, React.ReactNode][] = [
-    ["ID", <code className="text-xs">{id}</code>],
-    ["Slug", s.slug],
-    ["Tipo social", s.tipo_social ?? "—"],
-    ["Forma jurídica", s.legal_form ?? "—"],
-    ["Forma administración", s.forma_administracion ?? "—"],
-    ["Órgano admin.", s.tipo_organo_admin ?? "—"],
-    ["Unipersonal", s.es_unipersonal ? "Sí" : "No"],
-    ["Cotizada", s.es_cotizada ? "Sí" : "No"],
-    ["Jurisdicción", s.jurisdiction ?? "—"],
-    ["Materialidad", s.materiality ?? "—"],
-    ["Estado", s.entity_status ?? "—"],
-    ["Matriz", s.parent?.common_name ?? s.parent?.legal_name ?? "—"],
-    ["% Propiedad matriz", s.ownership_percentage != null ? `${s.ownership_percentage}%` : "—"],
-    ["PJ (persons)", s.person ? `${s.person.full_name} — ${s.person.tax_id ?? "—"}` : "—"],
+  const fields: Array<{ label: string; value: React.ReactNode; help: string; technical?: boolean }> = [
+    {
+      label: "Denominación social",
+      value: s.legal_name,
+      help: "Nombre jurídico que se usa en convocatorias, actas, certificaciones y expedientes.",
+    },
+    {
+      label: "NIF / CIF",
+      value: fiscalId(s),
+      help: "Identificador fiscal de la persona jurídica. Se alimenta desde entities.registration_number o la PJ canónica en persons.tax_id.",
+    },
+    {
+      label: "Domicilio social",
+      value: "Pendiente de contrato de datos",
+      help: "El schema actual no tiene campo estructurado de domicilio social. Las plantillas lo capturan en Capa 3 hasta que exista columna o tabla registral.",
+    },
+    {
+      label: "LEI",
+      value: "Pendiente de contrato de datos",
+      help: "El schema actual no tiene campo LEI estructurado. Es un requisito funcional para cotizadas y reporting, pero no está persistido aún.",
+    },
+    {
+      label: "Tipo social",
+      value: tipoSocialLabel(s.tipo_social ?? s.legal_form),
+      help: "Determina órgano competente, quórums, mayorías, convocatorias y plantillas disponibles.",
+    },
+    {
+      label: "Forma jurídica",
+      value: s.legal_form ?? "—",
+      help: "Literal registral o forma societaria mostrada en documentos.",
+    },
+    {
+      label: "Forma administración",
+      value: normalizeAdminForm(s.forma_administracion, s.tipo_organo_admin),
+      help: "Decide si el flujo usa Consejo, administrador único, solidarios o mancomunados.",
+    },
+    {
+      label: "Órgano admin.",
+      value: s.tipo_organo_admin ?? "—",
+      help: "Código funcional normalizado para seleccionar órgano y plantillas. Debe leerse como contrato interno de aplicación.",
+    },
+    {
+      label: "Unipersonal",
+      value: s.es_unipersonal ? "Sí" : "No",
+      help: "Si es unipersonal, las materias de junta se documentan como decisión del socio único.",
+    },
+    {
+      label: "Cotizada",
+      value: s.es_cotizada ? "Sí" : "No",
+      help: "Activa especialidades de convocatoria, publicidad, voto a distancia y advertencias LMV/CNMV.",
+    },
+    {
+      label: "Jurisdicción",
+      value: s.jurisdiction ?? "—",
+      help: "País/ordenamiento usado para resolver rule packs y marco normativo.",
+    },
+    {
+      label: "Estado",
+      value: s.entity_status ?? "—",
+      help: "Estado operativo de la sociedad dentro del demo.",
+    },
+    {
+      label: "Matriz",
+      value: s.parent?.common_name ?? s.parent?.legal_name ?? "—",
+      help: "Sociedad matriz directa si está modelada en entities.",
+    },
+    {
+      label: "% Propiedad matriz",
+      value: s.ownership_percentage != null ? `${s.ownership_percentage}%` : "—",
+      help: "Porcentaje de control directo desde la matriz en el modelo de grupo.",
+    },
+    {
+      label: "PJ canónica",
+      value: s.person ? `${s.person.full_name} · ${s.person.tax_id ?? "sin NIF"}` : "—",
+      help: "Vínculo técnico a la fila persons que representa la persona jurídica de la sociedad.",
+    },
+    {
+      label: "ID interno",
+      value: technicalValue(id),
+      help: "UUID técnico de la aplicación. No debe aparecer como dato registral en documentos de negocio.",
+      technical: true,
+    },
+    {
+      label: "Slug interno",
+      value: technicalValue(s.slug),
+      help: "Identificador de URL. Es técnico y no sustituye denominación ni NIF.",
+      technical: true,
+    },
   ];
   return (
     <div
       className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
       style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
     >
+      <div className="mb-5 rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-primary)]">
+        <p className="font-semibold text-[var(--g-brand-3308)]">Ficha maestra para generación documental</p>
+        <p className="mt-1 text-[var(--g-text-secondary)]">
+          Los campos fiscales y registrales deben alimentar Capa 2. Donde el contrato de datos aún no existe,
+          la ficha lo marca explícitamente para no confundir códigos internos con datos societarios.
+        </p>
+      </div>
       <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {fields.map(([k, v], i) => (
-          <div key={i} className="flex flex-col gap-0.5">
-            <dt className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">{k}</dt>
-            <dd className="text-sm text-[var(--g-text-primary)]">{v}</dd>
+        {fields.map((field) => (
+          <div
+            key={field.label}
+            className={`flex flex-col gap-0.5 ${field.technical ? "opacity-80" : ""}`}
+          >
+            <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+              {field.label}
+              <FieldHint text={field.help} />
+            </dt>
+            <dd className="text-sm text-[var(--g-text-primary)]">{field.value}</dd>
           </div>
         ))}
       </dl>
@@ -648,6 +818,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
 // ------------------------------------------------------------
 function TabCapital({ entityId }: { entityId: string }) {
   const { data: cap, isLoading } = useCapitalProfile(entityId);
+  const { data: classes = [], isLoading: classesLoading } = useShareClasses(entityId);
   if (isLoading) return <div className="p-4 text-sm text-[var(--g-text-secondary)]">Cargando…</div>;
   if (!cap) {
     return (
@@ -662,7 +833,11 @@ function TabCapital({ entityId }: { entityId: string }) {
       : null;
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+          Capital social y clases de acciones forman una unidad funcional: el motor usa estas cifras
+          para calcular censo, quórum, derechos de voto y mayorías de Junta.
+        </div>
         <Link
           to={`/secretaria/sociedades/${entityId}/transmision`}
           className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
@@ -674,11 +849,21 @@ function TabCapital({ entityId }: { entityId: string }) {
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <Kpi label="Capital escriturado" value={`${cap.capital_escriturado.toLocaleString()} ${cap.currency}`} />
-        <Kpi label="Capital desembolsado" value={cap.capital_desembolsado ? `${Number(cap.capital_desembolsado).toLocaleString()} ${cap.currency}` : "—"} sub={pct != null ? `${pct}% de escriturado` : undefined} />
+        <Kpi label="Capital desembolsado" value={cap.capital_desembolsado ? `${Number(cap.capital_desembolsado).toLocaleString()} ${cap.currency}` : "Pendiente"} sub={pct != null ? `${pct}% de escriturado` : "Debe quedar informado para SA golden path"} />
         <Kpi label="Número de títulos" value={cap.numero_titulos != null ? Number(cap.numero_titulos).toLocaleString() : "—"} />
         <Kpi label="Valor nominal" value={cap.valor_nominal != null ? `${Number(cap.valor_nominal).toLocaleString()} ${cap.currency}` : "—"} />
         <Kpi label="Vigente desde" value={cap.effective_from} />
         <Kpi label="Estado" value={cap.estado} />
+      </div>
+      <div
+        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+          <Layers className="h-4 w-4 text-[var(--g-brand-3308)]" />
+          Clases de acciones / participaciones
+        </div>
+        <ShareClassesInlineTable data={classes} isLoading={classesLoading} />
       </div>
     </div>
   );
@@ -697,11 +882,13 @@ function Kpi({ label, value, sub }: { label: string; value: React.ReactNode; sub
   );
 }
 
-// ------------------------------------------------------------
-// Tab: Clases
-// ------------------------------------------------------------
-function TabClases({ entityId }: { entityId: string }) {
-  const { data, isLoading } = useShareClasses(entityId);
+function ShareClassesInlineTable({
+  data,
+  isLoading,
+}: {
+  data: NonNullable<ReturnType<typeof useShareClasses>["data"]>;
+  isLoading: boolean;
+}) {
   return (
     <Table isLoading={isLoading} empty="Sin clases definidas." headers={["Código", "Nombre", "Votos/título", "Coef. económico", "Derechos voto", "Veto"]}>
       {(data ?? []).map((c) => (
@@ -788,7 +975,12 @@ function TabSocios({ entityId }: { entityId: string }) {
 function TabOrganos({ entityId }: { entityId: string }) {
   const { data, isLoading } = useEntityBodies(entityId);
   return (
-    <Table isLoading={isLoading} empty="Sin órganos." headers={["Órgano", "Tipo", "Slug"]}>
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-secondary)]">
+        La sociedad debe tener una Junta General y, para esta forma de administración, un único Consejo de Administración.
+        Las comisiones y comités son órganos internos o delegados del Consejo; los residuos de pruebas quedan ocultos.
+      </div>
+    <Table isLoading={isLoading} empty="Sin órganos." headers={["Órgano", "Tipo funcional", "Reglas operativas"]}>
       {(data ?? []).map((b) => (
         <tr key={b.id} className="hover:bg-[var(--g-surface-subtle)]/50">
           <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">
@@ -799,22 +991,30 @@ function TabOrganos({ entityId }: { entityId: string }) {
               {b.name}
             </Link>
           </td>
-          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{b.body_type}</td>
-          <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">{b.slug}</td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{bodyTypeLabel(b.body_type)}</td>
+          <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
+            {String(b.config?.organo_tipo ?? b.body_type ?? "—")}
+          </td>
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 
 // ------------------------------------------------------------
-// Tab: Admins (no colegiados)
+// Tab: Administradores societarios
 // ------------------------------------------------------------
 function TabAdmins({ entityId }: { entityId: string }) {
-  const { data, isLoading } = useAdministradores(entityId);
+  const { data, isLoading } = useAdministradoresSocietarios(entityId);
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+          En sociedades administradas por Consejo, esta pestaña muestra la composición vigente del
+          Consejo de Administración. En sociedades con administrador único, solidario o mancomunado,
+          muestra esos cargos no colegiados.
+        </div>
         <Link
           to={`/secretaria/sociedades/${entityId}/admin/nuevo`}
           className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
@@ -826,8 +1026,8 @@ function TabAdmins({ entityId }: { entityId: string }) {
       </div>
     <Table
       isLoading={isLoading}
-      empty="Sin administradores no colegiados."
-      headers={["Persona", "Cargo", "Desde", "Fuente", "RM"]}
+      empty="Sin administradores vigentes."
+      headers={["Persona", "Cargo", "Órgano", "Vigencia", "Fuente", "RM"]}
     >
       {(data ?? []).map((c) => (
         <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
@@ -838,7 +1038,12 @@ function TabAdmins({ entityId }: { entityId: string }) {
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
             {CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion}
           </td>
-          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.fecha_inicio}</td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
+            {c.body?.name ?? "No colegiado"}
+          </td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
+            {formatVigencia(c.fecha_inicio, c.fecha_fin)}
+          </td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
             {c.fuente_designacion ?? "—"}
           </td>
@@ -858,10 +1063,16 @@ function TabAdmins({ entityId }: { entityId: string }) {
 function TabRepresentaciones({ entityId }: { entityId: string }) {
   const { data, isLoading } = useRepresentaciones(entityId);
   return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-secondary)]">
+        Esta tabla recoge representaciones permanentes de personas jurídicas y delegaciones puntuales.
+        En una representación permanente, el porcentaje indica el alcance representado, no una nueva
+        participación económica.
+      </div>
     <Table
       isLoading={isLoading}
       empty="Sin representaciones vigentes."
-      headers={["Ámbito", "Representado", "Representante", "% Deleg.", "Desde"]}
+      headers={["Ámbito", "Representado", "Representante", "Alcance", "Vigencia", "Evidencia"]}
     >
       {(data ?? []).map((r) => (
         <tr key={r.id} className="hover:bg-[var(--g-surface-subtle)]/50">
@@ -877,12 +1088,20 @@ function TabRepresentaciones({ entityId }: { entityId: string }) {
             {r.representative?.full_name ?? "—"}
           </td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
-            {r.porcentaje_delegado != null ? `${Number(r.porcentaje_delegado).toFixed(2)}%` : "—"}
+            {r.porcentaje_delegado != null
+              ? `${Number(r.porcentaje_delegado).toFixed(2)}% representado`
+              : "Completa / no porcentual"}
           </td>
-          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{r.effective_from}</td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
+            {formatVigencia(r.effective_from, r.effective_to)}
+          </td>
+          <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
+            {typeof r.evidence?.documento_ref === "string" ? r.evidence.documento_ref : "—"}
+          </td>
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 
@@ -892,10 +1111,16 @@ function TabRepresentaciones({ entityId }: { entityId: string }) {
 function TabAutoridad({ entityId }: { entityId: string }) {
   const { data, isLoading } = useAuthorityEvidence(entityId);
   return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-secondary)]">
+        Autoridad no es la lista completa de miembros del órgano. Es la evidencia de cargos con
+        capacidad para firmar, certificar, dar Vº Bº o representar la sociedad en el pipeline documental.
+        La composición completa está en Órganos y Administradores.
+      </div>
     <Table
       isLoading={isLoading}
       empty="Sin evidencias de autoridad vigentes."
-      headers={["Persona", "Cargo", "Órgano", "Fuente", "Desde", "Inscripción RM"]}
+      headers={["Persona", "Cargo certificante", "Órgano", "Fuente", "Vigencia", "Inscripción RM"]}
     >
       {(data ?? []).map((a) => (
         <tr key={a.id} className="hover:bg-[var(--g-surface-subtle)]/50">
@@ -909,13 +1134,16 @@ function TabAutoridad({ entityId }: { entityId: string }) {
           </td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{a.body?.name ?? "—"}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{a.fuente_designacion}</td>
-          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{a.fecha_inicio}</td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
+            {formatVigencia(a.fecha_inicio, a.fecha_fin)}
+          </td>
           <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
             {a.inscripcion_rm_referencia ?? "—"}
           </td>
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 

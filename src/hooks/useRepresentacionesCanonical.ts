@@ -4,6 +4,7 @@ import { useTenantContext } from "@/context/TenantContext";
 
 export type RepresentationScope =
   | "PJ_PERMANENTE"
+  | "ADMIN_PJ_REPRESENTANTE"
   | "JUNTA_PROXY"
   | "CONSEJO_DELEGACION";
 
@@ -67,6 +68,7 @@ export function useRepresentaciones(
 
 export const SCOPE_LABELS: Record<RepresentationScope, string> = {
   PJ_PERMANENTE: "Representante PJ permanente",
+  ADMIN_PJ_REPRESENTANTE: "Representante persona jurídica",
   JUNTA_PROXY: "Delegación de voto en Junta",
   CONSEJO_DELEGACION: "Delegación en Consejo",
 };

@@ -14,6 +14,7 @@ export interface ReglasPack {
   version: number | string | null;
   jurisdiction: string | null;
   materia: string | null;
+  organo_tipo?: string | null;
   note: string | null;
 }
 
@@ -89,6 +90,7 @@ export function useReglasAplicables(entityId: string | undefined) {
             version: r.rule_set_version,
             jurisdiction: r.jurisdiction,
             materia: "GENERAL",
+            organo_tipo: null,
             note: "Régimen aplicable por jurisdicción + forma jurídica",
           });
         }
@@ -113,6 +115,7 @@ export function useReglasAplicables(entityId: string | undefined) {
             version: active.version_number ?? active.version ?? null,
             jurisdiction: sociedad?.jurisdiction ?? null,
             materia: p.materia_clase ?? p.materia ?? null,
+            organo_tipo: p.organo_tipo ?? null,
             note: p.nombre ?? p.descripcion ?? null,
           });
         }
@@ -132,6 +135,7 @@ export function useReglasAplicables(entityId: string | undefined) {
           version: null,
           jurisdiction: sociedad?.jurisdiction ?? null,
           materia: materias || p.tipo_clausula,
+          organo_tipo: null,
           note: p.descripcion ?? null,
         });
       }
