@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Activity, ChevronLeft, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "@/hooks/useRisks";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 type FormState = {
   code: string;
@@ -55,8 +56,11 @@ export default function RiskEditor() {
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
   const [params] = useSearchParams();
   const initialModule = params.get("module") ?? "gdpr";
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const riskListPath = scope.createScopedTo("/grc/risk-360");
   const { data: risk, isLoading } = useRiskById(id);
   const createRisk = useCreateRisk();
   const updateRisk = useUpdateRisk(id);
@@ -113,6 +117,7 @@ export default function RiskEditor() {
       status: form.status,
       probability: form.probability,
       impact: form.impact,
+      entity_id: isEdit ? risk?.entity_id ?? null : scopedEntityId,
     };
 
     try {
@@ -123,7 +128,7 @@ export default function RiskEditor() {
         await createRisk.mutateAsync(input);
         toast.success("Riesgo creado en GRC.");
       }
-      navigate("/grc/risk-360");
+      navigate(riskListPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`No se pudo guardar el riesgo: ${message}`);
@@ -150,7 +155,7 @@ export default function RiskEditor() {
     <div className="p-6 max-w-[920px] mx-auto">
       <button
         type="button"
-        onClick={() => navigate("/grc/risk-360")}
+        onClick={() => navigate(riskListPath)}
         className="mb-4 flex items-center gap-1.5 text-sm text-[var(--g-text-secondary)] transition-colors hover:text-[var(--g-brand-3308)]"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -336,7 +341,7 @@ export default function RiskEditor() {
         <div className="flex flex-col-reverse gap-3 border-t border-[var(--g-border-subtle)] px-6 py-4 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={() => navigate("/grc/risk-360")}
+            onClick={() => navigate(riskListPath)}
             className="inline-flex items-center justify-center border border-[var(--g-border-subtle)] bg-transparent px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >

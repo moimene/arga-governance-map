@@ -4,6 +4,7 @@ import { useCreateIncident } from "@/hooks/useIncidents";
 import { toast } from "sonner";
 import { CheckCircle, ChevronRight, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 type StepNum = 1 | 2 | 3 | 4;
 
@@ -83,6 +84,8 @@ function StepIndicator({ current }: { current: StepNum }) {
 
 export default function IncidenteStepper() {
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const createIncident = useCreateIncident();
   const [step, setStep] = useState<StepNum>(1);
   const [form, setForm] = useState<FormState>({
@@ -127,13 +130,14 @@ export default function IncidenteStepper() {
         country_code: form.country_code,
         detection_date: new Date(form.detection_date).toISOString(),
         regulatory_notification_required: needsNotif,
+        entity_id: scopedEntityId,
       });
       toast.success(
         needsNotif
           ? `Incidente creado. Marcado para notificación ${authority} con deadline 72h.`
           : "Incidente creado correctamente."
       );
-      navigate(`/grc/incidentes/${(created as { id: string }).id}`);
+      navigate(scope.createScopedTo(`/grc/incidentes/${(created as { id: string }).id}`));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`Error al crear: ${msg}`);

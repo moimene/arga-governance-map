@@ -2,6 +2,7 @@ import { useIncidents } from "@/hooks/useIncidents";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const SEV_CHIP: Record<string, string> = {
   Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -13,8 +14,10 @@ const SEV_CHIP: Record<string, string> = {
 export default function DoraIncidents() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const obligationFilter = params.get("obligation");
-  const { data: all = [], isLoading } = useIncidents("DORA");
+  const { data: all = [], isLoading } = useIncidents("DORA", { entityId: scopedEntityId });
 
   const data = obligationFilter
     ? all.filter((i) => i.obligations?.code === obligationFilter)
@@ -27,7 +30,7 @@ export default function DoraIncidents() {
           <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">Incidentes DORA</h1>
           <p className="text-sm text-[var(--g-text-secondary)]">
             {obligationFilter ? (
-              <>Filtrando por obligación <strong>{obligationFilter}</strong>. <Link to="/grc/m/dora/operate/incidents" className="text-[var(--g-link)] underline">Limpiar</Link></>
+              <>Filtrando por obligación <strong>{obligationFilter}</strong>. <Link to={scope.createScopedTo("/grc/m/dora/operate/incidents")} className="text-[var(--g-link)] underline">Limpiar</Link></>
             ) : (
               "Operativa DORA · Resiliencia ICT"
             )}
@@ -35,7 +38,7 @@ export default function DoraIncidents() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/grc/incidentes/nuevo")}
+          onClick={() => navigate(scope.createScopedTo("/grc/incidentes/nuevo"))}
           className="inline-flex items-center gap-2 px-4 h-10 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -109,7 +112,7 @@ export default function DoraIncidents() {
                 </div>
               </div>
               <Link
-                to={`/grc/incidentes/${i.id}`}
+                to={scope.createScopedTo(`/grc/incidentes/${i.id}`)}
                 className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline shrink-0"
               >
                 Abrir →

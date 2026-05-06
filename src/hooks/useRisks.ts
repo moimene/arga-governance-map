@@ -11,6 +11,7 @@ export type RiskRow = {
   impact: number | null;
   inherent_score: number | null;
   residual_score: number | null;
+  entity_id: string | null;
   module_id: string | null;
   status: string | null;
   obligation_id: string | null;
@@ -33,7 +34,7 @@ export type RiskWriteInput = {
   owner_id?: string | null;
 };
 
-export function useRisks(filters?: { moduleId?: string }) {
+export function useRisks(filters?: { moduleId?: string; entityId?: string | null }) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["grc", "risks", tenantId, filters],
@@ -42,13 +43,16 @@ export function useRisks(filters?: { moduleId?: string }) {
       let q = supabase
         .from("risks")
         .select(
-          "id, code, title, description, probability, impact, inherent_score, residual_score, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
+          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
         )
         .eq("tenant_id", tenantId!)
         .order("code");
 
       if (filters?.moduleId) {
         q = q.eq("module_id", filters.moduleId);
+      }
+      if (filters?.entityId) {
+        q = q.eq("entity_id", filters.entityId);
       }
 
       const { data, error } = await q;
@@ -67,7 +71,7 @@ export function useRiskById(id?: string) {
       const { data, error } = await supabase
         .from("risks")
         .select(
-          "id, code, title, description, probability, impact, inherent_score, residual_score, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
+          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
         )
         .eq("tenant_id", tenantId!)
         .eq("id", id!)

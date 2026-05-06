@@ -2,21 +2,33 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
-export function useGrcKpis() {
+export function useGrcKpis(entityId?: string | null) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "kpis", tenantId],
+    queryKey: ["grc", "kpis", tenantId, entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async () => {
+      let risksQuery = supabase
+        .from("risks")
+        .select("id, residual_score, status, entity_id")
+        .eq("tenant_id", tenantId!);
+
+      if (entityId) {
+        risksQuery = risksQuery.eq("entity_id", entityId);
+      }
+
+      let incidentsQuery = supabase
+        .from("incidents")
+        .select("id, status, is_major_incident, entity_id")
+        .eq("tenant_id", tenantId!);
+
+      if (entityId) {
+        incidentsQuery = incidentsQuery.eq("entity_id", entityId);
+      }
+
       const [risks, incidents, exceptions, regNots] = await Promise.all([
-        supabase
-          .from("risks")
-          .select("id, residual_score, status")
-          .eq("tenant_id", tenantId!),
-        supabase
-          .from("incidents")
-          .select("id, status, is_major_incident")
-          .eq("tenant_id", tenantId!),
+        risksQuery,
+        incidentsQuery,
         supabase
           .from("exceptions")
           .select("id, status, expires_at")

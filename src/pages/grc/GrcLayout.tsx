@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ScopeSwitcher } from "@/components/secretaria/shell/ScopeSwitcher";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import type { SecretariaScopeController } from "@/components/secretaria/shell";
 
 interface NavItem {
   label: string;
@@ -32,7 +35,13 @@ const navItems: NavItem[] = [
   { label: "Excepciones",     to: "/grc/excepciones", icon: FileWarning },
 ];
 
-function GrcSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function GrcSidebarContent({
+  scope,
+  onNavigate,
+}: {
+  scope: SecretariaScopeController;
+  onNavigate?: () => void;
+}) {
   const navigate = useNavigate();
 
   return (
@@ -49,13 +58,17 @@ function GrcSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
+      <div className="border-b border-[hsl(var(--sidebar-border))] p-3">
+        <ScopeSwitcher scope={scope} />
+      </div>
+
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navegación de GRC Compass">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={scope.createScopedTo(item.to)}
               end={item.end}
               onClick={onNavigate}
               className={({ isActive }) =>
@@ -96,6 +109,15 @@ function GrcSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function GrcLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const scope = useSecretariaScope();
+  const scopeLabel =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? scope.selectedEntity.legalName
+      : "Grupo ARGA Seguros";
+  const modeLabel =
+    scope.mode === "sociedad"
+      ? "Modo Sociedad · vista filtrada a la sociedad"
+      : "Modo Grupo · visión multi-sociedad";
 
   return (
     <div
@@ -106,7 +128,7 @@ export function GrcLayout() {
         className="hidden w-[var(--sidebar-width)] shrink-0 flex-col bg-[hsl(var(--sidebar-background))] lg:flex"
         aria-label="Navegación de GRC Compass"
       >
-        <GrcSidebarContent />
+        <GrcSidebarContent scope={scope} />
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -115,7 +137,7 @@ export function GrcLayout() {
           className="garrigues-module w-[min(320px,calc(100vw-2rem))] border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] p-0 text-[hsl(var(--sidebar-foreground))]"
         >
           <SheetTitle className="sr-only">Navegación de GRC Compass</SheetTitle>
-          <GrcSidebarContent onNavigate={() => setMobileOpen(false)} />
+          <GrcSidebarContent scope={scope} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 
@@ -133,6 +155,19 @@ export function GrcLayout() {
           <span>TGMS</span>
           <span aria-hidden="true">›</span>
           <span className="font-semibold text-[var(--g-brand-3308)]">GRC Compass</span>
+          <span aria-hidden="true">›</span>
+          <span className="truncate font-medium text-[var(--g-text-primary)]">{scopeLabel}</span>
+          <span
+            className="ml-auto hidden items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-page)] px-3 py-1.5 text-[12px] font-medium text-[var(--g-text-primary)] sm:inline-flex"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+          >
+            <span
+              className="h-2 w-2 bg-[var(--status-success)]"
+              style={{ borderRadius: "var(--g-radius-full)" }}
+              aria-hidden="true"
+            />
+            {modeLabel}
+          </span>
         </div>
         <Outlet />
       </main>

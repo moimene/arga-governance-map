@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useRisks, type RiskRow } from "@/hooks/useRisks";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity, Pencil, PlusCircle, Route } from "lucide-react";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import type { SecretariaScopeController } from "@/components/secretaria/shell";
 
 const FILTER_ALL = "Todos";
 
@@ -107,7 +109,13 @@ function SelectField({
   );
 }
 
-function RiskCard({ risk }: { risk: RiskRow }) {
+function RiskCard({
+  risk,
+  scope,
+}: {
+  risk: RiskRow;
+  scope: SecretariaScopeController;
+}) {
   const score = riskScore(risk);
 
   return (
@@ -173,7 +181,7 @@ function RiskCard({ risk }: { risk: RiskRow }) {
           </Link>
         )}
         <Link
-          to={`/grc/risk-360/${risk.id}/editar`}
+          to={scope.createScopedTo(`/grc/risk-360/${risk.id}/editar`)}
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
         >
           <Pencil className="h-3 w-3" aria-hidden="true" />
@@ -186,10 +194,16 @@ function RiskCard({ risk }: { risk: RiskRow }) {
 
 export default function Risk360() {
   const [params] = useSearchParams();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const scopeLabel =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? scope.selectedEntity.legalName
+      : "Grupo ARGA Seguros";
   const findingFilter = params.get("finding");
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");
-  const { data: allRisks = [], isLoading } = useRisks();
+  const { data: allRisks = [], isLoading } = useRisks({ entityId: scopedEntityId });
   const [moduleFilter, setModuleFilter] = useState(FILTER_ALL);
   const [scoreFilter, setScoreFilter] = useState(FILTER_ALL);
 
@@ -242,7 +256,7 @@ export default function Risk360() {
               Risk 360
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-[var(--g-text-secondary)]">
-              Mesa de priorización para revisar exposición, origen y acciones de mitigación.
+              Mesa de priorización para revisar exposición, origen y acciones de mitigación en {scopeLabel}.
               {findingFilter && (
                 <>
                   {" "}Filtrada por el hallazgo{" "}
@@ -255,7 +269,7 @@ export default function Risk360() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {findingFilter && (
             <Link
-              to="/grc/risk-360"
+              to={scope.createScopedTo("/grc/risk-360")}
               className="inline-flex h-10 items-center justify-center border border-[var(--g-border-subtle)] bg-transparent px-4 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -263,7 +277,7 @@ export default function Risk360() {
             </Link>
           )}
           <Link
-            to="/grc/risk-360/nuevo"
+            to={scope.createScopedTo("/grc/risk-360/nuevo")}
             className="inline-flex h-10 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -290,7 +304,7 @@ export default function Risk360() {
             </div>
           </div>
           <Link
-            to="/grc/m/audit/operate/plans"
+            to={scope.createScopedTo("/grc/m/audit/operate/plans")}
             className="inline-flex w-full items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] sm:w-auto"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -460,7 +474,7 @@ export default function Risk360() {
               .slice()
               .sort((a, b) => riskScore(b) - riskScore(a))
               .map((risk) => (
-                <RiskCard key={risk.id} risk={risk} />
+                <RiskCard key={risk.id} risk={risk} scope={scope} />
               ))}
           </div>
         </section>

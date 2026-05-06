@@ -13,6 +13,8 @@ import {
   getGrcP0ReadinessSummary,
   getGrcScreenPostureSummary,
 } from "@/lib/grc/dashboard-readiness";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -99,7 +101,13 @@ const ACCESS_CHIP = {
   backlog: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
 };
 
-function ComplianceMonitorRow({ monitor }: { monitor: GrcComplianceMonitorDomain }) {
+function ComplianceMonitorRow({
+  monitor,
+  scope,
+}: {
+  monitor: GrcComplianceMonitorDomain;
+  scope: SecretariaScopeController;
+}) {
   const StatusIcon = READINESS_ICON[monitor.readiness];
   const handoffLabels = monitor.handoffCandidateIds
     .map((id) => getGrcHandoffCandidate(id)?.contractEvent)
@@ -107,7 +115,7 @@ function ComplianceMonitorRow({ monitor }: { monitor: GrcComplianceMonitorDomain
 
   return (
     <Link
-      to={monitor.route}
+      to={scope.createScopedTo(monitor.route)}
       className="block border-t border-[var(--g-border-subtle)] px-4 py-3 transition-colors first:border-t-0 hover:bg-[var(--g-surface-subtle)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
     >
       <div className="flex items-start gap-3">
@@ -159,7 +167,7 @@ function ComplianceMonitorRow({ monitor }: { monitor: GrcComplianceMonitorDomain
   );
 }
 
-function ComplianceMonitorPanel() {
+function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController }) {
   const summary = getGrcComplianceMonitorSummary();
 
   return (
@@ -222,7 +230,7 @@ function ComplianceMonitorPanel() {
               </div>
               <div>
                 {monitors.map((monitor) => (
-                  <ComplianceMonitorRow key={monitor.id} monitor={monitor} />
+                  <ComplianceMonitorRow key={monitor.id} monitor={monitor} scope={scope} />
                 ))}
               </div>
             </div>
@@ -238,12 +246,18 @@ function ComplianceMonitorPanel() {
   );
 }
 
-function ReadinessDomainCard({ domain }: { domain: GrcP0Domain }) {
+function ReadinessDomainCard({
+  domain,
+  scope,
+}: {
+  domain: GrcP0Domain;
+  scope: SecretariaScopeController;
+}) {
   const StatusIcon = READINESS_ICON[domain.readiness];
 
   return (
     <Link
-      to={domain.route}
+      to={scope.createScopedTo(domain.route)}
       className="flex min-h-[188px] flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 transition-colors hover:bg-[var(--g-surface-subtle)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
       style={{ borderRadius: "var(--g-radius-lg)" }}
     >
@@ -299,7 +313,17 @@ function ReadinessDomainCard({ domain }: { domain: GrcP0Domain }) {
 }
 
 export default function GrcDashboard() {
-  const { data: kpis, isLoading } = useGrcKpis();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const scopeLabel =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? scope.selectedEntity.legalName
+      : "Grupo ARGA Seguros";
+  const scopeCopy =
+    scope.mode === "sociedad"
+      ? "Vista Sociedad: riesgos filtrados por entidad y señales GRC relacionadas."
+      : "Vista Grupo: señales agregadas de todas las sociedades.";
+  const { data: kpis, isLoading } = useGrcKpis(scopedEntityId);
   const readiness = getGrcP0ReadinessSummary();
   const screenSummary = getGrcScreenPostureSummary();
   const highlightedScreens = GRC_SCREEN_POSTURES.filter((screen) => screen.accessMode !== "backlog").slice(0, 8);
@@ -308,7 +332,7 @@ export default function GrcDashboard() {
       label: "Riesgos críticos",
       value: kpis?.criticalRisks ?? 0,
       body: "Priorizar mitigación o escalado al órgano correspondiente.",
-      to: "/grc/risk-360",
+      to: scope.createScopedTo("/grc/risk-360"),
       tone: "danger" as const,
       icon: Activity,
     },
@@ -316,7 +340,7 @@ export default function GrcDashboard() {
       label: "Incidentes abiertos",
       value: kpis?.openIncidents ?? 0,
       body: "Revisar severidad, deadline regulatorio y responsable de respuesta.",
-      to: "/grc/incidentes",
+      to: scope.createScopedTo("/grc/incidentes"),
       tone: "warning" as const,
       icon: AlertOctagon,
     },
@@ -324,7 +348,7 @@ export default function GrcDashboard() {
       label: "Excepciones pendientes",
       value: kpis?.pendingExceptions ?? 0,
       body: "Decidir si se aprueban, vencen o se transforman en plan.",
-      to: "/grc/excepciones",
+      to: scope.createScopedTo("/grc/excepciones"),
       tone: "warning" as const,
       icon: FileWarning,
     },
@@ -332,16 +356,16 @@ export default function GrcDashboard() {
       label: "Notificaciones reguladoras",
       value: kpis?.pendingRegNots ?? 0,
       body: "Confirmar ventana de notificación y evidencias mínimas.",
-      to: "/grc/alertas",
+      to: scope.createScopedTo("/grc/alertas"),
       tone: "danger" as const,
       icon: Send,
     },
   ];
   const quickActions = [
-    { label: "Abrir bandeja de trabajo", body: "Cola diaria de alertas, excepciones y tareas.", to: "/grc/mywork", icon: Briefcase },
-    { label: "Registrar incidente", body: "Alta gestionada dentro de GRC Compass.", to: "/grc/incidentes/nuevo", icon: AlertOctagon },
-    { label: "Crear riesgo", body: "Riesgo GRC con propietario y scoring.", to: "/grc/risk-360/nuevo", icon: Activity },
-    { label: "Escalar a Secretaría", body: "Propuesta de solo lectura para agenda del órgano.", to: "/secretaria/reuniones/nueva?source=grc", icon: Route },
+    { label: "Abrir bandeja de trabajo", body: "Cola diaria de alertas, excepciones y tareas.", to: scope.createScopedTo("/grc/mywork"), icon: Briefcase },
+    { label: "Registrar incidente", body: "Alta gestionada dentro de GRC Compass.", to: scope.createScopedTo("/grc/incidentes/nuevo"), icon: AlertOctagon },
+    { label: "Crear riesgo", body: "Riesgo GRC con propietario y scoring.", to: scope.createScopedTo("/grc/risk-360/nuevo"), icon: Activity },
+    { label: "Escalar a Secretaría", body: "Propuesta de solo lectura para agenda del órgano.", to: scope.createScopedTo("/secretaria/reuniones/nueva?source=grc"), icon: Route },
   ];
 
   return (
@@ -356,7 +380,10 @@ export default function GrcDashboard() {
             </h1>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Compliance y riesgo operativo para Grupo ARGA Seguros: qué atender, qué flujo iniciar y qué queda solo como contexto técnico.
+            Compliance y riesgo operativo para {scopeLabel}: qué atender, qué flujo iniciar y qué queda solo como contexto técnico.
+          </p>
+          <p className="mt-1 text-xs font-medium text-[var(--g-brand-3308)]">
+            {scopeCopy}
           </p>
         </div>
         <div className="flex w-fit flex-wrap items-center gap-2">
@@ -452,7 +479,7 @@ export default function GrcDashboard() {
         </div>
       </section>
 
-      <ComplianceMonitorPanel />
+      <ComplianceMonitorPanel scope={scope} />
 
       {/* KPIs */}
       <div className="flex items-center gap-2">
@@ -536,7 +563,7 @@ export default function GrcDashboard() {
 
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {GRC_P0_DOMAINS.map((domain) => (
-            <ReadinessDomainCard key={domain.id} domain={domain} />
+            <ReadinessDomainCard key={domain.id} domain={domain} scope={scope} />
           ))}
         </div>
 
@@ -557,7 +584,7 @@ export default function GrcDashboard() {
             </div>
           </div>
           <Link
-            to="/grc/mywork"
+            to={scope.createScopedTo("/grc/mywork")}
             className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -733,7 +760,7 @@ export default function GrcDashboard() {
               {GRC_HANDOFF_CANDIDATES.map((handoff) => (
                 <Link
                   key={handoff.id}
-                  to={handoff.targetRoute}
+                  to={scope.createScopedTo(handoff.targetRoute)}
                   className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs text-[var(--g-text-secondary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
@@ -769,7 +796,7 @@ export default function GrcDashboard() {
             ].map((link) => (
               <Link
                 key={link.to}
-                to={link.to}
+                to={scope.createScopedTo(link.to)}
                 className="flex items-center gap-2 text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] transition-colors"
               >
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -796,7 +823,7 @@ export default function GrcDashboard() {
             ].map((mod) => (
               <Link
                 key={mod.to}
-                to={mod.to}
+                to={scope.createScopedTo(mod.to)}
                 className="flex flex-col gap-0.5 p-3 border border-[var(--g-border-subtle)] hover:bg-[var(--g-surface-subtle)] transition-colors"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >

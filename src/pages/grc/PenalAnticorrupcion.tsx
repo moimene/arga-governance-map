@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Activity, ArrowRight, FileText, PlusCircle, Scale, ShieldCheck } from "lucide-react";
 import { useRisks } from "@/hooks/useRisks";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   controlStatusLabel,
   useAllControlsByObligationIds,
@@ -36,7 +37,13 @@ function matchesTaxonomy(...values: Array<string | null | undefined>) {
 }
 
 export default function PenalAnticorrupcion() {
-  const { data: risks = [], isLoading: loadingRisks } = useRisks();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const scopeLabel =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? scope.selectedEntity.legalName
+      : "Grupo ARGA Seguros";
+  const { data: risks = [], isLoading: loadingRisks } = useRisks({ entityId: scopedEntityId });
   const { data: obligations = [], isLoading: loadingObligations } = useObligationsList();
 
   const penalRisks = risks.filter((risk) =>
@@ -65,11 +72,11 @@ export default function PenalAnticorrupcion() {
             </h1>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Vista GRC conectada sobre riesgos, obligaciones y controles existentes. No usa tabla penal dedicada ni adopta el backbone GRC futuro.
+            Vista GRC conectada sobre riesgos, obligaciones y controles existentes en {scopeLabel}. No usa tabla penal dedicada ni adopta el backbone GRC futuro.
           </p>
         </div>
         <Link
-          to="/grc/risk-360/nuevo?module=penal"
+          to={scope.createScopedTo("/grc/risk-360/nuevo?module=penal")}
           className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -136,7 +143,7 @@ export default function PenalAnticorrupcion() {
                   )}
                 </div>
                 <Link
-                  to={`/grc/risk-360/${risk.id}/editar`}
+                  to={scope.createScopedTo(`/grc/risk-360/${risk.id}/editar`)}
                   className="inline-flex items-center gap-1 text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
                 >
                   Editar

@@ -1,5 +1,6 @@
 import { useIncidents } from "@/hooks/useIncidents";
 import { Link } from "react-router-dom";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const SEV_CHIP: Record<string, string> = {
   Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -9,7 +10,9 @@ const SEV_CHIP: Record<string, string> = {
 };
 
 export default function CyberIncidents() {
-  const { data: incidents = [], isLoading } = useIncidents("CYBER");
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const { data: incidents = [], isLoading } = useIncidents("CYBER", { entityId: scopedEntityId });
 
   return (
     <div className="p-6 space-y-5">
@@ -64,7 +67,7 @@ export default function CyberIncidents() {
               )}
             </div>
             <Link
-              to={`/grc/incidentes/${i.id}`}
+              to={scope.createScopedTo(`/grc/incidentes/${i.id}`)}
               className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline shrink-0"
             >
               Abrir →

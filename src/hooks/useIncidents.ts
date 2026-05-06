@@ -25,6 +25,7 @@ export type IncidentWithJoins = {
   detection_date: string | null;
   containment_date: string | null;
   resolution_date: string | null;
+  entity_id: string | null;
   obligation_id: string | null;
   root_cause: string | null;
   lessons_learned: string | null;
@@ -33,22 +34,25 @@ export type IncidentWithJoins = {
   regulatory_notifications?: RegulatoryNotificationLite[] | null;
 };
 
-export function useIncidents(incidentType?: string) {
+export function useIncidents(incidentType?: string, filters?: { entityId?: string | null }) {
   const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["grc", "incidents", tenantId, incidentType ?? "all"],
+    queryKey: ["grc", "incidents", tenantId, incidentType ?? "all", filters?.entityId ?? "all"],
     enabled: !!tenantId,
     queryFn: async () => {
       let q = supabase
         .from("incidents")
         .select(
-          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
+          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
         )
         .eq("tenant_id", tenantId!)
         .order("detection_date", { ascending: false });
 
       if (incidentType) {
         q = q.eq("incident_type", incidentType);
+      }
+      if (filters?.entityId) {
+        q = q.eq("entity_id", filters.entityId);
       }
 
       const { data, error } = await q;
@@ -66,7 +70,7 @@ export function useIncident(id?: string) {
       const { data, error } = await supabase
         .from("incidents")
         .select(
-          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
+          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
         )
         .eq("id", id!)
         .maybeSingle();
@@ -90,6 +94,7 @@ export function useCreateIncident() {
       country_code: string;
       detection_date: string;
       regulatory_notification_required: boolean;
+      entity_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("incidents")

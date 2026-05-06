@@ -10,6 +10,34 @@ test.describe('GRC Compass', () => {
     await expect(page.getByText(/No conectado ahora:/).first()).toBeVisible();
   });
 
+  test('cambio Grupo/Sociedad en GRC conserva el scope al navegar', async ({ page }) => {
+    await page.goto('/grc?scope=grupo');
+    await expect(page.getByRole('button', { name: /^Sociedad$/ })).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: /^Sociedad$/ }).click();
+    const sociedadSelect = page.getByLabel('Sociedad seleccionada');
+    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(async () => sociedadSelect.locator('option').count(), { timeout: 10_000 })
+      .toBeGreaterThan(1);
+
+    const firstEntityValue = await sociedadSelect.evaluate((select) => {
+      const element = select as HTMLSelectElement;
+      return Array.from(element.options).find((option) => option.value)?.value ?? '';
+    });
+    expect(firstEntityValue).toBeTruthy();
+    await sociedadSelect.selectOption(firstEntityValue);
+
+    await expect(page).toHaveURL(/\/grc\?scope=sociedad&entity=/);
+    await page.getByRole('link', { name: /Risk 360/i }).first().click();
+    await expect(page).toHaveURL(/\/grc\/risk-360\?scope=sociedad&entity=/);
+    await expect(page.getByText(/Modo Sociedad/i).first()).toBeVisible();
+
+    await page.getByRole('button', { name: /^Grupo$/ }).click();
+    await expect(page).toHaveURL(/\/grc\/risk-360$/);
+    await expect(page.getByText(/Modo Grupo/i).first()).toBeVisible();
+  });
+
   test('Risk 360 renderiza sin crash', async ({ page }) => {
     await page.goto('/grc/risk-360');
     await expect(page).not.toHaveURL('/login');

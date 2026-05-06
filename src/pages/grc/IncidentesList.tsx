@@ -3,6 +3,8 @@ import { useIncidents, type IncidentWithJoins } from "@/hooks/useIncidents";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertOctagon, ArrowRight, Clock, Plus, Route } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
+import { useSecretariaScope } from "@/components/secretaria/shell";
+import type { SecretariaScopeController } from "@/components/secretaria/shell";
 
 const FILTER_ALL = "Todas";
 
@@ -115,7 +117,13 @@ function SelectField({
   );
 }
 
-function IncidentCard({ incident }: { incident: IncidentWithJoins }) {
+function IncidentCard({
+  incident,
+  scope,
+}: {
+  incident: IncidentWithJoins;
+  scope: SecretariaScopeController;
+}) {
   const notificationLabel = notificationText(incident);
   const notificationIsOverdue = notificationLabel === "Plazo vencido";
 
@@ -142,7 +150,7 @@ function IncidentCard({ incident }: { incident: IncidentWithJoins }) {
           </h2>
         </div>
         <Link
-          to={`/grc/incidentes/${incident.id}`}
+          to={scope.createScopedTo(`/grc/incidentes/${incident.id}`)}
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[var(--g-border-subtle)] text-[var(--g-link)] transition-colors hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-label={`Abrir incidente ${incident.code}`}
@@ -199,7 +207,13 @@ function IncidentCard({ incident }: { incident: IncidentWithJoins }) {
 export default function IncidentesList() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { data: incidents = [], isLoading } = useIncidents();
+  const scope = useSecretariaScope();
+  const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
+  const scopeLabel =
+    scope.mode === "sociedad" && scope.selectedEntity
+      ? scope.selectedEntity.legalName
+      : "Grupo ARGA Seguros";
+  const { data: incidents = [], isLoading } = useIncidents(undefined, { entityId: scopedEntityId });
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");
   const [severityFilter, setSeverityFilter] = useState(FILTER_ALL);
@@ -242,13 +256,13 @@ export default function IncidentesList() {
               Incidentes
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-[var(--g-text-secondary)]">
-              Cola operativa para clasificar impacto, contener el evento y controlar plazos de notificación.
+              Cola operativa para clasificar impacto, contener el evento y controlar plazos de notificación en {scopeLabel}.
             </p>
           </div>
         </div>
         <button
           type="button"
-          onClick={() => navigate("/grc/incidentes/nuevo")}
+          onClick={() => navigate(scope.createScopedTo("/grc/incidentes/nuevo"))}
           className="inline-flex h-10 w-full items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] sm:w-auto"
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-label="Crear nuevo incidente"
@@ -276,7 +290,7 @@ export default function IncidentesList() {
           </div>
           <button
             type="button"
-            onClick={() => navigate("/grc/incidentes/nuevo")}
+            onClick={() => navigate(scope.createScopedTo("/grc/incidentes/nuevo"))}
             className="inline-flex w-full items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] sm:w-auto"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
@@ -378,7 +392,7 @@ export default function IncidentesList() {
           Lista operativa
         </div>
         {filteredIncidents.map((incident) => (
-          <IncidentCard key={incident.id} incident={incident} />
+          <IncidentCard key={incident.id} incident={incident} scope={scope} />
         ))}
       </section>
 
@@ -409,7 +423,7 @@ export default function IncidentesList() {
                   <tr
                     key={incident.id}
                     className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
-                    onClick={() => navigate(`/grc/incidentes/${incident.id}`)}
+                    onClick={() => navigate(scope.createScopedTo(`/grc/incidentes/${incident.id}`))}
                   >
                     <td className="px-5 py-3 font-mono text-xs text-[var(--g-text-secondary)]">
                       {incident.code}
@@ -455,7 +469,7 @@ export default function IncidentesList() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Link
-                        to={`/grc/incidentes/${incident.id}`}
+                        to={scope.createScopedTo(`/grc/incidentes/${incident.id}`)}
                         className="text-xs text-[var(--g-link)] underline hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
                         onClick={(event) => event.stopPropagation()}
                       >
