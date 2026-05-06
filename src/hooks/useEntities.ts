@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 
 export interface EntityRow {
   id: string;
@@ -27,6 +28,7 @@ export interface GoverningBodyRow {
   entity_id: string;
   name: string;
   body_type: string;
+  config?: Record<string, unknown> | null;
 }
 
 export interface PolicyRow {
@@ -152,7 +154,7 @@ export function useEntityBodies(entityId: string | undefined) {
         .eq("entity_id", entityId!)
         .order("name", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as GoverningBodyRow[];
+      return ((data ?? []) as GoverningBodyRow[]).filter(isOperationalSecretariaBody);
     },
   });
 }

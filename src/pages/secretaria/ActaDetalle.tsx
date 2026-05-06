@@ -10,11 +10,15 @@ import {
 } from "@/hooks/useActas";
 import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
+import { demoReadinessMessage } from "@/lib/secretaria/entity-demo-readiness";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import { useReunionAttendees } from "@/hooks/useReunionSecretaria";
+import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
 
 function buildActaFallback(params: {
   body: string;
@@ -74,6 +78,77 @@ function readinessLabel(value?: string) {
   }
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("es-ES");
+}
+
+function formatTimeOnly(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function textLinesFromSnapshots(snapshots: MeetingAdoptionSnapshot[]) {
+  return snapshots
+    .map((snapshot) => `${snapshot.agenda_item_index}. ${snapshot.resolution_text}`)
+    .join("\n");
+}
+
+function agreementLinesFromSnapshots(snapshots: MeetingAdoptionSnapshot[]) {
+  return snapshots
+    .map((snapshot) => {
+      const status = snapshot.status_resolucion === "ADOPTED" ? "aprobado" : "rechazado";
+      return `${snapshot.agenda_item_index}. ${snapshot.resolution_text} (${status})`;
+    })
+    .join("\n");
+}
+
+function attendeeLines(attendees: Array<{ attendance_type?: string | null; full_name?: string | null; person_id?: string | null }>) {
+  return attendees
+    .filter((attendee) => attendee.attendance_type !== "AUSENTE")
+    .map((attendee, index) => {
+      const name = attendee.full_name ?? attendee.person_id ?? `Asistente ${index + 1}`;
+      const type = attendee.attendance_type === "REPRESENTADO" ? "representado" : "presente";
+      return `${index + 1}. ${name} (${type})`;
+    })
+    .join("\n");
+}
+
+function quorumPercentage(
+  quorumData: Record<string, unknown> | null | undefined,
+  snapshots: MeetingAdoptionSnapshot[],
+) {
+  const quorum = asRecord(quorumData?.quorum);
+  const rawPct = quorum?.pct ?? quorum?.percentage ?? quorumData?.capital_concurrente_porcentaje;
+  if (typeof rawPct === "number" && Number.isFinite(rawPct)) {
+    return `${rawPct.toLocaleString("es-ES", { maximumFractionDigits: 2 })}%`;
+  }
+  if (typeof rawPct === "string" && rawPct.trim()) {
+    return rawPct.includes("%") ? rawPct.trim() : `${rawPct.trim()}%`;
+  }
+
+  const snapshot = snapshots.find((item) => item.vote_summary.capital_total > 0);
+  if (!snapshot) return "";
+  const pct = (snapshot.vote_summary.present_weight / snapshot.vote_summary.capital_total) * 100;
+  return `${pct.toLocaleString("es-ES", { maximumFractionDigits: 2 })}%`;
+}
+
+function cityFromLocation(location?: string | null) {
+  if (!location?.trim()) return "Madrid";
+  const first = location.split(/[,(]/)[0]?.trim();
+  return first || location.trim();
+}
+
 export default function ActaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -82,8 +157,10 @@ export default function ActaDetalle() {
   const { data: acta, isLoading } = useActaById(id);
   const { data: certs } = useCertificationsByMinute(id);
   const { data: certificationPlan, isLoading: certificationPlanLoading } = useCertificationPlanForMinute(id);
+  const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(acta?.meeting_id);
   const materializeAgreement = useMaterializeMeetingPointAgreement(id);
   const { primaryRole } = useCurrentUserRole();
+  const { data: readiness } = useEntityDemoReadiness(acta?.entity_id);
   const requestedPlantillaId = searchParams.get("plantilla");
   const requestedTemplateType = searchParams.get("tipo");
   const [materializingPoint, setMaterializingPoint] = useState<number | null>(null);
@@ -104,6 +181,7 @@ export default function ActaDetalle() {
   }
 
   const m = acta;
+  const meeting = m.meetings;
   const body = m.meetings?.governing_bodies?.name ?? "Órgano";
   const entity = m.meetings?.governing_bodies?.entities?.common_name ?? "—";
   const jurisdiction = m.meetings?.governing_bodies?.entities?.jurisdiction ?? null;
@@ -122,6 +200,17 @@ export default function ActaDetalle() {
         ...certificationPlan.blockedSnapshots,
       ].sort((a, b) => a.agenda_item_index - b.agenda_item_index)
     : [];
+  const meetingDate = meeting?.scheduled_start ?? m.created_at;
+  const ordenDiaTexto = textLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
+  const acuerdosTexto = agreementLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
+  const miembrosPresentesTexto =
+    attendeeLines(attendees) || "Según lista de asistentes incorporada al expediente.";
+  const presidente = meeting?.president?.full_name ?? "Presidencia del órgano";
+  const secretario = meeting?.secretary?.full_name ?? "Secretaría del órgano";
+  const porcentajeCapitalPresente =
+    quorumPercentage(meeting?.quorum_data, pointSnapshots) || "Según snapshot de quórum incorporado al expediente";
+  const isJunta = (meeting?.meeting_type ?? meeting?.governing_bodies?.body_type ?? "").toUpperCase().includes("JUNTA");
+  const meetingTypeLabel = bodyTypeLabel(meeting?.meeting_type ?? meeting?.governing_bodies?.body_type);
   const certificationDisabledReason = certificationPlanLoading
     ? "Cargando snapshot legal de la reunión"
     : !certificationPlan?.hasPointSnapshots
@@ -129,6 +218,9 @@ export default function ActaDetalle() {
       : certificationRefs.length === 0
         ? "No hay acuerdos societariamente proclamables para certificar"
         : null;
+  const certificationReadinessReason =
+    readiness?.status === "reference_only" ? demoReadinessMessage(readiness) : null;
+  const certificationGateReason = certificationReadinessReason ?? certificationDisabledReason;
   const actaVariables = {
     entity_id: m.entity_id,
     meeting_id: m.meeting_id,
@@ -136,9 +228,38 @@ export default function ActaDetalle() {
     denominacion_social: entity,
     organo_nombre: body,
     organo_convocante: body,
+    organo_tipo: meeting?.governing_bodies?.body_type ?? meeting?.meeting_type ?? "",
     jurisdiccion: jurisdiction ?? "",
-    fecha: m.created_at,
+    fecha: formatDateOnly(meetingDate) || m.created_at,
+    fecha_junta: formatDateOnly(meetingDate) || m.created_at,
     fecha_generacion: new Date().toISOString(),
+    ciudad_emision: cityFromLocation(meeting?.location),
+    lugar: meeting?.location ?? "Domicilio social",
+    hora_inicio: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    hora_fin: formatTimeOnly(meeting?.scheduled_end),
+    tipo_junta: isJunta ? "ordinaria" : "",
+    presidente,
+    secretario,
+    porcentaje_capital_presente: porcentajeCapitalPresente,
+    orden_dia_texto: ordenDiaTexto,
+    acuerdos_texto: acuerdosTexto,
+    miembros_presentes_texto: miembrosPresentesTexto,
+    asistentes_texto: miembrosPresentesTexto,
+    orden_dia: pointSnapshots.map((snapshot) => ({
+      ordinal: String(snapshot.agenda_item_index),
+      descripcion_punto: snapshot.resolution_text,
+    })),
+    acuerdos: pointSnapshots.map((snapshot) => ({
+      ordinal: String(snapshot.agenda_item_index),
+      texto: snapshot.resolution_text,
+      estado: snapshot.status_resolucion,
+    })),
+    miembros_presentes: attendees
+      .filter((attendee) => attendee.attendance_type !== "AUSENTE")
+      .map((attendee, index) => ({
+        nombre: attendee.full_name ?? attendee.person_id ?? `Asistente ${index + 1}`,
+        cargo: attendee.attendance_type === "REPRESENTADO" ? "Representado" : "Presente",
+      })),
     contenido_acta: m.content ?? "",
     acuerdos_certificados: certificationRefs,
     acuerdos_certificados_count: certificationRefs.length,
@@ -196,7 +317,7 @@ export default function ActaDetalle() {
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
             <FileSignature className="h-3.5 w-3.5" />
-            Acta · {m.meetings?.meeting_type ?? ""}
+            Acta · {meetingTypeLabel}
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
             {body}
@@ -226,11 +347,17 @@ export default function ActaDetalle() {
             variables: actaVariables,
             templateCriteria: {
               jurisdiction,
+              organoTipo: meeting?.governing_bodies?.body_type ?? meeting?.meeting_type,
             },
             preferredTemplateId: requestedTemplateType === "CERTIFICACION" ? null : requestedPlantillaId,
             fallbackText: actaFallback,
             filenamePrefix: "acta",
           }}
+          disabledReason={
+            certificationPlanLoading || attendeesLoading
+              ? "Cargando datos de reunión, asistentes y acuerdos antes de generar el acta."
+              : null
+          }
         />
       </div>
 
@@ -457,7 +584,7 @@ export default function ActaDetalle() {
                   bodyId={acta.body_id}
                   agreementIds={certificationRefs}
                   userRole={primaryRole}
-                  disabledReason={certificationDisabledReason}
+                  disabledReason={certificationGateReason}
                 />
               ) : null}
             </div>

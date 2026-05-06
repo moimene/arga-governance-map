@@ -113,9 +113,14 @@ export type ActaDetailRow = Omit<ActaRow, "meeting_type" | "body_name" | "entity
   meetings?: {
     meeting_type?: string | null;
     scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    location?: string | null;
     quorum_data?: Record<string, unknown> | null;
+    president?: { full_name?: string | null } | null;
+    secretary?: { full_name?: string | null } | null;
     governing_bodies?: {
       name?: string | null;
+      body_type?: string | null;
       entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
     } | null;
   } | null;
@@ -132,7 +137,7 @@ export function useActaById(id: string | undefined) {
       const { data, error } = await supabase
         .from("minutes")
         .select(
-          "*, meetings(meeting_type, scheduled_start, quorum_data, governing_bodies(name, entities(common_name, jurisdiction)))",
+          "*, meetings(meeting_type, scheduled_start, scheduled_end, location, quorum_data, president:president_id(full_name), secretary:secretary_id(full_name), governing_bodies(name, body_type, entities(common_name, jurisdiction)))",
         )
         .eq("id", id!)
         .eq("tenant_id", tenantId!)

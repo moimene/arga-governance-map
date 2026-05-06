@@ -52,6 +52,7 @@ export interface MeetingAttendee {
   capital_representado: number | null;
   via_representante: boolean | null;
   tenant_id: string | null;
+  full_name?: string | null;
 }
 
 export interface BodyMember {
@@ -317,11 +318,17 @@ export function useReunionAttendees(meetingId: string | undefined) {
     queryFn: async (): Promise<MeetingAttendee[]> => {
       const { data, error } = await supabase
         .from("meeting_attendees")
-        .select("*")
+        .select("*, person:person_id(full_name)")
         .eq("tenant_id", tenantId!)
         .eq("meeting_id", meetingId!);
       if (error) throw error;
-      return (data ?? []) as MeetingAttendee[];
+      type MeetingAttendeeRaw = MeetingAttendee & {
+        person?: { full_name?: string | null } | null;
+      };
+      return ((data ?? []) as MeetingAttendeeRaw[]).map((attendee) => ({
+        ...attendee,
+        full_name: attendee.person?.full_name ?? attendee.full_name ?? null,
+      }));
     },
   });
 }

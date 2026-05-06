@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 
 export interface BodyListRow {
   id: string;
@@ -96,14 +97,16 @@ export function useBodiesList() {
         entity?: { common_name?: string | null; slug?: string | null } | null;
         condiciones_persona?: Array<{ id: string; estado: string | null }> | null;
       };
-      return ((data ?? []) as BodyRaw[]).map((b) => ({
-        ...b,
-        entity_name: b.entity?.common_name ?? null,
-        entity_slug: b.entity?.slug ?? null,
-        member_count: (b.condiciones_persona ?? []).filter(
-          (m) => m.estado === "VIGENTE"
-        ).length,
-      }));
+      return ((data ?? []) as BodyRaw[])
+        .filter(isOperationalSecretariaBody)
+        .map((b) => ({
+          ...b,
+          entity_name: b.entity?.common_name ?? null,
+          entity_slug: b.entity?.slug ?? null,
+          member_count: (b.condiciones_persona ?? []).filter(
+            (m) => m.estado === "VIGENTE"
+          ).length,
+        }));
     },
   });
 }
@@ -285,6 +288,7 @@ export interface BodySlim {
   slug: string;
   name: string;
   body_type: string;
+  config?: Record<string, unknown> | null;
 }
 
 export function useBodiesByEntity(entityId: string | undefined) {
@@ -295,12 +299,12 @@ export function useBodiesByEntity(entityId: string | undefined) {
     queryFn: async (): Promise<BodySlim[]> => {
       const { data, error } = await supabase
         .from("governing_bodies")
-        .select("id, slug, name, body_type")
+        .select("id, slug, name, body_type, config")
         .eq("entity_id", entityId!)
         .eq("tenant_id", tenantId!)
         .order("name");
       if (error) throw error;
-      return (data ?? []) as BodySlim[];
+      return ((data ?? []) as BodySlim[]).filter(isOperationalSecretariaBody);
     },
   });
 }

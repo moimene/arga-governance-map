@@ -34,11 +34,34 @@ interface SearchResult {
   nav_to: string;
 }
 
-type AgreementRow = { id: string; agreement_kind: string; status: string; proposal_text?: string };
-type ConvocatoriaRow = { id: string; estado: string; fecha_1?: string; governing_bodies: { name: string } | null };
+type AgreementRow = {
+  id: string;
+  agreement_kind: string;
+  status: string;
+  proposal_text?: string | null;
+  decision_date?: string | null;
+  governing_bodies?: { name?: string | null } | null;
+};
+type ConvocatoriaRow = {
+  id: string;
+  estado: string;
+  fecha_1?: string | null;
+  tipo_convocatoria?: string | null;
+  agenda_items?: unknown;
+  governing_bodies: { name: string } | null;
+};
 type NoSessionRow = { id: string; title?: string; status: string };
 type PolicyRow = { id: string; name: string; status: string };
 type FindingRow = { id: string; code: string; title: string; severity?: string };
+type ResolutionRow = {
+  id: string;
+  meeting_id: string;
+  agreement_id: string | null;
+  agenda_item_index: number;
+  resolution_text: string;
+  required_majority_code: string | null;
+  status: string;
+};
 
 interface GlobalSearchProps {
   scope: SecretariaScopeController;
@@ -58,9 +81,21 @@ const KIND_META = {
   finding:     { icon: AlertTriangle, group: "Hallazgos" },
 };
 
+function normalizeSearchText(value: unknown) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function includesQuery(value: unknown, query: string) {
+  return normalizeSearchText(value).includes(normalizeSearchText(query));
+}
+
 async function runSearch(query: string, tenantId?: string | null, entityId?: string | null): Promise<SearchResult[]> {
   if (query.trim().length < 2 || !tenantId) return [];
-  const q = `%${query.trim()}%`;
+  const rawQuery = query.trim();
+  const q = `%${rawQuery}%`;
   const results: SearchResult[] = [];
   const { bodyIds, agreementIds } = await getSecretariaScopedIds(tenantId, entityId);
 
@@ -68,26 +103,48 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     if (agreementIds?.length === 0) return [];
     let request = supabase
       .from("agreements")
-      .select("id, agreement_kind, status, proposal_text")
+      .select("id, agreement_kind, status, proposal_text, decision_date, governing_bodies(name)")
       .eq("tenant_id", tenantId)
-      .or(`proposal_text.ilike.${q},agreement_kind.ilike.${q}`);
+      .order("updated_at", { ascending: false });
     if (agreementIds) request = request.in("id", agreementIds);
-    const { data, error } = await request.limit(5);
+    const { data, error } = await request.limit(80);
     if (error) throw error;
-    return (data ?? []) as AgreementRow[];
+    return ((data ?? []) as AgreementRow[])
+      .filter((agreement) =>
+        [
+          agreement.id,
+          agreement.agreement_kind,
+          agreement.status,
+          agreement.proposal_text,
+          agreement.decision_date,
+          agreement.governing_bodies?.name,
+        ].some((value) => includesQuery(value, rawQuery))
+      )
+      .slice(0, 8);
   }
 
   async function fetchConvocatorias(): Promise<ConvocatoriaRow[]> {
     if (bodyIds?.length === 0) return [];
     let request = supabase
       .from("convocatorias")
-      .select("id, estado, fecha_1, governing_bodies(name)")
+      .select("id, estado, fecha_1, tipo_convocatoria, agenda_items, governing_bodies(name)")
       .eq("tenant_id", tenantId)
-      .ilike("estado", q);
+      .order("fecha_1", { ascending: false });
     if (bodyIds) request = request.in("body_id", bodyIds);
-    const { data, error } = await request.limit(5);
+    const { data, error } = await request.limit(80);
     if (error) throw error;
-    return (data ?? []) as ConvocatoriaRow[];
+    return ((data ?? []) as ConvocatoriaRow[])
+      .filter((convocatoria) =>
+        [
+          convocatoria.id,
+          convocatoria.estado,
+          convocatoria.fecha_1,
+          convocatoria.tipo_convocatoria,
+          convocatoria.governing_bodies?.name,
+          JSON.stringify(convocatoria.agenda_items ?? ""),
+        ].some((value) => includesQuery(value, rawQuery))
+      )
+      .slice(0, 8);
   }
 
   async function fetchNoSessions(): Promise<NoSessionRow[]> {
@@ -96,7 +153,7 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       .from("no_session_resolutions")
       .select("id, title, status")
       .eq("tenant_id", tenantId)
-      .ilike("title", q);
+      .or(`title.ilike.${q},status.ilike.${q}`);
     if (bodyIds) request = request.in("body_id", bodyIds);
     const { data, error } = await request.limit(5);
     if (error) throw error;
@@ -128,12 +185,39 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     return (data ?? []) as FindingRow[];
   }
 
-  const [agreements, convocatorias, nosessions, policies, findings] = await Promise.allSettled([
+  async function fetchMeetingResolutions(): Promise<ResolutionRow[]> {
+    if (bodyIds?.length === 0) return [];
+    let meetingIds: string[] | null = null;
+    if (bodyIds) {
+      const { data: meetings, error: meetingsError } = await supabase
+        .from("meetings")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .in("body_id", bodyIds)
+        .limit(200);
+      if (meetingsError) throw meetingsError;
+      meetingIds = (meetings ?? []).map((meeting) => meeting.id);
+      if (meetingIds.length === 0) return [];
+    }
+
+    let request = supabase
+      .from("meeting_resolutions")
+      .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status")
+      .eq("tenant_id", tenantId)
+      .or(`resolution_text.ilike.${q},required_majority_code.ilike.${q},status.ilike.${q}`);
+    if (meetingIds) request = request.in("meeting_id", meetingIds);
+    const { data, error } = await request.limit(8);
+    if (error) throw error;
+    return (data ?? []) as ResolutionRow[];
+  }
+
+  const [agreements, convocatorias, nosessions, policies, findings, resolutions] = await Promise.allSettled([
     fetchAgreements(),
     fetchConvocatorias(),
     fetchNoSessions(),
     fetchPolicies(),
     fetchFindings(),
+    fetchMeetingResolutions(),
   ]);
 
   if (agreements.status === "fulfilled") {
@@ -141,7 +225,9 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       results.push({
         id: a.id,
         label: a.agreement_kind.replace(/_/g, " "),
-        sublabel: a.proposal_text?.substring(0, 60) ?? a.status,
+        sublabel: [a.status, a.decision_date, a.governing_bodies?.name, a.proposal_text?.substring(0, 60)]
+          .filter(Boolean)
+          .join(" · "),
         kind: "agreement",
         nav_to: `/secretaria/acuerdos/${a.id}`,
       });
@@ -192,6 +278,25 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
         sublabel: f.severity ?? "",
         kind: "finding",
         nav_to: `/hallazgos/${f.id}`,
+      });
+    });
+  }
+
+  if (resolutions.status === "fulfilled") {
+    const existing = new Set(results.map((result) => `${result.kind}:${result.id}`));
+    resolutions.value.forEach((resolution) => {
+      const resultId = resolution.agreement_id ?? resolution.id;
+      const key = `agreement:${resultId}`;
+      if (existing.has(key)) return;
+      existing.add(key);
+      results.push({
+        id: resultId,
+        label: resolution.required_majority_code?.replace(/_/g, " ") || `Punto ${resolution.agenda_item_index}`,
+        sublabel: `${resolution.status} · ${resolution.resolution_text.substring(0, 80)}`,
+        kind: "agreement",
+        nav_to: resolution.agreement_id
+          ? `/secretaria/acuerdos/${resolution.agreement_id}`
+          : `/secretaria/reuniones/${resolution.meeting_id}`,
       });
     });
   }

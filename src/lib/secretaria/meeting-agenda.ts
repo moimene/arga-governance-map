@@ -263,16 +263,18 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
     const source = bySource.get(sourceKey(point)) ?? byTitle.get(titleKey(point.punto));
     if (!source) return normalizePoint(point);
     return normalizePoint({
-      ...source,
       ...point,
-      agreement_id: point.agreement_id ?? source.agreement_id ?? null,
-      source_table: point.source_table ?? source.source_table ?? null,
-      source_id: point.source_id ?? source.source_id ?? null,
-      source_index: point.source_index ?? source.source_index ?? null,
-      origin: point.origin ?? source.origin,
+      punto: source.punto || point.punto,
+      materia: source.materia ?? point.materia,
+      tipo: source.tipo ?? point.tipo,
+      agreement_id: source.agreement_id ?? point.agreement_id ?? null,
+      source_table: source.source_table ?? point.source_table ?? null,
+      source_id: source.source_id ?? point.source_id ?? null,
+      source_index: source.source_index ?? point.source_index ?? null,
+      origin: source.origin ?? point.origin,
       notas: point.notas || source.notas,
-      group_campaign_id: point.group_campaign_id ?? source.group_campaign_id ?? null,
-      group_campaign_step: point.group_campaign_step ?? source.group_campaign_step ?? null,
+      group_campaign_id: source.group_campaign_id ?? point.group_campaign_id ?? null,
+      group_campaign_step: source.group_campaign_step ?? point.group_campaign_step ?? null,
     });
   });
 

@@ -9,6 +9,8 @@ import type { AdoptionMode } from "@/lib/rules-engine";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
 import { useCreateUnipersonalDecision } from "@/hooks/useDecisionesUnipers";
+import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
+import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 
 type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
 
@@ -304,6 +306,8 @@ export default function DecisionUnipersonalStepper() {
   const [createdDecisionId, setCreatedDecisionId] = useState<string | null>(null);
   const isSociedadScoped = scope.mode === "sociedad";
   const selectedMateria = materias.find((item) => item.materia === materia) ?? null;
+  const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
+  const readinessBlocked = readiness?.status === "reference_only";
 
   useEffect(() => {
     if (scope.mode === "sociedad" && scope.selectedEntity?.id) {
@@ -349,20 +353,23 @@ export default function DecisionUnipersonalStepper() {
       n: 1,
       label: "Tipo y materia",
       hint: "Selecciona sociedad, decisor unipersonal y materia",
-      canAdvance: Boolean(selectedEntityId && materia),
+      canAdvance: Boolean(selectedEntityId && materia && !readinessBlocked),
       body: (
-        <TipoMateriaStep
-          tipo={tipo}
-          setTipo={setTipo}
-          materia={materia}
-          setMateria={setMateria}
-          entities={entities}
-          selectedEntityId={selectedEntityId}
-          setSelectedEntityId={setSelectedEntityId}
-          isSociedadScoped={isSociedadScoped}
-          materias={materias}
-          isLoading={materiasLoading}
-        />
+        <div className="space-y-5">
+          <EntityReadinessNotice readiness={readiness} />
+          <TipoMateriaStep
+            tipo={tipo}
+            setTipo={setTipo}
+            materia={materia}
+            setMateria={setMateria}
+            entities={entities}
+            selectedEntityId={selectedEntityId}
+            setSelectedEntityId={setSelectedEntityId}
+            isSociedadScoped={isSociedadScoped}
+            materias={materias}
+            isLoading={materiasLoading}
+          />
+        </div>
       ),
     },
     {

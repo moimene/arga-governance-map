@@ -174,7 +174,14 @@ export function ProcessDocxButton({
 
   async function handleGenerate() {
     if (capa3Fields.length > 0) {
-      setCapa3Values(matrixResolution?.initialCapa3Values ?? {});
+      const initialValues = matrixResolution?.initialCapa3Values ?? {};
+      const errors = validateCapa3(capa3Fields, initialValues);
+      if (Object.keys(errors).length === 0) {
+        await runGenerate(initialValues);
+        return;
+      }
+
+      setCapa3Values(initialValues);
       setCapa3Errors({});
       setDraftAssistSummary(null);
       setDraftAssistApplied(false);

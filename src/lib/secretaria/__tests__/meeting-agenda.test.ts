@@ -66,6 +66,37 @@ describe("meeting agenda source merge", () => {
     });
   });
 
+  it("lets sourced agenda metadata override stale saved default matter classification", () => {
+    const points = mergeMeetingAgendaSources({
+      savedDebates: [
+        {
+          punto: "Operacion vinculada con aseguradora del grupo",
+          notas: "Se mantiene la nota del secretario.",
+          materia: "APROBACION_CUENTAS",
+          tipo: "ORDINARIA",
+          origin: "MEETING_FLOOR",
+        },
+      ],
+      preparedAgreements: [
+        {
+          id: "agreement-related-party",
+          agreement_kind: "OPERACION_VINCULADA",
+          matter_class: "ESPECIAL",
+          proposal_text: "Operacion vinculada con aseguradora del grupo",
+        },
+      ],
+    });
+
+    expect(points).toHaveLength(1);
+    expect(points[0]).toMatchObject({
+      materia: "OPERACION_VINCULADA",
+      tipo: "ESPECIAL",
+      origin: "PREPARED_AGREEMENT",
+      agreement_id: "agreement-related-party",
+      notas: "Se mantiene la nota del secretario.",
+    });
+  });
+
   it("enriches a formal agenda duplicate with prepared agreement id", () => {
     const points = mergeMeetingAgendaSources({
       convocatoriaId: "conv-1",

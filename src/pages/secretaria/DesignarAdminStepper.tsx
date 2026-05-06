@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSociedad } from "@/hooks/useSociedades";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 import {
   CARGO_LABELS,
   type TipoCondicion,
@@ -25,8 +26,10 @@ interface Draft {
 
 interface BodyRow {
   id: string;
+  slug?: string | null;
   name: string;
   body_type: string;
+  config?: Record<string, unknown> | null;
 }
 
 const CARGOS_NO_COLEGIADOS: TipoCondicion[] = [
@@ -90,9 +93,9 @@ export default function DesignarAdminStepper() {
       void (async () => {
         const { data } = await supabase
           .from("governing_bodies")
-          .select("id, name, body_type")
+          .select("id, slug, name, body_type, config")
           .eq("entity_id", entityId);
-        if (data) setBodies(data as BodyRow[]);
+        if (data) setBodies((data as BodyRow[]).filter(isOperationalSecretariaBody));
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,11 +112,11 @@ export default function DesignarAdminStepper() {
     if (!entityId) return;
     const { data, error } = await supabase
       .from("governing_bodies")
-      .select("id,name,body_type")
+      .select("id,slug,name,body_type,config")
       .eq("tenant_id", tenantId!)
       .eq("entity_id", entityId)
       .order("name", { ascending: true });
-    if (!error && data) setBodies(data as BodyRow[]);
+    if (!error && data) setBodies((data as BodyRow[]).filter(isOperationalSecretariaBody));
   };
 
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));

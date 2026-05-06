@@ -23,6 +23,17 @@ test.describe('Búsqueda Global', () => {
     }
   });
 
+  test('búsqueda por materia societaria devuelve acuerdos o puntos históricos', async ({ page }) => {
+    await page.goto('/secretaria');
+    await page.getByRole('button', { name: /Buscar/ }).first().click();
+    const input = page.getByRole('searchbox').or(page.getByPlaceholder(/buscar|search/i)).first();
+    await expect(input).toBeVisible({ timeout: 5_000 });
+    await input.fill('APROBACION_CUENTAS');
+    await expect(
+      page.getByText(/APROBACION CUENTAS|Aprobación de cuentas|APROBACION_CUENTAS/i).first()
+    ).toBeVisible({ timeout: 8_000 });
+  });
+
   test('Escape cierra el modal de búsqueda', async ({ page }) => {
     await page.goto('/');
     await page.keyboard.press('Meta+k');

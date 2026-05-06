@@ -18,12 +18,44 @@ import { resolverReglaEfectiva } from './jerarquia-normativa';
 
 type NumericQuorumKey = 'SA_1a' | 'SA_2a' | 'SL';
 
+function normalizeQuorumFraction(value: number) {
+  if (!Number.isFinite(value)) return value;
+  if (value > 1) return value / 100;
+  if (value < 0) return 0;
+  return value;
+}
+
+function normalizeQuorumParam<T extends { valor: number }>(param: T): T {
+  return {
+    ...param,
+    valor: normalizeQuorumFraction(param.valor),
+  };
+}
+
+function isQuorumOverride(override: RuleParamOverride) {
+  const raw = `${override.materia ?? ''} ${override.clave ?? ''}`.toUpperCase();
+  return raw.includes('QUORUM') || raw.includes('QUÓRUM') || raw.includes('CONSTITUCION');
+}
+
+function normalizeQuorumOverrides(overrides: RuleParamOverride[]) {
+  return overrides
+    .filter(isQuorumOverride)
+    .map((override) => {
+      if (typeof override.valor !== 'number') return override;
+      return {
+        ...override,
+        valor: normalizeQuorumFraction(override.valor),
+      };
+    });
+}
+
 function resolvePackQuorum(packs: RulePack[], key: NumericQuorumKey) {
   const candidates = packs
     .map((pack) => pack.constitucion?.quorum?.[key])
     .filter((param): param is NonNullable<RulePack['constitucion']['quorum'][NumericQuorumKey]> =>
       typeof param?.valor === 'number',
-    );
+    )
+    .map(normalizeQuorumParam);
 
   if (candidates.length === 0) return null;
   return candidates.reduce((max, current) => current.valor > max.valor ? current : max);
@@ -119,6 +151,34 @@ export function evaluarConstitucion(
       quorumRequerido: 1,
       quorumPresente: universal.pctPresente / 100,
       quorumCubierto: ok,
+    };
+  }
+
+  // ================================================================
+  // Gate 1c: source census must exist before any quorum math
+  // ================================================================
+  if (input.capitalConDerechoVoto <= 0) {
+    const gateNode: ExplainNode = {
+      regla: 'Gate: Censo disponible',
+      fuente: 'SISTEMA',
+      resultado: 'BLOCKING',
+      mensaje:
+        'No hay censo con capital/derechos de voto o miembros computables para constituir la sesión. Carga el censo societario antes de calcular quórum.',
+    };
+    explainNodes.push(gateNode);
+    blockingIssues.push('census_not_available');
+    severity = 'BLOCKING';
+
+    return {
+      etapa: 'CONSTITUCION',
+      ok: false,
+      severity,
+      explain: explainNodes,
+      blocking_issues: blockingIssues,
+      warnings,
+      quorumRequerido: 0,
+      quorumPresente: 0,
+      quorumCubierto: false,
     };
   }
 
@@ -245,8 +305,8 @@ export function evaluarConstitucion(
     referencia: quorumReferencia,
   };
 
-  const effectiveQuorum = resolverReglaEfectiva(quorumBase, overrides, 'mayor');
-  requiredQuorum = effectiveQuorum.valor as number;
+  const effectiveQuorum = resolverReglaEfectiva(quorumBase, normalizeQuorumOverrides(overrides), 'mayor');
+  requiredQuorum = normalizeQuorumFraction(effectiveQuorum.valor as number);
   quorumFuente = effectiveQuorum.fuente;
   quorumReferencia = effectiveQuorum.referencia || quorumReferencia;
 

@@ -8,9 +8,12 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
+import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
+import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { evaluarSolidario } from "@/lib/rules-engine/votacion-engine";
 import type { SolidarioConfig } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -22,13 +25,6 @@ const STEPS = [
 ];
 
 // ─── Step bodies ─────────────────────────────────────────────────────────────
-
-const BODY_TYPE_LABELS: Record<string, string> = {
-  JUNTA: "Junta General / Asamblea",
-  CDA: "Consejo de Administración",
-  COMISION: "Comisión",
-  COMITE: "Comité",
-};
 
 function StepTipoAcuerdo({
   selectedEntityId, setSelectedEntityId,
@@ -102,7 +98,7 @@ function StepTipoAcuerdo({
           <option value="">Seleccionar órgano...</option>
           {bodies.map((body) => (
             <option key={body.id} value={body.id}>
-              {BODY_TYPE_LABELS[body.body_type] ?? body.body_type} - {body.name}
+              {bodyOptionLabel(body)}
             </option>
           ))}
         </select>
@@ -373,6 +369,8 @@ export default function SolidarioStepper() {
   const [materia, setMateria] = useState("");
   const [texto, setTexto] = useState("");
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
+  const readinessBlocked = readiness?.status === "reference_only";
 
   useEffect(() => {
     if (!scopedEntityId) return;
@@ -466,7 +464,7 @@ export default function SolidarioStepper() {
   function canAdvance() {
     switch (current) {
       case 1:
-        return !!selectedEntityId && !!selectedBodyId && !!materia && texto.trim().length > 0;
+        return !!selectedEntityId && !!selectedBodyId && !!materia && texto.trim().length > 0 && !readinessBlocked;
       case 2:
         return adminId.trim().length > 0 && adminNombre.trim().length > 0 && Boolean(vigenciaDesde);
       case 3:
@@ -480,19 +478,22 @@ export default function SolidarioStepper() {
     switch (current) {
       case 1:
         return (
-          <StepTipoAcuerdo
-            selectedEntityId={selectedEntityId}
-            setSelectedEntityId={setSelectedEntityId}
-            selectedBodyId={selectedBodyId}
-            setSelectedBodyId={setSelectedBodyId}
-            entities={entities}
-            bodies={bodies}
-            isSociedadScoped={isSociedadScoped}
-            requestedPlantillaId={requestedPlantillaId}
-            requestedPlantillaLabel={requestedPlantilla ? `${requestedPlantilla.tipo} v${requestedPlantilla.version}` : null}
-            materia={materia} setMateria={setMateria}
-            texto={texto} setTexto={setTexto}
-          />
+          <div className="space-y-4">
+            <EntityReadinessNotice readiness={readiness} />
+            <StepTipoAcuerdo
+              selectedEntityId={selectedEntityId}
+              setSelectedEntityId={setSelectedEntityId}
+              selectedBodyId={selectedBodyId}
+              setSelectedBodyId={setSelectedBodyId}
+              entities={entities}
+              bodies={bodies}
+              isSociedadScoped={isSociedadScoped}
+              requestedPlantillaId={requestedPlantillaId}
+              requestedPlantillaLabel={requestedPlantilla ? `${requestedPlantilla.tipo} v${requestedPlantilla.version}` : null}
+              materia={materia} setMateria={setMateria}
+              texto={texto} setTexto={setTexto}
+            />
+          </div>
         );
       case 2:
         return (

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 
 export interface SecretariaScopedIds {
   bodyIds: string[] | null;
@@ -16,7 +17,7 @@ export async function getSecretariaScopedIds(
   const [bodiesResult, agreementsResult] = await Promise.all([
     supabase
       .from("governing_bodies")
-      .select("id")
+      .select("id,slug,name,config")
       .eq("tenant_id", tenantId)
       .eq("entity_id", entityId),
     supabase
@@ -30,7 +31,7 @@ export async function getSecretariaScopedIds(
   if (agreementsResult.error) throw agreementsResult.error;
 
   return {
-    bodyIds: (bodiesResult.data ?? []).map((body) => body.id),
+    bodyIds: (bodiesResult.data ?? []).filter(isOperationalSecretariaBody).map((body) => body.id),
     agreementIds: (agreementsResult.data ?? []).map((agreement) => agreement.id),
   };
 }

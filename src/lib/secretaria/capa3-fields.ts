@@ -66,6 +66,87 @@ function normalizeDraftValue(value: unknown) {
   return "";
 }
 
+function hasText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function stripListPrefix(value: string) {
+  return value.replace(/^(?:[-*]|\d+[.)-])\s*/, "").trim();
+}
+
+function recordText(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = normalizeDraftValue(record[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function structuredListText(value: unknown, textKeys: string[]) {
+  if (!Array.isArray(value)) return "";
+
+  return value
+    .map((item, index) => {
+      if (typeof item === "string") return stripListPrefix(item);
+      if (!isRecord(item)) return "";
+
+      const text = recordText(item, textKeys);
+      if (!text) return "";
+
+      const ordinal =
+        normalizeDraftValue(item.ordinal) ||
+        normalizeDraftValue(item.order_number) ||
+        normalizeDraftValue(item.agenda_item_index) ||
+        String(index + 1);
+      return `${ordinal}. ${stripListPrefix(text)}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function enrichStructuredTextValues(values: Record<string, unknown>) {
+  const output = { ...values };
+
+  if (!hasText(output.orden_dia_texto)) {
+    const text = structuredListText(output.orden_dia ?? output.agenda_items ?? output.puntos_orden_dia, [
+      "descripcion_punto",
+      "titulo",
+      "title",
+      "resolution_text",
+      "texto",
+      "description",
+      "materia",
+    ]);
+    if (text) output.orden_dia_texto = text;
+  }
+
+  if (!hasText(output.acuerdos_texto)) {
+    const text = structuredListText(output.acuerdos ?? output.snapshot_puntos ?? output.snapshot_certificables, [
+      "texto",
+      "resolution_text",
+      "titulo",
+      "title",
+      "descripcion_punto",
+      "materia",
+    ]);
+    if (text) output.acuerdos_texto = text;
+  }
+
+  if (!hasText(output.miembros_presentes_texto)) {
+    const text = structuredListText(output.miembros_presentes ?? output.asistentes ?? output.attendees, [
+      "nombre",
+      "full_name",
+      "name",
+      "person_name",
+      "cargo",
+      "role",
+    ]);
+    if (text) output.miembros_presentes_texto = text;
+  }
+
+  return output;
+}
+
 export function isRequiredCapa3Field(field: Pick<NormalizedCapa3Field, "obligatoriedad">) {
   return field.obligatoriedad === "OBLIGATORIO";
 }
@@ -151,5 +232,6 @@ export function buildInitialCapa3Values(
   seedValues: Record<string, unknown> = {},
 ) {
   const expanded = expandLegalStructuredVariables(seedValues);
-  return normalizeCapa3Draft(fields, { ...expanded, ...seedValues }).values;
+  const enriched = enrichStructuredTextValues({ ...expanded, ...seedValues });
+  return normalizeCapa3Draft(fields, enriched).values;
 }

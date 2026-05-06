@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Building2, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,20 +17,40 @@ export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ s
   const location = useLocation();
   const navigate = useNavigate();
   const selectValue = scope.selectedEntity?.id ?? "";
+  const selectedEntityInList = scope.entities.some((entity) => entity.id === selectValue);
+  const currentSearchParams = new URLSearchParams(location.search);
+  const currentScopeParam = currentSearchParams.get("scope");
+  const currentEntityParam = currentSearchParams.get("entity");
 
-  const getSociedadPath = (entityId: string) => {
+  const getSociedadPath = useCallback((entityId: string) => {
     if (location.pathname === "/secretaria/sociedades" || /^\/secretaria\/sociedades\/[^/]+/.test(location.pathname)) {
       return `/secretaria/sociedades/${entityId}`;
     }
     return location.pathname;
-  };
+  }, [location.pathname]);
 
-  const navigateToSociedad = (entityId: string) => {
+  const navigateToSociedad = useCallback((entityId: string) => {
     const params = new URLSearchParams(location.search);
     params.set("scope", "sociedad");
     params.set("entity", entityId);
     navigate(`${getSociedadPath(entityId)}?${params.toString()}`);
-  };
+  }, [getSociedadPath, location.search, navigate]);
+
+  useEffect(() => {
+    if (scope.mode !== "sociedad") return;
+
+    const entityId = scope.selectedEntity?.id;
+    if (!entityId) return;
+    if (currentScopeParam === "sociedad" && currentEntityParam === entityId) return;
+
+    navigateToSociedad(entityId);
+  }, [
+    currentEntityParam,
+    currentScopeParam,
+    navigateToSociedad,
+    scope.mode,
+    scope.selectedEntity?.id,
+  ]);
 
   const selectMode = (mode: SecretariaMode) => {
     scope.setMode(mode);
@@ -110,6 +130,9 @@ export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ s
             <option value="" disabled>
               {scope.isLoadingEntities ? "Cargando sociedades" : "Seleccionar sociedad"}
             </option>
+            {selectValue && scope.selectedEntity && !selectedEntityInList ? (
+              <option value={selectValue}>{scope.selectedEntity.legalName}</option>
+            ) : null}
             {scope.entities.map((entity) => (
               <option key={entity.id} value={entity.id}>
                 {entity.legalName}

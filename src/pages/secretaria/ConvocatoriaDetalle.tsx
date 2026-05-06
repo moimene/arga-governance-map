@@ -7,6 +7,7 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { validateMeetingScheduleFromConvocatoria } from "@/lib/secretaria/meeting-scheduler";
+import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
 
 function formatDateTime(value?: string | null) {
   return value ? new Date(value).toLocaleString("es-ES") : "—";
@@ -83,6 +84,10 @@ function agendaItems(conv: ConvocatoriaDocContext) {
 
 function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
   const agenda = Array.isArray(conv.agenda_items) ? conv.agenda_items : [];
+  const ordenDiaTexto =
+    agenda.length > 0
+      ? agenda.map((item, index) => `${index + 1}. ${item.titulo ?? "Punto del orden del día"}`).join("\n")
+      : "";
   const fecha1 = conv.fecha_1 ? new Date(conv.fecha_1) : null;
   const emittedAt = conv.fecha_emision ?? new Date().toISOString();
   const horaJunta = fecha1
@@ -115,8 +120,11 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     fecha: emittedAt,
     fecha_emision: emittedAt,
     fecha_junta: conv.fecha_1 ?? "—",
+    fecha_primera_convocatoria: conv.fecha_1 ?? "",
+    fecha_segunda_convocatoria: conv.fecha_2 ?? "",
     hora: horaJunta,
     hora_junta: horaJunta,
+    hora_primera_convocatoria: horaJunta,
     lugar: conv.lugar ?? "domicilio social",
     lugar_junta: conv.lugar ?? "domicilio social",
     ciudad: conv.lugar ?? "Madrid",
@@ -128,6 +136,7 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
       tipo: item.tipo ?? "ORDINARIA",
       inscribible: !!item.inscribible,
     })),
+    orden_dia_texto: ordenDiaTexto,
     numero_convocatoria: conv.is_second_call ? "Segunda convocatoria" : "Primera convocatoria",
     requiere_segunda_convocatoria: conv.is_second_call ? "Sí" : "No",
     articulo_segunda_convocatoria: conv.is_second_call ? "Régimen estatutario y legal aplicable" : "No aplica",
@@ -149,6 +158,7 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     snapshot_hash: String(conv.rule_trace?.snapshot_hash ?? conv.rule_trace?.hash ?? "snapshot-operativo-demo"),
     tsq_token: "Pendiente de timestamp cualificado EAD Trust en entorno productivo",
     cargo_firmante: "Secretaría del órgano",
+    firma_organo_administracion: "Secretaría del órgano convocante",
     firma: "Secretaría Societaria",
     firma_qes_ref: "Pendiente de QES productiva EAD Trust",
   };
@@ -549,7 +559,7 @@ export default function ConvocatoriaDetalle() {
               <>
                 <KV label="Estado" value={statusLabel(scheduledMeeting.status)} />
                 <KV label="Inicio" value={formatDateTime(scheduledMeeting.scheduled_start)} />
-                <KV label="Tipo" value={scheduledMeeting.meeting_type} />
+                <KV label="Tipo" value={bodyTypeLabel(scheduledMeeting.meeting_type)} />
                 <button
                   type="button"
                   onClick={() => navigate(scope.createScopedTo(`/secretaria/reuniones/${scheduledMeeting.id}`))}

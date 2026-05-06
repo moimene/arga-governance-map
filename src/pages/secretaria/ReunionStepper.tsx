@@ -13,6 +13,7 @@ import {
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
+import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useActiveConflicts } from "@/hooks/useConflicts";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
@@ -63,6 +64,11 @@ import {
   resolvePrototypeMeetingRulePacks,
   uniqueMeetingRuleSpecs,
 } from "@/lib/secretaria/prototype-rule-pack-fallback";
+import {
+  evaluateMeetingCensusAvailability,
+  meetingCensusSourceForBodyType,
+  selectVotingCapitalHoldings,
+} from "@/lib/secretaria/meeting-census";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
@@ -81,6 +87,10 @@ interface VoterRow {
   conflict_flag: boolean;
   conflict_reason: string;
 }
+
+type CensusMember = BodyMember & {
+  default_capital_representado?: number | null;
+};
 
 interface MeetingVoterRow {
   id: string;
@@ -186,6 +196,29 @@ function snapshotBadgeClass(snapshot?: MeetingAdoptionSnapshot) {
 
 function formatVoteWeight(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatSavedQuorumPct(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toLocaleString("es-ES", { maximumFractionDigits: 1 });
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.replace("%", "").replace(",", ".").trim());
+    if (Number.isFinite(parsed)) {
+      return parsed.toLocaleString("es-ES", { maximumFractionDigits: 1 });
+    }
+  }
+  return "—";
+}
+
+function formatSavedQuorumDate(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") return "fecha pendiente";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "fecha pendiente";
+  return date.toLocaleString("es-ES", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 function agreementOriginForPoint(point: DebatePunto) {
@@ -335,6 +368,7 @@ const ATTENDANCE_LABELS: Record<string, string> = {
 };
 
 const TIPO_CONDICION_LABELS: Record<string, string> = {
+  ACCIONISTA: "Accionista",
   CONSEJERO: "Consejero",
   PRESIDENTE: "Presidente",
   SECRETARIO: "Secretario",
@@ -350,10 +384,59 @@ const TIPO_CONDICION_LABELS: Record<string, string> = {
 function AsistentesStep({ meetingId }: { meetingId?: string }) {
   const { data: meeting, isLoading: meetingLoading } = useReunionById(meetingId);
   const bodyId = (meeting as { body_id?: string } | null)?.body_id;
+  const meetingRaw = meeting as
+    | {
+        governing_bodies?: {
+          body_type?: string | null;
+          entity_id?: string | null;
+          entities?: { legal_form?: string | null; tipo_social?: string | null } | null;
+        } | null;
+      }
+    | null;
+  const organoTipo = toTipoOrgano(meetingRaw?.governing_bodies?.body_type);
+  const censusSource = meetingCensusSourceForBodyType(meetingRaw?.governing_bodies?.body_type);
+  const isJuntaCensus = censusSource === "capital_holdings";
+  const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
+  const tipoSocial = toTipoSocial(
+    meetingRaw?.governing_bodies?.entities?.tipo_social ??
+      meetingRaw?.governing_bodies?.entities?.legal_form
+  );
 
-  const { data: members = [], isLoading: membersLoading } = useBodyMembers(bodyId);
+  const { data: bodyMembers = [], isLoading: membersLoading } = useBodyMembers(bodyId);
+  const { data: capitalHoldings = [], isLoading: holdingsLoading } = useCapitalHoldings(
+    isJuntaCensus ? entityId ?? undefined : undefined
+  );
   const { data: existingAttendees = [] } = useReunionAttendees(meetingId);
   const replaceAttendees = useReplaceAttendees(meetingId);
+  const members: CensusMember[] = useMemo(() => {
+    const existingAttendeeMembers: CensusMember[] = existingAttendees
+      .filter((attendee) => Boolean(attendee.person_id))
+      .map((attendee) => ({
+        id: attendee.id,
+        person_id: attendee.person_id!,
+        tipo_condicion: organoTipo === "JUNTA_GENERAL" ? (tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO") : "MIEMBRO",
+        full_name: attendee.full_name?.trim() || "Miembro sin identificar",
+        default_capital_representado: attendee.capital_representado ?? null,
+      }));
+
+    if (!isJuntaCensus) {
+      return bodyMembers.length > 0 ? bodyMembers : existingAttendeeMembers;
+    }
+
+    const shareholderMembers = selectVotingCapitalHoldings(capitalHoldings)
+      .map((holding): CensusMember => ({
+        id: holding.id,
+        person_id: holding.holder_person_id,
+        tipo_condicion: tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO",
+        full_name:
+          holding.holder?.full_name?.trim() ||
+          holding.holder?.denomination?.trim() ||
+          "Socio sin identificar",
+        default_capital_representado: holding.porcentaje_capital ?? null,
+      }));
+
+    return shareholderMembers.length > 0 ? shareholderMembers : existingAttendeeMembers;
+  }, [bodyMembers, capitalHoldings, existingAttendees, isJuntaCensus, organoTipo, tipoSocial]);
 
   const [attendance, setAttendance] = useState<Record<string, AttendanceEntry>>({});
   const [initialized, setInitialized] = useState(false);
@@ -383,7 +466,10 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         map[m.person_id] = {
           attendance_type: "PRESENCIAL",
           represented_by_id: "",
-          capital_representado: "",
+          capital_representado:
+            m.default_capital_representado === null || m.default_capital_representado === undefined
+              ? ""
+              : String(m.default_capital_representado),
           via_representante: false,
         };
       }
@@ -431,7 +517,9 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     const rows = members.map((m) => {
       const entry = attendance[m.person_id];
       const attendanceType = entry?.attendance_type ?? "PRESENCIAL";
-      const capitalValue = entry?.capital_representado === "" ? null : Number(entry?.capital_representado ?? 0);
+      const capitalValue = entry?.capital_representado === ""
+        ? m.default_capital_representado ?? null
+        : Number(entry?.capital_representado ?? 0);
       return {
         person_id: m.person_id,
         attendance_type: attendanceType,
@@ -450,11 +538,13 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     (m) => (attendance[m.person_id]?.attendance_type ?? "PRESENCIAL") !== "AUSENTE"
   ).length;
 
-  if (meetingLoading || (Boolean(bodyId) && membersLoading)) {
+  if (meetingLoading || (!isJuntaCensus && Boolean(bodyId) && membersLoading) || (isJuntaCensus && holdingsLoading)) {
     return (
       <div className="flex items-center gap-2 text-[var(--g-text-secondary)]">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Cargando miembros del órgano…</span>
+        <span className="text-sm">
+          {isJuntaCensus ? "Cargando accionistas con derecho de voto…" : "Cargando miembros del órgano…"}
+        </span>
       </div>
     );
   }
@@ -475,18 +565,24 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     );
   }
 
-  if (members.length === 0) {
+  const censusAvailability = evaluateMeetingCensusAvailability({
+    sourceCount: isJuntaCensus ? selectVotingCapitalHoldings(capitalHoldings).length : bodyMembers.length,
+    existingAttendeesCount: existingAttendees.length,
+  });
+
+  if (!censusAvailability.ok || members.length === 0) {
     return (
       <div
         className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
         <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-          No hay censo vigente del órgano
+          {isJuntaCensus ? "No hay socios/accionistas vigentes" : "No hay censo vigente del órgano"}
         </p>
         <p className="text-sm text-[var(--g-text-secondary)]">
-          No se puede celebrar la sesión hasta cargar miembros vigentes del órgano en el
-          censo societario. Registra el censo legal antes de calcular quórum, votar o generar acta.
+          {isJuntaCensus
+            ? "No se puede celebrar la Junta hasta cargar posiciones vigentes en el libro de socios/accionistas. Registra capital_holdings antes de calcular quórum, votar o generar acta."
+            : "No se puede celebrar la sesión hasta cargar miembros vigentes del órgano en el censo societario. Registra el censo legal antes de calcular quórum, votar o generar acta."}
         </p>
       </div>
     );
@@ -495,8 +591,9 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        Registra la modalidad de asistencia de cada miembro. Los representados requieren indicar
-        quién actúa en su nombre.
+        {isJuntaCensus
+          ? "Registra asistencia, representación y capital/derechos de voto de cada socio o accionista. Los porcentajes se precargan desde el libro vigente."
+          : "Registra la modalidad de asistencia de cada miembro. Los representados requieren indicar quién actúa en su nombre."}
       </p>
 
       <div className="overflow-x-auto">
@@ -664,9 +761,13 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
 
   const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(meetingId);
   const { data: members = [], isLoading: membersLoading } = useBodyMembers(bodyId);
+  const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
   const updateQuorum = useUpdateQuorumData(meetingId);
 
-  const debates = ((existingQuorum?.debates ?? []) as DebatePunto[]).map((debate) => {
+  const agendaForRules = agendaSources.length > 0
+    ? agendaSources
+    : ((existingQuorum?.debates ?? []) as DebatePunto[]);
+  const debates = agendaForRules.map((debate) => {
     const materia = debate.materia ?? defaultMateriaForTitle(debate.punto);
     return {
       ...debate,
@@ -696,7 +797,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   const prototypeRuleContext = resolvePrototypeMeetingRulePacks(ruleSpecs, ruleResolutions, organoTipo);
   const packs = prototypeRuleContext.packs;
   const overrides = selectedOverrides(ruleResolutions);
-  const loadingCensus = meetingLoading || attendeesLoading || (Boolean(bodyId) && membersLoading);
+  const loadingCensus =
+    meetingLoading || attendeesLoading || agendaSourcesLoading || (Boolean(bodyId) && membersLoading);
   const noBody = !loadingCensus && !bodyId;
   const noPersistentCensus = !loadingCensus && members.length === 0 && attendees.length === 0;
   const noPersistedAttendance = !loadingCensus && members.length > 0 && attendees.length === 0;
@@ -973,11 +1075,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         >
           <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Quórum ya registrado: {savedQuorum.pct}% · {savedQuorum.materia_clase ?? "sin clase"} —{" "}
-            {new Date(savedQuorum.evaluated_at).toLocaleString("es-ES", {
-              dateStyle: "short",
-              timeStyle: "short",
-            })}
+            Quórum ya registrado: {formatSavedQuorumPct(savedQuorum.pct)}% ·{" "}
+            {savedQuorum.materia_clase ?? "sin clase"} — {formatSavedQuorumDate(savedQuorum.evaluated_at)}
           </p>
         </div>
       )}
@@ -1389,9 +1488,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       (meetingForDebates as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data
         ?.debates ?? []
     ) as DebatePunto[];
+    const formalAgenda = agendaSources.length > 0 ? agendaSources : debates;
     const normalized =
-      debates.length > 0
-        ? debates.map((debate) => {
+      formalAgenda.length > 0
+        ? formalAgenda.map((debate) => {
             const materia = debate.materia ?? defaultMateriaForTitle(debate.punto);
             return {
               ...debate,
@@ -1401,14 +1501,6 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               origin: debate.origin ?? "MEETING_FLOOR",
             };
           })
-        : agendaSources.length > 0
-          ? agendaSources.map((point) => ({
-              ...point,
-              punto: point.punto || "Acuerdo de la sesión",
-              materia: point.materia ?? defaultMateriaForTitle(point.punto),
-              tipo: point.tipo ?? materiaClaseFromMateria(point.materia ?? defaultMateriaForTitle(point.punto)),
-              origin: point.origin ?? "MEETING_FLOOR",
-            }))
         : [
             {
               punto: "Acuerdo de la sesión",

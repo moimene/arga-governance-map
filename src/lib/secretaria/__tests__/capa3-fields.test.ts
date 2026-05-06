@@ -48,6 +48,35 @@ describe("capa3-fields", () => {
     });
   });
 
+  it("precarga textos Capa 3 desde listas estructuradas ya cargadas", () => {
+    const fields = normalizeCapa3Fields([
+      { campo: "orden_dia_texto", obligatoriedad: "OBLIGATORIO", descripcion: "Orden" },
+      { campo: "acuerdos_texto", obligatoriedad: "OBLIGATORIO", descripcion: "Acuerdos" },
+      { campo: "miembros_presentes_texto", obligatoriedad: "OBLIGATORIO", descripcion: "Asistentes" },
+    ]);
+
+    const values = buildInitialCapa3Values(fields, {
+      orden_dia: [
+        { ordinal: "1", descripcion_punto: "Aprobación de cuentas" },
+        { ordinal: "2", descripcion_punto: "Distribución de dividendos" },
+      ],
+      snapshot_puntos: [
+        { agenda_item_index: 1, resolution_text: "Se aprueban las cuentas" },
+        { agenda_item_index: 2, resolution_text: "Se aprueba la distribución" },
+      ],
+      attendees: [
+        { full_name: "Lucía Paredes" },
+        { full_name: "Antonio Ríos" },
+      ],
+    });
+
+    expect(values).toEqual({
+      orden_dia_texto: "1. Aprobación de cuentas\n2. Distribución de dividendos",
+      acuerdos_texto: "1. Se aprueban las cuentas\n2. Se aprueba la distribución",
+      miembros_presentes_texto: "1. Lucía Paredes\n2. Antonio Ríos",
+    });
+  });
+
   it("normaliza borradores parciales, legacy y valores inesperados de forma determinista", () => {
     const fields = normalizeCapa3Fields([
       { campo: "materia_acuerdo", obligatoriedad: "OBLIGATORIO", descripcion: "Materia" },

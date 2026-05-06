@@ -14,10 +14,13 @@ import { useBodyMandates } from "@/hooks/useBodies";
 import { useCreateConvocatoria, type AgendaItem } from "@/hooks/useConvocatorias";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
+import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
+import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
+import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { buildConvocatoriaNoticeDoubleEvaluation } from "@/lib/secretaria/dual-evaluation";
 import {
   buildTemplateTraceEvidence,
@@ -78,13 +81,6 @@ const AGENDA_MATERIAS = [
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
 ] as const;
-
-const BODY_TYPE_LABELS: Record<string, string> = {
-  JUNTA: "Junta General / Asamblea",
-  CDA: "Consejo de Administración",
-  COMISION: "Comisión",
-  COMITE: "Comité",
-};
 
 const CHANNEL_LABELS: Record<string, string> = {
   BORME: "BORME",
@@ -317,6 +313,8 @@ export default function ConvocatoriasStepper() {
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const tipoSocial = toTipoSocial(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
   const organoTipo = toTipoOrgano(selectedBody?.body_type);
+  const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
+  const readinessBlocked = readiness?.status === "reference_only";
 
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
@@ -582,7 +580,7 @@ export default function ConvocatoriasStepper() {
   // ── Validation gates ──
   function canAdvance(): boolean {
     switch (current) {
-      case 1: return !!selectedEntity && !!selectedBody;
+      case 1: return !!selectedEntity && !!selectedBody && !readinessBlocked;
       case 2: return !!fechaReunion && !!lugar;
       case 3: return agendaItems.some((i) => i.titulo.trim().length > 0);
       default: return true;
@@ -1038,6 +1036,8 @@ export default function ConvocatoriasStepper() {
                 </select>
               </div>
 
+              <EntityReadinessNotice readiness={readiness} />
+
               {/* Órgano */}
               {selectedEntityId && (
                 <div className="space-y-1.5">
@@ -1061,19 +1061,24 @@ export default function ConvocatoriasStepper() {
                       No hay órganos registrados para esta sociedad.
                     </p>
                   ) : (
-                    <select
-                      value={selectedBodyId ?? ""}
-                      onChange={(e) => setSelectedBodyId(e.target.value || null)}
-                      className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    >
-                      <option value="">— Seleccionar órgano —</option>
-                      {bodies.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {BODY_TYPE_LABELS[b.body_type] ?? b.body_type} — {b.name}
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        Mostrando {bodies.length} órgano(s) vinculados a {selectedEntity?.legal_name ?? "la sociedad seleccionada"}.
+                      </p>
+                      <select
+                        value={selectedBodyId ?? ""}
+                        onChange={(e) => setSelectedBodyId(e.target.value || null)}
+                        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <option value="">— Seleccionar órgano —</option>
+                        {bodies.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {bodyOptionLabel(b)}
+                          </option>
+                        ))}
+                      </select>
+                    </>
                   )}
                 </div>
               )}

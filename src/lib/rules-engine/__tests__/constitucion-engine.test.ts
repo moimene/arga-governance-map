@@ -120,6 +120,19 @@ describe('constitucion-engine', () => {
     expect(result.quorumCubierto).toBe(true);
   });
 
+  it('normalizes Cloud quorum values stored as percentages', () => {
+    const input = createConstitucionInput('SA', true, 'ORDINARIA', 100, 72.4);
+    const pack = createRulePack('ORDINARIA');
+    pack.constitucion.quorum.SA_1a.valor = 25;
+
+    const result = evaluarConstitucion(input, [pack]);
+
+    expect(result.ok).toBe(true);
+    expect(result.quorumRequerido).toBe(0.25);
+    expect(result.quorumPresente).toBeCloseTo(0.724);
+    expect(result.explain[0].regla).toBe('Quórum requerido: 25%');
+  });
+
   it('SA 1a ORDINARIA: 25% quorum — should fail when capital < 25%', () => {
     const input = createConstitucionInput('SA', true, 'ORDINARIA', 100, 20);
     const packs = [createRulePack('ORDINARIA')];
@@ -129,6 +142,17 @@ describe('constitucion-engine', () => {
     expect(result.quorumCubierto).toBe(false);
     expect(result.severity).toBe('BLOCKING');
     expect(result.blocking_issues).toContain('quorum_not_met');
+  });
+
+  it('blocks explicitly when no census denominator is available', () => {
+    const input = createConstitucionInput('SA', true, 'ORDINARIA', 0, 0);
+    const packs = [createRulePack('ORDINARIA')];
+    const result = evaluarConstitucion(input, packs);
+
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+    expect(result.blocking_issues).toContain('census_not_available');
+    expect(result.explain[0].regla).toBe('Gate: Censo disponible');
   });
 
   // ===== Test: SA 2a ORDINARIA — no quorum required =====
@@ -204,6 +228,46 @@ describe('constitucion-engine', () => {
 
     expect(result.ok).toBe(true);
     expect(result.quorumRequerido).toBe(0.3);
+  });
+
+  it('normalizes statutory quorum overrides before comparing with the legal floor', () => {
+    const packs = [createRulePack('ORDINARIA')];
+    const lowOverride: RuleParamOverride = {
+      id: 'override-low',
+      entity_id: 'entity-1',
+      materia: 'CONSTITUCION',
+      clave: 'SA_1a_quorum_pct',
+      valor: 10,
+      fuente: 'ESTATUTOS',
+      referencia: 'art. 25 Estatutos',
+    };
+    const highOverride: RuleParamOverride = {
+      ...lowOverride,
+      id: 'override-high',
+      valor: 60,
+    };
+
+    const low = evaluarConstitucion(
+      createConstitucionInput('SA', true, 'ORDINARIA', 100, 20),
+      packs,
+      [lowOverride]
+    );
+    const highFail = evaluarConstitucion(
+      createConstitucionInput('SA', true, 'ORDINARIA', 100, 55),
+      packs,
+      [highOverride]
+    );
+    const highPass = evaluarConstitucion(
+      createConstitucionInput('SA', true, 'ORDINARIA', 100, 60),
+      packs,
+      [highOverride]
+    );
+
+    expect(low.quorumRequerido).toBe(0.25);
+    expect(low.ok).toBe(false);
+    expect(highFail.quorumRequerido).toBe(0.6);
+    expect(highFail.ok).toBe(false);
+    expect(highPass.ok).toBe(true);
   });
 
   it('CONSEJO: quórum uses members majority before sociedad type', () => {

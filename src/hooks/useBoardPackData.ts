@@ -120,6 +120,11 @@ export interface BoardPackData {
   cotizadaWarnings: string[];
 }
 
+function firstJoined<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useBoardPackData(meetingId: string, entityId?: string | null): {
@@ -372,22 +377,32 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
     meeting_type: string;
     status: string;
     location: string | null;
-    governing_bodies: {
+    governing_bodies:
+      | {
       id: string;
       name: string;
       body_type: string;
       entity_id: string;
       quorum_rule: Record<string, unknown> | null;
-      entities: { common_name: string; es_cotizada: boolean | null }[] | null;
-    }[] | null;
-    president: { full_name: string }[] | null;
-    secretary: { full_name: string }[] | null;
+      entities: { common_name: string; es_cotizada: boolean | null } | { common_name: string; es_cotizada: boolean | null }[] | null;
+    }
+      | Array<{
+          id: string;
+          name: string;
+          body_type: string;
+          entity_id: string;
+          quorum_rule: Record<string, unknown> | null;
+          entities: { common_name: string; es_cotizada: boolean | null } | { common_name: string; es_cotizada: boolean | null }[] | null;
+        }>
+      | null;
+    president: { full_name: string } | { full_name: string }[] | null;
+    secretary: { full_name: string } | { full_name: string }[] | null;
   };
   const rawMeeting = meetingQ.data as RawMeeting | null;
 
   // DL-2: si la entidad es cotizada, añadir advertencias LMV
-  const gb = rawMeeting?.governing_bodies?.[0];
-  const ent = gb?.entities?.[0];
+  const gb = firstJoined(rawMeeting?.governing_bodies);
+  const ent = firstJoined(gb?.entities);
   const esCotizada = ent?.es_cotizada === true;
   const cotizadaWarnings: string[] = esCotizada
     ? [
@@ -415,8 +430,8 @@ export function useBoardPackData(meetingId: string, entityId?: string | null): {
               quorum_rule: gb.quorum_rule ?? null,
             }
           : null,
-        president: rawMeeting.president?.[0] ?? null,
-        secretary: rawMeeting.secretary?.[0] ?? null,
+        president: firstJoined(rawMeeting.president),
+        secretary: firstJoined(rawMeeting.secretary),
         agenda_items: (agendaQ.data ?? []) as Array<{
           order_number: number;
           title: string;

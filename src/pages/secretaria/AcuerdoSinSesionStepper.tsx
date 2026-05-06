@@ -18,7 +18,10 @@ import {
 } from "@/hooks/useAcuerdosSinSesion";
 import { evaluarMayoria } from "@/lib/rules-engine/majority-evaluator";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
+import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
+import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -58,13 +61,6 @@ const AGREEMENT_KIND_LABELS: Record<string, string> = {
   FUSION:                "Fusión",
   ESCISION:              "Escisión",
   NOMBRAMIENTO_AUDITOR:  "Nombramiento de auditor",
-};
-
-const BODY_TYPE_LABELS: Record<string, string> = {
-  JUNTA:   "Junta General / Asamblea",
-  CDA:     "Consejo de Administración",
-  COMISION:"Comisión",
-  COMITE:  "Comité",
 };
 
 const TALLY_COUNT_CLASS = {
@@ -115,6 +111,8 @@ export default function AcuerdoSinSesionStepper() {
   const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
+  const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
+  const readinessBlocked = readiness?.status === "reference_only";
 
   // ── Step 2 ──
   const [title, setTitle] = useState("");
@@ -227,7 +225,7 @@ export default function AcuerdoSinSesionStepper() {
   // ── Validation ──
   function canAdvance(): boolean {
     switch (current) {
-      case 1: return !!selectedEntityId && !!selectedBodyId && !!agreementKind;
+      case 1: return !!selectedEntityId && !!selectedBodyId && !!agreementKind && !readinessBlocked;
       case 2: return title.trim().length > 0 && proposalText.trim().length > 0;
       case 3: return includedMembers.length > 0;
       default: return true;
@@ -416,6 +414,8 @@ export default function AcuerdoSinSesionStepper() {
                 </select>
               </div>
 
+              <EntityReadinessNotice readiness={readiness} />
+
               {/* Órgano */}
               {selectedEntityId && (
                 <div className="space-y-1.5">
@@ -432,7 +432,7 @@ export default function AcuerdoSinSesionStepper() {
                       <option value="">— Seleccionar órgano —</option>
                       {bodies.map((b) => (
                         <option key={b.id} value={b.id}>
-                          {BODY_TYPE_LABELS[b.body_type] ?? b.body_type} — {b.name}
+                          {bodyOptionLabel(b)}
                         </option>
                       ))}
                     </select>
