@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,8 +36,6 @@ import { SiiLayout } from "@/pages/sii/SiiLayout";
 import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
-import GrcDashboard from "@/pages/modules/GrcDashboard";
-import AimsDashboard from "@/pages/modules/AimsDashboard";
 import { RequireAuth } from "@/components/RequireAuth";
 const DemoScenarioResult = lazy(() => import("@/pages/DemoScenarioResult"));
 
@@ -150,8 +148,8 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route element={<ProtectedShell />}>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/grc-old" element={<GrcDashboard />} />
-                  <Route path="/aims" element={<AimsDashboard />} />
+                  <Route path="/grc-old" element={<Navigate to="/grc" replace />} />
+                  <Route path="/aims" element={<Navigate to="/ai-governance" replace />} />
                   <Route path="/governance-map" element={<GovernanceMap />} />
                   <Route path="/entidades" element={<EntidadesList />} />
                   <Route path="/entidades/:id" element={<EntidadDetalle />} />
