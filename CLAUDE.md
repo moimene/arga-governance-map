@@ -14,7 +14,7 @@ Desde 2026-05-03, el desarrollo activo se consolida en un único worktree:
 
 Reglas:
 - Todas las conversaciones y carriles deben trabajar sobre este repo/worktree y sincronizar mediante commits/push a `origin/main`.
-- No trabajar en `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map-aims360` salvo lectura histórica o extracción puntual aprobada.
+- El worktree legacy quedó archivado el 2026-05-07 en `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map-aims360-archived-20260507` con `.auth/.env` neutralizado a `.env.archived`. No trabajar ahí salvo lectura histórica o extracción puntual aprobada. Detalle en `docs/superpowers/plans/2026-05-07-legacy-worktree-aims360-archived.md`.
 - No abrir nuevos worktrees para carriles paralelos sin autorización explícita.
 - Los worktrees `.claude/worktrees/*` y temporales `/private/tmp/arga-governance-map*` son históricos/auxiliares. No son fuente de verdad.
 - Si hay cambios pendientes en otro worktree, no fusionarlos en bloque: primero inventariar, extraer por patch revisado y verificar en este worktree principal.
