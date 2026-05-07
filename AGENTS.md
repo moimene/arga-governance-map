@@ -24,12 +24,12 @@ Reglas:
 | Repo | Rol | Contiene |
 |---|---|---|
 | **`arga-governance-map`** (este repo) | **Código fuente** | App React/TypeScript, hooks, SQL, tests |
-| **`TGMS_mapfre_mockup`** | **Workspace de planificación** | Specs, planes, prompts Lovable, investigación de negocio |
+| **Workspace TGMS de planificación** | **Planificación** | Specs, planes, prompts Lovable, investigación de negocio |
 
-**Regla:** Todo desarrollo de código va en este repo. Los planes y specs viven en `TGMS_mapfre_mockup/docs/superpowers/`.
+**Regla:** Todo desarrollo de código va en este repo. Los planes y specs de referencia viven en el workspace TGMS de planificación y, cuando ya se consolidan para ejecución, en `docs/superpowers/` de este repo.
 
-### ARGA = MAPFRE (pseudónimo de negocio)
-"Grupo ARGA Seguros" es el nombre ficticio que representa a MAPFRE en el demostrador. Los órganos de gobierno de MAPFRE deben verse reflejados en él. **Nunca usar "MAPFRE" directamente en código, datos demo ni commits.** Todos los datos demo, seeds, personas, órganos y entidades deben ser coherentes con la estructura corporativa de ARGA.
+### ARGA = pseudónimo operativo del cliente asegurador objetivo
+"Grupo ARGA Seguros" es el nombre ficticio del grupo asegurador usado en el prototipo. **Nunca usar el nombre real del cliente directamente en código, datos demo, seeds, docs de producto ni commits.** Todos los datos demo, personas, órganos y entidades deben ser coherentes con la estructura corporativa de ARGA.
 
 ### Estructura corporativa ARGA (dato demo)
 - **ARGA Seguros S.A.** — SA **cotizada** (equivalente IBEX 35). El motor de reglas NO debe bloquear cotizadas (DL-2 resuelta: evalúa LSC + advertencias LMV).
@@ -66,10 +66,10 @@ Los módulos GRC Compass (`/grc/*`), Secretaría Societaria (`/secretaria/*`) y 
 En código, ambos modos están en este repo. La segregación a repos independientes por módulo es **trabajo futuro, no prioridad actual**.
 
 ### Modelo comercial
-- Clientes grandes (tipo MAPFRE): shell TGMS completo + todos los módulos
+- Clientes grandes: shell TGMS completo + todos los módulos
 - Clientes medianos/pequeños: uno o varios módulos Garrigues sin shell TGMS
 
-### Prioridad actual: demo MAPFRE al máximo nivel funcional
+### Prioridad actual: prototipo operativo avanzado demo-ready
 - ✅ Código y datos demo pulidos
 - ✅ Flujos UX completos y navegables
 - ❌ No segregar módulos a repos separados todavía
@@ -80,13 +80,13 @@ En código, ambos modos están en este repo. La segregación a repos independien
 ## Qué es este proyecto
 
 **TGMS Platform** — plataforma de gobernanza corporativa para grupos aseguradores multinacionales.
-- Cliente demo: **Grupo ARGA Seguros** (ficcional, reconocible para MAPFRE)
-- Propósito: demo funcional para validar la filosofía ante MAPFRE antes de iniciar desarrollo real
+- Cliente demo/prototipo: **Grupo ARGA Seguros**.
+- Propósito: prototipo operativo avanzado para validar filosofía, flujos reales y separación de ownership antes de desarrollo productivo completo.
 
 **Supabase:** proyecto `governance_OS`, ID `hzqwefkwsxopwrmtksbg`, región eu-central-1
 **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
 **Tenant demo:** `tenant_id = "00000000-0000-0000-0000-000000000001"`
-**Entidad demo:** `entity_id = "00000000-0000-0000-0000-000000000010"` (ARGA Seguros S.A.)
+**Entidad canónica Cloud:** `entity_id = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (ARGA Seguros S.A.). El UUID `00000000-0000-0000-0000-000000000010` aparece en seeds/planes legacy y no debe tratarse como fuente canónica sin verificar.
 
 ---
 
@@ -634,10 +634,10 @@ Eliminados los casts `as { approval_workflow?: ... }` y `as { document_url?: ...
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
 
-**Documentos de referencia (rutas absolutas — NO están en este repo):**
-- Spec: `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/specs/2026-04-18-secretaria-societaria-design.md`
-- Plan v1 (T1–T12, con deuda UX): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation.md`
-- Plan v2 (T1–T14, UX corregida): `/Users/moisesmenendez/Dropbox/DESARROLLO/TGMS_mapfre_mockup/docs/superpowers/plans/2026-04-18-secretaria-societaria-implementation-v2.md`
+**Documentos de referencia históricos (workspace TGMS de planificación, externo al repo):**
+- Spec Secretaría 2026-04-18 — workspace de planificación externo
+- Plan v1 T1–T12 (con deuda UX) — workspace de planificación externo
+- Plan v2 T1–T14 (UX corregida) — workspace de planificación externo
 - Plan maestro pendientes: `docs/superpowers/plans/2026-04-19-plan-maestro-pendientes.md`
 
 ---
