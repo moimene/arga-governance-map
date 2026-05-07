@@ -132,3 +132,30 @@ Resultado:
 El saneamiento global de todas las sociedades demo sigue fuera de este cierre. La decision aplicada es concentrar el golden path en ARGA Seguros S.A. y ocultar residuos no operativos de los flujos de Secretaria, sin destruir trazabilidad historica ni hacer inferencias inseguras sobre sociedades de referencia.
 
 No se aplicaron migraciones ni `bun run db push`.
+
+## Addendum 2026-05-07 - ficha societaria y despliegue
+
+Se completo el hardening visual y funcional de la ficha societaria de ARGA Seguros S.A. en commit `ec4e96e`.
+
+Cambios confirmados:
+
+- La pestana `Clases` deja de existir como seccion independiente; las clases de acciones/participaciones viven dentro de `Capital`.
+- `Capital desembolsado` queda nutrido y coherente con el capital escriturado de ARGA Seguros S.A.
+- `Administradores` muestra composicion vigente del Consejo de Administracion; ya no depende de la vista de administradores no colegiados.
+- `Representaciones` aclara vigencia y evidencia de la representacion permanente de persona juridica.
+- `Autoridad` queda separada de miembros del organo y se reserva para cargos certificantes/firmantes.
+- `Marco normativo` diferencia Acuerdo360 como expediente/snapshot frente al motor de reglas mantenido por rule packs, overrides y pactos.
+
+Verificacion adicional:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:5201 bunx playwright test e2e/34-secretaria-sociedad-ficha.spec.ts --project=chromium --reporter=list
+```
+
+Resultado: pass.
+
+Preview Vercel con el bundle actualizado:
+
+- `https://arga-governance-qg7m7hd6i-moises-menendezs-projects.vercel.app`
+
+Nota: si una web muestra todavia `Clases` como pestana separada o el texto `Sin administradores no colegiados`, esta sirviendo un bundle anterior. El codigo fuente y el build actual contienen `Sin administradores vigentes.` solo como empty state defensivo y el E2E verifica que no aparece para ARGA Seguros S.A.

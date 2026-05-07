@@ -98,6 +98,24 @@ Warnings principales:
 - Varios acuerdos `APROBACION_POLITICA` sin plantilla activa compatible.
 - Certificacion legacy `ff224b50-c2cb-5d5f-ad88-90e7ba6cf98c` sin `authority_evidence_id`.
 
+### Actualizacion posterior 2026-05-06/07
+
+Este diagnostico global quedo superado para ARGA Seguros S.A. por el carril especifico de golden path documentado en:
+
+- `docs/superpowers/plans/2026-05-06-arga-seguros-golden-path-consolidation.md`
+- `docs/superpowers/plans/2026-05-07-secretaria-carril-memoria-avances.md`
+
+Resultado posterior para ARGA:
+
+- `Completa`: 1.
+- `blocking`: 0.
+- `warnings`: 0.
+- Acuerdos legacy `...0202` y `...0203` retirados del golden path ARGA y reasignados a sociedades compatibles.
+- Certificacion `ff224b50-c2cb-5d5f-ad88-90e7ba6cf98c` vinculada a authority evidence vigente.
+- Ficha societaria endurecida y verificada por E2E.
+
+El criterio de este documento sigue vigente para el resto de sociedades: no ejecutar reparacion global destructiva; cerrar sociedad por sociedad con fuente canonica y plan/apply idempotente.
+
 ## Decisiones pendientes
 
 P0 - Scope legacy ARGA:
