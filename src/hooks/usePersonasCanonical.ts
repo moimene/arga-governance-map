@@ -2,6 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
+type MaybeJoin<T> = T | T[] | null | undefined;
+
+function firstJoin<T>(value: MaybeJoin<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 export type PersonType = "PF" | "PJ";
 
 export interface PersonaRow {
@@ -141,24 +148,26 @@ export function usePersonasEnriquecidas(filter?: {
         tipo_condicion: string;
         entity_id: string;
         body_id: string | null;
-        entity?: { id: string; common_name: string | null; legal_name: string } | null;
-        body?: { id: string; name: string } | null;
+        entity?: MaybeJoin<{ id: string; common_name: string | null; legal_name: string }>;
+        body?: MaybeJoin<{ id: string; name: string }>;
       };
       type HoldingRaw = {
         holder_person_id: string;
         entity_id: string;
         porcentaje_capital: number | null;
-        entity?: { id: string; common_name: string | null; legal_name: string } | null;
+        entity?: MaybeJoin<{ id: string; common_name: string | null; legal_name: string }>;
       };
 
       const cargosByPerson = new Map<string, PersonaCargoAgregado[]>();
-      for (const c of (cargosR.data ?? []) as CargoRaw[]) {
+      for (const c of (cargosR.data ?? []) as unknown as CargoRaw[]) {
+        const entity = firstJoin(c.entity);
+        const body = firstJoin(c.body);
         const entry: PersonaCargoAgregado = {
           tipo_condicion: c.tipo_condicion,
           entity_id: c.entity_id,
-          entity_name: c.entity?.common_name ?? c.entity?.legal_name ?? "—",
+          entity_name: entity?.common_name ?? entity?.legal_name ?? "—",
           body_id: c.body_id,
-          body_name: c.body?.name ?? null,
+          body_name: body?.name ?? null,
         };
         const arr = cargosByPerson.get(c.person_id) ?? [];
         arr.push(entry);
@@ -166,10 +175,11 @@ export function usePersonasEnriquecidas(filter?: {
       }
 
       const holdingsByPerson = new Map<string, PersonaHoldingAgregado[]>();
-      for (const h of (holdingsR.data ?? []) as HoldingRaw[]) {
+      for (const h of (holdingsR.data ?? []) as unknown as HoldingRaw[]) {
+        const entity = firstJoin(h.entity);
         const entry: PersonaHoldingAgregado = {
           entity_id: h.entity_id,
-          entity_name: h.entity?.common_name ?? h.entity?.legal_name ?? "—",
+          entity_name: entity?.common_name ?? entity?.legal_name ?? "—",
           porcentaje_capital: h.porcentaje_capital,
         };
         const arr = holdingsByPerson.get(h.holder_person_id) ?? [];

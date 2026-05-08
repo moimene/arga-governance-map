@@ -6,6 +6,7 @@ import {
   evaluarAcuerdoCompleto,
   type RulePack,
   type RuleParamOverride,
+  type Fuente,
   type AdoptionMode,
   type TipoSocial,
   type TipoOrgano,
@@ -23,9 +24,15 @@ type RulePackJoinRow = {
   version: string;
   payload: unknown;
   is_active: boolean | null;
-  rule_packs: { materia: string; organo_tipo: string | null } | null;
+  rule_packs: MaybeJoin<{ materia: string; organo_tipo: string | null }>;
 };
 type OverrideRaw = { id: string; entity_id: string; materia: string; clave: string; valor: unknown; fuente: string; referencia: string | null };
+type MaybeJoin<T> = T | T[] | null | undefined;
+
+function firstJoin<T>(value: MaybeJoin<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
 
 /**
  * Feature flag: activar para usar el Motor de Reglas LSC V2.
@@ -264,9 +271,9 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     : { data: [] };
 
   // Buscar el rule pack de la materia del acuerdo
-  const rpRows = (rpVersions ?? []) as RulePackJoinRow[];
+  const rpRows = (rpVersions ?? []) as unknown as RulePackJoinRow[];
   const matchingVersion = rpRows.find(
-    (v) => v.rule_packs?.materia === a.agreement_kind
+    (v) => firstJoin(v.rule_packs)?.materia === a.agreement_kind
   );
 
   const packs: RulePack[] = matchingVersion
@@ -279,7 +286,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     materia: o.materia,
     clave: o.clave,
     valor: o.valor,
-    fuente: o.fuente,
+    fuente: o.fuente as Fuente,
     referencia: o.referencia,
   }));
 

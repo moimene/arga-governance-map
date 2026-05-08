@@ -36,11 +36,17 @@ const KIND_META: Record<DeadlineKind, { icon: React.ElementType; color: string; 
   TRAMITACION:       { icon: Gavel,       color: "text-[var(--status-info)]",    label: "Tramitación registral" },
 };
 
-type ConvRow = { id: string; fecha_1: string | null; estado: string | null; governing_bodies: { name: string } | null };
+type MaybeJoin<T> = T | T[] | null | undefined;
+type ConvRow = { id: string; fecha_1: string | null; estado: string | null; governing_bodies?: MaybeJoin<{ name: string | null }> };
 type LibroRow = { id: string; book_kind: string | null; legalization_deadline: string | null };
 type AcuerdoSinSesionRow = { id: string; title: string | null; status: string; voting_deadline: string | null };
-type MandatoRow = { id: string; role: string | null; end_date: string | null; persons: { full_name: string } | null };
+type MandatoRow = { id: string; role: string | null; end_date: string | null; persons?: MaybeJoin<{ full_name: string | null }> };
 type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; estimated_resolution: string | null };
+
+function firstJoin<T>(value: MaybeJoin<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
 
 function daysFromNow(isoDate: string): number {
   const today = new Date();
@@ -80,7 +86,7 @@ function useCalendarioDeadlines(entityId?: string | null) {
           .order("fecha_1", { ascending: true })
           .limit(20);
         if (error) throw error;
-        return (data ?? []) as ConvRow[];
+        return (data ?? []) as unknown as ConvRow[];
       }
 
       async function fetchLibros(): Promise<LibroRow[]> {
@@ -127,7 +133,7 @@ function useCalendarioDeadlines(entityId?: string | null) {
           .order("end_date", { ascending: true })
           .limit(10);
         if (error) throw error;
-        return (data ?? []) as MandatoRow[];
+        return (data ?? []) as unknown as MandatoRow[];
       }
 
       async function fetchTramitaciones(): Promise<FilingRow[]> {
@@ -158,11 +164,12 @@ function useCalendarioDeadlines(entityId?: string | null) {
       // Convocatorias
       convs.forEach((c) => {
         if (!c.fecha_1) return;
+        const body = firstJoin(c.governing_bodies);
         const days = daysFromNow(c.fecha_1);
         items.push({
           id: c.id,
           kind: "CONVOCATORIA",
-          label: c.governing_bodies?.name ?? "Órgano",
+          label: body?.name ?? "Órgano",
           sublabel: c.estado ?? "",
           deadline: c.fecha_1,
           daysLeft: days,
@@ -207,7 +214,8 @@ function useCalendarioDeadlines(entityId?: string | null) {
       mandates.forEach((m) => {
         if (!m.end_date) return;
         const days = daysFromNow(m.end_date);
-        const personName = m.persons?.full_name ?? "Consejero/a";
+        const person = firstJoin(m.persons);
+        const personName = person?.full_name ?? "Consejero/a";
         items.push({
           id: m.id,
           kind: "RENOVACION_MANDATO",

@@ -45,8 +45,8 @@ const defaultCode = () => {
   const timestamp = new Date()
     .toISOString()
     .slice(2, 19)
-    .replaceAll("-", "")
-    .replaceAll(":", "")
+    .replace(/-/g, "")
+    .replace(/:/g, "")
     .replace("T", "");
   const suffix = Math.random().toString(36).slice(2, 5).toUpperCase();
   return `RISK-${timestamp}-${suffix}`;

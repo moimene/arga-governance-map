@@ -401,7 +401,7 @@ export default function ExpedienteAcuerdo() {
             onNavigateGenerar={() => navigate(generarTo)}
             currentUserRole={primaryRole}
             currentUserName={displayName}
-            initialWorkflow={a.approval_workflow as ApprovalStep[] | null}
+            initialWorkflow={normalizeApprovalWorkflow(a.approval_workflow)}
           />
 
           {/* Trust Center — Evidencias de confianza */}
@@ -1226,6 +1226,34 @@ interface ApprovalStep {
   role: string;
   approvedAt: string | null;
   approvedBy: string | null;
+}
+
+function normalizeApprovalWorkflow(value: Record<string, unknown>[] | null): ApprovalStep[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const steps = value
+    .map((raw): ApprovalStep | null => {
+      const id = typeof raw.id === "string" ? raw.id : "";
+      if (!id) return null;
+
+      const role = typeof raw.role === "string" && raw.role.trim()
+        ? raw.role
+        : id;
+      const label = typeof raw.label === "string" && raw.label.trim()
+        ? raw.label
+        : role;
+
+      return {
+        id,
+        label,
+        role,
+        approvedAt: typeof raw.approvedAt === "string" ? raw.approvedAt : null,
+        approvedBy: typeof raw.approvedBy === "string" ? raw.approvedBy : null,
+      };
+    })
+    .filter((step): step is ApprovalStep => step !== null);
+
+  return steps.length > 0 ? steps : null;
 }
 
 const DEMO_APPROVERS: Record<string, string> = {

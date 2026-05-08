@@ -25,6 +25,7 @@ dist-ssr
 
 # Vite/Vitest build timestamps
 *.timestamp-*.mjs
+*.tsbuildinfo
 
 # Claude Code
 .claude/

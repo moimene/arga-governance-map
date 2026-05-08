@@ -148,7 +148,7 @@ En código, ambos modos están en este repo. La segregación a repos independien
 
 - `bun run db:check-target`: pass contra `governance_OS`.
 - `bun test`: pass, 582 pass, 66 skipped.
-- `bunx tsc --noEmit --pretty false`: pass.
+- `bun run typecheck`: pass. Gate real TypeScript (`tsc -b`); no usar `bunx tsc --noEmit` como señal verde porque el `tsconfig.json` raíz referencia proyectos.
 - `bun run lint`: pass, 0 errores, 23 warnings conocidos.
 - `bun run build`: pass, warnings conocidos de Browserslist/chunk size.
 - e2e ampliado: 39/39 pass con `e2e/05-secretaria-reuniones.spec.ts`, `10`, `11`, `12`, `14`, `16`, `17`, `18`, `19-cross-module-handoffs`.
@@ -1046,8 +1046,8 @@ bun run db:check-target
 # Tests unitarios
 bun test
 
-# Type check
-bunx tsc --noEmit --pretty false
+# Type check real (tsconfig raíz usa references)
+bun run typecheck
 
 # Lint y build
 bun run lint

@@ -47,7 +47,7 @@ bun scripts/secretaria-p0-cloud-smoke.ts \
 echo
 
 echo "== TypeScript =="
-bunx tsc --noEmit --pretty false
+bun run typecheck
 echo
 
 echo "== P0 RPC contract tests =="

@@ -437,11 +437,11 @@ async function resolveCapTableVars(entityId: string, tenantId: string): Promise<
   }
 
   const lista_socios = holdings.map((h) => {
-    const person = personMap[h.holder_person_id] || {};
-    const nombre = person.full_name || person.denomination || "—";
+    const person = h.holder_person_id ? personMap[h.holder_person_id] : undefined;
+    const nombre = person?.full_name || person?.denomination || "—";
     const porcentaje = h.porcentaje_capital ? Number(h.porcentaje_capital) : 0;
 
-    const vv = votingMap[h.holder_person_id];
+    const vv = h.holder_person_id ? votingMap[h.holder_person_id] : undefined;
     const porcentaje_voto =
       vv && vv.denominator > 0
         ? ((vv.weight / vv.denominator) * 100).toFixed(4)
@@ -449,7 +449,7 @@ async function resolveCapTableVars(entityId: string, tenantId: string): Promise<
 
     return {
       nombre,
-      tax_id: person.tax_id || "—",
+      tax_id: person?.tax_id || "—",
       numero_titulos: Number(h.numero_titulos).toLocaleString("es-ES"),
       porcentaje_capital: porcentaje.toFixed(4),
       porcentaje_voto,

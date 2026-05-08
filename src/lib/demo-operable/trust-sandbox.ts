@@ -126,7 +126,11 @@ export function buildDemoTrustCenter(run: DemoScenarioRunResult): DemoTrustCente
       finalEvidence: false,
       auditReference: run.evidence.auditReference,
     },
-    apiContract: qtspApiContract,
+    apiContract: {
+      ...qtspApiContract,
+      requiredEnvKeys: [...qtspApiContract.requiredEnvKeys],
+      endpoints: [...qtspApiContract.endpoints],
+    },
     guardrails: [
       "Credenciales Okta y secretos QTSP solo en proxy servidor",
       "Demo mode no invoca API productiva",

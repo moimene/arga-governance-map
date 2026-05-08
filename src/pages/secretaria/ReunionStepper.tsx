@@ -1181,6 +1181,8 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       .filter((debate) => debate.punto.trim())
       .map((debate, index) => ({
         ...debate,
+        materia: debate.materia ?? defaultMateriaForTitle(debate.punto),
+        tipo: normalizeMateriaClase(debate.tipo),
         origin: debate.origin ?? "MEETING_FLOOR",
         source_index: debate.source_index ?? index + 1,
       }));
@@ -1519,6 +1521,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         governing_bodies?: {
           body_type?: string | null;
           entity_id?: string | null;
+          quorum_rule?: Record<string, unknown> | null;
           entities?: { legal_form?: string | null; tipo_social?: string | null } | null;
         } | null;
       }

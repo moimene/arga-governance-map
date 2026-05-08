@@ -48,6 +48,7 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
 import {
   buildSecretariaDocumentGenerationRequest,
+  type SecretariaAdoptionMode,
   type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
 import { templateCompatibleWithAgreement } from "@/lib/secretaria/agreement-template-compatibility";
@@ -278,7 +279,7 @@ export default function GenerarDocumentoStepper() {
         entityId: agreement.entity_id,
         agreementIds: [agreement.id],
         templateId: plantilla.id,
-        expectedAdoptionMode: agreement.adoption_mode as Parameters<typeof buildSecretariaDocumentGenerationRequest>[0]["expectedAdoptionMode"],
+        expectedAdoptionMode: agreement.adoption_mode as SecretariaAdoptionMode,
         aiAssist: capa3AssistantApplied
           ? { enabled: true, allowed_fields: buildCapa3AiAllowedFields(normalizedCapa3Fields) }
           : null,

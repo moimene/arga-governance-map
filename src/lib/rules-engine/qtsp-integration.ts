@@ -75,6 +75,15 @@ const DEMO_X509_CHAIN = [
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z7pQlX5RfFQNd0XYqR9',
 ];
 
+type QTSPEnv = {
+  VITE_EAD_TRUST_OCSP_URL?: string;
+  VITE_EAD_TRUST_API_KEY?: string;
+};
+
+function getQTSPEnv(): QTSPEnv {
+  return (import.meta as unknown as { env?: QTSPEnv }).env ?? {};
+}
+
 // ============================================================
 // Helper: OCSP Verification
 // ============================================================
@@ -98,9 +107,7 @@ export function verificarOCSP(signerId: string): OCSPVerificationResult {
   // Real OCSP: if EAD Trust endpoint is configured, delegate to async version
   // Use verificarOCSPAsync() for real network calls when VITE_EAD_TRUST_OCSP_URL is set.
   // This sync version is retained for synchronous gate evaluation.
-  const ocspUrl = typeof import.meta !== 'undefined'
-    ? (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_OCSP_URL as string | undefined
-    : undefined;
+  const ocspUrl = getQTSPEnv().VITE_EAD_TRUST_OCSP_URL;
 
   if (ocspUrl) {
     // Endpoint configured but we can't await here — return UNKNOWN and let async version handle it
@@ -122,8 +129,7 @@ export function verificarOCSP(signerId: string): OCSPVerificationResult {
  * Falls back to sync stub otherwise.
  */
 export async function verificarOCSPAsync(signerId: string): Promise<OCSPVerificationResult> {
-  const ocspUrl = (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_OCSP_URL as string | undefined;
-  const apiKey = (import.meta as Record<string, unknown>).env?.VITE_EAD_TRUST_API_KEY as string | undefined;
+  const { VITE_EAD_TRUST_OCSP_URL: ocspUrl, VITE_EAD_TRUST_API_KEY: apiKey } = getQTSPEnv();
 
   if (!ocspUrl || !apiKey) {
     // Fall back to sync stub

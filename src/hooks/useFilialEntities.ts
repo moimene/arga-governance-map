@@ -37,7 +37,7 @@ export function useFilialEntities() {
         .not("jurisdiction", "is", null)
         .order("jurisdiction", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as FilialEntity[];
+      return (data ?? []) as unknown as FilialEntity[];
     },
   });
 }

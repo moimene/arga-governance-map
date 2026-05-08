@@ -948,8 +948,8 @@ src/
 # Tests unitarios (299/299 pass)
 npx vitest run
 
-# Type check (0 errors)
-npx tsc --noEmit
+# Type check real (0 errors)
+bun run typecheck
 
 # Build (2219 modules, ~6.5s)
 npx vite build --outDir /tmp/tgms-dist

@@ -34,13 +34,16 @@ interface SearchResult {
   nav_to: string;
 }
 
+type MaybeJoin<T> = T | T[] | null | undefined;
+type BodyNameJoin = MaybeJoin<{ name?: string | null }>;
+
 type AgreementRow = {
   id: string;
   agreement_kind: string;
   status: string;
   proposal_text?: string | null;
   decision_date?: string | null;
-  governing_bodies?: { name?: string | null } | null;
+  governing_bodies?: BodyNameJoin;
 };
 type ConvocatoriaRow = {
   id: string;
@@ -48,7 +51,7 @@ type ConvocatoriaRow = {
   fecha_1?: string | null;
   tipo_convocatoria?: string | null;
   agenda_items?: unknown;
-  governing_bodies: { name: string } | null;
+  governing_bodies?: BodyNameJoin;
 };
 type NoSessionRow = { id: string; title?: string; status: string };
 type PolicyRow = { id: string; name: string; status: string };
@@ -92,6 +95,11 @@ function includesQuery(value: unknown, query: string) {
   return normalizeSearchText(value).includes(normalizeSearchText(query));
 }
 
+function firstJoin<T>(value: MaybeJoin<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 async function runSearch(query: string, tenantId?: string | null, entityId?: string | null): Promise<SearchResult[]> {
   if (query.trim().length < 2 || !tenantId) return [];
   const rawQuery = query.trim();
@@ -109,17 +117,18 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     if (agreementIds) request = request.in("id", agreementIds);
     const { data, error } = await request.limit(80);
     if (error) throw error;
-    return ((data ?? []) as AgreementRow[])
-      .filter((agreement) =>
-        [
+    return ((data ?? []) as unknown as AgreementRow[])
+      .filter((agreement) => {
+        const body = firstJoin(agreement.governing_bodies);
+        return [
           agreement.id,
           agreement.agreement_kind,
           agreement.status,
           agreement.proposal_text,
           agreement.decision_date,
-          agreement.governing_bodies?.name,
-        ].some((value) => includesQuery(value, rawQuery))
-      )
+          body?.name,
+        ].some((value) => includesQuery(value, rawQuery));
+      })
       .slice(0, 8);
   }
 
@@ -133,17 +142,18 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     if (bodyIds) request = request.in("body_id", bodyIds);
     const { data, error } = await request.limit(80);
     if (error) throw error;
-    return ((data ?? []) as ConvocatoriaRow[])
-      .filter((convocatoria) =>
-        [
+    return ((data ?? []) as unknown as ConvocatoriaRow[])
+      .filter((convocatoria) => {
+        const body = firstJoin(convocatoria.governing_bodies);
+        return [
           convocatoria.id,
           convocatoria.estado,
           convocatoria.fecha_1,
           convocatoria.tipo_convocatoria,
-          convocatoria.governing_bodies?.name,
+          body?.name,
           JSON.stringify(convocatoria.agenda_items ?? ""),
-        ].some((value) => includesQuery(value, rawQuery))
-      )
+        ].some((value) => includesQuery(value, rawQuery));
+      })
       .slice(0, 8);
   }
 
@@ -222,10 +232,11 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
 
   if (agreements.status === "fulfilled") {
     agreements.value.forEach((a) => {
+      const body = firstJoin(a.governing_bodies);
       results.push({
         id: a.id,
         label: a.agreement_kind.replace(/_/g, " "),
-        sublabel: [a.status, a.decision_date, a.governing_bodies?.name, a.proposal_text?.substring(0, 60)]
+        sublabel: [a.status, a.decision_date, body?.name, a.proposal_text?.substring(0, 60)]
           .filter(Boolean)
           .join(" · "),
         kind: "agreement",
@@ -236,9 +247,10 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
 
   if (convocatorias.status === "fulfilled") {
     convocatorias.value.forEach((c) => {
+      const body = firstJoin(c.governing_bodies);
       results.push({
         id: c.id,
-        label: c.governing_bodies?.name ?? "Convocatoria",
+        label: body?.name ?? "Convocatoria",
         sublabel: `${c.estado} · ${c.fecha_1 ? new Date(c.fecha_1).toLocaleDateString("es-ES") : ""}`,
         kind: "convocatoria",
         nav_to: `/secretaria/convocatorias/${c.id}`,
