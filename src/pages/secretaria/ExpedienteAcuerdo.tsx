@@ -26,6 +26,7 @@ import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
+import { useAgreementRuleSnapshot } from "@/hooks/useRuleManager";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
@@ -107,6 +108,7 @@ export default function ExpedienteAcuerdo() {
   const { data: compliance } = useAgreementCompliance(id);
   const { data: verification, isLoading: verificationLoading } = useQTSPVerification(id);
   const { data: normativeSnapshot, isLoading: normativeLoading } = useAgreementNormativeSnapshot(agreement);
+  const { data: frozenSnapshot, isLoading: frozenSnapshotLoading } = useAgreementRuleSnapshot(id);
   const { primaryRole, displayName } = useCurrentUserRole();
 
   const { data: ruleEvaluations = [] } = useQuery({
@@ -319,6 +321,14 @@ export default function ExpedienteAcuerdo() {
           </Card>
 
           <NormativeSnapshotCard snapshot={normativeSnapshot} isLoading={normativeLoading} />
+
+          <FrozenRuleSnapshotCard
+            snapshot={frozenSnapshot}
+            isLoading={frozenSnapshotLoading}
+            agreementEntityId={a.entity_id}
+            agreementMatter={a.agreement_kind}
+            agreementAdoptionMode={a.adoption_mode}
+          />
 
           <Card icon={<Building2 className="h-4 w-4" />} title="Instrumentación y registro">
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -683,6 +693,220 @@ function NormativeSnapshotCard({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function FrozenRuleSnapshotCard({
+  snapshot,
+  isLoading,
+  agreementEntityId,
+  agreementMatter,
+  agreementAdoptionMode,
+}: {
+  snapshot: AgreementNormativeSnapshot | null;
+  isLoading: boolean;
+  agreementEntityId: string | null;
+  agreementMatter: string | null;
+  agreementAdoptionMode: string | null;
+}) {
+  if (isLoading) {
+    return (
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+        <p className="text-sm text-[var(--g-text-secondary)]">Cargando snapshot inmutable…</p>
+      </Card>
+    );
+  }
+
+  if (!snapshot) {
+    const ruleManagerLink =
+      agreementEntityId && agreementMatter && agreementAdoptionMode
+        ? `/secretaria/reglas?entity=${agreementEntityId}&matter=${encodeURIComponent(agreementMatter)}&adoption=${encodeURIComponent(agreementAdoptionMode)}`
+        : "/secretaria/reglas";
+    return (
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+        <p className="text-sm text-[var(--g-text-primary)]">
+          Este acuerdo no tiene un snapshot WORM de regla efectiva almacenado.
+        </p>
+        <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+          Acuerdo anterior al sistema de snapshots inmutables, o materializado por una vía que no
+          congeló la regla. Los acuerdos nuevos materializados por reunión sí congelan
+          automáticamente el snapshot.
+        </p>
+        <Link
+          to={ruleManagerLink}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
+        >
+          Ver regla efectiva actual en el simulador →
+        </Link>
+      </Card>
+    );
+  }
+
+  const sourceLayers = Array.from(new Set(snapshot.sources.map((source) => source.layer)));
+  const pactoWarnings = snapshot.warnings.filter((w) => w.toLowerCase().includes("pacto"));
+  const requiredFormalization = snapshot.formalization_requirements.filter(
+    (req) => req.status === "REQUIRED" || req.status === "CONDITIONAL",
+  );
+
+  return (
+    <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+      <div className="mb-3 flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+        <Lock className="h-3 w-3" aria-hidden />
+        <span>Snapshot inmutable: estas eran las reglas en el momento de adopción.</span>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center px-2.5 py-1 text-[11px] font-semibold ${normativeStatusTone(snapshot.framework_status)}`}
+          style={{ borderRadius: "var(--g-radius-full)" }}
+        >
+          {snapshot.framework_status}
+        </span>
+        <span className="text-xs text-[var(--g-text-secondary)]">
+          Evaluado: {new Date(snapshot.evaluated_at).toLocaleDateString("es-ES")}
+        </span>
+      </div>
+
+      {/* Tres planos jurídicos */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <PlanoBlock
+          label="Validez societaria"
+          ok={snapshot.blockers.length === 0}
+          detail={
+            snapshot.blockers.length === 0
+              ? "Sin bloqueos al adoptar"
+              : `${snapshot.blockers.length} bloqueo(s)`
+          }
+        />
+        <PlanoBlock
+          label="Cumplimiento contractual"
+          ok={pactoWarnings.length === 0}
+          detail={
+            pactoWarnings.length === 0
+              ? "Sin pactos en advertencia"
+              : `${pactoWarnings.length} advertencia(s) de pacto`
+          }
+        />
+        <PlanoBlock
+          label="Formalización"
+          ok={requiredFormalization.length > 0}
+          detail={
+            requiredFormalization.length === 0
+              ? "Sin formalización exigible"
+              : `${requiredFormalization.length} requisito(s) congelado(s)`
+          }
+        />
+      </div>
+
+      {/* Capas usadas */}
+      {sourceLayers.length > 0 && (
+        <div className="mb-3">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+            Capas normativas usadas
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {sourceLayers.map((layer) => (
+              <span
+                key={layer}
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              >
+                {layer}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {requiredFormalization.length > 0 && (
+        <div className="mb-3">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+            Formalización congelada
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
+            {requiredFormalization.map((req, idx) => (
+              <li key={idx}>
+                <span className="font-medium text-[var(--g-text-primary)]">{req.label}</span>
+                {req.status === "CONDITIONAL" ? " (condicional)" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {snapshot.blockers.length > 0 && (
+        <div
+          className="mb-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-subtle)] px-3 py-2"
+          style={{ borderRadius: "var(--g-radius-sm)" }}
+        >
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--status-error)]">
+            Bloqueos al adoptar
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
+            {snapshot.blockers.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {snapshot.warnings.length > 0 && (
+        <div
+          className="mb-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-3 py-2"
+          style={{ borderRadius: "var(--g-radius-sm)" }}
+        >
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--status-warning)]">
+            Advertencias
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
+            {snapshot.warnings.slice(0, 5).map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+            {snapshot.warnings.length > 5 && (
+              <li className="italic">+ {snapshot.warnings.length - 5} más</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      <details className="text-xs">
+        <summary className="cursor-pointer text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]">
+          Traza técnica del snapshot
+        </summary>
+        <div className="mt-2 space-y-1 font-mono text-[10px] text-[var(--g-text-secondary)]">
+          <div>snapshot_id: {snapshot.snapshot_id}</div>
+          <div>profile_hash: {snapshot.profile_hash}</div>
+          <div>profile_version: {snapshot.profile_version}</div>
+          {snapshot.rule_trace.meeting_rule_pack_version && (
+            <div>meeting_rule_pack_version: {snapshot.rule_trace.meeting_rule_pack_version}</div>
+          )}
+          {snapshot.rule_trace.meeting_ruleset_snapshot_id && (
+            <div>meeting_ruleset_snapshot_id: {snapshot.rule_trace.meeting_ruleset_snapshot_id}</div>
+          )}
+        </div>
+      </details>
+    </Card>
+  );
+}
+
+function PlanoBlock({ label, ok, detail }: { label: string; ok: boolean; detail: string }) {
+  return (
+    <div
+      className={`border bg-[var(--g-surface-subtle)] p-3 ${ok ? "border-[var(--status-success)]" : "border-[var(--status-warning)]"}`}
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <div className="mb-1 flex items-center gap-1.5">
+        {ok ? (
+          <CheckCircle2 className="h-3 w-3 text-[var(--status-success)]" aria-hidden />
+        ) : (
+          <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden />
+        )}
+        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+          {label}
+        </span>
+      </div>
+      <div className="text-xs text-[var(--g-text-secondary)]">{detail}</div>
+    </div>
   );
 }
 
