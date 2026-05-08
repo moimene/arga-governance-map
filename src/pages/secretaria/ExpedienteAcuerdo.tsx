@@ -27,6 +27,11 @@ import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { useAgreementRuleSnapshot } from "@/hooks/useRuleManager";
+import {
+  classifyFrozenSnapshot,
+  type FrozenSnapshotClassification,
+  type FrozenSnapshotHealth,
+} from "@/lib/secretaria/rule-manager-contract";
 import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
@@ -717,6 +722,7 @@ function FrozenRuleSnapshotCard({
     );
   }
 
+  // Acuerdo legacy: card compacta con deep-link al simulador.
   if (!snapshot) {
     const ruleManagerLink =
       agreementEntityId && agreementMatter && agreementAdoptionMode
@@ -724,29 +730,35 @@ function FrozenRuleSnapshotCard({
         : "/secretaria/reglas";
     return (
       <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
-        <p className="text-sm text-[var(--g-text-primary)]">
-          Este acuerdo no tiene un snapshot WORM de regla efectiva almacenado.
-        </p>
-        <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
-          Acuerdo anterior al sistema de snapshots inmutables, o materializado por una vía que no
-          congeló la regla. Los acuerdos nuevos materializados por reunión sí congelan
-          automáticamente el snapshot.
-        </p>
-        <Link
-          to={ruleManagerLink}
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
-        >
-          Ver regla efectiva actual en el simulador →
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Este acuerdo no tiene snapshot WORM. La regla efectiva no se congeló al materializarse.
+          </p>
+          <Link
+            to={ruleManagerLink}
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
+          >
+            Simulador →
+          </Link>
+        </div>
       </Card>
     );
   }
 
-  const sourceLayers = Array.from(new Set(snapshot.sources.map((source) => source.layer)));
-  const pactoWarnings = snapshot.warnings.filter((w) => w.toLowerCase().includes("pacto"));
-  const requiredFormalization = snapshot.formalization_requirements.filter(
-    (req) => req.status === "REQUIRED" || req.status === "CONDITIONAL",
-  );
+  // Classifier honesto: lectura del snapshot SIN inferir veredictos jurídicos.
+  const classification = classifyFrozenSnapshot(snapshot);
+  if (!classification) {
+    return (
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+        <p className="text-sm text-[var(--g-text-secondary)]">
+          Snapshot presente pero no interpretable.
+        </p>
+      </Card>
+    );
+  }
+
+  const blockers = Array.isArray(snapshot.blockers) ? snapshot.blockers : [];
+  const warnings = Array.isArray(snapshot.warnings) ? snapshot.warnings : [];
 
   return (
     <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
@@ -755,57 +767,32 @@ function FrozenRuleSnapshotCard({
         <span>Snapshot inmutable: estas eran las reglas en el momento de adopción.</span>
       </div>
 
+      {/* Línea técnica: framework_status + salud del profile + fecha. NO veredicto jurídico. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center px-2.5 py-1 text-[11px] font-semibold ${normativeStatusTone(snapshot.framework_status)}`}
+          className={`inline-flex items-center px-2.5 py-1 text-[11px] font-semibold ${normativeStatusTone(classification.framework_status)}`}
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
-          {snapshot.framework_status}
+          {classification.framework_status}
         </span>
-        <span className="text-xs text-[var(--g-text-secondary)]">
-          Evaluado: {new Date(snapshot.evaluated_at).toLocaleDateString("es-ES")}
-        </span>
+        <ProfileHealthChip health={classification.health} />
+        {classification.evaluated_at && (
+          <span className="text-xs text-[var(--g-text-secondary)]">
+            Evaluado: {new Date(classification.evaluated_at).toLocaleDateString("es-ES")}
+          </span>
+        )}
       </div>
 
-      {/* Tres planos jurídicos */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <PlanoBlock
-          label="Validez societaria"
-          ok={snapshot.blockers.length === 0}
-          detail={
-            snapshot.blockers.length === 0
-              ? "Sin bloqueos al adoptar"
-              : `${snapshot.blockers.length} bloqueo(s)`
-          }
-        />
-        <PlanoBlock
-          label="Cumplimiento contractual"
-          ok={pactoWarnings.length === 0}
-          detail={
-            pactoWarnings.length === 0
-              ? "Sin pactos en advertencia"
-              : `${pactoWarnings.length} advertencia(s) de pacto`
-          }
-        />
-        <PlanoBlock
-          label="Formalización"
-          ok={requiredFormalization.length > 0}
-          detail={
-            requiredFormalization.length === 0
-              ? "Sin formalización exigible"
-              : `${requiredFormalization.length} requisito(s) congelado(s)`
-          }
-        />
-      </div>
+      <p className="mb-3 text-xs text-[var(--g-text-secondary)]">{classification.health_detail}</p>
 
-      {/* Capas usadas */}
-      {sourceLayers.length > 0 && (
+      {/* Capas normativas presentes (status ACTIVE) */}
+      {classification.source_layers.length > 0 && (
         <div className="mb-3">
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
             Capas normativas usadas
           </div>
           <div className="flex flex-wrap gap-1">
-            {sourceLayers.map((layer) => (
+            {classification.source_layers.map((layer) => (
               <span
                 key={layer}
                 className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--g-text-primary)]"
@@ -818,52 +805,80 @@ function FrozenRuleSnapshotCard({
         </div>
       )}
 
-      {requiredFormalization.length > 0 && (
-        <div className="mb-3">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
-            Formalización congelada
-          </div>
-          <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
-            {requiredFormalization.map((req, idx) => (
+      {/* Resumen estructurado de pactos / estatutos sin string-matching */}
+      <div className="mb-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+        <FactRow
+          label="Pacto parasocial activo"
+          present={classification.has_pacto_layer}
+        />
+        <FactRow
+          label="Estatutos como override"
+          present={classification.has_estatutos_layer}
+        />
+        <FactRow
+          label="Reglamento de órgano"
+          present={classification.has_reglamento_layer}
+        />
+      </div>
+
+      {/* Formalización congelada — descriptivo, sin "OK" */}
+      <div className="mb-3 text-xs">
+        <div className="mb-1 font-medium uppercase tracking-wider text-[var(--g-text-secondary)] text-[10px]">
+          Formalización congelada
+        </div>
+        <p className="text-[var(--g-text-secondary)]">
+          {classification.formalization_required_count} requerido
+          {classification.formalization_required_count === 1 ? "" : "s"} ·{" "}
+          {classification.formalization_conditional_count} condicional
+          {classification.formalization_conditional_count === 1 ? "" : "es"}.
+        </p>
+        {classification.formalization_requirements.length > 0 && (
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[var(--g-text-secondary)]">
+            {classification.formalization_requirements.map((req, idx) => (
               <li key={idx}>
                 <span className="font-medium text-[var(--g-text-primary)]">{req.label}</span>
-                {req.status === "CONDITIONAL" ? " (condicional)" : ""}
+                {" — "}
+                {req.status === "REQUIRED"
+                  ? "requerido"
+                  : req.status === "CONDITIONAL"
+                    ? "condicional"
+                    : "informativo"}
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
 
-      {snapshot.blockers.length > 0 && (
+      {blockers.length > 0 && (
         <div
           className="mb-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-subtle)] px-3 py-2"
           style={{ borderRadius: "var(--g-radius-sm)" }}
         >
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--status-error)]">
-            Bloqueos al adoptar
+            Bloqueos del profile al adoptar
           </div>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
-            {snapshot.blockers.map((b, i) => (
+            {blockers.map((b, i) => (
               <li key={i}>{b}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {snapshot.warnings.length > 0 && (
+      {warnings.length > 0 && (
         <div
           className="mb-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-3 py-2"
           style={{ borderRadius: "var(--g-radius-sm)" }}
         >
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--status-warning)]">
-            Advertencias
+            Advertencias del profile
           </div>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-[var(--g-text-secondary)]">
-            {snapshot.warnings.slice(0, 5).map((w, i) => (
+            {warnings.slice(0, 5).map((w, i) => (
               <li key={i}>{w}</li>
             ))}
-            {snapshot.warnings.length > 5 && (
-              <li className="italic">+ {snapshot.warnings.length - 5} más</li>
+            {warnings.length > 5 && (
+              <li className="italic">+ {warnings.length - 5} más</li>
             )}
           </ul>
         </div>
@@ -874,14 +889,13 @@ function FrozenRuleSnapshotCard({
           Traza técnica del snapshot
         </summary>
         <div className="mt-2 space-y-1 font-mono text-[10px] text-[var(--g-text-secondary)]">
-          <div>snapshot_id: {snapshot.snapshot_id}</div>
-          <div>profile_hash: {snapshot.profile_hash}</div>
-          <div>profile_version: {snapshot.profile_version}</div>
-          {snapshot.rule_trace.meeting_rule_pack_version && (
-            <div>meeting_rule_pack_version: {snapshot.rule_trace.meeting_rule_pack_version}</div>
+          {classification.snapshot_id && <div>snapshot_id: {classification.snapshot_id}</div>}
+          {classification.profile_hash && <div>profile_hash: {classification.profile_hash}</div>}
+          {classification.meeting_rule_pack_version && (
+            <div>meeting_rule_pack_version: {classification.meeting_rule_pack_version}</div>
           )}
-          {snapshot.rule_trace.meeting_ruleset_snapshot_id && (
-            <div>meeting_ruleset_snapshot_id: {snapshot.rule_trace.meeting_ruleset_snapshot_id}</div>
+          {classification.meeting_ruleset_snapshot_id && (
+            <div>meeting_ruleset_snapshot_id: {classification.meeting_ruleset_snapshot_id}</div>
           )}
         </div>
       </details>
@@ -889,23 +903,46 @@ function FrozenRuleSnapshotCard({
   );
 }
 
-function PlanoBlock({ label, ok, detail }: { label: string; ok: boolean; detail: string }) {
+function ProfileHealthChip({ health }: { health: FrozenSnapshotHealth }) {
+  const tone =
+    health === "PROFILE_OK"
+      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+      : health === "PROFILE_INCOMPLETE"
+        ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+        : "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
+  const label =
+    health === "PROFILE_OK"
+      ? "PROFILE OK"
+      : health === "PROFILE_INCOMPLETE"
+        ? "PROFILE INCOMPLETO"
+        : "PROFILE EN CONFLICTO";
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${tone}`}
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function FactRow({ label, present }: { label: string; present: boolean }) {
   return (
     <div
-      className={`border bg-[var(--g-surface-subtle)] p-3 ${ok ? "border-[var(--status-success)]" : "border-[var(--status-warning)]"}`}
+      className="flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1.5"
       style={{ borderRadius: "var(--g-radius-md)" }}
     >
-      <div className="mb-1 flex items-center gap-1.5">
-        {ok ? (
-          <CheckCircle2 className="h-3 w-3 text-[var(--status-success)]" aria-hidden />
-        ) : (
-          <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden />
-        )}
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-          {label}
-        </span>
-      </div>
-      <div className="text-xs text-[var(--g-text-secondary)]">{detail}</div>
+      {present ? (
+        <CheckCircle2 className="h-3 w-3 text-[var(--g-brand-3308)]" aria-hidden />
+      ) : (
+        <Circle className="h-3 w-3 text-[var(--g-text-secondary)]" aria-hidden />
+      )}
+      <span className="text-[10px] uppercase tracking-wider text-[var(--g-text-primary)]">
+        {label}
+      </span>
+      <span className="ml-auto text-[10px] text-[var(--g-text-secondary)]">
+        {present ? "presente" : "no"}
+      </span>
     </div>
   );
 }

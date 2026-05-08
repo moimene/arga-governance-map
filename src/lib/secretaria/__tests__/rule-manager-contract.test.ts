@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEffectiveAgreementRule,
+  classifyFrozenSnapshot,
   classifyPactoConsequence,
   type RuleManagerInput,
 } from "../rule-manager-contract";
+import type {
+  AgreementNormativeSnapshot,
+  NormativeSource,
+} from "../normative-framework";
 import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
 
 const ENTITY = {
@@ -522,6 +527,188 @@ describe("buildEffectiveAgreementRule — coverage adicional (post-adversarial)"
     );
     expect(result.requirements.consent?.required).toBe(true);
     expect(result.requirements.consent?.from).toContain("Inversor X");
+  });
+});
+
+// ─── classifyFrozenSnapshot tests ────────────────────────────────────────────
+
+function buildSnapshot(
+  overrides: Partial<AgreementNormativeSnapshot> = {},
+): AgreementNormativeSnapshot {
+  const sources: NormativeSource[] = overrides.sources ?? [
+    {
+      id: "src-ley",
+      layer: "LEY",
+      plane: "SOCIETARIO",
+      label: "LSC",
+      reference: "Real Decreto Legislativo 1/2010",
+      version: "2026-01",
+      status: "ACTIVE",
+      priority: 10,
+      source_id: "ruleset-es-sa",
+      materia: "GENERAL",
+      notes: [],
+    },
+  ];
+  return {
+    schema_version: "agreement-normative-snapshot.v1",
+    snapshot_id: "snapshot-test",
+    profile_id: "profile-test",
+    profile_hash: "nf_abcd1234",
+    profile_version: "1",
+    entity_id: "entity-arga",
+    agreement_id: "agreement-test",
+    agreement_kind: "MODIFICACION_ESTATUTOS",
+    matter_class: "ESTATUTARIA",
+    adoption_mode: "MEETING",
+    agreement_status: "ADOPTED",
+    framework_status: "COMPLETO",
+    evaluated_at: "2026-05-08T10:00:00Z",
+    sources,
+    formalization_requirements: [],
+    warnings: [],
+    blockers: [],
+    rule_trace: {
+      jurisdiction_rule_set_ids: ["ruleset-es-sa"],
+      rule_pack_version_ids: ["pack-v1"],
+      override_ids: [],
+      pacto_ids: [],
+    },
+    ...overrides,
+  };
+}
+
+describe("classifyFrozenSnapshot", () => {
+  it("CASO 24 — Snapshot null/undefined → null (no throw)", () => {
+    expect(classifyFrozenSnapshot(null)).toBeNull();
+    expect(classifyFrozenSnapshot(undefined)).toBeNull();
+  });
+
+  it("CASO 25 — Snapshot COMPLETO sin warnings → PROFILE_OK", () => {
+    const result = classifyFrozenSnapshot(buildSnapshot());
+    expect(result?.health).toBe("PROFILE_OK");
+    expect(result?.profile_blockers_count).toBe(0);
+    expect(result?.framework_status).toBe("COMPLETO");
+  });
+
+  it("CASO 26 — Snapshot CONFLICTO con blockers → PROFILE_CONFLICT y detail con conteo", () => {
+    const result = classifyFrozenSnapshot(
+      buildSnapshot({
+        framework_status: "CONFLICTO",
+        blockers: ["Sociedad sin jurisdicción", "Forma jurídica no normalizada"],
+      }),
+    );
+    expect(result?.health).toBe("PROFILE_CONFLICT");
+    expect(result?.profile_blockers_count).toBe(2);
+    expect(result?.health_detail).toContain("2 bloqueo");
+  });
+
+  it("CASO 27 — Snapshot INCOMPLETO sin blockers → PROFILE_INCOMPLETE con disclaimer explícito", () => {
+    const result = classifyFrozenSnapshot(
+      buildSnapshot({
+        framework_status: "INCOMPLETO",
+        warnings: ["Estatutos no estructurados"],
+      }),
+    );
+    expect(result?.health).toBe("PROFILE_INCOMPLETE");
+    expect(result?.profile_blockers_count).toBe(0);
+    expect(result?.profile_warnings_count).toBe(1);
+    // El detail explícitamente aclara que no equivale a invalidez societaria.
+    expect(result?.health_detail).toContain("NO equivale a invalidez societaria");
+  });
+
+  it("CASO 28 — Capa PACTO_PARASOCIAL ACTIVE en sources → has_pacto_layer=true (no string-matching)", () => {
+    const result = classifyFrozenSnapshot(
+      buildSnapshot({
+        sources: [
+          {
+            id: "src-ley",
+            layer: "LEY",
+            plane: "SOCIETARIO",
+            label: "LSC",
+            reference: null,
+            version: null,
+            status: "ACTIVE",
+            priority: 10,
+            source_id: null,
+            materia: null,
+            notes: [],
+          },
+          {
+            id: "src-pacto",
+            layer: "PACTO_PARASOCIAL",
+            plane: "CONTRACTUAL",
+            label: "Pacto Fundación ARGA",
+            reference: null,
+            version: null,
+            status: "ACTIVE",
+            priority: 40,
+            source_id: "pacto-1",
+            materia: null,
+            notes: [],
+          },
+        ],
+      }),
+    );
+    expect(result?.has_pacto_layer).toBe(true);
+    expect(result?.has_estatutos_layer).toBe(false);
+    expect(result?.source_layers).toContain("PACTO_PARASOCIAL");
+  });
+
+  it("CASO 29 — Capa PACTO_PARASOCIAL con status MISSING NO cuenta como presente", () => {
+    const result = classifyFrozenSnapshot(
+      buildSnapshot({
+        sources: [
+          {
+            id: "src-pacto",
+            layer: "PACTO_PARASOCIAL",
+            plane: "CONTRACTUAL",
+            label: "Pactos parasociales",
+            reference: null,
+            version: null,
+            status: "MISSING",
+            priority: 40,
+            source_id: null,
+            materia: null,
+            notes: [],
+          },
+        ],
+      }),
+    );
+    expect(result?.has_pacto_layer).toBe(false);
+  });
+
+  it("CASO 30 — Formalización: cuenta REQUIRED y CONDITIONAL por separado", () => {
+    const result = classifyFrozenSnapshot(
+      buildSnapshot({
+        formalization_requirements: [
+          { kind: "CERTIFICACION", status: "REQUIRED", label: "x", reason: "x", source_layers: ["LEY"] },
+          { kind: "LIBRO_ACTAS", status: "REQUIRED", label: "x", reason: "x", source_layers: ["LEY"] },
+          { kind: "ESCRITURA_PUBLICA", status: "REQUIRED", label: "x", reason: "x", source_layers: ["LEY"] },
+          { kind: "PUBLICACION_SUPERVISOR", status: "CONDITIONAL", label: "x", reason: "x", source_layers: ["LEY"] },
+        ],
+      }),
+    );
+    expect(result?.formalization_required_count).toBe(3);
+    expect(result?.formalization_conditional_count).toBe(1);
+  });
+
+  it("CASO 31 — Snapshot con arrays undefined es resiliente (no NPE)", () => {
+    // Acuerdo legacy con shape parcial — guards defensivos deben evitar crash.
+    const partial = buildSnapshot();
+    const broken = {
+      ...partial,
+      sources: undefined as unknown as NormativeSource[],
+      warnings: undefined as unknown as string[],
+      blockers: undefined as unknown as string[],
+      formalization_requirements: undefined as unknown as never[],
+      rule_trace: undefined as unknown as AgreementNormativeSnapshot["rule_trace"],
+    };
+    expect(() => classifyFrozenSnapshot(broken as AgreementNormativeSnapshot)).not.toThrow();
+    const result = classifyFrozenSnapshot(broken as AgreementNormativeSnapshot);
+    expect(result?.profile_blockers_count).toBe(0);
+    expect(result?.source_layers).toEqual([]);
+    expect(result?.formalization_required_count).toBe(0);
   });
 });
 

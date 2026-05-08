@@ -22,9 +22,11 @@
 
 import {
   buildEntityNormativeProfile,
+  type AgreementNormativeSnapshot,
   type EntityNormativeProfile,
   type EntityNormativeProfileInput,
   type FormalizationRequirement,
+  type NormativeFrameworkStatus,
   type NormativeLayer,
   type NormativePlane,
   type NormativeSource,
@@ -657,5 +659,133 @@ export function buildEffectiveAgreementRule(input: RuleManagerInput): EffectiveA
       pacto_ids: pactosEval.resultados.map((r) => r.pacto_id),
       statutory_enshrined_pacto_ids: Array.from(statutoryIds),
     },
+  };
+}
+
+// ─── classifyFrozenSnapshot ─────────────────────────────────────────────────
+//
+// Toma un AgreementNormativeSnapshot ya almacenado (compliance_explain.normative_snapshot)
+// y produce una lectura HONESTA de lo que el snapshot describe.
+//
+// Diseño deliberadamente conservador:
+// - NO infiere "Validez societaria OK" / "Cumplimiento contractual OK". Esos
+//   son veredictos del simulador con LegalConsequence (Bloque 1+2), y el
+//   snapshot no contiene información suficiente sin reconstruir la cadena
+//   completa con pactos originales.
+// - NO hace string-matching sobre warnings: solo lee campos estructurados.
+// - Detecta presencia de capa PACTO_PARASOCIAL inspeccionando sources[].layer,
+//   no inspeccionando texto.
+// - Resume conteos (blockers, warnings, formalización requerida vs condicional)
+//   tal cual.
+// - Devuelve etiquetas humanas explícitas que NO usan "OK"/"breach"/"hold" para
+//   evitar implicaciones jurídicas que el snapshot no soporta.
+
+export type FrozenSnapshotHealth =
+  | "PROFILE_OK"          // framework_status COMPLETO sin blockers
+  | "PROFILE_INCOMPLETE"  // INCOMPLETO o DESACTUALIZADO
+  | "PROFILE_CONFLICT";   // CONFLICTO o blockers presentes
+
+export interface FrozenSnapshotClassification {
+  schema_version: "frozen-snapshot-classification.v1";
+
+  // Lectura técnica (sin inferencia jurídica)
+  framework_status: NormativeFrameworkStatus;
+  health: FrozenSnapshotHealth;
+  health_detail: string;
+
+  // Conteos del profile congelado
+  profile_blockers_count: number;
+  profile_warnings_count: number;
+
+  // Capas presentes (sources con status ACTIVE)
+  source_layers: NormativeLayer[];
+  has_pacto_layer: boolean;
+  has_estatutos_layer: boolean;
+  has_reglamento_layer: boolean;
+
+  // Formalización congelada
+  formalization_required_count: number;
+  formalization_conditional_count: number;
+  formalization_requirements: FormalizationRequirement[];
+
+  // Trazabilidad
+  evaluated_at: string | null;
+  snapshot_id: string | null;
+  profile_hash: string | null;
+  meeting_rule_pack_version: string | null;
+  meeting_ruleset_snapshot_id: string | null;
+}
+
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function safeString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export function classifyFrozenSnapshot(
+  snapshot: AgreementNormativeSnapshot | null | undefined,
+): FrozenSnapshotClassification | null {
+  if (!snapshot) return null;
+
+  const sources = safeArray(snapshot.sources);
+  const warnings = safeArray(snapshot.warnings);
+  const blockers = safeArray(snapshot.blockers);
+  const formalizationAll = safeArray(snapshot.formalization_requirements);
+  const ruleTrace = (snapshot.rule_trace ?? {}) as AgreementNormativeSnapshot["rule_trace"];
+
+  // Capas únicas presentes (con status ACTIVE; las MISSING/WARNING no cuentan)
+  const activeLayers = Array.from(
+    new Set(sources.filter((s) => s?.status === "ACTIVE").map((s) => s.layer)),
+  );
+
+  const hasPactoLayer = activeLayers.includes("PACTO_PARASOCIAL");
+  const hasEstatutosLayer = activeLayers.includes("ESTATUTOS");
+  const hasReglamentoLayer = activeLayers.includes("REGLAMENTO");
+
+  const requiredFormalization = formalizationAll.filter((r) => r?.status === "REQUIRED");
+  const conditionalFormalization = formalizationAll.filter((r) => r?.status === "CONDITIONAL");
+
+  // Salud del profile (solo describe lo que el framework_status ya etiquetó +
+  // presencia de blockers; sin inferencias adicionales).
+  const frameworkStatus: NormativeFrameworkStatus = snapshot.framework_status ?? "INCOMPLETO";
+  let health: FrozenSnapshotHealth;
+  let healthDetail: string;
+  if (frameworkStatus === "CONFLICTO" || blockers.length > 0) {
+    health = "PROFILE_CONFLICT";
+    healthDetail =
+      blockers.length > 0
+        ? `El profile reporta ${blockers.length} bloqueo(s) en el momento de adopción.`
+        : "El profile congelado se marcó como CONFLICTO al adoptarse.";
+  } else if (frameworkStatus === "INCOMPLETO" || frameworkStatus === "DESACTUALIZADO") {
+    health = "PROFILE_INCOMPLETE";
+    healthDetail =
+      `El profile congelado se marcó como ${frameworkStatus} al adoptarse. ` +
+      `Esto NO equivale a invalidez societaria; significa que faltaba alguna fuente estructurada.`;
+  } else {
+    health = "PROFILE_OK";
+    healthDetail = "El profile congelado se marcó como COMPLETO al adoptarse.";
+  }
+
+  return {
+    schema_version: "frozen-snapshot-classification.v1",
+    framework_status: frameworkStatus,
+    health,
+    health_detail: healthDetail,
+    profile_blockers_count: blockers.length,
+    profile_warnings_count: warnings.length,
+    source_layers: activeLayers,
+    has_pacto_layer: hasPactoLayer,
+    has_estatutos_layer: hasEstatutosLayer,
+    has_reglamento_layer: hasReglamentoLayer,
+    formalization_required_count: requiredFormalization.length,
+    formalization_conditional_count: conditionalFormalization.length,
+    formalization_requirements: formalizationAll,
+    evaluated_at: safeString(snapshot.evaluated_at),
+    snapshot_id: safeString(snapshot.snapshot_id),
+    profile_hash: safeString(snapshot.profile_hash),
+    meeting_rule_pack_version: safeString(ruleTrace.meeting_rule_pack_version),
+    meeting_ruleset_snapshot_id: safeString(ruleTrace.meeting_ruleset_snapshot_id),
   };
 }
