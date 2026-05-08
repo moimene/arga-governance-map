@@ -181,21 +181,35 @@ export default function RuleManagerPage() {
   const profileQuery = useRuleManagerProfile(entityId ?? undefined);
   const pactosVigentes = profileQuery.pactos;
 
+  // Si el usuario desactiva el modo pre-votación pero todavía no ha introducido
+  // cifras válidas, mantener el modo PRE_VOTE en el contrato. Esto evita el
+  // falso CONTRACTUAL_BREACH que aparecería al evaluar mayoría con
+  // `capitalPresente=0, votosFavor=0`.
+  const capitalPresenteValue =
+    capitalPresenteRaw.trim() === "" ? null : Number(capitalPresenteRaw);
+  const votosFavorValue = votosFavorRaw.trim() === "" ? null : Number(votosFavorRaw);
+  const votingFiguresIncomplete =
+    capitalPresenteValue === null ||
+    votosFavorValue === null ||
+    Number.isNaN(capitalPresenteValue) ||
+    Number.isNaN(votosFavorValue);
+  const effectiveSkipVotes = skipVotes || votingFiguresIncomplete;
+
   const previewInput: AgreementRulePreviewInput = {
     entityId: entityId ?? undefined,
     matter,
     matterClass: matterMeta.matter_class,
     adoptionMode,
     inscribable: matterMeta.inscribable,
-    pactosEval: skipVotes
+    pactosEval: effectiveSkipVotes
       ? {
           skipVoteDependentEvaluations: true,
           vetoRenunciado: Array.from(vetoRenunciado),
           consentimientosPrevios: Array.from(consentimientosPrevios),
         }
       : {
-          capitalPresente: Number(capitalPresenteRaw) || 0,
-          votosFavor: Number(votosFavorRaw) || 0,
+          capitalPresente: capitalPresenteValue ?? 0,
+          votosFavor: votosFavorValue ?? 0,
           vetoRenunciado: Array.from(vetoRenunciado),
           consentimientosPrevios: Array.from(consentimientosPrevios),
         },
@@ -358,6 +372,8 @@ export default function RuleManagerPage() {
               onCapitalPresenteChange={setCapitalPresenteRaw}
               votosFavorRaw={votosFavorRaw}
               onVotosFavorChange={setVotosFavorRaw}
+              effectiveSkipVotes={effectiveSkipVotes}
+              votingFiguresIncomplete={votingFiguresIncomplete}
             />
           </div>
         </div>
@@ -583,6 +599,8 @@ function SimuladorReglaCard({
   onCapitalPresenteChange,
   votosFavorRaw,
   onVotosFavorChange,
+  effectiveSkipVotes,
+  votingFiguresIncomplete,
 }: {
   matter: string;
   adoptionMode: string;
@@ -597,6 +615,8 @@ function SimuladorReglaCard({
   onCapitalPresenteChange: (value: string) => void;
   votosFavorRaw: string;
   onVotosFavorChange: (value: string) => void;
+  effectiveSkipVotes: boolean;
+  votingFiguresIncomplete: boolean;
 }) {
   const result = previewQuery.data;
   return (
@@ -697,8 +717,10 @@ function SimuladorReglaCard({
           </div>
         )}
         <p className="mt-2 text-[10px] text-[var(--g-text-secondary)]">
-          {skipVotes
-            ? "Modo pre-votación: los pactos de mayoría reforzada se reportan como pendientes, no como incumplidos."
+          {effectiveSkipVotes
+            ? !skipVotes && votingFiguresIncomplete
+              ? "Faltan cifras: el simulador trata los pactos de mayoría como pendientes hasta que introduzcas capital presente y votos a favor."
+              : "Modo pre-votación: los pactos de mayoría reforzada se reportan como pendientes, no como incumplidos."
             : "Modo con cifras: los pactos de mayoría reforzada se evalúan con los votos suministrados."}
         </p>
       </div>
