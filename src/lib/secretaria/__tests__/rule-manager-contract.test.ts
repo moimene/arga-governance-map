@@ -290,6 +290,205 @@ describe("buildEffectiveAgreementRule", () => {
   });
 });
 
+// ─── Fixes adversariales — coverage adicional ───────────────────────────────
+
+const ENTITY_SL_NO_LISTED = {
+  id: "entity-cartera-arga",
+  common_name: "Cartera ARGA S.L.U.",
+  legal_name: "Cartera ARGA, S.L.U.",
+  jurisdiction: "ES",
+  tipo_social: "SLU",
+  legal_form: "SL",
+  forma_administracion: "ADMIN_UNICO",
+  tipo_organo_admin: "ADMIN_UNICO",
+  es_unipersonal: true,
+  es_cotizada: false,
+} as const;
+
+describe("buildEffectiveAgreementRule — coverage adicional (post-adversarial)", () => {
+  it("CASO 12 — Sociedad SL no cotizada: NO emite WARNING de cotizada", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        entity: { ...ENTITY_SL_NO_LISTED },
+        rulePacks: [],
+        agreement: {
+          matter: "MODIFICACION_ESTATUTOS",
+          matter_class: "ESTATUTARIA",
+          body_type: "JUNTA",
+          adoption_mode: "MEETING",
+          inscribable: true,
+        },
+      }),
+    );
+    expect(result.status).toBe("PROCLAMABLE_AND_EXECUTABLE");
+    const cotizadaWarning = result.consequences.find(
+      (c) => c.consequence === "WARNING" && c.source_label.includes("LMV"),
+    );
+    expect(cotizadaWarning).toBeUndefined();
+    expect(result.requirements.publication?.required).toBe(false);
+  });
+
+  it("CASO 13 — Entidad sin jurisdicción: profile reporta blockers; status sigue legible", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        entity: {
+          ...ENTITY,
+          jurisdiction: null,
+        },
+      }),
+    );
+    expect(result.profile.blockers.length).toBeGreaterThan(0);
+    // El profile bloquea por datos faltantes, pero el contrato no inventa un VALIDITY_BLOCK
+    // automático: deja que la UI muestre los blockers a Legal.
+    expect(result.consequences.find((c) => c.consequence === "VALIDITY_BLOCK")).toBeUndefined();
+  });
+
+  it("CASO 14 — Multi-pacto: VETO + MAYORIA_REFORZADA simultáneos producen 2 consequences distintas", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        pactos: [VETO_PACTO, MAYORIA_REFORZADA_PACTO],
+        pactosEval: {
+          capitalPresente: 100,
+          votosFavor: 60, // < 75% pactado
+        },
+      }),
+    );
+    expect(result.status).toBe("PROCLAMABLE_HELD");
+    const hold = result.consequences.find((c) => c.consequence === "OPERATIONAL_HOLD");
+    const breach = result.consequences.find((c) => c.consequence === "CONTRACTUAL_BREACH");
+    expect(hold?.source_id).toBe(VETO_PACTO.id);
+    expect(breach?.source_id).toBe(MAYORIA_REFORZADA_PACTO.id);
+    expect(result.consequences.length).toBeGreaterThanOrEqual(3); // 2 pactos + WARNING cotizada
+  });
+
+  it("CASO 15 — Adoption_mode CO_APROBACION: convocatoria sí, quorum no, unanimidad no", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        agreement: {
+          matter: "DELEGACION_FACULTADES",
+          matter_class: "ORDINARIA",
+          body_type: "ADMIN_CONJUNTA",
+          adoption_mode: "CO_APROBACION",
+          inscribable: false,
+        },
+      }),
+    );
+    expect(result.requirements.convocatoria?.required).toBe(true);
+    expect(result.requirements.convocatoria?.notes.join(" ")).toContain("Co-aprobación");
+    expect(result.requirements.quorum?.required).toBe(false);
+    expect(result.requirements.unanimity?.required).toBe(false);
+  });
+
+  it("CASO 16 — Adoption_mode SOLIDARIO: ni convocatoria ni quorum ni unanimidad", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        agreement: {
+          matter: "GESTION_ORDINARIA",
+          matter_class: "ORDINARIA",
+          body_type: "ADMIN_SOLIDARIOS",
+          adoption_mode: "SOLIDARIO",
+          inscribable: false,
+        },
+      }),
+    );
+    expect(result.requirements.convocatoria?.required).toBe(false);
+    expect(result.requirements.convocatoria?.notes.join(" ")).toContain("solidario");
+    expect(result.requirements.quorum?.required).toBe(false);
+    expect(result.requirements.unanimity?.required).toBe(false);
+  });
+
+  it("CASO 17 — legal_majority suministrado por el caller: se usa threshold real, no heurística", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        agreement: {
+          matter: "MODIFICACION_ESTATUTOS",
+          matter_class: "ESTATUTARIA",
+          body_type: "JUNTA",
+          adoption_mode: "MEETING",
+          inscribable: true,
+          legal_majority: {
+            code: "REFORZADA_2_3",
+            threshold: 2 / 3,
+            description: "Mayoría reforzada de 2/3 según LSC art. 201.2",
+          },
+        },
+      }),
+    );
+    expect(result.requirements.majority?.code).toBe("REFORZADA_2_3");
+    expect(result.requirements.majority?.legal_threshold).toBeCloseTo(2 / 3, 3);
+    expect(result.requirements.majority?.effective_threshold).toBeCloseTo(2 / 3, 3);
+    expect(result.requirements.majority?.effective_source).toBe("LEY");
+    expect(result.requirements.majority?.description).toContain("LSC art. 201.2");
+  });
+
+  it("CASO 18 — Pacto MAYORIA_REFORZADA(0.75) eleva el threshold sobre legal(0.667): effective_source=PACTO", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        agreement: {
+          matter: "MODIFICACION_ESTATUTOS",
+          matter_class: "ESTATUTARIA",
+          body_type: "JUNTA",
+          adoption_mode: "MEETING",
+          inscribable: true,
+          legal_majority: { code: "REFORZADA_2_3", threshold: 2 / 3 },
+        },
+        pactos: [MAYORIA_REFORZADA_PACTO],
+      }),
+    );
+    expect(result.requirements.majority?.legal_threshold).toBeCloseTo(2 / 3, 3);
+    expect(result.requirements.majority?.pacto_threshold).toBe(0.75);
+    expect(result.requirements.majority?.effective_threshold).toBe(0.75);
+    expect(result.requirements.majority?.effective_source).toBe("PACTO");
+    expect(result.requirements.majority?.code).toBe("PACTO_MAYORIA_REFORZADA");
+  });
+
+  it("CASO 19 — Titular del veto: usa titular_veto cuando existe", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        pactos: [VETO_PACTO], // titular_veto = "Fundacion ARGA"
+      }),
+    );
+    expect(result.requirements.veto?.applies).toBe(true);
+    expect(result.requirements.veto?.titulares).toContain("Fundacion ARGA");
+  });
+
+  it("CASO 20 — Titular del veto: cae a firmantes cuando no hay titular_veto", () => {
+    const vetoSinTitular: PactoParasocial = {
+      ...VETO_PACTO,
+      id: "pacto-veto-sin-titular",
+      titular_veto: undefined,
+      firmantes: [
+        { nombre: "Inversor A", tipo: "PJ", capital_pct: 30 },
+        { nombre: "Inversor B", tipo: "PJ", capital_pct: 25 },
+      ],
+    };
+    const result = buildEffectiveAgreementRule(
+      input({
+        pactos: [vetoSinTitular],
+      }),
+    );
+    expect(result.requirements.veto?.titulares).toContain("Inversor A");
+    expect(result.requirements.veto?.titulares).toContain("Inversor B");
+  });
+
+  it("CASO 21 — Titular del consentimiento: lee de titular_veto del pacto, no del título genérico", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        agreement: {
+          matter: "AUMENTO_CAPITAL",
+          matter_class: "ESTRUCTURAL",
+          body_type: "JUNTA",
+          adoption_mode: "MEETING",
+          inscribable: true,
+        },
+        pactos: [CONSENTIMIENTO_PACTO], // titular_veto = "Inversor X"
+      }),
+    );
+    expect(result.requirements.consent?.required).toBe(true);
+    expect(result.requirements.consent?.from).toContain("Inversor X");
+  });
+});
+
 describe("classifyPactoConsequence", () => {
   it("pacto que no aplica → NO_EFFECT", () => {
     const out = classifyPactoConsequence({

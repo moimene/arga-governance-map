@@ -73,10 +73,26 @@ export interface EffectiveRuleConsequence {
   remediation_hint?: string;
 }
 
+export interface EffectiveMajority {
+  /** Código resumen del régimen aplicable (SIMPLE, REFORZADA, ESTRUCTURAL, PACTO_*). */
+  code: string | null;
+  /** Threshold legal base si lo conoce el caller (ej. 0.5, 0.6667, 0.75). */
+  legal_threshold?: number | null;
+  /** Threshold elevado por pacto si supera el legal. */
+  pacto_threshold?: number | null;
+  /** Threshold efectivo a aplicar. */
+  effective_threshold?: number | null;
+  /** Origen del threshold efectivo: ley o pacto. */
+  effective_source?: "LEY" | "PACTO" | null;
+  /** Descripción legible si el caller la suministra. */
+  description?: string | null;
+  notes: string[];
+}
+
 export interface EffectiveRuleRequirements {
   convocatoria?: { required: boolean; notes: string[] };
   quorum?: { required: boolean; notes: string[] };
-  majority?: { code: string | null; notes: string[] };
+  majority?: EffectiveMajority;
   unanimity?: { required: boolean; notes: string[] };
   veto?: { applies: boolean; titulares: string[]; notes: string[] };
   consent?: { required: boolean; from: string[]; notes: string[] };
@@ -97,6 +113,16 @@ export interface RuleManagerInput {
     body_type?: string | null;
     adoption_mode: string;
     inscribable?: boolean | null;
+    /**
+     * Si el caller resolvió la mayoría legal exacta desde un rule pack
+     * activo (con threshold real), la pasa aquí; el contrato la prefiere
+     * sobre la heurística por matter_class.
+     */
+    legal_majority?: {
+      code: string | null;
+      threshold?: number | null;
+      description?: string | null;
+    } | null;
   };
   pactosEval?: Partial<PactosEvalInput>;
   // Opciones de clasificación legal
@@ -177,12 +203,109 @@ function inferMajorityCode(matterClass?: string | null) {
   return null;
 }
 
+/** Adopción que exige convocatoria con plazo y forma. */
 const ADOPTION_NEEDS_CONVOCATION = new Set([
+  "MEETING",
+  "UNIVERSAL",
+  "CO_APROBACION", // k de n administradores: notificación a los implicados.
+]);
+
+/** Adopción que exige unanimidad o equivalente. */
+const ADOPTION_NEEDS_UNANIMITY = new Set([
+  "NO_SESSION",
+  "UNIPERSONAL_SOCIO",
+]);
+
+/** Adopción que exige quórum de constitución (sesión presencial o equivalente). */
+const ADOPTION_NEEDS_QUORUM = new Set([
   "MEETING",
   "UNIVERSAL",
 ]);
 
-function buildRequirements(input: RuleManagerInput, profile: EntityNormativeProfile): EffectiveRuleRequirements {
+/** Etiquetas humanas por modo de adopción. */
+const ADOPTION_LABELS: Record<string, string> = {
+  MEETING: "Acuerdo en sesión",
+  UNIVERSAL: "Junta universal",
+  NO_SESSION: "Acuerdo sin sesión",
+  CO_APROBACION: "Co-aprobación de administradores",
+  SOLIDARIO: "Decisión de administrador solidario",
+  UNIPERSONAL_SOCIO: "Decisión del socio único",
+  UNIPERSONAL_ADMIN: "Decisión del administrador único",
+};
+
+function maxPactoMajorityThreshold(pactos: PactoParasocial[], matter: string) {
+  const aplicables = pactos.filter(
+    (p) =>
+      p.estado === "VIGENTE" &&
+      p.tipo_clausula === "MAYORIA_REFORZADA_PACTADA" &&
+      p.materias_aplicables.includes(matter) &&
+      typeof p.umbral_activacion === "number",
+  );
+  if (aplicables.length === 0) return null;
+  return aplicables.reduce(
+    (max, p) => (p.umbral_activacion! > max ? p.umbral_activacion! : max),
+    0,
+  );
+}
+
+function buildMajorityRequirement(
+  input: RuleManagerInput,
+  pactos: PactoParasocial[],
+): EffectiveMajority {
+  const matterClass = (input.agreement.matter_class ?? "").trim().toUpperCase();
+  const heuristic = inferMajorityCode(input.agreement.matter_class);
+  const provided = input.agreement.legal_majority ?? null;
+  const legalThreshold = provided?.threshold ?? null;
+  const pactoThreshold = maxPactoMajorityThreshold(pactos, input.agreement.matter);
+
+  const effectiveThreshold =
+    pactoThreshold !== null && pactoThreshold > (legalThreshold ?? 0)
+      ? pactoThreshold
+      : legalThreshold;
+  const effectiveSource: "LEY" | "PACTO" | null =
+    pactoThreshold !== null && pactoThreshold === effectiveThreshold
+      ? "PACTO"
+      : legalThreshold !== null
+        ? "LEY"
+        : null;
+
+  const code = pactoThreshold !== null ? "PACTO_MAYORIA_REFORZADA" : provided?.code ?? heuristic;
+  const description = provided?.description ?? null;
+
+  const notes: string[] = [];
+  if (matterClass && !provided) {
+    notes.push(`Materia ${matterClass}: mayoría inferida por defecto del régimen aplicable.`);
+  } else if (provided) {
+    notes.push(
+      `Mayoría legal suministrada por el caller${
+        legalThreshold !== null ? ` (threshold ${(legalThreshold * 100).toFixed(1)}%)` : ""
+      }.`,
+    );
+  } else {
+    notes.push("No se ha clasificado la materia: la mayoría debe confirmarse caso a caso.");
+  }
+  if (pactoThreshold !== null) {
+    notes.push(
+      `Pacto parasocial eleva el threshold a ${(pactoThreshold * 100).toFixed(1)}% para esta materia.`,
+    );
+  }
+
+  return {
+    code,
+    legal_threshold: legalThreshold,
+    pacto_threshold: pactoThreshold,
+    effective_threshold: effectiveThreshold,
+    effective_source: effectiveSource,
+    description,
+    notes,
+  };
+}
+
+function buildRequirements(
+  input: RuleManagerInput,
+  profile: EntityNormativeProfile,
+  pactos: PactoParasocial[],
+): EffectiveRuleRequirements {
   const documentation = summarizeFormalizationForAgreement({
     agreement_kind: input.agreement.matter,
     matter_class: input.agreement.matter_class,
@@ -198,32 +321,59 @@ function buildRequirements(input: RuleManagerInput, profile: EntityNormativeProf
     matterClass === "ESTRUCTURAL" ||
     matterClass === "ESTATUTARIA";
 
+  const adoptionLabel = ADOPTION_LABELS[adoption] ?? adoption;
+  const requiresConvocation = ADOPTION_NEEDS_CONVOCATION.has(adoption);
+  const requiresUnanimity = ADOPTION_NEEDS_UNANIMITY.has(adoption);
+  const requiresQuorum = ADOPTION_NEEDS_QUORUM.has(adoption);
+
+  let convocationNote: string;
+  if (adoption === "CO_APROBACION") {
+    convocationNote = "Co-aprobación: notificar a los administradores requeridos antes del cierre.";
+  } else if (adoption === "SOLIDARIO") {
+    convocationNote = "Decisión solidaria: no requiere convocatoria formal; el administrador solidario decide.";
+  } else if (adoption === "UNIPERSONAL_ADMIN") {
+    convocationNote = "Decisión del administrador único: no requiere convocatoria formal.";
+  } else if (requiresConvocation) {
+    convocationNote = "La adopción requiere convocatoria con plazo y forma del régimen aplicable.";
+  } else {
+    convocationNote = "El modo de adopción no requiere convocatoria formal.";
+  }
+
+  let unanimityNote: string;
+  if (adoption === "NO_SESSION") {
+    unanimityNote = "Acuerdo sin sesión: requiere unanimidad o el régimen sin sesión aplicable.";
+  } else if (adoption === "UNIPERSONAL_SOCIO") {
+    unanimityNote = "Decisión unipersonal del socio único: equivale a acuerdo unánime.";
+  } else if (adoption === "CO_APROBACION") {
+    unanimityNote = "Co-aprobación exige los k administradores configurados, no unanimidad estricta.";
+  } else if (adoption === "SOLIDARIO") {
+    unanimityNote = "Decisión de administrador solidario: no aplica unanimidad ni mayoría colegiada.";
+  } else {
+    unanimityNote = "No requiere unanimidad por defecto.";
+  }
+
+  let quorumNote: string;
+  if (requiresQuorum) {
+    quorumNote = "El órgano necesita quorum de constitución conforme a ley/estatutos.";
+  } else if (adoption === "CO_APROBACION") {
+    quorumNote = "Co-aprobación: en lugar de quorum, exige los k administradores requeridos.";
+  } else {
+    quorumNote = `No aplica quorum: ${adoptionLabel.toLowerCase()}.`;
+  }
+
   return {
     convocatoria: {
-      required: ADOPTION_NEEDS_CONVOCATION.has(adoption),
-      notes: ADOPTION_NEEDS_CONVOCATION.has(adoption)
-        ? ["La adopción requiere convocatoria con plazo y forma del régimen aplicable."]
-        : ["El modo de adopción no requiere convocatoria formal."],
+      required: requiresConvocation,
+      notes: [convocationNote],
     },
     quorum: {
-      required: adoption === "MEETING",
-      notes: adoption === "MEETING"
-        ? ["El órgano necesita quorum de constitución conforme a ley/estatutos."]
-        : ["No aplica quorum: la adopción no es por sesión."],
+      required: requiresQuorum,
+      notes: [quorumNote],
     },
-    majority: {
-      code: inferMajorityCode(input.agreement.matter_class),
-      notes: matterClass
-        ? [`Materia ${matterClass}: mayoría inferida por defecto del régimen aplicable.`]
-        : ["No se ha clasificado la materia: la mayoría debe confirmarse caso a caso."],
-    },
+    majority: buildMajorityRequirement(input, pactos),
     unanimity: {
-      required: adoption === "NO_SESSION" || adoption === "UNIPERSONAL_SOCIO",
-      notes: adoption === "NO_SESSION"
-        ? ["Acuerdo sin sesión: requiere unanimidad o el régimen sin sesión aplicable."]
-        : adoption === "UNIPERSONAL_SOCIO"
-          ? ["Decisión unipersonal del socio único: equivale a acuerdo unánime."]
-          : ["No requiere unanimidad por defecto."],
+      required: requiresUnanimity,
+      notes: [unanimityNote],
     },
     documentation,
     registry: {
@@ -241,11 +391,16 @@ function buildRequirements(input: RuleManagerInput, profile: EntityNormativeProf
   };
 }
 
-function vetoRequirementFromPactos(pactosEval: PactoEvalResult[]): {
-  applies: boolean;
-  titulares: string[];
-  notes: string[];
-} {
+function titularsFromPacto(pacto: PactoParasocial | undefined): string[] {
+  if (!pacto) return [];
+  if (pacto.titular_veto) return [pacto.titular_veto];
+  return pacto.firmantes.map((firmante) => firmante.nombre).filter(Boolean);
+}
+
+function vetoRequirementFromPactos(
+  pactos: PactoParasocial[],
+  pactosEval: PactoEvalResult[],
+): { applies: boolean; titulares: string[]; notes: string[] } {
   const aplica = pactosEval.filter((r) => r.tipo === "VETO" && r.aplica);
   if (aplica.length === 0) {
     return {
@@ -254,10 +409,15 @@ function vetoRequirementFromPactos(pactosEval: PactoEvalResult[]): {
       notes: ["No hay derechos de veto pactados aplicables a esta materia."],
     };
   }
+  const pactoById = new Map(pactos.map((p) => [p.id, p]));
   const titulares = dedupe(
-    aplica.map((r) => r.explain.mensaje?.match(/Titular:\s*([^—]+?)(?:\s+—|$)/)?.[1]?.trim() ?? r.pacto_titulo),
+    aplica.flatMap((r) => titularsFromPacto(pactoById.get(r.pacto_id))),
     (value) => value,
   );
+  // Fallback al título del pacto si no hay datos estructurados de titular.
+  if (titulares.length === 0) {
+    aplica.forEach((r) => titulares.push(r.pacto_titulo));
+  }
   return {
     applies: true,
     titulares,
@@ -265,11 +425,10 @@ function vetoRequirementFromPactos(pactosEval: PactoEvalResult[]): {
   };
 }
 
-function consentRequirementFromPactos(pactosEval: PactoEvalResult[]): {
-  required: boolean;
-  from: string[];
-  notes: string[];
-} {
+function consentRequirementFromPactos(
+  pactos: PactoParasocial[],
+  pactosEval: PactoEvalResult[],
+): { required: boolean; from: string[]; notes: string[] } {
   const aplica = pactosEval.filter((r) => r.tipo === "CONSENTIMIENTO_INVERSOR" && r.aplica);
   if (aplica.length === 0) {
     return {
@@ -278,12 +437,17 @@ function consentRequirementFromPactos(pactosEval: PactoEvalResult[]): {
       notes: ["No hay consentimientos previos requeridos por pacto."],
     };
   }
+  const pactoById = new Map(pactos.map((p) => [p.id, p]));
+  const from = dedupe(
+    aplica.flatMap((r) => titularsFromPacto(pactoById.get(r.pacto_id))),
+    (value) => value,
+  );
+  if (from.length === 0) {
+    aplica.forEach((r) => from.push(r.pacto_titulo));
+  }
   return {
     required: true,
-    from: dedupe(
-      aplica.map((r) => r.pacto_titulo),
-      (value) => value,
-    ),
+    from,
     notes: aplica.map((r) => r.explain.mensaje ?? `Consentimiento previo requerido por pacto ${r.pacto_id}.`),
   };
 }
@@ -414,9 +578,10 @@ export function buildEffectiveAgreementRule(input: RuleManagerInput): EffectiveA
     });
   }
 
-  const requirements = buildRequirements(input, profile);
-  requirements.veto = vetoRequirementFromPactos(pactosEval.resultados);
-  requirements.consent = consentRequirementFromPactos(pactosEval.resultados);
+  const pactosVigentes = (input.pactos ?? []).filter((p) => p.estado === "VIGENTE");
+  const requirements = buildRequirements(input, profile, pactosVigentes);
+  requirements.veto = vetoRequirementFromPactos(pactosVigentes, pactosEval.resultados);
+  requirements.consent = consentRequirementFromPactos(pactosVigentes, pactosEval.resultados);
 
   const hasValidityBlock = consequences.some((c) => c.consequence === "VALIDITY_BLOCK");
   const hasBreach = consequences.some((c) => c.consequence === "CONTRACTUAL_BREACH");
