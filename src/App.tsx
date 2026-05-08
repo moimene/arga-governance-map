@@ -9,7 +9,7 @@ import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
-import { ProtectedShell } from "@/components/RequireAuth";
+import { ProtectedShell, RequireAuth } from "@/components/RequireAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
 import Dashboard from "@/pages/Dashboard";
@@ -36,7 +36,6 @@ import { SiiLayout } from "@/pages/sii/SiiLayout";
 import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
-import { RequireAuth } from "@/components/RequireAuth";
 const DemoScenarioResult = lazy(() => import("@/pages/DemoScenarioResult"));
 
 // ── Módulo Garrigues: Secretaría (lazy) ─────────────────────────────────────
