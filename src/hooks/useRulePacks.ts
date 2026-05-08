@@ -162,21 +162,24 @@ export function useRulePackForMateria(materia?: string) {
         .eq("rule_packs.tenant_id", tenantId!)
         .eq("is_active", true)
         .eq("rule_packs.materia", materia)
-        .order("version", { ascending: false })
-        .maybeSingle();
+        // Cloud legacy data can contain more than one active row for a matter.
+        // Pick the newest active row instead of failing with maybeSingle().
+        .order("created_at", { ascending: false })
+        .limit(1);
 
       if (error) throw error;
 
-      if (!data) return null;
+      const row = ((data ?? []) as RulePackJoinRow[])[0];
+      if (!row) return null;
 
-      const packed = (data as RulePackJoinRow).rule_packs;
+      const packed = row.rule_packs;
       return {
-        id: data.id,
-        rule_pack_id: data.pack_id,
-        version_tag: data.version,
-        status: data.is_active ? "ACTIVE" : "DEPRECATED",
-        params: data.payload,
-        created_at: data.created_at,
+        id: row.id,
+        rule_pack_id: row.pack_id,
+        version_tag: row.version,
+        status: row.is_active ? "ACTIVE" : "DEPRECATED",
+        params: row.payload,
+        created_at: row.created_at,
         tenant_id: packed?.tenant_id ?? tenantId!,
         materia: packed?.materia,
         clase: undefined,

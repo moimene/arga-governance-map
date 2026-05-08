@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
+import { useTenantContext } from "@/context/TenantContext";
 
 interface RuleEvaluationResult {
   id: string;
