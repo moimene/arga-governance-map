@@ -3,6 +3,7 @@
 Fecha: 2026-05-08
 Worktree: `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map`, rama `main`
 Cierra dos ítems del backlog: INC-06 (deuda fantasma) e INC-11 (consolidación trivial, no bug).
+Añade verificación contextual posterior de INC-08 e INC-10 para evitar repetir deuda fantasma.
 
 ## Contexto
 
@@ -80,6 +81,76 @@ import { ProtectedShell, RequireAuth } from "@/components/RequireAuth";
 
 **Estado: INC-11 cerrada como INVALID (no era bug) + consolidación estilística aplicada.**
 
+## INC-08 — Módulos `/grc/m/*` con secciones placeholder → VALIDADA PARCIAL + scope refinado
+
+### Inventario original (2026-05-06)
+
+> `/grc/m/{dora,cyber,gdpr,audit}/*` modular shell con secciones (`SOC.tsx`, `Vulnerabilities.tsx`, etc.) mostrando placeholders.
+
+### Verificación 2026-05-08
+
+Inspección contextual de `src/pages/grc/modules/*/*.tsx`:
+
+| Categoría | Archivos | Evidencia |
+|---|---|---|
+| Conectadas a hooks/Supabase | `dora/Incidents.tsx`, `dora/BCM.tsx`, `dora/RTO.tsx`, `cyber/Incidents.tsx`, `cyber/Vulnerabilities.tsx`, `audit/Findings.tsx`, `audit/ActionPlans.tsx` | Importan hooks o `supabase`, renderizan datos, loading/empty states. |
+| Vista puente no vacía | `dora/PoliciesLink.tsx` | Enlace intencional a `/politicas`, no placeholder vacío. |
+| Demo estática con contenido | `gdpr/ROPA.tsx`, `gdpr/DPIAs.tsx`, `gdpr/DSARs.tsx` | Arrays locales con filas demo y tablas renderizadas. No están Cloud-connected, pero no son pantallas vacías. |
+| Placeholder enterprise real | `audit/Program.tsx`, `cyber/SOC.tsx`, `dora/Thresholds.tsx`, `gdpr/DPO.tsx` | Copy explícito: "disponible en versión enterprise" / "configuración disponible en versión enterprise". |
+
+### Conclusión
+
+El inventario original era demasiado amplio. **No es cierto que `/grc/m/*` esté vacío de forma generalizada.** Hay 7 pantallas operativas conectadas, 1 puente, 3 demos estáticas y 4 placeholders enterprise reales.
+
+**Estado: INC-08 sigue activa, pero refinada a deuda parcial.**
+
+Plan recomendado cuando se aborde:
+
+1. Mantener rutas operativas conectadas.
+2. Decidir si las 3 vistas GDPR estáticas deben seguir como demo content o plegarse hasta tener fuente Cloud.
+3. Plegar u ocultar en navegación Cloud (`grc_module_nav.is_enabled=false` o equivalente de UI) solo estas 4 secciones enterprise: `audit/governance/program`, `cyber/governance/soc`, `dora/config/thresholds`, `gdpr/governance/dpo`.
+4. No borrar componentes sin revisar si se usan como señal comercial de roadmap.
+
+No se aplica fix en este carril: el objetivo era verificación contextual sin código.
+
+## INC-10 — Centralizar status-labels / chips GRC → VALIDADA
+
+### Inventario original (2026-05-06)
+
+> Status values (`"Abierto"`, `"En tratamiento"`) hardcoded en `RiskEditor.tsx`, `IncidenteStepper.tsx` y `SEV_CHIP` duplicado en 3+ páginas.
+
+### Verificación 2026-05-08
+
+El hallazgo es real y mayor que el ejemplo original:
+
+- `src/pages/grc/RiskEditor.tsx`: `BASE_STATUS_OPTIONS = ["Abierto", "En tratamiento"]` y defaults de `status`.
+- `src/pages/grc/IncidenteStepper.tsx`: defaults `severity: "Alto"`, `status: "Abierto"` y opciones de severidad hardcoded.
+- Duplicación de chips detectada en al menos 14 mapas locales:
+  - `IncidenteDetalle.tsx`: `SEV_CHIP`, `NOTIF_STATUS_CHIP`
+  - `IncidentesList.tsx`: `SEV_CHIP`, `STATUS_CHIP`
+  - `MyWork.tsx`: `STATUS_CHIP`
+  - `Excepciones.tsx`: `STATUS_CHIP`
+  - `modules/dora/Incidents.tsx`: `SEV_CHIP`
+  - `modules/cyber/Incidents.tsx`: `SEV_CHIP`
+  - `modules/cyber/Vulnerabilities.tsx`: `SEV_CHIP`, `STATUS_CHIP`
+  - `modules/audit/Findings.tsx`: `SEV_CHIP`
+  - `modules/audit/ActionPlans.tsx`: `STATUS_CHIP`
+  - `modules/gdpr/ROPA.tsx`, `DPIAs.tsx`, `DSARs.tsx`: `RISK_CHIP` / `STATUS_CHIP`
+- `src/lib/secretaria/status-labels.ts` existe, pero es de Secretaría: no cubre GRC ni debería convertirse sin diseño en dependencia cross-module.
+
+### Conclusión
+
+**INC-10 es deuda real.** No es el mismo patrón falso-positivo de INC-06/11. La deuda no está limitada a `RiskEditor`/`IncidenteStepper`; afecta a la superficie GRC modular y a listas/detalles.
+
+Plan recomendado cuando se aborde:
+
+1. Crear una centralización GRC propia (`src/lib/grc/status-labels.ts` o equivalente), no reutilizar directamente la de Secretaría.
+2. Separar funciones por dominio: `incidentStatusLabel`, `incidentSeverityChip`, `riskStatusOptions`, `exceptionStatusChip`, `notificationStatusLabel`, con fallback neutral.
+3. Migrar por grupos de bajo riesgo: incidentes primero (`IncidentesList`, `IncidenteDetalle`, `modules/dora/Incidents`, `modules/cyber/Incidents`, `IncidenteStepper`), luego riesgos/excepciones, luego módulos GDPR/audit/cyber vulnerabilidades.
+4. Añadir tests de contrato para labels/chips GRC antes de tocar UI.
+
+No se aplica fix en este carril: el objetivo era verificación contextual sin código.
+
 ## Lección para inventarios futuros
 
 Las dos invalidaciones comparten causa raíz: **grep ciego sin verificación de contexto**. Para evitar repetirlo:
@@ -105,21 +176,24 @@ INCs activas P0 (1):
 INCs activas P1 (4):
 - INC-15 Saneamiento sociedad por sociedad
 - INC-16 Schema versionado de estatutos/reglamentos
-- INC-08 Plegar secciones modulares vacías `/grc/m/*`
+- INC-08 Plegar secciones modulares vacías `/grc/m/*` — **validada parcial, scope refinado a 4 placeholders enterprise + decisión sobre 3 vistas GDPR estáticas**
 - INC-02 Mover `docs/BORRADORES INTERMEDIOS/` fuera del repo
 
-INCs activas P2/P3 (2):
-- INC-10 Centralizar status-labels GRC
+INCs activas P2/P3 (3):
+- INC-10 Centralizar status-labels GRC — **validada como deuda real**
 - INC-17 Documentar ruta despliegue prod
 - INC-07 Decidir gap evaluaciones AIMS RLS
 
 ## Verificación
 
 ```md
-- bunx tsc --noEmit --pretty false: pendiente al cerrar
-- bun run lint: pendiente al cerrar
-- bun test: pendiente al cerrar
-- bun run build: pendiente al cerrar
+- 2026-05-08 INC-06/11: verificación documental previa; cierre en commit 7a60c55.
+- 2026-05-08 INC-08/10: verificación contextual por lectura/grep de `src/pages/grc/modules/*`, `src/pages/grc/RiskEditor.tsx`, `src/pages/grc/IncidenteStepper.tsx`, `src/pages/grc/**` chips y `src/lib/secretaria/status-labels.ts`.
+- No source code changed in INC-08/10 verification: yes
+- `bun run typecheck`: pass
+- `bun run lint`: pass
+- `bun run build`: pass, con warnings esperados de Browserslist/chunk size
+- `bun test`: 898 pass / 66 skip / 0 fail
 - No secrets stored: yes
 - No Cloud writes: yes
 ```
