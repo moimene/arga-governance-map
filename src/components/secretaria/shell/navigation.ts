@@ -52,6 +52,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Biblioteca legal",
     items: [
+      { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
@@ -108,6 +109,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Biblioteca aplicable",
     items: [
+      { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
@@ -129,6 +131,7 @@ export function getNavGroups(mode: SecretariaMode) {
 }
 
 export function getSecretariaSectionLabel(pathname: string, mode: SecretariaMode) {
+  if (/^\/secretaria\/reglas/.test(pathname)) return "Gestor de Reglas Acuerdo360";
   if (/^\/secretaria\/sociedades\/[^/]+\/reglas/.test(pathname)) return "Reglas aplicables";
   if (/^\/secretaria\/sociedades\/[^/]+/.test(pathname)) return "Ficha societaria";
   if (/^\/secretaria\/personas\/[^/]+/.test(pathname)) return "Personas";

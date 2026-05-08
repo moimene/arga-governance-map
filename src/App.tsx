@@ -75,6 +75,7 @@ const DocumentosPendientesRevision = lazy(() => import("@/pages/secretaria/Docum
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
+const RuleManagerPage = lazy(() => import("@/pages/secretaria/RuleManagerPage"));
 const SociedadesList = lazy(() => import("@/pages/secretaria/SociedadesList"));
 const SociedadDetalle = lazy(() => import("@/pages/secretaria/SociedadDetalle"));
 const SociedadNuevaStepper = lazy(() => import("@/pages/secretaria/SociedadNuevaStepper"));
@@ -220,6 +221,7 @@ const App = () => (
                   <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
+                  <Route path="/secretaria/reglas" element={<Suspense fallback={<ModuleFallback />}><RuleManagerPage /></Suspense>} />
                   {/* Gestión societaria — sociedades y personas (modelo canónico) */}
                   <Route path="/secretaria/sociedades"                element={<Suspense fallback={<ModuleFallback />}><SociedadesList /></Suspense>} />
                   <Route path="/secretaria/sociedades/nueva"          element={<Suspense fallback={<ModuleFallback />}><SociedadNuevaStepper /></Suspense>} />

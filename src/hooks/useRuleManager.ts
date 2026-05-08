@@ -1,0 +1,266 @@
+import { useMemo } from "react";
+import { useTenantContext } from "@/context/TenantContext";
+import { useSociedad } from "@/hooks/useSociedades";
+import { useEntityRules } from "@/hooks/useJurisdiccionRules";
+import { useRulePacksForEntity, useRulePackForMateria } from "@/hooks/useRulePacks";
+import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { useAgreementById } from "@/hooks/useAgreementsList";
+import {
+  buildEntityNormativeProfile,
+  normalizeSocietyFormForRuleSet,
+  type EntityNormativeProfile,
+  type AgreementNormativeSnapshot,
+} from "@/lib/secretaria/normative-framework";
+import {
+  buildEffectiveAgreementRule,
+  type EffectiveAgreementRule,
+  type RuleManagerInput,
+} from "@/lib/secretaria/rule-manager-contract";
+import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
+
+// ─── useRuleManagerProfile ──────────────────────────────────────────────────
+//
+// Devuelve el perfil normativo y los pactos vigentes crudos para una sociedad.
+// Es el equivalente al "marco normativo" que verá el equipo legal en la página
+// /secretaria/reglas.
+
+export interface RuleManagerProfileQuery {
+  data: EntityNormativeProfile | null;
+  pactos: PactoParasocial[];
+  isLoading: boolean;
+  error: unknown;
+}
+
+export function useRuleManagerProfile(entityId?: string | null): RuleManagerProfileQuery {
+  const { tenantId } = useTenantContext();
+  const sociedadQuery = useSociedad(entityId ?? undefined);
+  const sociedad = sociedadQuery.data;
+  const ruleSetCompanyForm = useMemo(
+    () =>
+      normalizeSocietyFormForRuleSet(sociedad?.tipo_social ?? sociedad?.legal_form, {
+        listed: sociedad?.es_cotizada,
+      }) ?? undefined,
+    [sociedad?.es_cotizada, sociedad?.legal_form, sociedad?.tipo_social],
+  );
+  const ruleSetsQuery = useEntityRules(sociedad?.jurisdiction ?? undefined, ruleSetCompanyForm);
+  const rulePacksQuery = useRulePacksForEntity(entityId ?? undefined);
+  const pactosQuery = usePactosVigentes(entityId ?? undefined);
+
+  const profile = useMemo(() => {
+    if (!tenantId || !sociedad) return null;
+    return buildEntityNormativeProfile({
+      tenantId,
+      entity: sociedad,
+      jurisdictionRuleSets: ruleSetsQuery.data ?? [],
+      rulePacks: rulePacksQuery.data?.packs ?? [],
+      overrides: rulePacksQuery.data?.overrides ?? [],
+      pactos: pactosQuery.data ?? [],
+    });
+  }, [pactosQuery.data, rulePacksQuery.data, ruleSetsQuery.data, sociedad, tenantId]);
+
+  return {
+    data: profile,
+    pactos: pactosQuery.data ?? [],
+    isLoading:
+      sociedadQuery.isLoading ||
+      ruleSetsQuery.isLoading ||
+      rulePacksQuery.isLoading ||
+      pactosQuery.isLoading,
+    error:
+      sociedadQuery.error ??
+      ruleSetsQuery.error ??
+      rulePacksQuery.error ??
+      pactosQuery.error ??
+      null,
+  };
+}
+
+// ─── useAgreementRulePreview ────────────────────────────────────────────────
+//
+// Simulador read-only: dado (sociedad, materia, modo de adopción, etc.)
+// devuelve la regla efectiva del acuerdo según el contrato puro
+// `buildEffectiveAgreementRule`. No requiere acuerdo persistido.
+
+export interface AgreementRulePreviewInput {
+  entityId?: string | null;
+  bodyType?: string | null;
+  matter?: string;
+  matterClass?: string | null;
+  adoptionMode?: string;
+  inscribable?: boolean | null;
+  legalMajority?: RuleManagerInput["agreement"]["legal_majority"];
+  pactosEval?: RuleManagerInput["pactosEval"];
+  statutoryEnshrinedPactoIds?: string[];
+}
+
+export interface AgreementRulePreviewQuery {
+  data: EffectiveAgreementRule | null;
+  isLoading: boolean;
+  error: unknown;
+  enabled: boolean;
+}
+
+/**
+ * Lee `params` JSONB del rule pack y trata de extraer threshold y descripción.
+ * Defensivo: prueba varias claves comunes y devuelve null si no encuentra.
+ */
+function extractMajorityFromRulePackParams(
+  params: unknown,
+): RuleManagerInput["agreement"]["legal_majority"] | null {
+  if (!params || typeof params !== "object" || Array.isArray(params)) return null;
+  const record = params as Record<string, unknown>;
+  const candidates = [
+    record.majority,
+    record.mayoria,
+    record.mayoria_legal,
+    record.majority_threshold,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "number") {
+      return { code: null, threshold: candidate };
+    }
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      const obj = candidate as Record<string, unknown>;
+      const threshold =
+        typeof obj.threshold === "number"
+          ? obj.threshold
+          : typeof obj.umbral === "number"
+            ? obj.umbral
+            : typeof obj.value === "number"
+              ? obj.value
+              : null;
+      const code =
+        typeof obj.code === "string"
+          ? obj.code
+          : typeof obj.codigo === "string"
+            ? obj.codigo
+            : null;
+      const description =
+        typeof obj.description === "string"
+          ? obj.description
+          : typeof obj.descripcion === "string"
+            ? obj.descripcion
+            : null;
+      if (threshold !== null || code !== null) {
+        return { code, threshold, description };
+      }
+    }
+  }
+  return null;
+}
+
+export function useAgreementRulePreview(input: AgreementRulePreviewInput): AgreementRulePreviewQuery {
+  const { tenantId } = useTenantContext();
+  const sociedadQuery = useSociedad(input.entityId ?? undefined);
+  const sociedad = sociedadQuery.data;
+  const ruleSetCompanyForm = useMemo(
+    () =>
+      normalizeSocietyFormForRuleSet(sociedad?.tipo_social ?? sociedad?.legal_form, {
+        listed: sociedad?.es_cotizada,
+      }) ?? undefined,
+    [sociedad?.es_cotizada, sociedad?.legal_form, sociedad?.tipo_social],
+  );
+  const ruleSetsQuery = useEntityRules(sociedad?.jurisdiction ?? undefined, ruleSetCompanyForm);
+  const rulePacksQuery = useRulePacksForEntity(input.entityId ?? undefined);
+  const pactosQuery = usePactosVigentes(input.entityId ?? undefined);
+  const rulePackQuery = useRulePackForMateria(input.matter);
+
+  const enabled = !!input.entityId && !!input.matter && !!input.adoptionMode && !!tenantId;
+
+  const isLoading =
+    sociedadQuery.isLoading ||
+    ruleSetsQuery.isLoading ||
+    rulePacksQuery.isLoading ||
+    pactosQuery.isLoading ||
+    (!!input.matter && rulePackQuery.isLoading);
+
+  const error =
+    sociedadQuery.error ??
+    ruleSetsQuery.error ??
+    rulePacksQuery.error ??
+    pactosQuery.error ??
+    rulePackQuery.error ??
+    null;
+
+  const result = useMemo<EffectiveAgreementRule | null>(() => {
+    if (!enabled || !sociedad || !input.matter || !input.adoptionMode || !tenantId) return null;
+
+    // Si el caller no suministra legal_majority, intentamos extraerla del rule pack activo.
+    const derivedMajority =
+      input.legalMajority ?? extractMajorityFromRulePackParams(rulePackQuery.data?.params);
+
+    return buildEffectiveAgreementRule({
+      tenantId,
+      entity: sociedad,
+      jurisdictionRuleSets: ruleSetsQuery.data ?? [],
+      rulePacks: rulePacksQuery.data?.packs ?? [],
+      overrides: rulePacksQuery.data?.overrides ?? [],
+      pactos: pactosQuery.data ?? [],
+      agreement: {
+        matter: input.matter,
+        matter_class: input.matterClass ?? null,
+        body_type: input.bodyType ?? null,
+        adoption_mode: input.adoptionMode,
+        inscribable: input.inscribable ?? null,
+        legal_majority: derivedMajority ?? undefined,
+      },
+      pactosEval: input.pactosEval,
+      options: {
+        statutoryEnshrinedPactoIds: input.statutoryEnshrinedPactoIds,
+      },
+    });
+  }, [
+    enabled,
+    input.adoptionMode,
+    input.bodyType,
+    input.inscribable,
+    input.legalMajority,
+    input.matter,
+    input.matterClass,
+    input.pactosEval,
+    input.statutoryEnshrinedPactoIds,
+    pactosQuery.data,
+    rulePackQuery.data,
+    rulePacksQuery.data,
+    ruleSetsQuery.data,
+    sociedad,
+    tenantId,
+  ]);
+
+  return { data: result, isLoading, error, enabled };
+}
+
+// ─── useAgreementRuleSnapshot ───────────────────────────────────────────────
+//
+// Lectura del snapshot ya almacenado en `agreements.compliance_explain`.
+// NO recalcula la regla; sólo lee lo que se congeló al adoptar/documentar.
+
+export interface AgreementRuleSnapshotQuery {
+  data: AgreementNormativeSnapshot | null;
+  agreement: ReturnType<typeof useAgreementById>["data"] | null;
+  isLoading: boolean;
+  error: unknown;
+}
+
+export function useAgreementRuleSnapshot(agreementId?: string | null): AgreementRuleSnapshotQuery {
+  const agreementQuery = useAgreementById(agreementId ?? undefined);
+  const agreement = agreementQuery.data ?? null;
+
+  const snapshot = useMemo<AgreementNormativeSnapshot | null>(() => {
+    if (!agreement) return null;
+    const explain = (agreement as { compliance_explain?: Record<string, unknown> | null })
+      .compliance_explain;
+    if (!explain) return null;
+    const candidate =
+      (explain.normative_snapshot as AgreementNormativeSnapshot | undefined) ??
+      (explain.normative_profile as AgreementNormativeSnapshot | undefined);
+    return candidate ?? null;
+  }, [agreement]);
+
+  return {
+    data: snapshot,
+    agreement,
+    isLoading: agreementQuery.isLoading,
+    error: agreementQuery.error,
+  };
+}
