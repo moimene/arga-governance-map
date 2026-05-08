@@ -251,10 +251,9 @@ export function useAgreementRuleSnapshot(agreementId?: string | null): Agreement
     const explain = (agreement as { compliance_explain?: Record<string, unknown> | null })
       .compliance_explain;
     if (!explain) return null;
-    const candidate =
-      (explain.normative_snapshot as AgreementNormativeSnapshot | undefined) ??
-      (explain.normative_profile as AgreementNormativeSnapshot | undefined);
-    return candidate ?? null;
+    // agreement-360.ts only writes `normative_snapshot` into compliance_explain.
+    // No fallback to `normative_profile` (which lives inside compliance_snapshot).
+    return (explain.normative_snapshot as AgreementNormativeSnapshot | undefined) ?? null;
   }, [agreement]);
 
   return {

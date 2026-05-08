@@ -124,7 +124,16 @@ export interface RuleManagerInput {
       description?: string | null;
     } | null;
   };
-  pactosEval?: Partial<PactosEvalInput>;
+  pactosEval?: Partial<PactosEvalInput> & {
+    /**
+     * Si es true, los evaluadores que dependen de cifras de votación
+     * (MAYORIA_REFORZADA_PACTADA) NO se calculan: el contrato los reporta
+     * como WARNING "pendiente de votación" en lugar de evaluarlos con
+     * `votosFavor=0` (lo que produce un falso positivo de breach). Útil
+     * para el simulador pre-adopción donde aún no hay cifras.
+     */
+    skipVoteDependentEvaluations?: boolean;
+  };
   // Opciones de clasificación legal
   options?: {
     /**
@@ -534,7 +543,19 @@ export function buildEffectiveAgreementRule(input: RuleManagerInput): EffectiveA
     now: input.now,
   });
 
-  const pactosEval = evaluarPactosParasociales(input.pactos ?? [], {
+  const skipVotes = input.pactosEval?.skipVoteDependentEvaluations === true;
+  // Pactos cuya evaluación depende de cifras de votación (en MVP solo
+  // MAYORIA_REFORZADA_PACTADA). Si skipVotes está activo, los apartamos del
+  // engine y los reportamos como pendientes de votación.
+  const inputPactos = input.pactos ?? [];
+  const pactosForEngine = skipVotes
+    ? inputPactos.filter((p) => p.tipo_clausula !== "MAYORIA_REFORZADA_PACTADA")
+    : inputPactos;
+  const pactosPendingVote = skipVotes
+    ? inputPactos.filter((p) => p.tipo_clausula === "MAYORIA_REFORZADA_PACTADA")
+    : [];
+
+  const pactosEval = evaluarPactosParasociales(pactosForEngine, {
     materias: [input.agreement.matter],
     capitalPresente: input.pactosEval?.capitalPresente ?? 0,
     capitalTotal: input.pactosEval?.capitalTotal ?? 0,
@@ -562,6 +583,26 @@ export function buildEffectiveAgreementRule(input: RuleManagerInput): EffectiveA
       reason: result.explain.mensaje ?? `Resultado del pacto ${result.pacto_titulo}`,
       remediable: classification.remediable,
       remediation_hint: classification.remediation_hint,
+    });
+  }
+
+  // Pactos vote-dependent reportados como WARNING "pendiente de votación".
+  for (const pacto of pactosPendingVote) {
+    if (!pacto.materias_aplicables.includes(input.agreement.matter)) continue;
+    consequences.push({
+      consequence: "WARNING",
+      source_layer: "PACTO_PARASOCIAL",
+      source_plane: "CONTRACTUAL",
+      source_id: pacto.id,
+      source_label: pacto.titulo,
+      matter: input.agreement.matter,
+      reason:
+        `Pacto ${pacto.tipo_clausula} aplicable a la materia. ` +
+        `Umbral pactado: ${pacto.umbral_activacion ? (pacto.umbral_activacion * 100).toFixed(0) + "%" : "no especificado"}. ` +
+        `Pendiente de evaluar con cifras de votación.`,
+      remediable: false,
+      remediation_hint:
+        "Inyectar `capitalPresente` y `votosFavor` en pactosEval para evaluar el cumplimiento.",
     });
   }
 

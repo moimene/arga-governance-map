@@ -471,6 +471,42 @@ describe("buildEffectiveAgreementRule — coverage adicional (post-adversarial)"
     expect(result.requirements.veto?.titulares).toContain("Inversor B");
   });
 
+  it("CASO 22 — Modo pre-vote (skipVoteDependentEvaluations): MAYORIA_REFORZADA aplicable se reporta como WARNING, no breach falso", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        pactos: [MAYORIA_REFORZADA_PACTO],
+        pactosEval: {
+          // sin votosFavor, sin capitalPresente — modo simulación pre-votación
+          skipVoteDependentEvaluations: true,
+        },
+      }),
+    );
+    // El pacto está aplicable a la materia pero no se evalúa con votos=0;
+    // se reporta como WARNING pendiente.
+    expect(result.contractual_compliant).toBe(true);
+    expect(result.status).toBe("PROCLAMABLE_AND_EXECUTABLE");
+    const warning = result.consequences.find(
+      (c) => c.consequence === "WARNING" && c.source_id === MAYORIA_REFORZADA_PACTO.id,
+    );
+    expect(warning).toBeDefined();
+    expect(warning?.reason).toContain("Pendiente de evaluar");
+  });
+
+  it("CASO 23 — Modo pre-vote: VETO sigue siendo OPERATIONAL_HOLD (no depende de cifras)", () => {
+    const result = buildEffectiveAgreementRule(
+      input({
+        pactos: [VETO_PACTO],
+        pactosEval: {
+          skipVoteDependentEvaluations: true,
+        },
+      }),
+    );
+    // VETO no depende de votos: sigue marcando hold.
+    expect(result.status).toBe("PROCLAMABLE_HELD");
+    const hold = result.consequences.find((c) => c.consequence === "OPERATIONAL_HOLD");
+    expect(hold).toBeDefined();
+  });
+
   it("CASO 21 — Titular del consentimiento: lee de titular_veto del pacto, no del título genérico", () => {
     const result = buildEffectiveAgreementRule(
       input({

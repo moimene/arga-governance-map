@@ -11,8 +11,10 @@ import {
   Shield,
   ShieldAlert,
   Users,
+  XCircle,
 } from "lucide-react";
 import { useSociedades } from "@/hooks/useSociedades";
+import { useRulePacks } from "@/hooks/useRulePacks";
 import {
   useAgreementRulePreview,
   useRuleManagerProfile,
@@ -23,15 +25,18 @@ import type {
   EffectiveRuleConsequence,
   LegalConsequence,
 } from "@/lib/secretaria/rule-manager-contract";
+import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
 
-// ── Catálogo MVP de materias y modos de adopción para el simulador ─────────
+// ── Catálogo de materias y modos de adopción para el simulador ─────────────
 
-const MATTERS: Array<{
+type MatterEntry = {
   matter: string;
   label: string;
   matter_class: "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL";
   inscribable: boolean;
-}> = [
+};
+
+const MATTER_DEFAULTS: MatterEntry[] = [
   { matter: "APROBACION_CUENTAS", label: "Aprobación de cuentas anuales", matter_class: "ORDINARIA", inscribable: false },
   { matter: "DELEGACION_FACULTADES", label: "Delegación de facultades", matter_class: "ORDINARIA", inscribable: true },
   { matter: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", matter_class: "ORDINARIA", inscribable: true },
@@ -45,6 +50,32 @@ const MATTERS: Array<{
   { matter: "DISOLUCION", label: "Disolución", matter_class: "ESTRUCTURAL", inscribable: true },
   { matter: "TRANSFORMACION", label: "Transformación", matter_class: "ESTRUCTURAL", inscribable: true },
 ];
+
+function humanizeMatter(slug: string) {
+  return slug
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function mergeMattersWithRulePacks(
+  defaults: MatterEntry[],
+  rulePackMatters: Array<{ materia?: string }>,
+): MatterEntry[] {
+  const byMatter = new Map(defaults.map((m) => [m.matter, m]));
+  for (const pack of rulePackMatters) {
+    if (!pack.materia || byMatter.has(pack.materia)) continue;
+    byMatter.set(pack.materia, {
+      matter: pack.materia,
+      label: humanizeMatter(pack.materia),
+      // Defaults seguros para materias del rule pack que no están en hardcoded.
+      // Legal puede ajustar con el dropdown de matter_class si lo añadimos en el futuro.
+      matter_class: "ESTATUTARIA",
+      inscribable: true,
+    });
+  }
+  return Array.from(byMatter.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
 
 const ADOPTION_MODES: Array<{ value: string; label: string }> = [
   { value: "MEETING", label: "Acuerdo en sesión" },
@@ -126,18 +157,49 @@ export default function RuleManagerPage() {
   const initialAdoption = searchParams.get("adoption") ?? "MEETING";
 
   const sociedadesQuery = useSociedades();
+  const rulePacksQuery = useRulePacks();
   const [matter, setMatter] = useState<string>(initialMatter);
   const [adoptionMode, setAdoptionMode] = useState<string>(initialAdoption);
 
-  const matterMeta = MATTERS.find((m) => m.matter === matter) ?? MATTERS[0];
+  // Hipótesis de votación / waivers / consentimientos / estatutarización.
+  // Por defecto el simulador trabaja en modo PRE_VOTE (sin cifras de votación).
+  const [skipVotes, setSkipVotes] = useState<boolean>(true);
+  const [capitalPresenteRaw, setCapitalPresenteRaw] = useState<string>("");
+  const [votosFavorRaw, setVotosFavorRaw] = useState<string>("");
+  const [vetoRenunciado, setVetoRenunciado] = useState<Set<string>>(new Set());
+  const [consentimientosPrevios, setConsentimientosPrevios] = useState<Set<string>>(new Set());
+  const [statutoryPactoIds, setStatutoryPactoIds] = useState<Set<string>>(new Set());
+
+  // Materias: hardcoded defaults + materias únicas de rule packs activos en Cloud.
+  const matters = useMemo(
+    () => mergeMattersWithRulePacks(MATTER_DEFAULTS, rulePacksQuery.data ?? []),
+    [rulePacksQuery.data],
+  );
+  const matterMeta = matters.find((m) => m.matter === matter) ?? matters[0] ?? MATTER_DEFAULTS[0];
+  const matterUnknown = !matters.find((m) => m.matter === matter);
 
   const profileQuery = useRuleManagerProfile(entityId ?? undefined);
+  const pactosVigentes = profileQuery.pactos;
+
   const previewInput: AgreementRulePreviewInput = {
     entityId: entityId ?? undefined,
     matter,
     matterClass: matterMeta.matter_class,
     adoptionMode,
     inscribable: matterMeta.inscribable,
+    pactosEval: skipVotes
+      ? {
+          skipVoteDependentEvaluations: true,
+          vetoRenunciado: Array.from(vetoRenunciado),
+          consentimientosPrevios: Array.from(consentimientosPrevios),
+        }
+      : {
+          capitalPresente: Number(capitalPresenteRaw) || 0,
+          votosFavor: Number(votosFavorRaw) || 0,
+          vetoRenunciado: Array.from(vetoRenunciado),
+          consentimientosPrevios: Array.from(consentimientosPrevios),
+        },
+    statutoryEnshrinedPactoIds: Array.from(statutoryPactoIds),
   };
   const previewQuery = useAgreementRulePreview(previewInput);
 
@@ -149,12 +211,17 @@ export default function RuleManagerPage() {
     () => sociedades.find((s) => s.id === entityId) ?? null,
     [entityId, sociedades],
   );
+  const sociedadMissing = !!entityId && !sociedadesQuery.isLoading && !sociedad;
 
   const handleEntityChange = (next: string) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set("entity", next);
     else params.delete("entity");
     setSearchParams(params, { replace: true });
+    // Reset hipótesis al cambiar de sociedad — los pactos cambian.
+    setVetoRenunciado(new Set());
+    setConsentimientosPrevios(new Set());
+    setStatutoryPactoIds(new Set());
   };
 
   const handleMatterChange = (next: string) => {
@@ -169,6 +236,18 @@ export default function RuleManagerPage() {
     const params = new URLSearchParams(searchParams);
     params.set("adoption", next);
     setSearchParams(params, { replace: true });
+  };
+
+  const togglePactoSet = (
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+    pactoId: string,
+  ) => {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(pactoId)) next.delete(pactoId);
+      else next.add(pactoId);
+      return next;
+    });
   };
 
   return (
@@ -234,18 +313,33 @@ export default function RuleManagerPage() {
         </div>
       )}
 
-      {entityId && (
+      {sociedadMissing && (
+        <ErrorBanner
+          title="Sociedad no encontrada"
+          message={`No hay ninguna sociedad con identificador ${entityId} en este tenant.`}
+        />
+      )}
+
+      {entityId && !sociedadMissing && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* ── Marco normativo ─────────────────────────────────────────── */}
           <NormativeFrameworkCard
             isLoading={profileQuery.isLoading}
             profile={profileQuery.data}
+            error={profileQuery.error}
           />
 
           {/* ── Pactos vigentes ─────────────────────────────────────────── */}
           <PactosVigentesCard
             isLoading={profileQuery.isLoading}
-            pactos={profileQuery.pactos}
+            pactos={pactosVigentes}
+            error={profileQuery.error}
+            statutoryIds={statutoryPactoIds}
+            onToggleStatutory={(id) => togglePactoSet(setStatutoryPactoIds, id)}
+            vetoRenunciado={vetoRenunciado}
+            onToggleVetoRenunciado={(id) => togglePactoSet(setVetoRenunciado, id)}
+            consentimientosPrevios={consentimientosPrevios}
+            onToggleConsentimiento={(id) => togglePactoSet(setConsentimientosPrevios, id)}
           />
 
           {/* ── Simulador (full width) ──────────────────────────────────── */}
@@ -253,13 +347,41 @@ export default function RuleManagerPage() {
             <SimuladorReglaCard
               matter={matter}
               adoptionMode={adoptionMode}
+              matters={matters}
+              matterUnknown={matterUnknown}
               onMatterChange={handleMatterChange}
               onAdoptionChange={handleAdoptionChange}
               previewQuery={previewQuery}
+              skipVotes={skipVotes}
+              onSkipVotesChange={setSkipVotes}
+              capitalPresenteRaw={capitalPresenteRaw}
+              onCapitalPresenteChange={setCapitalPresenteRaw}
+              votosFavorRaw={votosFavorRaw}
+              onVotosFavorChange={setVotosFavorRaw}
             />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ErrorBanner ─────────────────────────────────────────────────────────────
+
+function ErrorBanner({ title, message }: { title: string; message: string }) {
+  return (
+    <div
+      className="flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)]"
+      role="alert"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" aria-hidden />
+      <div>
+        <div className="font-medium uppercase tracking-wider text-[10px] text-[var(--status-error)]">
+          {title}
+        </div>
+        <div className="mt-0.5 text-xs text-[var(--g-text-secondary)]">{message}</div>
+      </div>
     </div>
   );
 }
@@ -269,13 +391,20 @@ export default function RuleManagerPage() {
 function NormativeFrameworkCard({
   isLoading,
   profile,
+  error,
 }: {
   isLoading: boolean;
   profile: ReturnType<typeof useRuleManagerProfile>["data"];
+  error: unknown;
 }) {
   return (
     <Card title="Marco normativo" icon={Scale}>
-      {isLoading ? (
+      {error ? (
+        <ErrorBanner
+          title="No se pudo cargar el marco"
+          message={error instanceof Error ? error.message : "Error desconocido al consultar Cloud."}
+        />
+      ) : isLoading ? (
         <Loading label="Cargando marco normativo…" />
       ) : !profile ? (
         <Empty label="Sin datos" />
@@ -321,13 +450,32 @@ function NormativeFrameworkCard({
 function PactosVigentesCard({
   isLoading,
   pactos,
+  error,
+  statutoryIds,
+  onToggleStatutory,
+  vetoRenunciado,
+  onToggleVetoRenunciado,
+  consentimientosPrevios,
+  onToggleConsentimiento,
 }: {
   isLoading: boolean;
-  pactos: ReturnType<typeof useRuleManagerProfile>["pactos"];
+  pactos: PactoParasocial[];
+  error: unknown;
+  statutoryIds: Set<string>;
+  onToggleStatutory: (id: string) => void;
+  vetoRenunciado: Set<string>;
+  onToggleVetoRenunciado: (id: string) => void;
+  consentimientosPrevios: Set<string>;
+  onToggleConsentimiento: (id: string) => void;
 }) {
   return (
     <Card title="Pactos parasociales vigentes" icon={Users}>
-      {isLoading ? (
+      {error ? (
+        <ErrorBanner
+          title="No se pudieron cargar los pactos"
+          message={error instanceof Error ? error.message : "Error desconocido al consultar Cloud."}
+        />
+      ) : isLoading ? (
         <Loading label="Cargando pactos…" />
       ) : pactos.length === 0 ? (
         <p className="text-sm text-[var(--g-text-secondary)]">
@@ -335,56 +483,120 @@ function PactosVigentesCard({
         </p>
       ) : (
         <ul className="space-y-3">
-          {pactos.map((pacto) => (
-            <li
-              key={pacto.id}
-              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="font-medium text-[var(--g-text-primary)]">{pacto.titulo}</div>
-                <span
-                  className="bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] px-2 py-0.5 text-[10px] uppercase tracking-wider"
-                  style={{ borderRadius: "var(--g-radius-sm)" }}
-                >
-                  {pacto.tipo_clausula}
-                </span>
-              </div>
-              {pacto.titular_veto && (
-                <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                  Titular: {pacto.titular_veto}
+          {pactos.map((pacto) => {
+            const isStatutory = statutoryIds.has(pacto.id);
+            const isVetoRenunciado = vetoRenunciado.has(pacto.id);
+            const isConsentObtenido = consentimientosPrevios.has(pacto.id);
+            return (
+              <li
+                key={pacto.id}
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-medium text-[var(--g-text-primary)]">{pacto.titulo}</div>
+                  <span
+                    className="bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] px-2 py-0.5 text-[10px] uppercase tracking-wider"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    {pacto.tipo_clausula}
+                  </span>
                 </div>
-              )}
-              {pacto.materias_aplicables.length > 0 && (
-                <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                  Materias: {pacto.materias_aplicables.join(", ")}
+                {pacto.titular_veto && (
+                  <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Titular: {pacto.titular_veto}
+                  </div>
+                )}
+                {pacto.materias_aplicables.length > 0 && (
+                  <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Materias: {pacto.materias_aplicables.join(", ")}
+                  </div>
+                )}
+                {pacto.umbral_activacion !== undefined && (
+                  <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Umbral pactado: {(pacto.umbral_activacion * 100).toFixed(1)}%
+                  </div>
+                )}
+                <div className="mt-2 space-y-1 border-t border-[var(--g-border-subtle)] pt-2 text-xs">
+                  <PactoToggle
+                    checked={isStatutory}
+                    onChange={() => onToggleStatutory(pacto.id)}
+                    label="Estatutarizado (eleva a VALIDITY_BLOCK si incumple)"
+                  />
+                  {pacto.tipo_clausula === "VETO" && (
+                    <PactoToggle
+                      checked={isVetoRenunciado}
+                      onChange={() => onToggleVetoRenunciado(pacto.id)}
+                      label="Veto renunciado por el titular (waiver documentado)"
+                    />
+                  )}
+                  {pacto.tipo_clausula === "CONSENTIMIENTO_INVERSOR" && (
+                    <PactoToggle
+                      checked={isConsentObtenido}
+                      onChange={() => onToggleConsentimiento(pacto.id)}
+                      label="Consentimiento previo obtenido"
+                    />
+                  )}
                 </div>
-              )}
-              {pacto.umbral_activacion !== undefined && (
-                <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                  Umbral pactado: {(pacto.umbral_activacion * 100).toFixed(1)}%
-                </div>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>
   );
 }
 
+function PactoToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-[var(--g-text-primary)]">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-3 w-3 cursor-pointer accent-[var(--g-brand-3308)]"
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 function SimuladorReglaCard({
   matter,
   adoptionMode,
+  matters,
+  matterUnknown,
   onMatterChange,
   onAdoptionChange,
   previewQuery,
+  skipVotes,
+  onSkipVotesChange,
+  capitalPresenteRaw,
+  onCapitalPresenteChange,
+  votosFavorRaw,
+  onVotosFavorChange,
 }: {
   matter: string;
   adoptionMode: string;
+  matters: MatterEntry[];
+  matterUnknown: boolean;
   onMatterChange: (value: string) => void;
   onAdoptionChange: (value: string) => void;
   previewQuery: ReturnType<typeof useAgreementRulePreview>;
+  skipVotes: boolean;
+  onSkipVotesChange: (value: boolean) => void;
+  capitalPresenteRaw: string;
+  onCapitalPresenteChange: (value: string) => void;
+  votosFavorRaw: string;
+  onVotosFavorChange: (value: string) => void;
 }) {
   const result = previewQuery.data;
   return (
@@ -401,12 +613,17 @@ function SimuladorReglaCard({
             className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {MATTERS.map((m) => (
+            {matters.map((m) => (
               <option key={m.matter} value={m.matter}>
                 {m.label}
               </option>
             ))}
           </select>
+          {matterUnknown && (
+            <p className="mt-1 text-xs text-[var(--status-warning)]">
+              Materia desconocida en el catálogo: usando defaults seguros (estatutaria, inscribible).
+            </p>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -428,7 +645,76 @@ function SimuladorReglaCard({
         </div>
       </div>
 
-      {previewQuery.isLoading ? (
+      {/* ── Hipótesis de votación ───────────────────────────────────────── */}
+      <div
+        className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+            Hipótesis de votación
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--g-text-primary)]">
+            <input
+              type="checkbox"
+              checked={skipVotes}
+              onChange={(event) => onSkipVotesChange(event.target.checked)}
+              className="h-3 w-3 cursor-pointer accent-[var(--g-brand-3308)]"
+            />
+            <span>Pre-votación (no evaluar mayoría pactada)</span>
+          </label>
+        </div>
+        {!skipVotes && (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+                Capital presente (unidades)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={capitalPresenteRaw}
+                onChange={(event) => onCapitalPresenteChange(event.target.value)}
+                placeholder="ej. 100"
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+                Votos a favor
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={votosFavorRaw}
+                onChange={(event) => onVotosFavorChange(event.target.value)}
+                placeholder="ej. 75"
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-[var(--g-text-secondary)]">
+          {skipVotes
+            ? "Modo pre-votación: los pactos de mayoría reforzada se reportan como pendientes, no como incumplidos."
+            : "Modo con cifras: los pactos de mayoría reforzada se evalúan con los votos suministrados."}
+        </p>
+      </div>
+
+      {previewQuery.error ? (
+        <div className="mt-4">
+          <ErrorBanner
+            title="No se pudo calcular la regla efectiva"
+            message={
+              previewQuery.error instanceof Error
+                ? previewQuery.error.message
+                : "Error desconocido al consultar Cloud."
+            }
+          />
+        </div>
+      ) : previewQuery.isLoading ? (
         <Loading label="Calculando regla efectiva…" />
       ) : !previewQuery.enabled ? (
         <p className="mt-4 text-sm text-[var(--g-text-secondary)]">
