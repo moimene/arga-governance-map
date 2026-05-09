@@ -226,3 +226,145 @@ describe("buildMeetingAdoptionSnapshot", () => {
     expect(snapshot.societary_validity.ok).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// A3 — Voto de calidad CdA SA con empate (golden test)
+//
+// Contexto adversarial: pre-fix CDA→CONSEJO (commit 96a64ca), los CdA
+// caían a JUNTA_GENERAL en `useAgreementCompliance.toTipoOrgano`. La
+// rama JUNTA evalúa por capital social (% presente), no por número de
+// consejeros. Como consecuencia, los empates en CdA NUNCA disparaban
+// voto de calidad — falsos empates "ADOPTED" o "REJECTED" según el
+// numerador de capital, no según la lógica colegiada.
+//
+// Post-fix: con organoTipo=CONSEJO, el motor V2 ramifica correctamente
+// en `votacion-engine.ts:445-456` y dispara el voto de calidad cuando
+// hay empate y el flag está habilitado (DL-5 ARGA: voto calidad en CdA
+// y Comité Ejecutivo, NO en comisiones delegadas).
+//
+// Este test es el guard golden: si alguien revierte el fix, esta
+// aserción falla porque organoTipo=CONSEJO ya no se honra y el voto
+// de calidad no se aplica al empate.
+// ─────────────────────────────────────────────────────────────────────
+
+describe("A3 — buildMeetingAdoptionSnapshot voto de calidad CdA", () => {
+  const consejoOrdinariaPack = (): RulePack => ({
+    ...pack("APROBACION_CUENTAS"),
+    organoTipo: "CONSEJO",
+    modosAdopcionPermitidos: ["MEETING"],
+    votacion: {
+      mayoria: {
+        SA: majority("favor > contra"),
+        SL: majority("favor > contra"),
+        CONSEJO: majority("favor > contra"),
+      },
+      abstenciones: "no_cuentan",
+      votoCalidadPermitido: true,
+    },
+  });
+
+  it("CdA SA empate 3-3 + votoCalidadHabilitado=true → ADOPTED con voto_calidad_usado=true", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas anuales 2025 — empate resuelto por voto de calidad del Presidente",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: true,
+      votoCalidadHabilitado: true,
+      voters: [
+        { id: "c1-pres", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "CONTRA", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+        { id: "c6", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    // Resolución adoptada (voto de calidad rompió el empate).
+    expect(snapshot.status_resolucion).toBe("ADOPTED");
+
+    // Contexto persistido marca el flag como habilitado.
+    expect(snapshot.voting_context.voto_calidad_habilitado).toBe(true);
+
+    // El motor reportó que efectivamente USÓ el voto de calidad.
+    // Anti-bug: si organoTipo cae a JUNTA_GENERAL, esta aserción falla.
+    expect(snapshot.societary_validity.voting.votoCalidadUsado).toBe(true);
+
+    // Validez societaria OK (mayoría alcanzada vía voto de calidad).
+    expect(snapshot.societary_validity.ok).toBe(true);
+    expect(snapshot.societary_validity.majority_reached).toBe(true);
+
+    // Vote summary: empate registrado (3 favor, 3 contra) antes del
+    // voto de calidad.
+    expect(snapshot.vote_summary.favor).toBe(3);
+    expect(snapshot.vote_summary.contra).toBe(3);
+  });
+
+  it("sanity inverso: CdA SA empate + votoCalidadHabilitado=false → REJECTED, voto_calidad_usado undefined", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas anuales 2025 — empate sin voto de calidad",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: true,
+      votoCalidadHabilitado: false,
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "CONTRA", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+        { id: "c6", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+    expect(snapshot.voting_context.voto_calidad_habilitado).toBe(false);
+    expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeUndefined();
+    expect(snapshot.societary_validity.ok).toBe(false);
+    expect(snapshot.societary_validity.majority_reached).toBe(false);
+  });
+
+  it("CdA con mayoría clara (4-2) NO necesita voto de calidad aunque esté habilitado", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas — mayoría clara, voto de calidad no necesario",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: true,
+      votoCalidadHabilitado: true,
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "FAVOR", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+        { id: "c6", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    expect(snapshot.status_resolucion).toBe("ADOPTED");
+    // Voto de calidad estaba HABILITADO pero NO USADO (no había empate).
+    expect(snapshot.voting_context.voto_calidad_habilitado).toBe(true);
+    expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeFalsy();
+  });
+});
