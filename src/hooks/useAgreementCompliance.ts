@@ -221,13 +221,31 @@ function toMateriaClase(mc: string): MateriaClase {
 }
 
 /**
+ * Resuelve el `TipoOrgano` que el motor V2 debe usar para un agreement
+ * concreto, leyendo `governing_bodies.body_type` (y `config.organo_tipo`
+ * si está disponible). Wrapper fino sobre `resolveOrganoTipo` del helper
+ * centralizado.
+ *
+ * Exportado como punto de integración para D1 — regression guard contra
+ * el bug pre-fix en el que `body_type='CDA'` caía a `JUNTA_GENERAL`. El
+ * test asociado (`__tests__/useAgreementCompliance-organo-resolver.test.ts`)
+ * usa este wrapper directamente con fixtures, sin necesidad de montar
+ * el hook completo via renderHook.
+ */
+export function resolveAgreementOrganoTipo(
+  agreement: Pick<AgreementWithEntity, "governing_bodies">,
+): TipoOrgano {
+  return resolveOrganoTipo(agreement.governing_bodies);
+}
+
+/**
  * Ejecuta el motor V2 y mapea el resultado a ComplianceResult V1.
  * Carga rule packs + overrides desde Supabase, ejecuta evaluarAcuerdoCompleto().
  */
 async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<ComplianceResult> {
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
   const tipoSocial = toTipoSocial(companyForm);
-  const organoTipo = resolveOrganoTipo(a.governing_bodies);
+  const organoTipo = resolveAgreementOrganoTipo(a);
   const adoptionMode = a.adoption_mode as AdoptionMode;
   const materiaClase = toMateriaClase(a.matter_class);
   const fechaAcuerdo = a.decision_date ? `${a.decision_date}T12:00:00Z` : new Date().toISOString();
