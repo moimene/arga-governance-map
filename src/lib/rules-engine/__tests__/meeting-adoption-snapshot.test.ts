@@ -506,3 +506,251 @@ describe("A2 — engine_version persistence + isLegacyMeetingAdoptionSnapshot", 
     ).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// B2 motor edge cases — escenarios que un usuario REAL puede encontrar
+// en demo y que NO estaban cubiertos a nivel snapshot boundary.
+//
+// Plan informado por adversarial exploration (Ruflo agent code-explorer).
+// Casos descartados por duplicación con tests existentes:
+//   - Empate sin voto calidad (cubierto en describe A3 línea 314)
+//   - Conflict of interest (3 tests existentes, líneas 130, 179, 204)
+//   - Statutory veto base con valor: true (cubierto línea 96)
+//   - Cotizada DL-2 base (cubierto en bordes-no-computables.test.ts)
+//   - Pacto VETO genérico (cubierto línea 67)
+//
+// Casos AÑADIDOS aquí (gaps reales):
+//   1. Quórum failed CONSEJO a nivel snapshot — el path quorumReached:
+//      false NO estaba ejercitado. Cualquier CdA con asistencia
+//      insuficiente pasa por aquí.
+//   2. Statutory veto con valor: "activo" (string truthy) — variante
+//      de isTruthyOverrideValue NO cubierta. Importante porque
+//      migraciones humanas suelen escribir 'true' como string.
+//   3. Statutory veto con materia: "*" wildcard — el constraint del
+//      override aplica a CUALQUIER materia. No cubierto.
+// ─────────────────────────────────────────────────────────────────────
+
+describe("B2 — quorum failed CONSEJO en snapshot boundary", () => {
+  const consejoOrdinariaPack = (): RulePack => ({
+    ...pack("APROBACION_CUENTAS"),
+    organoTipo: "CONSEJO",
+    modosAdopcionPermitidos: ["MEETING"],
+    votacion: {
+      mayoria: {
+        SA: majority("favor > contra"),
+        SL: majority("favor > contra"),
+        CONSEJO: majority("favor > contra"),
+      },
+      abstenciones: "no_cuentan",
+    },
+  });
+
+  it("quorumReached=false bloquea status_resolucion incluso con votación favorable", () => {
+    // Escenario real: CdA SA convocado, solo 2 de 6 consejeros asisten
+    // (quórum no alcanzado: < 50% + 1). Aunque los 2 voten FAVOR, el
+    // motor debe rechazar el acuerdo por defecto de constitución.
+    //
+    // Setup robusto (post reviewer C1): voters configurados para que
+    // votingResult.acuerdoProclamable=TRUE si solo se mira la votación.
+    // 4 FAVOR + 1 CONTRA con totalMiembros=6, mayoría clara. El ÚNICO
+    // bloqueante esperado es el `quorum_not_confirmed_for_point` que
+    // viene de `quorumReached: false`.
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas — quórum insuficiente",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: false, // ← input clave: el ÚNICO bloqueante esperado
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "FAVOR", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    expect(snapshot.societary_validity.quorum_reached).toBe(false);
+    expect(snapshot.societary_validity.ok).toBe(false);
+    expect(snapshot.societary_validity.blocking_issues).toContain(
+      "quorum_not_confirmed_for_point",
+    );
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+
+    // Aislamiento del branch (post C1): si la línea 349 de
+    // meeting-adoption-snapshot.ts desaparece, votación clara 4-1 sería
+    // ADOPTED. Por tanto la regresión se cazaría aquí.
+    expect(snapshot.societary_validity.voting.acuerdoProclamable).toBe(true);
+    expect(snapshot.societary_validity.voting.mayoriaAlcanzada).toBe(true);
+  });
+
+  it("quorumReached omitido (undefined) → fallback permisivo: ok=true + ADOPTED", () => {
+    // Documentación del comportamiento default: si el caller omite
+    // quorumReached, el snapshot asume true (línea 345 de
+    // meeting-adoption-snapshot.ts: `quorumReached !== false`).
+    // Test guard contra cambio silencioso de ese default.
+    //
+    // Post reviewer I3: assertion del output final completo (status_resolucion
+    // + ok) para que cualquier nueva guarda interna que silenciosamente
+    // bloquee el acuerdo se detecte como regresión aquí.
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas — quórum no especificado",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      // quorumReached omitido intencionalmente
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "FAVOR", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    // Default permisivo del campo `quorumReached`.
+    expect(snapshot.societary_validity.quorum_reached).toBe(true);
+    expect(snapshot.societary_validity.blocking_issues).not.toContain(
+      "quorum_not_confirmed_for_point",
+    );
+
+    // Output final coherente (anti-silent-regression): si una nueva
+    // guarda interna del motor bloquea el acuerdo aunque quorum_reached
+    // sea true por default, el test detecta la regresión aquí.
+    expect(snapshot.societary_validity.ok).toBe(true);
+    expect(snapshot.status_resolucion).toBe("ADOPTED");
+  });
+});
+
+describe("B2 — statutory veto: variantes isTruthyOverrideValue no cubiertas", () => {
+  const buildOverride = (overrides: Partial<RuleParamOverride>): RuleParamOverride => ({
+    id: "override-veto",
+    entity_id: "entity-1",
+    materia: "FUSION",
+    clave: "veto_estatutario_fundacion",
+    valor: true,
+    fuente: "ESTATUTOS",
+    referencia: "Estatutos art. demo",
+    ...overrides,
+  });
+
+  it("override con valor: 'activo' (string truthy) activa veto correctamente", () => {
+    // Migraciones humanas a veces escriben 'true', 'activo', '1' como
+    // string en lugar de boolean. isTruthyOverrideValue debe reconocerlos.
+    const override = buildOverride({ valor: "activo" });
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar fusión",
+      materia: "FUSION",
+      materiaClase: "ESTRUCTURAL",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [
+        { id: "a1", vote: "FAVOR", voting_weight: 80 },
+        { id: "a2", vote: "CONTRA", voting_weight: 20 },
+      ],
+      totalMiembros: 2,
+      capitalTotal: 100,
+      packs: [pack("FUSION")],
+      overrides: [override],
+    });
+
+    expect(snapshot.societary_validity.statutory_veto_active).toBe(true);
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+  });
+
+  it("override con valor: 1 (número truthy) activa veto", () => {
+    const override = buildOverride({ valor: 1 });
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar fusión",
+      materia: "FUSION",
+      materiaClase: "ESTRUCTURAL",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 100 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      packs: [pack("FUSION")],
+      overrides: [override],
+    });
+    expect(snapshot.societary_validity.statutory_veto_active).toBe(true);
+  });
+
+  it("override con valor: 'false' (string falsy) NO activa veto", () => {
+    // Anti-bug: si alguien escribe 'false' por error, NO debe bloquear.
+    const override = buildOverride({ valor: "false" });
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar fusión",
+      materia: "FUSION",
+      materiaClase: "ESTRUCTURAL",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 100 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      packs: [pack("FUSION")],
+      overrides: [override],
+    });
+    expect(snapshot.societary_validity.statutory_veto_active).toBe(false);
+    expect(snapshot.societary_validity.ok).toBe(true);
+  });
+
+  it("override con valor: { activo: true } (objeto wrapped) activa veto", () => {
+    const override = buildOverride({ valor: { activo: true } });
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar fusión",
+      materia: "FUSION",
+      materiaClase: "ESTRUCTURAL",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 100 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      packs: [pack("FUSION")],
+      overrides: [override],
+    });
+    expect(snapshot.societary_validity.statutory_veto_active).toBe(true);
+  });
+
+  it("override con materia: '*' wildcard activa veto para CUALQUIER materia del agreement", () => {
+    // Veto general cubre todas las materias. Verifica que el filtro
+    // `materiaMatches = !override.materia || override.materia === materia || override.materia === "*"`
+    // (línea 154 de meeting-adoption-snapshot.ts) acepta el comodín.
+    const override = buildOverride({ materia: "*" });
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Aprobar cuentas — veto general aplica",
+      materia: "APROBACION_CUENTAS", // distinta de FUSION del override base
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 100 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      packs: [pack("APROBACION_CUENTAS")],
+      overrides: [override],
+    });
+
+    expect(snapshot.societary_validity.statutory_veto_active).toBe(true);
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+  });
+});

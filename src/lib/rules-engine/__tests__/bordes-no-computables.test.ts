@@ -337,4 +337,53 @@ describe('evaluarBordesNoComputables', () => {
 
     expect(result1).toEqual(result2);
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // B2 — cotizada con materia REPARTO_DIVIDENDOS activa el 4to borde
+  // (BORDE_COTIZADA_OPERACIONES_VINCULADAS), no cubierto en tests
+  // anteriores. Plan informado por adversarial exploration (Ruflo).
+  //
+  // Caso real ARGA: ARGA Seguros es cotizada y reparte dividendos. El
+  // motor debe emitir el warning de operaciones vinculadas adicional
+  // al de hecho relevante / IPDD / IAGC.
+  // ─────────────────────────────────────────────────────────────────
+  it('cotizada + REPARTO_DIVIDENDOS activa BORDE_COTIZADA_OPERACIONES_VINCULADAS (4 bordes cotizados, no 3)', () => {
+    const input: BordeInput = {
+      esCotizada: true,
+      tipoSocial: 'SA',
+      materias: ['REPARTO_DIVIDENDOS'],
+      liquidezVerificada: true,
+    };
+
+    const result = evaluarBordesNoComputables(input);
+
+    // Los 4 bordes cotizados deben aparecer.
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_LMV_HECHO_RELEVANTE')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_LMV_IPDD')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_OPERACIONES_VINCULADAS')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_IAGC')).toBe(true);
+
+    // Ninguno BLOCKING (DL-2: cotizada evalúa+advierte, no bloquea).
+    const cotizadaBordes = result.filter((r) => r.id.startsWith('BORDE_COTIZADA_'));
+    expect(cotizadaBordes.every((r) => r.severity !== 'BLOCKING')).toBe(true);
+  });
+
+  it('cotizada con materia NO-vinculada (e.g. APROBACION_CUENTAS) NO activa OPERACIONES_VINCULADAS', () => {
+    // Sanity inverso: el 4to borde es condicional a la materia. Si no
+    // está en la lista (AUTORIZACION_TRANSACCION, APROBACION_PRESUPUESTOS,
+    // REPARTO_DIVIDENDOS), no debe aparecer.
+    const input: BordeInput = {
+      esCotizada: true,
+      tipoSocial: 'SA',
+      materias: ['APROBACION_CUENTAS'],
+      liquidezVerificada: true,
+    };
+
+    const result = evaluarBordesNoComputables(input);
+
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_LMV_HECHO_RELEVANTE')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_LMV_IPDD')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_IAGC')).toBe(true);
+    expect(result.some((r) => r.id === 'BORDE_COTIZADA_OPERACIONES_VINCULADAS')).toBe(false);
+  });
 });
