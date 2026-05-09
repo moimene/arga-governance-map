@@ -21,10 +21,58 @@
  *
  * Opt-in vía SECRETARIA_E2E_PHASE_B1=1 (mismo flag que B1/B3).
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/base';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+
+// ── Helpers Playwright UI driving (mismo patrón que e2e/18) ─────────
+
+const FATAL_UI_PATTERNS = [
+  /relation .* does not exist/i,
+  /column .* does not exist/i,
+  /function .* does not exist/i,
+  /permission denied/i,
+  /violates row-level security/i,
+];
+
+async function expectNoFatalUi(page: Page) {
+  await expect(page).not.toHaveURL(/\/login/);
+  for (const pattern of FATAL_UI_PATTERNS) {
+    await expect(page.getByText(pattern).first()).toHaveCount(0);
+  }
+}
+
+async function goStep(page: Page, label: string | RegExp, heading: string | RegExp) {
+  await page.getByRole('button', { name: label }).first().click();
+  await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible({ timeout: 10_000 });
+  await expectNoFatalUi(page);
+}
+
+async function clickIfVisibleAndEnabled(page: Page, buttonName: string | RegExp) {
+  const button = page.getByRole('button', { name: buttonName }).first();
+  if ((await button.isVisible().catch(() => false)) && (await button.isEnabled().catch(() => false))) {
+    await button.click();
+    return true;
+  }
+  return false;
+}
+
+async function ensureAllVisibleVotesFavor(page: Page) {
+  const pointButtons = page.getByRole('button', { name: /Punto \d+/ });
+  const pointCount = Math.max(await pointButtons.count(), 1);
+
+  for (let pointIndex = 0; pointIndex < pointCount; pointIndex += 1) {
+    if (pointIndex > 0) await pointButtons.nth(pointIndex).click();
+    const voteSelects = page.locator('tbody select');
+    await expect(voteSelects.first()).toBeVisible({ timeout: 10_000 });
+    const voteCount = await voteSelects.count();
+    for (let index = 0; index < voteCount; index += 1) {
+      await voteSelects.nth(index).selectOption('FAVOR');
+    }
+  }
+}
 
 const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 const EXPECTED_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
@@ -362,6 +410,13 @@ test.describe('Phase B4 v0 — UI driving destructive con sociedad sintética', 
     const entityIds = created.filter((e) => e.table === 'entities').map((e) => e.id);
 
     for (const mId of meetingIds) {
+      // Orden: rule_evaluation_results → minutes → meeting_resolutions →
+      // agreements → meeting_votes → meeting_attendees → meetings (luego
+      // en cleanup principal).
+      await client.from('rule_evaluation_results').delete().eq('meeting_id', mId);
+      await client.from('minutes').delete().eq('meeting_id', mId);
+      await client.from('meeting_resolutions').delete().eq('meeting_id', mId);
+      await client.from('agreements').delete().eq('parent_meeting_id', mId);
       await client.from('meeting_votes').delete().eq('meeting_id', mId);
       await client.from('meeting_attendees').delete().eq('meeting_id', mId);
     }
@@ -463,5 +518,120 @@ test.describe('Phase B4 v0 — UI driving destructive con sociedad sintética', 
       browserErrors.filter((e) => /relation .* does not exist|column .* does not exist|permission denied|RLS/i.test(e)),
       'no fatal errors in browser console',
     ).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // B4 v1 — flow completo: quórum + agenda + votación + cierre + acta
+  //
+  // Continúa desde el meeting con asistentes ya guardados (test 1).
+  // Drives los pasos 3-6 del ReunionStepper, valida que se genera
+  // acta vía fn_generar_acta y que la fila aparece en `minutes` con
+  // body_id + entity_id correctos.
+  // ─────────────────────────────────────────────────────────────────
+
+  test('UI ReunionStepper v1: quórum + agenda + votación + cierre + acta', async ({ page }) => {
+    // Re-navegar al meeting (continúa el state del test 1).
+    await page.goto(`/secretaria/reuniones/${fixture.meetingId}`);
+    await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // STEP 3 — Quórum: verifica que el motor V2 reporta quórum alcanzado
+    // (3 presentes de 3 totales = 100% > 50%).
+    await goStep(page, /Quórum/, /Paso 3\. Quórum/);
+    await expect(page.getByText(/No hay lista de asistentes guardada/i)).toHaveCount(0);
+    await expect(page.getByText(/Evaluación Motor V2|QUÓRUM ALCANZADO/i).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await clickIfVisibleAndEnabled(page, 'Confirmar quórum y continuar');
+
+    // STEP 4 — Agenda y debate: añade 1 punto ORDINARIA APROBACION_CUENTAS.
+    await goStep(page, /Agenda y debate/, /Paso 4\. Agenda y debate/);
+    await expect(page.getByText(/Agenda formal|Punto 1/i).first()).toBeVisible({ timeout: 20_000 });
+    const materiaSelect = page.locator('main select').first();
+    await expect(materiaSelect).toBeVisible({ timeout: 10_000 });
+    await materiaSelect.selectOption('APROBACION_CUENTAS');
+    await expect(materiaSelect).toHaveValue('APROBACION_CUENTAS', { timeout: 5_000 });
+
+    const agendaTitle = page.getByRole('textbox', { name: /Aprobación de cuentas anuales/i }).first();
+    if (await agendaTitle.isVisible().catch(() => false)) {
+      await agendaTitle.fill(`B4 v1 test ${fixture.runId} — aprobar cuentas`);
+    }
+
+    const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
+    await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
+    await saveDebates.click();
+    await expect(page.getByText('Agenda y debate guardados').first()).toBeVisible({ timeout: 20_000 });
+
+    // Reload para asegurar que el state del agenda step se persiste.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // STEP 5 — Votaciones: marcar todos FAVOR + registrar resolución.
+    await goStep(page, /Votaciones/, /Paso 5\. Votaciones/);
+    await expect(page.getByText('Evaluación de adopción por punto')).toBeVisible({ timeout: 20_000 });
+
+    const saveResolutionButton = page
+      .getByRole('button', {
+        name: /Registrar resolución y crear expediente Acuerdo 360|Recalcular resolución y crear expediente Acuerdo 360/,
+      })
+      .first();
+    if (await saveResolutionButton.isVisible().catch(() => false)) {
+      await ensureAllVisibleVotesFavor(page);
+      if (await saveResolutionButton.isEnabled().catch(() => false)) {
+        await saveResolutionButton.click();
+        await expect(
+          page
+            .getByText(/Snapshot legal actualizado|resolución\(es\) registrada\(s\)|resoluciones ya están registradas/i)
+            .first(),
+        ).toBeVisible({ timeout: 30_000 });
+      }
+    }
+
+    // STEP 6 — Cierre: generar acta vía fn_generar_acta.
+    await goStep(page, /Cierre/, /Paso 6\. Cierre/);
+    const existingMinuteButton = page.getByRole('button', { name: 'Ver acta existente' });
+    const hasExisting = await expect(existingMinuteButton)
+      .toBeVisible({ timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!hasExisting) {
+      const generateButton = page.getByRole('button', { name: 'Confirmar cierre y generar acta' });
+      await expect(generateButton).toBeEnabled({ timeout: 20_000 });
+      await generateButton.click();
+      await expect(page.locator('main').getByText('Acta generada en borrador')).toBeVisible({
+        timeout: 30_000,
+      });
+    }
+
+    // Verificación Cloud: minutes tiene una fila para este meeting con
+    // body_id + entity_id correctos (post-F10.2 backfill).
+    const { data: minute, error: minuteErr } = await client
+      .from('minutes')
+      .select('id, meeting_id, body_id, entity_id, content_hash, snapshot_id')
+      .eq('meeting_id', fixture.meetingId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    expect(minuteErr, 'read minutes back').toBeNull();
+    expect(minute, 'minute row created by fn_generar_acta').not.toBeNull();
+    expect(minute!.meeting_id).toBe(fixture.meetingId);
+    expect(minute!.body_id, 'minute.body_id linked to CdA').toBe(fixture.bodyId);
+    expect(minute!.entity_id, 'minute.entity_id linked to entity').toBe(fixture.entityId);
+    expect(minute!.content_hash, 'fn_generar_acta calcula content_hash').toMatch(/^[a-f0-9]+$/i);
+
+    // Verificación: meeting_resolutions tiene al menos 1 fila para el meeting.
+    const { data: resolutions, error: resErr } = await client
+      .from('meeting_resolutions')
+      .select('id, agenda_item_index, agreement_id')
+      .eq('meeting_id', fixture.meetingId);
+    expect(resErr, 'read meeting_resolutions').toBeNull();
+    expect(resolutions?.length, 'al menos 1 meeting_resolution registrada').toBeGreaterThanOrEqual(1);
+
+    // Track minute para cleanup explícito.
+    if (minute?.id) created.push({ table: 'minutes', id: minute.id, marker: fixture.runId });
   });
 });
