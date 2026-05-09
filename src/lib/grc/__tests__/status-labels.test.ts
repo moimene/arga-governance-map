@@ -11,6 +11,7 @@ import {
   RISK_LEVEL_CHIP,
   RISK_STATUS_OPTIONS,
   SEVERITY_CHIP,
+  SEVERITY_DOT,
   SEVERITY_OPTIONS,
   VULNERABILITY_STATUS_CHIP,
   actionPlanStatusChip,
@@ -22,6 +23,7 @@ import {
   notificationStatusLabel,
   riskLevelChip,
   severityChip,
+  severityDot,
   vulnerabilityStatusChip,
 } from "../status-labels";
 
@@ -97,6 +99,42 @@ describe("grc/status-labels — severity options (canonical order)", () => {
 
   it("las options coinciden con las keys del SEVERITY_CHIP (sin drift)", () => {
     expect([...SEVERITY_OPTIONS].sort()).toEqual(Object.keys(SEVERITY_CHIP).sort());
+  });
+});
+
+describe("grc/status-labels — severity dot (status indicator distinto del chip)", () => {
+  it("expone exactamente los 4 niveles de severity en SEVERITY_DOT", () => {
+    expect(Object.keys(SEVERITY_DOT).sort()).toEqual(["Alto", "Bajo", "Crítico", "Medio"]);
+  });
+
+  it("Crítico=status-error, Alto=status-warning (igual que el chip)", () => {
+    expect(severityDot("Crítico")).toContain("var(--status-error)");
+    expect(severityDot("Alto")).toContain("var(--status-warning)");
+  });
+
+  it("Medio y Bajo usan --g-sec-300 (paleta distinta del chip NEUTRAL)", () => {
+    expect(severityDot("Medio")).toContain("var(--g-sec-300)");
+    expect(severityDot("Bajo")).toContain("var(--g-sec-300)");
+  });
+
+  it("dot NO incluye `border` ni `text-` (es solo bg, a diferencia del chip)", () => {
+    for (const value of Object.values(SEVERITY_DOT)) {
+      expect(value).not.toContain("border");
+      expect(value).not.toContain("text-");
+    }
+  });
+
+  it("fallback --g-sec-300 (no NEUTRAL) para valores ausentes/desconocidos", () => {
+    for (const input of FALLBACK_INPUTS) {
+      expect(severityDot(input)).toContain("var(--g-sec-300)");
+      expect(severityDot(input)).not.toContain("border");
+    }
+  });
+
+  it("dot y chip son helpers distintos para el mismo input (paletas diferentes)", () => {
+    // Crítico/Alto coinciden por diseño; Medio/Bajo divergen.
+    expect(severityDot("Crítico")).not.toBe(severityChip("Crítico")); // dot: bg-only, chip: bg+text
+    expect(severityDot("Medio")).not.toBe(severityChip("Medio")); // sec-300 vs surface-muted
   });
 });
 

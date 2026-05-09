@@ -1,7 +1,7 @@
 import { useIncidents } from "@/hooks/useIncidents";
 import { Link } from "react-router-dom";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-import { severityChip } from "@/lib/grc/status-labels";
+import { severityChip, severityDot } from "@/lib/grc/status-labels";
 
 export default function CyberIncidents() {
   const scope = useSecretariaScope();
@@ -35,11 +35,7 @@ export default function CyberIncidents() {
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
             <div
-              className={`h-2.5 w-2.5 rounded-full mt-1.5 shrink-0 ${
-                i.severity === "Crítico" ? "bg-[var(--status-error)]" :
-                i.severity === "Alto" ? "bg-[var(--status-warning)]" :
-                "bg-[var(--g-sec-300)]"
-              }`}
+              className={`h-2.5 w-2.5 rounded-full mt-1.5 shrink-0 ${severityDot(i.severity)}`}
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">

@@ -51,6 +51,33 @@ export function severityChip(value: string | null | undefined): string {
   return SEVERITY_CHIP[value] ?? CHIP_BASE.NEUTRAL;
 }
 
+/**
+ * Indicadores tipo "dot" (círculo pequeño) acoplados a `severity`. Comparten
+ * los valores Crítico/Alto con `SEVERITY_CHIP` pero usan paleta distinta
+ * para Medio/Bajo (`--g-sec-300` en lugar de NEUTRAL muted+border) porque
+ * el dot no tiene texto/borde — la diferenciación visual depende solo del
+ * color de fondo.
+ *
+ * Usado por status-dots inline en módulos GRC (cyber/dora Incidents).
+ */
+const DOT_BASE = {
+  ERROR:     "bg-[var(--status-error)]",
+  WARNING:   "bg-[var(--status-warning)]",
+  SECONDARY: "bg-[var(--g-sec-300)]",
+} as const;
+
+export const SEVERITY_DOT: Record<string, string> = {
+  Crítico: DOT_BASE.ERROR,
+  Alto:    DOT_BASE.WARNING,
+  Medio:   DOT_BASE.SECONDARY,
+  Bajo:    DOT_BASE.SECONDARY,
+};
+
+export function severityDot(value: string | null | undefined): string {
+  if (!value) return DOT_BASE.SECONDARY;
+  return SEVERITY_DOT[value] ?? DOT_BASE.SECONDARY;
+}
+
 // ─── Estado incidente ────────────────────────────────────────────────────────
 
 export const INCIDENT_STATUS_CHIP: Record<string, string> = {
