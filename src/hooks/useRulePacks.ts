@@ -1,37 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/context/TenantContext';
+import {
+  mapRulePackJoinRowToVersionRow,
+  pickFreshestRulePackVersion,
+  type RulePackJoinRow,
+  type RulePackVersionRow,
+} from '@/lib/secretaria/rule-pack-params';
 
-/**
- * Rule pack version row with joined rule pack fields
- */
-export interface RulePackVersionRow {
-  id: string;
-  rule_pack_id: string;
-  version_tag: string;
-  status: string;
-  params: unknown; // JSONB — the full RulePack params
-  created_at: string;
-  tenant_id: string;
-  // joined fields
-  materia?: string;
-  clase?: string;
-  organo_tipo?: string;
-}
+export type { RulePackVersionRow };
 
 /**
  * Rule parameter override row
  */
-type RulePackJoinRow = {
-  id: string;
-  pack_id: string;
-  version: string;
-  is_active: boolean | null;
-  payload: unknown;
-  created_at: string | null;
-  rule_packs: { tenant_id: string; materia: string; organo_tipo: string | null } | null;
-};
-
 export interface RuleParamOverrideRow {
   id: string;
   entity_id: string;
@@ -64,23 +45,8 @@ export function useRulePacks() {
 
       if (error) throw error;
 
-      // Transform PostgREST response to flatten joined fields
       const rows = (data ?? []) as RulePackJoinRow[];
-      return rows.map((row) => {
-        const packed = row.rule_packs;
-        return {
-          id: row.id,
-          rule_pack_id: row.pack_id,
-          version_tag: row.version,
-          status: row.is_active ? "ACTIVE" : "DEPRECATED",
-          params: row.payload,
-          created_at: row.created_at,
-          tenant_id: packed?.tenant_id ?? tenantId!,
-          materia: packed?.materia,
-          clase: undefined,
-          organo_tipo: packed?.organo_tipo ?? undefined,
-        } as RulePackVersionRow;
-      });
+      return rows.map((row) => mapRulePackJoinRowToVersionRow(row, tenantId!));
     },
   });
 }
@@ -108,21 +74,9 @@ export function useRulePacksForEntity(entityId?: string) {
 
       if (packsError) throw packsError;
 
-      const packs = (packsData as RulePackJoinRow[] ?? []).map((row) => {
-        const packed = row.rule_packs;
-        return {
-          id: row.id,
-          rule_pack_id: row.pack_id,
-          version_tag: row.version,
-          status: row.is_active ? "ACTIVE" : "DEPRECATED",
-          params: row.payload,
-          created_at: row.created_at,
-          tenant_id: packed?.tenant_id ?? tenantId!,
-          materia: packed?.materia,
-          clase: undefined,
-          organo_tipo: packed?.organo_tipo ?? undefined,
-        } as RulePackVersionRow;
-      });
+      const packs = ((packsData ?? []) as RulePackJoinRow[]).map((row) =>
+        mapRulePackJoinRowToVersionRow(row, tenantId!),
+      );
 
       // Load overrides for this entity
       const { data: overridesData, error: overridesError } = await supabase
@@ -144,10 +98,29 @@ export function useRulePacksForEntity(entityId?: string) {
 }
 
 /**
- * Load a single active rule pack version by materia code
- * Joins with rule_packs to get clase, organo_tipo
- * Enabled only when materia is truthy
- * staleTime: 60 seconds
+ * Load a single active rule pack version by materia code.
+ * Joins with rule_packs to get clase, organo_tipo.
+ * Enabled only when materia is truthy.
+ * staleTime: 60 seconds.
+ *
+ * Why no `.maybeSingle()` and no `.limit(1)`:
+ *
+ *   Cloud legacy data can contain more than one `is_active = true` row for
+ *   the same materia (the canonical INC-14 case for `AUMENTO_CAPITAL`). The
+ *   previous implementation used `.maybeSingle()` and crashed with PGRST116.
+ *
+ *   We now bring all active rows back and let `pickFreshestRulePackVersion`
+ *   decide which one wins, applying the documented policy:
+ *
+ *     "última activación/creación operativa gana, aunque la versión
+ *      semántica sea menor"
+ *
+ *   SQL still provides a defensive primary ordering by `created_at` DESC
+ *   (with `id` DESC as a deterministic tie-breaker so PostgREST never falls
+ *   back to undefined ordering on equal timestamps), but the JS picker is
+ *   the source of truth — if the SQL ordering ever changes the picker
+ *   still returns the correct row, and tests cover the decision directly.
+ *   See `src/lib/secretaria/rule-pack-params.ts` and its tests.
  */
 export function useRulePackForMateria(materia?: string) {
   const { tenantId } = useTenantContext();
@@ -162,29 +135,16 @@ export function useRulePackForMateria(materia?: string) {
         .eq("rule_packs.tenant_id", tenantId!)
         .eq("is_active", true)
         .eq("rule_packs.materia", materia)
-        // Cloud legacy data can contain more than one active row for a matter.
-        // Pick the newest active row instead of failing with maybeSingle().
         .order("created_at", { ascending: false })
-        .limit(1);
+        .order("id", { ascending: false });
 
       if (error) throw error;
 
-      const row = ((data ?? []) as RulePackJoinRow[])[0];
+      const rows = (data ?? []) as RulePackJoinRow[];
+      const row = pickFreshestRulePackVersion(rows);
       if (!row) return null;
 
-      const packed = row.rule_packs;
-      return {
-        id: row.id,
-        rule_pack_id: row.pack_id,
-        version_tag: row.version,
-        status: row.is_active ? "ACTIVE" : "DEPRECATED",
-        params: row.payload,
-        created_at: row.created_at,
-        tenant_id: packed?.tenant_id ?? tenantId!,
-        materia: packed?.materia,
-        clase: undefined,
-        organo_tipo: packed?.organo_tipo ?? undefined,
-      } as RulePackVersionRow;
+      return mapRulePackJoinRowToVersionRow(row, tenantId!);
     },
   });
 }

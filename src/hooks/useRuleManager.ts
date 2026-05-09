@@ -16,6 +16,7 @@ import {
   type EffectiveAgreementRule,
   type RuleManagerInput,
 } from "@/lib/secretaria/rule-manager-contract";
+import { extractMajorityFromRulePackParams } from "@/lib/secretaria/rule-pack-params";
 import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
 
 // ─── useRuleManagerProfile ──────────────────────────────────────────────────
@@ -98,55 +99,6 @@ export interface AgreementRulePreviewQuery {
   isLoading: boolean;
   error: unknown;
   enabled: boolean;
-}
-
-/**
- * Lee `params` JSONB del rule pack y trata de extraer threshold y descripción.
- * Defensivo: prueba varias claves comunes y devuelve null si no encuentra.
- */
-function extractMajorityFromRulePackParams(
-  params: unknown,
-): RuleManagerInput["agreement"]["legal_majority"] | null {
-  if (!params || typeof params !== "object" || Array.isArray(params)) return null;
-  const record = params as Record<string, unknown>;
-  const candidates = [
-    record.majority,
-    record.mayoria,
-    record.mayoria_legal,
-    record.majority_threshold,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === "number") {
-      return { code: null, threshold: candidate };
-    }
-    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
-      const obj = candidate as Record<string, unknown>;
-      const threshold =
-        typeof obj.threshold === "number"
-          ? obj.threshold
-          : typeof obj.umbral === "number"
-            ? obj.umbral
-            : typeof obj.value === "number"
-              ? obj.value
-              : null;
-      const code =
-        typeof obj.code === "string"
-          ? obj.code
-          : typeof obj.codigo === "string"
-            ? obj.codigo
-            : null;
-      const description =
-        typeof obj.description === "string"
-          ? obj.description
-          : typeof obj.descripcion === "string"
-            ? obj.descripcion
-            : null;
-      if (threshold !== null || code !== null) {
-        return { code, threshold, description };
-      }
-    }
-  }
-  return null;
 }
 
 export function useAgreementRulePreview(input: AgreementRulePreviewInput): AgreementRulePreviewQuery {
