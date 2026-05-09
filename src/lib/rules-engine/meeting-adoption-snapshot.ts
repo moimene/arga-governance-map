@@ -48,12 +48,39 @@ export const MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION = "2.1";
  * Acepta input genérico (`Record<string, unknown> | null`) porque los
  * snapshots leídos de `agreements.compliance_snapshot` (JSONB) llegan
  * sin tipo concreto.
+ *
+ * Discriminación: la columna `compliance_snapshot` es JSONB y guarda
+ * shapes distintos según el flujo de adopción:
+ *   - MEETING:        `MeetingAdoptionSnapshot` (este helper aplica)
+ *   - SOLIDARIO:      `evaluarSolidario` output (NO aplica)
+ *   - CO_APROBACION:  `evaluarCoAprobacion` output (NO aplica)
+ *   - NO_SESSION:     `evaluarProcesoSinSesion` output (NO aplica)
+ *
+ * Solo se considera legacy si:
+ *   1) `schema_version` empieza con `"meeting-adoption-snapshot"` (es
+ *      un snapshot de meeting flow), Y
+ *   2) `engine_version` está ausente, vacío o es distinto al actual.
+ *
+ * Para shapes que NO son meeting (solidario, co-aprobacion, no-session),
+ * devuelve `false` — el bug CDA→CONSEJO del adapter no afecta esos
+ * flujos porque no pasan por `useAgreementCompliance.evaluateV2`.
  */
 export function isLegacyMeetingAdoptionSnapshot(
-  snapshot: { engine_version?: string | null } | Record<string, unknown> | null | undefined,
+  snapshot:
+    | { schema_version?: string; engine_version?: string | null }
+    | Record<string, unknown>
+    | null
+    | undefined,
   currentVersion: string = MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
 ): boolean {
   if (!snapshot || typeof snapshot !== "object") return false;
+  const schemaVersion = (snapshot as { schema_version?: unknown }).schema_version;
+  if (
+    typeof schemaVersion !== "string" ||
+    !schemaVersion.startsWith("meeting-adoption-snapshot")
+  ) {
+    return false;
+  }
   const version = (snapshot as { engine_version?: unknown }).engine_version;
   if (typeof version !== "string" || version.length === 0) return true;
   return version !== currentVersion;

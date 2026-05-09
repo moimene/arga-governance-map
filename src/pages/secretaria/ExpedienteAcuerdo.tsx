@@ -27,6 +27,7 @@ import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { useAgreementRuleSnapshot } from "@/hooks/useRuleManager";
+import { isLegacyMeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import {
   classifyFrozenSnapshot,
   type FrozenSnapshotClassification,
@@ -504,9 +505,27 @@ export default function ExpedienteAcuerdo() {
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
             <div className="border-b border-[var(--g-border-subtle)] px-5 py-3">
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Compliance snapshot
-              </h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Compliance snapshot
+                </h2>
+                {isLegacyMeetingAdoptionSnapshot(a.compliance_snapshot) && (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                    title="Snapshot legacy. Este resultado fue calculado con una versión anterior del motor. La evaluación actual puede diferir."
+                    aria-label="Snapshot legacy: calculado con una versión anterior del motor"
+                  >
+                    <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden="true" />
+                    Snapshot legacy
+                  </span>
+                )}
+              </div>
+              {isLegacyMeetingAdoptionSnapshot(a.compliance_snapshot) && (
+                <p className="mt-2 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
+                  Este resultado fue calculado con una versión anterior del motor. La evaluación actual puede diferir.
+                </p>
+              )}
             </div>
             <div className="space-y-2 p-5 text-sm">
               {compliance ? (

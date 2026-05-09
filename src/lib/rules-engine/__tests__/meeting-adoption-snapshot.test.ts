@@ -415,7 +415,7 @@ describe("A2 — engine_version persistence + isLegacyMeetingAdoptionSnapshot", 
   });
 
   it("isLegacyMeetingAdoptionSnapshot detecta snapshot SIN engine_version (legacy pre-A2)", () => {
-    // Simula snapshot leído de Cloud sin el campo (pre-A2).
+    // Simula snapshot meeting leído de Cloud sin el campo (pre-A2).
     const legacy = {
       schema_version: "meeting-adoption-snapshot.v2",
       agenda_item_index: 0,
@@ -448,14 +448,61 @@ describe("A2 — engine_version persistence + isLegacyMeetingAdoptionSnapshot", 
   });
 
   it("isLegacyMeetingAdoptionSnapshot tolera engine_version no-string (corrupción)", () => {
-    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: 21 } as unknown as Record<string, unknown>)).toBe(true);
-    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: "" })).toBe(true);
-    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: null })).toBe(true);
+    expect(
+      isLegacyMeetingAdoptionSnapshot({
+        schema_version: "meeting-adoption-snapshot.v2",
+        engine_version: 21,
+      } as unknown as Record<string, unknown>),
+    ).toBe(true);
+    expect(
+      isLegacyMeetingAdoptionSnapshot({
+        schema_version: "meeting-adoption-snapshot.v2",
+        engine_version: "",
+      }),
+    ).toBe(true);
+    expect(
+      isLegacyMeetingAdoptionSnapshot({
+        schema_version: "meeting-adoption-snapshot.v2",
+        engine_version: null,
+      }),
+    ).toBe(true);
   });
 
   it("isLegacyMeetingAdoptionSnapshot acepta currentVersion explícito (futuro: comparar contra '3.0')", () => {
-    const v21 = { engine_version: "2.1" };
+    const v21 = { schema_version: "meeting-adoption-snapshot.v2", engine_version: "2.1" };
     expect(isLegacyMeetingAdoptionSnapshot(v21, "2.1")).toBe(false);
     expect(isLegacyMeetingAdoptionSnapshot(v21, "3.0")).toBe(true);
+  });
+
+  // Discriminación de shapes: solidario/co-aprobacion/no-session NO son
+  // afectados por el bug CDA→CONSEJO porque no pasan por
+  // useAgreementCompliance.evaluateV2.
+  it("isLegacyMeetingAdoptionSnapshot devuelve false para shapes NO-meeting (solidario/co-aprobacion/no-session)", () => {
+    // Solidario: motor V2 output con shape distinto, sin schema_version meeting.
+    const solidarioSnap = {
+      adoption_mode: "SOLIDARIO",
+      adminVigentes: ["a1"],
+      firmasPresentes: ["a1"],
+      result: { acuerdoProclamable: true },
+    };
+    expect(isLegacyMeetingAdoptionSnapshot(solidarioSnap)).toBe(false);
+
+    // Co-aprobación: shape distinto.
+    const coAprobacionSnap = {
+      adoption_mode: "CO_APROBACION",
+      k_required: 2,
+      n_total: 2,
+    };
+    expect(isLegacyMeetingAdoptionSnapshot(coAprobacionSnap)).toBe(false);
+
+    // Objeto arbitrario sin schema_version.
+    expect(isLegacyMeetingAdoptionSnapshot({ foo: "bar" })).toBe(false);
+
+    // schema_version distinto.
+    expect(
+      isLegacyMeetingAdoptionSnapshot({
+        schema_version: "no-session-snapshot.v1",
+      }),
+    ).toBe(false);
   });
 });
