@@ -19,6 +19,46 @@ import type {
   VotacionOutput,
 } from "./types";
 
+/**
+ * Versión del motor V2 que produjo este snapshot. Se incrementa cuando
+ * la semántica del motor cambia de manera observable en el output.
+ *
+ * Histórico:
+ *   "2.0" — schema inicial v2 (pre-fix CDA→CONSEJO).
+ *   "2.1" — post-fix `useAgreementCompliance.toTipoOrgano` (commit
+ *           96a64ca, 2026-05-09). Los CdA con body_type='CDA' ahora
+ *           se evalúan como CONSEJO en el adapter en lugar de
+ *           JUNTA_GENERAL. Los snapshots con `engine_version` ausente
+ *           o anterior a 2.1 fueron generados con el bug previo.
+ *
+ * Helper: usar `isLegacyMeetingAdoptionSnapshot(snapshot)` para
+ * detectar snapshots históricos que pueden discrepar del motor
+ * actual al re-evaluar.
+ */
+export const MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION = "2.1";
+
+/**
+ * Detecta si un snapshot de adopción de reunión fue producido por una
+ * versión del motor anterior a la actual (o sin `engine_version` —
+ * snapshots pre-A2). Útil para etiquetar visiblemente "snapshot legacy"
+ * en UI o para auditoría.
+ *
+ * NO re-evalúa el snapshot. Solo compara strings de versión.
+ *
+ * Acepta input genérico (`Record<string, unknown> | null`) porque los
+ * snapshots leídos de `agreements.compliance_snapshot` (JSONB) llegan
+ * sin tipo concreto.
+ */
+export function isLegacyMeetingAdoptionSnapshot(
+  snapshot: { engine_version?: string | null } | Record<string, unknown> | null | undefined,
+  currentVersion: string = MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
+): boolean {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  const version = (snapshot as { engine_version?: unknown }).engine_version;
+  if (typeof version !== "string" || version.length === 0) return true;
+  return version !== currentVersion;
+}
+
 export interface MeetingAdoptionRuleTrace {
   source: "V2_CLOUD" | "PROTOTYPE_FALLBACK";
   rule_pack_id: string | null;
@@ -73,6 +113,13 @@ export interface VoteSummary {
 
 export interface MeetingAdoptionSnapshot {
   schema_version: "meeting-adoption-snapshot.v2";
+  /**
+   * Versión del motor V2 que produjo este snapshot. Ver
+   * `MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION` para el histórico.
+   * Snapshots persistidos en Cloud antes de A2 (2026-05-09) NO tienen
+   * este campo; usar `isLegacyMeetingAdoptionSnapshot` para detectar.
+   */
+  engine_version: string;
   agenda_item_index: number;
   agreement_id?: string | null;
   resolution_id?: string | null;
@@ -280,6 +327,7 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
 
   return {
     schema_version: "meeting-adoption-snapshot.v2",
+    engine_version: MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
     agenda_item_index: input.agendaItemIndex,
     resolution_text: input.resolutionText,
     materia: input.materia,

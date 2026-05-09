@@ -8,7 +8,11 @@ export { evaluarConvocatoria } from './convocatoria-engine';
 export { evaluarConstitucion, calcularDenominadorAjustado, validarCapitalUniversal } from './constitucion-engine';
 export { evaluarMayoria } from './majority-evaluator';
 export { evaluarVotacion } from './votacion-engine';
-export { buildMeetingAdoptionSnapshot } from './meeting-adoption-snapshot';
+export {
+  buildMeetingAdoptionSnapshot,
+  isLegacyMeetingAdoptionSnapshot,
+  MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
+} from './meeting-adoption-snapshot';
 export type {
   MeetingAdoptionSnapshot,
   MeetingAdoptionSnapshotInput,

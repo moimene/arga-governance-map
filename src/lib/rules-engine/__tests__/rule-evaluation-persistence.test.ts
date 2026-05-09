@@ -8,6 +8,7 @@ import type { MeetingAdoptionSnapshot } from "../meeting-adoption-snapshot";
 function snapshot(patch: Partial<MeetingAdoptionSnapshot> = {}): MeetingAdoptionSnapshot {
   return {
     schema_version: "meeting-adoption-snapshot.v2",
+    engine_version: "2.1",
     agenda_item_index: 1,
     resolution_text: "Aprobar autorización de garantía",
     materia: "AUTORIZACION_GARANTIA",

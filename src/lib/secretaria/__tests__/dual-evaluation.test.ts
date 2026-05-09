@@ -9,6 +9,7 @@ import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 function snapshot(ok: boolean, status: "ADOPTED" | "REJECTED" = ok ? "ADOPTED" : "REJECTED"): MeetingAdoptionSnapshot {
   return {
     schema_version: "meeting-adoption-snapshot.v2",
+    engine_version: "2.1",
     agenda_item_index: 1,
     resolution_text: "Acuerdo",
     materia: "APROBACION_CUENTAS",

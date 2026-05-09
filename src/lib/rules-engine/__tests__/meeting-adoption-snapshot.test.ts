@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildMeetingAdoptionSnapshot } from "../meeting-adoption-snapshot";
+import {
+  buildMeetingAdoptionSnapshot,
+  isLegacyMeetingAdoptionSnapshot,
+  MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
+} from "../meeting-adoption-snapshot";
 import type {
   MajoritySpec,
   ReglaActa,
@@ -366,5 +370,92 @@ describe("A3 — buildMeetingAdoptionSnapshot voto de calidad CdA", () => {
     // Voto de calidad estaba HABILITADO pero NO USADO (no había empate).
     expect(snapshot.voting_context.voto_calidad_habilitado).toBe(true);
     expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeFalsy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// A2 — engine_version persistence + legacy snapshot detection
+//
+// Antes de A2 (2026-05-09) los snapshots no llevaban `engine_version`.
+// Tras el fix CDA→CONSEJO (commit 96a64ca), los snapshots históricos
+// persistidos en Cloud quedan estancados con `organo_tipo` derivado
+// del bug previo. Re-evaluar el agreement actualmente produciría un
+// resultado distinto.
+//
+// Estos tests validan:
+//   1) Builds nuevos siempre llevan engine_version actual.
+//   2) `isLegacyMeetingAdoptionSnapshot` detecta snapshots legacy
+//      (sin campo) y snapshots de versiones antiguas.
+//   3) Snapshots con la versión actual NO son legacy.
+// ─────────────────────────────────────────────────────────────────────
+
+describe("A2 — engine_version persistence + isLegacyMeetingAdoptionSnapshot", () => {
+  it("buildMeetingAdoptionSnapshot persiste engine_version actual", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Test",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 100 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      packs: [pack("APROBACION_CUENTAS")],
+    });
+    expect(snapshot.engine_version).toBe(MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION);
+  });
+
+  it("MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION está fijado en '2.1' (post-fix CDA→CONSEJO)", () => {
+    // Anti-bug: si alguien degrada a '2.0' sin migración explícita,
+    // los snapshots producidos posteriormente NO se distinguirían de
+    // los legacy pre-fix. Esto bloquea ese cambio silencioso.
+    expect(MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION).toBe("2.1");
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot detecta snapshot SIN engine_version (legacy pre-A2)", () => {
+    // Simula snapshot leído de Cloud sin el campo (pre-A2).
+    const legacy = {
+      schema_version: "meeting-adoption-snapshot.v2",
+      agenda_item_index: 0,
+      voting_context: { organo_tipo: "JUNTA_GENERAL" },
+    };
+    expect(isLegacyMeetingAdoptionSnapshot(legacy)).toBe(true);
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot detecta snapshot con engine_version anterior", () => {
+    const oldSnap = {
+      schema_version: "meeting-adoption-snapshot.v2",
+      engine_version: "2.0",
+      voting_context: { organo_tipo: "JUNTA_GENERAL" },
+    };
+    expect(isLegacyMeetingAdoptionSnapshot(oldSnap)).toBe(true);
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot devuelve false para snapshots con la versión actual", () => {
+    const fresh = {
+      schema_version: "meeting-adoption-snapshot.v2",
+      engine_version: MEETING_ADOPTION_SNAPSHOT_ENGINE_VERSION,
+      voting_context: { organo_tipo: "CONSEJO" },
+    };
+    expect(isLegacyMeetingAdoptionSnapshot(fresh)).toBe(false);
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot tolera snapshot null/undefined sin throw", () => {
+    expect(isLegacyMeetingAdoptionSnapshot(null)).toBe(false);
+    expect(isLegacyMeetingAdoptionSnapshot(undefined)).toBe(false);
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot tolera engine_version no-string (corrupción)", () => {
+    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: 21 } as unknown as Record<string, unknown>)).toBe(true);
+    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: "" })).toBe(true);
+    expect(isLegacyMeetingAdoptionSnapshot({ engine_version: null })).toBe(true);
+  });
+
+  it("isLegacyMeetingAdoptionSnapshot acepta currentVersion explícito (futuro: comparar contra '3.0')", () => {
+    const v21 = { engine_version: "2.1" };
+    expect(isLegacyMeetingAdoptionSnapshot(v21, "2.1")).toBe(false);
+    expect(isLegacyMeetingAdoptionSnapshot(v21, "3.0")).toBe(true);
   });
 });
