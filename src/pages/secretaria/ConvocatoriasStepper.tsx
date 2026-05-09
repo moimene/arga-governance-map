@@ -6,7 +6,8 @@ import {
   AlertTriangle, FileText, Globe, Plus, Send, ShieldCheck, Trash2, Users,
 } from "lucide-react";
 import { evaluarConvocatoria } from "@/lib/rules-engine";
-import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
+import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoSocial } from "@/lib/rules-engine";
+import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -130,13 +131,6 @@ function toTipoSocial(value: unknown): TipoSocial {
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";
   return "SA";
-}
-
-function toTipoOrgano(value: unknown): TipoOrgano {
-  const raw = String(value ?? "").toUpperCase();
-  if (raw.includes("CDA") || raw.includes("CONSEJO")) return "CONSEJO";
-  if (raw.includes("COMISION") || raw.includes("COMIT")) return "COMISION_DELEGADA";
-  return "JUNTA_GENERAL";
 }
 
 function materiaClaseFromTipo(tipo: AgendaItem["tipo"]) {
@@ -312,7 +306,7 @@ export default function ConvocatoriasStepper() {
   const bodiesPending = Boolean(selectedEntityId && (entitiesLoading || bodiesLoading || bodiesFetching));
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const tipoSocial = toTipoSocial(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
-  const organoTipo = toTipoOrgano(selectedBody?.body_type);
+  const organoTipo = resolveOrganoTipo(selectedBody);
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
 

@@ -45,6 +45,7 @@ import {
   type TipoOrgano,
   type TipoSocial,
 } from "@/lib/rules-engine";
+import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import {
   AGENDA_ORIGIN_LABELS,
   newSessionAgendaPoint,
@@ -135,13 +136,6 @@ function toTipoSocial(value: unknown): TipoSocial {
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";
   return "SA";
-}
-
-function toTipoOrgano(value: unknown): TipoOrgano {
-  const raw = String(value ?? "").toUpperCase();
-  if (raw.includes("CDA") || raw.includes("CONSEJO")) return "CONSEJO";
-  if (raw.includes("COMISION") || raw.includes("COMIT")) return "COMISION_DELEGADA";
-  return "JUNTA_GENERAL";
 }
 
 function normalizeMateriaClase(value: unknown): MateriaClase {
@@ -393,7 +387,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         } | null;
       }
     | null;
-  const organoTipo = toTipoOrgano(meetingRaw?.governing_bodies?.body_type);
+  const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   const censusSource = meetingCensusSourceForBodyType(meetingRaw?.governing_bodies?.body_type);
   const isJuntaCensus = censusSource === "capital_holdings";
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
@@ -787,7 +781,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
   );
-  const organoTipo = toTipoOrgano(meetingRaw?.governing_bodies?.body_type);
+  const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
   const { data: ruleResolutions = [], isLoading: rulesLoading } = useRuleResolutions({
     materias: ruleSpecs,
@@ -1530,7 +1524,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
       meetingRaw?.governing_bodies?.entities?.legal_form
   );
-  const organoTipo = toTipoOrgano(meetingRaw?.governing_bodies?.body_type);
+  const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? meetingContext?.entityId ?? null;
   const votoCalidadHabilitado = votoCalidadHabilitadoPorOrgano(
     organoTipo,

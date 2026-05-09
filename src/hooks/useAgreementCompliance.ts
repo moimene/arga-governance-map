@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
+import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import {
   evaluarAcuerdoCompleto,
   type RulePack,
@@ -212,13 +213,6 @@ function toTipoSocial(companyForm: string | null): TipoSocial {
   return "SL";
 }
 
-/** Mapea body_type del órgano al TipoOrgano del motor V2. */
-function toTipoOrgano(bodyType: string | null): TipoOrgano {
-  if (bodyType === "CONSEJO" || bodyType === "consejo_administracion") return "CONSEJO";
-  if (bodyType === "COMISION" || bodyType === "comision_delegada") return "COMISION_DELEGADA";
-  return "JUNTA_GENERAL";
-}
-
 /** Mapea matter_class del agreement al MateriaClase del motor V2. */
 function toMateriaClase(mc: string): MateriaClase {
   if (mc === "ESTATUTARIA") return "ESTATUTARIA";
@@ -233,7 +227,7 @@ function toMateriaClase(mc: string): MateriaClase {
 async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<ComplianceResult> {
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
   const tipoSocial = toTipoSocial(companyForm);
-  const organoTipo = toTipoOrgano(a.governing_bodies?.body_type ?? null);
+  const organoTipo = resolveOrganoTipo(a.governing_bodies);
   const adoptionMode = a.adoption_mode as AdoptionMode;
   const materiaClase = toMateriaClase(a.matter_class);
   const fechaAcuerdo = a.decision_date ? `${a.decision_date}T12:00:00Z` : new Date().toISOString();
