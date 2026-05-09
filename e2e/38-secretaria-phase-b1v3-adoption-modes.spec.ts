@@ -551,24 +551,15 @@ test.describe('Phase B1 v3 — adoption modes no-meeting/no-no-session', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────
-  // ⚠ P0 SCHEMA GAP — agreements_adoption_mode_check NO acepta
-  // 'SOLIDARIO' ni 'CO_APROBACION'. Per CLAUDE.md Sprint G, los
-  // TypeScript types se extendieron y `evaluarSolidario`/`evaluarCoAprobacion`
-  // existen en el motor, pero la migración del CHECK constraint NUNCA
-  // se aplicó. CHECK actual:
-  //   ['MEETING', 'UNIVERSAL', 'NO_SESSION', 'UNIPERSONAL_SOCIO', 'UNIPERSONAL_ADMIN']
-  //
-  // En UI real: cualquier intento de adoptar acuerdo solidario o
-  // mancomunados via SolidarioStepper/CoAprobacionStepper rompe contra
-  // BD con `agreements_adoption_mode_check` violation.
-  //
-  // Estos 2 tests quedan skipped hasta que se aplique migración para
-  // ampliar la enumeración. Reactivar quitando `.skip` cuando exista
-  // migración. La verificación que hacen es legítima — el test es
-  // correcto, la BD es la que falta.
+  // P0 schema gap RESUELTO en migración
+  // `extend_agreements_adoption_mode_solidario_co_aprobacion`
+  // (2026-05-09). Antes el CHECK constraint solo aceptaba 5 modes y
+  // los steppers Solidario/CoAprobacion rompían contra BD pese a que
+  // el motor TS los soportaba. La migración alinea la enumeración
+  // con AdoptionMode del Sprint G.
   // ─────────────────────────────────────────────────────────────────
 
-  test.skip('SOLIDARIO: SL + 2 administradores solidarios + acuerdo solidario', async () => {
+  test('SOLIDARIO: SL + 2 administradores solidarios + acuerdo solidario', async () => {
     const runId = generateRunId('SO');
     const fixture = await createSocietyVariant(client, created, {
       runId,
@@ -621,7 +612,7 @@ test.describe('Phase B1 v3 — adoption modes no-meeting/no-no-session', () => {
     expect((body?.config ?? {}).adoption_mode).toBe('SOLIDARIO');
   });
 
-  test.skip('CO_APROBACION: SL + 2 administradores mancomunados + acuerdo co-aprobación', async () => {
+  test('CO_APROBACION: SL + 2 administradores mancomunados + acuerdo co-aprobación', async () => {
     const runId = generateRunId('MA');
     const fixture = await createSocietyVariant(client, created, {
       runId,
