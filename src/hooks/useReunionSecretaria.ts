@@ -532,6 +532,28 @@ export function useReplaceAttendees(meetingId: string | undefined) {
       }>
     ) => {
       if (!meetingId || !tenantId) return;
+
+      // Purgar meeting_votes que referencian los attendees actuales.
+      // FK `meeting_votes_attendee_id_fkey` no es ON DELETE CASCADE, así
+      // que si el meeting tiene votos previos (re-edición de asistencia
+      // tras haber votado), el DELETE de meeting_attendees fallaría con
+      // FK violation 23503. Bug detectado en e2e/18 golden path.
+      const { data: existingIds, error: idErr } = await supabase
+        .from("meeting_attendees")
+        .select("id")
+        .eq("meeting_id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (idErr) throw idErr;
+      const ids = (existingIds ?? []).map((r) => r.id);
+      if (ids.length > 0) {
+        const { error: votesErr } = await supabase
+          .from("meeting_votes")
+          .delete()
+          .in("attendee_id", ids)
+          .eq("tenant_id", tenantId);
+        if (votesErr) throw votesErr;
+      }
+
       const { error: delErr } = await supabase
         .from("meeting_attendees")
         .delete()

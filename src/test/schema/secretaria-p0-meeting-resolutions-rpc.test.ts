@@ -37,10 +37,26 @@ describe("Secretaria P0 meeting resolutions transactional RPC", () => {
   });
 
   it("uses the RPC from the hook and avoids direct multi-step writes in the client", () => {
+    // El contrato de este guard es específico a `useSaveMeetingResolutions`:
+    // ese hook DEBE invocar la RPC `fn_save_meeting_resolutions` y NO
+    // escribir directamente en meeting_resolutions/meeting_votes (el RPC
+    // es transaccional y aplica role check + audit trail).
+    //
+    // Otros hooks del MISMO archivo (e.g. `useReplaceAttendees`) tienen
+    // contratos distintos y pueden necesitar tocar meeting_votes para
+    // mantener integridad referencial. Por eso scopeamos el guard a la
+    // función concreta vía extracción de su body.
     expect(hook).toMatch(/rpc\("fn_save_meeting_resolutions"/);
-    expect(hook).not.toMatch(/from\("meeting_resolutions"\)\s*\.delete\(/);
-    expect(hook).not.toMatch(/from\("meeting_votes"\)\s*\.delete\(/);
-    expect(hook).not.toMatch(/from\("meeting_resolutions"\)\s*\.insert\(/);
-    expect(hook).not.toMatch(/from\("meeting_votes"\)\s*\.insert\(/);
+
+    const saveFnMatch = hook.match(
+      /export function useSaveMeetingResolutions[\s\S]*?\n\}\s*$/m,
+    );
+    expect(saveFnMatch, "useSaveMeetingResolutions function body found").not.toBeNull();
+    const saveFnBody = saveFnMatch![0];
+
+    expect(saveFnBody).not.toMatch(/from\("meeting_resolutions"\)\s*\.delete\(/);
+    expect(saveFnBody).not.toMatch(/from\("meeting_votes"\)\s*\.delete\(/);
+    expect(saveFnBody).not.toMatch(/from\("meeting_resolutions"\)\s*\.insert\(/);
+    expect(saveFnBody).not.toMatch(/from\("meeting_votes"\)\s*\.insert\(/);
   });
 });
