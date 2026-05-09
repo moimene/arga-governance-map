@@ -3,13 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-
-const SEV_CHIP: Record<string, string> = {
-  Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Medio:   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-  Bajo:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
+import { severityChip } from "@/lib/grc/status-labels";
 
 export default function DoraIncidents() {
   const [params] = useSearchParams();
@@ -75,7 +69,7 @@ export default function DoraIncidents() {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-mono text-xs text-[var(--g-text-secondary)]">{i.code}</span>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${SEV_CHIP[i.severity] ?? ""}`}
+                    className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${severityChip(i.severity)}`}
                     style={{ borderRadius: "var(--g-radius-full)" }}
                   >
                     {i.severity}

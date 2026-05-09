@@ -4,6 +4,7 @@ import { Activity, ChevronLeft, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "@/hooks/useRisks";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { RISK_STATUS_OPTIONS } from "@/lib/grc/status-labels";
 
 type FormState = {
   code: string;
@@ -33,8 +34,6 @@ const MODULE_OPTIONS = [
   { value: "audit", label: "Auditoría" },
   { value: "penal", label: "Penal / Anticorrupción" },
 ];
-
-const BASE_STATUS_OPTIONS = ["Abierto", "En tratamiento"];
 
 const emptyToNull = (value: string) => {
   const trimmed = value.trim();
@@ -137,9 +136,10 @@ export default function RiskEditor() {
 
   const isSaving = createRisk.isPending || updateRisk.isPending;
   const inherentPreview = form.probability * form.impact;
-  const statusOptions = BASE_STATUS_OPTIONS.includes(form.status)
-    ? BASE_STATUS_OPTIONS
-    : [...BASE_STATUS_OPTIONS, form.status];
+  const baseStatusOptions: string[] = [...RISK_STATUS_OPTIONS];
+  const statusOptions = baseStatusOptions.includes(form.status)
+    ? baseStatusOptions
+    : [...baseStatusOptions, form.status];
 
   if (isEdit && isLoading) {
     return (

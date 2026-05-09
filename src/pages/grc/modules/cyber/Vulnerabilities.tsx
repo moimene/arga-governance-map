@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { severityChip, vulnerabilityStatusChip } from "@/lib/grc/status-labels";
 
 type VulnerabilityRow = {
   id: string;
@@ -29,20 +30,6 @@ function useVulnerabilities() {
     },
   });
 }
-
-const SEV_CHIP: Record<string, string> = {
-  Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Medio:   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-  Bajo:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
-const STATUS_CHIP: Record<string, string> = {
-  Abierta:        "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  "En mitigación":"bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Parcheada:      "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  Aceptada:       "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
 
 export default function Vulnerabilities() {
   const { data: vulns = [], isLoading } = useVulnerabilities();
@@ -89,7 +76,7 @@ export default function Vulnerabilities() {
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${SEV_CHIP[v.severity] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${severityChip(v.severity)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {v.severity}
@@ -100,7 +87,7 @@ export default function Vulnerabilities() {
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[v.status] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${vulnerabilityStatusChip(v.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {v.status}

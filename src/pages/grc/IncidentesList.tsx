@@ -5,23 +5,9 @@ import { AlertOctagon, ArrowRight, Clock, Plus, Route } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
+import { SEVERITY_OPTIONS, incidentStatusChip, severityChip } from "@/lib/grc/status-labels";
 
 const FILTER_ALL = "Todas";
-
-const SEV_CHIP: Record<string, string> = {
-  Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Medio: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-  Bajo: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
-const STATUS_CHIP: Record<string, string> = {
-  Abierto: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  "En contención": "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  "En investigación": "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-  Resuelto: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  Cerrado: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
 
 const INCIDENT_TYPE_LABEL: Record<string, string> = {
   DORA: "Resiliencia digital",
@@ -161,13 +147,13 @@ function IncidentCard({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <span
-          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${SEV_CHIP[incident.severity ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${severityChip(incident.severity)}`}
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
           {incident.severity ?? "Sin severidad"}
         </span>
         <span
-          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[incident.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${incidentStatusChip(incident.status)}`}
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
           {incident.status ?? "Sin estado"}
@@ -348,7 +334,7 @@ export default function IncidentesList() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <SelectField id="incident-severity-filter" label="Severidad" value={severityFilter} onChange={setSeverityFilter}>
-            {[FILTER_ALL, "Crítico", "Alto", "Medio", "Bajo"].map((option) => (
+            {[FILTER_ALL, ...SEVERITY_OPTIONS].map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </SelectField>
@@ -446,7 +432,7 @@ export default function IncidentesList() {
                     </td>
                     <td className="px-5 py-3">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${SEV_CHIP[incident.severity ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${severityChip(incident.severity)}`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
                       >
                         {incident.severity ?? "Sin severidad"}
@@ -454,7 +440,7 @@ export default function IncidentesList() {
                     </td>
                     <td className="px-5 py-3">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[incident.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${incidentStatusChip(incident.status)}`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
                       >
                         {incident.status ?? "Sin estado"}

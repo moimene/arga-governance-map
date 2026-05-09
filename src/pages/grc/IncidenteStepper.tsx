@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { CheckCircle, ChevronRight, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { SEVERITY_OPTIONS } from "@/lib/grc/status-labels";
 
 type StepNum = 1 | 2 | 3 | 4;
 
@@ -244,10 +245,9 @@ export default function IncidenteStepper() {
                 className={SELECT_CLASSES}
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                <option value="Crítico">Crítico</option>
-                <option value="Alto">Alto</option>
-                <option value="Medio">Medio</option>
-                <option value="Bajo">Bajo</option>
+                {SEVERITY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
               </select>
             </div>
             <div>

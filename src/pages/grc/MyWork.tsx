@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Briefcase } from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
+import { incidentStatusChip } from "@/lib/grc/status-labels";
 
 type IncidentLite = {
   code: string;
@@ -59,13 +60,6 @@ function useMyWork() {
   });
 }
 
-const STATUS_CHIP: Record<string, string> = {
-  Abierto:           "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  "En contención":   "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  "En investigación":"bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-  Resuelto:          "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div
@@ -114,7 +108,7 @@ export default function MyWork() {
               <span className="flex-1 text-[var(--g-text-primary)]">{i.title}</span>
               <span className="text-xs text-[var(--g-text-secondary)]">{i.incident_type}</span>
               <span
-                className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[i.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${incidentStatusChip(i.status)}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
                 {i.status}

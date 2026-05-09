@@ -1,19 +1,9 @@
+import { dpiaStatusChip, riskLevelChip } from "@/lib/grc/status-labels";
+
 const DPIAS = [
   { id: "DPIA-01", name: "Modelo IA de scoring de siniestros", status: "Aprobada",    risk: "Alto",  date: "2026-01-20" },
   { id: "DPIA-02", name: "Analítica comportamiento web",        status: "En revisión", risk: "Medio", date: "2026-03-04" },
 ];
-
-const STATUS_CHIP: Record<string, string> = {
-  Aprobada:     "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  "En revisión":"bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Rechazada:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-};
-
-const RISK_CHIP: Record<string, string> = {
-  Alto:  "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Medio: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Bajo:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
 
 export default function DPIAs() {
   return (
@@ -49,7 +39,7 @@ export default function DPIAs() {
                   <td className="px-5 py-3 font-medium text-[var(--g-text-primary)]">{d.name}</td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[d.status] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${dpiaStatusChip(d.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {d.status}
@@ -57,7 +47,7 @@ export default function DPIAs() {
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${RISK_CHIP[d.risk] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${riskLevelChip(d.risk)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {d.risk}

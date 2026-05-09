@@ -1,14 +1,10 @@
+import { riskLevelChip } from "@/lib/grc/status-labels";
+
 const ROPA_DATA = [
   { id: "R-01", purpose: "Contratación de pólizas",    legal_basis: "Contrato",          data_subjects: "Clientes",            retention: "10 años",              risk: "Medio" },
   { id: "R-02", purpose: "Marketing renovaciones",      legal_basis: "Consentimiento",    data_subjects: "Clientes",            retention: "Hasta revocación",     risk: "Bajo" },
   { id: "R-03", purpose: "Siniestros y fraude",         legal_basis: "Interés legítimo",  data_subjects: "Clientes, terceros",  retention: "15 años",              risk: "Alto" },
 ];
-
-const RISK_CHIP: Record<string, string> = {
-  Alto:  "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Medio: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Bajo:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
 
 export default function ROPA() {
   return (
@@ -47,7 +43,7 @@ export default function ROPA() {
                   <td className="px-5 py-3 text-[var(--g-text-secondary)]">{r.retention}</td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${RISK_CHIP[r.risk] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${riskLevelChip(r.risk)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {r.risk}

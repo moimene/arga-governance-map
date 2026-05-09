@@ -3,27 +3,11 @@ import { useIncident, type RegulatoryNotificationLite } from "@/hooks/useInciden
 import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Send, Route } from "lucide-react";
 import { useEffect, useState } from "react";
-
-const SEV_CHIP: Record<string, string> = {
-  Crítico: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Alto:    "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Medio:   "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-  Bajo:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
-
-const NOTIF_STATUS_LABEL: Record<string, string> = {
-  Pendiente: "PENDIENTE",
-  Enviada: "ENVIADA",
-  Aceptada: "ACEPTADA",
-  Rechazada: "RECHAZADA",
-};
-
-const NOTIF_STATUS_CHIP: Record<string, string> = {
-  Pendiente: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Enviada: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  Aceptada: "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
-  Rechazada: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-};
+import {
+  notificationStatusChip,
+  notificationStatusLabel,
+  severityChip,
+} from "@/lib/grc/status-labels";
 
 /** Countdown component that re-renders every minute */
 function Countdown({ deadline }: { deadline: string }) {
@@ -139,7 +123,7 @@ export default function IncidenteDetalle() {
               )}
               {incident.severity && (
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${SEV_CHIP[incident.severity] ?? ""}`}
+                  className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${severityChip(incident.severity)}`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
                   {incident.severity}
@@ -319,10 +303,10 @@ export default function IncidenteDetalle() {
                         {n.notification_type}
                       </span>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${NOTIF_STATUS_CHIP[n.status] ?? ""}`}
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${notificationStatusChip(n.status)}`}
                         style={{ borderRadius: "var(--g-radius-full)" }}
                       >
-                        {NOTIF_STATUS_LABEL[n.status] ?? n.status}
+                        {notificationStatusLabel(n.status)}
                       </span>
                     </div>
                     <div className="text-xs text-[var(--g-text-secondary)] space-y-0.5">

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { actionPlanStatusChip } from "@/lib/grc/status-labels";
 
 type AuditActionPlanRow = {
   id: string;
@@ -26,12 +27,6 @@ function useAuditActionPlans() {
     },
   });
 }
-
-const STATUS_CHIP: Record<string, string> = {
-  Abierto:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  "En curso": "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Cerrado:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-};
 
 export default function ActionPlans() {
   const { data: plans = [], isLoading } = useAuditActionPlans();
@@ -65,7 +60,7 @@ export default function ActionPlans() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-0.5">
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[p.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+                  className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${actionPlanStatusChip(p.status)}`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
                   {p.status}

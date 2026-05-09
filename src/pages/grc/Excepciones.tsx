@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, FileWarning, Plus } from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
+import { exceptionStatusChip } from "@/lib/grc/status-labels";
 
 type ExceptionRow = {
   id: string;
@@ -17,13 +18,6 @@ type ExceptionRow = {
 };
 
 const FILTER_ALL = "Todas";
-
-const STATUS_CHIP: Record<string, string> = {
-  Pendiente: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Aprobada: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  Rechazada: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-  Expirada: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
-};
 
 const DATE_FILTER_LABEL: Record<string, string> = {
   todas: "Todas",
@@ -121,7 +115,7 @@ function ExceptionCard({ exception }: { exception: ExceptionRow }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-[var(--g-text-secondary)]">{exception.code}</span>
             <span
-              className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[exception.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+              className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${exceptionStatusChip(exception.status)}`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
               {exception.status}
@@ -344,7 +338,7 @@ export default function Excepciones() {
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[exception.status] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${exceptionStatusChip(exception.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {exception.status}

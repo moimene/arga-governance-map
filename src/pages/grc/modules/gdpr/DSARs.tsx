@@ -1,13 +1,9 @@
+import { dsarStatusChip } from "@/lib/grc/status-labels";
+
 const DSARS = [
   { id: "DSAR-2026-012", type: "Acceso",    status: "En curso",  sla: "2026-04-25", subject: "cliente anónimo #4412" },
   { id: "DSAR-2026-013", type: "Supresión", status: "Resuelto",  sla: "2026-04-10", subject: "cliente anónimo #1180" },
 ];
-
-const STATUS_CHIP: Record<string, string> = {
-  "En curso": "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
-  Resuelto:   "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  Pendiente:  "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-};
 
 function slaClass(sla: string) {
   const days = Math.round((new Date(sla).getTime() - Date.now()) / 86_400_000);
@@ -51,7 +47,7 @@ export default function DSARs() {
                   <td className="px-5 py-3 text-[var(--g-text-secondary)]">{d.subject}</td>
                   <td className="px-5 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${STATUS_CHIP[d.status] ?? ""}`}
+                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${dsarStatusChip(d.status)}`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
                       {d.status}
