@@ -70,7 +70,7 @@ export function useSecretariaScope(): SecretariaScopeController {
   const queryMode = useMemo(() => readQueryMode(searchParams), [searchParams]);
   const queryEntityId = searchParams.get(ENTITY_PARAM) || null;
   const routeEntityId = pathEntityId ?? queryEntityId;
-  const { data: entityRows = [], isLoading } = useEntitiesList();
+  const { data: entityRows = [], isLoading } = useEntitiesList({ sociedadesOnly: true });
   const entities = useMemo(() => entityRows.map(toEntityOption), [entityRows]);
   const preferredEntity = useMemo(() => getPreferredEntity(entities), [entities]);
 

@@ -373,7 +373,7 @@ function TramitadorNuevo() {
   const scopedBackTo = isSociedadScoped && scopedEntityId
     ? `/secretaria/tramitador?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/tramitador";
-  const { data: entities = [] } = useEntitiesList();
+  const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: agreements = [], isLoading: agreementsLoading } = useAgreementsList([
     "CERTIFIED",
     "ADOPTED",

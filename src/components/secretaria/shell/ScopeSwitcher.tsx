@@ -13,6 +13,10 @@ const MODE_OPTIONS: Array<{ mode: SecretariaMode; label: string; icon: typeof Ne
   { mode: "sociedad", label: "Sociedad", icon: Building2 },
 ];
 
+function isSociedadDetailPath(pathname: string) {
+  return /^\/secretaria\/sociedades\/[^/]+/.test(pathname) && pathname !== "/secretaria/sociedades/nueva";
+}
+
 export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ scope }, ref) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -23,7 +27,7 @@ export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ s
   const currentEntityParam = currentSearchParams.get("entity");
 
   const getSociedadPath = useCallback((entityId: string) => {
-    if (location.pathname === "/secretaria/sociedades" || /^\/secretaria\/sociedades\/[^/]+/.test(location.pathname)) {
+    if (location.pathname === "/secretaria/sociedades" || isSociedadDetailPath(location.pathname)) {
       return `/secretaria/sociedades/${entityId}`;
     }
     return location.pathname;
@@ -64,7 +68,7 @@ export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ s
     const params = new URLSearchParams(location.search);
     params.delete("scope");
     params.delete("entity");
-    const pathname = /^\/secretaria\/sociedades\/[^/]+/.test(location.pathname)
+    const pathname = isSociedadDetailPath(location.pathname)
       ? "/secretaria/sociedades"
       : location.pathname;
     const search = params.toString();

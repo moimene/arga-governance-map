@@ -359,7 +359,7 @@ export default function SolidarioStepper() {
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const requestedPlantillaId = searchParams.get("plantilla");
   const { data: requestedPlantilla } = usePlantillaProtegida(requestedPlantillaId ?? undefined);
-  const { data: entities = [] } = useEntitiesList();
+  const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const isSociedadScoped = Boolean(scopedEntityId);
   const [current, setCurrent] = useState(1);
 

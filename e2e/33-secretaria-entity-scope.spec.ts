@@ -44,6 +44,17 @@ async function getArgaEntityId(page: Page) {
 }
 
 test.describe('Secretaría — scope sociedad ARGA', () => {
+  test('permite abrir alta de sociedad aunque exista scope sociedad activo', async ({ page }) => {
+    const entityId = await getArgaEntityId(page);
+
+    await page.goto(`/secretaria/sociedades/nueva?scope=sociedad&entity=${entityId}`);
+
+    await expect(page).toHaveURL(/\/secretaria\/sociedades\/nueva/);
+    await expect(page.locator('main').getByRole('heading', { name: 'Alta de sociedad' })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test('conserva sociedad y no mezcla órganos en convocatorias, reuniones y actas', async ({ page }) => {
     const failedSupabaseResponses: string[] = [];
     page.on('response', (response) => {

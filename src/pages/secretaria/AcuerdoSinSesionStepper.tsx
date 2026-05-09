@@ -106,7 +106,7 @@ export default function AcuerdoSinSesionStepper() {
     setAgreementKind("");
   }, [scopedEntityId]);
 
-  const { data: entities = [] } = useEntitiesList();
+  const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
   const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;

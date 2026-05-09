@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Building2, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
 type TipoSocial = "SA" | "SL" | "SLU" | "SAU";
-type TipoOrgano = "ADMIN_UNICO" | "SOLIDARIO" | "MANCOMUNADO" | "CONSEJO";
+type TipoOrgano = "ADMIN_UNICO" | "ADMIN_SOLIDARIOS" | "ADMIN_MANCOMUNADOS" | "CDA";
+type FormaAdministracion =
+  | "ADMINISTRADOR_UNICO"
+  | "ADMINISTRADORES_SOLIDARIOS"
+  | "ADMINISTRADORES_MANCOMUNADOS"
+  | "CONSEJO";
 
 interface Draft {
   // Paso 1 — identidad
@@ -17,7 +23,7 @@ interface Draft {
   jurisdiction: string;
   registration_number: string;
   // Paso 2 — forma de administración
-  forma_administracion: string;
+  forma_administracion: FormaAdministracion;
   tipo_organo_admin: TipoOrgano;
   es_unipersonal: boolean;
   es_cotizada: boolean;
@@ -35,8 +41,8 @@ const EMPTY: Draft = {
   tipo_social: "SL",
   jurisdiction: "ES",
   registration_number: "",
-  forma_administracion: "SOLIDARIO",
-  tipo_organo_admin: "SOLIDARIO",
+  forma_administracion: "CONSEJO",
+  tipo_organo_admin: "CDA",
   es_unipersonal: false,
   es_cotizada: false,
   currency: "EUR",
@@ -47,8 +53,149 @@ const EMPTY: Draft = {
 
 const STEPS = ["Identidad", "Administración", "Capital", "Confirmar"];
 
+const TIPO_SOCIAL_OPTIONS: Array<{ value: TipoSocial; label: string }> = [
+  { value: "SA", label: "S.A. — Sociedad Anónima" },
+  { value: "SL", label: "S.L. — Sociedad Limitada" },
+  { value: "SAU", label: "S.A.U. — S.A. unipersonal" },
+  { value: "SLU", label: "S.L.U. — S.L. unipersonal" },
+];
+
+const ADMIN_OPTIONS: Array<{
+  value: TipoOrgano;
+  label: string;
+  forma: FormaAdministracion;
+}> = [
+  { value: "CDA", label: "Consejo de Administración", forma: "CONSEJO" },
+  { value: "ADMIN_UNICO", label: "Administrador único", forma: "ADMINISTRADOR_UNICO" },
+  { value: "ADMIN_SOLIDARIOS", label: "Administradores solidarios", forma: "ADMINISTRADORES_SOLIDARIOS" },
+  { value: "ADMIN_MANCOMUNADOS", label: "Administradores mancomunados", forma: "ADMINISTRADORES_MANCOMUNADOS" },
+];
+
+const ADMIN_BY_VALUE = ADMIN_OPTIONS.reduce<Record<TipoOrgano, (typeof ADMIN_OPTIONS)[number]>>((acc, option) => {
+  acc[option.value] = option;
+  return acc;
+}, {} as Record<TipoOrgano, (typeof ADMIN_OPTIONS)[number]>);
+
+function slugify(value: string) {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 56);
+  return normalized || "sociedad";
+}
+
+function legalFormFromTipo(tipo: TipoSocial) {
+  return (
+    {
+      SA: "S.A.",
+      SAU: "S.A.U.",
+      SL: "S.L.",
+      SLU: "S.L.U.",
+    } as Record<TipoSocial, string>
+  )[tipo];
+}
+
+function isUnipersonalTipo(tipo: TipoSocial) {
+  return tipo === "SAU" || tipo === "SLU";
+}
+
+function syncTipoWithUnipersonal(tipo: TipoSocial, value: boolean): TipoSocial {
+  if (value && tipo === "SA") return "SAU";
+  if (value && tipo === "SL") return "SLU";
+  if (!value && tipo === "SAU") return "SA";
+  if (!value && tipo === "SLU") return "SL";
+  return tipo;
+}
+
+function juntaName(tipo: TipoSocial, esUnipersonal: boolean) {
+  if (esUnipersonal) return "Socio único";
+  return tipo === "SA" || tipo === "SAU" ? "Junta General de Accionistas" : "Junta General de Socios";
+}
+
+function adminBodySeed(tipo: TipoOrgano) {
+  if (tipo === "ADMIN_UNICO") {
+    return {
+      slugPart: "admin-unico",
+      name: "Administrador único",
+      config: { organo_tipo: "ADMIN_UNICO", adoption_mode: "UNIPERSONAL_ADMIN" },
+      quorum_rule: { unipersonal_admin: true },
+    };
+  }
+  if (tipo === "ADMIN_SOLIDARIOS") {
+    return {
+      slugPart: "admin-solidarios",
+      name: "Administradores solidarios",
+      config: { organo_tipo: "ADMIN_SOLIDARIOS", adoption_mode: "SOLIDARIO" },
+      quorum_rule: { accion_individual: true },
+    };
+  }
+  if (tipo === "ADMIN_MANCOMUNADOS") {
+    return {
+      slugPart: "admin-mancomunados",
+      name: "Administradores mancomunados",
+      config: { organo_tipo: "ADMIN_CONJUNTA", adoption_mode: "CO_APROBACION" },
+      quorum_rule: { firmas_requeridas: 2, total_administradores: 2 },
+    };
+  }
+  return {
+    slugPart: "consejo-administracion",
+    name: "Consejo de Administración",
+    config: { organo_tipo: "CONSEJO_ADMIN", voto_calidad_presidente: true },
+    quorum_rule: { quorum_asistencia: 0.5, mayoria_simple: 0.5, voto_calidad_presidente: true },
+  };
+}
+
+function buildInitialBodies(input: {
+  tenantId: string;
+  entityId: string;
+  baseSlug: string;
+  tipoSocial: TipoSocial;
+  tipoOrgano: TipoOrgano;
+  esUnipersonal: boolean;
+  esCotizada: boolean;
+}) {
+  const admin = adminBodySeed(input.tipoOrgano);
+  const suffix = Date.now();
+  return [
+    {
+      tenant_id: input.tenantId,
+      entity_id: input.entityId,
+      slug: `${input.baseSlug}-junta-${suffix}`,
+      name: juntaName(input.tipoSocial, input.esUnipersonal),
+      body_type: "JUNTA",
+      config: {
+        organo_tipo: input.esUnipersonal ? "SOCIO_UNICO" : "JUNTA_GENERAL",
+        tipo_social: input.tipoSocial,
+        adoption_mode: input.esUnipersonal ? "UNIPERSONAL_SOCIO" : undefined,
+        voto_distancia: input.esCotizada,
+        canal_publicidad: input.esCotizada ? ["BORME", "CNMV", "WEB_SOCIEDAD"] : undefined,
+      },
+      quorum_rule: input.esUnipersonal
+        ? { unipersonal: true }
+        : {
+            primera_convocatoria_pct: input.tipoSocial === "SA" || input.tipoSocial === "SAU" ? 25 : 50,
+            segunda_convocatoria_pct: 0,
+            cotizada: input.esCotizada,
+          },
+    },
+    {
+      tenant_id: input.tenantId,
+      entity_id: input.entityId,
+      slug: `${input.baseSlug}-${admin.slugPart}-${suffix}`,
+      name: admin.name,
+      body_type: "CDA",
+      config: admin.config,
+      quorum_rule: admin.quorum_rule,
+    },
+  ];
+}
+
 export default function SociedadNuevaStepper() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { tenantId } = useTenantContext();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -67,12 +214,19 @@ export default function SociedadNuevaStepper() {
 
   async function guardar() {
     setSaving(true);
+    // Tracking para rollback compensatorio en caso de fallo parcial.
+    // PostgREST no expone transacciones multi-tabla desde el cliente, así que
+    // el alta es secuencial y se compensa best-effort en el catch.
+    let createdPersonId: string | null = null;
+    let createdEntityId: string | null = null;
     try {
+      if (!tenantId) throw new Error("No hay tenant activo para crear la sociedad");
+
       // 1) Crear persona jurídica (PJ) para la sociedad
       const { data: person, error: pErr } = await supabase
         .from("persons")
         .insert({
-          tenant_id: tenantId!,
+          tenant_id: tenantId,
           full_name: draft.legal_name,
           denomination: draft.legal_name,
           tax_id: draft.tax_id,
@@ -81,23 +235,21 @@ export default function SociedadNuevaStepper() {
         .select()
         .single();
       if (pErr || !person) throw pErr ?? new Error("No se creó la PJ");
+      createdPersonId = person.id;
 
       // 2) Crear entity con FK person_id
-      const slug = draft.legal_name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 60);
+      const slug = slugify(draft.legal_name);
+      const uniqueSlug = `${slug}-${Date.now()}`;
       const { data: entity, error: eErr } = await supabase
         .from("entities")
         .insert({
-          tenant_id: tenantId!,
+          tenant_id: tenantId,
           person_id: person.id,
-          slug: `${slug}-${Date.now()}`,
+          slug: uniqueSlug,
           legal_name: draft.legal_name,
           common_name: draft.common_name || draft.legal_name,
           jurisdiction: draft.jurisdiction,
-          legal_form: draft.tipo_social,
+          legal_form: legalFormFromTipo(draft.tipo_social),
           tipo_social: draft.tipo_social,
           registration_number: draft.registration_number || null,
           forma_administracion: draft.forma_administracion,
@@ -110,10 +262,11 @@ export default function SociedadNuevaStepper() {
         .select()
         .single();
       if (eErr || !entity) throw eErr ?? new Error("No se creó la entidad");
+      createdEntityId = entity.id;
 
       // 3) Crear entity_capital_profile VIGENTE
       const { error: cErr } = await supabase.from("entity_capital_profile").insert({
-        tenant_id: tenantId!,
+        tenant_id: tenantId,
         entity_id: entity.id,
         currency: draft.currency,
         capital_escriturado: Number(draft.capital_escriturado),
@@ -125,12 +278,12 @@ export default function SociedadNuevaStepper() {
       });
       if (cErr) throw cErr;
 
-      // 4) Clase única "A" por defecto
+      // 4) Clase ordinaria por defecto
       const { error: scErr } = await supabase.from("share_classes").insert({
-        tenant_id: tenantId!,
+        tenant_id: tenantId,
         entity_id: entity.id,
-        class_code: "A",
-        name: "Clase ordinaria",
+        class_code: "ORD",
+        name: "Ordinaria",
         votes_per_title: 1,
         economic_rights_coeff: 1,
         voting_rights: true,
@@ -138,9 +291,48 @@ export default function SociedadNuevaStepper() {
       });
       if (scErr) throw scErr;
 
+      // 5) Órganos mínimos para que la sociedad sea operativa en Secretaría.
+      const { error: bodiesErr } = await supabase.from("governing_bodies").insert(
+        buildInitialBodies({
+          tenantId,
+          entityId: entity.id,
+          baseSlug: uniqueSlug,
+          tipoSocial: draft.tipo_social,
+          tipoOrgano: draft.tipo_organo_admin,
+          esUnipersonal: draft.es_unipersonal,
+          esCotizada: draft.es_cotizada,
+        }),
+      );
+      if (bodiesErr) throw bodiesErr;
+
       toast.success("Sociedad creada correctamente");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sociedades", tenantId] }),
+        queryClient.invalidateQueries({ queryKey: ["entities", tenantId] }),
+        queryClient.invalidateQueries({ queryKey: ["governing_bodies"] }),
+      ]);
       navigate(`/secretaria/sociedades/${entity.id}`);
     } catch (e) {
+      // Rollback compensatorio: orden inverso al de creación.
+      // Best-effort: si una limpieza falla, se loggea pero no se propaga
+      // para no enmascarar el error original al usuario.
+      if (createdEntityId) {
+        const cleanups = [
+          supabase.from("governing_bodies").delete().eq("entity_id", createdEntityId),
+          supabase.from("share_classes").delete().eq("entity_id", createdEntityId),
+          supabase.from("entity_capital_profile").delete().eq("entity_id", createdEntityId),
+          supabase.from("entities").delete().eq("id", createdEntityId),
+        ];
+        for (const cleanup of cleanups) {
+          const { error } = await cleanup;
+          if (error) console.error("[alta-sociedad] rollback parcial falló:", error);
+        }
+      }
+      if (createdPersonId) {
+        const { error } = await supabase.from("persons").delete().eq("id", createdPersonId);
+        if (error) console.error("[alta-sociedad] rollback persona falló:", error);
+      }
+
       const msg = e instanceof Error ? e.message : String(e);
       toast.error("No se pudo crear la sociedad: " + msg);
     } finally {
@@ -361,13 +553,11 @@ function StepIdentidad({
       <Select
         label="Tipo social"
         value={draft.tipo_social}
-        onChange={(v) => update("tipo_social", v)}
-        options={[
-          { value: "SA", label: "S.A. — Sociedad Anónima" },
-          { value: "SL", label: "S.L. — Sociedad Limitada" },
-          { value: "SAU", label: "S.A.U. — S.A. unipersonal" },
-          { value: "SLU", label: "S.L.U. — S.L. unipersonal" },
-        ]}
+        onChange={(v) => {
+          update("tipo_social", v);
+          update("es_unipersonal", isUnipersonalTipo(v));
+        }}
+        options={TIPO_SOCIAL_OPTIONS}
       />
       <Input
         label="Jurisdicción *"
@@ -400,20 +590,18 @@ function StepAdmin({
         value={draft.tipo_organo_admin}
         onChange={(v) => {
           update("tipo_organo_admin", v);
-          update("forma_administracion", v);
+          update("forma_administracion", ADMIN_BY_VALUE[v].forma);
         }}
-        options={[
-          { value: "ADMIN_UNICO", label: "Administrador único" },
-          { value: "SOLIDARIO", label: "Administradores solidarios" },
-          { value: "MANCOMUNADO", label: "Administradores mancomunados" },
-          { value: "CONSEJO", label: "Consejo de Administración" },
-        ]}
+        options={ADMIN_OPTIONS}
       />
       <div className="flex flex-col gap-3">
         <Checkbox
           label="Sociedad unipersonal"
           value={draft.es_unipersonal}
-          onChange={(v) => update("es_unipersonal", v)}
+          onChange={(v) => {
+            update("es_unipersonal", v);
+            update("tipo_social", syncTipoWithUnipersonal(draft.tipo_social, v));
+          }}
           help="Marca si la sociedad tiene un único socio (SLU/SAU)."
         />
         <Checkbox
@@ -479,14 +667,15 @@ function StepConfirm({ draft }: { draft: Draft }) {
         <li>Persona jurídica (persons) con denominación y NIF.</li>
         <li>Entidad (entities) con FK a la PJ.</li>
         <li>Perfil de capital VIGENTE (entity_capital_profile).</li>
-        <li>Clase de títulos &ldquo;A&rdquo; ordinaria por defecto.</li>
+        <li>Clase ordinaria &ldquo;ORD&rdquo; por defecto.</li>
+        <li>Junta y órgano de administración iniciales.</li>
       </ul>
       <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Field label="Denominación" value={draft.legal_name} />
         <Field label="NIF/CIF" value={draft.tax_id} />
         <Field label="Tipo" value={draft.tipo_social} />
         <Field label="Jurisdicción" value={draft.jurisdiction} />
-        <Field label="Órgano" value={draft.tipo_organo_admin} />
+        <Field label="Órgano" value={ADMIN_BY_VALUE[draft.tipo_organo_admin].label} />
         <Field label="Unipersonal / Cotizada" value={`${draft.es_unipersonal ? "Sí" : "No"} · ${draft.es_cotizada ? "Sí" : "No"}`} />
         <Field label="Capital" value={`${draft.capital_escriturado} ${draft.currency}`} />
         <Field label="Títulos" value={`${draft.numero_titulos} × ${draft.valor_nominal}`} />

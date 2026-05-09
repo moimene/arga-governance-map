@@ -40,6 +40,9 @@ function tipoOrganoLabel(s: string | null): string {
   return (
     {
       ADMIN_UNICO: "Administrador único",
+      ADMIN_SOLIDARIOS: "Solidarios",
+      ADMIN_MANCOMUNADOS: "Mancomunados",
+      CDA: "Consejo de Administración",
       SOLIDARIO: "Solidarios",
       MANCOMUNADO: "Mancomunados",
       CONSEJO: "Consejo de Administración",

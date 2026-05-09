@@ -295,7 +295,7 @@ function FirmaArchivoStep({
 
 export default function DecisionUnipersonalStepper() {
   const scope = useSecretariaScope();
-  const { data: entities = [] } = useEntitiesList();
+  const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: materias = [], isLoading: materiasLoading } = useMateriaCatalog();
   const createDecision = useCreateUnipersonalDecision();
   const [tipo, setTipo] = useState<DecisionType>("SOCIO_UNICO");

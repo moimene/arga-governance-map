@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 
 export interface EntityRow {
@@ -16,6 +17,7 @@ export interface EntityRow {
   entity_status: string;
   materiality: string;
   secretary_owner_id: string | null;
+  person_id?: string | null;
 }
 
 export interface EntityWithParent extends EntityRow {
@@ -85,14 +87,24 @@ export const formatJurisdiction = labelJurisdiction;
 export const formatMateriality = labelMateriality;
 export const formatEntityStatus = labelStatus;
 
-export function useEntitiesList() {
+export function useEntitiesList(options?: { sociedadesOnly?: boolean }) {
+  const { tenantId } = useTenantContext();
+  const sociedadesOnly = options?.sociedadesOnly ?? false;
+
   return useQuery({
-    queryKey: ["entities", "list"],
+    queryKey: ["entities", tenantId, "list", sociedadesOnly ? "sociedades" : "all"],
+    enabled: !!tenantId,
     queryFn: async (): Promise<EntityWithParent[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("entities")
         .select("*, parent:parent_entity_id(common_name)")
-        .order("common_name", { ascending: true });
+        .eq("tenant_id", tenantId!);
+
+      if (sociedadesOnly) {
+        query = query.not("person_id", "is", null);
+      }
+
+      const { data, error } = await query.order("common_name", { ascending: true });
       if (error) throw error;
       type Raw = EntityRow & { parent?: { common_name?: string | null } | null };
       return ((data ?? []) as Raw[]).map((e) => ({
@@ -104,11 +116,17 @@ export function useEntitiesList() {
 }
 
 export function useEntityBySlug(slug: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!slug,
-    queryKey: ["entities", "bySlug", slug],
+    enabled: !!slug && !!tenantId,
+    queryKey: ["entities", tenantId, "bySlug", slug],
     queryFn: async (): Promise<EntityRow | null> => {
-      const { data, error } = await supabase.from("entities").select("*").eq("slug", slug!).maybeSingle();
+      const { data, error } = await supabase
+        .from("entities")
+        .select("*")
+        .eq("tenant_id", tenantId!)
+        .eq("slug", slug!)
+        .maybeSingle();
       if (error) throw error;
       return (data as EntityRow) ?? null;
     },
@@ -116,13 +134,15 @@ export function useEntityBySlug(slug: string | undefined) {
 }
 
 export function useEntityChildren(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["entities", "children", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["entities", tenantId, "children", entityId],
     queryFn: async (): Promise<EntityRow[]> => {
       const { data, error } = await supabase
         .from("entities")
         .select("*")
+        .eq("tenant_id", tenantId!)
         .eq("parent_entity_id", entityId!)
         .order("common_name", { ascending: true });
       if (error) throw error;
@@ -132,11 +152,17 @@ export function useEntityChildren(entityId: string | undefined) {
 }
 
 export function useEntityParent(parentId: string | null | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!parentId,
-    queryKey: ["entities", "byId", parentId],
+    enabled: !!parentId && !!tenantId,
+    queryKey: ["entities", tenantId, "byId", parentId],
     queryFn: async (): Promise<EntityRow | null> => {
-      const { data, error } = await supabase.from("entities").select("*").eq("id", parentId!).maybeSingle();
+      const { data, error } = await supabase
+        .from("entities")
+        .select("*")
+        .eq("tenant_id", tenantId!)
+        .eq("id", parentId!)
+        .maybeSingle();
       if (error) throw error;
       return (data as EntityRow) ?? null;
     },
@@ -144,13 +170,15 @@ export function useEntityParent(parentId: string | null | undefined) {
 }
 
 export function useEntityBodies(entityId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!entityId,
-    queryKey: ["governing_bodies", "byEntity", entityId],
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["governing_bodies", tenantId, "byEntity", entityId],
     queryFn: async (): Promise<GoverningBodyRow[]> => {
       const { data, error } = await supabase
         .from("governing_bodies")
         .select("*")
+        .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .order("name", { ascending: true });
       if (error) throw error;

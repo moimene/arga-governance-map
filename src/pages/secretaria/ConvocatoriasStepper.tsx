@@ -295,7 +295,7 @@ export default function ConvocatoriasStepper() {
     setSelectedBodyId(null);
   }, [scopedEntityId]);
 
-  const { data: entities = [], isLoading: entitiesLoading } = useEntitiesList();
+  const { data: entities = [], isLoading: entitiesLoading } = useEntitiesList({ sociedadesOnly: true });
   const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
   const scopedEntityInvalid = Boolean(
     isSociedadScoped && selectedEntityId && !entitiesLoading && !selectedEntity,
