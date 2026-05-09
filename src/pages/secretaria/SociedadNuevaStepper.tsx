@@ -316,6 +316,13 @@ export default function SociedadNuevaStepper() {
       // Rollback compensatorio: orden inverso al de creación.
       // Best-effort: si una limpieza falla, se loggea pero no se propaga
       // para no enmascarar el error original al usuario.
+      //
+      // INVARIANTE: el orden secuencial children → entities → persons es
+      // contrato verificado por `e2e/35-secretaria-alta-rollback.spec.ts`.
+      // No convertir a Promise.allSettled paralelo sin actualizar el test:
+      // entities y persons sí dependen del orden por FK; los 3 children
+      // (governing_bodies, share_classes, entity_capital_profile) podrían
+      // paralelizarse pero el test asume orden estricto hoy.
       if (createdEntityId) {
         const cleanups = [
           supabase.from("governing_bodies").delete().eq("entity_id", createdEntityId),
