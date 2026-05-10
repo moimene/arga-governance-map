@@ -108,6 +108,7 @@ function newAgendaItem(): AgendaItem {
     materia: "APROBACION_CUENTAS",
     tipo: "ORDINARIA",
     inscribible: false,
+    propuesta_acuerdo: null,
   };
 }
 
@@ -786,7 +787,15 @@ export default function ConvocatoriasStepper() {
         publication_channels: channels,
         agenda_items: agendaItems
           .filter((i) => i.titulo.trim().length > 0)
-          .map(({ titulo, materia, tipo, inscribible }) => ({ titulo, materia, tipo, inscribible })),
+          .map(({ titulo, materia, tipo, inscribible, propuesta_acuerdo }) => ({
+            titulo,
+            materia,
+            tipo,
+            inscribible,
+            // BATCH 3: persistir propuesta concreta del acuerdo en JSONB.
+            // Backward-compat: convocatorias antiguas leen null.
+            propuesta_acuerdo: propuesta_acuerdo ?? null,
+          })),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
         ...buildConvocatoriaTrace(),
       });
@@ -1388,7 +1397,9 @@ export default function ConvocatoriasStepper() {
                         value={item.titulo}
                         onChange={(e) => updateAgendaItem(item.id, { titulo: e.target.value })}
                         placeholder="Descripción del punto del orden del día"
-                        className="flex-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                        // Legibility BATCH 2: text-sm → text-base con padding más
+                        // generoso. Es texto legal que el secretario relee.
+                        className="flex-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-base text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       />
                       {agendaItems.length > 1 && (
@@ -1440,6 +1451,40 @@ export default function ConvocatoriasStepper() {
                         />
                         <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
                       </label>
+                    </div>
+
+                    {/* Propuesta de acuerdo concreta — art. 197.1 / 287 LSC.
+                        Texto que el secretario redacta para el punto y que
+                        los consejeros estudian antes de la sesión. Persiste
+                        en agenda_items JSONB. */}
+                    <div className="mt-3 pl-5">
+                      <label className="block text-xs font-medium text-[var(--g-text-primary)] mb-1">
+                        Propuesta de acuerdo
+                        <span className="ml-1 text-[var(--g-text-secondary)]">
+                          (texto que se someterá a votación — opcional pero recomendable
+                          {item.tipo !== "ORDINARIA" && (
+                            <span className="ml-1 text-[var(--status-warning)]">
+                              · obligatoria para materias {item.tipo.toLowerCase()}
+                            </span>
+                          )})
+                        </span>
+                      </label>
+                      <textarea
+                        value={item.propuesta_acuerdo ?? ""}
+                        onChange={(e) =>
+                          updateAgendaItem(item.id, {
+                            propuesta_acuerdo: e.target.value.length > 0 ? e.target.value : null,
+                          })
+                        }
+                        placeholder={
+                          item.tipo === "ORDINARIA"
+                            ? "Ej: Aprobar las cuentas anuales del ejercicio 2025 cerradas a 31/12/2025…"
+                            : "Texto íntegro del acuerdo que se propondrá. Para materias estatutarias / estructurales LSC art. 197.1 / 287 exige que los socios dispongan del texto exacto antes de la sesión."
+                        }
+                        rows={3}
+                        className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-base leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      />
                     </div>
                   </div>
                 ))}

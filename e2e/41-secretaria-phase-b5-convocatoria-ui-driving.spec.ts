@@ -442,6 +442,17 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await expect(tituloPunto).toBeVisible({ timeout: 5_000 });
     await tituloPunto.fill(`B5 ${fixture.runId} — Aprobación de cuentas anuales 2025`);
 
+    // BATCH 3 (consolidación pre-test cycle): rellenar también la propuesta
+    // de acuerdo concreta (art. 197.1 LSC). El textarea tiene placeholder
+    // "Ej: Aprobar las cuentas anuales..." cuando tipo=ORDINARIA.
+    const propuestaTextarea = page.getByPlaceholder(/Aprobar las cuentas anuales del ejercicio/i).first();
+    if (await propuestaTextarea.isVisible().catch(() => false)) {
+      await propuestaTextarea.fill(
+        `B5 ${fixture.runId} propuesta — Aprobar las cuentas anuales del ejercicio 2025 ` +
+        `cerradas a 31/12/2025, formuladas por el órgano de administración con fecha 01/03/2026.`,
+      );
+    }
+
     const next3 = page.getByRole('button', { name: /^Siguiente$/i });
     await expect(next3).toBeEnabled({ timeout: 10_000 });
     await next3.click();
@@ -503,6 +514,13 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     expect(conv.junta_universal).toBe(false);
     expect(Array.isArray(conv.agenda_items)).toBe(true);
     expect((conv.agenda_items as unknown[]).length, 'agenda con al menos 1 punto').toBeGreaterThanOrEqual(1);
+
+    // BATCH 3: verificar que el primer punto persiste propuesta_acuerdo
+    // en el JSONB con el texto que tecleamos en el textarea.
+    const firstAgendaItem = (conv.agenda_items as Array<Record<string, unknown>>)[0];
+    expect(firstAgendaItem.titulo, 'titulo del primer punto').toMatch(new RegExp(fixture.runId));
+    expect(firstAgendaItem.propuesta_acuerdo, 'propuesta_acuerdo persistida').toBeTruthy();
+    expect(firstAgendaItem.propuesta_acuerdo, 'propuesta menciona ejercicio 2025').toMatch(/ejercicio 2025/i);
 
     // Sin errores fatales
     expect(

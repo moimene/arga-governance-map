@@ -166,6 +166,24 @@ export interface AgendaItem {
   materia: string;
   tipo: "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL";
   inscribible: boolean;
+  /**
+   * Texto concreto de la propuesta de acuerdo que se someterá a votación
+   * para este punto del orden del día.
+   *
+   * Razón legal: art. 197.1 LSC + 287 LSC + 144 RRM exigen que en
+   * convocatorias que afecten estatutos / capital / operaciones
+   * estructurales el socio reciba el texto íntegro propuesto antes de la
+   * sesión. Sin este campo, la convocatoria queda con descripción
+   * genérica del punto pero los consejeros no tienen el texto exacto.
+   *
+   * Se persiste en `convocatorias.agenda_items` JSONB (no requiere
+   * migration). Backward-compatible: convocatorias antiguas leen `null`.
+   *
+   * Futuro (no en este lote): `template_id` opcional para vincular
+   * MODELO_ACUERDO de plantillas_protegidas y autorrellenar la propuesta
+   * desde plantilla.
+   */
+  propuesta_acuerdo?: string | null;
 }
 
 export interface CreateConvocatoriaInput {

@@ -373,8 +373,11 @@ export default function ActaDetalle() {
                 Contenido del acta
               </h2>
             </div>
-            <div className="p-5">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--g-text-primary)]">
+            <div className="p-6">
+              {/* Legibility BATCH 2: el contenido legal del acta sube de
+                  text-sm (14px) a text-base (16px) con leading-loose y
+                  padding generoso para facilitar revisión densa. */}
+              <pre className="whitespace-pre-wrap font-sans text-base leading-loose text-[var(--g-text-primary)]">
                 {m.content ?? "— Sin contenido —"}
               </pre>
             </div>

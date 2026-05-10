@@ -688,7 +688,7 @@ export default function GenerarDocumentoStepper() {
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
-        <h1 className="text-lg font-bold text-[var(--g-text-primary)]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+        <h1 className="text-xl font-bold text-[var(--g-text-primary)]" style={{ fontFamily: "'Montserrat', sans-serif" }}>
           Generar documento
         </h1>
       </div>
@@ -734,7 +734,7 @@ export default function GenerarDocumentoStepper() {
         {/* ──────── Step 0: Select plantilla ──────── */}
         {step === 0 && (
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
               Seleccionar plantilla
             </h2>
             <p className="text-xs text-[var(--g-text-secondary)]">
@@ -820,7 +820,7 @@ export default function GenerarDocumentoStepper() {
         {/* ──────── Step 1: Review resolved variables ──────── */}
         {step === 1 && selectedPlantilla && (
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
               Variables resueltas (Capa 2)
             </h2>
             <p className="text-xs text-[var(--g-text-secondary)]">
@@ -938,7 +938,7 @@ export default function GenerarDocumentoStepper() {
         {/* ──────── Step 2: Capa3 form ──────── */}
         {step === 2 && selectedPlantilla && (
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
               Campos editables (Capa 3)
             </h2>
             <p className="text-xs text-[var(--g-text-secondary)]">
@@ -1041,7 +1041,7 @@ export default function GenerarDocumentoStepper() {
         {/* ──────── Step 3: Editable draft ──────── */}
         {step === 3 && (
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
               Borrador editable del documento
             </h2>
 
@@ -1099,7 +1099,10 @@ export default function GenerarDocumentoStepper() {
                   }}
                   aria-invalid={!!renderError}
                   aria-describedby={renderError ? "editable-draft-error editable-draft-meta" : "editable-draft-meta"}
-                  className="min-h-[420px] w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-3 text-sm leading-relaxed text-[var(--g-text-primary)] outline-none transition-colors focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]"
+                  // Legibility BATCH 2: el borrador del documento legal pasa de
+                  // text-sm (14px) a text-base (16px) con leading-loose para
+                  // facilitar revisión legal extensa. Min-h sube a 480px.
+                  className="min-h-[480px] w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-5 py-4 text-base leading-loose text-[var(--g-text-primary)] outline-none transition-colors focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]"
                   style={{
                     borderRadius: "var(--g-radius-md)",
                     fontFamily: "'Montserrat', 'Inter', sans-serif",

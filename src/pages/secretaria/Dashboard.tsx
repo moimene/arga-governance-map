@@ -806,13 +806,25 @@ export default function SecretariaDashboard() {
           </div>
           <div className="space-y-3">
             {[
+              // En modo grupo: alta de sociedad disponible (alta global) y
+              // campañas. En modo sociedad: el contexto está fijado, no
+              // mostramos "Nueva sociedad" porque la operación natural ahí
+              // es trabajar sobre la sociedad seleccionada.
               ...(scope.mode === "grupo"
-                ? [{
-                    label: "Campaña de cuentas del grupo",
-                    helper: "Coordina varias sociedades desde un solo proceso.",
-                    icon: Repeat2,
-                    path: "/secretaria/procesos-grupo",
-                  }]
+                ? [
+                    {
+                      label: "Nueva sociedad",
+                      helper: "Alta de sociedad SA/SL/SAU/SLU con órganos iniciales y cap table.",
+                      icon: Building2,
+                      path: "/secretaria/sociedades/nueva",
+                    },
+                    {
+                      label: "Campaña de cuentas del grupo",
+                      helper: "Coordina varias sociedades desde un solo proceso.",
+                      icon: Repeat2,
+                      path: "/secretaria/procesos-grupo",
+                    },
+                  ]
                 : []),
               {
                 label: "Nueva convocatoria",
@@ -825,6 +837,12 @@ export default function SecretariaDashboard() {
                 helper: "Abre asistencia, quórum, debates, votaciones y acta.",
                 icon: Users,
                 path: "/secretaria/reuniones/nueva",
+              },
+              {
+                label: "Nuevo acuerdo sin sesión",
+                helper: "NO_SESSION / co-aprobación / solidario / decisión unipersonal.",
+                icon: HandshakeIcon,
+                path: "/secretaria/acuerdos-sin-sesion",
               },
               {
                 label: "Generar documento",
