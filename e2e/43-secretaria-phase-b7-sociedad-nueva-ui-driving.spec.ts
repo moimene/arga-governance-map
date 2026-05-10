@@ -200,12 +200,22 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
   });
 
   test('UI SociedadNuevaStepper drive 4 pasos + verify Cloud writes', async ({ page }) => {
-    // Capturar errores de browser para debug
+    // Capturar errores de browser + network 4xx para debug profundo
     const browserErrors: string[] = [];
+    const networkFails: string[] = [];
     page.on('pageerror', (err) => browserErrors.push(`[pageerror] ${err.message}`));
     page.on('console', (msg) => {
       if (msg.type() === 'error' && !/favicon|ResizeObserver/i.test(msg.text())) {
         browserErrors.push(`[console.error] ${msg.text()}`);
+      }
+    });
+    page.on('response', async (resp) => {
+      const url = resp.url();
+      const status = resp.status();
+      if (status >= 400 && /supabase\.co\/rest\/|supabase\.co\/rpc\//.test(url)) {
+        let body = '';
+        try { body = await resp.text(); } catch { /* noop */ }
+        networkFails.push(`[${status}] ${resp.request().method()} ${url} → ${body.slice(0, 400)}`);
       }
     });
 
@@ -249,13 +259,26 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
 
     // ── PASO 4: Confirmar + crear ────────────────────────────────
     await expect(page.getByText(/Revisa los datos/i).first()).toBeVisible({ timeout: 10_000 });
-    // El botón principal cambia a "Crear sociedad"
+    // BATCH 4 (ronda 2): el botón muestra "Cargando contexto…" mientras
+    // TenantContext hidrata desde user_profiles. Esperar al texto exacto
+    // "Crear sociedad" garantiza que tenantId !== null cuando hagamos click.
     const crear = page.getByRole('button', { name: 'Crear sociedad' });
-    await expect(crear).toBeEnabled({ timeout: 10_000 });
+    await crear.scrollIntoViewIfNeeded();
+    await expect(crear).toBeVisible({ timeout: 15_000 });
+    await expect(crear).toBeEnabled({ timeout: 15_000 });
     await crear.click();
 
     // Esperar toast success o redirect a /secretaria/sociedades/:id
-    await page.waitForURL(/\/secretaria\/sociedades\/[a-f0-9-]{36}/, { timeout: 30_000 });
+    try {
+      await page.waitForURL(/\/secretaria\/sociedades\/[a-f0-9-]{36}/, { timeout: 30_000 });
+    } catch (e) {
+      const toastErrors = await page.locator('[data-sonner-toast]').allTextContents().catch(() => []);
+      console.error('[B7 debug] browserErrors:', JSON.stringify(browserErrors, null, 2));
+      console.error('[B7 debug] networkFails:', JSON.stringify(networkFails, null, 2));
+      console.error('[B7 debug] toastErrors:', JSON.stringify(toastErrors, null, 2));
+      console.error('[B7 debug] current URL:', page.url());
+      throw e;
+    }
     const url = page.url();
     const idMatch = url.match(/\/secretaria\/sociedades\/([a-f0-9-]{36})/);
     expect(idMatch, 'redirect a detalle de sociedad creada').not.toBeNull();

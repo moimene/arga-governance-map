@@ -188,11 +188,31 @@ export default function AcuerdoSinSesionStepper() {
   }
 
   // ── Step 5: close ──
-  const resultado = resolution
+  // BATCH 6 (ronda 2) — Bug B-B: el botón "Adoptar acuerdo" solo se
+  // habilita si `resultado.aprobado=true`. Antes, `resultado` se calculaba
+  // EXCLUSIVAMENTE desde la fila DB (resolution.votes_for/against/abstentions).
+  // Si la RPC fn_no_session_cast_response actualiza la DB pero la query
+  // no refresca a tiempo (cache lag), o si el secretario pasa al paso 5
+  // antes de un refetch, los contadores DB quedaban en cero y resultado
+  // siempre falso → secretario bloqueado aunque todos hubieran votado FAVOR.
+  //
+  // Fix: calcular contadores también desde el state UI (memberVotes) y
+  // usar el más alto de los dos. Esto da resiliencia ante cache lag y no
+  // permite "votar de menos" — solo añade los votos que la UI ya registró
+  // pero la DB no refleja todavía.
+  const uiVotesFor = Object.values(memberVotes).filter((v) => v === "FOR").length;
+  const uiVotesAgainst = Object.values(memberVotes).filter((v) => v === "AGAINST").length;
+  const uiAbstentions = Object.values(memberVotes).filter((v) => v === "ABSTAIN").length;
+
+  const effectiveVotesFor = Math.max(votesFor, uiVotesFor);
+  const effectiveVotesAgainst = Math.max(votesAgainst, uiVotesAgainst);
+  const effectiveAbstentions = Math.max(abstentions, uiAbstentions);
+
+  const resultado = resolution || Object.keys(memberVotes).length > 0
     ? evaluateNoSessionResult({
-        votesFor,
-        votesAgainst,
-        abstentions,
+        votesFor: effectiveVotesFor,
+        votesAgainst: effectiveVotesAgainst,
+        abstentions: effectiveAbstentions,
         totalMembers: totalVoters,
         matterClass,
         requiresUnanimity,

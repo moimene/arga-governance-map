@@ -201,4 +201,99 @@ describe("rule-resolution", () => {
     expect(result.ok).toBe(false);
     expect(result.blocking_issues[0]).toContain("ninguna vigente");
   });
+
+  // BATCH 5 (ronda 2) — Bug B-A: el motor no debe caer ciegamente a un
+  // rule pack para otro órgano cuando el caller especifica organoTipo.
+  // Antes del fix: convocar CdA con APROBACION_CUENTAS retornaba el pack
+  // de Junta General (porque era el único vigente para esa materia) →
+  // motor aplicaba reglas erróneas sin avisar.
+  describe("Bug B-A: filter por organoTipo sin fallback ciego", () => {
+    it("BLOQUEA cuando todas las versiones vigentes son para otro órgano", () => {
+      const result = resolveRulePackForMatter({
+        materia: "APROBACION_CUENTAS",
+        organoTipo: "CONSEJO",  // pide CdA
+        versions: [
+          {
+            pack_id: "APROBACION_CUENTAS",
+            version: "1.0.0",
+            status: "ACTIVE",
+            payload: { materia: "APROBACION_CUENTAS" },
+            rule_packs: { materia: "APROBACION_CUENTAS", organo_tipo: "JUNTA_GENERAL" },
+          },
+        ],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.severity).toBe("BLOCKING");
+      expect(result.rulePack).toBeNull();
+      expect(result.blocking_issues.join(" ")).toMatch(
+        /no es competencia del órgano CONSEJO/i,
+      );
+      expect(result.blocking_issues.join(" ")).toMatch(/JUNTA_GENERAL/i);
+    });
+
+    it("ACEPTA versiones genéricas (organoTipo NULL) cuando no hay match exacto", () => {
+      // Una versión genérica sin organoTipo declarado debe aceptarse para
+      // cualquier órgano (es un pack legal aplicable por materia, no por órgano).
+      const result = resolveRulePackForMatter({
+        materia: "DELEGACION_FACULTADES",
+        organoTipo: "CONSEJO",
+        versions: [
+          {
+            pack_id: "DELEGACION_FACULTADES",
+            version: "1.0.0",
+            status: "ACTIVE",
+            payload: { materia: "DELEGACION_FACULTADES" },
+            rule_packs: { materia: "DELEGACION_FACULTADES" },  // sin organo_tipo
+          },
+        ],
+      });
+      expect(result.ok).toBe(true);
+      expect(result.rulePack?.packId).toBe("DELEGACION_FACULTADES");
+    });
+
+    it("ACEPTA cuando hay match exacto de órgano y descarta versiones de otros órganos", () => {
+      const result = resolveRulePackForMatter({
+        materia: "FORMULACION_CUENTAS",
+        organoTipo: "CONSEJO",
+        versions: [
+          {
+            pack_id: "FORMULACION_CUENTAS",
+            version: "1.0.0",
+            status: "ACTIVE",
+            payload: { materia: "FORMULACION_CUENTAS" },
+            rule_packs: { materia: "FORMULACION_CUENTAS", organo_tipo: "JUNTA_GENERAL" },
+          },
+          {
+            pack_id: "FORMULACION_CUENTAS_CONSEJO",
+            version: "1.0.0",
+            status: "ACTIVE",
+            payload: { materia: "FORMULACION_CUENTAS" },
+            rule_packs: { materia: "FORMULACION_CUENTAS", organo_tipo: "CONSEJO" },
+          },
+        ],
+      });
+      expect(result.ok).toBe(true);
+      expect(result.rulePack?.organoTipo).toBe("CONSEJO");
+      expect(result.rulePack?.packId).toBe("FORMULACION_CUENTAS_CONSEJO");
+    });
+
+    it("MANTIENE backward-compat: sin organoTipo en input acepta cualquier vigente", () => {
+      // Caller histórico que no especifica organoTipo: comportamiento legacy.
+      const result = resolveRulePackForMatter({
+        materia: "APROBACION_CUENTAS",
+        // organoTipo omitido
+        versions: [
+          {
+            pack_id: "APROBACION_CUENTAS",
+            version: "1.0.0",
+            status: "ACTIVE",
+            payload: { materia: "APROBACION_CUENTAS" },
+            rule_packs: { materia: "APROBACION_CUENTAS", organo_tipo: "JUNTA_GENERAL" },
+          },
+        ],
+      });
+      expect(result.ok).toBe(true);
+      expect(result.rulePack?.organoTipo).toBe("JUNTA_GENERAL");
+    });
+  });
 });

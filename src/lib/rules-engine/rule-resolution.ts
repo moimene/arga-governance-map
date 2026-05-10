@@ -310,9 +310,46 @@ export function resolveRulePackForMatter(input: RuleResolutionInput): RuleResolu
     return organoOk && claseOk;
   });
 
+  // BATCH 5 (ronda 2) — bug B-A: si hay versiones vigentes pero NINGUNA es
+  // compatible con el órgano consultado (todas tienen organoTipo distinto),
+  // no caemos a un fallback ciego — sería el bug que aplicaba reglas de
+  // Junta General al convocar Consejo de Administración. En su lugar
+  // bloqueamos con explicación clara para que el usuario corrija el órgano
+  // o la materia.
+  //
+  // Las versiones genéricas (organoTipo=null) sí se aceptan en scopedMatches
+  // porque la condición `!version.organoTipo` ya las deja pasar — solo
+  // bloqueamos cuando todas las versiones vigentes son explícitamente para
+  // otros órganos.
+  if (scopedMatches.length === 0 && input.organoTipo) {
+    const otherOrganos = Array.from(
+      new Set(vigenteMatches.map((v) => v.organoTipo).filter((o): o is string => Boolean(o))),
+    ).join(", ");
+    const message =
+      `Materia ${input.materia} no es competencia del órgano ${input.organoTipo}. ` +
+      (otherOrganos
+        ? `Las versiones vigentes están definidas para: ${otherOrganos}. ` +
+          `Convoca el órgano correcto o selecciona una materia compatible con ${input.organoTipo}.`
+        : `No hay versiones vigentes compatibles con este órgano.`);
+    blocking_issues.push(message);
+    explain.push(makeExplain("RULE_PACK_ORGANO_INCOMPATIBLE", "BLOCKING", message));
+    return {
+      ok: false,
+      severity: "BLOCKING",
+      rulePack: null,
+      applicableOverrides: [],
+      rulesetSnapshotId: null,
+      explain,
+      blocking_issues,
+      warnings,
+    };
+  }
+
+  // Si scopedMatches está vacío y el caller no especificó organoTipo (caso
+  // de uso histórico), conservamos el fallback con warning — backward-compat.
   const candidates = scopedMatches.length > 0 ? scopedMatches : vigenteMatches;
-  if (scopedMatches.length === 0 && (input.organoTipo || input.clase)) {
-    warnings.push("No hay match exacto de órgano/clase; se usa el mejor rule pack vigente de la materia.");
+  if (scopedMatches.length === 0 && input.clase) {
+    warnings.push("No hay match exacto de clase; se usa el mejor rule pack vigente de la materia.");
   }
 
   const sorted = [...candidates].sort(compareVersionDesc);

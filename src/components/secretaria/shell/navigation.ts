@@ -72,6 +72,15 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         requiresEntity: true,
         selectedEntityRoute: true,
       },
+      // BATCH 4 (ronda 2): "Catálogo sociedades" navega al listado
+      // completo y permite crear nueva sociedad incluso estando en modo
+      // sociedad scopeada. Sin esto, el usuario en scope ARGA no tiene
+      // forma de descubrir el botón "Nueva sociedad" de SociedadesList.
+      {
+        label: "Catálogo sociedades",
+        to: "/secretaria/sociedades",
+        icon: Building2,
+      },
       { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
       { label: "Board Pack", to: "/secretaria/board-pack", icon: Briefcase, requiresEntity: true },
     ],

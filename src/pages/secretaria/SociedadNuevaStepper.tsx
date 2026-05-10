@@ -196,7 +196,12 @@ function buildInitialBodies(input: {
 export default function SociedadNuevaStepper() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tenantId } = useTenantContext();
+  // BATCH 4 (ronda 2): además de tenantId, observar isLoading del provider
+  // para deshabilitar el botón "Crear sociedad" mientras se hidrata. Antes
+  // hacíamos throw si tenantId era null en el click → toast error opaco.
+  // Ahora preservamos el throw como guard de último recurso (defense in
+  // depth) pero el flujo principal espera a que el contexto esté ready.
+  const { tenantId, isLoading: tenantLoading } = useTenantContext();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -427,12 +432,21 @@ export default function SociedadNuevaStepper() {
           <button
             type="button"
             onClick={guardar}
-            disabled={saving}
-            aria-busy={saving}
+            // BATCH 4 (ronda 2): bloquear botón mientras TenantContext
+            // hidrata (`tenantLoading`) o si tenantId aún no está disponible.
+            // Sin este guard, el usuario puede hacer click rápidamente y el
+            // throw "No hay tenant activo" producía un toast.error opaco.
+            disabled={saving || tenantLoading || !tenantId}
+            aria-busy={saving || tenantLoading}
+            title={tenantLoading || !tenantId ? "Cargando contexto del tenant…" : undefined}
             className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {saving ? "Creando…" : "Crear sociedad"}
+            {saving
+              ? "Creando…"
+              : tenantLoading || !tenantId
+                ? "Cargando contexto…"
+                : "Crear sociedad"}
           </button>
         )}
       </div>

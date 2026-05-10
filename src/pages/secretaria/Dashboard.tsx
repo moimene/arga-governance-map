@@ -806,18 +806,19 @@ export default function SecretariaDashboard() {
           </div>
           <div className="space-y-3">
             {[
-              // En modo grupo: alta de sociedad disponible (alta global) y
-              // campañas. En modo sociedad: el contexto está fijado, no
-              // mostramos "Nueva sociedad" porque la operación natural ahí
-              // es trabajar sobre la sociedad seleccionada.
+              // BATCH 4 (ronda 2): "Nueva sociedad" disponible en AMBOS modos
+              // porque el usuario puede dar de alta sociedad nueva sin importar
+              // si está en scope grupo o scope sociedad. Antes el quick action
+              // solo aparecía en grupo, lo cual hacía invisible la entrada
+              // cuando el usuario arrancaba con scope ARGA seleccionado.
+              {
+                label: "Nueva sociedad",
+                helper: "Alta de sociedad SA/SL/SAU/SLU con órganos iniciales y cap table.",
+                icon: Building2,
+                path: "/secretaria/sociedades/nueva",
+              },
               ...(scope.mode === "grupo"
                 ? [
-                    {
-                      label: "Nueva sociedad",
-                      helper: "Alta de sociedad SA/SL/SAU/SLU con órganos iniciales y cap table.",
-                      icon: Building2,
-                      path: "/secretaria/sociedades/nueva",
-                    },
                     {
                       label: "Campaña de cuentas del grupo",
                       helper: "Coordina varias sociedades desde un solo proceso.",
