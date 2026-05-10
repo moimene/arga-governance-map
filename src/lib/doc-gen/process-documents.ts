@@ -728,10 +728,16 @@ export async function generateProcessDocx(
     }
   }
 
+  // BATCH 14 (ronda 2 U-E): el documento DOCX final contiene SOLO el body
+  // legal — la trazabilidad (Request ID, hashes, plantilla, evidence_status)
+  // se mantiene como metadata externa via evidence_bundles + audit_log,
+  // NO inyectada en el cuerpo del documento visible al secretario.
+  // `tracedText` se sigue calculando para audit/content_hash pero el DOCX
+  // se genera con el body limpio.
   const tracedText = withTraceFooter(renderedText, input, plantilla, variables);
   const contentHash = await computeContentHash(tracedText);
   const buffer = await generateDocx({
-    renderedText: tracedText,
+    renderedText: renderedText,
     title: input.title,
     subtitle: input.subtitle,
     templateTipo: plantilla?.tipo ?? input.kind,

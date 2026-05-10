@@ -168,10 +168,13 @@ describe("motor-plantillas composer smoke", () => {
       },
     );
 
+    // BATCH 14 (ronda 2 U-E): el marco normativo y sus metadatos quedan
+    // en `systemTraceText` (auditoría externa), NO en `renderedText` ni en
+    // `document.renderedText` (que ahora son el body limpio del documento).
     expect(result.systemTraceText).toContain("MARCO NORMATIVO SOCIETARIO");
     expect(result.systemTraceText).toContain("normative-snapshot:agreement-demo:nf_demo");
-    expect(result.renderedText).toContain("Estado marco normativo: COMPLETO");
-    expect(result.document.renderedText).toContain("Fuentes aplicadas: LEY, SISTEMA");
+    expect(result.systemTraceText).toContain("Estado marco normativo: COMPLETO");
+    expect(result.systemTraceText).toContain("Fuentes aplicadas: LEY, SISTEMA");
     expect(result.normativeSnapshot?.profile_hash).toBe("nf_demo");
   });
 
@@ -218,9 +221,14 @@ describe("motor-plantillas composer smoke", () => {
       { archiveDraft: false, generatedAt: "2026-05-03" },
     );
 
+    // BATCH 14: renderedText es el body limpio (sin TRAZABILIDAD).
+    // La trazabilidad sigue presente en systemTraceText.
     expect(reviewed.renderedBodyText).toContain("ACLARACION OPERATIVA");
-    expect(reviewed.renderedText).toContain("TRAZABILIDAD DOCUMENTAL");
+    expect(reviewed.systemTraceText).toContain("TRAZABILIDAD DOCUMENTAL");
+    expect(reviewed.renderedText).toContain("ACLARACION OPERATIVA");
+    expect(reviewed.renderedText).not.toContain("TRAZABILIDAD DOCUMENTAL");
     expect(reviewed.document.renderedText).toContain("Texto incorporado por revision humana");
+    expect(reviewed.document.renderedText).not.toContain("TRAZABILIDAD DOCUMENTAL");
     expect(reviewed.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(reviewed.docxBuffer.length).toBeGreaterThan(0);
     expect(reviewed.archive.skippedReason).toBe("archive_disabled");
@@ -352,7 +360,9 @@ describe("motor-plantillas composer smoke", () => {
       },
     );
 
-    expect(result.renderedText).toContain(AGREEMENT_ID);
+    // BATCH 14: el AGREEMENT_ID se inyecta en el systemTraceText
+    // (TRAZABILIDAD DOCUMENTAL > "Agreement IDs:"), no en el body limpio.
+    expect(result.systemTraceText).toContain(AGREEMENT_ID);
   });
 
   it("genera CERTIFICACION sin variables huerfanas", async () => {

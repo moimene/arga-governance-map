@@ -445,10 +445,17 @@ export async function prepareDocumentComposition(
 
   const renderedBodyText = rendered.text.trim();
   const systemTraceText = traceFooter(req, template, normativeSnapshot);
-  const renderedWithTrace = `${renderedBodyText}${systemTraceText}`;
+  // BATCH 14 (ronda 2 U-E): el documento que el usuario ve y descarga
+  // contiene SOLO el body legal — la sección "TRAZABILIDAD DOCUMENTAL"
+  // (Request ID, hashes, evidence_status, normative warnings) queda
+  // exclusivamente en `systemTraceText` para auditoría externa via
+  // document_drafts.system_trace_text + evidence_bundles + audit_log.
+  // Antes el `renderedText` concatenaba body + trace, ensuciando el DOCX
+  // final con metadatos técnicos visibles para el secretario.
+  const renderedTextClean = renderedBodyText;
   const postRenderValidation = validatePostRenderDocument({
     documentType: req.document_type,
-    renderedText: renderedWithTrace,
+    renderedText: renderedTextClean,
     capa1Template: template.capa1_inmutable,
     agreementIds: req.agreement_ids,
     unresolvedVariables: rendered.unresolvedVariables,
@@ -470,7 +477,7 @@ export async function prepareDocumentComposition(
     mergedVariables,
     renderedBodyText,
     systemTraceText,
-    renderedText: renderedWithTrace,
+    renderedText: renderedTextClean,
     normativeSnapshot,
     unresolvedVariables: rendered.unresolvedVariables,
     postRenderValidation,
@@ -630,12 +637,10 @@ export async function finalizeEditableDocumentDraft(
   }
 
   const normativeSnapshot = options.normativeSnapshot ?? prepared.normativeSnapshot ?? null;
-  const renderedText = appendTraceFooter(
-    renderedBodyText,
-    prepared.request,
-    prepared.template,
-    normativeSnapshot,
-  );
+  // BATCH 14 (ronda 2 U-E): el `renderedText` que se valida y se entrega
+  // al docx-generator contiene SOLO el body editable. La trazabilidad
+  // documental se persiste por separado en `systemTraceText`.
+  const renderedText = renderedBodyText;
   const postRenderValidation = validatePostRenderDocument({
     documentType: prepared.request.document_type,
     renderedText,
