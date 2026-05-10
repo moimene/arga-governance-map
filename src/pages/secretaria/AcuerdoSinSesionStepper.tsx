@@ -40,9 +40,9 @@ const MATTER_CLASSES = [
 ] as const;
 
 const AGREEMENT_KINDS: Record<string, string[]> = {
-  ORDINARIA:   ["APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO", "DELEGACION_FACULTADES", "DISTRIBUCION_DIVIDENDOS"],
-  ESTATUTARIA: ["MODIFICACION_ESTATUTOS", "CAMBIO_DENOMINACION", "CAMBIO_DOMICILIO", "MODIFICACION_OBJETO"],
-  ESTRUCTURAL: ["AUMENTO_CAPITAL", "REDUCCION_CAPITAL", "DISOLUCION", "FUSION", "ESCISION", "NOMBRAMIENTO_AUDITOR"],
+  ORDINARIA:   ["APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO", "DELEGACION_FACULTADES", "DISTRIBUCION_DIVIDENDOS", "OTROS_LIBRE"],
+  ESTATUTARIA: ["MODIFICACION_ESTATUTOS", "CAMBIO_DENOMINACION", "CAMBIO_DOMICILIO", "MODIFICACION_OBJETO", "OTROS_LIBRE"],
+  ESTRUCTURAL: ["AUMENTO_CAPITAL", "REDUCCION_CAPITAL", "DISOLUCION", "FUSION", "ESCISION", "NOMBRAMIENTO_AUDITOR", "OTROS_LIBRE"],
 };
 
 const AGREEMENT_KIND_LABELS: Record<string, string> = {
@@ -61,6 +61,29 @@ const AGREEMENT_KIND_LABELS: Record<string, string> = {
   FUSION:                "Fusión",
   ESCISION:              "Escisión",
   NOMBRAMIENTO_AUDITOR:  "Nombramiento de auditor",
+  OTROS_LIBRE:           "Otros — acuerdo libre (sin tipología catalogada)",
+};
+
+// BATCH 9 (ronda 2 U-F): mapping agreement_kind → body_types compatibles.
+// Antes el stepper permitía cualquier combinación (CdA con APROBACION_CUENTAS
+// que es competencia exclusiva de Junta General). Ahora filtra por body_type
+// del órgano seleccionado en step 1.
+//
+// Reglas:
+//   JUNTA       → casi todos los kinds (la Junta General es soberana en LSC)
+//   CDA         → DELEGACION_FACULTADES + OTROS_LIBRE (poco más adopta sin sesión;
+//                  formulación cuentas, autorizaciones administrativas, etc.)
+//   COMISION_*  → idem CDA (delegada del CdA)
+const AGREEMENT_KIND_BY_BODY_TYPE: Record<string, Set<string>> = {
+  JUNTA: new Set([
+    "APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO",
+    "DISTRIBUCION_DIVIDENDOS", "MODIFICACION_ESTATUTOS", "CAMBIO_DENOMINACION",
+    "CAMBIO_DOMICILIO", "MODIFICACION_OBJETO", "AUMENTO_CAPITAL",
+    "REDUCCION_CAPITAL", "DISOLUCION", "FUSION", "ESCISION",
+    "NOMBRAMIENTO_AUDITOR", "OTROS_LIBRE",
+  ]),
+  CDA: new Set(["DELEGACION_FACULTADES", "OTROS_LIBRE"]),
+  COMISION_DELEGADA: new Set(["DELEGACION_FACULTADES", "OTROS_LIBRE"]),
 };
 
 const TALLY_COUNT_CLASS = {
@@ -120,6 +143,10 @@ export default function AcuerdoSinSesionStepper() {
   const [fundamentoJuridico, setFundamentoJuridico] = useState("");
 
   // ── Step 3 ──
+  // BATCH 9 (ronda 2 F-B): dirección de notificación opcional pero recomendada
+  // para QTSP/ERDS trazabilidad. Sin schema column dedicada, se concatena al
+  // proposal_text como bloque legible "Dirección de notificación: <texto>".
+  const [direccionNotificacion, setDireccionNotificacion] = useState("");
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
   const activeMembers = mandates.filter((m) => m.status === "Activo");
   const [deadlineDays, setDeadlineDays] = useState(5);
@@ -168,10 +195,21 @@ export default function AcuerdoSinSesionStepper() {
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + deadlineDays);
     try {
+      // BATCH 9 (ronda 2 F-B): concatenar dirección de notificación al
+      // proposal_text como bloque legible — sin migration de schema.
+      // Cuando se autorice ALTER TABLE no_session_resolutions ADD COLUMN
+      // direccion_notificacion, mover este bloque a una columna dedicada.
+      const proposalParts = [proposalText];
+      if (fundamentoJuridico) {
+        proposalParts.push(`Fundamento jurídico: ${fundamentoJuridico}`);
+      }
+      if (direccionNotificacion.trim()) {
+        proposalParts.push(`Dirección de notificación: ${direccionNotificacion.trim()}`);
+      }
       const created = await createResolution.mutateAsync({
         body_id: selectedBodyId,
         title: title.trim() || `${AGREEMENT_KIND_LABELS[agreementKind] ?? agreementKind} — Acuerdo sin sesión`,
-        proposal_text: proposalText + (fundamentoJuridico ? `\n\nFundamento jurídico: ${fundamentoJuridico}` : ""),
+        proposal_text: proposalParts.join("\n\n"),
         matter_class: matterClass,
         agreement_kind: agreementKind,
         requires_unanimity: requiresUnanimity,
@@ -496,10 +534,39 @@ export default function AcuerdoSinSesionStepper() {
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       <option value="">— Seleccionar tipo —</option>
-                      {(AGREEMENT_KINDS[matterClass] ?? []).map((k) => (
-                        <option key={k} value={k}>{AGREEMENT_KIND_LABELS[k] ?? k}</option>
-                      ))}
+                      {/* BATCH 9 (ronda 2 U-F): filtrar agreement_kinds por
+                          body_type del órgano seleccionado. Si no hay body_type
+                          (legacy) o el body es JUNTA, se muestran todos.
+                          Para CdA/Comisión solo se muestran kinds compatibles. */}
+                      {(AGREEMENT_KINDS[matterClass] ?? [])
+                        .filter((k) => {
+                          const bodyType = selectedBody?.body_type?.toUpperCase();
+                          if (!bodyType) return true;
+                          const allowedSet = AGREEMENT_KIND_BY_BODY_TYPE[bodyType];
+                          return !allowedSet || allowedSet.has(k);
+                        })
+                        .map((k) => (
+                          <option key={k} value={k}>{AGREEMENT_KIND_LABELS[k] ?? k}</option>
+                        ))}
                     </select>
+                    {(() => {
+                      const bodyType = selectedBody?.body_type?.toUpperCase();
+                      if (!bodyType) return null;
+                      const allowedSet = AGREEMENT_KIND_BY_BODY_TYPE[bodyType];
+                      if (!allowedSet) return null;
+                      const totalForClass = AGREEMENT_KINDS[matterClass]?.length ?? 0;
+                      const visibleForClass = (AGREEMENT_KINDS[matterClass] ?? []).filter((k) =>
+                        allowedSet.has(k),
+                      ).length;
+                      if (totalForClass === visibleForClass) return null;
+                      return (
+                        <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                          Mostrando {visibleForClass} de {totalForClass} tipos — filtrado por
+                          competencia del órgano <strong>{selectedBody?.name ?? bodyType}</strong>.
+                          Si necesitas un acuerdo no listado, usa &ldquo;Otros — acuerdo libre&rdquo;.
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -625,6 +692,28 @@ export default function AcuerdoSinSesionStepper() {
                   })}
                 </div>
               )}
+
+              {/* BATCH 9 (ronda 2 F-B): dirección de notificación del acuerdo
+                  para QTSP/ERDS trazabilidad. Texto libre — pre-cargar manual
+                  desde domicilio social cuando exista columna entities.domicilio_social. */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Dirección de notificación del acuerdo
+                  <span className="ml-1 text-[var(--g-text-secondary)]">(opcional, recomendable)</span>
+                </label>
+                <input
+                  type="text"
+                  value={direccionNotificacion}
+                  onChange={(e) => setDireccionNotificacion(e.target.value)}
+                  placeholder="Ej. Domicilio social C/ Gran Vía 1, Madrid · burofax + email certificado a cada miembro"
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+                <p className="text-xs text-[var(--g-text-secondary)]">
+                  Se incluirá en el proposal_text para trazabilidad QTSP/ERDS y queda
+                  registrada en el acuerdo emitido.
+                </p>
+              </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-[var(--g-text-primary)]">
