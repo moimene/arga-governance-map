@@ -738,19 +738,20 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
       .poll(async () => (await materiaSelect.locator('option').count()), { timeout: 10_000 })
       .toBeGreaterThan(1);
 
-    // Seleccionar APROBACION_CUENTAS explícitamente — es ORDINARIA, garantiza que
-    // el INSERT en agreements pasa el CHECK constraint agreements_matter_class_check
-    // que solo acepta ORDINARIA / ESTATUTARIA / ESTRUCTURAL.
-    //
-    // ⚠ Hallazgo (B6.3): el catálogo materia_catalog tiene rows con
-    //    matter_class='ESPECIAL' (PACTO_PARASOCIAL, EXCLUSION_SOCIO, etc.) pero
-    //    agreements_matter_class_check rechaza ESPECIAL. Si un usuario real
-    //    selecciona una materia ESPECIAL en el unipersonal stepper, el INSERT
-    //    en agreements falla silenciosamente con HTTP 400. Es deuda de schema:
-    //    o bien (a) extender el CHECK para incluir ESPECIAL, o (b) filtrar el
-    //    catálogo en useMateriaCatalog para no exponer matter_class no soportadas.
-    //    No es bloqueante para B6.3 — el test selecciona una materia válida.
-    await materiaSelect.selectOption('APROBACION_CUENTAS');
+    // Post-fix matter_class='ESPECIAL' (commit posterior a B6 — ver
+    // docs/superpowers/plans/2026-05-09-matter-class-especial-filter.md):
+    // useMateriaCatalog filtra el dropdown a sólo matter_class compatibles
+    // con agreements (ORDINARIA / ESTATUTARIA / ESTRUCTURAL). Por tanto la
+    // primera opción no-vacía siempre es safe-to-pick — ya no hay workaround
+    // forzando APROBACION_CUENTAS.
+    const optionsCount = await materiaSelect.locator('option').count();
+    let pickedValue: string | null = null;
+    for (let i = 0; i < optionsCount; i += 1) {
+      const v = await materiaSelect.locator('option').nth(i).getAttribute('value');
+      if (v && v.trim().length > 0) { pickedValue = v; break; }
+    }
+    expect(pickedValue, 'al menos 1 materia agreement-compatible').not.toBeNull();
+    await materiaSelect.selectOption(pickedValue!);
 
     const next1 = page.getByRole('button', { name: /Siguiente|Continuar/ }).first();
     await expect(next1).toBeEnabled({ timeout: 10_000 });
