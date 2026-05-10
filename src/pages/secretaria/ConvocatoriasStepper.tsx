@@ -47,30 +47,62 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
     { value: "ERDS",               label: "Notificación ERDS (EAD Trust)", recommended: true },
     { value: "CORREO_CERTIFICADO", label: "Correo certificado" },
     { value: "BUROFAX",            label: "Burofax" },
+    { value: "EMAIL_SIMPLE",       label: "Email simple a los miembros del órgano" },
   ],
   PT: [
     { value: "JORNAL_OFICIAL",  label: "Diário da República", recommended: true },
     { value: "JORNAL_DIARIO",   label: "Jornal diário de grande circulação" },
     { value: "WEB_CORPORATIVA", label: "Site corporativo" },
     { value: "ERDS",            label: "Notificação ERDS certificada (EAD Trust)" },
+    { value: "EMAIL_SIMPLE",    label: "Email simple aos membros do órgão" },
   ],
   BR: [
     { value: "DIARIO_OFICIAL",    label: "Diário Oficial do Estado", recommended: true },
     { value: "JORNAL_CIRCULACAO", label: "Jornal de grande circulação" },
     { value: "WEB_CORPORATIVA",   label: "Site corporativo" },
+    { value: "EMAIL_SIMPLE",      label: "Email simples aos membros do órgão" },
   ],
   MX: [
     { value: "DOF",                label: "Diario Oficial de la Federación", recommended: true },
     { value: "CORREO_CERTIFICADO", label: "Correo certificado a socios" },
     { value: "WEB_CORPORATIVA",    label: "Sitio corporativo" },
     { value: "ERDS",               label: "Notificación ERDS (EAD Trust)" },
+    { value: "EMAIL_SIMPLE",       label: "Email simple a los miembros del órgano" },
   ],
 };
 
+// BATCH 8.5 (ronda 2 U-C): para CdA / Comisión Delegada el universo de
+// canales relevantes es MUCHO más pequeño que para Junta General. La
+// publicidad oficial (BORME, diarios, web corporativa art. 173 LSC) solo
+// aplica a Junta General. CdA y comisiones tienen comunicación directa a
+// sus miembros — bastan canales de notificación individual.
+const CHANNELS_RELEVANT_BY_BODY_TYPE: Record<string, Set<string>> = {
+  // Junta General: todos los canales legales — el de mostrar la lista completa.
+  JUNTA: new Set([]),  // empty = no filter, mostrar todos
+  // CdA: solo notificación directa al consejero.
+  CDA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
+  // Comisión Delegada: idem CdA.
+  COMISION_DELEGADA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
+};
+
+// BATCH 8.3 (ronda 2 U-A): tooltips para clarificar las 3 clases de materia.
+// Antes solo se mostraban las etiquetas sin explicación → confusión usuario.
 const AGENDA_TIPOS = [
-  { value: "ORDINARIA",    label: "Ordinaria" },
-  { value: "ESTATUTARIA",  label: "Estatutaria" },
-  { value: "ESTRUCTURAL",  label: "Estructural (inscribible)" },
+  {
+    value: "ORDINARIA",
+    label: "Ordinaria",
+    hint: "Mayoría simple (>50%). Gestión ordinaria del órgano: cuentas, nombramientos, dividendos, etc.",
+  },
+  {
+    value: "ESTATUTARIA",
+    label: "Estatutaria",
+    hint: "Mayoría reforzada (art. 199 LSC para SL = mayoría 2/3 votos / art. 201 LSC para SA). Modifica estatutos: capital, denominación, domicilio.",
+  },
+  {
+    value: "ESTRUCTURAL",
+    label: "Estructural (inscribible)",
+    hint: "Mayoría reforzada + escritura pública + notario + registro mercantil. Operaciones estructurales: fusión, escisión, transformación, disolución.",
+  },
 ] as const;
 
 const AGENDA_MATERIAS = [
@@ -81,7 +113,15 @@ const AGENDA_MATERIAS = [
   { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true },
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
+  // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
+  // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
+  // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
+  // tipo correcto y aceptar que no hay rule pack aplicable.
+  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false },
 ] as const;
+
+// Materias que NO se envían al motor V2 (puntos libres sin regla).
+const MATERIAS_LIBRES = new Set<string>(["OTROS_LIBRE"]);
 
 const CHANNEL_LABELS: Record<string, string> = {
   BORME: "BORME",
@@ -99,6 +139,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   CORREO_CERTIFICADO: "Correo certificado",
   BUROFAX: "Burofax",
   EMAIL_CON_ACUSE: "Email con acuse",
+  EMAIL_SIMPLE: "Email simple",
 };
 
 function newAgendaItem(): AgendaItem {
@@ -313,10 +354,15 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
-  const agendaRuleSpecs = agendaItems.map((item) => ({
-    materia: item.materia,
-    clase: materiaClaseFromTipo(item.tipo),
-  }));
+  const agendaRuleSpecs = agendaItems
+    // BATCH 8.3 (ronda 2 U-A): filtrar materias libres antes del motor.
+    // OTROS_LIBRE indica intencionalmente que el secretario asume el punto
+    // como informativo / sin reglas LSC aplicables — no es bug, es diseño.
+    .filter((item) => !MATERIAS_LIBRES.has(item.materia))
+    .map((item) => ({
+      materia: item.materia,
+      clase: materiaClaseFromTipo(item.tipo),
+    }));
 
   const {
     data: ruleResolutions = [],
@@ -413,7 +459,27 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 4 ──
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
-  const activeMandates = mandates.filter((m) => m.status === "Activo");
+  // BATCH 8.4 (ronda 2 U-B): los destinatarios ahora se ordenan con
+  // PRESIDENTE primero, SECRETARIO segundo, después órdenes de prioridad
+  // estándar y resto alfabético. Antes aparecían en orden de inserción
+  // (alfabético por tipo_condicion) lo cual ponía CONSEJERO antes que
+  // PRESIDENTE — inverso al uso operativo.
+  const ROLE_PRIORITY: Record<string, number> = {
+    PRESIDENTE: 1,
+    SECRETARIO: 2,
+    VICEPRESIDENTE: 3,
+    CONSEJERO_COORDINADOR: 4,
+    CONSEJERO: 5,
+  };
+  const activeMandates = mandates
+    .filter((m) => m.status === "Activo")
+    .sort((a, b) => {
+      const pa = ROLE_PRIORITY[a.role ?? ""] ?? 99;
+      const pb = ROLE_PRIORITY[b.role ?? ""] ?? 99;
+      if (pa !== pb) return pa - pb;
+      // Mismo rol: orden alfabético por nombre
+      return (a.full_name ?? "").localeCompare(b.full_name ?? "", "es");
+    });
   const [excludedPersonIds, setExcludedPersonIds] = useState<Set<string>>(new Set());
   function toggleExclude(personId: string) {
     setExcludedPersonIds((prev) => {
@@ -428,7 +494,18 @@ export default function ConvocatoriasStepper() {
   }
 
   // ── Step 5 ──
-  const channelOpts = CHANNEL_OPTIONS[jurisdiction] ?? CHANNEL_OPTIONS["ES"];
+  // BATCH 8.5 (ronda 2 U-C): filtrar canales según body_type del órgano
+  // convocado. JUNTA → lista completa (publicidad oficial); CDA / COMISION
+  // → solo notificación directa (email/correo certificado/ERDS/burofax).
+  // Sin este filtro, el secretario ve toda la lista cuando convoca CdA y
+  // genera ruido innecesario.
+  const channelOptsBase = CHANNEL_OPTIONS[jurisdiction] ?? CHANNEL_OPTIONS["ES"];
+  const bodyTypeForChannels = selectedBody?.body_type?.toUpperCase() ?? "JUNTA";
+  const relevantChannelSet = CHANNELS_RELEVANT_BY_BODY_TYPE[bodyTypeForChannels];
+  const channelOpts =
+    relevantChannelSet && relevantChannelSet.size > 0
+      ? channelOptsBase.filter((ch) => relevantChannelSet.has(ch.value))
+      : channelOptsBase;
   const [channels, setChannels] = useState<string[]>([]);
   function toggleChannel(val: string) {
     setChannels((prev) =>
@@ -547,6 +624,32 @@ export default function ConvocatoriasStepper() {
   const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; descripcion: string }[]>([]);
   const [documentosIncluidos, setDocumentosIncluidos] = useState<Set<string>>(new Set());
   const requiredDocuments = evaluacionV2.documentosObligatorios;
+  // BATCH 8.6 (ronda 2 U-D): mapear cada documento obligatorio a las
+  // materias del orden del día que lo exigen. Antes la UI mostraba
+  // "Borrador de cuentas anuales" sin contexto — ahora explica "exigido
+  // por la materia APROBACION_CUENTAS" para que el secretario entienda
+  // el vínculo entre el punto del orden y el documento requerido.
+  const documentToMaterias = (() => {
+    const map = new Map<string, Set<string>>();
+    for (const resolution of ruleResolutions) {
+      const materia = resolution.rulePack?.materia;
+      const payload = resolution.rulePack?.payload;
+      const docs =
+        payload && typeof payload === "object" && "convocatoria" in payload &&
+        payload.convocatoria && typeof payload.convocatoria === "object" &&
+        "documentosObligatorios" in payload.convocatoria
+          ? (payload.convocatoria as { documentosObligatorios?: Array<{ id: string }> }).documentosObligatorios ?? []
+          : [];
+      for (const doc of docs) {
+        if (!doc?.id || !materia) continue;
+        if (!map.has(doc.id)) map.set(doc.id, new Set());
+        map.get(doc.id)!.add(materia);
+      }
+    }
+    const out: Record<string, string[]> = {};
+    map.forEach((set, id) => { out[id] = Array.from(set); });
+    return out;
+  })();
   const missingRequiredDocuments = tipoConvocatoria === "UNIVERSAL"
     ? []
     : requiredDocuments.filter((doc) => !documentosIncluidos.has(doc.id));
@@ -1435,11 +1538,18 @@ export default function ConvocatoriasStepper() {
                       <select
                         value={item.tipo}
                         onChange={(e) => updateAgendaItem(item.id, { tipo: e.target.value as AgendaItem["tipo"] })}
+                        // BATCH 8.3 (ronda 2 U-A): tooltip sobre el select
+                        // explica las 3 clases de materia para que el
+                        // secretario sepa cuándo aplica cada una.
+                        title={
+                          AGENDA_TIPOS.find((t) => t.value === item.tipo)?.hint ??
+                          "Clase de materia LSC: ORDINARIA / ESTATUTARIA / ESTRUCTURAL"
+                        }
                         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
                         {AGENDA_TIPOS.map((t) => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
+                          <option key={t.value} value={t.value} title={t.hint}>{t.label}</option>
                         ))}
                       </select>
                       <label className="flex items-center gap-1.5 cursor-pointer">
@@ -1743,6 +1853,14 @@ export default function ConvocatoriasStepper() {
                             <span className="block text-[11px] text-[var(--g-text-secondary)]">
                               {doc.condicion ? `${doc.id} · ${doc.condicion}` : doc.id}
                             </span>
+                            {documentToMaterias[doc.id]?.length ? (
+                              <span className="mt-0.5 block text-[11px] text-[var(--g-brand-3308)]">
+                                Exigido por:{" "}
+                                {documentToMaterias[doc.id]
+                                  .map((m) => AGENDA_MATERIAS.find((am) => am.value === m)?.label ?? m)
+                                  .join(", ")}
+                              </span>
+                            ) : null}
                           </span>
                           {!included && (
                             <span
