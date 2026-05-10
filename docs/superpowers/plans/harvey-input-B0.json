@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "scope": "G4-G10 plantillas legales TGMS Garrigues — frente legal",
+    "fecha_extraccion": "2026-05-10",
+    "tenant": "ARGA Seguros (cliente demo, pseudónimo)",
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "operador": "moises.menendez",
+    "destinatario": "Harvey AI — Comité Legal Garrigues",
+    "supabase_ref": "hzqwefkwsxopwrmtksbg (governance_OS, eu-central-1)",
+    "version_kit": "B0-recalibrado-1.0"
+  },
+  "recalibracion_critica": {
+    "premisa_original_G4": "17 plantillas con aprobada_por IS NULL",
+    "realidad_validada": "El estado real es DISTINTO al asumido. Ver clasificacion abajo.",
+    "estado_real_firma": [
+      { "clasificacion": "DEMO-OPERATIVO (marcador, no firma final)", "plantillas_total": 45, "plantillas_activas": 32, "plantillas_archivadas": 13 },
+      { "clasificacion": "Comité Legal ARGA", "plantillas_total": 9 },
+      { "clasificacion": "NULL (sin firma) — TODAS ARCHIVADAS, no afectan operativa", "plantillas_total": 8, "plantillas_activas": 0 },
+      { "clasificacion": "Comité Legal ARGA — Secretaría Societaria", "plantillas_total": 6 },
+      { "clasificacion": "Legal Team", "plantillas_total": 3 }
+    ],
+    "target_real_para_harvey": {
+      "plantillas_a_promover_a_firma_productiva": 32,
+      "descripcion": "Plantillas ACTIVAS con marcador DEMO-OPERATIVO que requieren auditoría legal Garrigues + promoción a firma productiva final.",
+      "exclusiones": [
+        "8 plantillas con aprobada_por NULL — todas en estado ARCHIVADA, no se renderizan en flujos activos",
+        "13 plantillas demo-operativo en ARCHIVADA — versiones legacy, no requieren acción"
+      ]
+    },
+    "implicacion_para_kit_harvey": "B1-B7 trabajan sobre las 32 ACTIVAS. NO sobre las 8 NULL archivadas. El UI marker 'pendiente firma legal' del kit anterior aplicaría sobre las 32 demo-operativo."
+  },
+  "inventario_32_plantillas_activas_demo_operativo": [
+    { "tipo": "ACTA_ACUERDO_ESCRITO", "materia": "ACUERDO_SIN_SESION", "variantes": 1, "versiones": ["1.3.0"], "organos": ["JUNTA_GENERAL_O_CONSEJO"] },
+    { "tipo": "ACTA_CONSIGNACION", "materia": "DECISION_ADMIN_UNICO", "variantes": 1, "versiones": ["1.2.0"], "organos": ["ADMIN_UNICO"] },
+    { "tipo": "ACTA_CONSIGNACION", "materia": "DECISION_SOCIO_UNICO", "variantes": 1, "versiones": ["1.2.0"], "organos": ["SOCIO_UNICO"] },
+    { "tipo": "ACTA_DECISION_CONJUNTA", "materia": "CO_APROBACION", "variantes": 1, "versiones": ["1.1.0"], "organos": ["ADMIN_CONJUNTA_O_COAPROBADORES"] },
+    { "tipo": "ACTA_ORGANO_ADMIN", "materia": "ADMIN_SOLIDARIO", "variantes": 1, "versiones": ["1.1.0"], "organos": ["ADMIN_SOLIDARIOS"] },
+    { "tipo": "ACTA_SESION", "materia": "CONSEJO_ADMIN", "variantes": 1, "versiones": ["1.2.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "ACTA_SESION", "materia": "JUNTA_GENERAL", "variantes": 1, "versiones": ["1.2.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "CERTIFICACION", "materia": "CERTIFICACION_ACUERDOS", "variantes": 1, "versiones": ["1.3.0"], "organos": ["DERIVADO_DEL_ACTO"] },
+    { "tipo": "CONVOCATORIA", "materia": "CONVOCATORIA_JUNTA", "variantes": 1, "versiones": ["1.2.0"], "organos": ["ORGANO_ADMIN"] },
+    { "tipo": "CONVOCATORIA_SL_NOTIFICACION", "materia": "NOTIFICACION_CONVOCATORIA_SL", "variantes": 1, "versiones": ["1.2.0"], "organos": ["ORGANO_ADMIN"] },
+    { "tipo": "INFORME_DOCUMENTAL_PRE", "materia": "EXPEDIENTE_PRE", "variantes": 1, "versiones": ["1.1.0"], "organos": ["SOPORTE_INTERNO"] },
+    { "tipo": "INFORME_PRECEPTIVO", "materia": "CONVOCATORIA_PRE", "variantes": 1, "versiones": ["1.1.0"], "organos": ["SOPORTE_INTERNO"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "APROBACION_CUENTAS", "variantes": 1, "versiones": ["1.1.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "APROBACION_PLAN_NEGOCIO", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "AUMENTO_CAPITAL", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "CESE_CONSEJERO", "variantes": 2, "versiones": ["1.1.0", "1.1.0"], "organos": ["CONSEJO_ADMIN", "JUNTA_GENERAL"], "nota_G10": "Duplicidad Capa 2/Capa 3 detectada — ver detalle" },
+    { "tipo": "MODELO_ACUERDO", "materia": "COMITES_INTERNOS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "DELEGACION_FACULTADES", "variantes": 1, "versiones": ["1.1.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "DISTRIBUCION_CARGOS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "DISTRIBUCION_DIVIDENDOS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "FORMULACION_CUENTAS", "variantes": 1, "versiones": ["1.1.0"], "organos": ["ORGANO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "FUSION_ESCISION", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"], "nota_G5": "Plantilla genérica para 4 operaciones — ver detalle. Texto YA cita RDL 5/2023 correctamente." },
+    { "tipo": "MODELO_ACUERDO", "materia": "MODIFICACION_ESTATUTOS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "NOMBRAMIENTO_AUDITOR", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "NOMBRAMIENTO_CONSEJERO", "variantes": 2, "versiones": ["1.1.0", "1.1.0"], "organos": ["CONSEJO_ADMIN", "JUNTA_GENERAL"], "nota_G10": "Duplicidad Capa 2/Capa 3 detectada — ver detalle" },
+    { "tipo": "MODELO_ACUERDO", "materia": "OPERACION_VINCULADA", "variantes": 1, "versiones": ["1.1.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "POLITICA_REMUNERACION", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "POLITICAS_CORPORATIVAS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "RATIFICACION_ACTOS", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"], "nota_G6": "Plantilla actual usa textarea libre {{enumeracion_actos}} — migración a array repeatable estructurado pendiente" },
+    { "tipo": "MODELO_ACUERDO", "materia": "REDUCCION_CAPITAL", "variantes": 1, "versiones": ["1.0.0"], "organos": ["JUNTA_GENERAL"] },
+    { "tipo": "MODELO_ACUERDO", "materia": "SEGUROS_RESPONSABILIDAD", "variantes": 1, "versiones": ["1.0.0"], "organos": ["CONSEJO_ADMIN"], "nota_G7": "Plantilla actual YA contiene cláusula intra-grupo con safeguards art. 14 LOSSEAR + soporte mercado independiente. Mejor de lo que sugería la auditoría inicial." }
+  ],
+  "plantillas_criticas_detalle": {
+    "G5_FUSION_ESCISION": {
+      "id": "e3697ad9-e0c2-4baf-9144-c80a11808c07",
+      "version_actual": "1.0.0",
+      "estado_redaccion": "BIEN_REDACTADA_PENDIENTE_SPLIT",
+      "hallazgo": "Plantilla genérica única que cubre fusión, escisión, transformación y disolución vía variable {{tipo_operacion_estructural}} editable por usuario. La cita legal de RDL 5/2023 SÍ está actualizada (arts. 11-25, 28-30, 35-40, 47-50). Pero la legislación tiene plazos, mayorías y requisitos DIFERENTES por tipo de operación (e.g., transformación arts. 318-329 LSC, disolución arts. 368-378 LSC).",
+      "recomendacion_garrigues": "Split en 4 plantillas dedicadas con texto específico por operación O alternativa: mantener plantilla genérica con bloques condicionales Handlebars {{#if tipo_operacion_estructural === 'FUSION'}}...{{/if}} para personalizar plazos y mayorías por tipo. Decisión legal de Garrigues.",
+      "referencia_legal_actual": "RDL 5/2023 + arts. 318-329 LSC (transformación) + arts. 368-378 LSC (disolución)",
+      "capa3_editables_relevantes": [
+        "tipo_operacion_estructural (text — debería ser select con 4 opciones)",
+        "articulos_aplicables (text editable — riesgo de inconsistencia legal por usuario)",
+        "requiere_experto (boolean)",
+        "relacion_canje (text)"
+      ]
+    },
+    "G6_RATIFICACION_ACTOS": {
+      "id": "edd5c389-0187-476c-9592-c020058fdc69",
+      "version_actual": "1.0.0",
+      "estado_redaccion": "INDETERMINACION_RIESGO",
+      "hallazgo": "El campo Capa 3 `enumeracion_actos` es un textarea LIBRE (no array estructurado). Riesgo de nulidad por indeterminación según art. 1261 CC + jurisp. TS Sala 1ª s. 12/03/2019. La plantilla actual confía en que el secretario rellene texto libre que cubra cada acto — pero no garantiza que cada acto tenga campos mínimos (fecha, contraparte, importe, fundamento).",
+      "recomendacion_garrigues": "Migración a array repeatable Capa 3 con item_schema { fecha_acto: date OBLIGATORIO, descripcion: textarea OBLIGATORIO min 20 chars, contraparte: text OBLIGATORIO, importe: currency OPCIONAL, fundamento_acto: select OBLIGATORIO con opciones [GESTION_ORDINARIA, ACTO_NEGOCIO_NO_RATIFICADO, ACTO_REPRESENTANTE_SIN_PODER] }. Ver kit B4 para spec completo.",
+      "referencia_legal_actual": "Arts. 234-235 LSC + RRM arts. 108-109"
+    },
+    "G7_SEGUROS_RESPONSABILIDAD": {
+      "id": "df75cda9-e558-43c7-a6a9-902e2c06ee97",
+      "version_actual": "1.0.0",
+      "estado_redaccion": "CON_SAFEGUARDS_PRESENTES",
+      "hallazgo": "Recalibración crítica: la plantilla actual YA contiene cláusula intra-grupo con safeguards (declaración conflicto, abstención consejeros afectados, soporte mercado independiente, autorización conforme a operaciones vinculadas, art. 14 LOSSEAR explícito). Está mejor redactada de lo que sugería la auditoría inicial.",
+      "recomendacion_garrigues": "Auditoría de validación + promoción a firma productiva. NO requiere split ni reescritura mayor. Verificar si existe trigger DGSFP reporting automático cuando aseguradora_del_grupo=true, y completar si falta.",
+      "referencia_legal_actual": "Art. 217 LSC; Ley 50/1980 Contrato Seguro; arts. 236-241 LSC; art. 529 ter.h LSC; art. 14 LOSSEAR (explícito en capa 1)",
+      "campos_capa3_existentes": ["aseguradora_del_grupo: boolean OBLIGATORIO", "tratamiento_conflicto_intra_grupo: textarea OBLIGATORIO", "soporte_mercado_independiente: boolean RECOMENDADO"]
+    }
+  },
+  "plantillas_G10_duplicidad_capa2_capa3": [
+    {
+      "id": "433da411-ba65-410c-8375-24db637f7e75",
+      "tipo": "MODELO_ACUERDO",
+      "materia": "CESE_CONSEJERO",
+      "version": "1.1.0",
+      "organo_tipo": "CONSEJO_ADMIN",
+      "variables_duplicadas": [
+        { "nombre": "nombre_consejero", "capa2": "persons.nombre_completo (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "dni_consejero", "capa2": "persons.nif (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "cargo_denominacion", "capa2": "mandate.cargo_denominacion (auto)", "capa3": "input usuario OBLIGATORIO" }
+      ]
+    },
+    {
+      "id": "ba214d42-1933-497f-a2c0-0867c7c7a55f",
+      "tipo": "MODELO_ACUERDO",
+      "materia": "CESE_CONSEJERO",
+      "version": "1.1.0",
+      "organo_tipo": "JUNTA_GENERAL",
+      "variables_duplicadas": [
+        { "nombre": "nombre_consejero", "capa2": "persons.nombre_completo (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "dni_consejero", "capa2": "persons.nif (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "cargo_denominacion", "capa2": "mandate.cargo_denominacion (auto)", "capa3": "input usuario OBLIGATORIO" }
+      ]
+    },
+    {
+      "id": "27be9063-8977-44c7-b72c-eb26ecb3c49b",
+      "tipo": "MODELO_ACUERDO",
+      "materia": "NOMBRAMIENTO_CONSEJERO",
+      "version": "1.1.0",
+      "organo_tipo": "CONSEJO_ADMIN",
+      "variables_duplicadas": [
+        { "nombre": "nombre_candidato", "capa2": "persons.nombre_completo (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "dni_candidato", "capa2": "persons.nif (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "cargo_denominacion", "capa2": "agreement.cargo_denominacion (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "categoria_consejero", "capa2": "agreement.categoria_consejero (auto)", "capa3": "input usuario OBLIGATORIO" }
+      ]
+    },
+    {
+      "id": "10f90d59-39d3-4633-83ff-81140eff50d5",
+      "tipo": "MODELO_ACUERDO",
+      "materia": "NOMBRAMIENTO_CONSEJERO",
+      "version": "1.1.0",
+      "organo_tipo": "JUNTA_GENERAL",
+      "variables_duplicadas": [
+        { "nombre": "nombre_candidato", "capa2": "persons.nombre_completo (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "dni_candidato", "capa2": "persons.nif (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "cargo_denominacion", "capa2": "agreement.cargo_denominacion (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "categoria_consejero", "capa2": "agreement.categoria_consejero (auto)", "capa3": "input usuario OBLIGATORIO" },
+        { "nombre": "plazo_mandato", "capa2": "entities.plazo_mandato_estatutos (auto)", "capa3": "input usuario OBLIGATORIO" }
+      ]
+    }
+  ],
+  "G8_fuente_ENTIDAD_no_canonica": {
+    "estado_post_validacion": "NO_DETECTADO",
+    "queries_ejecutadas": [
+      "WHERE capa2_variables::text ILIKE '%\"fuente\":\"ENTIDAD\"%' → 0 rows",
+      "WHERE capa2_variables::text ILIKE '%\"fuente\": \"ENTIDAD\"%' → 0 rows"
+    ],
+    "interpretacion": "El hallazgo G8 en la auditoría inicial puede haber sido falsa alarma o ya corregido. Las plantillas inspeccionadas usan dotted paths canónicos como 'entities.name', 'persons.nombre_completo', 'mandate.cargo_denominacion'. Harvey debería confirmar en B6 mediante revisión manual de capa2_variables, pero el riesgo se ha reducido significativamente."
+  },
+  "rule_packs_vigentes_42_total": {
+    "CONSEJO": [
+      "APROBACION_PLAN_NEGOCIO", "APROBACION_PRESUPUESTO", "COOPTACION",
+      "CUENTAS_CONSOLIDADAS", "DELEGACION_FACULTADES (1.0.0 + 1.1.0)",
+      "DIVIDENDO_A_CUENTA", "EJECUCION_AUMENTO_DELEGADO", "FORMULACION_CUENTAS",
+      "INFORME_GESTION", "NOMBRAMIENTO_CONSEJERO (cooptación)",
+      "OPERACION_VINCULADA (1.0.0 + 1.1.0)", "RATIFICACION_ACTOS (1.0.0 + 1.1.0)",
+      "TRASLADO_DOMICILIO_NACIONAL"
+    ],
+    "JUNTA_GENERAL": [
+      "APLICACION_RESULTADO", "APROBACION_CUENTAS (v1.0.0 + 1.0.0)",
+      "AUMENTO_CAPITAL (v1.0.0 + 1.0.0)", "AUMENTO_CAPITAL_NO_DINERARIO",
+      "AUTORIZACION_GARANTIA (1.0.0 + 1.1.0)", "CESE_CONSEJERO",
+      "CESION_GLOBAL_ACTIVO", "DISOLUCION", "DISTRIBUCION_DIVIDENDOS",
+      "EMISION_OBLIGACIONES", "ESCISION", "FUSION", "MOD_ESTATUTOS",
+      "MODIFICACION_ESTATUTOS", "NOMBRAMIENTO", "NOMBRAMIENTO_AUDITOR (1.0.0 + 1.1.0)",
+      "NOMBRAMIENTO_CESE", "REDUCCION_CAPITAL (v1.0.0 + 1.0.0)",
+      "RETRIBUCION_ADMIN", "SUPRESION_PREFERENTE", "TRANSFORMACION"
+    ],
+    "SOCIO_UNICO": ["SOCIEDAD_UNIPERSONAL"]
+  },
+  "instrucciones_para_harvey": {
+    "alcance_recalibrado": "Trabaja sobre las 32 plantillas ACTIVAS demo-operativo. NO sobre las 8 NULL ARCHIVADAS.",
+    "prioridad_p0_critica": [
+      "G6 RATIFICACION_ACTOS — migración a array repeatable (riesgo nulidad indeterminación art. 1261 CC)",
+      "G5 FUSION_ESCISION — decisión Garrigues split vs condicionales Handlebars"
+    ],
+    "prioridad_p1_validacion": [
+      "G7 SEGUROS_RESPONSABILIDAD — auditoría de safeguards existentes + promoción",
+      "G10 4 plantillas — definir contrato precedencia Capa 2 vs Capa 3"
+    ],
+    "prioridad_p2_promocion": [
+      "Las 28 plantillas restantes — auditoría legal individual + promoción a firma productiva"
+    ],
+    "fuera_de_scope": [
+      "8 plantillas ARCHIVADAS NULL — no afectan operativa",
+      "G8 fuente ENTIDAD — ya corregido o falsa alarma; validar en B6 sólo como sanity check"
+    ]
+  },
+  "mapping_a_bloques_kit_harvey": {
+    "B1_triage": "32 plantillas activas demo-operativo → triage individual",
+    "B2_redaccion_corregida_y_firma": "Outputs de B1 → SQL UPDATE para promover firma productiva",
+    "B3_split_FUSION_ESCISION": "Decisión Garrigues split vs condicionales — actualizar plan según decisión",
+    "B4_RATIFICACION_ACTOS_lista_actos": "Migración array repeatable (P0)",
+    "B5_SEGUROS_RESPONSABILIDAD": "Validación safeguards existentes — NO redacción nueva",
+    "B6_G8_G9_G10": "Saneamiento técnico — G8 sanity check, G10 contrato precedencia",
+    "B7_migration_consolidado": "Script SQL idempotente final + checklist verificación"
+  }
+}
