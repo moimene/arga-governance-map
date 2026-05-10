@@ -40,9 +40,28 @@ const MATTER_CLASSES = [
 ] as const;
 
 const AGREEMENT_KINDS: Record<string, string[]> = {
-  ORDINARIA:   ["APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO", "DELEGACION_FACULTADES", "DISTRIBUCION_DIVIDENDOS", "OTROS_LIBRE"],
-  ESTATUTARIA: ["MODIFICACION_ESTATUTOS", "CAMBIO_DENOMINACION", "CAMBIO_DOMICILIO", "MODIFICACION_OBJETO", "OTROS_LIBRE"],
-  ESTRUCTURAL: ["AUMENTO_CAPITAL", "REDUCCION_CAPITAL", "DISOLUCION", "FUSION", "ESCISION", "NOMBRAMIENTO_AUDITOR", "OTROS_LIBRE"],
+  // Corrección post-adversarial: ampliado con materias CONSEJO del seed real
+  // (rule_packs.organo_tipo='CONSEJO'). Esto permite al órgano de
+  // administración adoptar todas sus competencias LSC (art. 244, 253, 277, etc.)
+  // sin caer en OTROS_LIBRE.
+  ORDINARIA:   [
+    "APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO",
+    "DELEGACION_FACULTADES", "DISTRIBUCION_DIVIDENDOS",
+    // Competencias CdA (seed rule_packs.organo_tipo='CONSEJO')
+    "FORMULACION_CUENTAS", "COOPTACION", "DIVIDENDO_A_CUENTA",
+    "OPERACION_VINCULADA", "RATIFICACION_ACTOS", "INFORME_GESTION",
+    "APROBACION_PLAN_NEGOCIO", "APROBACION_PRESUPUESTO",
+    "CUENTAS_CONSOLIDADAS", "EJECUCION_AUMENTO_DELEGADO",
+    "OTROS_LIBRE",
+  ],
+  ESTATUTARIA: [
+    "MODIFICACION_ESTATUTOS", "CAMBIO_DENOMINACION", "CAMBIO_DOMICILIO",
+    "MODIFICACION_OBJETO", "TRASLADO_DOMICILIO_NACIONAL", "OTROS_LIBRE",
+  ],
+  ESTRUCTURAL: [
+    "AUMENTO_CAPITAL", "REDUCCION_CAPITAL", "DISOLUCION", "FUSION",
+    "ESCISION", "NOMBRAMIENTO_AUDITOR", "OTROS_LIBRE",
+  ],
 };
 
 const AGREEMENT_KIND_LABELS: Record<string, string> = {
@@ -62,18 +81,36 @@ const AGREEMENT_KIND_LABELS: Record<string, string> = {
   ESCISION:              "Escisión",
   NOMBRAMIENTO_AUDITOR:  "Nombramiento de auditor",
   OTROS_LIBRE:           "Otros — acuerdo libre (sin tipología catalogada)",
+  // Materias CdA del seed (corrección post-adversarial)
+  FORMULACION_CUENTAS:   "Formulación de cuentas anuales por el Consejo (art. 253 LSC)",
+  COOPTACION:            "Cooptación de consejero (art. 244 LSC)",
+  DIVIDENDO_A_CUENTA:    "Dividendo a cuenta (art. 277 LSC)",
+  OPERACION_VINCULADA:   "Operación con parte vinculada",
+  RATIFICACION_ACTOS:    "Ratificación de actos y contratos",
+  INFORME_GESTION:       "Formulación del Informe de Gestión",
+  APROBACION_PLAN_NEGOCIO:"Aprobación del Plan de Negocio",
+  APROBACION_PRESUPUESTO:"Aprobación del Presupuesto Anual",
+  CUENTAS_CONSOLIDADAS:  "Formulación de Cuentas Consolidadas",
+  EJECUCION_AUMENTO_DELEGADO:"Ejecución de aumento de capital delegado",
+  TRASLADO_DOMICILIO_NACIONAL:"Traslado de domicilio social (España)",
 };
 
-// BATCH 9 (ronda 2 U-F): mapping agreement_kind → body_types compatibles.
-// Antes el stepper permitía cualquier combinación (CdA con APROBACION_CUENTAS
-// que es competencia exclusiva de Junta General). Ahora filtra por body_type
-// del órgano seleccionado en step 1.
+// BATCH 9 (ronda 2 U-F) + corrección post-revisión adversarial:
+// Mapping agreement_kind → body_types compatibles. Validado contra el seed
+// real de rule_packs (13 materias CONSEJO + 21 JUNTA_GENERAL + 1 SOCIO_UNICO).
+// La revisión adversarial reveló dos gaps:
+//   1. Mi catálogo CDA inicial solo tenía DELEGACION_FACULTADES + OTROS_LIBRE.
+//      El seed real tiene 13 competencias del Consejo (FORMULACION_CUENTAS,
+//      COOPTACION, DIVIDENDO_A_CUENTA, RATIFICACION_ACTOS, etc.). Mi UI
+//      bloqueaba 11 casos legítimos.
+//   2. ARGA tiene body_types 'COMISION' y 'COMITE' (no 'COMISION_DELEGADA').
+//      Mi mapping inicial no los cubría → caía al default mostrando todo.
 //
-// Reglas:
-//   JUNTA       → casi todos los kinds (la Junta General es soberana en LSC)
-//   CDA         → DELEGACION_FACULTADES + OTROS_LIBRE (poco más adopta sin sesión;
-//                  formulación cuentas, autorizaciones administrativas, etc.)
-//   COMISION_*  → idem CDA (delegada del CdA)
+// Reglas LSC corregidas:
+//   JUNTA          → soberana, casi todas las materias
+//   CDA / CONSEJO  → competencias del órgano administración (art. 244, 253,
+//                    277, etc. LSC) según seed rule_packs.organo_tipo='CONSEJO'
+//   COMISION/COMITE → mismo subset que CDA (delegadas)
 const AGREEMENT_KIND_BY_BODY_TYPE: Record<string, Set<string>> = {
   JUNTA: new Set([
     "APROBACION_CUENTAS", "NOMBRAMIENTO_CONSEJERO", "CESE_CONSEJERO",
@@ -82,8 +119,25 @@ const AGREEMENT_KIND_BY_BODY_TYPE: Record<string, Set<string>> = {
     "REDUCCION_CAPITAL", "DISOLUCION", "FUSION", "ESCISION",
     "NOMBRAMIENTO_AUDITOR", "OTROS_LIBRE",
   ]),
-  CDA: new Set(["DELEGACION_FACULTADES", "OTROS_LIBRE"]),
-  COMISION_DELEGADA: new Set(["DELEGACION_FACULTADES", "OTROS_LIBRE"]),
+  CDA: new Set([
+    "DELEGACION_FACULTADES",
+    "FORMULACION_CUENTAS",
+    "COOPTACION",
+    "NOMBRAMIENTO_CONSEJERO",  // por cooptación art. 244 LSC
+    "DIVIDENDO_A_CUENTA",
+    "OPERACION_VINCULADA",
+    "RATIFICACION_ACTOS",
+    "INFORME_GESTION",
+    "APROBACION_PLAN_NEGOCIO",
+    "APROBACION_PRESUPUESTO",
+    "CUENTAS_CONSOLIDADAS",
+    "EJECUCION_AUMENTO_DELEGADO",
+    "TRASLADO_DOMICILIO_NACIONAL",
+    "OTROS_LIBRE",
+  ]),
+  COMISION: new Set(["DELEGACION_FACULTADES", "OPERACION_VINCULADA", "INFORME_GESTION", "OTROS_LIBRE"]),
+  COMISION_DELEGADA: new Set(["DELEGACION_FACULTADES", "OPERACION_VINCULADA", "INFORME_GESTION", "OTROS_LIBRE"]),
+  COMITE: new Set(["DELEGACION_FACULTADES", "INFORME_GESTION", "OTROS_LIBRE"]),
 };
 
 const TALLY_COUNT_CLASS = {

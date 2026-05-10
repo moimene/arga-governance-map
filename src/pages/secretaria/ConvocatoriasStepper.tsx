@@ -71,18 +71,23 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
   ],
 };
 
-// BATCH 8.5 (ronda 2 U-C): para CdA / Comisión Delegada el universo de
-// canales relevantes es MUCHO más pequeño que para Junta General. La
-// publicidad oficial (BORME, diarios, web corporativa art. 173 LSC) solo
-// aplica a Junta General. CdA y comisiones tienen comunicación directa a
-// sus miembros — bastan canales de notificación individual.
+// BATCH 8.5 (ronda 2 U-C) + corrección post-revisión adversarial:
+// Filtra canales según body_type del órgano. La revisión reveló que mi
+// mapping inicial solo cubría 'CDA' y 'COMISION_DELEGADA' pero ARGA
+// Seguros (cliente demo) usa body_types 'COMISION' y 'COMITE' (sin _DELEGADA)
+// → para esos órganos caía al default mostrando toda la lista pública
+// (BORME etc.) que no aplica.
+//
+// Reglas:
+//   JUNTA → todos los canales (publicidad oficial art. 173 LSC + ERDS)
+//   CDA / COMISION / COMITE / COMISION_DELEGADA → notificación directa
+//     al miembro (email, correo certificado, ERDS, burofax)
 const CHANNELS_RELEVANT_BY_BODY_TYPE: Record<string, Set<string>> = {
-  // Junta General: todos los canales legales — el de mostrar la lista completa.
   JUNTA: new Set([]),  // empty = no filter, mostrar todos
-  // CdA: solo notificación directa al consejero.
   CDA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
-  // Comisión Delegada: idem CdA.
+  COMISION: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
   COMISION_DELEGADA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
+  COMITE: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
 };
 
 // BATCH 8.3 (ronda 2 U-A): tooltips para clarificar las 3 clases de materia.

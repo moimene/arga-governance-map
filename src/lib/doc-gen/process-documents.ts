@@ -728,14 +728,22 @@ export async function generateProcessDocx(
     }
   }
 
-  // BATCH 14 (ronda 2 U-E): el documento DOCX final contiene SOLO el body
-  // legal — la trazabilidad (Request ID, hashes, plantilla, evidence_status)
-  // se mantiene como metadata externa via evidence_bundles + audit_log,
-  // NO inyectada en el cuerpo del documento visible al secretario.
-  // `tracedText` se sigue calculando para audit/content_hash pero el DOCX
-  // se genera con el body limpio.
+  // BATCH 14 (ronda 2 U-E) + corrección post-revisión adversarial:
+  // El documento DOCX final contiene SOLO el body legal. La trazabilidad
+  // (Request ID, hashes, plantilla, evidence_status) se mantiene como
+  // metadata externa via evidence_bundles + audit_log.
+  //
+  // Inicialmente B14 calculaba `contentHash = SHA(tracedText)` (body+trace)
+  // mientras el DOCX se generaba con `renderedText` (body limpio) — los
+  // hashes registrados en evidence_bundles.manifest.contentHash NO
+  // coincidían con el hash real del archivo DOCX archivado, rompiendo
+  // verificación de integridad.
+  //
+  // Fix: contentHash se calcula sobre el MISMO texto que se inyecta en el
+  // DOCX (`renderedText` body limpio). El `withTraceFooter` se conserva
+  // para retrocompatibilidad de la firma pero NO se usa en el hash.
   const tracedText = withTraceFooter(renderedText, input, plantilla, variables);
-  const contentHash = await computeContentHash(tracedText);
+  const contentHash = await computeContentHash(renderedText);
   const buffer = await generateDocx({
     renderedText: renderedText,
     title: input.title,
