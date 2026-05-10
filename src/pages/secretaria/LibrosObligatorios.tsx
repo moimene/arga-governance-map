@@ -1,8 +1,19 @@
-import { Building2, Library, AlertTriangle, CheckCircle2, Clock, Loader2, Search, X } from "lucide-react";
+import { Building2, Library, AlertTriangle, CheckCircle2, Clock, Loader2, Search, X, FileSignature, BookOpen } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLibrosList } from "@/hooks/useLibros";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+
+// BATCH 12 (ronda 2 F-E): mapping book_kind → ruta del contenido del libro.
+// Las rutas siguen el patrón "ver registro" (no edición) para los 2 libros
+// con contenido visualizable. Los otros book_kinds quedan sin link visible
+// (no hay registro paginado todavía).
+const BOOK_CONTENT_ROUTE: Record<string, { path: string; label: string; icon: typeof FileSignature }> = {
+  ACTAS: { path: "/secretaria/actas", label: "Ver actas registradas", icon: FileSignature },
+  SOCIOS: { path: "/secretaria/libro-socios", label: "Ver libro de socios", icon: BookOpen },
+  ACCIONES: { path: "/secretaria/libro-socios", label: "Ver libro de acciones", icon: BookOpen },
+};
 
 const BOOK_KIND_LABEL: Record<string, string> = {
   ACTAS:       "Libro de actas",
@@ -43,6 +54,7 @@ function deadlineHelp(days: number | null, isOk: boolean): string | null {
 }
 
 export default function LibrosObligatorios() {
+  const navigate = useNavigate();
   const scope = useSecretariaScope();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -63,7 +75,8 @@ export default function LibrosObligatorios() {
     const matchesStatus = !statusFilter || book.legalization_status === statusFilter;
     return matchesSearch && matchesStatus;
   });
-  const colSpan = isSociedadMode ? 4 : 5;
+  // BATCH 12: +1 columna "Contenido" para todas las vistas.
+  const colSpan = isSociedadMode ? 5 : 6;
   const alertCount = books.filter((b) => {
     const days = daysUntil(b.legalization_deadline);
     return days !== null && days <= 30 && b.legalization_status !== "LEGALIZADO";
@@ -297,6 +310,7 @@ export default function LibrosObligatorios() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Periodo</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Plazo legalización</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Legalización</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Contenido</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
@@ -366,6 +380,34 @@ export default function LibrosObligatorios() {
                       >
                         {statusLabel(b.legalization_status)}
                       </span>
+                    </td>
+                    {/* BATCH 12 (ronda 2 F-E): botón "Ver contenido" para libros
+                        con vista paginada existente (ACTAS → /actas; SOCIOS/
+                        ACCIONES → /libro-socios). Otros book_kinds quedan sin
+                        link visible mientras no haya vista de contenido. */}
+                    <td className="px-6 py-4 text-sm">
+                      {(() => {
+                        const route = BOOK_CONTENT_ROUTE[b.book_kind];
+                        if (!route) {
+                          return (
+                            <span className="text-xs text-[var(--g-text-secondary)]">
+                              Vista no disponible
+                            </span>
+                          );
+                        }
+                        const Icon = route.icon;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => navigate(scope.createScopedTo(route.path))}
+                            className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {route.label}
+                          </button>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

@@ -1,5 +1,6 @@
 // Calendario de vencimientos — Sprint E (E-D7)
 // Fuentes: convocatorias, libros, acuerdos sin sesión, mandatos (renovación)
+// BATCH 13 (ronda 2 F-F): filtrado por rol de usuario.
 
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +10,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 
 type DeadlineKind =
   | "CONVOCATORIA"
@@ -316,12 +318,37 @@ function groupByWeek(items: DeadlineItem[]): Array<{ label: string; items: Deadl
   return order.filter((k) => groups[k]).map((k) => ({ label: k, items: groups[k] }));
 }
 
+// BATCH 13 (ronda 2 F-F): mapping rol → tipos de evento visibles.
+// SECRETARIO y ADMIN_TENANT ven TODOS los tipos de deadline (gestión total).
+// Otros roles solo ven los eventos que les afectan operativamente:
+//   CONSEJERO   → convocatorias, votos sin sesión, renovaciones de mandato
+//   COMPLIANCE  → legalizaciones de libro + tramitaciones (cumplimiento)
+//   AUDITOR     → solo lectura de convocatorias / votos (no operativo)
+//   default     → conservador: solo convocatorias y votos (lo más
+//                  comunicativo, sin operaciones de secretaría)
+const VISIBLE_KINDS_BY_ROLE: Record<string, Set<DeadlineKind>> = {
+  SECRETARIO: new Set([]),  // empty = no filter, mostrar todos
+  ADMIN_TENANT: new Set([]),
+  CONSEJERO: new Set(["CONVOCATORIA", "VOTO_SIN_SESION", "RENOVACION_MANDATO"]),
+  COMPLIANCE: new Set(["LEGALIZACION_LIBRO", "TRAMITACION"]),
+  AUDITOR: new Set(["CONVOCATORIA", "VOTO_SIN_SESION"]),
+};
+
 export default function Calendario() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
-  const { data: deadlines = [], isLoading } = useCalendarioDeadlines(scopedEntityId);
+  const { data: rawDeadlines = [], isLoading } = useCalendarioDeadlines(scopedEntityId);
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
+  const { primaryRole } = useCurrentUserRole();
+
+  // Filtrar por rol: si el usuario es SECRETARIO/ADMIN_TENANT (set vacío),
+  // mostrar todos. Otros roles ven solo el subset de su VISIBLE_KINDS.
+  const visibleSet = VISIBLE_KINDS_BY_ROLE[primaryRole ?? "SECRETARIO"];
+  const deadlines = visibleSet && visibleSet.size > 0
+    ? rawDeadlines.filter((d) => visibleSet.has(d.kind))
+    : rawDeadlines;
+  const isFilteredByRole = visibleSet && visibleSet.size > 0;
 
   const groups = groupByWeek(deadlines);
   const criticalCount = deadlines.filter((d) => d.urgency === "critical").length;
@@ -341,13 +368,25 @@ export default function Calendario() {
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
           Próximos 90 días — convocatorias, legalizaciones de libros, plazos de votación y renovaciones de mandato.
         </p>
-        <div
-          className="mt-3 inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
-          style={{ borderRadius: "var(--g-radius-full)" }}
-        >
-          {scope.mode === "sociedad" && scope.selectedEntity
-            ? `Vista filtrada por sociedad: ${scope.selectedEntity.legalName}`
-            : "Vista de grupo: plazos agregados de la cartera societaria"}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <div
+            className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+          >
+            {scope.mode === "sociedad" && scope.selectedEntity
+              ? `Vista filtrada por sociedad: ${scope.selectedEntity.legalName}`
+              : "Vista de grupo: plazos agregados de la cartera societaria"}
+          </div>
+          {/* BATCH 13: indicador visible de filtrado por rol */}
+          {isFilteredByRole && (
+            <div
+              className="inline-flex items-center gap-2 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-3 py-1.5 text-xs font-medium text-[var(--g-brand-3308)]"
+              style={{ borderRadius: "var(--g-radius-full)" }}
+              title={`Como ${primaryRole}, solo ves los plazos que te afectan operativamente. SECRETARIO y ADMIN_TENANT ven la agenda completa.`}
+            >
+              Agenda personal · rol {primaryRole}
+            </div>
+          )}
         </div>
       </div>
 

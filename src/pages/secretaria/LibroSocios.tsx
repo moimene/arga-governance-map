@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { BookText, TrendingUp, TrendingDown, ArrowLeftRight, FolderOpen, Loader2, Building2 } from "lucide-react";
+import { BookText, TrendingUp, TrendingDown, ArrowLeftRight, FolderOpen, Loader2, Building2, Users } from "lucide-react";
 import { useCapitalMovements } from "@/hooks/useCapitalMovements";
+import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const MOVEMENT_LABEL: Record<string, string> = {
@@ -40,6 +41,10 @@ export default function LibroSocios() {
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
   const scopedEntityId = isSociedadMode ? selectedEntity?.id ?? undefined : undefined;
   const { data = [], isLoading } = useCapitalMovements(scopedEntityId);
+  // BATCH 11 (ronda 2 F-D): cap table actual = capital_holdings vigentes.
+  // Antes el LibroSocios solo mostraba el log de movimientos. Ahora añade
+  // sección "Cap table actual" con socios vigentes ordenados por % capital.
+  const { data: capTable = [], isLoading: capTableLoading } = useCapitalHoldings(scopedEntityId);
   const [filterType, setFilterType] = useState("ALL");
 
   const filtered = filterType === "ALL"
@@ -117,7 +122,102 @@ export default function LibroSocios() {
         </div>
       ) : null}
 
-      <div className="mb-4">
+      {/* BATCH 11 (ronda 2 F-D): Cap table actual — vigente.
+          Visible solo en modo sociedad scopeado (capital_holdings sin
+          effective_to). Tabla ordenada por % capital descendente. */}
+      {isSociedadMode && scopedEntityId ? (
+        <div
+          className="mb-5 overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] px-5 py-3">
+            <Users className="h-4 w-4 text-[var(--g-brand-3308)]" />
+            <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
+              Cap table actual
+            </h2>
+            <span className="text-xs text-[var(--g-text-secondary)]">
+              ({capTable.length} {capTable.length === 1 ? "socio" : "socios"} vigentes)
+            </span>
+          </div>
+          <table className="w-full min-w-[800px]">
+            <thead>
+              <tr className="bg-[var(--g-surface-subtle)]">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Socio</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">NIF/CIF</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Clase</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Títulos</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">% Capital</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Voto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Alta</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--g-border-subtle)]">
+              {capTableLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando cap table…
+                    </div>
+                  </td>
+                </tr>
+              ) : capTable.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                    Sin socios registrados en el libro.
+                  </td>
+                </tr>
+              ) : (
+                capTable.map((h) => {
+                  const holderName = h.holder?.full_name ?? h.holder?.denomination ?? "—";
+                  const taxId = h.holder?.tax_id ?? "—";
+                  const className = h.share_class?.name ?? h.share_class?.class_code ?? "—";
+                  const titulos = Number(h.numero_titulos ?? 0);
+                  const pctCapital = Number(h.porcentaje_capital ?? 0);
+                  const votingRights = h.voting_rights;
+                  const isTreasury = h.is_treasury;
+                  const altaDate = h.effective_from
+                    ? new Date(h.effective_from).toLocaleDateString("es-ES")
+                    : "—";
+                  return (
+                    <tr key={h.id} className="transition-colors hover:bg-[var(--g-surface-subtle)]/50">
+                      <td className="px-6 py-3 text-sm font-medium text-[var(--g-text-primary)]">
+                        {isTreasury ? "🏦 Autocartera" : holderName}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)] font-mono">{taxId}</td>
+                      <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{className}</td>
+                      <td className="px-6 py-3 text-right text-sm font-mono text-[var(--g-text-primary)]">
+                        {titulos.toLocaleString("es-ES")}
+                      </td>
+                      <td className="px-6 py-3 text-right text-sm font-mono font-semibold text-[var(--g-text-primary)]">
+                        {pctCapital.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%
+                      </td>
+                      <td className="px-6 py-3 text-sm">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium ${
+                            isTreasury
+                              ? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                              : votingRights
+                                ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                                : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                          }`}
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          {isTreasury ? "Sin voto (autocartera)" : votingRights ? "Con voto" : "Sin voto"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{altaDate}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="text-base font-semibold text-[var(--g-text-primary)]">Movimientos de capital</h2>
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
