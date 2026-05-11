@@ -65,16 +65,6 @@ BEGIN
     RAISE EXCEPTION 'p_new_kind invalido: %', p_new_kind;
   END IF;
 
-  -- Reviewer adversarial H1 (round 4): no-op check ANTES de set_config + UPDATE
-  -- para evitar contaminar agenda_item_kind_changelog WORM con filas
-  -- redundantes from=to. Paridad con TS reclassification-matrix.ts:137-141.
-  SELECT kind INTO v_current_kind
-  FROM agenda_items
-  WHERE id = p_agenda_item_id AND meeting_id = p_meeting_id;
-  IF v_current_kind IS NOT NULL AND v_current_kind = p_new_kind THEN
-    RAISE EXCEPTION 'P7: el punto ya está clasificado como % — reclasificación no-op rechazada (no contamina WORM audit).', p_new_kind;
-  END IF;
-
   -- Authn: identificar caller. service_role bypassa todas las validaciones.
   IF fn_secretaria_is_service_role() THEN
     v_user_id := NULL; -- distinguir ops humanas vs scripts admin en audit
@@ -111,6 +101,18 @@ BEGIN
     IF NOT v_has_secretario_role THEN
       RAISE EXCEPTION '403: usuario % no tiene rol SECRETARIO en tenant %', v_user_id, v_agenda_tenant_id;
     END IF;
+  END IF;
+
+  -- Codex P2 round 16: no-op check MOVIDO DESPUÉS de RBAC/tenant validation.
+  -- Antes corría primero → callers cross-tenant podían enumerar p_new_kind
+  -- values y deducir existence + current kind de agenda_items ajenos por la
+  -- diferencia entre "no-op rechazada" y "agenda_item no encontrado".
+  -- Ahora solo callers autorizados llegan a este check.
+  SELECT kind INTO v_current_kind
+  FROM agenda_items
+  WHERE id = p_agenda_item_id AND meeting_id = p_meeting_id;
+  IF v_current_kind IS NOT NULL AND v_current_kind = p_new_kind THEN
+    RAISE EXCEPTION 'P7: el punto ya está clasificado como % — reclasificación no-op rechazada (no contamina WORM audit).', p_new_kind;
   END IF;
 
   -- ─── P7 enforcement (matriz TS server-side) ──────────────────────────────
