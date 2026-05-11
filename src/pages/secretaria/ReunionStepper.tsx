@@ -2059,9 +2059,18 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const contra = currentSnapshot.vote_summary.contra;
   const abstencion = currentSnapshot.vote_summary.abstenciones;
   const hasPersistentVoters = voters.length > 0;
-  const allPointsHaveVotes = hasPersistentVoters && agendaPoints.every((_, index) =>
-    evaluateMeetingVoteCompleteness(pointRows(index)).complete
-  );
+  // Codex P1 (round 3 fix): VotacionesStep solo renderiza puntos DECISORIO en
+  // la UI de votación; INFORMATIVO/DELIBERATIVO no reciben voters/votes y
+  // `evaluateMeetingVoteCompleteness` devolvería complete=false para ellos.
+  // `allPointsHaveVotes` debe iterar exclusivamente `votablePointIndices`
+  // para no bloquear el botón "Registrar resultado" en agendas mixtas.
+  const allPointsHaveVotes =
+    votablePointIndices.length === 0
+      ? hasPersistentVoters
+      : hasPersistentVoters &&
+        votablePointIndices.every((index) =>
+          evaluateMeetingVoteCompleteness(pointRows(index)).complete,
+        );
 
   const hasResolutions = existingResolutions.length > 0 || resolutionsSaved;
   const linkedAgreementCount = existingResolutions.filter((resolution) => resolution.agreement_id).length;
@@ -2086,7 +2095,13 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         dual_evaluation: buildDualEvaluationForPoint(i),
       };
     });
-    const rows = agendaPoints.map((point, i) => {
+    // Codex P1 (round 3 fix): solo puntos DECISORIO generan rows en
+    // `meeting_resolutions`. INFORMATIVO/DELIBERATIVO se trazan en el acta vía
+    // `buildActaPuntosSequencial` (RRM art. 99, orden secuencial). Insertar
+    // rows sin votos forzaría a T4 a auto-derivar kind_resolution sobre
+    // resoluciones que no son tales (status sin sentido).
+    const rows = votablePointIndices.map((i) => {
+      const point = agendaPoints[i];
       const rowsForPoint = pointRows(i);
       const snapshot = snapshots[i];
       const materia = point.materia ?? defaultMateriaForTitle(point.punto);
