@@ -209,15 +209,23 @@ describe.skipIf(!hasAdminClient())(
 describe.skipIf(!hasAdminClient())(
   "v2 plantillas overrides — T3 plantilla_capa3_overrides_por_entidad",
   () => {
-    let testPlantillaId: string | null = null;
+    // Sentinel único por suite — solo borramos rows con este prefijo en motivo.
+    // Esto preserva overrides legítimos en la misma plantilla que pudiera tener
+    // otro proceso (real cliente v2.1+, otro test, etc.). El cleanup borra
+    // SOLO rows insertadas por este suite, identificadas por prefijo de motivo.
+    const TEST_MOTIVO_SENTINEL = "TEST_SENTINEL_V2_T3_DELETE_ME";
 
     afterEach(async () => {
-      if (testPlantillaId) {
-        await supabaseAdmin!
-          .from("plantilla_capa3_overrides_por_entidad")
-          .delete()
-          .eq("plantilla_id", testPlantillaId);
-      }
+      // Cleanup defensivo: borra SOLO rows con motivo sentinel (no afecta
+      // overrides legítimos de otro origen). Si un test inserta exitosamente
+      // (improbable — todos esperan rechazo), su row tiene el motivo sentinel
+      // y se limpia. Si un test falla en su rejection assertion y la inserción
+      // se cuela, también se limpia. Si una row externa existe con motivo
+      // distinto, se preserva.
+      await supabaseAdmin!
+        .from("plantilla_capa3_overrides_por_entidad")
+        .delete()
+        .like("motivo", `${TEST_MOTIVO_SENTINEL}%`);
     });
 
     it("CHECK length(motivo) >= 10 rejects short motivo", async () => {
@@ -232,7 +240,6 @@ describe.skipIf(!hasAdminClient())(
         // Skip if no ACTIVA plantilla in cloud (unlikely after B9)
         return;
       }
-      testPlantillaId = pl.id;
       const firstCampo = ((pl.capa3_editables ?? []) as Array<{ campo: string }>)[0]?.campo ?? "test_campo";
 
       const { error } = await supabaseAdmin!
@@ -244,7 +251,7 @@ describe.skipIf(!hasAdminClient())(
           campo: firstCampo,
           obligatoriedad_override: "OBLIGATORIO",
           compatible_with_canonical_version: "1.0.0",
-          motivo: "corto",
+          motivo: "corto", // intencionalmente <10 chars — CHECK rechaza antes que cleanup pueda llegar
         });
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/check|length|motivo/i);
@@ -259,7 +266,6 @@ describe.skipIf(!hasAdminClient())(
         .limit(1)
         .maybeSingle();
       if (!pl) return;
-      testPlantillaId = pl.id;
       const firstCampo = ((pl.capa3_editables ?? []) as Array<{ campo: string }>)[0]?.campo ?? "test_campo";
 
       const { error } = await supabaseAdmin!
@@ -271,7 +277,7 @@ describe.skipIf(!hasAdminClient())(
           campo: firstCampo,
           opciones_override: [],
           compatible_with_canonical_version: "1.0.0",
-          motivo: "test motivo válido al menos 10 chars",
+          motivo: `${TEST_MOTIVO_SENTINEL}_opciones_vacias`,
         });
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/array vacío|opciones_override/i);
@@ -286,7 +292,6 @@ describe.skipIf(!hasAdminClient())(
         .limit(1)
         .maybeSingle();
       if (!pl) return;
-      testPlantillaId = pl.id;
 
       const { error } = await supabaseAdmin!
         .from("plantilla_capa3_overrides_por_entidad")
@@ -297,7 +302,7 @@ describe.skipIf(!hasAdminClient())(
           campo: "campo_inexistente_zzz",
           obligatoriedad_override: "OBLIGATORIO",
           compatible_with_canonical_version: "1.0.0",
-          motivo: "test motivo válido al menos 10 chars",
+          motivo: `${TEST_MOTIVO_SENTINEL}_campo_inexistente`,
         });
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/no existe en capa3_editables/i);
@@ -312,7 +317,6 @@ describe.skipIf(!hasAdminClient())(
         .limit(1)
         .maybeSingle();
       if (!pl) return;
-      testPlantillaId = pl.id;
       const firstCampo = ((pl.capa3_editables ?? []) as Array<{ campo: string }>)[0]?.campo ?? "test_campo";
 
       const { error } = await supabaseAdmin!
@@ -324,7 +328,7 @@ describe.skipIf(!hasAdminClient())(
           campo: firstCampo,
           // No overrides set
           compatible_with_canonical_version: "1.0.0",
-          motivo: "test motivo válido al menos 10 chars",
+          motivo: `${TEST_MOTIVO_SENTINEL}_at_least_one`,
         });
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/check|capa3_at_least_one_override/i);
