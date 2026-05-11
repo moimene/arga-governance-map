@@ -312,6 +312,18 @@ export default function GenerarDocumentoStepper() {
 
   useEffect(() => {
     if (!agreement || !selectedPlantilla) return;
+    // Codex P2 round 9: bloquear la hidratación de defaults hasta que los
+    // overrides estén cargados. Antes: el primer render con
+    // hasLoadedOverrides=false usaba el canonical `effectivePlantilla` →
+    // normalizedCapa3Fields traía SOLO los defaults canónicos/heurísticos →
+    // se populaba capa3Values → cuando los overrides arribaban, el effect
+    // skipeaba (next[key]?.trim() truthy) → entity-specific
+    // default_value_override nunca llegaba al formulario ni al documento.
+    //
+    // Solución: si entityId está disponible pero los overrides no han cargado
+    // todavía, esperar. Si entityId NO está disponible (agreement aún se
+    // resuelve, etc.), permitimos defaults (no hay overrides posibles).
+    if (agreement.entity_id && !hasLoadedOverrides) return;
     const defaults = buildDefaultCapa3Values(normalizedCapa3Fields, agreement, resolvedVars);
     if (Object.keys(defaults).length === 0) return;
     setCapa3Values((current) => {
@@ -324,7 +336,7 @@ export default function GenerarDocumentoStepper() {
       }
       return changed ? next : current;
     });
-  }, [agreement, normalizedCapa3Fields, resolvedVars, selectedPlantilla]);
+  }, [agreement, normalizedCapa3Fields, resolvedVars, selectedPlantilla, hasLoadedOverrides]);
 
   const buildComposerRequest = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
