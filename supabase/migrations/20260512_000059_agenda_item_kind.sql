@@ -11,16 +11,17 @@
 -- Functions / RPC:
 --   - set_kind_change_context (SECURITY DEFINER) — session vars helper for T3 audit
 --
--- Triggers (6 total — cross-validation + immutability + audit):
+-- Triggers (5 total — cross-validation + immutability + audit):
 --   T1 tr_agenda_kind_immutable_after_voted     BEFORE UPDATE agenda_items
 --   T2 tr_agenda_kind_immutable_after_closed    BEFORE UPDATE agenda_items
---   T3 tr_agenda_kind_audit_after_convoked      AFTER  UPDATE agenda_items
+--   T3 tr_agenda_kind_audit_after_convoked      AFTER  UPDATE agenda_items (SECURITY DEFINER)
 --   T4 tr_resolution_kind_matches_agenda        BEFORE INSERT/UPDATE meeting_resolutions
 --   T5 tr_agreement_requires_decisorio          BEFORE INSERT/UPDATE agreements
---   T6 tr_agenda_kind_only_for_meeting_mode     BEFORE INSERT/UPDATE agenda_items
+--   (T6 dropped post-adversarial: meetings.adoption_mode no existe en schema real;
+--    invariante semántico ya cubierto por data model — ver §4.10 comentario)
 --
 -- Spec: docs/superpowers/specs/2026-05-12-agenda-item-kind-spec.md (§4.1–4.10)
--- PR: feature/agenda-item-kind (17 hallazgos resueltos en 4 rondas adversariales)
+-- PR: feature/agenda-item-kind (5 rondas adversariales + 4 BLOQUEANTES post-impl)
 
 BEGIN;
 
