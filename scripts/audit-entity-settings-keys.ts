@@ -39,8 +39,19 @@ const LEGACY_ENTITIES_KEYS = new Set([
   "datos_registrales_resumen",    // computed: tomo+folio+hoja+inscripcion concatenados
 ]);
 
-// Regex que extrae claves usadas en {{ENTIDAD.<key>}} o {{entities.<key>}}
-const ENTITY_KEY_REGEX = /\{\{\s*(?:ENTIDAD|entities)\.([a-zA-Z0-9_]+)\s*[}|]/g;
+// Regex permisivo que extrae claves ENTIDAD.<key> o entities.<key> donde
+// quiera que aparezcan en capa1_inmutable. Esto cubre TANTO interpolación
+// directa {{ENTIDAD.x}} COMO referencias dentro de subexpressions/helpers
+// como {{#if (eq ENTIDAD.x "y")}}, {{#unless ENTIDAD.x}}, {{lookup ENTIDAD.x ...}},
+// que son los patrones principales de v2 para activar/desactivar bloques.
+//
+// Reportado en review humana pre-merge: el regex anterior anchored to {{...}}
+// dejaba pasar typos en condicionales como {{#if (eq ENTIDAD.es_cotizadaaa "SÍ")}}
+// que renderizan silenciosamente como falsy sin que el audit los detectara.
+//
+// Lookahead [^a-zA-Z0-9_.] (o end-of-string) asegura que el match termina
+// en cualquier carácter no-identificador (espacio, ), }, ", etc.).
+const ENTITY_KEY_REGEX = /(?:ENTIDAD|entities)\.([a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_.]|$)/g;
 
 async function main() {
   // 1. Cargar plantillas ACTIVA y catalog
