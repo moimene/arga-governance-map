@@ -32,6 +32,11 @@ const LEGACY_ENTITIES_KEYS = new Set([
   "jurisdiction", "legal_form", "entity_type_detail", "denominacion_social",
   "cif", "domicilio_social", "registro_mercantil", "tomo", "folio", "hoja",
   "inscripcion", "lugar", "tipo_social", "articulo_estatutos_comision",
+  // Aliases legacy detectados en plantillas v1 (deuda v2.1: implementar mapping en resolveEntityVars)
+  "nif",                          // alias de tax_id
+  "tipo_sociedad",                // alias de tipo_social
+  "tipo_sociedad_unipersonal",    // computed: tipo_social + ' Unipersonal' si es_unipersonal
+  "datos_registrales_resumen",    // computed: tomo+folio+hoja+inscripcion concatenados
 ]);
 
 // Regex que extrae claves usadas en {{ENTIDAD.<key>}} o {{entities.<key>}}
