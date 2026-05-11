@@ -163,22 +163,22 @@ describe("useReclassifyAgendaItemKind", () => {
       motivo: "Elevación tras consulta legal",
     });
 
-    // Orden esperado:
+    // Codex P1 #1 fix: orden esperado tras consolidación a RPC transaccional
     //   from:meetings → maybeSingle (meeting meta)
     //   from:agenda_items → maybeSingle (current kind)
-    //   rpc:set_kind_change_context
-    //   from:agenda_items → update
-    const rpcIdx = callLog.indexOf("rpc:set_kind_change_context");
-    const updateIdx = callLog.indexOf("update");
+    //   rpc:reclassify_agenda_item_kind (set_config + UPDATE atomicamente)
+    const rpcIdx = callLog.indexOf("rpc:reclassify_agenda_item_kind");
     expect(rpcIdx).toBeGreaterThan(-1);
-    expect(updateIdx).toBeGreaterThan(-1);
-    expect(rpcIdx).toBeLessThan(updateIdx);
 
-    expect(mockRpc).toHaveBeenCalledWith("set_kind_change_context", {
+    expect(mockRpc).toHaveBeenCalledWith("reclassify_agenda_item_kind", {
+      p_agenda_item_id: "ai-1",
+      p_meeting_id: "m-1",
+      p_new_kind: "DECISORIO",
       p_motivo: "Elevación tras consulta legal",
       p_user_id: "user-secretario-001",
     });
-    expect(mockFromUpdate).toHaveBeenCalledWith({ kind: "DECISORIO" });
+    // mockFromUpdate NO debe ser llamado en v1.3.1+ — UPDATE ahora va dentro del RPC
+    expect(mockFromUpdate).not.toHaveBeenCalled();
   });
 
   it("RBAC: rechaza si user no tiene rol SECRETARIO", async () => {
@@ -210,7 +210,7 @@ describe("useReclassifyAgendaItemKind", () => {
       }),
     ).rejects.toThrow(/motivo.*3 caracteres/i);
 
-    expect(callLog).not.toContain("rpc:set_kind_change_context");
+    expect(callLog).not.toContain("rpc:reclassify_agenda_item_kind");
     expect(mockFromUpdate).not.toHaveBeenCalled();
   });
 
@@ -273,7 +273,8 @@ describe("useReclassifyAgendaItemKind", () => {
     });
 
     expect(mockRpc).toHaveBeenCalled();
-    expect(mockFromUpdate).toHaveBeenCalledWith({ kind: "DECISORIO" });
+    // v1.3.1 Codex P1 #1: UPDATE va dentro del RPC, no via supabase.from().update()
+    expect(mockFromUpdate).not.toHaveBeenCalled();
   });
 
   it("meeting no encontrada: rechaza con mensaje claro", async () => {
@@ -304,7 +305,7 @@ describe("useReclassifyAgendaItemKind", () => {
     ).rejects.toThrow(/agenda_item ai-NOT-FOUND no encontrado/);
   });
 
-  it("RPC set_kind_change_context falla: aborta antes del UPDATE", async () => {
+  it("RPC reclassify_agenda_item_kind falla: aborta sin commitear cambio", async () => {
     const { result } = renderHook(() => useReclassifyAgendaItemKind(), { wrapper });
 
     // Capturar la implementación actual y sustituirla puntualmente
@@ -313,7 +314,7 @@ describe("useReclassifyAgendaItemKind", () => {
       .spyOn(supabase, "rpc")
       .mockImplementationOnce(
         // @ts-expect-error mock with simplified shape — runtime contract is { data, error }
-        async () => ({ data: null, error: { message: "set_kind_change_context falló" } }),
+        async () => ({ data: null, error: { message: "reclassify_agenda_item_kind falló" } }),
       );
 
     await expect(
@@ -323,7 +324,7 @@ describe("useReclassifyAgendaItemKind", () => {
         newKind: "DECISORIO",
         motivo: "Motivo válido",
       }),
-    ).rejects.toThrow(/set_kind_change_context falló/);
+    ).rejects.toThrow(/reclassify_agenda_item_kind falló/);
 
     expect(mockFromUpdate).not.toHaveBeenCalled();
     rpcSpy.mockRestore();
