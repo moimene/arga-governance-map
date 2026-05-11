@@ -122,15 +122,11 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     .select("key, default_value")
     .eq("estado_catalog", "ACTIVA");
 
-  const catalogDefaults: Record<string, unknown> = {};
-  for (const row of (catalog ?? []) as Array<{ key: string; default_value: unknown }>) {
-    if (row.default_value !== null && !(row.key in settingsByKey)) {
-      catalogDefaults[row.key] = row.default_value;
-    }
-  }
-
-  return {
-    // Campos directos de entities (compatibilidad existente)
+  // Campos derivados de la fila entities (legacy — fuente de verdad cuando existe valor real).
+  // IMPORTANTE: estos valores deben ganar sobre catalog defaults para claves que solapan
+  // (ej. tipo_social existe como columna real en entities Y como catalog key con default 'SA').
+  // Si tipo_social = 'SL' en BD, NO debe ser sobrescrito por el default 'SA' del catalog.
+  const legacyFieldsRaw: Record<string, unknown> = {
     name: data.common_name || data.legal_name,
     tax_id: data.tax_id || data.registration_number,
     registration_number: data.registration_number,
@@ -148,11 +144,36 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     hoja: data.registry_sheet || "—",
     inscripcion: data.registry_inscription || "—",
     lugar: data.city || data.address || "—",
-    tipo_social: data.tipo_social || data.legal_form, // SA, SL
+    tipo_social: data.tipo_social || data.legal_form,
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
-    // Catalog defaults (claves no overrideadas)
+  };
+
+  // Construir catalog defaults excluyendo claves que ya tienen valor real en legacy fields.
+  // Esto previene que el default canónico del catalog ('SA' para tipo_social) sobrescriba
+  // el valor real de la entidad ('SL', 'SLU', etc.) cuando no hay setting explícito.
+  const legacyKeysWithRealValue = new Set(
+    Object.entries(legacyFieldsRaw)
+      .filter(([, v]) => v !== undefined && v !== null && v !== "—")
+      .map(([k]) => k),
+  );
+
+  const catalogDefaults: Record<string, unknown> = {};
+  for (const row of (catalog ?? []) as Array<{ key: string; default_value: unknown }>) {
+    if (
+      row.default_value !== null &&
+      !(row.key in settingsByKey) &&
+      !legacyKeysWithRealValue.has(row.key)
+    ) {
+      catalogDefaults[row.key] = row.default_value;
+    }
+  }
+
+  return {
+    // Catalog defaults (sólo claves NO presentes ya en legacy ni en settings)
     ...catalogDefaults,
-    // entity_settings (claves overrideadas) — gana sobre catalog defaults
+    // Campos directos de entities (legacy — fuente de verdad para claves overlapped)
+    ...legacyFieldsRaw,
+    // entity_settings (overrides explícitos) — gana sobre todo
     ...settingsByKey,
   };
 }
