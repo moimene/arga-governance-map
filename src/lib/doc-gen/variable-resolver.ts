@@ -110,27 +110,40 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     .eq("entity_id", entityId)
     .eq("tenant_id", tenantId);
 
-  // Codex P2 round 14: keys booleanas legacy (`{{#if es_cotizada}}` etc.)
-  // que pueden venir como string "SÍ"/"NO" desde entity_settings (JSONB).
-  // Normalizamos a boolean para que Handlebars `{{#if}}` evalúe consistente
-  // independiente de si el valor procede de entity_settings (string) o
-  // entities columna (boolean).
-  const BOOLEAN_KEYS = new Set(["es_cotizada", "es_unipersonal"]);
-  const normalizeBooleanIfApplicable = (key: string, value: unknown): unknown => {
-    if (!BOOLEAN_KEYS.has(key)) return value;
+  // Codex P2 round 15: dual representation para keys booleanas.
+  // - `es_cotizada` / `es_unipersonal` → string "SÍ"/"NO" (v2 spec canonical,
+  //   usado en `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}`)
+  // - `is_cotizada` / `is_unipersonal` → boolean alias (legacy compat para
+  //   `{{#if es_cotizada}}` migrated → `{{#if is_cotizada}}`)
+  //
+  // Decisión: la canonical key sigue el spec v2 (string). El alias `is_*`
+  // permite a plantillas legacy migrar a forma boolean correcta sin romper
+  // el contrato spec.
+  const YES_NO_KEYS = new Set(["es_cotizada", "es_unipersonal"]);
+  const normalizeYesNoIfApplicable = (key: string, value: unknown): unknown => {
+    if (!YES_NO_KEYS.has(key)) return value;
+    if (typeof value === "boolean") return value ? "SÍ" : "NO";
+    if (typeof value === "string") {
+      const norm = value.trim().toUpperCase();
+      if (norm === "SÍ" || norm === "SI" || norm === "TRUE" || norm === "YES") return "SÍ";
+      if (norm === "NO" || norm === "FALSE") return "NO";
+    }
+    return value;
+  };
+  const yesNoToBool = (value: unknown): boolean | undefined => {
     if (typeof value === "boolean") return value;
     if (typeof value === "string") {
       const norm = value.trim().toUpperCase();
       if (norm === "SÍ" || norm === "SI" || norm === "TRUE" || norm === "YES") return true;
       if (norm === "NO" || norm === "FALSE") return false;
     }
-    return value;
+    return undefined;
   };
 
   const settingsByKey: Record<string, unknown> = {};
   for (const row of (settings ?? []) as Array<{ key: string; value: unknown }>) {
-    // value es JSONB — convertirlo a tipo nativo + normalizar booleanas
-    settingsByKey[row.key] = normalizeBooleanIfApplicable(row.key, row.value);
+    // value es JSONB — convertirlo a tipo nativo + normalizar canonical SÍ/NO
+    settingsByKey[row.key] = normalizeYesNoIfApplicable(row.key, row.value);
   }
 
   // Cargar catalog defaults para claves no overrideadas
@@ -143,20 +156,16 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   // IMPORTANTE: estos valores deben ganar sobre catalog defaults para claves que solapan
   // (ej. tipo_social existe como columna real en entities Y como catalog key con default 'SA').
   // Si tipo_social = 'SL' en BD, NO debe ser sobrescrito por el default 'SA' del catalog.
-  // Codex P2 round 14: preservar boolean true/false desde la columna entities.
-  // Plantillas legacy usan `{{#if es_cotizada}}` → Handlebars trata cualquier
-  // string no vacío como truthy. Si exponíamos "NO" string, la rama listed-only
-  // se ejecutaba para entidades NO cotizadas.
-  // Plantillas v2 con `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}` reciben false (no
-  // matchea "SÍ") → rama no-listed (también correcto). Helper de plantilla
-  // puede normalizar si necesita string.
-  const boolFromColumn = (val: unknown): boolean | undefined => {
-    if (val === true) return true;
-    if (val === false) return false;
+  // Codex P2 round 15: derivar "SÍ"/"NO" string desde la columna entities
+  // (canonical v2 spec). El alias boolean `is_*` se añade abajo en el spread
+  // final para plantillas legacy que necesitan Handlebars `{{#if}}` directo.
+  const yesNoFromColumn = (val: unknown): string | undefined => {
+    if (val === true) return "SÍ";
+    if (val === false) return "NO";
     return undefined;
   };
-  const esCotizadaFromEntity = boolFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
-  const esUnipersonalFromEntity = boolFromColumn(
+  const esCotizadaFromEntity = yesNoFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
+  const esUnipersonalFromEntity = yesNoFromColumn(
     (data as { es_unipersonal?: unknown }).es_unipersonal,
   );
 
@@ -232,12 +241,18 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
       !(row.key in settingsByKey) &&
       !legacyKeysWithRealValue.has(row.key)
     ) {
-      // Codex P2 round 14: normalizar booleanas también en catalog defaults
-      catalogDefaults[row.key] = normalizeBooleanIfApplicable(row.key, row.default_value);
+      // Codex P2 round 15: normalizar a SÍ/NO canonical en catalog defaults
+      catalogDefaults[row.key] = normalizeYesNoIfApplicable(row.key, row.default_value);
     }
   }
 
-  return {
+  // Codex P2 round 15: compute aliases boolean (`is_cotizada`, `is_unipersonal`)
+  // derivados del valor canonical resuelto. Esto cierra la trinidad de
+  // representaciones para Handlebars:
+  //   - `{{es_cotizada}}` → "SÍ" o "NO" (v2 canonical, eq comparable)
+  //   - `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}` → matchea correctamente
+  //   - `{{#if is_cotizada}}` → true cuando "SÍ" (legacy {{#if}} pattern)
+  const finalValues: Record<string, unknown> = {
     // Capa 1: catalog defaults (fallback final si nada más responde)
     ...catalogDefaults,
     // Capa 2: entities columna real — gana sobre catalog, NO gana sobre settings
@@ -245,6 +260,14 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     // Capa 3: entity_settings (admin overrides) — gana sobre todo
     ...settingsByKey,
   };
+  for (const yesNoKey of YES_NO_KEYS) {
+    const aliasKey = yesNoKey.replace(/^es_/, "is_");
+    if (aliasKey !== yesNoKey) {
+      const bool = yesNoToBool(finalValues[yesNoKey]);
+      if (bool !== undefined) finalValues[aliasKey] = bool;
+    }
+  }
+  return finalValues;
 }
 
 /**

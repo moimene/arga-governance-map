@@ -320,9 +320,12 @@ describe("variable-resolver", () => {
 
     // BD real wins: tipo_social=SL, no el catalog default SA
     expect(result.values.tipo_social).toBe("SL");
-    // Codex P2 round 14: es_cotizada catalog default 'NO' string ahora se
-    // normaliza a boolean false para consistencia con `{{#if}}` legacy.
-    expect(result.values.es_cotizada).toBe(false);
+    // Codex P2 round 15: es_cotizada canonical "SÍ"/"NO" string (v2 spec).
+    // El alias boolean `is_cotizada` se expone via ENTIDAD nested namespace
+    // (las plantillas que lo necesitan acceden con `{{ENTIDAD.is_cotizada}}`).
+    expect(result.values.es_cotizada).toBe("NO");
+    const entidad1 = result.values.ENTIDAD as Record<string, unknown> | undefined;
+    expect(entidad1?.is_cotizada).toBe(false);
   });
 
   // ── Codex P1 — dotted refs en plantillas v2 ──────────────────────────────
@@ -349,16 +352,17 @@ describe("variable-resolver", () => {
 
     // Forma legacy plana sigue funcionando
     expect(result.values.cargo_secretario_label).toBe("Secretario General");
-    // Codex P2 round 14: "SÍ" string en entity_settings se normaliza a
-    // boolean true para que `{{#if es_cotizada}}` legacy evalúe correctamente.
-    expect(result.values.es_cotizada).toBe(true);
+    // Codex P2 round 15: canonical "SÍ" string (v2 spec); alias boolean via
+    // namespace nested ENTIDAD.is_cotizada
+    expect(result.values.es_cotizada).toBe("SÍ");
 
     // Forma v2 dotted: ENTIDAD es objeto navegable por Handlebars
     const entidad = result.values.ENTIDAD as Record<string, unknown> | undefined;
     expect(entidad).toBeDefined();
     expect(entidad?.cargo_secretario_label).toBe("Secretario General");
-    expect(entidad?.es_cotizada).toBe(true);
+    expect(entidad?.es_cotizada).toBe("SÍ");
     expect(entidad?.tipo_social).toBe("SA");
+    expect(entidad?.is_cotizada).toBe(true); // alias boolean para `{{#if ENTIDAD.is_cotizada}}`
   });
 
   it("Handlebars renderiza {{ENTIDAD.x}} y {{#if (eq ENTIDAD.x \"SÍ\")}} desde el resolver", async () => {
@@ -386,13 +390,13 @@ describe("variable-resolver", () => {
       { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
     );
 
-    // Codex P2 round 14: es_cotizada ahora es boolean canónico → usar
-    // `{{#if}}` directamente (forma idiomática Handlebars). Plantillas
-    // legacy con `{{#if es_cotizada}}` también funcionan.
+    // Codex P2 round 15: v2 canonical SÍ/NO string. Plantillas usan
+    // `{{eq "SÍ"}}` para v2 spec compliance. Legacy `{{#if is_cotizada}}`
+    // también verificado (alias boolean).
     const rendered = renderTemplate({
       template:
         "Cargo: {{ENTIDAD.cargo_secretario_label}}. " +
-        "{{#if ENTIDAD.es_cotizada}}Sociedad cotizada.{{else}}No cotizada.{{/if}}",
+        "{{#if (eq ENTIDAD.es_cotizada \"SÍ\")}}Sociedad cotizada.{{else}}No cotizada.{{/if}}",
       variables: result.values,
     });
 
@@ -400,5 +404,15 @@ describe("variable-resolver", () => {
     expect(rendered.text).toContain("Cargo: Secretario General");
     expect(rendered.text).toContain("Sociedad cotizada.");
     expect(rendered.text).not.toContain("No cotizada.");
+
+    // Verificar alias boolean via nested namespace para plantillas que
+    // prefieren `{{#if}}` idiomático (forma migrada de legacy v1)
+    const legacyRender = renderTemplate({
+      template: "{{#if ENTIDAD.is_cotizada}}Listed.{{else}}NotListed.{{/if}}",
+      variables: result.values,
+    });
+    expect(legacyRender.ok).toBe(true);
+    expect(legacyRender.text).toContain("Listed.");
+    expect(legacyRender.text).not.toContain("NotListed.");
   });
 });
