@@ -112,34 +112,82 @@ COMMENT ON FUNCTION set_kind_change_context IS
   'Setea session vars consumidas por trigger T3 audit log. DEPRECATED en v1.3.1 — set_config(..., true) es transaction-local pero PostgREST abre transacciones separadas por HTTP request → session vars no se propagan al UPDATE subsiguiente. Usar reclassify_agenda_item_kind() RPC consolidado en su lugar.';
 
 -- ──────────────────────────────────────────────────────────────────────────────
--- 4.4b — RPC consolidado (Codex P1 #1 fix): set_config + UPDATE en una sola
--- transacción atómica. Reemplaza el patrón set_kind_change_context + UPDATE
--- separados que perdía session vars entre HTTP requests via PostgREST.
+-- 4.4b — RPC consolidado seguro (Codex P1 #1 v2 security hardening).
+-- Cambios respecto a primera versión:
+--   (a) p_user_id ELIMINADO — caller derivado de auth.uid() server-side
+--   (b) tenant scope validado via fn_secretaria_assert_tenant_access
+--   (c) rol SECRETARIO validado en rbac_user_roles JOIN rbac_roles
+--   (d) service_role bypasea validaciones (scripts admin + backfill + tests)
 -- ──────────────────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS reclassify_agenda_item_kind(uuid, uuid, text, text, uuid);
+
 CREATE OR REPLACE FUNCTION reclassify_agenda_item_kind(
   p_agenda_item_id uuid,
   p_meeting_id uuid,
   p_new_kind text,
-  p_motivo text,
-  p_user_id uuid
+  p_motivo text
 )
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_user_id uuid;
+  v_agenda_tenant_id uuid;
+  v_has_secretario_role boolean;
 BEGIN
-  IF length(p_motivo) < 3 THEN
+  -- Validación motivo
+  IF p_motivo IS NULL OR length(p_motivo) < 3 THEN
     RAISE EXCEPTION 'motivo debe tener al menos 3 caracteres';
   END IF;
+
+  -- Validación kind enum
   IF p_new_kind NOT IN ('INFORMATIVO', 'DELIBERATIVO', 'DECISORIO') THEN
     RAISE EXCEPTION 'p_new_kind invalido: %', p_new_kind;
   END IF;
 
-  -- set_config y UPDATE corren en LA MISMA TRANSACCIÓN PL/pgSQL,
-  -- por lo que el trigger T3 ve los session vars al ejecutarse.
+  -- Authn: identificar caller. service_role bypassa todas las validaciones.
+  IF fn_secretaria_is_service_role() THEN
+    v_user_id := NULL; -- distinguir ops humanas vs scripts admin en audit
+  ELSE
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+      RAISE EXCEPTION '401: usuario no autenticado';
+    END IF;
+  END IF;
+
+  -- Resolver tenant del agenda_item
+  SELECT tenant_id INTO v_agenda_tenant_id
+  FROM agenda_items
+  WHERE id = p_agenda_item_id
+    AND meeting_id = p_meeting_id;
+  IF v_agenda_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'agenda_item % no encontrado en meeting %', p_agenda_item_id, p_meeting_id;
+  END IF;
+
+  -- AuthZ tenant + role (skip para service_role)
+  IF NOT fn_secretaria_is_service_role() THEN
+    PERFORM fn_secretaria_assert_tenant_access(v_agenda_tenant_id);
+
+    SELECT EXISTS (
+      SELECT 1
+      FROM rbac_user_roles ur
+      JOIN rbac_roles r ON r.id = ur.role_id
+      WHERE ur.user_id = v_user_id
+        AND ur.tenant_id = v_agenda_tenant_id
+        AND ur.is_active = true
+        AND r.role_code = 'SECRETARIO'
+    ) INTO v_has_secretario_role;
+
+    IF NOT v_has_secretario_role THEN
+      RAISE EXCEPTION '403: usuario % no tiene rol SECRETARIO en tenant %', v_user_id, v_agenda_tenant_id;
+    END IF;
+  END IF;
+
+  -- set_config y UPDATE en la misma transacción → T3 captura motivo + autor
   PERFORM set_config('app.kind_change_motivo', p_motivo, true);
-  PERFORM set_config('app.user_id', p_user_id::text, true);
+  PERFORM set_config('app.user_id', COALESCE(v_user_id::text, ''), true);
 
   UPDATE agenda_items
   SET kind = p_new_kind
@@ -152,11 +200,11 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION reclassify_agenda_item_kind FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION reclassify_agenda_item_kind TO authenticated;
+REVOKE EXECUTE ON FUNCTION reclassify_agenda_item_kind(uuid, uuid, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION reclassify_agenda_item_kind(uuid, uuid, text, text) TO authenticated, service_role;
 
-COMMENT ON FUNCTION reclassify_agenda_item_kind IS
-  'Codex P1 #1 fix: RPC consolidado set_config + UPDATE en una transacción atómica. Trigger T3 captura motivo + autor desde session vars en la misma transacción. Reemplaza el patrón set_kind_change_context + supabase.from(agenda_items).update() que dividía en 2 HTTP requests sin compartir session.';
+COMMENT ON FUNCTION reclassify_agenda_item_kind(uuid, uuid, text, text) IS
+  'Codex P1 #1 v2 security: (a) auth.uid() server-side (no p_user_id forgeable), (b) tenant scope via fn_secretaria_assert_tenant_access, (c) rol SECRETARIO en rbac_user_roles, (d) service_role bypassa. Audit author capturado via session var consumida por trigger T3 en la misma transacción.';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 4.5 — Trigger T1: kind inmutable post-voted (cualquier kind_resolution)

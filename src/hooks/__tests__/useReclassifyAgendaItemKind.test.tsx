@@ -170,12 +170,12 @@ describe("useReclassifyAgendaItemKind", () => {
     const rpcIdx = callLog.indexOf("rpc:reclassify_agenda_item_kind");
     expect(rpcIdx).toBeGreaterThan(-1);
 
+    // v1.3.1 Codex P1 #1 security: p_user_id NO se pasa — auth.uid() derivado server-side
     expect(mockRpc).toHaveBeenCalledWith("reclassify_agenda_item_kind", {
       p_agenda_item_id: "ai-1",
       p_meeting_id: "m-1",
       p_new_kind: "DECISORIO",
       p_motivo: "Elevación tras consulta legal",
-      p_user_id: "user-secretario-001",
     });
     // mockFromUpdate NO debe ser llamado en v1.3.1+ — UPDATE ahora va dentro del RPC
     expect(mockFromUpdate).not.toHaveBeenCalled();

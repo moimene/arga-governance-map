@@ -267,10 +267,19 @@ function resolvePointKind(
   point: DebatePunto,
   kindIndex: Map<string, AgendaItemKind>,
 ): AgendaItemKind {
+  // Codex P1 #2 fix: resolución por orden de prioridad
+  //  1. agenda_items.kind (SSOT autoritative cuando el row existe)
+  //  2. point.kind propagado desde convocatoria JSON o savedDebates JSON
+  //  3. Default conservador DELIBERATIVO
   if (point.source_table === "agenda_items" && point.source_id) {
     const fromTable = kindIndex.get(point.source_id);
     if (fromTable) return fromTable;
   }
+  // Codex P1 #2: aceptar kind propagado desde convocatoria JSON, savedDebates, etc.
+  // Sin esto, un punto DECISORIO de convocatoria recién creada (sin row en
+  // agenda_items todavía) renderiza como DELIBERATIVO en VotacionesStep y queda
+  // out-of-rail, bloqueando el flujo normal vote/materialization.
+  if (point.kind) return point.kind;
   return "DELIBERATIVO";
 }
 
@@ -1379,6 +1388,8 @@ interface DebatePunto {
   agreement_id?: string | null;
   group_campaign_id?: string | null;
   group_campaign_step?: string | null;
+  /** Codex P1 #2 fix: kind propagado desde fuente (convocatoria JSON, agenda_items, etc.). */
+  kind?: AgendaItemKind | null;
 }
 
 function DebatesStep({ meetingId }: { meetingId?: string }) {
