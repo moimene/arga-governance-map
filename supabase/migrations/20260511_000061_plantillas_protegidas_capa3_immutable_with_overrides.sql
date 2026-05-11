@@ -54,6 +54,7 @@ BEGIN
   -- R2: detectar campos eliminados que tienen overrides
   -- OLD.campos = array de campo strings en OLD.capa3_editables
   -- NEW.campos = array de campo strings en NEW.capa3_editables
+  -- Nota: el filtro NULL-safe se añade en migración 000062 (Codex P2 round 7).
   SELECT array_agg(elem->>'campo') INTO v_old_campos
   FROM jsonb_array_elements(COALESCE(OLD.capa3_editables, '[]'::jsonb)) AS elem
   WHERE elem ? 'campo';
