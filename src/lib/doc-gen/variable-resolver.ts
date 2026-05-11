@@ -126,6 +126,20 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   // IMPORTANTE: estos valores deben ganar sobre catalog defaults para claves que solapan
   // (ej. tipo_social existe como columna real en entities Y como catalog key con default 'SA').
   // Si tipo_social = 'SL' en BD, NO debe ser sobrescrito por el default 'SA' del catalog.
+  // Codex P2 round 12: helper SÍ/NO desde columna boolean.
+  // Si entities.<col> está populado (true/false), devuelve "SÍ"/"NO".
+  // Si la columna es null/undefined, devuelve undefined → no se incluye en
+  // legacyFieldsRaw y el catalog default gana (comportamiento legacy).
+  const yesNoFromColumn = (val: unknown): string | undefined => {
+    if (val === true) return "SÍ";
+    if (val === false) return "NO";
+    return undefined;
+  };
+  const esCotizadaFromEntity = yesNoFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
+  const esUnipersonalFromEntity = yesNoFromColumn(
+    (data as { es_unipersonal?: unknown }).es_unipersonal,
+  );
+
   const legacyFieldsRaw: Record<string, unknown> = {
     name: data.common_name || data.legal_name,
     tax_id: data.tax_id || data.registration_number,
@@ -146,6 +160,14 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     lugar: data.city || data.address || "—",
     tipo_social: data.tipo_social || data.legal_form,
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
+    // Codex P2 round 12: derivar es_cotizada / es_unipersonal de la fila
+    // entities (columnas booleanas reales). ARGA Seguros está seeded como
+    // entities.es_cotizada=true; sin esto, el resolver caía al catalog default
+    // 'NO' → plantillas con {{ENTIDAD.es_cotizada}} o condicionales MAR/cotizada
+    // renderizaban la rama no-listed. Solo se exponen cuando la columna tiene
+    // valor (true/false); si es NULL, undefined → catalog default gana.
+    ...(esCotizadaFromEntity !== undefined ? { es_cotizada: esCotizadaFromEntity } : {}),
+    ...(esUnipersonalFromEntity !== undefined ? { es_unipersonal: esUnipersonalFromEntity } : {}),
   };
 
   // Codex P2 round 8: dos conjuntos distintos.
