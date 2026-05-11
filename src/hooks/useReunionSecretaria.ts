@@ -401,7 +401,11 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
       const [agendaRes, convocatoriaRes, agreementsRes] = await Promise.all([
         supabase
           .from("agenda_items")
-          .select("id, order_number, title, description")
+          // kind + decision_subtype necesarios para que mergeMeetingAgendaSources
+          // propague la clasificación a debates/votación (sin ellos, source.kind
+          // viene undefined y el merge cae a DELIBERATIVO por defecto — Codex P2
+          // round 2 + reviewer adversarial C1).
+          .select("id, order_number, title, description, kind, decision_subtype")
           .eq("meeting_id", meetingId!)
           .order("order_number", { ascending: true }),
         explicitConvocatoriaId

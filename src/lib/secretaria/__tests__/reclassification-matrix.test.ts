@@ -196,4 +196,127 @@ describe("checkReclassificationAllowed — matriz P7", () => {
     );
     expect(r.allowed).toBe(true);
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Estados canónicos de BD (CHECK constraint `meetings_status_check`):
+  //   'DRAFT' (inglés literal) / 'CONVOCADA' / 'CELEBRADA' / 'CANCELADA'.
+  // El comportamiento debe ser idéntico al de los strings legacy mapeados:
+  //   BORRADOR → DRAFT, CONVOKED → CONVOCADA, OPEN → CELEBRADA,
+  //   CLOSED/CERRADA → CANCELADA.
+  // Estos tests garantizan que los strings que realmente persiste la BD
+  // producen las decisiones correctas — punto de regresión histórico (Codex
+  // P1: trigger T3 audit fallaba porque comprobaba 'CONVOKED'/'OPEN' que
+  // nunca existieron en este schema).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it("'DRAFT' (canónico BD) + CONSEJO + DELIB→DECIS: permitido", () => {
+    const r = checkReclassificationAllowed(
+      base({ meetingStatus: "DRAFT", organType: "CONSEJO" }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("'BORRADOR' (legacy) se mapea a DRAFT: permitido en JUNTA formal", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "BORRADOR",
+        organType: "JUNTA_GENERAL",
+        isUniversal: false,
+      }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("CONVOCADA + CONSEJO + DELIB→DECIS: permitido (igual que CONVOKED legacy)", () => {
+    const r = checkReclassificationAllowed(
+      base({ meetingStatus: "CONVOCADA", organType: "CONSEJO" }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("CONVOCADA + JUNTA convocada formalmente + DELIB→DECIS: DENEGADO (vicio procedimiento)", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CONVOCADA",
+        organType: "JUNTA_GENERAL",
+        isUniversal: false,
+      }),
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toMatch(/Junta convocada formalmente/i);
+    expect(r.reason).toMatch(/vicio de procedimiento|art\. 174/i);
+  });
+
+  it("CONVOCADA + JUNTA universal + DELIB→DECIS: permitido (unanimidad asumida)", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CONVOCADA",
+        organType: "JUNTA_GENERAL",
+        isUniversal: true,
+      }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("CELEBRADA + CONSEJO + DELIB→DECIS: permitido (igual que OPEN legacy, UI valida quórum)", () => {
+    const r = checkReclassificationAllowed(
+      base({ meetingStatus: "CELEBRADA", organType: "CONSEJO" }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("CELEBRADA + JUNTA convocada formalmente + DELIB→DECIS: DENEGADO (vicio procedimiento)", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CELEBRADA",
+        organType: "JUNTA",
+        isUniversal: false,
+      }),
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toMatch(/Junta convocada formalmente/i);
+  });
+
+  it("CELEBRADA + JUNTA universal + DELIB→DECIS: permitido", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CELEBRADA",
+        organType: "JUNTA",
+        isUniversal: true,
+      }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("'CANCELADA' (canónico BD) + cualquier órgano: DENEGADO (terminal, igual que CLOSED)", () => {
+    const r = checkReclassificationAllowed(
+      base({ meetingStatus: "CANCELADA", organType: "CONSEJO" }),
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toMatch(/Reunión cancelada|firmada el acta/i);
+  });
+
+  it("'CERRADA' (legacy español) se mapea a CANCELADA: DENEGADO incluso en JUNTA universal", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CERRADA",
+        organType: "JUNTA",
+        isUniversal: true,
+      }),
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toMatch(/Reunión cancelada/i);
+  });
+
+  it("status canónico case-insensitive: 'celebrada' (lowercase) trata igual que 'CELEBRADA'", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "celebrada",
+        organType: "JUNTA",
+        isUniversal: false,
+      }),
+    );
+    expect(r.allowed).toBe(false);
+    expect(r.reason).toMatch(/Junta convocada formalmente/i);
+  });
 });

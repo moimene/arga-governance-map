@@ -10,13 +10,20 @@
  *
  * Triggers under test (5):
  *   T1 tr_agenda_kind_immutable_after_voted   BEFORE UPDATE agenda_items
- *   T2 tr_agenda_kind_immutable_after_closed  BEFORE UPDATE agenda_items
+ *   T2 tr_agenda_kind_immutable_after_closed  BEFORE UPDATE agenda_items  (CANCELADA — Spanish)
  *   T3 tr_agenda_kind_audit_after_convoked    AFTER  UPDATE agenda_items (SECURITY DEFINER)
+ *                                             — fires on CONVOCADA/CELEBRADA (Spanish)
  *   T4 tr_resolution_kind_matches_agenda      BEFORE INSERT/UPDATE meeting_resolutions
  *   T5 tr_agreement_requires_decisorio        BEFORE INSERT/UPDATE agreements
  *
  * Plus WORM coverage: UPDATE/DELETE on agenda_item_kind_changelog rejected
  * (worm_guard trigger from migration helper).
+ *
+ * NOTE: meeting.status uses Spanish enums in production. Migration 000059
+ * shipped with English placeholders (CONVOKED/OPEN/CLOSED) that did not match
+ * the meetings_status_check CHECK constraint
+ * (DRAFT, CONVOCADA, CELEBRADA, CANCELADA) — migration 000061 patched the
+ * trigger bodies. This test now exercises the Spanish state names.
  *
  * Runtime env: requires VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in
  * `.env.local`. Without those, `hasAdminClient()` returns false and every
@@ -26,7 +33,7 @@
  * Sentinel cleanup pattern: each describe block uses a unique sentinel
  * substring (TEST_T1_AGENDAKIND_SENTINEL, TEST_T2_..., etc.) in title /
  * resolution_text / slug fields so afterEach can scope DELETE strictly to
- * rows this suite inserted. Real demo data with status='OPEN' or audit
+ * rows this suite inserted. Real demo data with status='CELEBRADA' or audit
  * rows from production code are NEVER touched.
  *
  * SCHEMA NOTES (verified against supabase/functions/_types/database.ts):
@@ -203,10 +210,11 @@ describe.skipIf(!hasAdminClient())(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T2 — Immutability post-CLOSED
+// T2 — Immutability post-CANCELADA (Spanish status; production uses CANCELADA
+// as the "closed" terminal state). Migration 000061 mapped CLOSED → CANCELADA.
 // ─────────────────────────────────────────────────────────────────────────────
 describe.skipIf(!hasAdminClient())(
-  "Agenda Item Kind — T2 immutability post-CLOSED",
+  "Agenda Item Kind — T2 immutability post-CANCELADA",
   () => {
     const SENTINEL = "TEST_T2_AGENDAKIND_SENTINEL_PLEASE_DELETE";
     let bodyId: string | null = null;
@@ -235,9 +243,9 @@ describe.skipIf(!hasAdminClient())(
         .like("slug", `%${SENTINEL.toLowerCase()}%`);
     });
 
-    it("rejects kind change when meeting.status='CLOSED'", async () => {
+    it("rejects kind change when meeting.status='CANCELADA'", async () => {
       if (!entityPresent) {
-        console.warn("[T2] Skipping CLOSED scenario — body missing.");
+        console.warn("[T2] Skipping CANCELADA scenario — body missing.");
         return;
       }
 
@@ -247,7 +255,7 @@ describe.skipIf(!hasAdminClient())(
         .insert({
           tenant_id: DEMO_TENANT,
           body_id: bodyId!,
-          slug: `${SENTINEL.toLowerCase()}-closed`,
+          slug: `${SENTINEL.toLowerCase()}-cancelada`,
           status: "DRAFT",
         })
         .select("id")
@@ -260,17 +268,17 @@ describe.skipIf(!hasAdminClient())(
         .insert({
           meeting_id: meeting!.id,
           order_number: 1,
-          title: `${SENTINEL} — closed test`,
+          title: `${SENTINEL} — cancelada test`,
           tenant_id: DEMO_TENANT,
         })
         .select("id")
         .single();
       expect(errA).toBeNull();
 
-      // 3. Flip meeting to CLOSED
+      // 3. Flip meeting to CANCELADA (terminal/closed status in production)
       const { error: errCloseMeeting } = await supabaseAdmin!
         .from("meetings")
-        .update({ status: "CLOSED" })
+        .update({ status: "CANCELADA" })
         .eq("id", meeting!.id);
       expect(errCloseMeeting).toBeNull();
 
@@ -281,7 +289,7 @@ describe.skipIf(!hasAdminClient())(
         .update({ kind: "DECISORIO" })
         .eq("id", agenda!.id);
       expect(errU).not.toBeNull();
-      expect(errU?.message.toLowerCase()).toMatch(/inmutable|closed|cerrada|reunión/);
+      expect(errU?.message.toLowerCase()).toMatch(/inmutable|cancelada|reunión/);
     });
 
     it("allows kind change when meeting.status='DRAFT' (happy path)", async () => {
@@ -326,10 +334,11 @@ describe.skipIf(!hasAdminClient())(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T3 — Audit log after CONVOKED/OPEN
+// T3 — Audit log after CONVOCADA/CELEBRADA (Spanish status names).
+// Migration 000061 mapped CONVOKED → CONVOCADA, OPEN → CELEBRADA.
 // ─────────────────────────────────────────────────────────────────────────────
 describe.skipIf(!hasAdminClient())(
-  "Agenda Item Kind — T3 audit log on kind change post-CONVOKED",
+  "Agenda Item Kind — T3 audit log on kind change post-CONVOCADA",
   () => {
     const SENTINEL = "TEST_T3_AGENDAKIND_SENTINEL_PLEASE_DELETE";
     let bodyId: string | null = null;
@@ -374,21 +383,21 @@ describe.skipIf(!hasAdminClient())(
         .like("slug", `%${SENTINEL.toLowerCase()}%`);
     });
 
-    it("INSERTs audit log row when status='CONVOKED' and kind changes", async () => {
+    it("INSERTs audit log row when status='CONVOCADA' and kind changes", async () => {
       if (!entityPresent) {
-        console.warn("[T3] Skipping CONVOKED audit test — body missing.");
+        console.warn("[T3] Skipping CONVOCADA audit test — body missing.");
         return;
       }
 
       // Unique motivo per run so we can scope audit-log assertion safely.
-      const runMotivo = `${SENTINEL}_motivo_${Date.now()}_convoked`;
+      const runMotivo = `${SENTINEL}_motivo_${Date.now()}_convocada`;
 
       const { data: meeting, error: errM } = await supabaseAdmin!
         .from("meetings")
         .insert({
           tenant_id: DEMO_TENANT,
           body_id: bodyId!,
-          slug: `${SENTINEL.toLowerCase()}-convoked-${Date.now()}`,
+          slug: `${SENTINEL.toLowerCase()}-convocada-${Date.now()}`,
           status: "DRAFT",
         })
         .select("id")
@@ -400,17 +409,17 @@ describe.skipIf(!hasAdminClient())(
         .insert({
           meeting_id: meeting!.id,
           order_number: 1,
-          title: `${SENTINEL} — convoked audit`,
+          title: `${SENTINEL} — convocada audit`,
           tenant_id: DEMO_TENANT,
         })
         .select("id")
         .single();
       expect(errA).toBeNull();
 
-      // Promote to CONVOKED before changing kind
+      // Promote to CONVOCADA before changing kind
       await supabaseAdmin!
         .from("meetings")
-        .update({ status: "CONVOKED" })
+        .update({ status: "CONVOCADA" })
         .eq("id", meeting!.id);
 
       // Set audit context (motivo gets captured by T3 trigger via
@@ -447,7 +456,7 @@ describe.skipIf(!hasAdminClient())(
       const auditRow = audit![0];
       expect(auditRow.from_kind).toBe("DELIBERATIVO"); // default
       expect(auditRow.to_kind).toBe("DECISORIO");
-      expect(auditRow.meeting_status_at_change).toBe("CONVOKED");
+      expect(auditRow.meeting_status_at_change).toBe("CONVOCADA");
     });
 
     it("does NOT insert audit log when status='DRAFT'", async () => {
@@ -837,7 +846,7 @@ describe.skipIf(!hasAdminClient())(
 
       await supabaseAdmin
         .from("meetings")
-        .update({ status: "CONVOKED" })
+        .update({ status: "CONVOCADA" })
         .eq("id", meeting!.id);
 
       // Trigger T3 INSERT into changelog

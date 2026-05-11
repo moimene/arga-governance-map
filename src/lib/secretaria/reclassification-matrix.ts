@@ -1,5 +1,5 @@
 /**
- * Matriz P7 — reclasificación de `agenda_items.kind` (v1.3).
+ * Matriz P7 — reclasificación de `agenda_items.kind` (v1.4).
  *
  * Evalúa si una reclasificación de `kind` (INFORMATIVO / DELIBERATIVO /
  * DECISORIO) es admisible según el estado procedimental de la reunión y el
@@ -7,19 +7,29 @@
  * defensa en profundidad antes del UPDATE (los triggers T2/T3 son el último
  * backstop).
  *
+ * Estados canónicos (español, los que persiste la BD):
+ *   - `BORRADOR`   (legacy inglés: `DRAFT`)
+ *   - `CONVOCADA`  (legacy inglés: `CONVOKED`)
+ *   - `CELEBRADA`  (legacy inglés: `OPEN`)
+ *   - `CERRADA`    (legacy inglés: `CLOSED`)
+ *
+ * `normalizeStatus` mapea ambos vocabularios al canónico español para
+ * defensa en profundidad: producción usa español, pero código histórico y
+ * tests pueden seguir pasando los valores ingleses sin romper.
+ *
  * Reglas (spec §10 R7 + §6 P7):
  *
- * - `meeting.status === 'CLOSED'` → NUNCA permitido (T2 ya bloquea, doble
+ * - `meeting.status === 'CERRADA'` → NUNCA permitido (T2 ya bloquea, doble
  *   check UX).
- * - `meeting.status === 'DRAFT'` → siempre permitido (sin restricciones).
- * - `meeting.status === 'CONVOKED'`:
+ * - `meeting.status === 'BORRADOR'` → siempre permitido (sin restricciones).
+ * - `meeting.status === 'CONVOCADA'`:
  *    · CONSEJO → permitido (con audit).
  *    · JUNTA convocada formalmente (no universal) + newKind=DECISORIO →
  *      NO permitido (vicio procedimiento, requiere reconvocar).
  *    · JUNTA universal → permitido (asume unanimidad por construcción).
  *    · default (sin organType conocido) → permitido (degradación conservadora
  *      a CONSEJO: si no podemos demostrar JUNTA formal, no bloqueamos).
- * - `meeting.status === 'OPEN'`:
+ * - `meeting.status === 'CELEBRADA'`:
  *    · CONSEJO + reclassify a DECISORIO → permitido si quórum unánime (la UI
  *      pre-condiciona; la matriz asume "sí" y deja al UI exigir constancia).
  *    · JUNTA universal + unanimidad → permitido.
@@ -35,7 +45,16 @@
  */
 import type { AgendaItemKind } from "./agenda-kind";
 
-export type MeetingStatus = "DRAFT" | "CONVOKED" | "OPEN" | "CLOSED" | string;
+export type MeetingStatus =
+  | "BORRADOR"
+  | "CONVOCADA"
+  | "CELEBRADA"
+  | "CERRADA"
+  | "DRAFT"
+  | "CONVOKED"
+  | "OPEN"
+  | "CLOSED"
+  | string;
 
 export type OrganType = "CONSEJO" | "JUNTA" | "JUNTA_GENERAL" | "CONSEJO_ADMIN" | string;
 
@@ -76,12 +95,36 @@ function normalizeOrganType(value?: OrganType): "CONSEJO" | "JUNTA" | "UNKNOWN" 
   return "UNKNOWN";
 }
 
-function normalizeStatus(value: MeetingStatus): "DRAFT" | "CONVOKED" | "OPEN" | "CLOSED" | "OTHER" {
+/**
+ * Normaliza el estado de la reunión al vocabulario canónico de BD.
+ *
+ * CHECK constraint real `meetings_status_check` en producción:
+ *   ('DRAFT', 'CONVOCADA', 'CELEBRADA', 'CANCELADA')
+ *
+ * - DRAFT (inglés literal, NO 'BORRADOR') — reunión sin emitir convocatoria
+ * - CONVOCADA — convocatoria emitida, antes de la sesión
+ * - CELEBRADA — sesión abierta o en desarrollo
+ * - CANCELADA — terminal (acta firmada o reunión abortada)
+ *
+ * Mapea también valores legacy (BORRADOR / CONVOKED / OPEN / CLOSED / CERRADA)
+ * que pudieron usarse en código histórico, tests previos o documentación
+ * en español natural. La comparación es case-insensitive.
+ */
+function normalizeStatus(
+  value: MeetingStatus,
+): "DRAFT" | "CONVOCADA" | "CELEBRADA" | "CANCELADA" | "OTHER" {
   const upper = String(value ?? "").toUpperCase().trim();
+  // Canónico BD (DRAFT inglés, resto español)
   if (upper === "DRAFT") return "DRAFT";
-  if (upper === "CONVOKED") return "CONVOKED";
-  if (upper === "OPEN") return "OPEN";
-  if (upper === "CLOSED") return "CLOSED";
+  if (upper === "CONVOCADA") return "CONVOCADA";
+  if (upper === "CELEBRADA") return "CELEBRADA";
+  if (upper === "CANCELADA") return "CANCELADA";
+  // Legacy → mapeo al canónico
+  if (upper === "BORRADOR") return "DRAFT";        // tests/docs en español
+  if (upper === "CONVOKED") return "CONVOCADA";    // inglés legacy
+  if (upper === "OPEN") return "CELEBRADA";        // inglés legacy
+  if (upper === "CLOSED") return "CANCELADA";      // inglés legacy
+  if (upper === "CERRADA") return "CANCELADA";     // español alterno (incorrecto)
   return "OTHER";
 }
 
@@ -101,23 +144,23 @@ export function checkReclassificationAllowed(
   const status = normalizeStatus(input.meetingStatus);
   const organ = normalizeOrganType(input.organType);
 
-  // Hard block: reunión cerrada
-  if (status === "CLOSED") {
+  // Hard block: reunión terminal (CANCELADA, legacy: CLOSED/CERRADA)
+  if (status === "CANCELADA") {
     return {
       allowed: false,
       reason:
-        "Reunión cerrada: la reclasificación está prohibida una vez firmada el acta. " +
+        "Reunión cancelada: la reclasificación está prohibida una vez firmada el acta. " +
         "(T2 enforcement; este es el chequeo previo UX.)",
     };
   }
 
-  // DRAFT: sin restricciones procedimentales
+  // DRAFT (canónico BD, legacy: BORRADOR): sin restricciones procedimentales
   if (status === "DRAFT") {
     return { allowed: true };
   }
 
-  // CONVOKED y OPEN: depende de órgano
-  if (status === "CONVOKED" || status === "OPEN") {
+  // CONVOCADA y CELEBRADA (legacy: CONVOKED / OPEN): depende de órgano
+  if (status === "CONVOCADA" || status === "CELEBRADA") {
     if (organ === "JUNTA") {
       const isUniversal = input.isUniversal === true;
       if (!isUniversal && newKind === "DECISORIO") {

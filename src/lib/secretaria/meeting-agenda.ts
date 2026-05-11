@@ -303,6 +303,12 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
       notas: point.notas || source.notas,
       group_campaign_id: source.group_campaign_id ?? point.group_campaign_id ?? null,
       group_campaign_step: source.group_campaign_step ?? point.group_campaign_step ?? null,
+      // Codex P2 fix: propaga kind y decision_subtype desde sources autoritativos.
+      // Precedencia: saved gana sobre source — si el usuario reclasificó manualmente
+      // un punto (saved tiene kind no nulo), no se pisa con el source. Si saved es
+      // null/undefined, hereda del source (ej. DECISORIO viniendo de convocatoria).
+      kind: point.kind ?? source.kind ?? null,
+      decision_subtype: point.decision_subtype ?? source.decision_subtype ?? null,
     });
   });
 
