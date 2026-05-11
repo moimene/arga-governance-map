@@ -109,7 +109,54 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION set_kind_change_context IS
-  'Setea session vars consumidas por trigger T3 audit log. Llamar inmediatamente antes de UPDATE agenda_items.kind. Si no se llama, audit log captura "sin_motivo_proporcionado" + autor NULL (detectable en dashboard).';
+  'Setea session vars consumidas por trigger T3 audit log. DEPRECATED en v1.3.1 — set_config(..., true) es transaction-local pero PostgREST abre transacciones separadas por HTTP request → session vars no se propagan al UPDATE subsiguiente. Usar reclassify_agenda_item_kind() RPC consolidado en su lugar.';
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- 4.4b — RPC consolidado (Codex P1 #1 fix): set_config + UPDATE en una sola
+-- transacción atómica. Reemplaza el patrón set_kind_change_context + UPDATE
+-- separados que perdía session vars entre HTTP requests via PostgREST.
+-- ──────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION reclassify_agenda_item_kind(
+  p_agenda_item_id uuid,
+  p_meeting_id uuid,
+  p_new_kind text,
+  p_motivo text,
+  p_user_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF length(p_motivo) < 3 THEN
+    RAISE EXCEPTION 'motivo debe tener al menos 3 caracteres';
+  END IF;
+  IF p_new_kind NOT IN ('INFORMATIVO', 'DELIBERATIVO', 'DECISORIO') THEN
+    RAISE EXCEPTION 'p_new_kind invalido: %', p_new_kind;
+  END IF;
+
+  -- set_config y UPDATE corren en LA MISMA TRANSACCIÓN PL/pgSQL,
+  -- por lo que el trigger T3 ve los session vars al ejecutarse.
+  PERFORM set_config('app.kind_change_motivo', p_motivo, true);
+  PERFORM set_config('app.user_id', p_user_id::text, true);
+
+  UPDATE agenda_items
+  SET kind = p_new_kind
+  WHERE id = p_agenda_item_id
+    AND meeting_id = p_meeting_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'agenda_item % no encontrado en meeting %', p_agenda_item_id, p_meeting_id;
+  END IF;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION reclassify_agenda_item_kind FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION reclassify_agenda_item_kind TO authenticated;
+
+COMMENT ON FUNCTION reclassify_agenda_item_kind IS
+  'Codex P1 #1 fix: RPC consolidado set_config + UPDATE en una transacción atómica. Trigger T3 captura motivo + autor desde session vars en la misma transacción. Reemplaza el patrón set_kind_change_context + supabase.from(agenda_items).update() que dividía en 2 HTTP requests sin compartir session.';
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 4.5 — Trigger T1: kind inmutable post-voted (cualquier kind_resolution)
@@ -202,6 +249,13 @@ CREATE TRIGGER tr_agenda_kind_audit_after_convoked
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 4.8 — Trigger T4: cross-validation BIDIRECCIONAL resolution↔agenda (D1)
+--   + auto-derive kind_resolution (Codex P1 #2 fix)
+--
+-- Codex P1 #2: con DEFAULT 'DECISION', fn_save_meeting_resolutions (que NO pasa
+-- kind_resolution) rompe el save para puntos INFO/DELIB porque T4 rechaza
+-- DECISION sobre no-DECISORIO. Fix: auto-derive desde agenda.kind cuando el
+-- caller envía el default 'DECISION' pero el agenda es DELIB/INFO. Errores
+-- explícitos (DELIBERATION_OUTCOME sobre INFORMATIVO, etc.) siguen rechazados.
 -- ──────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION resolution_kind_matches_agenda()
 RETURNS TRIGGER AS $$
@@ -218,7 +272,17 @@ BEGIN
     RAISE EXCEPTION 'meeting_resolutions.agenda_item_index=% no corresponde a ningún agenda_item de la reunión %', NEW.agenda_item_index, NEW.meeting_id;
   END IF;
 
-  -- Bidireccional D1: cada kind_resolution requiere su agenda kind
+  -- Codex P1 #2 auto-derive: si kind_resolution viene con el DEFAULT 'DECISION'
+  -- pero el agenda es DELIB/INFO, derivar al kind_resolution correcto. Esto
+  -- mantiene fn_save_meeting_resolutions y otros legacy callers funcionando
+  -- sin necesidad de actualizar todos los call sites.
+  IF NEW.kind_resolution = 'DECISION' AND v_agenda_kind = 'DELIBERATIVO' THEN
+    NEW.kind_resolution := 'DELIBERATION_OUTCOME';
+  ELSIF NEW.kind_resolution = 'DECISION' AND v_agenda_kind = 'INFORMATIVO' THEN
+    NEW.kind_resolution := 'INFORMATION_NOTED';
+  END IF;
+
+  -- Bidireccional D1 (post-derivación): cada kind_resolution requiere su agenda kind
   IF NEW.kind_resolution = 'DECISION' AND v_agenda_kind != 'DECISORIO' THEN
     RAISE EXCEPTION 'kind_resolution=DECISION requiere agenda_items.kind=DECISORIO (actual: %). Reclasifica el punto antes de votar.', v_agenda_kind;
   END IF;

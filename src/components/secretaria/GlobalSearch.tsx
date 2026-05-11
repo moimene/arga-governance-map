@@ -227,19 +227,67 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       if (meetingIds.length === 0) return [];
     }
 
+    // Codex P2 fix: NO embed agenda_items via PostgREST porque no hay FK definida
+    // entre meeting_resolutions y agenda_items (la relación es por
+    // meeting_id + order_number, no por FK directa). PostgREST rechazaría el
+    // join y Promise.allSettled silenciaría el error → agenda items nunca
+    // aparecerían en resultados.
+    //
+    // Solución: 2 queries separadas y merge cliente-side via (meeting_id, order_number).
     let request = supabase
       .from("meeting_resolutions")
-      // agenda_items join provides the authoritative kind (agenda_item.kind v1.3 SSOT)
-      // and order_number for hash navigation (#punto-N).
       .select(
-        "id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution, agenda_items(kind, order_number, title)"
+        "id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution"
       )
       .eq("tenant_id", tenantId)
       .or(`resolution_text.ilike.${q},required_majority_code.ilike.${q},status.ilike.${q}`);
     if (meetingIds) request = request.in("meeting_id", meetingIds);
-    const { data, error } = await request.limit(8);
+    const { data: resolutionRows, error } = await request.limit(8);
     if (error) throw error;
-    return (data ?? []) as unknown as ResolutionRow[];
+
+    const resolutions = (resolutionRows ?? []) as Array<{
+      id: string;
+      meeting_id: string;
+      agreement_id: string | null;
+      agenda_item_index: number;
+      resolution_text: string;
+      required_majority_code: string | null;
+      status: string;
+      kind_resolution: string | null;
+    }>;
+    if (resolutions.length === 0) return [];
+
+    // Segunda query: agenda_items para los meetings + order_numbers que aparecen
+    // en las resolutions. Filter manual por (meeting_id, order_number) pairs.
+    const uniqueMeetingIds = Array.from(new Set(resolutions.map((r) => r.meeting_id)));
+    const { data: agendaRows } = await supabase
+      .from("agenda_items")
+      .select("meeting_id, order_number, kind, title")
+      .in("meeting_id", uniqueMeetingIds);
+
+    const agendaByKey = new Map<string, { kind: string | null; title: string | null }>();
+    for (const ai of (agendaRows ?? []) as Array<{
+      meeting_id: string;
+      order_number: number;
+      kind: string | null;
+      title: string | null;
+    }>) {
+      agendaByKey.set(`${ai.meeting_id}:${ai.order_number}`, {
+        kind: ai.kind,
+        title: ai.title,
+      });
+    }
+
+    // Merge: cada resolution recibe su agenda_items match (o null si orphan).
+    return resolutions.map((r) => {
+      const match = agendaByKey.get(`${r.meeting_id}:${r.agenda_item_index}`);
+      return {
+        ...r,
+        agenda_items: match
+          ? { kind: match.kind, order_number: r.agenda_item_index, title: match.title }
+          : null,
+      };
+    }) as unknown as ResolutionRow[];
   }
 
   const [agreements, convocatorias, nosessions, policies, findings, resolutions] = await Promise.allSettled([

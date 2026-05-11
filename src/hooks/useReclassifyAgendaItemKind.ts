@@ -114,19 +114,26 @@ export function useReclassifyAgendaItemKind() {
         throw new Error(`Matriz P7: ${matrixCheck.reason ?? "reclasificación denegada"}`);
       }
 
-      // 5. RPC: setear session vars ANTES del UPDATE
-      const { error: rpcError } = await supabase.rpc("set_kind_change_context", {
+      // 5+6. Codex P1 #1 fix: RPC consolidado que ejecuta set_config + UPDATE
+      // en una sola transacción atómica. El patrón anterior (RPC + UPDATE como
+      // 2 HTTP requests separados via PostgREST) perdía los session vars porque
+      // set_config(..., true) es transaction-local — cada HTTP request abre
+      // una transacción nueva. Resultado: trigger T3 audit log siempre con
+      // motivo='sin_motivo_proporcionado' + autor NULL.
+      //
+      // El RPC `reclassify_agenda_item_kind` (SECURITY DEFINER) hace:
+      //   1. set_config('app.kind_change_motivo', ...) + set_config('app.user_id', ...)
+      //   2. UPDATE agenda_items SET kind = ... WHERE id = ... AND meeting_id = ...
+      //   3. T3 trigger ve los session vars en la MISMA transacción y captura
+      //      autor + motivo correctamente.
+      const { error: rpcError } = await supabase.rpc("reclassify_agenda_item_kind", {
+        p_agenda_item_id: params.agendaItemId,
+        p_meeting_id: params.meetingId,
+        p_new_kind: params.newKind,
         p_motivo: params.motivo,
         p_user_id: user.id,
       });
       if (rpcError) throw rpcError;
-
-      // 6. UPDATE kind
-      const { error: updErr } = await supabase
-        .from("agenda_items")
-        .update({ kind: params.newKind })
-        .eq("id", params.agendaItemId);
-      if (updErr) throw updErr;
 
       return { agendaItemId: params.agendaItemId, newKind: params.newKind };
     },
