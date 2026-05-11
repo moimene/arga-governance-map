@@ -92,7 +92,7 @@ function valueAsText(value: unknown): string {
 }
 
 function buildDefaultCapa3Values(
-  fields: Array<{ campo: string }>,
+  fields: Array<{ campo: string; default?: string; opciones?: string[] }>,
   agreement: AgreementFull,
   resolvedVars: Record<string, unknown>,
 ): Record<string, string> {
@@ -121,6 +121,17 @@ function buildDefaultCapa3Values(
   for (const field of fields) {
     const key = field.campo;
     const normalizedKey = key.toLowerCase();
+
+    // Codex P2 round 5: si la capa3 (incluyendo override de entidad) declara
+    // un `default` para este campo, gana sobre las heurísticas por nombre.
+    // Esto permite que `plantilla_capa3_overrides_por_entidad.default_value_override`
+    // surta efecto en el documento generado (antes era inert: solo
+    // obligatoriedad se conectaba).
+    if (typeof field.default === "string" && field.default.trim().length > 0) {
+      defaults[key] = field.default;
+      continue;
+    }
+
     if (normalizedKey === "tabla_respuestas" || normalizedKey.includes("respuestas")) {
       defaults[key] = responseSummary;
     } else if (

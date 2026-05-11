@@ -24,6 +24,13 @@ export interface Capa3Field {
   campo: string;
   obligatoriedad: string;
   descripcion: string;
+  /** Default sugerido (Codex P2 round 5). Aplicado por buildDefaultCapa3Values. */
+  default?: string;
+  /**
+   * Lista cerrada de opciones (Codex P2 round 5). Si está presente y no vacía,
+   * Capa3Form renderiza `<select>` en lugar de `<textarea>`.
+   */
+  opciones?: string[];
 }
 
 interface Capa3FormProps {
@@ -166,7 +173,8 @@ export function Capa3Form({
               {field.descripcion}
             </p>
 
-            {/* Input */}
+            {/* Input — Codex P2 round 5: si el campo declara `opciones`,
+                renderiza un <select> con lista cerrada. Si no, textarea libre. */}
             {readOnly ? (
               <div
                 className={`px-3 py-2 text-sm text-[var(--g-text-primary)] ${config.bgClass}`}
@@ -176,6 +184,31 @@ export function Capa3Form({
                   <span className="italic text-[var(--g-text-secondary)]">Sin completar</span>
                 )}
               </div>
+            ) : field.opciones && field.opciones.length > 0 ? (
+              <select
+                id={`capa3-${field.campo}`}
+                value={values[field.campo] || ""}
+                onChange={(e) => handleChange(field.campo, e.target.value)}
+                aria-required={required}
+                aria-invalid={required && isEmpty}
+                aria-describedby={`capa3-${field.campo}-desc`}
+                className={`w-full px-3 py-2 text-sm text-[var(--g-text-primary)] border ${
+                  required && isEmpty
+                    ? config.borderClass
+                    : "border-[var(--g-border-subtle)]"
+                } focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] transition-colors`}
+                style={{
+                  borderRadius: "var(--g-radius-md)",
+                  background: "var(--g-surface-card)",
+                }}
+              >
+                <option value="">— Seleccione una opción —</option>
+                {field.opciones.map((opcion) => (
+                  <option key={opcion} value={opcion}>
+                    {opcion}
+                  </option>
+                ))}
+              </select>
             ) : (
               <textarea
                 id={`capa3-${field.campo}`}

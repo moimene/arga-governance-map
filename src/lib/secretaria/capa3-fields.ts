@@ -4,6 +4,19 @@ export interface NormalizedCapa3Field {
   campo: string;
   obligatoriedad: string;
   descripcion: string;
+  /**
+   * Default value sugerido (Codex P2 round 5): permite que
+   * `entity_settings` o `plantilla_capa3_overrides_por_entidad` propaguen un
+   * valor por defecto al render del formulario. `buildDefaultCapa3Values`
+   * lo aplica si el campo está vacío.
+   */
+  default?: string;
+  /**
+   * Lista cerrada de opciones permitidas (Codex P2 round 5): si está presente
+   * y tiene >=1 elemento, `Capa3Form` renderiza un `<select>` en lugar de
+   * `<input>`/`<textarea>`. Valores fuera de la lista quedan descartados.
+   */
+  opciones?: string[];
 }
 
 export interface NormalizedCapa3Draft {
@@ -19,6 +32,8 @@ interface RawCapa3Field {
   descripcion?: unknown;
   tipo?: unknown;
   label?: unknown;
+  default?: unknown;
+  opciones?: unknown;
 }
 
 const SAFE_FIELD_NAME = /^[a-zA-Z_][a-zA-Z0-9_.-]*$/;
@@ -151,6 +166,24 @@ export function isRequiredCapa3Field(field: Pick<NormalizedCapa3Field, "obligato
   return field.obligatoriedad === "OBLIGATORIO";
 }
 
+function normalizeOpciones(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    // Acepta strings y números; rechaza objects/arrays/null para no exponer
+    // shapes complejos al render del <select>.
+    if (typeof item === "string" || typeof item === "number") {
+      const s = String(item).trim();
+      if (s && !seen.has(s)) {
+        seen.add(s);
+        out.push(s);
+      }
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
   if (!Array.isArray(value)) return [];
 
@@ -164,14 +197,30 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
     if (!campo || !SAFE_FIELD_NAME.test(campo) || seen.has(campo)) continue;
     seen.add(campo);
 
-    normalized.push({
+    const opciones = normalizeOpciones(raw.opciones);
+    // Codex P2 round 5: preservar `default` y `opciones` del override para
+    // que `buildDefaultCapa3Values` y `Capa3Form` los puedan consumir aguas
+    // abajo. Antes se descartaban silenciosamente → entity-specific defaults
+    // y allowed options no surtían efecto en Step 2 ni en el documento.
+    const defaultValueRaw = normalizeDraftValue(raw.default);
+    // Si hay opciones explícitas, validar que el default esté dentro
+    // (defensa: ignorar default incompatible con la lista cerrada).
+    const defaultValue =
+      defaultValueRaw && (!opciones || opciones.includes(defaultValueRaw))
+        ? defaultValueRaw
+        : undefined;
+
+    const entry: NormalizedCapa3Field = {
       campo,
       obligatoriedad: normalizeObligatoriedad(raw.obligatoriedad),
       descripcion:
         (asString(raw.descripcion).trim() ||
           asString(raw.label).trim() ||
           defaultDescription(campo)).slice(0, 240),
-    });
+    };
+    if (defaultValue !== undefined) entry.default = defaultValue;
+    if (opciones !== undefined) entry.opciones = opciones;
+    normalized.push(entry);
   }
 
   return normalized;
