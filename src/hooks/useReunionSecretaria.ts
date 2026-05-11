@@ -291,9 +291,13 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
     .eq("meeting_id", meetingId)
     .eq("tenant_id", tenantId);
   if (selErr) {
-    // eslint-disable-next-line no-console
-    console.warn("[materializeAgendaItems] select existing falló:", selErr.message);
-    return;
+    // Codex P2 round 15: abortar en lugar de loguear. Si el lookup falla
+    // (RLS drift, transient PostgREST), no podemos garantizar idempotencia
+    // y el usuario llegaría a voting con BD posiblemente inconsistente.
+    // Mejor fallar temprano con mensaje claro.
+    throw new Error(
+      `Lookup de agenda_items existentes falló: ${selErr.message}. No se puede garantizar la materialización idempotente; reintenta la operación.`,
+    );
   }
   const existingByOrder = new Map<number, { id: string; kind: string | null }>();
   for (const row of (existingRows ?? []) as Array<{

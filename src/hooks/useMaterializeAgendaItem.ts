@@ -41,7 +41,12 @@ export function useMaterializeAgendaItem() {
         throw new Error("meetingId y tenantId son obligatorios para materializar");
       }
       const safeTitle = (params.title ?? "").trim().slice(0, 240) || "Punto sin título";
-      const { data, error } = await supabase
+      // Codex P2 round 15: idempotencia. Si dos clientes con cache stale
+      // intentan materializar el mismo (meeting_id, order_number) concurrente,
+      // el UNIQUE ix_agenda_items_meeting_order (000066) rechaza duplicados.
+      // En lugar de fallar, primero intentamos INSERT y si choca con UNIQUE
+      // (23505), hacemos SELECT del row existente y devolvemos su id.
+      const insertResult = await supabase
         .from("agenda_items")
         .insert({
           meeting_id: params.meetingId,
@@ -55,9 +60,29 @@ export function useMaterializeAgendaItem() {
         })
         .select("id")
         .single();
-      if (error) throw error;
-      if (!data?.id) throw new Error("INSERT agenda_items no devolvió id");
-      return data.id as string;
+
+      if (insertResult.error) {
+        // UNIQUE violation → otro cliente ya materializó. SELECT y devolver id.
+        const isUniqueViolation =
+          (insertResult.error as { code?: string }).code === "23505" ||
+          /duplicate key|unique/i.test(insertResult.error.message ?? "");
+        if (isUniqueViolation) {
+          const { data: existing, error: selErr } = await supabase
+            .from("agenda_items")
+            .select("id")
+            .eq("meeting_id", params.meetingId)
+            .eq("order_number", params.orderNumber)
+            .maybeSingle();
+          if (selErr) throw selErr;
+          if (!existing?.id) {
+            throw new Error("INSERT colisionó por UNIQUE pero SELECT no encontró el row");
+          }
+          return existing.id as string;
+        }
+        throw insertResult.error;
+      }
+      if (!insertResult.data?.id) throw new Error("INSERT agenda_items no devolvió id");
+      return insertResult.data.id as string;
     },
     onSuccess: (_id, vars) => {
       // Codex P2 round 7: queryKey real es
