@@ -198,17 +198,25 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
     seen.add(campo);
 
     const opciones = normalizeOpciones(raw.opciones);
-    // Codex P2 round 5: preservar `default` y `opciones` del override para
-    // que `buildDefaultCapa3Values` y `Capa3Form` los puedan consumir aguas
-    // abajo. Antes se descartaban silenciosamente → entity-specific defaults
-    // y allowed options no surtían efecto en Step 2 ni en el documento.
-    const defaultValueRaw = normalizeDraftValue(raw.default);
-    // Si hay opciones explícitas, validar que el default esté dentro
-    // (defensa: ignorar default incompatible con la lista cerrada).
-    const defaultValue =
-      defaultValueRaw && (!opciones || opciones.includes(defaultValueRaw))
-        ? defaultValueRaw
-        : undefined;
+    // Codex P2 round 5+16: preservar `default` y `opciones`. Round 16: el
+    // empty string "" es un override explícito válido (SQL contract:
+    // NULL = no override, "" = clear el campo). Antes el truthiness check
+    // `defaultValueRaw &&` lo descartaba.
+    //
+    // Distinguimos:
+    //   raw.default === undefined → no override (skip)
+    //   raw.default === null      → no override (skip)
+    //   raw.default === ""        → override explícito (preservar "")
+    //   raw.default === "value"   → override explícito (preservar)
+    let defaultValue: string | undefined;
+    if (raw.default !== undefined && raw.default !== null) {
+      const normalized = normalizeDraftValue(raw.default); // boolean/number → string, trim
+      // Si hay opciones explícitas y el default NO está vacío,
+      // validar que esté dentro (defensa). "" siempre permitido (clear).
+      if (normalized === "" || !opciones || opciones.includes(normalized)) {
+        defaultValue = normalized;
+      }
+    }
 
     const entry: NormalizedCapa3Field = {
       campo,
