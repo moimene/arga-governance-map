@@ -281,7 +281,44 @@ export function useCreateMeetingFromConvocatoria() {
         .single();
 
       if (error) throw error;
-      return { id: (data as { id: string }).id, reused: false };
+      const meetingId = (data as { id: string }).id;
+
+      // Codex P1 round 8: materializar agenda_items rows en la misma operación
+      // de creación. Antes el flujo dejaba la agenda en `convocatorias.agenda_items`
+      // (jsonb) y NO insertaba en la tabla `agenda_items`. Resultado:
+      //   - reclassify_agenda_item_kind no podía operar (sin id)
+      //   - meeting_resolutions ↔ agenda_items integrity rules (T5, etc.)
+      //     rechazaban inserts por (meeting_id, agenda_item_index) sin match
+      //   - el hook useMaterializeAgendaItem se usaba como workaround on-demand
+      //
+      // Ahora cada punto de la convocatoria deja huella desde el INSERT inicial.
+      // Default conservador: kind='DELIBERATIVO' si la convocatoria no lo declaró.
+      const agendaPoints = convocatoria.agenda_items ?? [];
+      if (agendaPoints.length > 0) {
+        const agendaRows = agendaPoints.map((point, index) => ({
+          tenant_id: tenantId,
+          meeting_id: meetingId,
+          order_number: index + 1,
+          title: (point.titulo ?? "").trim().slice(0, 240) || `Punto ${index + 1}`,
+          kind: point.kind ?? "DELIBERATIVO",
+          decision_subtype: point.decision_subtype ?? null,
+        }));
+        const { error: agendaError } = await supabase
+          .from("agenda_items")
+          .insert(agendaRows);
+        if (agendaError) {
+          // No abortamos: el meeting ya está creado y el flujo on-demand de
+          // useMaterializeAgendaItem sigue funcionando como red de seguridad.
+          // Solo logueamos para observabilidad.
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[useCreateMeetingFromConvocatoria] agenda_items bulk insert falló; fallback a materialización on-demand:",
+            agendaError.message,
+          );
+        }
+      }
+
+      return { id: meetingId, reused: false };
     },
     onSuccess: (_result, convocatoria) => {
       qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });

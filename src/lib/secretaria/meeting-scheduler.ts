@@ -15,7 +15,22 @@ export interface ConvocatoriaForMeetingSchedule {
   lugar?: string | null;
   modalidad?: string | null;
   statutory_basis?: string | null;
-  agenda_items?: Array<{ titulo?: string; materia?: string; tipo?: string; inscribible?: boolean }> | null;
+  /**
+   * Codex P1 round 8: incluye `kind` opcional para que
+   * `useCreateMeetingFromConvocatoria` pueda materializar el row en
+   * `agenda_items` con la clasificación correcta desde el inicio (en
+   * lugar de defaultearlo a DELIBERATIVO y forzar reclasificación). El
+   * shape sigue siendo retrocompatible: convocatorias antiguas sin
+   * `kind` declarado se materializan como DELIBERATIVO por convención.
+   */
+  agenda_items?: Array<{
+    titulo?: string;
+    materia?: string;
+    tipo?: string;
+    inscribible?: boolean;
+    kind?: "INFORMATIVO" | "DELIBERATIVO" | "DECISORIO" | null;
+    decision_subtype?: "CONSTITUTIVE" | "RATIFICATORY" | "ELEVATION" | "ACKNOWLEDGEMENT" | null;
+  }> | null;
   rule_trace?: Record<string, unknown> | null;
   reminders_trace?: Record<string, unknown> | null;
   /**
