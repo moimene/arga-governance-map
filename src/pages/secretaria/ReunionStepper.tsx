@@ -52,6 +52,16 @@ import {
   type AgendaPointOrigin,
 } from "@/lib/secretaria/meeting-agenda";
 import {
+  normalizeAgendaItemKind,
+  type AgendaItemKind,
+} from "@/lib/secretaria/agenda-kind";
+import {
+  checkReclassificationAllowed,
+  type OrganType,
+} from "@/lib/secretaria/reclassification-matrix";
+import { useReclassifyAgendaItemKind } from "@/hooks/useReclassifyAgendaItemKind";
+import { useAgendaItemRealtimeSubscription } from "@/hooks/useAgendaItemRealtimeSubscription";
+import {
   buildMeetingAdoptionDoubleEvaluation,
   type DualEvaluationComparison,
 } from "@/lib/secretaria/dual-evaluation";
@@ -219,6 +229,266 @@ function agreementOriginForPoint(point: DebatePunto) {
   if (point.agreement_id || point.origin === "PREPARED_AGREEMENT") return "PREPARED" as const;
   if (point.origin === "CONVOCATORIA" || point.origin === "MEETING_AGENDA") return "AGENDA_ITEM" as const;
   return "MEETING_FLOOR" as const;
+}
+
+// ── agenda_items.kind helpers (Task 8) ───────────────────────────────────────
+
+type AgendaKindRow = {
+  id: string;
+  kind: string | null;
+  order_number: number | null;
+  title: string | null;
+};
+
+/**
+ * Carga la columna `kind` de `agenda_items` filtrada por meeting_id.
+ * Resultado indexado por id para resolver chips por punto.
+ * El query se invalida desde `useAgendaItemRealtimeSubscription` y desde
+ * la mutación `useReclassifyAgendaItemKind`.
+ */
+function useAgendaItemsKind(meetingId: string | undefined) {
+  return useQuery({
+    enabled: !!meetingId,
+    queryKey: ["agenda_items", meetingId],
+    staleTime: 30_000,
+    queryFn: async (): Promise<AgendaKindRow[]> => {
+      const { data, error } = await supabase
+        .from("agenda_items")
+        .select("id, kind, order_number, title")
+        .eq("meeting_id", meetingId!)
+        .order("order_number", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as AgendaKindRow[];
+    },
+  });
+}
+
+function resolvePointKind(
+  point: DebatePunto,
+  kindIndex: Map<string, AgendaItemKind>,
+): AgendaItemKind {
+  if (point.source_table === "agenda_items" && point.source_id) {
+    const fromTable = kindIndex.get(point.source_id);
+    if (fromTable) return fromTable;
+  }
+  return "DELIBERATIVO";
+}
+
+const KIND_CHIP_STYLES: Record<AgendaItemKind, string> = {
+  INFORMATIVO: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
+  DELIBERATIVO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
+  DECISORIO: "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
+};
+
+const KIND_CHIP_LABELS: Record<AgendaItemKind, string> = {
+  INFORMATIVO: "INFO",
+  DELIBERATIVO: "DELIB",
+  DECISORIO: "DECIS",
+};
+
+const KIND_CHIP_LONG_LABELS: Record<AgendaItemKind, string> = {
+  INFORMATIVO: "informativo",
+  DELIBERATIVO: "deliberativo",
+  DECISORIO: "decisorio",
+};
+
+function KindChip({ kind }: { kind: AgendaItemKind }) {
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${KIND_CHIP_STYLES[kind]}`}
+      style={{ borderRadius: "var(--g-radius-sm)" }}
+      aria-label={`Punto ${KIND_CHIP_LONG_LABELS[kind]}`}
+    >
+      {KIND_CHIP_LABELS[kind]}
+    </span>
+  );
+}
+
+interface ReclassifyKindDialogProps {
+  open: boolean;
+  agendaItemId: string | null;
+  meetingId: string;
+  currentKind: AgendaItemKind;
+  meetingStatus: string;
+  organType: OrganType | undefined;
+  isUniversal: boolean | undefined;
+  pointTitle: string;
+  pointOrderNumber: number;
+  onClose: () => void;
+}
+
+function ReclassifyKindDialog({
+  open,
+  agendaItemId,
+  meetingId,
+  currentKind,
+  meetingStatus,
+  organType,
+  isUniversal,
+  pointTitle,
+  pointOrderNumber,
+  onClose,
+}: ReclassifyKindDialogProps) {
+  const reclassify = useReclassifyAgendaItemKind();
+  const [motivo, setMotivo] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setMotivo("");
+      setSubmitError(null);
+    }
+  }, [open]);
+
+  if (!open || !agendaItemId) return null;
+
+  // Pre-validación matriz P7 (UX: bloquear submit ANTES de la mutación)
+  const matrixCheck = checkReclassificationAllowed({
+    meetingStatus,
+    currentKind,
+    newKind: "DECISORIO",
+    organType,
+    isUniversal,
+  });
+
+  const trimmedMotivo = motivo.trim();
+  const motivoTooShort = trimmedMotivo.length > 0 && trimmedMotivo.length < 3;
+  const canSubmit =
+    matrixCheck.allowed && trimmedMotivo.length >= 3 && !reclassify.isPending;
+
+  async function handleSubmit() {
+    if (!canSubmit || !agendaItemId) return;
+    setSubmitError(null);
+    try {
+      await reclassify.mutateAsync({
+        agendaItemId,
+        meetingId,
+        newKind: "DECISORIO",
+        motivo: trimmedMotivo,
+      });
+      toast.success(`Punto ${pointOrderNumber} reclasificado a DECISORIO`);
+      onClose();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Error al reclasificar el punto";
+      setSubmitError(message);
+      toast.error(message);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reclassify-dialog-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-brand-3308)]/40 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+        style={{
+          borderRadius: "var(--g-radius-xl)",
+          boxShadow: "var(--g-shadow-modal)",
+        }}
+      >
+        <h3
+          id="reclassify-dialog-title"
+          className="text-base font-semibold text-[var(--g-text-primary)]"
+        >
+          Reclasificar punto {pointOrderNumber} a DECISORIO
+        </h3>
+        <p className="mt-2 text-xs text-[var(--g-text-secondary)]">{pointTitle}</p>
+        <div
+          className="mt-3 flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <span>Cambio:</span>
+          <KindChip kind={currentKind} />
+          <span className="text-[var(--g-text-secondary)]">→</span>
+          <KindChip kind="DECISORIO" />
+        </div>
+
+        {!matrixCheck.allowed && (
+          <div
+            className="mt-4 flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--status-error)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="font-semibold">Matriz P7 deniega:</span>{" "}
+              {matrixCheck.reason ?? "reclasificación no permitida."}
+            </span>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <label
+            htmlFor="reclassify-motivo"
+            className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]"
+          >
+            Motivo de la reclasificación
+            <span className="ml-1 text-[var(--status-error)]">*</span>
+          </label>
+          <textarea
+            id="reclassify-motivo"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={3}
+            disabled={!matrixCheck.allowed || reclassify.isPending}
+            aria-invalid={motivoTooShort ? true : undefined}
+            aria-describedby={motivoTooShort ? "reclassify-motivo-error" : undefined}
+            placeholder="Justifica la elevación a decisorio (mínimo 3 caracteres). Queda registrado en el changelog de auditoría."
+            className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+          {motivoTooShort && (
+            <p
+              id="reclassify-motivo-error"
+              className="mt-1 text-xs text-[var(--status-error)]"
+            >
+              Mínimo 3 caracteres.
+            </p>
+          )}
+        </div>
+
+        {submitError && (
+          <div
+            className="mt-3 flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--status-error)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={reclassify.isPending}
+            className="inline-flex items-center bg-transparent px-3 py-1.5 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            aria-busy={reclassify.isPending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {reclassify.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Reclasificar a DECISORIO
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Paso 1: Constitución ─────────────────────────────────────────────────────
@@ -1115,6 +1385,15 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
   const { tenantId } = useTenantContext();
   const { data: meeting } = useReunionById(meetingId);
   const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
+  const { data: agendaKindRows = [] } = useAgendaItemsKind(meetingId);
+  useAgendaItemRealtimeSubscription(meetingId);
+  const kindIndex = useMemo(() => {
+    const map = new Map<string, AgendaItemKind>();
+    for (const row of agendaKindRows) {
+      map.set(row.id, normalizeAgendaItemKind(row.kind));
+    }
+    return map;
+  }, [agendaKindRows]);
   const existingQD = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
   const existingDebates = useMemo(
     () => (existingQD?.debates ?? []) as DebatePunto[],
@@ -1232,6 +1511,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
                   Punto {idx + 1}
                 </span>
+                <KindChip kind={resolvePointKind(d, kindIndex)} />
                 <span
                   className="bg-[var(--g-sec-100)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-full)" }}
@@ -1363,15 +1643,26 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const { tenantId } = useTenantContext();
   const { data: meetingForDebates } = useReunionById(meetingId);
   const { data: agendaSources = [] } = useMeetingAgendaSources(meetingId);
+  const { data: agendaKindRows = [] } = useAgendaItemsKind(meetingId);
+  useAgendaItemRealtimeSubscription(meetingId);
   const { data: existingResolutions = [] } = useReunionResolutions(meetingId);
   const saveResolutions = useSaveMeetingResolutions(meetingId);
   const updateQuorumData = useUpdateQuorumData(meetingId);
   const [resolutionsSaved, setResolutionsSaved] = useState(false);
   const [snapshotOnlySaved, setSnapshotOnlySaved] = useState(false);
   const [selectedPointIndex, setSelectedPointIndex] = useState(0);
+  const [reclassifyTargetIndex, setReclassifyTargetIndex] = useState<number | null>(null);
   const [votesByPoint, setVotesByPoint] = useState<
     Record<number, Record<string, Pick<VoterRow, "vote" | "conflict_flag" | "conflict_reason">>>
   >({});
+
+  const kindIndex = useMemo(() => {
+    const map = new Map<string, AgendaItemKind>();
+    for (const row of agendaKindRows) {
+      map.set(row.id, normalizeAgendaItemKind(row.kind));
+    }
+    return map;
+  }, [agendaKindRows]);
 
   const { data: meetingContext } = useQuery({
     enabled: !!meetingId && !!tenantId,
@@ -1509,9 +1800,26 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     return normalized;
   }, [agendaSources, meetingForDebates]);
 
+  // Task 8: índice original→{punto, kind, agendaItemId}. Solo los DECISORIO
+  // entran al carril de votación. Los no-DECIS se muestran en sección aparte
+  // con CTA "Reclasificar a DECISORIO".
+  const pointKinds = useMemo(
+    () => agendaPoints.map((p) => resolvePointKind(p, kindIndex)),
+    [agendaPoints, kindIndex],
+  );
+  const votablePointIndices = useMemo(
+    () => agendaPoints.map((_, i) => i).filter((i) => pointKinds[i] === "DECISORIO"),
+    [agendaPoints, pointKinds],
+  );
+  const nonVotablePointIndices = useMemo(
+    () => agendaPoints.map((_, i) => i).filter((i) => pointKinds[i] !== "DECISORIO"),
+    [agendaPoints, pointKinds],
+  );
+
   const meetingRaw = meetingForDebates as
     | {
-        quorum_data?: Record<string, unknown> | null;
+        status?: string | null;
+        quorum_data?: (Record<string, unknown> & { is_universal?: boolean }) | null;
         governing_bodies?: {
           body_type?: string | null;
           entity_id?: string | null;
@@ -1526,6 +1834,11 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   );
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? meetingContext?.entityId ?? null;
+  // Datos para matriz P7 del diálogo de reclasificación
+  const meetingStatusForMatrix = meetingRaw?.status ?? "DRAFT";
+  const bodyTypeForMatrix = meetingRaw?.governing_bodies?.body_type ?? undefined;
+  const isUniversalForMatrix =
+    meetingRaw?.quorum_data?.is_universal === true ? true : undefined;
   const votoCalidadHabilitado = votoCalidadHabilitadoPorOrgano(
     organoTipo,
     meetingRaw?.governing_bodies?.quorum_rule ?? null
@@ -1558,6 +1871,15 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       setSelectedPointIndex(Math.max(agendaPoints.length - 1, 0));
     }
   }, [agendaPoints.length, selectedPointIndex]);
+
+  // Task 8: si el índice actual no es DECISORIO, reapuntar al primer votable
+  // disponible para que el formulario de voto solo opere sobre DECIS.
+  useEffect(() => {
+    if (votablePointIndices.length === 0) return;
+    if (!votablePointIndices.includes(selectedPointIndex)) {
+      setSelectedPointIndex(votablePointIndices[0]);
+    }
+  }, [votablePointIndices, selectedPointIndex]);
 
   function rowForPoint(voter: VoterRow, pointIndex = selectedPointIndex): VoterRow {
     const pointState = votesByPoint[pointIndex]?.[voter.id];
@@ -1831,51 +2153,151 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         aplicable sin mezclar acuerdos distintos.
       </p>
 
-      <div className="flex flex-wrap gap-2">
-        {agendaPoints.map((point, index) => {
-          const hasVotes = pointRows(index).some((v) => v.vote !== "");
-          const active = index === selectedPointIndex;
-          const linkedAgreement = existingResolutions.find(
-            (resolution) => resolution.agenda_item_index === index + 1 && Boolean(resolution.agreement_id)
-          );
-          return (
-            <button
-              key={`${point.punto}-${index}`}
-              type="button"
-              onClick={() => setSelectedPointIndex(index)}
-              className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium transition-colors ${
-                active
-                  ? "border-[var(--g-brand-3308)] bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                  : "border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
-              }`}
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              Punto {index + 1}
-              {hasVotes && <CheckCircle2 className="h-3.5 w-3.5" />}
-              {linkedAgreement && (
-                <span
-                  className={`px-1.5 py-0.5 text-[10px] font-semibold ${
-                    active
-                      ? "bg-[var(--g-text-inverse)] text-[var(--g-brand-3308)]"
-                      : "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-sm)" }}
+      {votablePointIndices.length === 0 ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            No hay puntos clasificados como <KindChip kind="DECISORIO" /> en esta reunión. Solo los
+            puntos decisorios pueden votarse. Reclasifica un punto informativo o deliberativo
+            usando los botones de la sección siguiente.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {votablePointIndices.map((index) => {
+            const point = agendaPoints[index];
+            const hasVotes = pointRows(index).some((v) => v.vote !== "");
+            const active = index === selectedPointIndex;
+            const linkedAgreement = existingResolutions.find(
+              (resolution) =>
+                resolution.agenda_item_index === index + 1 && Boolean(resolution.agreement_id),
+            );
+            return (
+              <button
+                key={`${point.punto}-${index}`}
+                type="button"
+                onClick={() => setSelectedPointIndex(index)}
+                className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium transition-colors ${
+                  active
+                    ? "border-[var(--g-brand-3308)] bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                    : "border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <span>Punto {index + 1}</span>
+                <KindChip kind="DECISORIO" />
+                {hasVotes && <CheckCircle2 className="h-3.5 w-3.5" />}
+                {linkedAgreement && (
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                      active
+                        ? "bg-[var(--g-text-inverse)] text-[var(--g-brand-3308)]"
+                        : "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+                    }`}
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    360
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {nonVotablePointIndices.length > 0 && (
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <div className="mb-3 flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-info)]" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+                Puntos no decisorios — fuera del carril de votación
+              </p>
+              <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                Los puntos informativos y deliberativos no se someten a votación. Si durante la
+                sesión emerge la necesidad de elevar uno a decisorio, reclasifícalo. La matriz P7
+                valida si la elevación es admisible según estado de la reunión y tipo de órgano.
+              </p>
+            </div>
+          </div>
+          <ul className="divide-y divide-[var(--g-border-subtle)]">
+            {nonVotablePointIndices.map((index) => {
+              const point = agendaPoints[index];
+              const kind = pointKinds[index];
+              const agendaItemId =
+                point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+              return (
+                <li
+                  key={`non-decis-${point.punto}-${index}`}
+                  className="flex flex-wrap items-center justify-between gap-3 py-2.5"
                 >
-                  360
-                </span>
-              )}
-            </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+                      Punto {index + 1}
+                    </span>
+                    <KindChip kind={kind} />
+                    <span className="text-sm text-[var(--g-text-primary)]">{point.punto}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReclassifyTargetIndex(index)}
+                    disabled={!agendaItemId}
+                    title={
+                      agendaItemId
+                        ? "Reclasificar este punto a DECISORIO"
+                        : "Este punto no está vinculado a agenda_items (nacido en sesión sin persistir); guarda la agenda antes de reclasificar."
+                    }
+                    className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    Reclasificar a DECISORIO
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {meetingId && reclassifyTargetIndex !== null && agendaPoints[reclassifyTargetIndex] ? (
+        (() => {
+          const point = agendaPoints[reclassifyTargetIndex];
+          const kind = pointKinds[reclassifyTargetIndex];
+          const agendaItemId =
+            point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+          return (
+            <ReclassifyKindDialog
+              open
+              agendaItemId={agendaItemId}
+              meetingId={meetingId}
+              currentKind={kind}
+              meetingStatus={meetingStatusForMatrix}
+              organType={bodyTypeForMatrix}
+              isUniversal={isUniversalForMatrix}
+              pointTitle={point.punto}
+              pointOrderNumber={reclassifyTargetIndex + 1}
+              onClose={() => setReclassifyTargetIndex(null)}
+            />
           );
-        })}
-      </div>
+        })()
+      ) : null}
 
       <div
         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
-        <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-          {selectedPoint?.punto ?? "Acuerdo de la sesión"}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <KindChip kind={pointKinds[selectedPointIndex] ?? "DELIBERATIVO"} />
+          <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+            {selectedPoint?.punto ?? "Acuerdo de la sesión"}
+          </p>
+        </div>
         <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
           {labelMateria(selectedPoint?.materia ?? "APROBACION_CUENTAS")} ·{" "}
           {normalizeMateriaClase(selectedPoint?.tipo)} ·{" "}
