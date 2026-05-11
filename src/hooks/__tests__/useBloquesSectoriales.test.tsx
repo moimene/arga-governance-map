@@ -5,12 +5,92 @@
  *
  * Without this gate, generic societies download/cache all sector-specific
  * approved text, violating the "default empty until opt-in" contract.
+ *
+ * Tests mock Supabase so they are deterministic and never depend on Cloud
+ * availability — the previous version relied on the hard-coded Supabase
+ * client and would time out when the Cloud project was slow or unreachable.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useBloquesSectoriales } from "../useBloquesSectoriales";
 import type { ReactNode } from "react";
+
+// Shared fixtures. The mocked client returns these rows regardless of the
+// filter chain; the hook applies the in-memory .filter() for `materia_aplicable`
+// itself, so we just need to expose data the hook can filter through.
+const ALL_BLOQUES = [
+  {
+    id: "bloque-mar-1",
+    clave_bloque: "COTIZADAS_MAR_DISCLAIMER",
+    version: "1.0.0",
+    sector: "COTIZADAS",
+    materia_aplicable: ["CONVOCATORIA_JUNTA"],
+    texto_aprobado: "Texto MAR disclaimer.",
+    referencia_legal: "MAR Art. 17",
+    descripcion: "Disclaimer cotizadas",
+    estado: "ACTIVA",
+  },
+  {
+    id: "bloque-banca-1",
+    clave_bloque: "BANCA_REPORTING",
+    version: "1.0.0",
+    sector: "BANCA",
+    materia_aplicable: ["NOMBRAMIENTO_CONSEJERO"],
+    texto_aprobado: "Reporting BdE.",
+    referencia_legal: "RDL 4/2015",
+    descripcion: "Reporting BdE",
+    estado: "ACTIVA",
+  },
+];
+
+// Capture the last `.eq("sector", X)` value so we can return rows matching
+// what the hook would actually fetch. The mock chains all .eq() calls into
+// a single PostgREST-like builder and resolves with the filtered subset.
+const lastEqCalls: Record<string, string> = {};
+
+vi.mock("@/integrations/supabase/client", () => {
+  // The chain is: from(table).select(*).eq("estado","ACTIVA")[.eq("sector",X)]
+  // Each .eq() returns the same chain so it remains thenable. The terminal
+  // resolver computes the filtered dataset based on captured .eq() values.
+  function makeChain() {
+    const chain: {
+      eq: (col: string, val: string) => typeof chain;
+      then: <T>(resolve: (v: { data: unknown; error: null }) => T) => Promise<T>;
+    } = {
+      eq: (col: string, val: string) => {
+        lastEqCalls[col] = val;
+        return chain;
+      },
+      then: (resolve) => {
+        const sectorFilter = lastEqCalls["sector"];
+        const filtered = sectorFilter
+          ? ALL_BLOQUES.filter((b) => b.sector === sectorFilter)
+          : ALL_BLOQUES;
+        return Promise.resolve({ data: filtered, error: null }).then(resolve);
+      },
+    };
+    return chain;
+  }
+
+  const supabase = {
+    from: vi.fn(() => ({
+      select: vi.fn(() => {
+        // Reset captured filters per query so successive renders are independent.
+        delete lastEqCalls["sector"];
+        delete lastEqCalls["estado"];
+        return makeChain();
+      }),
+    })),
+  };
+  return { supabase };
+});
+
+vi.mock("@/context/TenantContext", () => ({
+  useTenantContext: () => ({ tenantId: "00000000-0000-0000-0000-000000000001" }),
+}));
+
+// Import AFTER mocks are registered.
+import { useBloquesSectoriales } from "../useBloquesSectoriales";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -45,13 +45,22 @@ const LEGACY_ENTITIES_KEYS = new Set([
 // como {{#if (eq ENTIDAD.x "y")}}, {{#unless ENTIDAD.x}}, {{lookup ENTIDAD.x ...}},
 // que son los patrones principales de v2 para activar/desactivar bloques.
 //
-// Reportado en review humana pre-merge: el regex anterior anchored to {{...}}
+// Reportado en review Codex pre-merge: el regex original anchored a {{...}}
 // dejaba pasar typos en condicionales como {{#if (eq ENTIDAD.es_cotizadaaa "SÍ")}}
 // que renderizan silenciosamente como falsy sin que el audit los detectara.
 //
-// Lookahead [^a-zA-Z0-9_.] (o end-of-string) asegura que el match termina
-// en cualquier carácter no-identificador (espacio, ), }, ", etc.).
-const ENTITY_KEY_REGEX = /(?:ENTIDAD|entities)\.([a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_.]|$)/g;
+// Diseño:
+//   \b                              — word boundary previene matches dentro de
+//                                     identificadores compuestos como XENTIDAD.foo
+//   (?:ENTIDAD|entities)\.          — prefijo canónico (ENTIDAD) o legacy (entities)
+//   ([a-zA-Z_][a-zA-Z0-9_]*)        — capture group: identificador válido (no empieza
+//                                     con dígito, sigue convención JS/Handlebars)
+//
+// Sin requerir lookahead final: el carácter no-identificador siguiente queda
+// naturalmente fuera del capture group, y `*` (greedy) consume el identificador
+// más largo posible. Probado contra interpolación directa, subexpressions
+// {{#if (eq ...)}}, block helpers {{#unless}}, y lookup helpers.
+const ENTITY_KEY_REGEX = /\b(?:ENTIDAD|entities)\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
 
 async function main() {
   // 1. Cargar plantillas ACTIVA y catalog

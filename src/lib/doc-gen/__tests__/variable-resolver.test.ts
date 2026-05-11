@@ -294,4 +294,105 @@ describe("variable-resolver", () => {
   ])("Capa 3 prevalece sobre Capa 2 en duplicidad %s", (_label, capa2, capa3) => {
     expect(mergeVariables(capa2, capa3)).toMatchObject(capa3);
   });
+
+  // ── Codex P1 — precedencia BD real sobre catalog default ─────────────────
+  it("SL entity sin entity_settings override: tipo_social = 'SL' (no 'SA' del catalog default)", async () => {
+    mockDb.rows.entities = {
+      common_name: "ARGA SL",
+      legal_name: "ARGA, S.L.",
+      tax_id: "B-00000001",
+      legal_form: "SL",
+      tipo_social: "SL",
+    };
+    mockDb.rows.entity_settings = []; // sin overrides
+    mockDb.rows.entity_settings_catalog = [
+      { key: "tipo_social", default_value: "SA" }, // catalog dice SA por defecto
+      { key: "es_cotizada", default_value: "NO" },
+    ];
+
+    const result = await resolveVariables(
+      [
+        { variable: "tipo_social", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+        { variable: "es_cotizada", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
+    );
+
+    // BD real wins: tipo_social=SL, no el catalog default SA
+    expect(result.values.tipo_social).toBe("SL");
+    // Catalog default sigue aplicando para keys que NO existen como columna real
+    expect(result.values.es_cotizada).toBe("NO");
+  });
+
+  // ── Codex P1 — dotted refs en plantillas v2 ──────────────────────────────
+  it("expone ENTIDAD nested object para plantillas v2 dotted ({{ENTIDAD.cargo_secretario_label}})", async () => {
+    mockDb.rows.entities = {
+      common_name: "ARGA Seguros",
+      legal_name: "ARGA Seguros, S.A.",
+      legal_form: "SA",
+      tipo_social: "SA",
+    };
+    mockDb.rows.entity_settings = [
+      { key: "cargo_secretario_label", value: "Secretario General" },
+      { key: "es_cotizada", value: "SÍ" },
+    ];
+    mockDb.rows.entity_settings_catalog = [];
+
+    const result = await resolveVariables(
+      [
+        { variable: "cargo_secretario_label", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+        { variable: "es_cotizada", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
+    );
+
+    // Forma legacy plana sigue funcionando
+    expect(result.values.cargo_secretario_label).toBe("Secretario General");
+    expect(result.values.es_cotizada).toBe("SÍ");
+
+    // Forma v2 dotted: ENTIDAD es objeto navegable por Handlebars
+    const entidad = result.values.ENTIDAD as Record<string, unknown> | undefined;
+    expect(entidad).toBeDefined();
+    expect(entidad?.cargo_secretario_label).toBe("Secretario General");
+    expect(entidad?.es_cotizada).toBe("SÍ");
+    expect(entidad?.tipo_social).toBe("SA");
+  });
+
+  it("Handlebars renderiza {{ENTIDAD.x}} y {{#if (eq ENTIDAD.x \"SÍ\")}} desde el resolver", async () => {
+    // Smoke end-to-end resolver → renderer para confirmar que ambas formas
+    // (legacy plana + v2 dotted + condicional dotted) renderizan correctamente.
+    const { renderTemplate } = await import("../template-renderer");
+
+    mockDb.rows.entities = {
+      common_name: "ARGA Seguros",
+      legal_name: "ARGA Seguros, S.A.",
+      legal_form: "SA",
+      tipo_social: "SA",
+    };
+    mockDb.rows.entity_settings = [
+      { key: "cargo_secretario_label", value: "Secretario General" },
+      { key: "es_cotizada", value: "SÍ" },
+    ];
+    mockDb.rows.entity_settings_catalog = [];
+
+    const result = await resolveVariables(
+      [
+        { variable: "cargo_secretario_label", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+        { variable: "es_cotizada", fuente: "ENTIDAD", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
+    );
+
+    const rendered = renderTemplate({
+      template:
+        "Cargo: {{ENTIDAD.cargo_secretario_label}}. " +
+        "{{#if (eq ENTIDAD.es_cotizada \"SÍ\")}}Sociedad cotizada.{{else}}No cotizada.{{/if}}",
+      variables: result.values,
+    });
+
+    expect(rendered.ok).toBe(true);
+    expect(rendered.text).toContain("Cargo: Secretario General");
+    expect(rendered.text).toContain("Sociedad cotizada.");
+    expect(rendered.text).not.toContain("No cotizada.");
+  });
 });

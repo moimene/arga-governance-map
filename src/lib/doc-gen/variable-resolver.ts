@@ -171,11 +171,34 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   return {
     // Catalog defaults (sólo claves NO presentes ya en legacy ni en settings)
     ...catalogDefaults,
-    // Campos directos de entities (legacy — fuente de verdad para claves overlapped)
-    ...legacyFieldsRaw,
-    // entity_settings (overrides explícitos) — gana sobre todo
+    // entity_settings (overrides explícitos del usuario) — gana sobre catalog
     ...settingsByKey,
+    // Campos directos de entities (legacy — fuente de verdad inviolable para
+    // claves que existen como columna real en `entities`). Ganan sobre TODO
+    // cuando tienen un valor real (no null/undefined/"—"): si la BD dice
+    // tipo_social='SL', ni un setting accidental ni un catalog default pueden
+    // sobrescribirlo. Para keys catalog-only (es_cotizada, cargo_secretario_label,
+    // etc.) este spread no las contiene, así que el flujo catalog→settings se
+    // respeta intacto para ellas.
+    ...legacyOverridesForRealColumns(legacyFieldsRaw, legacyKeysWithRealValue),
   };
+}
+
+/**
+ * Devuelve sólo las legacy keys que tienen valor real en la columna directa
+ * de `entities`. Esto permite que el spread final preserve la precedencia
+ * "BD real wins" sin pisar las claves catalog-only que el usuario configura
+ * via entity_settings.
+ */
+function legacyOverridesForRealColumns(
+  legacyFieldsRaw: Record<string, unknown>,
+  legacyKeysWithRealValue: Set<string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of legacyKeysWithRealValue) {
+    out[key] = legacyFieldsRaw[key];
+  }
+  return out;
 }
 
 // ── Body (organ) resolver ────────────────────────────────────────────────────
@@ -707,6 +730,24 @@ export async function resolveVariables(
           entityId: context.entityId,
         });
       }
+    }
+  }
+
+  // Nested namespace objects — soporte dotted v2 (`{{ENTIDAD.cargo_secretario_label}}`,
+  // `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}`). Handlebars navega objetos anidados
+  // para placeholders punteados; al exponer cada source map completo bajo su clave
+  // categórica, las plantillas pueden usar tanto la forma legacy plana como la nueva
+  // forma dotted sin romper compatibilidad. Las claves "ENTIDAD", "ORGANO", etc. son
+  // todas mayúsculas para evitar colisiones con variables planas de capa2 (que son
+  // siempre minúsculas o snake_case).
+  for (const [namespace, sourceVars] of Object.entries(sourceMap)) {
+    if (Object.keys(sourceVars).length === 0) continue;
+    // Sólo añadir el namespace si no colisiona con una key plana ya resuelta.
+    // (No esperamos colisiones — los namespaces son MAYÚSCULAS y las keys planas
+    // son snake_case — pero el guard previene corromper datos si una plantilla
+    // futura usara una key "ENTIDAD" plana.)
+    if (!(namespace in values)) {
+      values[namespace] = sourceVars;
     }
   }
 
