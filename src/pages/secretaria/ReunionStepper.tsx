@@ -54,12 +54,14 @@ import {
 import {
   normalizeAgendaItemKind,
   type AgendaItemKind,
+  type AgendaDecisionSubtype,
 } from "@/lib/secretaria/agenda-kind";
 import {
   checkReclassificationAllowed,
   type OrganType,
 } from "@/lib/secretaria/reclassification-matrix";
 import { useReclassifyAgendaItemKind } from "@/hooks/useReclassifyAgendaItemKind";
+import { useMaterializeAgendaItem } from "@/hooks/useMaterializeAgendaItem";
 import { useAgendaItemRealtimeSubscription } from "@/hooks/useAgendaItemRealtimeSubscription";
 import {
   buildMeetingAdoptionDoubleEvaluation,
@@ -1390,6 +1392,8 @@ interface DebatePunto {
   group_campaign_step?: string | null;
   /** Codex P1 #2 fix: kind propagado desde fuente (convocatoria JSON, agenda_items, etc.). */
   kind?: AgendaItemKind | null;
+  /** Codex P2 round 6: decision_subtype para materialización on-demand del agenda_item. */
+  decision_subtype?: AgendaDecisionSubtype | null;
 }
 
 function DebatesStep({ meetingId }: { meetingId?: string }) {
@@ -1663,6 +1667,14 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const [snapshotOnlySaved, setSnapshotOnlySaved] = useState(false);
   const [selectedPointIndex, setSelectedPointIndex] = useState(0);
   const [reclassifyTargetIndex, setReclassifyTargetIndex] = useState<number | null>(null);
+  // Codex P2 round 6: cuando un punto procede de convocatoria, no existe row
+  // en agenda_items. El RPC reclassify_agenda_item_kind requiere un id real,
+  // así que materializamos on-demand. Mantenemos el id resuelto aquí para
+  // pasarlo al dialog sin esperar a que la query invalidation refresque
+  // agendaPoints (que ocurriría un tick después).
+  const [pendingAgendaItemId, setPendingAgendaItemId] = useState<string | null>(null);
+  const [materializingIndex, setMaterializingIndex] = useState<number | null>(null);
+  const materializeAgendaItem = useMaterializeAgendaItem();
   const [votesByPoint, setVotesByPoint] = useState<
     Record<number, Record<string, Pick<VoterRow, "vote" | "conflict_flag" | "conflict_reason">>>
   >({});
@@ -2064,9 +2076,15 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   // `evaluateMeetingVoteCompleteness` devolvería complete=false para ellos.
   // `allPointsHaveVotes` debe iterar exclusivamente `votablePointIndices`
   // para no bloquear el botón "Registrar resultado" en agendas mixtas.
+  //
+  // Codex P2 round 6: si NO hay puntos DECISORIO (agenda 100% INFO/DELIB),
+  // el botón "Registrar resolución" no tiene sentido — handleSaveResolutions
+  // sometería un rows=[] vacío. allPointsHaveVotes ahora retorna false en
+  // ese caso para mantener el botón disabled. Una agenda sin decisorios cierra
+  // el acta vía el step de generación de documento, no vía resoluciones.
   const allPointsHaveVotes =
     votablePointIndices.length === 0
-      ? hasPersistentVoters
+      ? false
       : hasPersistentVoters &&
         votablePointIndices.every((index) =>
           evaluateMeetingVoteCompleteness(pointRows(index)).complete,
@@ -2256,8 +2274,41 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             {nonVotablePointIndices.map((index) => {
               const point = agendaPoints[index];
               const kind = pointKinds[index];
-              const agendaItemId =
+              const existingAgendaItemId =
                 point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+              // Codex P2 round 6: ya no chequeamos disabled aquí. Si el punto
+              // viene de convocatoria sin agenda_items materializada, hacemos
+              // INSERT on-demand antes de abrir el dialog. El usuario solo
+              // ve la latencia del INSERT (~100-200ms) sin perder el flujo.
+              const isMaterializing =
+                materializingIndex === index && materializeAgendaItem.isPending;
+              const handleClickReclassify = async () => {
+                if (!meetingId || !tenantId) return;
+                if (existingAgendaItemId) {
+                  setPendingAgendaItemId(existingAgendaItemId);
+                  setReclassifyTargetIndex(index);
+                  return;
+                }
+                try {
+                  setMaterializingIndex(index);
+                  const newId = await materializeAgendaItem.mutateAsync({
+                    meetingId,
+                    tenantId,
+                    orderNumber: index + 1,
+                    title: point.punto,
+                    kind,
+                    decisionSubtype: point.decision_subtype ?? null,
+                  });
+                  setPendingAgendaItemId(newId);
+                  setReclassifyTargetIndex(index);
+                } catch (e) {
+                  toast.error(
+                    `No se pudo materializar el punto en BD: ${e instanceof Error ? e.message : String(e)}`,
+                  );
+                } finally {
+                  setMaterializingIndex(null);
+                }
+              };
               return (
                 <li
                   key={`non-decis-${point.punto}-${index}`}
@@ -2272,17 +2323,18 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setReclassifyTargetIndex(index)}
-                    disabled={!agendaItemId}
+                    onClick={handleClickReclassify}
+                    disabled={isMaterializing}
+                    aria-busy={isMaterializing}
                     title={
-                      agendaItemId
+                      existingAgendaItemId
                         ? "Reclasificar este punto a DECISORIO"
-                        : "Este punto no está vinculado a agenda_items (nacido en sesión sin persistir); guarda la agenda antes de reclasificar."
+                        : "Punto procedente de convocatoria: se materializará en agenda_items antes de reclasificar (~100 ms)."
                     }
                     className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    Reclasificar a DECISORIO
+                    {isMaterializing ? "Materializando..." : "Reclasificar a DECISORIO"}
                   </button>
                 </li>
               );
@@ -2295,12 +2347,18 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         (() => {
           const point = agendaPoints[reclassifyTargetIndex];
           const kind = pointKinds[reclassifyTargetIndex];
-          const agendaItemId =
-            point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
+          // Codex P2 round 6: usar pendingAgendaItemId (id materializado on-demand
+          // o existente) en lugar de resolver siempre desde point.source_*.
+          // Tras invalidación de queries, agendaPoints se refresca con el id
+          // nuevo, pero el primer render del dialog podría llegar antes que el
+          // refetch; pendingAgendaItemId garantiza id correcto en el primer paint.
+          const resolvedAgendaItemId =
+            pendingAgendaItemId ??
+            (point.source_table === "agenda_items" && point.source_id ? point.source_id : null);
           return (
             <ReclassifyKindDialog
               open
-              agendaItemId={agendaItemId}
+              agendaItemId={resolvedAgendaItemId}
               meetingId={meetingId}
               currentKind={kind}
               meetingStatus={meetingStatusForMatrix}
@@ -2308,7 +2366,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               isUniversal={isUniversalForMatrix}
               pointTitle={point.punto}
               pointOrderNumber={reclassifyTargetIndex + 1}
-              onClose={() => setReclassifyTargetIndex(null)}
+              onClose={() => {
+                setReclassifyTargetIndex(null);
+                setPendingAgendaItemId(null);
+              }}
             />
           );
         })()
