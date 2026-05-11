@@ -12,6 +12,11 @@ import {
   type AgreementOrigin,
 } from "@/lib/secretaria/agreement-360";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import {
+  normalizeAgendaItemKind,
+  type AgendaItemKind,
+  type ResolutionKind,
+} from "@/lib/secretaria/agenda-kind";
 
 export interface ActaRow {
   id: string;
@@ -328,6 +333,164 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
       queryClient.invalidateQueries({ queryKey: ["meeting_resolutions", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["agreements", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["certification_registry_intake", tenantId] });
+    },
+  });
+}
+
+// =============================================================================
+// D3 — Construcción de puntos del acta en ORDEN SECUENCIAL (RRM art. 99).
+// =============================================================================
+//
+// CRÍTICO D3: NO reagrupar por kind. RRM art. 99 exige relación cronológica
+// del acta. La plantilla ACTA_SESION canónica usa {{#each meetings.junta.puntos}}
+// como loop secuencial. Reagrupación rompe orden + plantilla + jurisprudencia.
+// Ver docs/superpowers/specs/2026-05-12-agenda-item-kind-spec.md §10 + adversarial round 4.
+//
+// La plantilla v1.3.0 (pendiente de bump por Comité Legal) podrá usar bloques
+// condicionales `{{#if (eq kind "DECISORIO")}}…{{/if}}` para renderizar campos
+// decisorios solo en puntos DECISORIO. Mientras la plantilla actual (legacy
+// v1.2.0) renderice todos los campos genéricamente, los campos decisorios
+// (kind_resolution, status, resolution_text) quedan vacíos en puntos no-DEC
+// — degradación elegante.
+
+/**
+ * Punto del acta listo para el loop de la plantilla canónica.
+ *
+ * Incluye:
+ *  - `order_number`: posición cronológica en el orden del día (1..N).
+ *  - `kind`: naturaleza del punto (INFORMATIVO/DELIBERATIVO/DECISORIO).
+ *  - `kind_resolution`: tipo de resolución registrada (sólo si hubo voto).
+ *  - `status` + `resolution_text`: resultado de la votación (sólo DECISORIO).
+ */
+export interface ActaPuntoSequencial {
+  id: string;
+  meeting_id: string;
+  order_number: number;
+  title: string;
+  description: string | null;
+  kind: AgendaItemKind;
+  kind_resolution: ResolutionKind | null;
+  status: string | null;
+  resolution_text: string | null;
+  agreement_id: string | null;
+}
+
+/** Fila mínima esperada desde `agenda_items` (vía PostgREST). */
+export interface AgendaItemRow {
+  id: string;
+  meeting_id: string;
+  order_number: number;
+  title: string;
+  description: string | null;
+  kind?: string | null;
+  tenant_id: string;
+  created_at?: string | null;
+}
+
+/** Fila mínima esperada desde `meeting_resolutions` (vía PostgREST). */
+export interface MeetingResolutionRow {
+  meeting_id: string;
+  agenda_item_index: number | null;
+  kind_resolution?: string | null;
+  status?: string | null;
+  resolution_text?: string | null;
+  agreement_id?: string | null;
+}
+
+const VALID_RESOLUTION_KINDS = new Set<ResolutionKind>([
+  "DECISION",
+  "DELIBERATION_OUTCOME",
+  "INFORMATION_NOTED",
+]);
+
+function normalizeResolutionKind(value: unknown): ResolutionKind | null {
+  if (typeof value !== "string") return null;
+  const upper = value.toUpperCase().trim();
+  return VALID_RESOLUTION_KINDS.has(upper as ResolutionKind)
+    ? (upper as ResolutionKind)
+    : null;
+}
+
+/**
+ * Construye el array de puntos del acta preservando el orden cronológico
+ * exigido por RRM art. 99. NUNCA reagrupa por `kind`.
+ *
+ * Reglas:
+ *  1. Ordena por `order_number` ASC (estable, no por kind).
+ *  2. Para cada punto, busca su resolución por `agenda_item_index === order_number`.
+ *  3. Si hay resolución → enriquece con `kind_resolution`, `status`,
+ *     `resolution_text`, `agreement_id`. Si no → campos null (degradación elegante).
+ *  4. `kind` normalizado via `normalizeAgendaItemKind` (default DELIBERATIVO).
+ *
+ * Función PURA: sin efectos secundarios, sin Supabase, sin Tanstack.
+ * Reutilizable por tests, plantillas y previsualización de acta.
+ */
+export function buildActaPuntosSequencial(
+  agendaItems: AgendaItemRow[],
+  resolutions: MeetingResolutionRow[],
+): ActaPuntoSequencial[] {
+  // CRÍTICO D3: ordenamos por order_number ASC. NO por kind.
+  // Cualquier reagrupación rompería la plantilla {{#each puntos}} + RRM art. 99.
+  const sorted = [...agendaItems].sort((a, b) => a.order_number - b.order_number);
+
+  // Indexamos resoluciones por agenda_item_index para lookup O(1).
+  const byIndex = new Map<number, MeetingResolutionRow>();
+  for (const res of resolutions) {
+    if (typeof res.agenda_item_index === "number") {
+      byIndex.set(res.agenda_item_index, res);
+    }
+  }
+
+  return sorted.map((item) => {
+    const resolution = byIndex.get(item.order_number) ?? null;
+    return {
+      id: item.id,
+      meeting_id: item.meeting_id,
+      order_number: item.order_number,
+      title: item.title,
+      description: item.description,
+      kind: normalizeAgendaItemKind(item.kind ?? "DELIBERATIVO"),
+      kind_resolution: resolution ? normalizeResolutionKind(resolution.kind_resolution) : null,
+      status: resolution?.status ?? null,
+      resolution_text: resolution?.resolution_text ?? null,
+      agreement_id: resolution?.agreement_id ?? null,
+    };
+  });
+}
+
+/**
+ * Hook derivado: carga `agenda_items` + `meeting_resolutions` para un
+ * meeting y devuelve los puntos en ORDEN SECUENCIAL para el loop de la
+ * plantilla ACTA_SESION.
+ *
+ * Wrapper read-only sobre `buildActaPuntosSequencial` con tenant scoping
+ * y queryKey estable.
+ */
+export function useActaPuntosSequencial(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!meetingId && !!tenantId,
+    queryKey: ["actas", tenantId, "puntos_sequencial", meetingId],
+    queryFn: async (): Promise<ActaPuntoSequencial[]> => {
+      const [itemsRes, resolutionsRes] = await Promise.all([
+        supabase
+          .from("agenda_items")
+          .select("id, meeting_id, order_number, title, description, kind, tenant_id, created_at")
+          .eq("meeting_id", meetingId!)
+          .eq("tenant_id", tenantId!)
+          .order("order_number", { ascending: true }),
+        supabase
+          .from("meeting_resolutions")
+          .select("meeting_id, agenda_item_index, kind_resolution, status, resolution_text, agreement_id")
+          .eq("meeting_id", meetingId!)
+          .eq("tenant_id", tenantId!),
+      ]);
+      if (itemsRes.error) throw itemsRes.error;
+      if (resolutionsRes.error) throw resolutionsRes.error;
+
+      const items = (itemsRes.data ?? []) as AgendaItemRow[];
+      const resolutions = (resolutionsRes.data ?? []) as MeetingResolutionRow[];
+      return buildActaPuntosSequencial(items, resolutions);
     },
   });
 }
