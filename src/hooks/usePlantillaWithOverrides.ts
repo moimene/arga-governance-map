@@ -1,4 +1,5 @@
 // src/hooks/usePlantillaWithOverrides.ts
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
@@ -102,9 +103,18 @@ export function usePlantillaWithOverrides(plantillaId?: string, entityId?: strin
   // constante de módulo (referencia estable).
   const overrides = overridesQuery.data ?? EMPTY_OVERRIDES;
   const canonicalCapa3 = (plantilla?.capa3_editables ?? EMPTY_CAPA3) as Capa3Field[];
-  // Pass canonical version so applyCapa3Overrides filters out stale overrides
-  // (those whose compatible_with_canonical_version no longer matches).
-  const mergedCapa3 = applyCapa3Overrides(canonicalCapa3, overrides, plantilla?.version);
+
+  // Codex P2 round 6: memoizar `applyCapa3Overrides` por (canonical, overrides,
+  // version). Antes el merge se recomputaba en cada render → `mergedCapa3`
+  // identity cambia → `effectivePlantilla.capa3_editables` cambia →
+  // `normalizedCapa3Fields` cambia → el defaults effect del stepper se
+  // disparaba después de cada edición del usuario, repoblando los defaults y
+  // bloqueando al usuario que intentara dejar en blanco un campo OPCIONAL/
+  // RECOMENDADO con default.
+  const mergedCapa3 = useMemo(
+    () => applyCapa3Overrides(canonicalCapa3, overrides, plantilla?.version),
+    [canonicalCapa3, overrides, plantilla?.version],
+  );
 
   const warnCompatibility = overrides.some(
     (o) => plantilla && o.compatible_with_canonical_version !== plantilla.version,
