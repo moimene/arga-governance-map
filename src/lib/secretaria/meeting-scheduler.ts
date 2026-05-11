@@ -18,6 +18,17 @@ export interface ConvocatoriaForMeetingSchedule {
   agenda_items?: Array<{ titulo?: string; materia?: string; tipo?: string; inscribible?: boolean }> | null;
   rule_trace?: Record<string, unknown> | null;
   reminders_trace?: Record<string, unknown> | null;
+  /**
+   * Junta universal (LSC art. 178): todos los socios presentes aceptan
+   * unánimemente la celebración y el orden del día. Si la convocatoria se
+   * emitió bajo esta modalidad, se propaga a `meetings.quorum_data.is_universal`
+   * para que la matriz P7 (reclasificación DELIBERATIVO/INFORMATIVO → DECISORIO
+   * en reuniones formalmente convocadas) no bloquee a juntas universales.
+   *
+   * Default conservador: `false` cuando es `null`/`undefined`. Solo cuando es
+   * literalmente `true` se considera universal.
+   */
+  junta_universal?: boolean | null;
 }
 
 export interface MeetingScheduleValidation {
@@ -105,11 +116,17 @@ export function buildMeetingScheduleFromConvocatoria(
     confidentiality_level: "NORMAL",
     quorum_data: patchQuorumDataSourceLinks(
       {
+        // Propagamos `is_universal` al nivel raíz de quorum_data porque
+        // `useReclassifyAgendaItemKind` lee `meta.quorum_data?.is_universal`
+        // para resolver `isUniversal` en la matriz P7. Default conservador:
+        // solo `true` cuando la convocatoria es literalmente universal.
+        is_universal: convocatoria.junta_universal === true,
         scheduled_from: {
           source: "convocatoria",
           convocatoria_id: convocatoria.id,
           estado_convocatoria: convocatoria.estado,
           statutory_basis: convocatoria.statutory_basis ?? null,
+          junta_universal: convocatoria.junta_universal === true,
         },
         agenda_preview: agenda.map((item, index) => ({
           index: index + 1,

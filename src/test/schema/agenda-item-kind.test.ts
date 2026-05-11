@@ -1,20 +1,28 @@
 // src/test/schema/agenda-item-kind.test.ts
 /**
- * Agenda Item Kind (v1.3) — schema guardrails for migration
- * supabase/migrations/20260512_000059_agenda_item_kind.sql.
+ * Agenda Item Kind — schema guardrails for migrations
+ * supabase/migrations/20260512_000059_agenda_item_kind.sql,
+ * 20260512_000061_agenda_item_kind_status_espanol.sql, and
+ * 20260512_000062_agenda_item_kind_p7_enforcement.sql.
  *
- * Verifies the 5 active triggers + new columns + WORM audit log behavior
- * post-adversarial patches (commit 71722c8 + 9b18458). T6 was DROPPED
- * because meetings.adoption_mode does not exist in the real schema; the
- * invariant is covered by the data model itself (no test here).
+ * Verifies the 5 active triggers + RPC + new columns + WORM audit log behavior
+ * post-adversarial patches (commit 71722c8 + 9b18458) and the three PR#2
+ * hardenings (000062): T2 widened to acta firmada, T5 reads top-level
+ * execution_mode.agenda_item_index, and reclassify_agenda_item_kind enforces
+ * the P7 matrix server-side (art. 174 LSC). T6 was DROPPED because
+ * meetings.adoption_mode does not exist in the real schema; the invariant
+ * is covered by the data model itself (no test here).
  *
- * Triggers under test (5):
- *   T1 tr_agenda_kind_immutable_after_voted   BEFORE UPDATE agenda_items
- *   T2 tr_agenda_kind_immutable_after_closed  BEFORE UPDATE agenda_items  (CANCELADA — Spanish)
- *   T3 tr_agenda_kind_audit_after_convoked    AFTER  UPDATE agenda_items (SECURITY DEFINER)
- *                                             — fires on CONVOCADA/CELEBRADA (Spanish)
- *   T4 tr_resolution_kind_matches_agenda      BEFORE INSERT/UPDATE meeting_resolutions
- *   T5 tr_agreement_requires_decisorio        BEFORE INSERT/UPDATE agreements
+ * Triggers / RPC under test:
+ *   T1  tr_agenda_kind_immutable_after_voted   BEFORE UPDATE agenda_items
+ *   T2  tr_agenda_kind_immutable_after_closed  BEFORE UPDATE agenda_items
+ *                                              — blocks CANCELADA OR minute.signed_at IS NOT NULL (000062 §TAREA 2)
+ *   T3  tr_agenda_kind_audit_after_convoked    AFTER  UPDATE agenda_items (SECURITY DEFINER)
+ *                                              — fires on CONVOCADA/CELEBRADA (Spanish)
+ *   T4  tr_resolution_kind_matches_agenda      BEFORE INSERT/UPDATE meeting_resolutions
+ *   T5  tr_agreement_requires_decisorio        BEFORE INSERT/UPDATE agreements
+ *                                              — top-level execution_mode.agenda_item_index supported (000062 §TAREA 3)
+ *   RPC reclassify_agenda_item_kind            P7 matrix server-side (000062 §TAREA 1)
  *
  * Plus WORM coverage: UPDATE/DELETE on agenda_item_kind_changelog rejected
  * (worm_guard trigger from migration helper).
@@ -323,6 +331,122 @@ describe.skipIf(!hasAdminClient())(
       expect(errA).toBeNull();
 
       // DRAFT meeting + no resolutions => T1 and T2 should let this through.
+      const { error: errU } = await supabaseAdmin!
+        .from("agenda_items")
+        // @ts-expect-error new column not in generated types yet
+        .update({ kind: "DECISORIO" })
+        .eq("id", agenda!.id);
+      expect(errU).toBeNull();
+    });
+
+    // 000062 §TAREA 2: T2 must also block when status='CELEBRADA' but the
+    // associated minute has signed_at IS NOT NULL ("celebrada con acta firmada").
+    // The original T2 in 000061 only checked status='CANCELADA' and missed this
+    // path, leaving agenda_items.kind mutable after the secretario signed.
+    it("rejects kind change when meeting.status='CELEBRADA' with a signed minute (000062 §TAREA 2)", async () => {
+      if (!entityPresent) {
+        console.warn("[T2] Skipping CELEBRADA+signed minute — body missing.");
+        return;
+      }
+
+      const { data: meeting, error: errM } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: bodyId!,
+          slug: `${SENTINEL.toLowerCase()}-celebrada-signed-${Date.now()}`,
+          status: "DRAFT",
+        })
+        .select("id")
+        .single();
+      expect(errM).toBeNull();
+
+      const { data: agenda, error: errA } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — celebrada+signed`,
+          tenant_id: DEMO_TENANT,
+        })
+        .select("id")
+        .single();
+      expect(errA).toBeNull();
+
+      // Promote to CELEBRADA and persist a signed minute. Both conditions
+      // together (status not CANCELADA but acta firmada) must trigger T2.
+      const { error: errProm } = await supabaseAdmin!
+        .from("meetings")
+        .update({ status: "CELEBRADA" })
+        .eq("id", meeting!.id);
+      expect(errProm).toBeNull();
+
+      const { error: errMin } = await supabaseAdmin!
+        .from("minutes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          meeting_id: meeting!.id,
+          signed_at: new Date().toISOString(),
+        });
+      expect(errMin).toBeNull();
+
+      const { error: errU } = await supabaseAdmin!
+        .from("agenda_items")
+        // @ts-expect-error new column not in generated types yet
+        .update({ kind: "DECISORIO" })
+        .eq("id", agenda!.id);
+      expect(errU).not.toBeNull();
+      // 000062 mensaje: "agenda_items.kind inmutable: reunión cerrada (...)"
+      expect(errU?.message.toLowerCase()).toMatch(
+        /inmutable|acta firmada|cerrada|cancelada/,
+      );
+    });
+
+    // 000062 §TAREA 2 complement: status='CELEBRADA' without a signed minute
+    // must still allow reclassification — exercises the EXISTS branch returning
+    // false. Documents the happy path of the new check.
+    it("allows kind change when meeting.status='CELEBRADA' but no minute is signed (000062 §TAREA 2)", async () => {
+      if (!entityPresent) {
+        console.warn("[T2] Skipping CELEBRADA+unsigned minute — body missing.");
+        return;
+      }
+
+      const { data: meeting } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: bodyId!,
+          slug: `${SENTINEL.toLowerCase()}-celebrada-unsigned-${Date.now()}`,
+          status: "DRAFT",
+        })
+        .select("id")
+        .single();
+
+      const { data: agenda } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — celebrada unsigned`,
+          tenant_id: DEMO_TENANT,
+        })
+        .select("id")
+        .single();
+
+      await supabaseAdmin!
+        .from("meetings")
+        .update({ status: "CELEBRADA" })
+        .eq("id", meeting!.id);
+
+      // Unsigned minute → EXISTS clause returns false → T2 must NOT fire.
+      await supabaseAdmin!
+        .from("minutes")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          meeting_id: meeting!.id,
+          signed_at: null,
+        });
+
       const { error: errU } = await supabaseAdmin!
         .from("agenda_items")
         // @ts-expect-error new column not in generated types yet
@@ -793,6 +917,259 @@ describe.skipIf(!hasAdminClient())(
         parent_meeting_id: meeting!.id,
         execution_mode: { agreement_360: { agenda_item_index: 1 } },
         proposal_text: `${SENTINEL} — decisorio happy path`,
+      });
+      expect(error).toBeNull();
+    });
+
+    // 000062 §TAREA 3: T5 must also read execution_mode->>'agenda_item_index'
+    // (top-level), not only execution_mode->'agreement_360'->>'agenda_item_index'.
+    // Paridad con extractAgendaItemIndexFromExecutionMode (src/lib/secretaria/
+    // agreement-360.ts:143–154). Sin el fix, este INSERT pasaba por falso negativo.
+    it("path 5: top-level execution_mode.agenda_item_index on INFO agenda → REJECTS (000062 §TAREA 3)", async () => {
+      if (!entityPresent) {
+        console.warn("[T5] Skipping top-level INFO path — body missing.");
+        return;
+      }
+
+      const { data: meeting } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: bodyId!,
+          slug: `${SENTINEL.toLowerCase()}-top-level-info-${Date.now()}`,
+          status: "DRAFT",
+        })
+        .select("id")
+        .single();
+
+      const { error: errA } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — top-level INFO agenda`,
+          tenant_id: DEMO_TENANT,
+          // @ts-expect-error new column not in generated types yet
+          kind: "INFORMATIVO",
+        });
+      expect(errA).toBeNull();
+
+      const { error } = await supabaseAdmin!.from("agreements").insert({
+        tenant_id: DEMO_TENANT,
+        adoption_mode: "MEETING",
+        agreement_kind: "APROBACION_CUENTAS",
+        matter_class: "ORDINARIA",
+        parent_meeting_id: meeting!.id,
+        // ⬇️ top-level path, NOT nested under agreement_360
+        execution_mode: { agenda_item_index: 1 },
+        proposal_text: `${SENTINEL} — top-level info reject`,
+      });
+      expect(error).not.toBeNull();
+      expect(error?.message.toLowerCase()).toMatch(
+        /decisorio|materializar|deliberativo|informativo/,
+      );
+    });
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RPC reclassify_agenda_item_kind — P7 matrix server-side enforcement
+// (migration 000062 §TAREA 1). Defense-in-depth against bypass: a SECRETARIO
+// authenticated client can call the RPC directly and skip the client-side
+// matrix in src/lib/secretaria/reclassification-matrix.ts; the SQL must
+// re-implement the same rules. Three canonical scenarios cover the matrix:
+//   - JUNTA + CONVOCADA + !is_universal + DECISORIO → BLOCK with art. 174 LSC msg
+//   - JUNTA + CONVOCADA + is_universal=true + DECISORIO → ALLOW (unanimidad)
+//   - JUNTA + DRAFT + DECISORIO → ALLOW (no procedural constraints yet)
+//
+// supabase-js (service_role) sends JWT claim role=service_role, so the RPC
+// path takes the fn_secretaria_is_service_role() bypass and we exercise the
+// P7 logic without RBAC/tenant gates getting in the way.
+// ─────────────────────────────────────────────────────────────────────────────
+describe.skipIf(!hasAdminClient())(
+  "Agenda Item Kind — RPC P7 matrix server-side (000062 §TAREA 1)",
+  () => {
+    const SENTINEL = "TEST_RPC_P7_AGENDAKIND_SENTINEL_PLEASE_DELETE";
+    let cdaBodyId: string | null = null;
+    let juntaBodyId: string | null = null;
+    let fixturesReady = false;
+
+    beforeAll(async () => {
+      if (!supabaseAdmin) return;
+
+      // Need both a JUNTA-typed body (for vicio rule) and any body for DRAFT
+      // (we reuse the JUNTA one — the rule only fires on CONVOCADA/CELEBRADA).
+      const { data: bodies } = await supabaseAdmin
+        .from("governing_bodies")
+        .select("id, body_type")
+        .eq("entity_id", DEMO_ENTITY_ARGA);
+      if (!bodies || bodies.length === 0) {
+        console.warn("[RPC P7] Skipping — DEMO_ENTITY_ARGA has no bodies.");
+        return;
+      }
+      const junta = bodies.find(
+        (b: { body_type: string | null }) =>
+          ["JUNTA", "JUNTA_GENERAL", "JGA", "JUNTA_ACCIONISTAS"].includes(
+            (b.body_type ?? "").toUpperCase(),
+          ),
+      );
+      const cda = bodies.find(
+        (b: { body_type: string | null }) =>
+          ["CDA", "CONSEJO", "CONSEJO_ADMIN"].includes(
+            (b.body_type ?? "").toUpperCase(),
+          ),
+      );
+      if (!junta) {
+        console.warn(
+          "[RPC P7] Skipping — no JUNTA-typed body under DEMO_ENTITY_ARGA. " +
+            "TAREA 1 vicio test requires body_type=JUNTA*.",
+        );
+        return;
+      }
+      juntaBodyId = junta.id as string;
+      cdaBodyId = (cda?.id as string) ?? juntaBodyId;
+      fixturesReady = true;
+    });
+
+    afterEach(async () => {
+      if (!supabaseAdmin) return;
+      // The kind change fires T3 audit row → agenda_items FK referenced by
+      // WORM changelog. Best-effort delete: meeting first (cascade off agenda),
+      // then agenda + meeting if changelog didn't reference them yet
+      // (only DRAFT cases avoid the audit log). Failures are expected for
+      // CONVOCADA cases that succeeded and DO have audit rows.
+      await supabaseAdmin
+        .from("agenda_items")
+        .delete()
+        .like("title", `%${SENTINEL}%`);
+      await supabaseAdmin
+        .from("meetings")
+        .delete()
+        .like("slug", `%${SENTINEL.toLowerCase()}%`);
+    });
+
+    it("rejects DECISORIO on JUNTA + CONVOCADA + !is_universal (art. 174 LSC)", async () => {
+      if (!fixturesReady) {
+        console.warn("[RPC P7] Skipping vicio test — fixtures missing.");
+        return;
+      }
+
+      const { data: meeting, error: errM } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: juntaBodyId!,
+          slug: `${SENTINEL.toLowerCase()}-junta-convocada-${Date.now()}`,
+          status: "CONVOCADA",
+          quorum_data: { is_universal: false },
+        })
+        .select("id")
+        .single();
+      expect(errM).toBeNull();
+
+      const { data: agenda, error: errA } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — junta convocada vicio`,
+          tenant_id: DEMO_TENANT,
+          // @ts-expect-error new column not in generated types yet
+          kind: "DELIBERATIVO",
+        })
+        .select("id")
+        .single();
+      expect(errA).toBeNull();
+
+      const { error } = await supabaseAdmin!.rpc("reclassify_agenda_item_kind", {
+        p_agenda_item_id: agenda!.id,
+        p_meeting_id: meeting!.id,
+        p_new_kind: "DECISORIO",
+        p_motivo: `${SENTINEL} vicio art 174`,
+      });
+
+      expect(error).not.toBeNull();
+      // Mensaje del RPC: "P7: junta convocada formalmente — ... art. 174 LSC"
+      expect(error?.message.toLowerCase()).toMatch(
+        /p7|art\.? 174|vicio|reconvocar/,
+      );
+    });
+
+    it("allows DECISORIO on JUNTA + CONVOCADA + is_universal=true", async () => {
+      if (!fixturesReady) {
+        console.warn("[RPC P7] Skipping universal test — fixtures missing.");
+        return;
+      }
+
+      const { data: meeting } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: juntaBodyId!,
+          slug: `${SENTINEL.toLowerCase()}-junta-universal-${Date.now()}`,
+          status: "CONVOCADA",
+          quorum_data: { is_universal: true },
+        })
+        .select("id")
+        .single();
+
+      const { data: agenda } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — junta universal allow`,
+          tenant_id: DEMO_TENANT,
+          // @ts-expect-error new column not in generated types yet
+          kind: "DELIBERATIVO",
+        })
+        .select("id")
+        .single();
+
+      const { error } = await supabaseAdmin!.rpc("reclassify_agenda_item_kind", {
+        p_agenda_item_id: agenda!.id,
+        p_meeting_id: meeting!.id,
+        p_new_kind: "DECISORIO",
+        p_motivo: `${SENTINEL} universal allow`,
+      });
+      expect(error).toBeNull();
+    });
+
+    it("allows DECISORIO on JUNTA + DRAFT (no procedural constraints)", async () => {
+      if (!fixturesReady) {
+        console.warn("[RPC P7] Skipping DRAFT test — fixtures missing.");
+        return;
+      }
+
+      const { data: meeting } = await supabaseAdmin!
+        .from("meetings")
+        .insert({
+          tenant_id: DEMO_TENANT,
+          body_id: juntaBodyId!,
+          slug: `${SENTINEL.toLowerCase()}-junta-draft-${Date.now()}`,
+          status: "DRAFT",
+        })
+        .select("id")
+        .single();
+
+      const { data: agenda } = await supabaseAdmin!
+        .from("agenda_items")
+        .insert({
+          meeting_id: meeting!.id,
+          order_number: 1,
+          title: `${SENTINEL} — junta draft allow`,
+          tenant_id: DEMO_TENANT,
+          // @ts-expect-error new column not in generated types yet
+          kind: "DELIBERATIVO",
+        })
+        .select("id")
+        .single();
+
+      const { error } = await supabaseAdmin!.rpc("reclassify_agenda_item_kind", {
+        p_agenda_item_id: agenda!.id,
+        p_meeting_id: meeting!.id,
+        p_new_kind: "DECISORIO",
+        p_motivo: `${SENTINEL} draft allow`,
       });
       expect(error).toBeNull();
     });
