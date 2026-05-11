@@ -103,7 +103,34 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
 
   if (error || !data) return {};
 
+  // Cargar entity_settings de la sociedad (overrides explícitos)
+  const { data: settings } = await supabase
+    .from("entity_settings")
+    .select("key, value")
+    .eq("entity_id", entityId)
+    .eq("tenant_id", tenantId);
+
+  const settingsByKey: Record<string, unknown> = {};
+  for (const row of (settings ?? []) as Array<{ key: string; value: unknown }>) {
+    // value es JSONB — convertirlo a tipo nativo
+    settingsByKey[row.key] = row.value;
+  }
+
+  // Cargar catalog defaults para claves no overrideadas
+  const { data: catalog } = await supabase
+    .from("entity_settings_catalog")
+    .select("key, default_value")
+    .eq("estado_catalog", "ACTIVA");
+
+  const catalogDefaults: Record<string, unknown> = {};
+  for (const row of (catalog ?? []) as Array<{ key: string; default_value: unknown }>) {
+    if (row.default_value !== null && !(row.key in settingsByKey)) {
+      catalogDefaults[row.key] = row.default_value;
+    }
+  }
+
   return {
+    // Campos directos de entities (compatibilidad existente)
     name: data.common_name || data.legal_name,
     tax_id: data.tax_id || data.registration_number,
     registration_number: data.registration_number,
@@ -123,6 +150,10 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     lugar: data.city || data.address || "—",
     tipo_social: data.tipo_social || data.legal_form, // SA, SL
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
+    // Catalog defaults (claves no overrideadas)
+    ...catalogDefaults,
+    // entity_settings (claves overrideadas) — gana sobre catalog defaults
+    ...settingsByKey,
   };
 }
 
