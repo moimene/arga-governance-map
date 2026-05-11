@@ -13,6 +13,7 @@ import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
 import { useCreateConvocatoria, type AgendaItem } from "@/hooks/useConvocatorias";
+import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
@@ -110,6 +111,52 @@ const AGENDA_TIPOS = [
   },
 ] as const;
 
+// agenda_item.kind v1.3: naturaleza del punto del orden del día.
+// Solo los puntos DECISORIO se someten a votación y materializan como
+// acuerdo registrable. INFORMATIVO y DELIBERATIVO no producen acuerdo y
+// por tanto no exigen materia / mayoría / propuesta de acuerdo.
+const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] = [
+  {
+    value: "INFORMATIVO",
+    label: "Informativo",
+    helper: "Solo informe, sin decisión ni debate formal.",
+  },
+  {
+    value: "DELIBERATIVO",
+    label: "Deliberativo",
+    helper: "Debate y conclusiones, sin votación formal.",
+  },
+  {
+    value: "DECISORIO",
+    label: "Decisorio",
+    helper: "Sometible a votación y materializable como acuerdo.",
+  },
+];
+
+// Subtipos de decisión cuando kind === DECISORIO (opcional, NULL por defecto).
+const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; hint: string }[] = [
+  {
+    value: "CONSTITUTIVE",
+    label: "Constitutivo",
+    hint: "Crea, modifica o extingue derechos / obligaciones (ej: aumento capital, nombramiento).",
+  },
+  {
+    value: "RATIFICATORY",
+    label: "Ratificatorio",
+    hint: "Confirma o convalida un acto previo (ej: ratificación de operación apoderada).",
+  },
+  {
+    value: "ELEVATION",
+    label: "Elevación a público",
+    hint: "Eleva a escritura pública un acuerdo ya adoptado.",
+  },
+  {
+    value: "ACKNOWLEDGEMENT",
+    label: "Acuse / constancia",
+    hint: "Deja constancia formal de un hecho sin efectos constitutivos.",
+  },
+];
+
 const AGENDA_MATERIAS = [
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false },
   { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false },
@@ -154,6 +201,9 @@ function newAgendaItem(): AgendaItem {
     materia: "APROBACION_CUENTAS",
     tipo: "ORDINARIA",
     inscribible: false,
+    // agenda_item.kind v1.3: default DELIBERATIVO (coincide con BD default).
+    kind: "DELIBERATIVO",
+    decision_subtype: null,
     propuesta_acuerdo: null,
   };
 }
@@ -360,6 +410,9 @@ export default function ConvocatoriasStepper() {
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
   const agendaRuleSpecs = agendaItems
+    // agenda_item.kind v1.3: solo DECISORIO produce acuerdo y exige reglas LSC.
+    // INFORMATIVO / DELIBERATIVO no se someten a votación → no aplica motor V2.
+    .filter((item) => (item.kind ?? "DELIBERATIVO") === "DECISORIO")
     // BATCH 8.3 (ronda 2 U-A): filtrar materias libres antes del motor.
     // OTROS_LIBRE indica intencionalmente que el secretario asume el punto
     // como informativo / sin reglas LSC aplicables — no es bug, es diseño.
@@ -432,7 +485,10 @@ export default function ConvocatoriasStepper() {
     webInscrita: true,
     primeraConvocatoria: true,
     esJuntaUniversal: tipoConvocatoria === "UNIVERSAL",
-    materias: agendaItems.map((i) => i.materia),
+    // agenda_item.kind v1.3: motor V2 solo recibe materias DECISORIO.
+    materias: agendaItems
+      .filter((i) => (i.kind ?? "DELIBERATIVO") === "DECISORIO")
+      .map((i) => i.materia),
   };
   const evaluacionV2 = evaluarConvocatoria(
     convocatoriaInput,
@@ -579,6 +635,10 @@ export default function ConvocatoriasStepper() {
             materia: materiaMeta?.value ?? requestedTemplateMateria ?? first.materia,
             tipo: (materiaMeta?.tipo ?? first.tipo) as AgendaItem["tipo"],
             inscribible: materiaMeta?.inscribible ?? first.inscribible,
+            // agenda_item.kind v1.3: si llega una plantilla MODELO_ACUERDO,
+            // el punto se trata como DECISORIO (se va a votar). Las plantillas
+            // de convocatoria sin materia conservan el kind por defecto.
+            kind: "DECISORIO",
           },
           ...prev.slice(1),
         ];
@@ -895,15 +955,25 @@ export default function ConvocatoriasStepper() {
         publication_channels: channels,
         agenda_items: agendaItems
           .filter((i) => i.titulo.trim().length > 0)
-          .map(({ titulo, materia, tipo, inscribible, propuesta_acuerdo }) => ({
-            titulo,
-            materia,
-            tipo,
-            inscribible,
-            // BATCH 3: persistir propuesta concreta del acuerdo en JSONB.
-            // Backward-compat: convocatorias antiguas leen null.
-            propuesta_acuerdo: propuesta_acuerdo ?? null,
-          })),
+          .map(({ titulo, materia, tipo, inscribible, kind, decision_subtype, propuesta_acuerdo }) => {
+            const effectiveKind: AgendaItemKind = kind ?? "DELIBERATIVO";
+            return {
+              titulo,
+              materia,
+              tipo,
+              inscribible,
+              // agenda_item.kind v1.3: persistir naturaleza del punto.
+              // Solo DECISORIO admite decision_subtype; INFO / DELIB → null.
+              kind: effectiveKind,
+              decision_subtype:
+                effectiveKind === "DECISORIO" ? (decision_subtype ?? null) : null,
+              // BATCH 3: persistir propuesta concreta del acuerdo en JSONB.
+              // Backward-compat: convocatorias antiguas leen null.
+              // Para INFO / DELIB no hay propuesta de acuerdo posible.
+              propuesta_acuerdo:
+                effectiveKind === "DECISORIO" ? (propuesta_acuerdo ?? null) : null,
+            };
+          }),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
         ...buildConvocatoriaTrace(),
       });
@@ -1485,12 +1555,19 @@ export default function ConvocatoriasStepper() {
           {current === 3 && (
             <div className="mt-6 space-y-4">
               <p className="text-xs text-[var(--g-text-secondary)]">
-                Añade los puntos del orden del día. Clasifica cada punto para que el motor
-                aplique el quórum y mayoría correspondientes.
+                Añade los puntos del orden del día. Clasifica cada punto según su
+                naturaleza (informativo, deliberativo o decisorio); solo los puntos
+                decisorios requieren materia, clase LSC y propuesta de acuerdo, y se
+                someten al motor de validez.
               </p>
 
               <div className="space-y-3">
-                {agendaItems.map((item, idx) => (
+                {agendaItems.map((item, idx) => {
+                  const itemKind: AgendaItemKind = item.kind ?? "DELIBERATIVO";
+                  const isDecisorio = itemKind === "DECISORIO";
+                  const kindHelper =
+                    KIND_OPTIONS.find((k) => k.value === itemKind)?.helper ?? "";
+                  return (
                   <div
                     key={item.id}
                     className="border border-[var(--g-border-subtle)] p-3"
@@ -1521,88 +1598,184 @@ export default function ConvocatoriasStepper() {
                         </button>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 pl-5">
-                      <select
-                        value={item.materia}
-                        onChange={(e) => {
-                          const materia = e.target.value;
-                          const meta = AGENDA_MATERIAS.find((m) => m.value === materia);
-                          updateAgendaItem(item.id, {
-                            materia,
-                            tipo: (meta?.tipo ?? item.tipo) as AgendaItem["tipo"],
-                            inscribible: meta?.inscribible ?? item.inscribible,
-                          });
-                        }}
-                        className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
+
+                    {/* agenda_item.kind v1.3: selector de naturaleza del punto.
+                        Determina si exige materia / mayoría / propuesta de
+                        acuerdo (DECISORIO) o solo es informe / debate
+                        (INFORMATIVO / DELIBERATIVO). */}
+                    <div className="pl-5">
+                      <div
+                        className="flex flex-wrap gap-2"
+                        role="radiogroup"
+                        aria-label={`Naturaleza del punto ${idx + 1}`}
                       >
-                        {AGENDA_MATERIAS.map((m) => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={item.tipo}
-                        onChange={(e) => updateAgendaItem(item.id, { tipo: e.target.value as AgendaItem["tipo"] })}
-                        // BATCH 8.3 (ronda 2 U-A): tooltip sobre el select
-                        // explica las 3 clases de materia para que el
-                        // secretario sepa cuándo aplica cada una.
-                        title={
-                          AGENDA_TIPOS.find((t) => t.value === item.tipo)?.hint ??
-                          "Clase de materia LSC: ORDINARIA / ESTATUTARIA / ESTRUCTURAL"
-                        }
-                        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      >
-                        {AGENDA_TIPOS.map((t) => (
-                          <option key={t.value} value={t.value} title={t.hint}>{t.label}</option>
-                        ))}
-                      </select>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.inscribible}
-                          onChange={(e) => updateAgendaItem(item.id, { inscribible: e.target.checked })}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
-                      </label>
+                        {KIND_OPTIONS.map((opt) => {
+                          const active = itemKind === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              aria-label={`${opt.label}: ${opt.helper}`}
+                              onClick={() => {
+                                // Al cambiar a INFORMATIVO / DELIBERATIVO,
+                                // limpiar decision_subtype (solo aplica a DECISORIO).
+                                const patch: Partial<AgendaItem> = { kind: opt.value };
+                                if (opt.value !== "DECISORIO") {
+                                  patch.decision_subtype = null;
+                                }
+                                updateAgendaItem(item.id, patch);
+                              }}
+                              title={opt.helper}
+                              className={`px-3 py-2 text-sm border transition-colors ${
+                                active
+                                  ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] border-[var(--g-brand-3308)]"
+                                  : "bg-[var(--g-surface-card)] text-[var(--g-text-primary)] border-[var(--g-border-subtle)] hover:bg-[var(--g-surface-subtle)]"
+                              }`}
+                              style={{ borderRadius: "var(--g-radius-md)" }}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-xs text-[var(--g-text-secondary)]">
+                        {kindHelper}
+                      </p>
                     </div>
 
-                    {/* Propuesta de acuerdo concreta — art. 197.1 / 287 LSC.
-                        Texto que el secretario redacta para el punto y que
-                        los consejeros estudian antes de la sesión. Persiste
-                        en agenda_items JSONB. */}
-                    <div className="mt-3 pl-5">
-                      <label className="block text-xs font-medium text-[var(--g-text-primary)] mb-1">
-                        Propuesta de acuerdo
-                        <span className="ml-1 text-[var(--g-text-secondary)]">
-                          (texto que se someterá a votación — opcional pero recomendable
-                          {item.tipo !== "ORDINARIA" && (
-                            <span className="ml-1 text-[var(--status-warning)]">
-                              · obligatoria para materias {item.tipo.toLowerCase()}
+                    {/* Subtipo de decisión: solo aplica a DECISORIO. */}
+                    {isDecisorio && (
+                      <div className="mt-3 pl-5">
+                        <label
+                          htmlFor={`decision-subtype-${item.id}`}
+                          className="block text-xs font-medium text-[var(--g-text-primary)] mb-1"
+                        >
+                          Subtipo de decisión
+                          <span className="ml-1 text-[var(--g-text-secondary)]">
+                            (opcional — clasifica el efecto jurídico)
+                          </span>
+                        </label>
+                        <select
+                          id={`decision-subtype-${item.id}`}
+                          value={item.decision_subtype ?? ""}
+                          onChange={(e) =>
+                            updateAgendaItem(item.id, {
+                              decision_subtype:
+                                e.target.value === ""
+                                  ? null
+                                  : (e.target.value as AgendaDecisionSubtype),
+                            })
+                          }
+                          title={
+                            DECISION_SUBTYPE_OPTIONS.find((s) => s.value === item.decision_subtype)
+                              ?.hint ?? "Subtipo opcional"
+                          }
+                          className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          <option value="">— Sin clasificar —</option>
+                          {DECISION_SUBTYPE_OPTIONS.map((s) => (
+                            <option key={s.value} value={s.value} title={s.hint}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Materia / clase / inscribible / propuesta solo aplican a
+                        puntos DECISORIO. Para INFO / DELIB no hay acuerdo. */}
+                    {isDecisorio && (
+                      <>
+                        <div className="flex items-center gap-3 pl-5 mt-3">
+                          <select
+                            value={item.materia}
+                            onChange={(e) => {
+                              const materia = e.target.value;
+                              const meta = AGENDA_MATERIAS.find((m) => m.value === materia);
+                              updateAgendaItem(item.id, {
+                                materia,
+                                tipo: (meta?.tipo ?? item.tipo) as AgendaItem["tipo"],
+                                inscribible: meta?.inscribible ?? item.inscribible,
+                              });
+                            }}
+                            aria-label="Materia del acuerdo"
+                            className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                          >
+                            {AGENDA_MATERIAS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={item.tipo}
+                            onChange={(e) => updateAgendaItem(item.id, { tipo: e.target.value as AgendaItem["tipo"] })}
+                            aria-label="Clase de materia LSC"
+                            // BATCH 8.3 (ronda 2 U-A): tooltip sobre el select
+                            // explica las 3 clases de materia para que el
+                            // secretario sepa cuándo aplica cada una.
+                            title={
+                              AGENDA_TIPOS.find((t) => t.value === item.tipo)?.hint ??
+                              "Clase de materia LSC: ORDINARIA / ESTATUTARIA / ESTRUCTURAL"
+                            }
+                            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                          >
+                            {AGENDA_TIPOS.map((t) => (
+                              <option key={t.value} value={t.value} title={t.hint}>{t.label}</option>
+                            ))}
+                          </select>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={item.inscribible}
+                              onChange={(e) => updateAgendaItem(item.id, { inscribible: e.target.checked })}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
+                          </label>
+                        </div>
+
+                        {/* Propuesta de acuerdo concreta — art. 197.1 / 287 LSC.
+                            Texto que el secretario redacta para el punto y que
+                            los consejeros estudian antes de la sesión. Persiste
+                            en agenda_items JSONB. */}
+                        <div className="mt-3 pl-5">
+                          <label className="block text-xs font-medium text-[var(--g-text-primary)] mb-1">
+                            Propuesta de acuerdo
+                            <span className="ml-1 text-[var(--g-text-secondary)]">
+                              (texto que se someterá a votación — opcional pero recomendable
+                              {item.tipo !== "ORDINARIA" && (
+                                <span className="ml-1 text-[var(--status-warning)]">
+                                  · obligatoria para materias {item.tipo.toLowerCase()}
+                                </span>
+                              )})
                             </span>
-                          )})
-                        </span>
-                      </label>
-                      <textarea
-                        value={item.propuesta_acuerdo ?? ""}
-                        onChange={(e) =>
-                          updateAgendaItem(item.id, {
-                            propuesta_acuerdo: e.target.value.length > 0 ? e.target.value : null,
-                          })
-                        }
-                        placeholder={
-                          item.tipo === "ORDINARIA"
-                            ? "Ej: Aprobar las cuentas anuales del ejercicio 2025 cerradas a 31/12/2025…"
-                            : "Texto íntegro del acuerdo que se propondrá. Para materias estatutarias / estructurales LSC art. 197.1 / 287 exige que los socios dispongan del texto exacto antes de la sesión."
-                        }
-                        rows={3}
-                        className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-base leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      />
-                    </div>
+                          </label>
+                          <textarea
+                            value={item.propuesta_acuerdo ?? ""}
+                            onChange={(e) =>
+                              updateAgendaItem(item.id, {
+                                propuesta_acuerdo: e.target.value.length > 0 ? e.target.value : null,
+                              })
+                            }
+                            placeholder={
+                              item.tipo === "ORDINARIA"
+                                ? "Ej: Aprobar las cuentas anuales del ejercicio 2025 cerradas a 31/12/2025…"
+                                : "Texto íntegro del acuerdo que se propondrá. Para materias estatutarias / estructurales LSC art. 197.1 / 287 exige que los socios dispongan del texto exacto antes de la sesión."
+                            }
+                            rows={3}
+                            className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-base leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <button
@@ -1975,15 +2148,28 @@ export default function ConvocatoriasStepper() {
                   <ol className="space-y-1">
                     {agendaItems
                       .filter((i) => i.titulo.trim())
-                      .map((item, idx) => (
-                        <li key={item.id} className="text-sm text-[var(--g-text-primary)]">
-                          <span className="text-[var(--g-text-secondary)]">{idx + 1}. </span>
-                          {item.titulo}
-                          <span className="ml-2 text-xs text-[var(--g-text-secondary)]">
-                            [{labelMateria(item.materia)} · {item.tipo}{item.inscribible ? " · inscribible" : ""}]
-                          </span>
-                        </li>
-                      ))}
+                      .map((item, idx) => {
+                        const itemKind: AgendaItemKind = item.kind ?? "DELIBERATIVO";
+                        const kindLabel =
+                          KIND_OPTIONS.find((k) => k.value === itemKind)?.label ?? itemKind;
+                        return (
+                          <li key={item.id} className="text-sm text-[var(--g-text-primary)]">
+                            <span className="text-[var(--g-text-secondary)]">{idx + 1}. </span>
+                            {item.titulo}
+                            <span className="ml-2 text-xs text-[var(--g-text-secondary)]">
+                              [{kindLabel}
+                              {itemKind === "DECISORIO" && (
+                                <>
+                                  {" · "}
+                                  {labelMateria(item.materia)} · {item.tipo}
+                                  {item.inscribible ? " · inscribible" : ""}
+                                </>
+                              )}
+                              ]
+                            </span>
+                          </li>
+                        );
+                      })}
                   </ol>
                 )}
               </div>

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 
 export interface ConvocatoriaRow {
   id: string;
@@ -19,7 +20,15 @@ export interface ConvocatoriaRow {
   publication_channels: string[] | null;
   publication_evidence_url: string | null;
   statutory_basis: string | null;
-  agenda_items?: Array<{ titulo?: string; materia?: string; tipo?: string; inscribible?: boolean }> | null;
+  agenda_items?: Array<{
+    titulo?: string;
+    materia?: string;
+    tipo?: string;
+    inscribible?: boolean;
+    kind?: AgendaItemKind;
+    decision_subtype?: AgendaDecisionSubtype | null;
+    propuesta_acuerdo?: string | null;
+  }> | null;
   convocatoria_text?: string | null;
   rule_trace: Record<string, unknown> | null;
   reminders_trace: Record<string, unknown> | null;
@@ -166,6 +175,23 @@ export interface AgendaItem {
   materia: string;
   tipo: "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL";
   inscribible: boolean;
+  /**
+   * Naturaleza del punto del orden del día (agenda_item.kind v1.3):
+   * - INFORMATIVO: solo informe, sin decisión.
+   * - DELIBERATIVO: debate y conclusiones, sin votación formal (default).
+   * - DECISORIO: sometible a votación y materializable como acuerdo.
+   *
+   * Se persiste en `convocatorias.agenda_items` JSONB y se replica como
+   * fuente autoritative en `meeting_resolutions.kind` cuando el punto pasa
+   * a reunión. Default `DELIBERATIVO` para coincidir con el default de BD.
+   */
+  kind?: AgendaItemKind;
+  /**
+   * Subtipo de decisión (solo aplica si kind === "DECISORIO").
+   * NULL por defecto. Permite distinguir actos constitutivos, ratificatorios,
+   * elevación a público y mero acknowledgement de hechos.
+   */
+  decision_subtype?: AgendaDecisionSubtype | null;
   /**
    * Texto concreto de la propuesta de acuerdo que se someterá a votación
    * para este punto del orden del día.
