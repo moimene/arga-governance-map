@@ -87,7 +87,6 @@ const ALL_ENTRIES: CatalogEntry[] = [...CONFIG_CONDICIONAL, ...CARGO, ...PERFIL_
 async function main() {
   console.log(`Seeding entity_settings_catalog with ${ALL_ENTRIES.length} entries...`);
   let inserted = 0;
-  let updated = 0;
   for (const entry of ALL_ENTRIES) {
     const { error } = await supabase
       .from("entity_settings_catalog")
