@@ -72,6 +72,11 @@ describe.skipIf(!hasAdminClient())(
 
       // Sin valor, debe quedar unresolved (no rompe)
       expect(result.unresolved).toContain("clave_inexistente_nunca_creada");
+      // R4 explicit assertion: console.warn called with context for observability
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[variable-resolver] unresolved key",
+        expect.objectContaining({ variable: "clave_inexistente_nunca_creada" }),
+      );
       consoleSpy.mockRestore();
     });
   },

@@ -22,28 +22,36 @@ async function login(page: import("@playwright/test").Page) {
 }
 
 test.describe("v2 plantillas overrides — regresión sin overrides activos", () => {
-  test("composer renderiza plantilla canónica sin cambios visibles tras infra v2", async ({ page }) => {
+  test("listado de plantillas: snapshot DOM normalizado para detectar regresión", async ({ page }) => {
     await login(page);
     await page.goto("/secretaria/plantillas");
-    // Asume al menos 1 plantilla ACTIVA en el listado
     await expect(page.getByRole("heading", { name: /plantillas/i })).toBeVisible();
-    const firstPlantilla = page.locator('[data-testid="plantilla-row"]').first();
-    if (await firstPlantilla.count() === 0) {
-      // Sin plantillas no podemos hacer regresión; marcamos como skip lógico
-      test.skip(true, "No hay plantillas ACTIVA en demo tenant");
-      return;
-    }
-    await firstPlantilla.click();
 
-    // Verifica que la página de detalle carga (proxy: existe contenido capa1)
-    await expect(page.getByText(/capa\s*1|plantilla|versión/i)).toBeVisible({ timeout: 10000 });
+    // Snapshot del DOM principal — detecta cambios inesperados tras desplegar
+    // la infra v2. Normalizamos UUIDs, timestamps y fechas para estabilidad.
+    const main = page.locator("main").first();
+    const html = await main.innerHTML();
+    const normalized = html
+      .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g, "<UUID>")
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.?\d*Z?/g, "<TS>")
+      .replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, "<DATE>");
+    expect(normalized).toMatchSnapshot("plantillas-listado-baseline.html");
   });
 
-  test("BloquesSectorialesPanel no aparece para sociedad GENERICO sin showAll", async ({ page }) => {
+  test("tramitador composer carga sin errores con infra v2 desplegada", async ({ page }) => {
     await login(page);
-    // Navegar al composer/tramitador (ruta exacta depende de la implementación)
-    // En v2.0 el panel se enchufa en GenerarDocumentoStepper, no en Plantillas
-    // Este test queda como placeholder — se ampliará cuando se enchufe el panel
-    test.skip(true, "Panel no enchufado al composer en v2.0 (es opt-in, R6)");
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto("/secretaria/tramitador");
+    await expect(page.getByRole("heading")).toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState("networkidle");
+    // Sin overrides activos en BD, el composer debe cargar igual que antes de v2
+    expect(errors).toEqual([]);
+  });
+
+  test.skip("BloquesSectorialesPanel no aparece para sociedad GENERICO sin showAll", async () => {
+    // Posterga a v2.1: el panel BloquesSectorialesPanel es opt-in (R6) y no se
+    // enchufa todavía a TramitadorStepper/GenerarDocumentoStepper en v2.0.
+    // Cuando se conecte (v2.1), este test verificará el comportamiento R10.
   });
 });

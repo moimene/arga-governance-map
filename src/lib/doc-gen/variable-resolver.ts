@@ -675,6 +675,16 @@ export async function resolveVariables(
       }
       if (!found) {
         unresolved.push(v.variable);
+        // R4: log warning for observability without throwing — render still produces ""
+        // for missing keys, so migration progressiva is safe (capa1 puede referenciar
+        // claves antes de que la entidad/catalog las tengan pobladas).
+        console.warn("[variable-resolver] unresolved key", {
+          variable: v.variable,
+          fuente: v.fuente,
+          normalizedFuente,
+          agreementId: context.agreementId,
+          entityId: context.entityId,
+        });
       }
     }
   }

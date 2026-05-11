@@ -8,6 +8,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useUserRole } from "@/hooks/useUserRole";
 
 function useOverridesActivos() {
   const { tenantId } = useTenantContext();
@@ -45,10 +47,37 @@ function useChangelogReciente() {
 }
 
 export default function PlantillasMantenimiento() {
-  // RBAC simple: si no es ADMIN_TENANT, mostrar 403
-  // (En v2.0 dejamos placeholder; integración real con useUserRole en v2.1+)
+  // RBAC: solo ADMIN_TENANT puede acceder (spec §5.4).
+  // En v2.0 verificamos en frontend; RLS JWT-based queda para v2.1.
+  const { user, loading: userLoading } = useCurrentUser();
+  const { roles, isLoading: rolesLoading } = useUserRole(user?.id);
+  const isAdmin = roles.includes("ADMIN_TENANT");
+
   const overrides = useOverridesActivos();
   const changelog = useChangelogReciente();
+
+  if (userLoading || rolesLoading) {
+    return (
+      <main className="p-6 max-w-6xl mx-auto">
+        <p className="text-sm text-[var(--g-text-secondary)]">Verificando permisos…</p>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="p-6 max-w-6xl mx-auto">
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-[var(--g-text-primary)]">
+            403 — Acceso denegado
+          </h1>
+          <p className="text-sm text-[var(--g-text-secondary)]">
+            Esta página requiere rol ADMIN_TENANT.
+          </p>
+        </header>
+      </main>
+    );
+  }
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
