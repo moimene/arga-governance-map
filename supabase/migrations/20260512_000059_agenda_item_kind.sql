@@ -304,10 +304,7 @@ CREATE TRIGGER tr_agreement_requires_decisorio
 --   o se introduce otra tabla con agenda + adoption mode mixto, reactivar.
 -- ──────────────────────────────────────────────────────────────────────────────
 -- (no trigger defined here — invariante cubierto por data model)
-
+-- B2 fix: DROP defensivo del trigger por si una versión previa lo creó.
 DROP TRIGGER IF EXISTS tr_agenda_kind_only_for_meeting_mode ON agenda_items;
-CREATE TRIGGER tr_agenda_kind_only_for_meeting_mode
-  BEFORE INSERT OR UPDATE ON agenda_items
-  FOR EACH ROW EXECUTE FUNCTION agenda_kind_only_for_meeting_mode();
 
 COMMIT;
