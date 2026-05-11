@@ -60,11 +60,17 @@ export function useMaterializeAgendaItem() {
       return data.id as string;
     },
     onSuccess: (_id, vars) => {
-      // Invalidar para que la UI refresque inmediatamente
-      queryClient.invalidateQueries({ queryKey: ["meeting_agenda_sources", vars.meetingId] });
-      queryClient.invalidateQueries({ queryKey: ["agenda_items", vars.meetingId] });
+      // Codex P2 round 7: queryKey real es
+      //   ['secretaria', tenantId, 'meetings', meetingId, 'agenda-sources']
+      // (definido en useMeetingAgendaSources). El key plano que usábamos antes
+      // era no-op silencioso. Invalidamos el subtree completo de meetings del
+      // tenant para refrescar agenda-sources + byId + cualquier query derivada.
       queryClient.invalidateQueries({
-        queryKey: ["meeting", vars.meetingId],
+        queryKey: ["secretaria", vars.tenantId, "meetings"],
+      });
+      // También el changelog WORM por si la UI muestra historial de cambios.
+      queryClient.invalidateQueries({
+        queryKey: ["agenda_item_kind_changelog"],
       });
     },
   });
