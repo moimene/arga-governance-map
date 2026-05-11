@@ -110,12 +110,28 @@ export function usePlantillaWithOverrides(plantillaId?: string, entityId?: strin
     (o) => plantilla && o.compatible_with_canonical_version !== plantilla.version,
   );
 
+  // Consumer-facing flags:
+  //  - isLoading: at least one of the two queries is loading
+  //  - hasLoadedOverrides: the overrides query finished successfully (data is
+  //    real, not the EMPTY_OVERRIDES placeholder). Consumers use this to know
+  //    whether `capa3_editables` reflects real merged data or is still the
+  //    canonical fallback (when entityId/plantillaId unavailable, the query
+  //    is disabled and `overridesQuery.isSuccess` stays false; in that case
+  //    we expose the canonical capa3 from the plantilla load).
+  //
+  //  Codex P2: GenerarDocumentoStepper's `effectivePlantilla` would replace
+  //  canonical capa3 with EMPTY_CAPA3 during the overrides fetch, hiding
+  //  required fields in Step 2. Exposing `hasLoadedOverrides` lets consumers
+  //  preserve the canonical until the merge result is real.
+  const hasLoadedOverrides = overridesQuery.isSuccess;
+
   return {
     plantilla,
     capa3_editables: mergedCapa3,
     overrides,
     warnCompatibility,
     isLoading: plantillaQuery.isLoading || overridesQuery.isLoading,
+    hasLoadedOverrides,
     error: plantillaQuery.error || overridesQuery.error,
   };
 }

@@ -230,6 +230,8 @@ export default function GenerarDocumentoStepper() {
   const {
     capa3_editables: overriddenCapa3Editables,
     warnCompatibility: capa3OverridesWarnCompat,
+    isLoading: overridesLoading,
+    hasLoadedOverrides,
   } = usePlantillaWithOverrides(
     selectedPlantilla?.id,
     agreement?.entity_id ?? undefined,
@@ -239,13 +241,22 @@ export default function GenerarDocumentoStepper() {
   // the entity-scoped merged version. All other fields (capa1_inmutable,
   // capa2_variables, version, …) are preserved verbatim. We never mutate the
   // canonical object.
+  //
+  // Codex P2: During the overrides fetch, `overriddenCapa3Editables` falls back
+  // to EMPTY_CAPA3 (empty array). If we blindly replaced capa3_editables with
+  // that, Step 2 would render with zero required fields and the user could
+  // generate a document without filling them. Preserve the canonical
+  // capa3_editables until the overrides query has actually resolved.
   const effectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
     if (!selectedPlantilla) return null;
+    if (overridesLoading || !hasLoadedOverrides) {
+      return selectedPlantilla;
+    }
     return {
       ...selectedPlantilla,
       capa3_editables: overriddenCapa3Editables as PlantillaProtegidaRow["capa3_editables"],
     };
-  }, [selectedPlantilla, overriddenCapa3Editables]);
+  }, [selectedPlantilla, overriddenCapa3Editables, overridesLoading, hasLoadedOverrides]);
 
   useEffect(() => {
     if (capa3OverridesWarnCompat) {
