@@ -264,10 +264,18 @@ export function useMeetingForConvocatoria(
 }
 
 /**
- * Materializa `agenda_items` rows desde los puntos de la convocatoria si
- * todavía no existen. Idempotente: solo inserta puntos faltantes (basados en
- * `order_number`). Codex P1 round 9: se ejecuta también para meetings
- * "reused" que pudieron crearse por flujo previo sin materializar la agenda.
+ * Materializa o reconcilia `agenda_items` rows desde los puntos de la convocatoria.
+ *
+ * Comportamiento (Codex P2 round 10 — UPDATE + INSERT, no solo gaps):
+ *   - Rows faltantes (order_number ausente) → INSERT.
+ *   - Rows existentes con kind=DELIBERATIVO (default conservador) Y la
+ *     convocatoria declara un kind distinto → UPDATE para reconciliar.
+ *     Solo se updatea cuando el row NO tiene historial en
+ *     `agenda_item_kind_changelog` (es decir, el kind actual es el default
+ *     legacy del flujo previo, no una reclasificación humana explícita).
+ *   - Rows con changelog se respetan: una reclasificación humana es SSOT.
+ *
+ * Idempotente. Se ejecuta tanto en NEW meetings como en reused.
  */
 async function materializeAgendaItemsForConvocatoriaMeeting(
   meetingId: string,
@@ -276,10 +284,10 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
 ): Promise<void> {
   const agendaPoints = convocatoria.agenda_items ?? [];
   if (agendaPoints.length === 0) return;
-  // Idempotencia: detectar qué order_numbers ya existen
+  // 1. SELECT existing rows con id+order_number+kind para reconciliar
   const { data: existingRows, error: selErr } = await supabase
     .from("agenda_items")
-    .select("order_number")
+    .select("id, order_number, kind")
     .eq("meeting_id", meetingId)
     .eq("tenant_id", tenantId);
   if (selErr) {
@@ -287,33 +295,99 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
     console.warn("[materializeAgendaItems] select existing falló:", selErr.message);
     return;
   }
-  const existingOrders = new Set<number>(
-    ((existingRows ?? []) as Array<{ order_number: number | null }>)
-      .map((r) => r.order_number)
-      .filter((n): n is number => typeof n === "number"),
-  );
-  const rowsToInsert = agendaPoints
-    .map((point, index) => ({
-      point,
-      orderNumber: index + 1,
-    }))
-    .filter(({ orderNumber }) => !existingOrders.has(orderNumber))
-    .map(({ point, orderNumber }) => ({
-      tenant_id: tenantId,
-      meeting_id: meetingId,
-      order_number: orderNumber,
-      title: (point.titulo ?? "").trim().slice(0, 240) || `Punto ${orderNumber}`,
-      kind: point.kind ?? "DELIBERATIVO",
-      decision_subtype: point.decision_subtype ?? null,
-    }));
-  if (rowsToInsert.length === 0) return;
-  const { error: insErr } = await supabase.from("agenda_items").insert(rowsToInsert);
-  if (insErr) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[materializeAgendaItems] bulk insert falló; fallback a materialización on-demand:",
-      insErr.message,
+  const existingByOrder = new Map<number, { id: string; kind: string | null }>();
+  for (const row of (existingRows ?? []) as Array<{
+    id: string;
+    order_number: number | null;
+    kind: string | null;
+  }>) {
+    if (typeof row.order_number === "number") {
+      existingByOrder.set(row.order_number, { id: row.id, kind: row.kind });
+    }
+  }
+
+  // 2. Determinar inserts (gaps) y updates (legacy default ≠ convocatoria)
+  const rowsToInsert: Array<{
+    tenant_id: string;
+    meeting_id: string;
+    order_number: number;
+    title: string;
+    kind: string;
+    decision_subtype: string | null;
+  }> = [];
+  const updateCandidates: Array<{
+    id: string;
+    desired_kind: string;
+    desired_decision_subtype: string | null;
+  }> = [];
+
+  agendaPoints.forEach((point, index) => {
+    const orderNumber = index + 1;
+    const existing = existingByOrder.get(orderNumber);
+    const desiredKind = point.kind ?? "DELIBERATIVO";
+    const desiredSubtype = point.decision_subtype ?? null;
+    if (!existing) {
+      rowsToInsert.push({
+        tenant_id: tenantId,
+        meeting_id: meetingId,
+        order_number: orderNumber,
+        title: (point.titulo ?? "").trim().slice(0, 240) || `Punto ${orderNumber}`,
+        kind: desiredKind,
+        decision_subtype: desiredSubtype,
+      });
+      return;
+    }
+    // Existing row: reconciliar SOLO si current kind es legacy default
+    // (DELIBERATIVO) y la convocatoria declara algo distinto.
+    if (existing.kind === "DELIBERATIVO" && desiredKind !== "DELIBERATIVO") {
+      updateCandidates.push({
+        id: existing.id,
+        desired_kind: desiredKind,
+        desired_decision_subtype: desiredSubtype,
+      });
+    }
+  });
+
+  // 3. INSERT gaps
+  if (rowsToInsert.length > 0) {
+    const { error: insErr } = await supabase.from("agenda_items").insert(rowsToInsert);
+    if (insErr) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[materializeAgendaItems] bulk insert falló:",
+        insErr.message,
+      );
+    }
+  }
+
+  // 4. UPDATE candidatos legacy → solo si NO tienen changelog (respeta
+  //    reclasificaciones humanas previas como SSOT).
+  if (updateCandidates.length > 0) {
+    const candidateIds = updateCandidates.map((c) => c.id);
+    const { data: changelogRows } = await supabase
+      .from("agenda_item_kind_changelog")
+      .select("agenda_item_id")
+      .in("agenda_item_id", candidateIds);
+    const idsWithChangelog = new Set(
+      ((changelogRows ?? []) as Array<{ agenda_item_id: string }>).map((r) => r.agenda_item_id),
     );
+    for (const candidate of updateCandidates) {
+      if (idsWithChangelog.has(candidate.id)) continue; // respeta humano
+      const { error: updErr } = await supabase
+        .from("agenda_items")
+        .update({
+          kind: candidate.desired_kind,
+          decision_subtype: candidate.desired_decision_subtype,
+        })
+        .eq("id", candidate.id);
+      if (updErr) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[materializeAgendaItems] reconcile UPDATE ${candidate.id} falló:`,
+          updErr.message,
+        );
+      }
+    }
   }
 }
 

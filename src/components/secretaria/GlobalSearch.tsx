@@ -227,26 +227,39 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       if (meetingIds.length === 0) return [];
     }
 
-    // Codex P2 round 9: agenda_items como fuente primaria de búsqueda.
-    // Antes la búsqueda partía de meeting_resolutions → INFORMATIVO/DELIBERATIVO
-    // sin resolution row nunca aparecían (especialmente tras round 6 que dejó
-    // de crear meeting_resolutions para puntos no-DECISORIO).
+    // Codex P2 round 10: UNION agenda_items.title + meeting_resolutions.text.
+    // agenda_items sigue siendo fuente primaria (preserva INFO/DELIB sin
+    // resolución), pero también unificamos resultados cuando el texto matchea
+    // resolution_text/required_majority_code/status. El producto cartesiano
+    // se deduplica por (meeting_id, order_number/agenda_item_index).
     //
-    // Ahora:
-    //   1. Query agenda_items por title ilike (fuente primaria)
-    //   2. Carga meeting_resolutions matching (meeting_id, agenda_item_index)
-    //      para enriquecer con agreement_id, status, kind_resolution, etc.
-    //   3. Merge — agenda_items sin resolution exhibe status="DRAFT" implícito.
+    // Pipeline:
+    //   1a. agenda_items por title ilike (primary)
+    //   1b. meeting_resolutions por resolution_text/required_majority_code/status (paralela)
+    //   2. Resolver agenda_items para las resolutions que matchearon (enrich kind)
+    //   3. Resolver resolutions para los agenda_items que matchearon (enrich agreement_id)
+    //   4. Merge dedupe
     let agendaRequest = supabase
       .from("agenda_items")
       .select("id, meeting_id, order_number, title, kind, decision_subtype")
       .eq("tenant_id", tenantId)
       .ilike("title", q);
     if (meetingIds) agendaRequest = agendaRequest.in("meeting_id", meetingIds);
-    const { data: agendaRows, error: agendaErr } = await agendaRequest.limit(8);
-    if (agendaErr) throw agendaErr;
 
-    const agendaItems = (agendaRows ?? []) as Array<{
+    let resolutionRequest = supabase
+      .from("meeting_resolutions")
+      .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution")
+      .eq("tenant_id", tenantId)
+      .or(`resolution_text.ilike.${q},required_majority_code.ilike.${q},status.ilike.${q}`);
+    if (meetingIds) resolutionRequest = resolutionRequest.in("meeting_id", meetingIds);
+
+    const [agendaResp, resoTextResp] = await Promise.all([
+      agendaRequest.limit(8),
+      resolutionRequest.limit(8),
+    ]);
+    if (agendaResp.error) throw agendaResp.error;
+
+    const agendaItems = (agendaResp.data ?? []) as Array<{
       id: string;
       meeting_id: string;
       order_number: number;
@@ -254,17 +267,7 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       kind: string | null;
       decision_subtype: string | null;
     }>;
-    if (agendaItems.length === 0) return [];
-
-    // Segunda query: meeting_resolutions matching para enriquecer
-    const uniqueMeetingIds = Array.from(new Set(agendaItems.map((a) => a.meeting_id)));
-    const { data: resolutionRows } = await supabase
-      .from("meeting_resolutions")
-      .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution")
-      .eq("tenant_id", tenantId)
-      .in("meeting_id", uniqueMeetingIds);
-
-    const resolutionByKey = new Map<string, {
+    const matchedResolutions = (resoTextResp.data ?? []) as Array<{
       id: string;
       meeting_id: string;
       agreement_id: string | null;
@@ -273,43 +276,97 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       required_majority_code: string | null;
       status: string;
       kind_resolution: string | null;
-    }>();
-    for (const r of (resolutionRows ?? []) as Array<{
-      id: string;
+    }>;
+    if (agendaItems.length === 0 && matchedResolutions.length === 0) return [];
+
+    // Para resolutions que matchearon por texto: cargar sus agenda_items
+    const meetingIdsForReso = Array.from(new Set(matchedResolutions.map((r) => r.meeting_id)));
+    const agendaEnrichResp =
+      meetingIdsForReso.length > 0
+        ? await supabase
+            .from("agenda_items")
+            .select("meeting_id, order_number, kind, title")
+            .in("meeting_id", meetingIdsForReso)
+        : { data: [] as Array<{ meeting_id: string; order_number: number; kind: string | null; title: string | null }> };
+    const agendaByKey = new Map<string, { kind: string | null; title: string | null }>();
+    for (const ai of (agendaEnrichResp.data ?? []) as Array<{
       meeting_id: string;
-      agreement_id: string | null;
-      agenda_item_index: number;
-      resolution_text: string;
-      required_majority_code: string | null;
-      status: string;
-      kind_resolution: string | null;
+      order_number: number;
+      kind: string | null;
+      title: string | null;
     }>) {
+      agendaByKey.set(`${ai.meeting_id}:${ai.order_number}`, { kind: ai.kind, title: ai.title });
+    }
+
+    // Para agenda_items primaries: cargar resolutions matching (puede coincidir
+    // o no con matchedResolutions; siempre query separada para no perder agenda
+    // sin texto match en resolution).
+    const meetingIdsForAgenda = Array.from(new Set(agendaItems.map((a) => a.meeting_id)));
+    const resoEnrichResp =
+      meetingIdsForAgenda.length > 0
+        ? await supabase
+            .from("meeting_resolutions")
+            .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution")
+            .eq("tenant_id", tenantId)
+            .in("meeting_id", meetingIdsForAgenda)
+        : { data: [] as typeof matchedResolutions };
+    const resolutionByKey = new Map<string, (typeof matchedResolutions)[number]>();
+    for (const r of (resoEnrichResp.data ?? []) as typeof matchedResolutions) {
       resolutionByKey.set(`${r.meeting_id}:${r.agenda_item_index}`, r);
     }
 
-    // Merge: cada agenda_item con su resolution match (o stub si sin resolución).
-    return agendaItems.map((ai) => {
-      const r = resolutionByKey.get(`${ai.meeting_id}:${ai.order_number}`);
-      if (r) {
-        return {
-          ...r,
-          agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title },
-        };
-      }
-      // Stub: agenda_item sin resolución. Reusamos shape ResolutionRow con
-      // id = agenda_item.id (no resolution real) y status DRAFT implícito.
-      return {
-        id: ai.id,
-        meeting_id: ai.meeting_id,
-        agreement_id: null,
-        agenda_item_index: ai.order_number,
-        resolution_text: ai.title,
-        required_majority_code: null,
-        status: "DRAFT",
-        kind_resolution: null,
-        agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title },
-      };
-    }) as unknown as ResolutionRow[];
+    // Merge + dedupe por (meeting_id, agenda_item_index/order_number)
+    const seen = new Set<string>();
+    const out: Array<{
+      id: string;
+      meeting_id: string;
+      agreement_id: string | null;
+      agenda_item_index: number;
+      resolution_text: string;
+      required_majority_code: string | null;
+      status: string;
+      kind_resolution: string | null;
+      agenda_items: { kind: string | null; order_number: number; title: string | null } | null;
+    }> = [];
+
+    // Primero agenda_items hits (preservan INFO/DELIB sin resolution)
+    for (const ai of agendaItems) {
+      const key = `${ai.meeting_id}:${ai.order_number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const r = resolutionByKey.get(key);
+      out.push(
+        r
+          ? { ...r, agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title } }
+          : {
+              id: ai.id,
+              meeting_id: ai.meeting_id,
+              agreement_id: null,
+              agenda_item_index: ai.order_number,
+              resolution_text: ai.title,
+              required_majority_code: null,
+              status: "DRAFT",
+              kind_resolution: null,
+              agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title },
+            },
+      );
+    }
+    // Luego resolutions que matchearon por texto pero su agenda_item no
+    // estaba en la query primaria
+    for (const r of matchedResolutions) {
+      const key = `${r.meeting_id}:${r.agenda_item_index}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ai = agendaByKey.get(key);
+      out.push({
+        ...r,
+        agenda_items: ai
+          ? { kind: ai.kind, order_number: r.agenda_item_index, title: ai.title }
+          : null,
+      });
+    }
+
+    return out as unknown as ResolutionRow[];
   }
 
   const [agreements, convocatorias, nosessions, policies, findings, resolutions] = await Promise.allSettled([
