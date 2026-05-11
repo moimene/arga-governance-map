@@ -148,12 +148,25 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
   };
 
-  // Construir catalog defaults excluyendo claves que ya tienen valor real en legacy fields.
-  // Esto previene que el default canónico del catalog ('SA' para tipo_social) sobrescriba
-  // el valor real de la entidad ('SL', 'SLU', etc.) cuando no hay setting explícito.
+  // Codex P2 round 8: dos conjuntos distintos.
+  //
+  // 1. `legacyKeysWithRealValue` — keys con dato real (≠ null/undefined/"—").
+  //    Solo estas excluyen al catalog default (BD real gana sobre catalog).
+  //    Si la BD tiene `tipo_social='SL'`, el catalog default 'SA' no debe pisar.
+  //
+  // 2. `legacyKeysToExposeAsFallback` — keys con cualquier valor (incluyendo "—").
+  //    Estas se exponen al spread final para que plantillas legacy que
+  //    referencian {{cif}}, {{domicilio_social}}, {{tomo}}, etc. encuentren al
+  //    menos el placeholder "—" en entities con datos sparse (antes el resolver
+  //    siempre devolvía el "—"; filtrarlo rompía plantillas legacy).
   const legacyKeysWithRealValue = new Set(
     Object.entries(legacyFieldsRaw)
       .filter(([, v]) => v !== undefined && v !== null && v !== "—")
+      .map(([k]) => k),
+  );
+  const legacyKeysToExposeAsFallback = new Set(
+    Object.entries(legacyFieldsRaw)
+      .filter(([, v]) => v !== undefined && v !== null)
       .map(([k]) => k),
   );
 
@@ -169,32 +182,42 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   }
 
   return {
-    // Catalog defaults (sólo claves NO presentes ya en legacy ni en settings)
+    // Catalog defaults (sólo claves NO presentes ya en legacy con valor real ni en settings)
     ...catalogDefaults,
     // entity_settings (overrides explícitos del usuario) — gana sobre catalog
     ...settingsByKey,
-    // Campos directos de entities (legacy — fuente de verdad inviolable para
-    // claves que existen como columna real en `entities`). Ganan sobre TODO
-    // cuando tienen un valor real (no null/undefined/"—"): si la BD dice
-    // tipo_social='SL', ni un setting accidental ni un catalog default pueden
-    // sobrescribirlo. Para keys catalog-only (es_cotizada, cargo_secretario_label,
-    // etc.) este spread no las contiene, así que el flujo catalog→settings se
-    // respeta intacto para ellas.
-    ...legacyOverridesForRealColumns(legacyFieldsRaw, legacyKeysWithRealValue),
+    // Campos directos de entities — pisan a catalog SOLO cuando tienen valor real.
+    // Para keys donde el legacy field es "—" (placeholder), seguimos exponiéndolo
+    // como fallback para compatibilidad con plantillas legacy (Codex P2 round 8).
+    // El orden es: catalog (más bajo) → settings → legacy real → legacy "—" fallback.
+    ...legacyOverridesForRealColumns(legacyFieldsRaw, legacyKeysToExposeAsFallback, legacyKeysWithRealValue),
   };
 }
 
 /**
- * Devuelve sólo las legacy keys que tienen valor real en la columna directa
- * de `entities`. Esto permite que el spread final preserve la precedencia
- * "BD real wins" sin pisar las claves catalog-only que el usuario configura
- * via entity_settings.
+ * Devuelve las legacy keys que deben exponerse al consumidor final.
+ *
+ * Ordenamiento dentro del spread: las keys con valor real se aplican LAST
+ * para que ganen sobre catalog/settings; las keys con "—" placeholder se
+ * exponen también pero como capa más baja del propio spread (rellenan huecos
+ * cuando ni catalog ni settings ni legacy real las cubren).
+ *
+ * Codex P2 round 8: separar "BD tiene info útil" de "BD tiene placeholder
+ * al menos" para no romper plantillas legacy que renderizan literal "—".
  */
 function legacyOverridesForRealColumns(
   legacyFieldsRaw: Record<string, unknown>,
+  legacyKeysToExposeAsFallback: Set<string>,
   legacyKeysWithRealValue: Set<string>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  // Primero las keys con placeholder ("—") como capa baja
+  for (const key of legacyKeysToExposeAsFallback) {
+    if (!legacyKeysWithRealValue.has(key)) {
+      out[key] = legacyFieldsRaw[key];
+    }
+  }
+  // Después las keys con valor real para que ganen
   for (const key of legacyKeysWithRealValue) {
     out[key] = legacyFieldsRaw[key];
   }

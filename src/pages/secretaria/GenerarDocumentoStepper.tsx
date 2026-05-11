@@ -35,6 +35,7 @@ import { usePlantillaWithOverrides } from "@/hooks/usePlantillaWithOverrides";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
+import { BloquesSectorialesPanel } from "@/components/secretaria/BloquesSectorialesPanel";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
@@ -1066,6 +1067,35 @@ export default function GenerarDocumentoStepper() {
                 setDraftCloudId(null);
               }}
             />
+
+            {/* Codex P2 round 8: cablear BloquesSectorialesPanel.
+                El panel sugiere bloques sectoriales aprobados (MAR cotizadas,
+                BCE banca, etc.) que se appendean al campo_libre_sectorial.
+                Cada inserción crea un row WORM en bloque_insertions.
+                Solo se monta si la plantilla declara `campo_libre_sectorial`
+                en su capa3 (graceful degradation §5.3) y el agreement tiene
+                entity_id resuelto. */}
+            {agreement?.entity_id && agreement?.id && normalizedCapa3Fields.some((f) => f.campo === "campo_libre_sectorial") ? (
+              <BloquesSectorialesPanel
+                entityId={agreement.entity_id}
+                agreementId={agreement.id}
+                materia={agreement.agreement_kind ?? ""}
+                capa3Editables={normalizedCapa3Fields as unknown as Array<{ campo: string; [k: string]: unknown }>}
+                campoLibreValue={normalizedCapa3Values["campo_libre_sectorial"] ?? ""}
+                onCampoLibreChange={(newValue) => {
+                  setCapa3Values((current) => ({ ...current, campo_libre_sectorial: newValue }));
+                  setCapa3Errors({});
+                  setPreparedDraft(null);
+                  setEditableDraftText("");
+                  setCompositionResult(null);
+                  setDocxBuffer(null);
+                  setContentHash("");
+                  setDraftPersistenceStatus("idle");
+                  setDraftPersistenceMessage(null);
+                  setDraftCloudId(null);
+                }}
+              />
+            ) : null}
 
             {Object.keys(capa3Errors).length > 0 && (
               <div
