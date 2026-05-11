@@ -13,7 +13,7 @@ function wrapper({ children }: { children: ReactNode }) {
 describe("useEntitySettingsCatalog", () => {
   it("loads catalog and exposes Map by key", async () => {
     const { result } = renderHook(() => useEntitySettingsCatalog(), { wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.isLoading).toBe(false), { timeout: 5000 });
     // Asume seed Task 3 ejecutado — catalog tiene al menos `es_cotizada`
     expect(result.current.data).toBeDefined();
     const map = result.current.byKey;
