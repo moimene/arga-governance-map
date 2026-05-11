@@ -192,6 +192,19 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
       .map(([k]) => k),
   );
 
+  // Codex P2 round 13: precedencia v2 spec canónica.
+  //   1. catalog defaults (más bajo)
+  //   2. entities columna real (legacy fields con valor real)
+  //   3. entity_settings (overrides explícitos del admin — MÁS ALTO)
+  //
+  // Mi fix round 5 había puesto legacy fields encima de entity_settings, pero
+  // eso violaba la spec v2: si un admin define
+  // `entity_settings.es_cotizada="NO"`, su override debe ganar incluso si
+  // `entities.es_cotizada=true`. La columna `entities` es legacy/canónica, el
+  // settings explícito es la configuración deseada de la sociedad.
+  //
+  // Catalog defaults se excluyen para keys donde HAY un valor explícito
+  // (settings o legacy con valor real) — el catalog es fallback puro.
   const catalogDefaults: Record<string, unknown> = {};
   for (const row of (catalog ?? []) as Array<{ key: string; default_value: unknown }>) {
     if (
@@ -204,15 +217,12 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   }
 
   return {
-    // Catalog defaults (sólo claves NO presentes ya en legacy con valor real ni en settings)
+    // Capa 1: catalog defaults (fallback final si nada más responde)
     ...catalogDefaults,
-    // entity_settings (overrides explícitos del usuario) — gana sobre catalog
-    ...settingsByKey,
-    // Campos directos de entities — pisan a catalog SOLO cuando tienen valor real.
-    // Para keys donde el legacy field es "—" (placeholder), seguimos exponiéndolo
-    // como fallback para compatibilidad con plantillas legacy (Codex P2 round 8).
-    // El orden es: catalog (más bajo) → settings → legacy real → legacy "—" fallback.
+    // Capa 2: entities columna real — gana sobre catalog, NO gana sobre settings
     ...legacyOverridesForRealColumns(legacyFieldsRaw, legacyKeysToExposeAsFallback, legacyKeysWithRealValue),
+    // Capa 3: entity_settings (admin overrides) — gana sobre todo
+    ...settingsByKey,
   };
 }
 
