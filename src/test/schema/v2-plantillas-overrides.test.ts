@@ -431,10 +431,14 @@ describe.skipIf(!hasAdminClient())(
     });
 
     it("trigger rejects DELETE físico", async () => {
-      // Insert sentinel
+      // Codex P2 round 18: usar versión dinámica por test run. Antes la
+      // version fija "1.0.0" colisionaba en `bloques_unique_clave_version`
+      // en re-ejecuciones (cleanup archiva pero no borra). Upsert tampoco
+      // sirve aquí porque el trigger WORM round 7 bloquea ARCHIVADA→ACTIVA.
+      const testVersion = `test-delete-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       await supabaseAdmin!.from("bloques_sectoriales").insert({
         clave_bloque: sentinelClave,
-        version: "1.0.0",
+        version: testVersion,
         sector: "GENERICO",
         materia_aplicable: ["TEST"],
         texto_aprobado: "Texto sentinel para test DELETE",
@@ -444,7 +448,8 @@ describe.skipIf(!hasAdminClient())(
       const { error } = await supabaseAdmin!
         .from("bloques_sectoriales")
         .delete()
-        .eq("clave_bloque", sentinelClave);
+        .eq("clave_bloque", sentinelClave)
+        .eq("version", testVersion);
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/DELETE físico.*prohibido/i);
     });
