@@ -151,18 +151,23 @@ export function BloquesSectorialesPanel({
           bloque={b}
           disabled={!hasCampoLibre}
           onInsert={async () => {
-            const sep = campoLibreValue && !campoLibreValue.endsWith("\n\n") ? "\n\n" : "";
-            const newValue = `${campoLibreValue}${sep}${b.texto_aprobado}`;
-            onCampoLibreChange(newValue);
+            // WORM contract: persist audit row FIRST (blocking). Only update the
+            // textarea if the audit row succeeded. This prevents generated documents
+            // containing untracked sector text when the INSERT into bloque_insertions
+            // fails (RLS, constraint, transient network). On failure, the textarea
+            // is unchanged and the secretary can retry — guarantees that every byte
+            // of sector text in capa3 has a matching WORM row in bloque_insertions.
             try {
               await insertMutation.mutateAsync({ agreementId, bloque: b });
+              const sep = campoLibreValue && !campoLibreValue.endsWith("\n\n") ? "\n\n" : "";
+              const newValue = `${campoLibreValue}${sep}${b.texto_aprobado}`;
+              onCampoLibreChange(newValue);
               toast.success(
                 `Bloque ${b.clave_bloque} v${b.version} insertado. Puedes editarlo antes de generar el documento.`,
               );
             } catch (e) {
-              toast.error("Falló el registro de auditoría del bloque. El texto está insertado, pero la trazabilidad no se guardó.");
-              // No revertir el append: el secretario ya tiene el texto
-              console.error(e);
+              toast.error("Falló el registro de auditoría del bloque. El texto NO se ha insertado para preservar trazabilidad WORM. Reintenta o consulta a soporte.");
+              console.error("[BloquesSectorialesPanel] audit insert failed; textarea NOT modified", e);
             }
           }}
         />
