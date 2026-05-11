@@ -333,6 +333,47 @@ describe.skipIf(!hasAdminClient())(
       expect(error).not.toBeNull();
       expect(error?.message).toMatch(/check|capa3_at_least_one_override/i);
     });
+
+    // H5 deny-list regression tests
+    it.each([
+      ["snapshot_hash", /snapshot_/i],
+      ["snapshot_rule_pack_id", /snapshot_/i],
+      ["resultado_gate", /resultado_/i],
+      ["tenant_id", /tenant_id/i],
+      ["entity_id", /entity_id/i],
+      ["agreement_id", /agreement_id/i],
+      ["entities.name", /entities\./i],
+      ["MOTOR", /MOTOR/],
+      ["QTSP", /QTSP/],
+      ["firma_qes_ref", /firma_qes/i],
+    ])(
+      "deny-list rejects override with protected campo=%s",
+      async (forbiddenCampo, errorPattern) => {
+        const { data: pl } = await supabaseAdmin!
+          .from("plantillas_protegidas")
+          .select("id")
+          .eq("tenant_id", DEMO_TENANT)
+          .eq("estado", "ACTIVA")
+          .limit(1)
+          .maybeSingle();
+        if (!pl) return;
+
+        const { error } = await supabaseAdmin!
+          .from("plantilla_capa3_overrides_por_entidad")
+          .insert({
+            tenant_id: DEMO_TENANT,
+            entity_id: DEMO_ENTITY_ARGA,
+            plantilla_id: pl.id,
+            campo: forbiddenCampo,
+            obligatoriedad_override: "OBLIGATORIO",
+            compatible_with_canonical_version: "1.0.0",
+            motivo: `${TEST_MOTIVO_SENTINEL}_deny_${forbiddenCampo.replace(/[^a-z0-9]/gi, "_")}`,
+          });
+        expect(error).not.toBeNull();
+        expect(error?.message).toMatch(/prefijo protegido/i);
+        expect(error?.message).toMatch(errorPattern);
+      },
+    );
   },
 );
 

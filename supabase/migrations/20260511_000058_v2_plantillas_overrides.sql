@@ -172,6 +172,13 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_plantilla plantillas_protegidas%ROWTYPE;
   v_campo_exists boolean;
+  v_protected_prefixes text[] := ARRAY[
+    'snapshot_', 'resultado_', 'rule_pack', 'normative_',
+    'tenant_id', 'entity_id', 'agreement_id',
+    'entities.', 'agreements.', 'meetings.', 'mandates.',
+    'SISTEMA', 'QTSP', 'MOTOR', 'firma_qes', 'tsq_'
+  ];
+  v_prefix text;
 BEGIN
   SELECT * INTO v_plantilla FROM plantillas_protegidas WHERE id = NEW.plantilla_id;
 
@@ -179,6 +186,18 @@ BEGIN
   IF v_plantilla.estado <> 'ACTIVA' THEN
     RAISE EXCEPTION 'No se permite override sobre plantilla con estado=% (debe ser ACTIVA)', v_plantilla.estado;
   END IF;
+
+  -- H5 deny-list: rechazar campos con prefijo protegido (snapshot, resultado,
+  -- tenant/entity/agreement ids, dotted entity sources, MOTOR/SISTEMA/QTSP).
+  -- Sin esto, una plantilla mal configurada (o un admin con write a capa3_editables)
+  -- podría declarar un campo capa3 con el mismo nombre que una variable
+  -- auto-resuelta del MOTOR LSC y sobrescribirla en mergeVariables.
+  FOREACH v_prefix IN ARRAY v_protected_prefixes
+  LOOP
+    IF NEW.campo = v_prefix OR NEW.campo LIKE v_prefix || '%' THEN
+      RAISE EXCEPTION 'Override rechazado: campo "%" usa prefijo protegido "%". Capa 3 no puede sobrescribir variables MOTOR/SISTEMA/identificadores. Renombra el campo en capa3_editables.', NEW.campo, v_prefix;
+    END IF;
+  END LOOP;
 
   -- Campo debe existir en capa3_editables
   IF v_plantilla.capa3_editables IS NOT NULL THEN
