@@ -117,10 +117,11 @@ CREATE OR REPLACE FUNCTION agenda_kind_immutable_after_voted()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.kind IS DISTINCT FROM NEW.kind THEN
+    -- B1 fix: agenda_items real column is 'order_number' (not 'index' as spec asumió)
     IF EXISTS (
       SELECT 1 FROM meeting_resolutions r
       WHERE r.meeting_id = NEW.meeting_id
-        AND r.agenda_item_index = NEW.index
+        AND r.agenda_item_index = NEW.order_number
     ) THEN
       RAISE EXCEPTION 'agenda_items.kind inmutable: existe meeting_resolution apuntando al punto. Cambia primero la resolution.';
     END IF;
@@ -159,9 +160,17 @@ CREATE TRIGGER tr_agenda_kind_immutable_after_closed
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 4.7 — Trigger T3: audit log post-CONVOKED
+--   SECURITY DEFINER + COALESCE tenant_id (B4 fix): agenda_items.tenant_id es
+--   nullable. Si NULL, usar tenant demo como default (consistente con patrón
+--   sistémico del repo). SECURITY DEFINER permite INSERT al audit log incluso
+--   si la sesión actual no cumple el RLS check (B3 mitigation).
 -- ──────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION agenda_kind_audit_after_convoked()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_meeting_status text;
 BEGIN
@@ -172,7 +181,8 @@ BEGIN
         tenant_id, agenda_item_id, meeting_id, meeting_status_at_change,
         from_kind, to_kind, motivo, autor
       ) VALUES (
-        NEW.tenant_id, NEW.id, NEW.meeting_id, v_meeting_status,
+        COALESCE(NEW.tenant_id, '00000000-0000-0000-0000-000000000001'::uuid),
+        NEW.id, NEW.meeting_id, v_meeting_status,
         OLD.kind, NEW.kind,
         COALESCE(current_setting('app.kind_change_motivo', true),
                  'sin_motivo_proporcionado'),
@@ -182,7 +192,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS tr_agenda_kind_audit_after_convoked ON agenda_items;
 CREATE TRIGGER tr_agenda_kind_audit_after_convoked
@@ -197,10 +207,11 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_agenda_kind text;
 BEGIN
+  -- B1 fix: agenda_items real column is 'order_number' (not 'index')
   SELECT kind INTO v_agenda_kind
   FROM agenda_items
   WHERE meeting_id = NEW.meeting_id
-    AND index = NEW.agenda_item_index;
+    AND order_number = NEW.agenda_item_index;
 
   IF v_agenda_kind IS NULL THEN
     RAISE EXCEPTION 'meeting_resolutions.agenda_item_index=% no corresponde a ningún agenda_item de la reunión %', NEW.agenda_item_index, NEW.meeting_id;
@@ -249,13 +260,14 @@ BEGIN
     RETURN NEW; -- Sin trazabilidad de punto explícita (compatibilidad legacy)
   END IF;
 
+  -- B1 fix: agenda_items real column is 'order_number' (not 'index')
   SELECT kind INTO v_agenda_kind
   FROM agenda_items
   WHERE meeting_id = NEW.parent_meeting_id
-    AND index = v_agenda_item_index;
+    AND order_number = v_agenda_item_index;
 
   IF v_agenda_kind IS NULL THEN
-    RAISE EXCEPTION 'agreement.parent_meeting_id no tiene agenda_item con index=%', v_agenda_item_index;
+    RAISE EXCEPTION 'agreement.parent_meeting_id no tiene agenda_item con order_number=%', v_agenda_item_index;
   END IF;
 
   IF v_agenda_kind != 'DECISORIO' THEN
@@ -272,26 +284,25 @@ CREATE TRIGGER tr_agreement_requires_decisorio
   FOR EACH ROW EXECUTE FUNCTION agreement_requires_decisorio();
 
 -- ──────────────────────────────────────────────────────────────────────────────
--- 4.10 — Trigger T6: kind solo para adoption_mode=MEETING (G-I3 fix)
+-- 4.10 — Trigger T6: DROPPED (B2 fix)
+--   El spec asumía meetings.adoption_mode pero esa columna NO EXISTE en el
+--   schema real (verified contra supabase/functions/_types/database.ts:2792).
+--   adoption_mode existe en agreements y plantillas_protegidas, no en meetings.
+--
+--   Decisión arquitectónica: T6 no es implementable como spec'd. Sin embargo,
+--   el invariante semántico que T6 quería enforce (agenda_items solo existen
+--   para meetings tipo MEETING) ya está garantizado por el data model:
+--   - meetings es la tabla de reuniones formales (MEETING mode)
+--   - Los otros modos (NO_SESSION, UNIPERSONAL_*, CO_APROBACION, SOLIDARIO)
+--     NO tienen registro en meetings; tienen sus propias tablas
+--     (no_session_resolutions, unipersonal_decisions, etc.)
+--   - Por tanto, si agenda_items.meeting_id apunta a una fila válida en
+--     meetings, automáticamente es modo MEETING.
+--
+--   T6 queda OUT OF SCOPE de v1. Si en el futuro meetings añade adoption_mode
+--   o se introduce otra tabla con agenda + adoption mode mixto, reactivar.
 -- ──────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION agenda_kind_only_for_meeting_mode()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_adoption_mode text;
-BEGIN
-  SELECT adoption_mode INTO v_adoption_mode FROM meetings WHERE id = NEW.meeting_id;
-  IF v_adoption_mode IS NULL THEN
-    RAISE EXCEPTION 'agenda_items.meeting_id no apunta a una meeting válida (id=%)', NEW.meeting_id;
-  END IF;
-  -- Para no-MEETING (NO_SESSION, UNIPERSONAL_*, CO_APROBACION, SOLIDARIO),
-  -- forzar DECISORIO. Estos modos son inherentemente decisorios — no admiten
-  -- orden del día deliberativo o informativo.
-  IF v_adoption_mode != 'MEETING' AND NEW.kind != 'DECISORIO' THEN
-    RAISE EXCEPTION 'agenda_items asociados a meetings.adoption_mode=% deben tener kind=DECISORIO (modo inherentemente decisorio). Recibido: %', v_adoption_mode, NEW.kind;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- (no trigger defined here — invariante cubierto por data model)
 
 DROP TRIGGER IF EXISTS tr_agenda_kind_only_for_meeting_mode ON agenda_items;
 CREATE TRIGGER tr_agenda_kind_only_for_meeting_mode
