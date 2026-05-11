@@ -46,6 +46,14 @@ export function BloquesSectorialesPanel({
 }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  // Codex P2 round 14: tracking de bloques insertados durante esta sesión
+  // para detectar divergencia WORM. Cada insert appendea el texto canónico
+  // aquí; si el secretario edita y altera ese texto en el textarea, la
+  // detección compara y muestra warning visible. Trazabilidad: bloque_insertions
+  // guarda texto_insertado=texto_aprobado original, no la edición.
+  const [insertedBlocks, setInsertedBlocks] = useState<Array<{ clave: string; version: string; texto: string }>>(
+    [],
+  );
   const sectorQuery = useEntitySectorRegulado(entityId);
   const sector = sectorQuery.data;
   const catalogQuery = useEntitySettingsCatalog();
@@ -135,6 +143,34 @@ export function BloquesSectorialesPanel({
         </div>
       )}
 
+      {/* Codex P2 round 14: detectar divergencia WORM. Si alguno de los
+          bloques insertados ya no aparece literal en el textarea, la
+          trazabilidad bloque_insertions no refleja el documento real. */}
+      {insertedBlocks.length > 0 && insertedBlocks.some((b) => !campoLibreValue.includes(b.texto)) ? (
+        <div
+          role="alert"
+          className="p-3 text-xs text-[var(--g-text-primary)] bg-[var(--g-surface-subtle)] border border-[var(--status-warning)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="font-medium">⚠ Trazabilidad WORM divergente</p>
+          <p className="mt-1">
+            Has editado el contenido de uno o más bloques sectoriales. La tabla{" "}
+            <code className="font-mono text-xs">bloque_insertions</code> registra el texto
+            aprobado original, no las ediciones. El documento generado puede contener texto
+            distinto al registrado en auditoría. Revisa las ediciones antes de firmar.
+          </p>
+          <ul className="mt-2 ml-4 list-disc">
+            {insertedBlocks
+              .filter((b) => !campoLibreValue.includes(b.texto))
+              .map((b) => (
+                <li key={`${b.clave}-${b.version}`}>
+                  Bloque <code className="font-mono">{b.clave}</code> v{b.version} editado
+                </li>
+              ))}
+          </ul>
+        </div>
+      ) : null}
+
       {bloquesQuery.isLoading && (
         <p className="text-sm text-[var(--g-text-secondary)]">Cargando bloques…</p>
       )}
@@ -162,8 +198,13 @@ export function BloquesSectorialesPanel({
               const sep = campoLibreValue && !campoLibreValue.endsWith("\n\n") ? "\n\n" : "";
               const newValue = `${campoLibreValue}${sep}${b.texto_aprobado}`;
               onCampoLibreChange(newValue);
+              // Codex P2 round 14: tracking local para detectar divergence
+              setInsertedBlocks((prev) => [
+                ...prev,
+                { clave: b.clave_bloque, version: b.version, texto: b.texto_aprobado },
+              ]);
               toast.success(
-                `Bloque ${b.clave_bloque} v${b.version} insertado. Puedes editarlo antes de generar el documento.`,
+                `Bloque ${b.clave_bloque} v${b.version} insertado. Puedes editarlo antes de generar el documento (las ediciones quedan fuera del WORM trace).`,
               );
             } catch (e) {
               toast.error("Falló el registro de auditoría del bloque. El texto NO se ha insertado para preservar trazabilidad WORM. Reintenta o consulta a soporte.");

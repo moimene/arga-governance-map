@@ -110,10 +110,27 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     .eq("entity_id", entityId)
     .eq("tenant_id", tenantId);
 
+  // Codex P2 round 14: keys booleanas legacy (`{{#if es_cotizada}}` etc.)
+  // que pueden venir como string "SÍ"/"NO" desde entity_settings (JSONB).
+  // Normalizamos a boolean para que Handlebars `{{#if}}` evalúe consistente
+  // independiente de si el valor procede de entity_settings (string) o
+  // entities columna (boolean).
+  const BOOLEAN_KEYS = new Set(["es_cotizada", "es_unipersonal"]);
+  const normalizeBooleanIfApplicable = (key: string, value: unknown): unknown => {
+    if (!BOOLEAN_KEYS.has(key)) return value;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const norm = value.trim().toUpperCase();
+      if (norm === "SÍ" || norm === "SI" || norm === "TRUE" || norm === "YES") return true;
+      if (norm === "NO" || norm === "FALSE") return false;
+    }
+    return value;
+  };
+
   const settingsByKey: Record<string, unknown> = {};
   for (const row of (settings ?? []) as Array<{ key: string; value: unknown }>) {
-    // value es JSONB — convertirlo a tipo nativo
-    settingsByKey[row.key] = row.value;
+    // value es JSONB — convertirlo a tipo nativo + normalizar booleanas
+    settingsByKey[row.key] = normalizeBooleanIfApplicable(row.key, row.value);
   }
 
   // Cargar catalog defaults para claves no overrideadas
@@ -126,17 +143,20 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
   // IMPORTANTE: estos valores deben ganar sobre catalog defaults para claves que solapan
   // (ej. tipo_social existe como columna real en entities Y como catalog key con default 'SA').
   // Si tipo_social = 'SL' en BD, NO debe ser sobrescrito por el default 'SA' del catalog.
-  // Codex P2 round 12: helper SÍ/NO desde columna boolean.
-  // Si entities.<col> está populado (true/false), devuelve "SÍ"/"NO".
-  // Si la columna es null/undefined, devuelve undefined → no se incluye en
-  // legacyFieldsRaw y el catalog default gana (comportamiento legacy).
-  const yesNoFromColumn = (val: unknown): string | undefined => {
-    if (val === true) return "SÍ";
-    if (val === false) return "NO";
+  // Codex P2 round 14: preservar boolean true/false desde la columna entities.
+  // Plantillas legacy usan `{{#if es_cotizada}}` → Handlebars trata cualquier
+  // string no vacío como truthy. Si exponíamos "NO" string, la rama listed-only
+  // se ejecutaba para entidades NO cotizadas.
+  // Plantillas v2 con `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}` reciben false (no
+  // matchea "SÍ") → rama no-listed (también correcto). Helper de plantilla
+  // puede normalizar si necesita string.
+  const boolFromColumn = (val: unknown): boolean | undefined => {
+    if (val === true) return true;
+    if (val === false) return false;
     return undefined;
   };
-  const esCotizadaFromEntity = yesNoFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
-  const esUnipersonalFromEntity = yesNoFromColumn(
+  const esCotizadaFromEntity = boolFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
+  const esUnipersonalFromEntity = boolFromColumn(
     (data as { es_unipersonal?: unknown }).es_unipersonal,
   );
 
@@ -212,7 +232,8 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
       !(row.key in settingsByKey) &&
       !legacyKeysWithRealValue.has(row.key)
     ) {
-      catalogDefaults[row.key] = row.default_value;
+      // Codex P2 round 14: normalizar booleanas también en catalog defaults
+      catalogDefaults[row.key] = normalizeBooleanIfApplicable(row.key, row.default_value);
     }
   }
 

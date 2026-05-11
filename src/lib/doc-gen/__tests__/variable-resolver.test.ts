@@ -320,8 +320,9 @@ describe("variable-resolver", () => {
 
     // BD real wins: tipo_social=SL, no el catalog default SA
     expect(result.values.tipo_social).toBe("SL");
-    // Catalog default sigue aplicando para keys que NO existen como columna real
-    expect(result.values.es_cotizada).toBe("NO");
+    // Codex P2 round 14: es_cotizada catalog default 'NO' string ahora se
+    // normaliza a boolean false para consistencia con `{{#if}}` legacy.
+    expect(result.values.es_cotizada).toBe(false);
   });
 
   // ── Codex P1 — dotted refs en plantillas v2 ──────────────────────────────
@@ -348,13 +349,15 @@ describe("variable-resolver", () => {
 
     // Forma legacy plana sigue funcionando
     expect(result.values.cargo_secretario_label).toBe("Secretario General");
-    expect(result.values.es_cotizada).toBe("SÍ");
+    // Codex P2 round 14: "SÍ" string en entity_settings se normaliza a
+    // boolean true para que `{{#if es_cotizada}}` legacy evalúe correctamente.
+    expect(result.values.es_cotizada).toBe(true);
 
     // Forma v2 dotted: ENTIDAD es objeto navegable por Handlebars
     const entidad = result.values.ENTIDAD as Record<string, unknown> | undefined;
     expect(entidad).toBeDefined();
     expect(entidad?.cargo_secretario_label).toBe("Secretario General");
-    expect(entidad?.es_cotizada).toBe("SÍ");
+    expect(entidad?.es_cotizada).toBe(true);
     expect(entidad?.tipo_social).toBe("SA");
   });
 
@@ -383,10 +386,13 @@ describe("variable-resolver", () => {
       { agreementId: "agr-1", tenantId: "tenant-1", entityId: "entity-1" },
     );
 
+    // Codex P2 round 14: es_cotizada ahora es boolean canónico → usar
+    // `{{#if}}` directamente (forma idiomática Handlebars). Plantillas
+    // legacy con `{{#if es_cotizada}}` también funcionan.
     const rendered = renderTemplate({
       template:
         "Cargo: {{ENTIDAD.cargo_secretario_label}}. " +
-        "{{#if (eq ENTIDAD.es_cotizada \"SÍ\")}}Sociedad cotizada.{{else}}No cotizada.{{/if}}",
+        "{{#if ENTIDAD.es_cotizada}}Sociedad cotizada.{{else}}No cotizada.{{/if}}",
       variables: result.values,
     });
 

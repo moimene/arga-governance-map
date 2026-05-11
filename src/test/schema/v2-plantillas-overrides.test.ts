@@ -243,6 +243,11 @@ describe.skipIf(!hasAdminClient())(
         .select("id, capa3_editables")
         .eq("tenant_id", DEMO_TENANT)
         .eq("estado", "ACTIVA")
+        // Codex P2 round 14: filtrar plantillas con capa3 NOT NULL.
+        // Antes el test caía a fallback "test_campo" si la plantilla traída
+        // tenía capa3=NULL → el insert override fallaba en el guard de
+        // existence (000060) antes de poder asertar el CHECK objetivo.
+        .not("capa3_editables", "is", null)
         .limit(1)
         .maybeSingle();
       if (!pl) {
@@ -274,6 +279,11 @@ describe.skipIf(!hasAdminClient())(
         .select("id, capa3_editables")
         .eq("tenant_id", DEMO_TENANT)
         .eq("estado", "ACTIVA")
+        // Codex P2 round 14: filtrar plantillas con capa3 NOT NULL.
+        // Antes el test caía a fallback "test_campo" si la plantilla traída
+        // tenía capa3=NULL → el insert override fallaba en el guard de
+        // existence (000060) antes de poder asertar el CHECK objetivo.
+        .not("capa3_editables", "is", null)
         .limit(1)
         .maybeSingle();
       if (!pl) return;
@@ -302,6 +312,11 @@ describe.skipIf(!hasAdminClient())(
         .select("id, capa3_editables")
         .eq("tenant_id", DEMO_TENANT)
         .eq("estado", "ACTIVA")
+        // Codex P2 round 14: filtrar plantillas con capa3 NOT NULL.
+        // Antes el test caía a fallback "test_campo" si la plantilla traída
+        // tenía capa3=NULL → el insert override fallaba en el guard de
+        // existence (000060) antes de poder asertar el CHECK objetivo.
+        .not("capa3_editables", "is", null)
         .limit(1)
         .maybeSingle();
       if (!pl) return;
@@ -329,6 +344,11 @@ describe.skipIf(!hasAdminClient())(
         .select("id, capa3_editables")
         .eq("tenant_id", DEMO_TENANT)
         .eq("estado", "ACTIVA")
+        // Codex P2 round 14: filtrar plantillas con capa3 NOT NULL.
+        // Antes el test caía a fallback "test_campo" si la plantilla traída
+        // tenía capa3=NULL → el insert override fallaba en el guard de
+        // existence (000060) antes de poder asertar el CHECK objetivo.
+        .not("capa3_editables", "is", null)
         .limit(1)
         .maybeSingle();
       if (!pl) return;
