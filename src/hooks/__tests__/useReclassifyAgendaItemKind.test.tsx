@@ -123,6 +123,13 @@ vi.mock("@/hooks/useUserRole", () => ({
   }),
 }));
 
+// Codex P2 round 14: useReclassifyAgendaItemKind ahora consume useTenantContext
+// para invalidar el queryKey real de useMeetingAgendaSources tras reclassify.
+// Mock con tenant demo para que los tests existing pasen.
+vi.mock("@/context/TenantContext", () => ({
+  useTenantContext: () => ({ tenantId: "00000000-0000-0000-0000-000000000001" }),
+}));
+
 // Import después de los mocks
 import { useReclassifyAgendaItemKind } from "../useReclassifyAgendaItemKind";
 

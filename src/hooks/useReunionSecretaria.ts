@@ -352,10 +352,12 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
   if (rowsToInsert.length > 0) {
     const { error: insErr } = await supabase.from("agenda_items").insert(rowsToInsert);
     if (insErr) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[materializeAgendaItems] bulk insert falló:",
-        insErr.message,
+      // Codex P2 round 14: abortar en lugar de solo loguear. agenda_items
+      // ya es requerido por triggers (T5, integrity rules) — sin esos rows
+      // el usuario llega a voting/save con BD inconsistente y un error
+      // críptico aguas abajo. Mejor fallar temprano con mensaje claro.
+      throw new Error(
+        `Materialización de agenda_items falló: ${insErr.message}. La reunión existe pero la agenda no se persistió; reintenta la creación o contacta soporte.`,
       );
     }
   }

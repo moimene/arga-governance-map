@@ -22,6 +22,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { AgendaItemKind } from "@/lib/secretaria/agenda-kind";
 import {
@@ -50,6 +51,7 @@ type AgendaItemKindRow = {
 export function useReclassifyAgendaItemKind() {
   const { user } = useCurrentUser();
   const { roles } = useUserRole(user?.id);
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -142,6 +144,16 @@ export function useReclassifyAgendaItemKind() {
       queryClient.invalidateQueries({
         queryKey: ["agenda_item_kind_changelog", vars.agendaItemId],
       });
+      // Codex P2 round 14: invalidar también el subtree meeting_agenda_sources
+      // (queryKey real: ['secretaria', tenantId, 'meetings', meetingId, 'agenda-sources']).
+      // Sin esto, tras reclassify de un punto convocatoria-backed (post-materialize),
+      // useMeetingAgendaSources cache exhibía source_table='convocatorias' stale →
+      // resolvePointKind ignoraba el kind index actualizado.
+      if (tenantId) {
+        queryClient.invalidateQueries({
+          queryKey: ["secretaria", tenantId, "meetings", vars.meetingId, "agenda-sources"],
+        });
+      }
     },
   });
 }

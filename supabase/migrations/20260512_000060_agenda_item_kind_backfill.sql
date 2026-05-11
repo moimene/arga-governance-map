@@ -24,13 +24,18 @@ BEGIN;
 SET session_replication_role = 'replica';
 
 -- Paso 1: agenda_items con señal relacional → DECISORIO
+-- Codex P1 round 14: incluir TAMBIÉN resoluciones DRAFT/PENDING. La mera
+-- existencia de una row en meeting_resolutions declara intent decisorio
+-- (alguien creó la resolución porque planeaba adoptarla). Antes solo se
+-- promovían ADOPTED/REJECTED → deployments con DRAFT/PENDING fallaban en
+-- el verify block más abajo. 000064 era el patch para Cloud, pero fresh
+-- deploys abortaban antes de llegar a 000064.
 UPDATE agenda_items ai
 SET kind = 'DECISORIO'
 WHERE EXISTS (
   SELECT 1 FROM meeting_resolutions r
   WHERE r.meeting_id = ai.meeting_id
     AND r.agenda_item_index = ai.order_number
-    AND r.status IN ('ADOPTED', 'REJECTED')
 )
 OR EXISTS (
   SELECT 1 FROM agreements a

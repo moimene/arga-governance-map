@@ -149,8 +149,14 @@ BEGIN
   PERFORM set_config('app.kind_change_motivo', p_motivo, true);
   PERFORM set_config('app.user_id', COALESCE(v_user_id::text, ''), true);
 
+  -- Codex P2 round 14: si el nuevo kind NO es DECISORIO, limpiar
+  -- decision_subtype para satisfacer el CHECK constraint 000059
+  -- (decision_subtype IS NULL cuando kind != 'DECISORIO').
+  -- Sin esto, downgrade DECISORIO→DELIB/INFO sobre rows con subtype set
+  -- fallaba con check-constraint error.
   UPDATE agenda_items
-  SET kind = p_new_kind
+  SET kind = p_new_kind,
+      decision_subtype = CASE WHEN p_new_kind = 'DECISORIO' THEN decision_subtype ELSE NULL END
   WHERE id = p_agenda_item_id
     AND meeting_id = p_meeting_id;
 
