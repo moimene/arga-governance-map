@@ -17,8 +17,11 @@ export interface BloqueSectorialRow {
 
 /**
  * Carga bloques sectoriales sugeridos según sector + materia.
- * Si sector === 'GENERICO' o sector === undefined, devuelve [] por defecto (R10).
- * El consumidor puede pasar `showAll: true` para relajar el filtro de sector.
+ *
+ * Contrato R10: cuando sector === 'GENERICO' (o undefined) y showAll === false,
+ * el query NO se ejecuta — devuelve undefined data sin descargar texto sectorial
+ * que la sociedad no debería ver por defecto. El consumidor puede pasar
+ * showAll: true para relajar el filtro y consultar todos los bloques.
  */
 export function useBloquesSectoriales(params: {
   sector?: string;
@@ -26,9 +29,15 @@ export function useBloquesSectoriales(params: {
   showAll?: boolean;
 }) {
   const { sector, materia, showAll } = params;
+
+  // R10 gate: skip query entirely para sociedades GENERICO sin opt-in explícito.
+  // Esto previene fetch + cache de texto sectorial restringido (defense in depth
+  // sobre el ocultamiento visual del componente).
+  const isGenericoWithoutOptIn = !showAll && (!sector || sector === "GENERICO");
+
   return useQuery({
     queryKey: ["bloques_sectoriales", sector, materia, showAll],
-    enabled: !!materia,
+    enabled: !!materia && !isGenericoWithoutOptIn,
     queryFn: async (): Promise<BloqueSectorialRow[]> => {
       let query = supabase
         .from("bloques_sectoriales")
