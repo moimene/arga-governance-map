@@ -31,6 +31,7 @@ import { useAgreement, type AgreementFull } from "@/hooks/useAgreementCompliance
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { usePlantillaWithOverrides } from "@/hooks/usePlantillaWithOverrides";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
@@ -222,6 +223,39 @@ export default function GenerarDocumentoStepper() {
   const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
   const agreementEntityName = agreement?.entities?.common_name ?? undefined;
+
+  // Load entity-scoped capa3 overrides for the selected plantilla. When
+  // entity_id is unavailable (loading or missing) the hook degrades to the
+  // canonical capa3 — no breakage. See src/hooks/usePlantillaWithOverrides.ts.
+  const {
+    capa3_editables: overriddenCapa3Editables,
+    warnCompatibility: capa3OverridesWarnCompat,
+  } = usePlantillaWithOverrides(
+    selectedPlantilla?.id,
+    agreement?.entity_id ?? undefined,
+  );
+
+  // Effective plantilla = canonical plantilla with capa3_editables replaced by
+  // the entity-scoped merged version. All other fields (capa1_inmutable,
+  // capa2_variables, version, …) are preserved verbatim. We never mutate the
+  // canonical object.
+  const effectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (!selectedPlantilla) return null;
+    return {
+      ...selectedPlantilla,
+      capa3_editables: overriddenCapa3Editables as PlantillaProtegidaRow["capa3_editables"],
+    };
+  }, [selectedPlantilla, overriddenCapa3Editables]);
+
+  useEffect(() => {
+    if (capa3OverridesWarnCompat) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[GenerarDocumentoStepper] Hay overrides Capa 3 con compatible_with_canonical_version distinto a la plantilla actual; se han ignorado.",
+      );
+    }
+  }, [capa3OverridesWarnCompat]);
+
   const missingRequiredCapa2 = useMemo(() => {
     if (!selectedPlantilla) return [];
     return (selectedPlantilla.capa2_variables ?? [])
@@ -241,8 +275,8 @@ export default function GenerarDocumentoStepper() {
     [compatiblePlantillas, requestedPlantillaId],
   );
   const normalizedCapa3Fields = useMemo(
-    () => normalizeCapa3Fields(selectedPlantilla?.capa3_editables),
-    [selectedPlantilla?.capa3_editables],
+    () => normalizeCapa3Fields(effectivePlantilla?.capa3_editables),
+    [effectivePlantilla?.capa3_editables],
   );
   const normalizedCapa3Values = useMemo(
     () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values).values,
@@ -392,15 +426,15 @@ export default function GenerarDocumentoStepper() {
   // ── Step 4: Render preview ───────────────────────────────────────────────
 
   const handleRenderPreview = useCallback(async () => {
-    if (!selectedPlantilla?.capa1_inmutable) {
+    if (!selectedPlantilla?.capa1_inmutable || !effectivePlantilla) {
       setRenderError("La plantilla no tiene contenido capa1.");
       return;
     }
 
     try {
-      const request = await buildComposerRequest(selectedPlantilla);
+      const request = await buildComposerRequest(effectivePlantilla);
       const prepared = await prepareDocumentComposition(request, normalizedCapa3Values, {
-        plantilla: selectedPlantilla,
+        plantilla: effectivePlantilla,
         baseVariables: resolvedVars,
         normativeSnapshot,
       });
@@ -435,7 +469,7 @@ export default function GenerarDocumentoStepper() {
     }
 
     setStep(3);
-  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
+  }, [selectedPlantilla, effectivePlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
 
   const handleDraftCapa3 = useCallback(async () => {
     if (!selectedPlantilla) return;
@@ -584,12 +618,12 @@ export default function GenerarDocumentoStepper() {
   // ── Step 5: Configure draft and generate DOCX ───────────────────────────
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedPlantilla || !preparedDraft) return;
+    if (!selectedPlantilla || !effectivePlantilla || !preparedDraft) return;
 
     setIsGenerating(true);
     try {
       const result = await finalizeEditableDocumentDraft(preparedDraft, editableDraftText, {
-        plantilla: selectedPlantilla,
+        plantilla: effectivePlantilla,
         baseVariables: resolvedVars,
         archiveDraft: false,
         normativeSnapshot,
@@ -621,7 +655,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, normativeSnapshot]);
+  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, effectivePlantilla, normativeSnapshot]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {
@@ -944,6 +978,25 @@ export default function GenerarDocumentoStepper() {
             <p className="text-xs text-[var(--g-text-secondary)]">
               Complete los campos que requiere esta plantilla. Los campos obligatorios deben rellenarse antes de generar.
             </p>
+
+            {/* Reviewer adversarial CRÍTICO #2: warnCompatibility visible al usuario.
+                Si la entidad tiene overrides obsoletos por version mismatch, el secretario
+                debe verlo antes de firmar — no solo en console.warn. */}
+            {capa3OverridesWarnCompat ? (
+              <div
+                role="alert"
+                className="border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <p className="font-medium">Overrides Capa 3 incompatibles</p>
+                <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                  Esta entidad tiene overrides para una versión anterior de la plantilla. Se han
+                  ignorado los overrides incompatibles y se usan los valores canónicos. Para
+                  reactivarlos, actualice <code className="font-mono text-xs">compatible_with_canonical_version</code> a{" "}
+                  <code className="font-mono text-xs">{selectedPlantilla.version}</code>.
+                </p>
+              </div>
+            ) : null}
 
             {normalizedCapa3Fields.length > 0 ? (
               <div
