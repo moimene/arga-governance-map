@@ -850,6 +850,17 @@ export async function resolveVariables(
     }
   }
 
+  // Codex P2 round 16: alias `entities` lowercase para plantillas legacy/audited
+  // que usan `{{entities.name}}` o `{{#if (eq entities.es_cotizada "SÍ")}}`.
+  // El audit script (`scripts/audit-entity-settings-keys.ts`) acepta
+  // `entities.*` como legacy syntax válido — sin este alias, esas plantillas
+  // pasan audit pero renderizan blanks porque Handlebars no encontraba el
+  // namespace. Solo se añade el alias para ENTIDAD (no para ORGANO/REUNION/...)
+  // porque solo ese tiene una contraparte lowercase en el audit.
+  if (sourceMap.ENTIDAD && Object.keys(sourceMap.ENTIDAD).length > 0 && !("entities" in values)) {
+    values.entities = sourceMap.ENTIDAD;
+  }
+
   return { values, resolved, unresolved, errors };
 }
 

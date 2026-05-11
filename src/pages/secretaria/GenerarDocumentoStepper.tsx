@@ -119,17 +119,23 @@ function buildDefaultCapa3Values(
     ].join("\n");
 
   const defaults: Record<string, string> = {};
+  // Keys cuyo default proviene de override explícito (incluyendo "") — el
+  // filtro final preserva éstas tal cual; las de heurística sí se filtran.
+  const overrideExplicitKeys = new Set<string>();
   for (const field of fields) {
     const key = field.campo;
     const normalizedKey = key.toLowerCase();
 
-    // Codex P2 round 5: si la capa3 (incluyendo override de entidad) declara
-    // un `default` para este campo, gana sobre las heurísticas por nombre.
-    // Esto permite que `plantilla_capa3_overrides_por_entidad.default_value_override`
-    // surta efecto en el documento generado (antes era inert: solo
-    // obligatoriedad se conectaba).
-    if (typeof field.default === "string" && field.default.trim().length > 0) {
+    // Codex P2 round 5+16: si la capa3 (incluyendo override de entidad)
+    // declara un `default`, gana sobre las heurísticas por nombre.
+    // Round 16: empty string "" también cuenta como override válido — el SQL
+    // contract distingue NULL (sin override) de "" (override explícito para
+    // limpiar el campo). Solo si field.default es undefined caemos a
+    // heurísticas. Esto permite a un admin override "vaciar" el campo
+    // sin que las heurísticas lo repueblen con texto canonical antiguo.
+    if (typeof field.default === "string") {
       defaults[key] = field.default;
+      overrideExplicitKeys.add(key);
       continue;
     }
 
@@ -149,7 +155,11 @@ function buildDefaultCapa3Values(
     }
   }
 
-  return Object.fromEntries(Object.entries(defaults).filter(([, value]) => value.trim().length > 0));
+  return Object.fromEntries(
+    Object.entries(defaults).filter(
+      ([k, value]) => overrideExplicitKeys.has(k) || value.trim().length > 0,
+    ),
+  );
 }
 
 function inferDocumentTypeForComposer(
