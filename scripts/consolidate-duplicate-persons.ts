@@ -39,6 +39,39 @@
  *   - Idempotent: re-running the script on an already-archived
  *     duplicate is a no-op (detected by tax_id prefix ARCHIVED-).
  *
+ * IMPORTANT — IDEMPOTENCY, NOT ATOMICITY:
+ *   Each migrateFk runs as an independent PostgREST transaction.
+ *   supabase-js cannot wrap multiple statements in a single tx from the
+ *   client, and we deliberately do NOT introduce an RPC SECURITY DEFINER
+ *   for this sprint (deferred to Plan A').
+ *
+ *   Consequence: if a mid-Phase-1 UPDATE fails (RLS oddity, dropped
+ *   connection, manual Ctrl-C), prior UPDATEs are COMMITTED and
+ *   Phase 3 (soft-archive) has NOT run. The duplicate's tax_id stays
+ *   on its original value.
+ *
+ *   Recovery is by re-running the script:
+ *     - detectDuplicates() still sees the duplicate (tax_id is not ARCHIVED-).
+ *     - preflightCheck() re-evaluates. Some collisions that existed before
+ *       Phase 1 may now be GONE (refs already moved), but new ones may
+ *       appear because canonical has absorbed some refs already. Read the
+ *       output carefully.
+ *     - Phase 1 re-runs all UPDATEs. Already-migrated rows are no-ops
+ *       (WHERE column = duplicate.id matches zero rows after first run).
+ *     - Phase 2 orphan check confirms cleanliness.
+ *     - Phase 3 archives.
+ *
+ *   To prove recoverability empirically, run with --apply --pair=<canon>:<dup>
+ *   against a fabricated test pair in a Cloud preview branch, fault-inject
+ *   by SIGTERM mid-Phase-1, then re-run — the final state must match a
+ *   clean run. A scaffolding script for this (`test-consolidate-recoverability.ts`)
+ *   is TODO for Plan A'; until then, the recovery flow is documented but
+ *   not regression-tested.
+ *
+ *   If atomicity is required (e.g. production multi-pair batch with no
+ *   operator), wrap in a `fn_consolidate_person` RPC SECURITY DEFINER —
+ *   deferred to Plan A'.
+ *
  * Usage:
  *   bun run scripts/consolidate-duplicate-persons.ts --dry-run
  *   bun run scripts/consolidate-duplicate-persons.ts --apply --auto-detect
@@ -62,11 +95,17 @@ const TENANT_ID = "00000000-0000-0000-0000-000000000001";
 // canonical id before soft-archive, or the row will be orphaned.
 //
 // Action policy:
-//   - "migrate"  (default): UPDATE table SET column = canonical WHERE column = duplicate.
-//   - "skip"    : the column is intentionally not touched (e.g. audit/WORM trails
-//                that should preserve the original reference). Currently empty — none
-//                of the 47 FKs land on append-only/audit tables; audit & censo
-//                snapshots reference IDs via JSON payloads, not enforced FKs.
+//   - "migrate"  (default, 44 FKs): UPDATE table SET column = canonical WHERE column = duplicate.
+//   - "skip"     (3 FKs): the column lives on a WORM-protected table whose triggers
+//                  block ANY update or delete (BEFORE UPDATE OR DELETE → RAISE). Migrating
+//                  these would abort the script mid-Phase-1 with no rollback. Soft-archive
+//                  of the duplicate is enough: the WORM row still references the duplicate's
+//                  uuid, but the duplicate's tax_id is now ARCHIVED-<ts>- so it cannot be
+//                  confused with the canonical, and the unique constraint is freed.
+//                  Affected tables (verified 2026-05-12 via pg_trigger probe):
+//                    * capital_movements              (trg_capital_movements_worm)
+//                    * no_session_notificaciones      (worm_no_session_notificaciones)
+//                    * no_session_respuestas          (worm_no_session_respuestas)
 //
 // Each entry carries a `rationale` so future reviewers can verify the decision.
 interface FkRef {
@@ -152,8 +191,12 @@ const PERSONS_FK_REFERENCES: FkRef[] = [
   {
     table: "capital_movements",
     column: "person_id",
-    action: "migrate",
-    rationale: "Movimientos del libro de socios (transmisiones, ampliaciones, etc.).",
+    action: "skip",
+    rationale:
+      "WORM-protected (BEFORE UPDATE OR DELETE trigger trg_capital_movements_worm raises). " +
+      "Movimientos de capital son inmutables por diseño. Soft-archive del duplicado preserva el " +
+      "row; la FK histórica sigue válida apuntando al ARCHIVED-<ts>-<tax_id> — la persona " +
+      "ya no es accesible vía tax_id real pero la trazabilidad temporal se mantiene.",
   },
 
   // --- Meetings / minutes ------------------------------------------
@@ -210,14 +253,20 @@ const PERSONS_FK_REFERENCES: FkRef[] = [
   {
     table: "no_session_notificaciones",
     column: "person_id",
-    action: "migrate",
-    rationale: "Destinatario de la notificación ERDS.",
+    action: "skip",
+    rationale:
+      "WORM-protected (BEFORE UPDATE OR DELETE trigger worm_no_session_notificaciones via " +
+      "worm_guard()). Notificaciones ERDS son evidencia probatoria inmutable. Soft-archive del " +
+      "duplicado preserva la FK histórica apuntando al ARCHIVED-.",
   },
   {
     table: "no_session_respuestas",
     column: "person_id",
-    action: "migrate",
-    rationale: "Votante en acuerdo sin sesión.",
+    action: "skip",
+    rationale:
+      "WORM-protected (BEFORE UPDATE OR DELETE trigger worm_no_session_respuestas via " +
+      "worm_guard()). Respuestas/votos en acuerdo sin sesión son evidencia probatoria inmutable. " +
+      "Mismo razonamiento que no_session_notificaciones.",
   },
 
   // --- Voting projection -------------------------------------------
@@ -389,12 +438,26 @@ const PERSONS_FK_REFERENCES: FkRef[] = [
 
 // Sanity check at module load: list must be exactly the 47 FKs we
 // expect (or the script must be regenerated against Cloud).
+// Breakdown: 44 migrate + 3 skip (WORM) = 47 total.
 const EXPECTED_FK_COUNT = 47;
+const EXPECTED_MIGRATE_COUNT = 44;
+const EXPECTED_SKIP_COUNT = 3;
 if (PERSONS_FK_REFERENCES.length !== EXPECTED_FK_COUNT) {
   console.warn(
     `⚠️ FK list has ${PERSONS_FK_REFERENCES.length} entries, expected ${EXPECTED_FK_COUNT}. ` +
       `Re-probe pg_constraint and regenerate this script.`,
   );
+}
+{
+  const migrateCount = PERSONS_FK_REFERENCES.filter((r) => r.action === "migrate").length;
+  const skipCount = PERSONS_FK_REFERENCES.filter((r) => r.action === "skip").length;
+  if (migrateCount !== EXPECTED_MIGRATE_COUNT || skipCount !== EXPECTED_SKIP_COUNT) {
+    console.warn(
+      `⚠️ FK action mix is migrate=${migrateCount}, skip=${skipCount}; ` +
+        `expected migrate=${EXPECTED_MIGRATE_COUNT}, skip=${EXPECTED_SKIP_COUNT}. ` +
+        `WORM tables (capital_movements, no_session_*) must stay action=skip.`,
+    );
+  }
 }
 
 // --------------------------------------------------------------------
@@ -453,7 +516,7 @@ async function detectDuplicates(supabase: SupabaseClient): Promise<DuplicatePair
     arr.push(p);
     groupsByTaxId.set(p.tax_id, arr);
   }
-  for (const [taxId, group] of groupsByTaxId) {
+  for (const [taxId, group] of groupsByTaxId.entries()) {
     if (group.length < 2) continue;
     // Convention: oldest = canonical, newer = duplicate. Operator can
     // override with --pair=<canonical>:<duplicate>.
@@ -617,7 +680,94 @@ async function preflightCheck(
     }
   }
 
-  // ---- Check 4: idempotency ---------------------------------------
+  // ---- Check 4: ux_representaciones_vigente -----------------------
+  // Index keys (verified 2026-05-12 via pg_indexes):
+  //   (entity_id, represented_person_id, scope, COALESCE(meeting_id, sentinel))
+  //   WHERE effective_to IS NULL
+  //
+  // The unique key uses `represented_person_id`, NOT `representative_person_id`.
+  // So a 23505 collision happens iff BOTH canonical and duplicate appear as
+  // `represented_person_id` in a VIGENTE row with the same (entity, scope, meeting).
+  // Migrations of `representative_person_id` cannot trip this index. We surface
+  // an informational WARN for those moves so the operator sees the data flow.
+  const { data: dupRepsRepresented, error: e5a } = await supabase
+    .from("representaciones")
+    .select("id, entity_id, scope, meeting_id, representative_person_id")
+    .eq("tenant_id", TENANT_ID)
+    .eq("represented_person_id", pair.duplicate.id)
+    .is("effective_to", null);
+  if (e5a) throw new Error(`preflight representaciones (represented): ${e5a.message}`);
+
+  for (const r of dupRepsRepresented ?? []) {
+    let q = supabase
+      .from("representaciones")
+      .select("id, representative_person_id")
+      .eq("tenant_id", TENANT_ID)
+      .eq("entity_id", r.entity_id)
+      .eq("represented_person_id", pair.canonical.id)
+      .eq("scope", r.scope)
+      .is("effective_to", null);
+    q = r.meeting_id ? q.eq("meeting_id", r.meeting_id) : q.is("meeting_id", null);
+    const { data: clash } = await q.maybeSingle();
+    if (clash) {
+      conflicts.push(
+        `ux_representaciones_vigente collision: both have VIGENTE representación as represented ` +
+          `in entity=${r.entity_id} scope=${r.scope} meeting=${r.meeting_id ?? "NULL"} ` +
+          `(canonical representación id=${clash.id})`,
+      );
+    }
+  }
+
+  // Informational only: how many representaciones move as representative_person_id?
+  const { count: repAsRepresentativeCount } = await supabase
+    .from("representaciones")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", TENANT_ID)
+    .eq("representative_person_id", pair.duplicate.id)
+    .is("effective_to", null);
+  if ((repAsRepresentativeCount ?? 0) > 0) {
+    warnings.push(
+      `representaciones.representative_person_id will move ${repAsRepresentativeCount} VIGENTE row(s) ` +
+        `(no unique-key collision risk — column not part of ux_representaciones_vigente)`,
+    );
+  }
+
+  // ---- Check 5: ux_authority_vigente ------------------------------
+  // Index keys (verified 2026-05-12 via pg_indexes):
+  //   (tenant_id, entity_id, COALESCE(body_id, sentinel), person_id, cargo)
+  //   WHERE estado = 'VIGENTE'
+  //
+  // Two VIGENTE rows for canonical + duplicate with same (entity, body, cargo)
+  // would trip 23505 when migrating authority_evidence.person_id.
+  const { data: dupAEs, error: e6 } = await supabase
+    .from("authority_evidence")
+    .select("id, entity_id, body_id, cargo")
+    .eq("tenant_id", TENANT_ID)
+    .eq("person_id", pair.duplicate.id)
+    .eq("estado", "VIGENTE");
+  if (e6) throw new Error(`preflight authority_evidence: ${e6.message}`);
+
+  for (const ae of dupAEs ?? []) {
+    let q = supabase
+      .from("authority_evidence")
+      .select("id, cargo")
+      .eq("tenant_id", TENANT_ID)
+      .eq("person_id", pair.canonical.id)
+      .eq("entity_id", ae.entity_id)
+      .eq("cargo", ae.cargo)
+      .eq("estado", "VIGENTE");
+    q = ae.body_id ? q.eq("body_id", ae.body_id) : q.is("body_id", null);
+    const { data: clash } = await q.maybeSingle();
+    if (clash) {
+      conflicts.push(
+        `ux_authority_vigente collision: both have VIGENTE authority_evidence ` +
+          `entity=${ae.entity_id} body=${ae.body_id ?? "NULL"} cargo=${ae.cargo} ` +
+          `(canonical authority id=${clash.id})`,
+      );
+    }
+  }
+
+  // ---- Check 6: idempotency ---------------------------------------
   // If duplicate is already archived, nothing to do.
   if (pair.duplicate.tax_id?.startsWith("ARCHIVED-")) {
     warnings.push(`duplicate is already archived (tax_id=${pair.duplicate.tax_id}); migration will be skipped`);
@@ -808,11 +958,15 @@ async function main() {
     auth: { persistSession: false },
   });
 
+  const migrateCount = PERSONS_FK_REFERENCES.filter((r) => r.action === "migrate").length;
+  const skipCount = PERSONS_FK_REFERENCES.filter((r) => r.action === "skip").length;
   console.log("consolidate-duplicate-persons");
   console.log(`  url    : ${SUPABASE_URL}`);
   console.log(`  tenant : ${TENANT_ID}`);
   console.log(`  mode   : ${dryRun ? "DRY-RUN" : "APPLY"}`);
-  console.log(`  FK refs covered: ${PERSONS_FK_REFERENCES.length} (probe 2026-05-12)`);
+  console.log(
+    `  FK refs: ${PERSONS_FK_REFERENCES.length} total (${migrateCount} migrate + ${skipCount} skip WORM) — probe 2026-05-12`,
+  );
   console.log("");
 
   const pairs = await detectDuplicates(supabase);
