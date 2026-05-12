@@ -9,9 +9,11 @@ import {
   entityHasCollegiateBody,
   entityHasUnipersonalAdmin,
   getVisibleSidebarSections,
+  isCollegiateAdmin,
   isItemDisabled,
   isItemVisible,
   isMancomunadoAdmin,
+  isNonCollegiateAdmin,
   isSolidarioAdmin,
   type SidebarVisibilityContext,
   type VisibleSecretariaNavGroup,
@@ -53,6 +55,111 @@ describe("sidebar-visibility — helpers de clasificación", () => {
 
   it("entityHasUnipersonalAdmin es false en SA + CDA estándar", () => {
     expect(entityHasUnipersonalAdmin(baseCtx())).toBe(false);
+  });
+});
+
+describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA legacy)", () => {
+  // SociedadNuevaStepper persiste TODOS los bodies de administración con
+  // body_type:"CDA" y guarda el régimen real en config.organo_tipo. Estos
+  // tests verifican que entityHasCollegiateBody NO da falso positivo
+  // cuando el régimen es no-colegiado.
+
+  it("SLU + ADMIN_UNICO con body legacy CDA → NO colegiado (veto por tipo_organo_admin)", () => {
+    const ctx = baseCtx({
+      entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_UNICO"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "MEETING")).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "UNIVERSAL")).toBe(false);
+  });
+
+  it("SL + ADMIN_SOLIDARIOS (plural canónico) con body legacy CDA → NO colegiado", () => {
+    const ctx = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_SOLIDARIOS" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_SOLIDARIOS"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "SOLIDARIO")).toBe(true);
+  });
+
+  it("SL + ADMIN_MANCOMUNADOS (plural canónico) con body legacy CDA → NO colegiado", () => {
+    const ctx = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_MANCOMUNADOS" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_CONJUNTA"], // alias del stepper
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "CO_APROBACION")).toBe(true);
+  });
+
+  it("Veto secundario desde body.config.organo_tipo cuando tipo_organo_admin está vacío", () => {
+    // Caso seeds legacy: entity sin tipo_organo_admin pero bodies con config
+    const ctx = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_UNICO"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+  });
+
+  it("CDA legítimo (régimen explícito CDA) sigue siendo colegiado", () => {
+    // SA + CDA estándar: tipo_organo_admin="CDA" o organo_tipo="CONSEJO_ADMIN"
+    const ctx1 = baseCtx({
+      entity: { tipo_social: "SA", tipo_organo_admin: "CDA" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["CONSEJO_ADMIN"],
+    });
+    expect(entityHasCollegiateBody(ctx1)).toBe(true);
+
+    const ctx2 = baseCtx({
+      entity: { tipo_social: "SA", tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: ["CONSEJO_ADMIN"],
+    });
+    expect(entityHasCollegiateBody(ctx2)).toBe(true);
+  });
+
+  it("JUNTA como único body sin admin → colegiado (fallback bodyTypes)", () => {
+    const ctx = baseCtx({
+      entity: { tipo_social: "SA", tipo_organo_admin: null },
+      bodyTypes: ["JUNTA"],
+      organoTipos: [],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(true);
+  });
+
+  it("body_type=CDA SIN organo_tipo y SIN tipo_organo_admin → NO colegiado (CDA es ambiguo)", () => {
+    // CDA por sí solo no garantiza colegialidad — puede ser legacy SociedadNuevaStepper
+    const ctx = baseCtx({
+      entity: { tipo_social: null, tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: [],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+  });
+
+  it("isNonCollegiateAdmin / isCollegiateAdmin clasifican correctamente", () => {
+    expect(isNonCollegiateAdmin("ADMIN_UNICO")).toBe(true);
+    expect(isNonCollegiateAdmin("ADMIN_SOLIDARIOS")).toBe(true);
+    expect(isNonCollegiateAdmin("ADMIN_MANCOMUNADOS")).toBe(true);
+    expect(isNonCollegiateAdmin("ADMIN_CONJUNTA")).toBe(true);
+    expect(isNonCollegiateAdmin("SOCIO_UNICO")).toBe(true);
+    expect(isNonCollegiateAdmin("CDA")).toBe(false);
+    expect(isNonCollegiateAdmin("CONSEJO_ADMIN")).toBe(false);
+    expect(isNonCollegiateAdmin(null)).toBe(false);
+
+    expect(isCollegiateAdmin("CDA")).toBe(true);
+    expect(isCollegiateAdmin("CONSEJO_ADMIN")).toBe(true);
+    expect(isCollegiateAdmin("CONSEJO")).toBe(true);
+    expect(isCollegiateAdmin("CONSEJO_ADMINISTRACION")).toBe(true);
+    expect(isCollegiateAdmin("ADMIN_UNICO")).toBe(false);
+    expect(isCollegiateAdmin(null)).toBe(false);
   });
 });
 

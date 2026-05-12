@@ -36,6 +36,16 @@ export type SidebarVisibilityContext = {
   hasSelectedEntity: boolean;
   entity?: EntityContext | null;
   bodyTypes?: string[];               // body_types vigentes para la entidad activa
+  /**
+   * `governing_bodies.config.organo_tipo` por body vigente. Necesario porque
+   * `SociedadNuevaStepper` persiste TODOS los bodies de administración con
+   * `body_type: "CDA"` independientemente del régimen real, y guarda el
+   * régimen efectivo en `config.organo_tipo` (e.g. ADMIN_UNICO,
+   * ADMIN_SOLIDARIOS, ADMIN_CONJUNTA, CONSEJO_ADMIN). Sin esto, sociedades
+   * unipersonales/solidarias/mancomunadas darían falso positivo en
+   * `entityHasCollegiateBody`.
+   */
+  organoTipos?: string[];
   adoptionModes?: string[];           // adoption_modes disponibles para la entidad activa
   capabilities?: CapabilitiesContext | null;
   readiness?: ReadinessContext | null;
@@ -109,6 +119,39 @@ const MANCOMUNADO_ADMIN_TYPES = new Set([
  */
 const SOLIDARIO_ADMIN_TYPES = new Set(["ADMIN_SOLIDARIOS", "ADMIN_SOLIDARIO"]);
 
+/**
+ * Regímenes administrativos NO colegiados. Si la sociedad declara uno de
+ * estos en `entities.tipo_organo_admin` o en `governing_bodies.config.organo_tipo`,
+ * cualquier `body_type: "CDA"` legacy se ignora — esos bodies se persisten
+ * como CDA por defecto (SociedadNuevaStepper) pero NO son colegiados.
+ *
+ * Incluye `ADMIN_CONJUNTA` (alias `governing_bodies.config.organo_tipo` para
+ * régimen mancomunado en el stepper) además del plural canónico y singular
+ * legacy.
+ */
+const NON_COLLEGIATE_ADMIN_TYPES = new Set([
+  "ADMIN_UNICO",
+  "ADMINISTRADOR_UNICO",
+  "ADMIN_SOLIDARIOS",
+  "ADMIN_SOLIDARIO",
+  "ADMIN_MANCOMUNADOS",
+  "ADMIN_MANCOMUNADO",
+  "ADMIN_CONJUNTA",
+  "SOCIO_UNICO",
+]);
+
+/**
+ * Regímenes administrativos EXPLÍCITAMENTE colegiados (sólo CDA / Consejo
+ * de Administración). El alias `CONSEJO_ADMIN` aparece en `body.config.organo_tipo`
+ * cuando `SociedadNuevaStepper` crea el CDA para una SA estándar.
+ */
+const COLLEGIATE_ADMIN_TYPES = new Set([
+  "CDA",
+  "CONSEJO",
+  "CONSEJO_ADMIN",
+  "CONSEJO_ADMINISTRACION",
+]);
+
 export function isMancomunadoAdmin(tipoOrganoAdmin: string | null | undefined): boolean {
   return MANCOMUNADO_ADMIN_TYPES.has(String(tipoOrganoAdmin ?? "").toUpperCase());
 }
@@ -117,16 +160,47 @@ export function isSolidarioAdmin(tipoOrganoAdmin: string | null | undefined): bo
   return SOLIDARIO_ADMIN_TYPES.has(String(tipoOrganoAdmin ?? "").toUpperCase());
 }
 
+export function isNonCollegiateAdmin(value: string | null | undefined): boolean {
+  return NON_COLLEGIATE_ADMIN_TYPES.has(String(value ?? "").toUpperCase());
+}
+
+export function isCollegiateAdmin(value: string | null | undefined): boolean {
+  return COLLEGIATE_ADMIN_TYPES.has(String(value ?? "").toUpperCase());
+}
+
 function upper(value: string | null | undefined) {
   return String(value ?? "").toUpperCase();
 }
 
 export function entityHasCollegiateBody(ctx: SidebarVisibilityContext): boolean {
+  // 1) Veto fuerte desde tipo_organo_admin: si el régimen es ADMIN_UNICO/
+  //    ADMIN_SOLIDARIOS/ADMIN_MANCOMUNADOS, NO es colegiado, ni siquiera
+  //    si los bodies persistidos tienen body_type="CDA" por convención
+  //    legacy del SociedadNuevaStepper.
+  const admin = ctx.entity?.tipo_organo_admin;
+  if (isNonCollegiateAdmin(admin)) return false;
+  // 2) Régimen explícitamente colegiado en la entidad
+  if (isCollegiateAdmin(admin)) return true;
+
+  // 3) Veto secundario desde body configs: si algún body declara organo_tipo
+  //    no colegiado en su config, esa estructura administrativa no es
+  //    colegiada. (Caso: entidad sin tipo_organo_admin pero bodies con
+  //    config.organo_tipo poblado.)
+  const organoTipos = ctx.organoTipos ?? [];
+  if (organoTipos.some((tipo) => isNonCollegiateAdmin(tipo))) return false;
+  if (organoTipos.some((tipo) => isCollegiateAdmin(tipo))) return true;
+
+  // 4) Fallback final a body_types. Sólo se llega aquí cuando no hay
+  //    información de régimen ni en la entidad ni en los configs. Aceptamos
+  //    Junta General, Comisiones, etc., como colegiadas; NO usamos "CDA"
+  //    aquí porque ese body_type es ambiguo (ver SociedadNuevaStepper).
   const bodyTypes = ctx.bodyTypes ?? [];
-  if (bodyTypes.some((bt) => COLLEGIATE_BODY_TYPES.has(upper(bt)))) return true;
-  const admin = upper(ctx.entity?.tipo_organo_admin);
-  if (admin === "CDA" || admin === "CONSEJO" || admin === "CONSEJO_ADMINISTRACION") return true;
-  return false;
+  return bodyTypes.some((bt) => {
+    const upperBt = upper(bt);
+    // Excluir CDA del fallback — el régimen real estaría en config/admin
+    if (upperBt === "CDA") return false;
+    return COLLEGIATE_BODY_TYPES.has(upperBt);
+  });
 }
 
 export function entityHasUnipersonalAdmin(ctx: SidebarVisibilityContext): boolean {

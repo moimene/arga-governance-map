@@ -5,6 +5,7 @@ import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
+  entityHasCollegiateBody,
   isMancomunadoAdmin,
   isSolidarioAdmin,
   type SidebarVisibilityContext,
@@ -88,34 +89,73 @@ export function useSidebarVisibility(
     [bodies]
   );
 
+  // organo_tipo es el régimen REAL declarado en body.config (lo persiste
+  // SociedadNuevaStepper). Necesario porque body_type=CDA se persiste por
+  // defecto incluso para sociedades ADMIN_UNICO/SOLIDARIOS/MANCOMUNADOS.
+  const organoTipos = useMemo(() => {
+    const result: string[] = [];
+    for (const body of bodies ?? []) {
+      const config = (body.config ?? {}) as Record<string, unknown>;
+      const organoTipo = typeof config.organo_tipo === "string" ? config.organo_tipo : null;
+      if (organoTipo) result.push(organoTipo);
+    }
+    return result;
+  }, [bodies]);
+
   const adoptionModes = useMemo(() => {
     const modes = new Set<string>();
+
+    // adoption_mode declarado explícitamente en body.config (lo persiste
+    // SociedadNuevaStepper). Es la fuente más fiable cuando existe.
     for (const body of bodies ?? []) {
       const config = (body.config ?? {}) as Record<string, unknown>;
       const modeFromConfig = typeof config.adoption_mode === "string" ? config.adoption_mode : null;
       if (modeFromConfig) modes.add(modeFromConfig.toUpperCase());
     }
-    // Modos inferidos siempre disponibles para órganos colegiados clásicos
-    const bodyTypesUpper = bodyTypes.map((bt) => bt.toUpperCase());
-    const colegiado = bodyTypesUpper.some((bt) =>
-      ["CDA", "CONSEJO", "JUNTA", "JUNTA_GENERAL", "COMITE", "COMISION"].some((c) => bt.includes(c))
-    );
-    if (colegiado) {
+
+    // Construir un context provisional para usar el helper centralizado y
+    // evitar duplicar la lógica de colegialidad (que también respeta el
+    // veto tipo_organo_admin/organo_tipo).
+    const partialCtx: SidebarVisibilityContext = {
+      mode: scope.mode,
+      hasSelectedEntity,
+      entity,
+      bodyTypes,
+      organoTipos,
+    };
+
+    // Modos colegiados sólo si la entidad/bodies realmente son colegiados
+    // (helper aplica veto desde tipo_organo_admin/organo_tipo primero).
+    if (entityHasCollegiateBody(partialCtx)) {
       modes.add("MEETING");
       modes.add("UNIVERSAL");
       modes.add("NO_SESSION");
     }
-    const admin = String(entity?.tipo_organo_admin ?? "").toUpperCase();
-    if (admin === "ADMIN_UNICO" || admin === "ADMINISTRADOR_UNICO") modes.add("UNIPERSONAL_ADMIN");
-    // isMancomunadoAdmin / isSolidarioAdmin aceptan tanto el plural canónico
-    // del schema (`ADMIN_MANCOMUNADOS`, `ADMIN_SOLIDARIOS`) como el singular
-    // legacy y alias derivados del config del órgano.
+
+    const admin = entity?.tipo_organo_admin;
+    if (admin && (String(admin).toUpperCase() === "ADMIN_UNICO" || String(admin).toUpperCase() === "ADMINISTRADOR_UNICO")) {
+      modes.add("UNIPERSONAL_ADMIN");
+    }
     if (isMancomunadoAdmin(admin)) modes.add("CO_APROBACION");
     if (isSolidarioAdmin(admin)) modes.add("SOLIDARIO");
+
+    // Veto/expansión también desde body.config.organo_tipo (caso sin
+    // tipo_organo_admin poblado en entities).
+    for (const tipo of organoTipos) {
+      if (isMancomunadoAdmin(tipo)) modes.add("CO_APROBACION");
+      if (isSolidarioAdmin(tipo)) modes.add("SOLIDARIO");
+      const upper = String(tipo).toUpperCase();
+      if (upper === "ADMIN_UNICO") modes.add("UNIPERSONAL_ADMIN");
+      // ADMIN_CONJUNTA → mancomunado (alias del stepper)
+      if (upper === "ADMIN_CONJUNTA") modes.add("CO_APROBACION");
+      if (upper === "SOCIO_UNICO") modes.add("UNIPERSONAL_SOCIO");
+    }
+
     const tipo = String(entity?.tipo_social ?? "").toUpperCase();
     if (tipo === "SLU" || tipo === "SAU" || entity?.es_unipersonal) modes.add("UNIPERSONAL_SOCIO");
+
     return Array.from(modes);
-  }, [bodies, bodyTypes, entity]);
+  }, [bodies, bodyTypes, organoTipos, entity, scope.mode, hasSelectedEntity]);
 
   const capabilities: CapabilitiesContext | null = useMemo(() => {
     if (!capabilityRows) return null;
@@ -142,6 +182,7 @@ export function useSidebarVisibility(
       hasSelectedEntity,
       entity,
       bodyTypes,
+      organoTipos,
       adoptionModes,
       capabilities,
       readiness: readinessCtx,
@@ -153,6 +194,7 @@ export function useSidebarVisibility(
       hasSelectedEntity,
       entity,
       bodyTypes,
+      organoTipos,
       adoptionModes,
       capabilities,
       readinessCtx,
