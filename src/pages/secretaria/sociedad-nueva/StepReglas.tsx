@@ -1,7 +1,7 @@
 import type { RulesDraft, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { CheckboxField } from "./shared/CheckboxField";
 import { Field } from "./shared/Field";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 import { NumberField } from "./shared/NumberField";
 
 export function StepReglas({

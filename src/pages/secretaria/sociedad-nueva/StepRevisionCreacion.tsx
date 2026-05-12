@@ -11,15 +11,17 @@ export function StepRevisionCreacion({
   draft,
   validation,
   saving,
+  disabled = false,
   onCreate,
 }: {
   draft: SociedadOnboardingDraft;
   validation: ValidationResult;
   saving: boolean;
+  disabled?: boolean;
   onCreate: () => void;
 }) {
   const status = projectedStatus(validation);
-  const canCreate = validation.blocking.length === 0;
+  const canCreate = validation.blocking.length === 0 && !disabled;
   const allIssues = [...validation.blocking, ...validation.blockingOperational, ...validation.warnings];
 
   return (

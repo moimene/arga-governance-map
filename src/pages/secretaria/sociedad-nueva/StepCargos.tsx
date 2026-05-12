@@ -1,7 +1,8 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { BodyKey, CargoInputDraft, FuenteDesignacion, TipoCondicionOnboarding, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { Field } from "./shared/Field";
-import { IssueList, issueForField } from "./shared/IssueList";
+import { IssueList } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 import { PersonaPicker } from "./shared/PersonaPicker";
 import { SelectField } from "./shared/SelectField";
 

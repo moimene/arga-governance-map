@@ -1,724 +1,470 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useReducer, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, Check, ChevronLeft } from "lucide-react";
+import { AlertTriangle, Building2, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useSociedades } from "@/hooks/useSociedades";
+import { buildRpcPayload } from "@/lib/secretaria/sociedad-onboarding/builders";
+import { loadEntitySettingsCatalogKeys } from "@/lib/secretaria/sociedad-onboarding/catalog-loader";
+import { createEmptySociedadDraft, isUnipersonalTipo } from "@/lib/secretaria/sociedad-onboarding/defaults";
+import { persistInitialCargos, persistInitialRepresentaciones, type RepresentacionAdminPJInput } from "@/lib/secretaria/sociedad-onboarding/adapters";
+import { validateSociedadOperability, validateStep } from "@/lib/secretaria/sociedad-onboarding/validation";
+import type {
+  AdapterContext,
+  CargoInputDraft,
+  SociedadOnboardingDraft,
+  ValidationResult,
+} from "@/lib/secretaria/sociedad-onboarding/types";
+import { StepCapital } from "./sociedad-nueva/StepCapital";
+import { StepCapTable } from "./sociedad-nueva/StepCapTable";
+import { StepCargos } from "./sociedad-nueva/StepCargos";
+import { StepClasesSeries } from "./sociedad-nueva/StepClasesSeries";
+import { StepDocumentosSoporte } from "./sociedad-nueva/StepDocumentosSoporte";
+import { StepDomicilioCnaeRegistro } from "./sociedad-nueva/StepDomicilioCnaeRegistro";
+import { StepIdentificacionLegal } from "./sociedad-nueva/StepIdentificacionLegal";
+import { StepOrganos } from "./sociedad-nueva/StepOrganos";
+import { StepPerfilGrupo } from "./sociedad-nueva/StepPerfilGrupo";
+import { StepReglas } from "./sociedad-nueva/StepReglas";
+import { StepRevisionCreacion } from "./sociedad-nueva/StepRevisionCreacion";
+import { IssueList } from "./sociedad-nueva/shared/IssueList";
 
-type TipoSocial = "SA" | "SL" | "SLU" | "SAU";
-type TipoOrgano = "ADMIN_UNICO" | "ADMIN_SOLIDARIOS" | "ADMIN_MANCOMUNADOS" | "CDA";
-type FormaAdministracion =
-  | "ADMINISTRADOR_UNICO"
-  | "ADMINISTRADORES_SOLIDARIOS"
-  | "ADMINISTRADORES_MANCOMUNADOS"
-  | "CONSEJO";
+const STEPS = [
+  "Identificacion",
+  "Domicilio",
+  "Perfil",
+  "Capital",
+  "Clases",
+  "Cap table",
+  "Organos",
+  "Cargos",
+  "Reglas",
+  "Soporte",
+  "Revision",
+];
 
-interface Draft {
-  // Paso 1 — identidad
-  legal_name: string;
-  common_name: string;
-  tax_id: string;
-  tipo_social: TipoSocial;
-  jurisdiction: string;
-  registration_number: string;
-  // Paso 2 — forma de administración
-  forma_administracion: FormaAdministracion;
-  tipo_organo_admin: TipoOrgano;
-  es_unipersonal: boolean;
-  es_cotizada: boolean;
-  // Paso 3 — capital
-  currency: string;
-  capital_escriturado: string;
-  numero_titulos: string;
-  valor_nominal: string;
-}
-
-const EMPTY: Draft = {
-  legal_name: "",
-  common_name: "",
-  tax_id: "",
-  tipo_social: "SL",
-  jurisdiction: "ES",
-  registration_number: "",
-  forma_administracion: "CONSEJO",
-  tipo_organo_admin: "CDA",
-  es_unipersonal: false,
-  es_cotizada: false,
-  currency: "EUR",
-  capital_escriturado: "3000",
-  numero_titulos: "3000",
-  valor_nominal: "1",
+type DraftAction = {
+  updater: (draft: SociedadOnboardingDraft) => SociedadOnboardingDraft;
 };
 
-const STEPS = ["Identidad", "Administración", "Capital", "Confirmar"];
-
-const TIPO_SOCIAL_OPTIONS: Array<{ value: TipoSocial; label: string }> = [
-  { value: "SA", label: "S.A. — Sociedad Anónima" },
-  { value: "SL", label: "S.L. — Sociedad Limitada" },
-  { value: "SAU", label: "S.A.U. — S.A. unipersonal" },
-  { value: "SLU", label: "S.L.U. — S.L. unipersonal" },
-];
-
-const ADMIN_OPTIONS: Array<{
-  value: TipoOrgano;
-  label: string;
-  forma: FormaAdministracion;
-}> = [
-  { value: "CDA", label: "Consejo de Administración", forma: "CONSEJO" },
-  { value: "ADMIN_UNICO", label: "Administrador único", forma: "ADMINISTRADOR_UNICO" },
-  { value: "ADMIN_SOLIDARIOS", label: "Administradores solidarios", forma: "ADMINISTRADORES_SOLIDARIOS" },
-  { value: "ADMIN_MANCOMUNADOS", label: "Administradores mancomunados", forma: "ADMINISTRADORES_MANCOMUNADOS" },
-];
-
-const ADMIN_BY_VALUE = ADMIN_OPTIONS.reduce<Record<TipoOrgano, (typeof ADMIN_OPTIONS)[number]>>((acc, option) => {
-  acc[option.value] = option;
-  return acc;
-}, {} as Record<TipoOrgano, (typeof ADMIN_OPTIONS)[number]>);
-
-function slugify(value: string) {
-  const normalized = value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 56);
-  return normalized || "sociedad";
+interface Tx1Result {
+  entityId: string;
+  bodyIds: Record<string, string>;
+  settingsSkipped: string[];
 }
 
-function legalFormFromTipo(tipo: TipoSocial) {
-  return (
-    {
-      SA: "S.A.",
-      SAU: "S.A.U.",
-      SL: "S.L.",
-      SLU: "S.L.U.",
-    } as Record<TipoSocial, string>
-  )[tipo];
+function draftReducer(draft: SociedadOnboardingDraft, action: DraftAction) {
+  return action.updater(draft);
 }
 
-function isUnipersonalTipo(tipo: TipoSocial) {
-  return tipo === "SAU" || tipo === "SLU";
+function allIssues(result: ValidationResult) {
+  return [...result.blocking, ...result.blockingOperational, ...result.warnings];
 }
 
-function syncTipoWithUnipersonal(tipo: TipoSocial, value: boolean): TipoSocial {
-  if (value && tipo === "SA") return "SAU";
-  if (value && tipo === "SL") return "SLU";
-  if (!value && tipo === "SAU") return "SA";
-  if (!value && tipo === "SLU") return "SL";
-  return tipo;
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
-function juntaName(tipo: TipoSocial, esUnipersonal: boolean) {
-  if (esUnipersonal) return "Socio único";
-  return tipo === "SA" || tipo === "SAU" ? "Junta General de Accionistas" : "Junta General de Socios";
+function objectToStringRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, item]) => {
+    if (typeof item === "string" && item) acc[key] = item;
+    return acc;
+  }, {});
 }
 
-function adminBodySeed(tipo: TipoOrgano) {
-  if (tipo === "ADMIN_UNICO") {
-    return {
-      slugPart: "admin-unico",
-      name: "Administrador único",
-      config: { organo_tipo: "ADMIN_UNICO", adoption_mode: "UNIPERSONAL_ADMIN" },
-      quorum_rule: { unipersonal_admin: true },
-    };
+function parseTx1Result(data: unknown): Tx1Result {
+  if (!data || typeof data !== "object") {
+    throw new Error("La RPC no devolvio resultado de alta");
   }
-  if (tipo === "ADMIN_SOLIDARIOS") {
-    return {
-      slugPart: "admin-solidarios",
-      name: "Administradores solidarios",
-      config: { organo_tipo: "ADMIN_SOLIDARIOS", adoption_mode: "SOLIDARIO" },
-      quorum_rule: { accion_individual: true },
-    };
-  }
-  if (tipo === "ADMIN_MANCOMUNADOS") {
-    return {
-      slugPart: "admin-mancomunados",
-      name: "Administradores mancomunados",
-      config: { organo_tipo: "ADMIN_CONJUNTA", adoption_mode: "CO_APROBACION" },
-      quorum_rule: { firmas_requeridas: 2, total_administradores: 2 },
-    };
-  }
+  const raw = data as Record<string, unknown>;
+  const entityId = typeof raw.entity_id === "string" ? raw.entity_id : "";
+  if (!entityId) throw new Error("La RPC no devolvio entity_id");
   return {
-    slugPart: "consejo-administracion",
-    name: "Consejo de Administración",
-    config: { organo_tipo: "CONSEJO_ADMIN", voto_calidad_presidente: true },
-    quorum_rule: { quorum_asistencia: 0.5, mayoria_simple: 0.5, voto_calidad_presidente: true },
+    entityId,
+    bodyIds: objectToStringRecord(raw.body_ids),
+    settingsSkipped: Array.isArray(raw.settings_skipped) ? raw.settings_skipped.map(String) : [],
   };
 }
 
-function buildInitialBodies(input: {
-  tenantId: string;
-  entityId: string;
-  baseSlug: string;
-  tipoSocial: TipoSocial;
-  tipoOrgano: TipoOrgano;
-  esUnipersonal: boolean;
-  esCotizada: boolean;
-}) {
-  const admin = adminBodySeed(input.tipoOrgano);
-  const suffix = Date.now();
-  return [
-    {
-      tenant_id: input.tenantId,
-      entity_id: input.entityId,
-      slug: `${input.baseSlug}-junta-${suffix}`,
-      name: juntaName(input.tipoSocial, input.esUnipersonal),
-      body_type: "JUNTA",
-      config: {
-        organo_tipo: input.esUnipersonal ? "SOCIO_UNICO" : "JUNTA_GENERAL",
-        tipo_social: input.tipoSocial,
-        adoption_mode: input.esUnipersonal ? "UNIPERSONAL_SOCIO" : undefined,
-        voto_distancia: input.esCotizada,
-        canal_publicidad: input.esCotizada ? ["BORME", "CNMV", "WEB_SOCIEDAD"] : undefined,
-      },
-      quorum_rule: input.esUnipersonal
-        ? { unipersonal: true }
-        : {
-            primera_convocatoria_pct: input.tipoSocial === "SA" || input.tipoSocial === "SAU" ? 25 : 50,
-            segunda_convocatoria_pct: 0,
-            cotizada: input.esCotizada,
-          },
-    },
-    {
-      tenant_id: input.tenantId,
-      entity_id: input.entityId,
-      slug: `${input.baseSlug}-${admin.slugPart}-${suffix}`,
-      name: admin.name,
-      body_type: "CDA",
-      config: admin.config,
-      quorum_rule: admin.quorum_rule,
-    },
-  ];
+function adapterContextFromTx1(tenantId: string, tx1: Tx1Result): AdapterContext {
+  const bodyJuntaId = tx1.bodyIds.JUNTA;
+  const bodyAdminId = tx1.bodyIds.ADMIN ?? tx1.bodyIds.CDA;
+  if (!bodyJuntaId || !bodyAdminId) {
+    throw new Error("La RPC no devolvio los organos minimos para completar TX2");
+  }
+  const bodyComisiones: Record<string, string> = {};
+  for (const key of [
+    "COMISION_AUDITORIA",
+    "COMISION_NOMBRAMIENTOS",
+    "COMISION_RETRIBUCIONES",
+    "COMISION_RIESGOS",
+  ]) {
+    if (tx1.bodyIds[key]) bodyComisiones[key] = tx1.bodyIds[key];
+  }
+  return {
+    tenantId,
+    entityId: tx1.entityId,
+    bodyJuntaId,
+    bodyAdminId,
+    bodyConsejoId: tx1.bodyIds.CDA ?? null,
+    bodyComisiones,
+  };
+}
+
+function adminPJRepresentaciones(cargos: CargoInputDraft[]): RepresentacionAdminPJInput[] {
+  const reps: RepresentacionAdminPJInput[] = [];
+  for (const cargo of cargos) {
+    if (cargo.tipo_condicion !== "ADMIN_PJ") continue;
+    if (!cargo.persona?.representante) continue;
+    reps.push({
+      represented: cargo.persona,
+      representante: cargo.persona.representante,
+      effective_from: cargo.fecha_inicio,
+      fuente: cargo.fuente_designacion,
+    });
+  }
+  return reps;
 }
 
 export default function SociedadNuevaStepper() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  // BATCH 4 (ronda 2): además de tenantId, observar isLoading del provider
-  // para deshabilitar el botón "Crear sociedad" mientras se hidrata. Antes
-  // hacíamos throw si tenantId era null en el click → toast error opaco.
-  // Ahora preservamos el throw como guard de último recurso (defense in
-  // depth) pero el flujo principal espera a que el contexto esté ready.
   const { tenantId, isLoading: tenantLoading } = useTenantContext();
+  const { data: sociedades = [] } = useSociedades();
+  const [draft, dispatch] = useReducer(draftReducer, undefined, () => createEmptySociedadDraft());
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
 
-  const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
-  const prev = () => setStep((s) => Math.max(s - 1, 0));
+  const parentOptions = useMemo(
+    () =>
+      sociedades.map((sociedad) => ({
+        value: sociedad.id,
+        label: sociedad.common_name ?? sociedad.legal_name,
+      })),
+    [sociedades],
+  );
 
-  const canNext = (() => {
-    if (step === 0) return draft.legal_name.trim() && draft.tax_id.trim() && draft.jurisdiction;
-    if (step === 1) return draft.tipo_organo_admin;
-    if (step === 2) return Number(draft.capital_escriturado) > 0;
-    return true;
-  })();
+  const stepValidation = validateStep(draft, step);
+  const fullValidation = validateSociedadOperability(draft);
+  const currentIssues = allIssues(stepValidation);
+  const canNext = stepValidation.blocking.length === 0;
+  const isLastStep = step === STEPS.length - 1;
 
-  async function guardar() {
+  const replaceDraft = (nextDraft: SociedadOnboardingDraft) => {
+    dispatch({ updater: () => nextDraft });
+  };
+
+  const patchSection = <K extends keyof SociedadOnboardingDraft>(
+    section: K,
+    patch: Partial<SociedadOnboardingDraft[K]>,
+  ) => {
+    dispatch({
+      updater: (current) => ({
+        ...current,
+        [section]: {
+          ...(current[section] as unknown as Record<string, unknown>),
+          ...(patch as Record<string, unknown>),
+        },
+      }),
+    });
+  };
+
+  const setSection = <K extends keyof SociedadOnboardingDraft>(
+    section: K,
+    value: SociedadOnboardingDraft[K],
+  ) => {
+    dispatch({
+      updater: (current) => ({
+        ...current,
+        [section]: value,
+      }),
+    });
+  };
+
+  const prev = () => setStep((current) => Math.max(current - 1, 0));
+  const next = () => {
+    if (!canNext) return;
+    setStep((current) => Math.min(current + 1, STEPS.length - 1));
+  };
+
+  async function invalidateSociedadQueries(tenant: string, entityId: string) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sociedades", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["entities", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["governing_bodies"] }),
+      queryClient.invalidateQueries({ queryKey: ["governing_bodies", tenant, "byEntity", entityId] }),
+      queryClient.invalidateQueries({ queryKey: ["entity_capital_profile", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["share_classes", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["capital_holdings", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["cargos", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["representaciones", tenant] }),
+      queryClient.invalidateQueries({ queryKey: ["personas_canonical", tenant] }),
+    ]);
+  }
+
+  async function crearSociedad() {
+    const validation = validateSociedadOperability(draft);
+    if (validation.blocking.length > 0) {
+      toast.error("Hay bloqueos que impiden crear la sociedad");
+      return;
+    }
+
     setSaving(true);
-    // Tracking para rollback compensatorio en caso de fallo parcial.
-    // PostgREST no expone transacciones multi-tabla desde el cliente, así que
-    // el alta es secuencial y se compensa best-effort en el catch.
-    let createdPersonId: string | null = null;
     let createdEntityId: string | null = null;
+
     try {
       if (!tenantId) throw new Error("No hay tenant activo para crear la sociedad");
 
-      // 1) Crear persona jurídica (PJ) para la sociedad
-      const { data: person, error: pErr } = await supabase
-        .from("persons")
-        .insert({
-          tenant_id: tenantId,
-          full_name: draft.legal_name,
-          denomination: draft.legal_name,
-          tax_id: draft.tax_id,
-          person_type: "PJ",
-        })
-        .select()
-        .single();
-      if (pErr || !person) throw pErr ?? new Error("No se creó la PJ");
-      createdPersonId = person.id;
-
-      // 2) Crear entity con FK person_id
-      const slug = slugify(draft.legal_name);
-      const uniqueSlug = `${slug}-${Date.now()}`;
-      const { data: entity, error: eErr } = await supabase
-        .from("entities")
-        .insert({
-          tenant_id: tenantId,
-          person_id: person.id,
-          slug: uniqueSlug,
-          legal_name: draft.legal_name,
-          common_name: draft.common_name || draft.legal_name,
-          jurisdiction: draft.jurisdiction,
-          legal_form: legalFormFromTipo(draft.tipo_social),
-          tipo_social: draft.tipo_social,
-          registration_number: draft.registration_number || null,
-          forma_administracion: draft.forma_administracion,
-          tipo_organo_admin: draft.tipo_organo_admin,
-          es_unipersonal: draft.es_unipersonal,
-          es_cotizada: draft.es_cotizada,
-          entity_status: "Active",
-          materiality: "Medium",
-          // El legacy stepper no ejecuta TX2 (no crea cargos), pero hasta que
-          // /secretaria/sociedades/nueva monte el nuevo flujo D6 (StepRevisionCreacion
-          // + RPC + adaptador) esta ruta es el único alta operativo en producción
-          // demo. La migración 000067 introdujo default 'INCOMPLETA_CARGOS' pesimista
-          // para nuevas filas creadas vía RPC, pero las creadas por este stepper
-          // legacy deben seguir naciendo OPERATIVA para no ensuciar la demo con
-          // sociedades flagged incompletas que sí están operativas en la práctica.
-          // Eliminar este override cuando la ruta se migre al flujo D6 (review Codex P2).
-          onboarding_status: "OPERATIVA",
-        })
-        .select()
-        .single();
-      if (eErr || !entity) throw eErr ?? new Error("No se creó la entidad");
-      createdEntityId = entity.id;
-
-      // 3) Crear entity_capital_profile VIGENTE
-      const { error: cErr } = await supabase.from("entity_capital_profile").insert({
-        tenant_id: tenantId,
-        entity_id: entity.id,
-        currency: draft.currency,
-        capital_escriturado: Number(draft.capital_escriturado),
-        capital_desembolsado: Number(draft.capital_escriturado),
-        numero_titulos: Number(draft.numero_titulos),
-        valor_nominal: Number(draft.valor_nominal),
-        estado: "VIGENTE",
-        effective_from: new Date().toISOString().slice(0, 10),
+      const catalogKeys = await loadEntitySettingsCatalogKeys();
+      const payload = buildRpcPayload(draft, catalogKeys);
+      const { data, error } = await supabase.rpc("fn_crear_sociedad_legal_y_capital", {
+        p_tenant_id: tenantId,
+        p_payload: payload,
       });
-      if (cErr) throw cErr;
+      if (error) throw error;
 
-      // 4) Clase ordinaria por defecto
-      const { error: scErr } = await supabase.from("share_classes").insert({
-        tenant_id: tenantId,
-        entity_id: entity.id,
-        class_code: "ORD",
-        name: "Ordinaria",
-        votes_per_title: 1,
-        economic_rights_coeff: 1,
-        voting_rights: true,
-        veto_rights: false,
-      });
-      if (scErr) throw scErr;
+      const tx1 = parseTx1Result(data);
+      createdEntityId = tx1.entityId;
+      const adapterContext = adapterContextFromTx1(tenantId, tx1);
 
-      // 5) Órganos mínimos para que la sociedad sea operativa en Secretaría.
-      const { error: bodiesErr } = await supabase.from("governing_bodies").insert(
-        buildInitialBodies({
-          tenantId,
-          entityId: entity.id,
-          baseSlug: uniqueSlug,
-          tipoSocial: draft.tipo_social,
-          tipoOrgano: draft.tipo_organo_admin,
-          esUnipersonal: draft.es_unipersonal,
-          esCotizada: draft.es_cotizada,
-        }),
-      );
-      if (bodiesErr) throw bodiesErr;
+      let failedCargos = 0;
+      let failedRepresentaciones = 0;
+      try {
+        const cargosResult = await persistInitialCargos(adapterContext, draft.cargos);
+        const failedCargoKeys = new Set(cargosResult.failedCargos.map((failure) => failure.cargo.key));
+        const repsResult = await persistInitialRepresentaciones(
+          adapterContext,
+          adminPJRepresentaciones(draft.cargos.filter((cargo) => !failedCargoKeys.has(cargo.key))),
+        );
+        failedCargos = cargosResult.failedCargos.length;
+        failedRepresentaciones = repsResult.failedReps.length;
+      } catch (tx2Error) {
+        await invalidateSociedadQueries(tenantId, tx1.entityId);
+        toast.warning("Sociedad creada con cargos pendientes", {
+          description: `TX2 no se completo: ${errorMessage(tx2Error)}`,
+        });
+        navigate(`/secretaria/sociedades/${tx1.entityId}`);
+        return;
+      }
 
-      toast.success("Sociedad creada correctamente");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["sociedades", tenantId] }),
-        queryClient.invalidateQueries({ queryKey: ["entities", tenantId] }),
-        queryClient.invalidateQueries({ queryKey: ["governing_bodies"] }),
-      ]);
-      navigate(`/secretaria/sociedades/${entity.id}`);
-    } catch (e) {
-      // Rollback compensatorio: orden inverso al de creación.
-      // Best-effort: si una limpieza falla, se loggea pero no se propaga
-      // para no enmascarar el error original al usuario.
-      //
-      // INVARIANTE: el orden secuencial children → entities → persons es
-      // contrato verificado por `e2e/35-secretaria-alta-rollback.spec.ts`.
-      // No convertir a Promise.allSettled paralelo sin actualizar el test:
-      // entities y persons sí dependen del orden por FK; los 3 children
-      // (governing_bodies, share_classes, entity_capital_profile) podrían
-      // paralelizarse pero el test asume orden estricto hoy.
-      if (createdEntityId) {
-        const cleanups = [
-          supabase.from("governing_bodies").delete().eq("entity_id", createdEntityId),
-          supabase.from("share_classes").delete().eq("entity_id", createdEntityId),
-          supabase.from("entity_capital_profile").delete().eq("entity_id", createdEntityId),
-          supabase.from("entities").delete().eq("id", createdEntityId),
-        ];
-        for (const cleanup of cleanups) {
-          const { error } = await cleanup;
-          if (error) console.error("[alta-sociedad] rollback parcial falló:", error);
+      const hasTx2Failures = failedCargos > 0 || failedRepresentaciones > 0;
+      const hasOperationalBlocks = validation.blockingOperational.length > 0;
+      if (!hasTx2Failures && !hasOperationalBlocks) {
+        const { error: statusError } = await supabase
+          .from("entities")
+          .update({ onboarding_status: "OPERATIVA" })
+          .eq("tenant_id", tenantId)
+          .eq("id", tx1.entityId);
+        if (statusError) {
+          toast.warning("Sociedad creada; no se pudo promover a operativa", {
+            description: statusError.message,
+          });
+        } else {
+          toast.success("Sociedad creada y operativa");
         }
-      }
-      if (createdPersonId) {
-        const { error } = await supabase.from("persons").delete().eq("id", createdPersonId);
-        if (error) console.error("[alta-sociedad] rollback persona falló:", error);
+      } else {
+        const pending = [
+          hasOperationalBlocks ? `${validation.blockingOperational.length} validacion(es) operativa(s)` : "",
+          failedCargos ? `${failedCargos} cargo(s)` : "",
+          failedRepresentaciones ? `${failedRepresentaciones} representacion(es)` : "",
+        ].filter(Boolean);
+        toast.warning("Sociedad creada con tareas pendientes", {
+          description: pending.join(" · "),
+        });
       }
 
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error("No se pudo crear la sociedad: " + msg);
+      if (tx1.settingsSkipped.length > 0) {
+        toast.warning("Algunas reglas no estaban activas en el catalogo", {
+          description: tx1.settingsSkipped.join(", "),
+        });
+      }
+
+      await invalidateSociedadQueries(tenantId, tx1.entityId);
+      navigate(`/secretaria/sociedades/${tx1.entityId}`);
+    } catch (error) {
+      const suffix = createdEntityId ? ` Sociedad creada: ${createdEntityId}` : "";
+      toast.error(`No se pudo crear la sociedad: ${errorMessage(error)}${suffix}`);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-[960px] p-6">
+    <div className="mx-auto max-w-[1120px] p-4 sm:p-6">
       <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => navigate("/secretaria/sociedades")}
+        <Link
+          to="/secretaria/sociedades"
           className="inline-flex items-center gap-1 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
         >
           <ChevronLeft className="h-3 w-3" /> Sociedades
-        </button>
+        </Link>
       </div>
 
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
           <Building2 className="h-3.5 w-3.5" />
-          Secretaría · Nueva sociedad
+          Secretaria · Nueva sociedad
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
           Alta de sociedad
         </h1>
+        <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
+          La informacion se conserva en este asistente hasta la revision final. La base de datos se escribe en TX1 y los cargos iniciales en TX2.
+        </p>
       </div>
 
-      {/* Stepper */}
-      <ol className="mb-6 flex items-center gap-2 text-xs">
-        {STEPS.map((label, i) => {
-          const active = i === step;
-          const done = i < step;
+      <ol className="mb-6 flex gap-2 overflow-x-auto pb-1 text-xs">
+        {STEPS.map((label, index) => {
+          const active = index === step;
+          const done = index < step;
           return (
-            <li
-              key={label}
-              className={`flex items-center gap-2 rounded-full px-3 py-1 ${
-                active
-                  ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                  : done
-                    ? "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
-                    : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-              }`}
-            >
-              <span>
-                {done ? <Check className="inline h-3 w-3" /> : i + 1}. {label}
-              </span>
+            <li key={label} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setStep(index)}
+                className={`inline-flex min-h-9 items-center gap-2 px-3 py-1.5 font-semibold ${
+                  active
+                    ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                    : done
+                      ? "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                {done ? <Check className="h-3.5 w-3.5" /> : <span>{index + 1}</span>}
+                <span>{label}</span>
+              </button>
             </li>
           );
         })}
       </ol>
 
-      <div
-        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+      {currentIssues.length > 0 && !isLastStep ? (
+        <div className="mb-4">
+          <IssueList issues={currentIssues} />
+        </div>
+      ) : null}
+
+      <section
+        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 sm:p-6"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
-        {step === 0 && <StepIdentidad draft={draft} update={update} />}
-        {step === 1 && <StepAdmin draft={draft} update={update} />}
-        {step === 2 && <StepCapital draft={draft} update={update} />}
-        {step === 3 && <StepConfirm draft={draft} />}
-      </div>
+        {step === 0 ? (
+          <StepIdentificacionLegal
+            draft={draft.identification}
+            fullDraft={draft}
+            issues={currentIssues}
+            onChange={(patch) => patchSection("identification", patch)}
+            onDraftChange={replaceDraft}
+          />
+        ) : null}
+        {step === 1 ? (
+          <StepDomicilioCnaeRegistro
+            draft={draft.registry}
+            issues={currentIssues}
+            onChange={(patch) => patchSection("registry", patch)}
+          />
+        ) : null}
+        {step === 2 ? (
+          <StepPerfilGrupo
+            draft={draft.profile}
+            issues={currentIssues}
+            parentOptions={parentOptions}
+            unipersonalLocked={isUnipersonalTipo(draft.identification.tipo_social)}
+            onChange={(patch) => patchSection("profile", patch)}
+          />
+        ) : null}
+        {step === 3 ? (
+          <StepCapital
+            draft={draft.capital}
+            issues={currentIssues}
+            onChange={(patch) => patchSection("capital", patch)}
+          />
+        ) : null}
+        {step === 4 ? (
+          <StepClasesSeries
+            classes={draft.shareClasses}
+            issues={currentIssues}
+            onChange={(classes) => setSection("shareClasses", classes)}
+          />
+        ) : null}
+        {step === 5 ? (
+          <StepCapTable
+            entries={draft.capTable}
+            shareClasses={draft.shareClasses}
+            totalTitles={draft.capital.numero_titulos}
+            issues={currentIssues}
+            onChange={(entries) => setSection("capTable", entries)}
+          />
+        ) : null}
+        {step === 6 ? (
+          <StepOrganos
+            draft={draft.organos}
+            isConsejo={draft.profile.tipo_organo_admin === "CDA"}
+            issues={currentIssues}
+            onChange={(patch) => patchSection("organos", patch)}
+          />
+        ) : null}
+        {step === 7 ? (
+          <StepCargos
+            cargos={draft.cargos}
+            issues={currentIssues}
+            onChange={(cargos) => setSection("cargos", cargos)}
+          />
+        ) : null}
+        {step === 8 ? (
+          <StepReglas
+            draft={draft.rules}
+            issues={currentIssues}
+            onChange={(patch) => patchSection("rules", patch)}
+          />
+        ) : null}
+        {step === 9 ? (
+          <StepDocumentosSoporte
+            docs={draft.supportDocs}
+            onChange={(docs) => setSection("supportDocs", docs)}
+          />
+        ) : null}
+        {step === 10 ? (
+          <StepRevisionCreacion
+            draft={draft}
+            validation={fullValidation}
+            saving={saving}
+            disabled={tenantLoading || !tenantId}
+            onCreate={crearSociedad}
+          />
+        ) : null}
+      </section>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
           onClick={prev}
-          disabled={step === 0}
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-40"
+          disabled={step === 0 || saving}
+          className="inline-flex items-center justify-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-40"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          Atrás
+          Atras
         </button>
-        {step < STEPS.length - 1 ? (
+        {!isLastStep ? (
           <button
             type="button"
             onClick={next}
-            disabled={!canNext}
-            className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
+            disabled={!canNext || saving}
+            className="inline-flex items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             Siguiente
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={guardar}
-            // BATCH 4 (ronda 2): bloquear botón mientras TenantContext
-            // hidrata (`tenantLoading`) o si tenantId aún no está disponible.
-            // Sin este guard, el usuario puede hacer click rápidamente y el
-            // throw "No hay tenant activo" producía un toast.error opaco.
-            disabled={saving || tenantLoading || !tenantId}
-            aria-busy={saving || tenantLoading}
-            title={tenantLoading || !tenantId ? "Cargando contexto del tenant…" : undefined}
-            className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            {saving
-              ? "Creando…"
-              : tenantLoading || !tenantId
-                ? "Cargando contexto…"
-                : "Crear sociedad"}
-          </button>
+          <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+            <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
+            La promocion a operativa solo ocurre si TX2 termina sin pendientes.
+          </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-        {label}
-      </span>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
-        style={{ borderRadius: "var(--g-radius-md)" }}
-      />
-    </label>
-  );
-}
-
-function Select<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
-        style={{ borderRadius: "var(--g-radius-md)" }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Checkbox({
-  label,
-  value,
-  onChange,
-  help,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  help?: string;
-}) {
-  return (
-    <label className="flex items-start gap-2">
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 accent-[var(--g-brand-3308)]"
-      />
-      <div>
-        <div className="text-sm text-[var(--g-text-primary)]">{label}</div>
-        {help ? <div className="text-xs text-[var(--g-text-secondary)]">{help}</div> : null}
-      </div>
-    </label>
-  );
-}
-
-// Paso 1
-function StepIdentidad({
-  draft,
-  update,
-}: {
-  draft: Draft;
-  update: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Input
-        label="Denominación legal *"
-        value={draft.legal_name}
-        onChange={(v) => update("legal_name", v)}
-        placeholder="ARGA SEGUROS, S.A."
-      />
-      <Input
-        label="Nombre común"
-        value={draft.common_name}
-        onChange={(v) => update("common_name", v)}
-        placeholder="ARGA Seguros"
-      />
-      <Input
-        label="NIF/CIF *"
-        value={draft.tax_id}
-        onChange={(v) => update("tax_id", v)}
-        placeholder="A-XXXXXXXX"
-      />
-      <Select
-        label="Tipo social"
-        value={draft.tipo_social}
-        onChange={(v) => {
-          update("tipo_social", v);
-          update("es_unipersonal", isUnipersonalTipo(v));
-        }}
-        options={TIPO_SOCIAL_OPTIONS}
-      />
-      <Input
-        label="Jurisdicción *"
-        value={draft.jurisdiction}
-        onChange={(v) => update("jurisdiction", v)}
-        placeholder="ES"
-      />
-      <Input
-        label="Nº registral (RM)"
-        value={draft.registration_number}
-        onChange={(v) => update("registration_number", v)}
-        placeholder="T 1234, F 56, H M-12345"
-      />
-    </div>
-  );
-}
-
-// Paso 2
-function StepAdmin({
-  draft,
-  update,
-}: {
-  draft: Draft;
-  update: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Select
-        label="Órgano de administración"
-        value={draft.tipo_organo_admin}
-        onChange={(v) => {
-          update("tipo_organo_admin", v);
-          update("forma_administracion", ADMIN_BY_VALUE[v].forma);
-        }}
-        options={ADMIN_OPTIONS}
-      />
-      <div className="flex flex-col gap-3">
-        <Checkbox
-          label="Sociedad unipersonal"
-          value={draft.es_unipersonal}
-          onChange={(v) => {
-            update("es_unipersonal", v);
-            update("tipo_social", syncTipoWithUnipersonal(draft.tipo_social, v));
-          }}
-          help="Marca si la sociedad tiene un único socio (SLU/SAU)."
-        />
-        <Checkbox
-          label="Sociedad cotizada"
-          value={draft.es_cotizada}
-          onChange={(v) => update("es_cotizada", v)}
-          help="Motor LSC evaluará + advertirá sobre implicaciones LMV (DL-2)."
-        />
-      </div>
-    </div>
-  );
-}
-
-// Paso 3
-function StepCapital({
-  draft,
-  update,
-}: {
-  draft: Draft;
-  update: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
-}) {
-  const valueNominal =
-    Number(draft.capital_escriturado) > 0 && Number(draft.numero_titulos) > 0
-      ? Number(draft.capital_escriturado) / Number(draft.numero_titulos)
-      : 0;
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Input
-        label="Moneda"
-        value={draft.currency}
-        onChange={(v) => update("currency", v)}
-      />
-      <Input
-        label="Capital escriturado *"
-        type="number"
-        value={draft.capital_escriturado}
-        onChange={(v) => update("capital_escriturado", v)}
-      />
-      <Input
-        label="Número de títulos"
-        type="number"
-        value={draft.numero_titulos}
-        onChange={(v) => update("numero_titulos", v)}
-      />
-      <Input
-        label="Valor nominal (auto)"
-        type="number"
-        value={valueNominal ? valueNominal.toString() : draft.valor_nominal}
-        onChange={(v) => update("valor_nominal", v)}
-      />
-    </div>
-  );
-}
-
-// Paso 4 — Confirmación
-function StepConfirm({ draft }: { draft: Draft }) {
-  return (
-    <div>
-      <p className="mb-4 text-sm text-[var(--g-text-primary)]">
-        Revisa los datos antes de crear la sociedad. Esta acción crea:
-      </p>
-      <ul className="mb-4 list-disc pl-6 text-sm text-[var(--g-text-secondary)]">
-        <li>Persona jurídica (persons) con denominación y NIF.</li>
-        <li>Entidad (entities) con FK a la PJ.</li>
-        <li>Perfil de capital VIGENTE (entity_capital_profile).</li>
-        <li>Clase ordinaria &ldquo;ORD&rdquo; por defecto.</li>
-        <li>Junta y órgano de administración iniciales.</li>
-      </ul>
-      <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Field label="Denominación" value={draft.legal_name} />
-        <Field label="NIF/CIF" value={draft.tax_id} />
-        <Field label="Tipo" value={draft.tipo_social} />
-        <Field label="Jurisdicción" value={draft.jurisdiction} />
-        <Field label="Órgano" value={ADMIN_BY_VALUE[draft.tipo_organo_admin].label} />
-        <Field label="Unipersonal / Cotizada" value={`${draft.es_unipersonal ? "Sí" : "No"} · ${draft.es_cotizada ? "Sí" : "No"}`} />
-        <Field label="Capital" value={`${draft.capital_escriturado} ${draft.currency}`} />
-        <Field label="Títulos" value={`${draft.numero_titulos} × ${draft.valor_nominal}`} />
-      </dl>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">{label}</dt>
-      <dd className="text-sm text-[var(--g-text-primary)]">{value}</dd>
     </div>
   );
 }

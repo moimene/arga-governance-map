@@ -2,7 +2,7 @@ import { deriveNominalValue } from "@/lib/secretaria/sociedad-onboarding/default
 import type { CapitalDraft, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { NumberField } from "./shared/NumberField";
 import { SelectField } from "./shared/SelectField";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 
 const TITLE_TYPE_OPTIONS = [
   { value: "ACCION", label: "Accion" },

@@ -1,7 +1,7 @@
 import type { OrganosDraft, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { CheckboxField } from "./shared/CheckboxField";
 import { NumberField } from "./shared/NumberField";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 
 export function StepOrganos({
   draft,

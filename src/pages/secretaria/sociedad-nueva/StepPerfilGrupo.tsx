@@ -3,7 +3,7 @@ import type { ProfileDraft, TipoOrganoAdmin, ValidationIssue } from "@/lib/secre
 import { CheckboxField } from "./shared/CheckboxField";
 import { Field } from "./shared/Field";
 import { SelectField, type SelectOption } from "./shared/SelectField";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 
 const ORGANO_OPTIONS = [
   { value: "CDA", label: "Consejo de Administracion" },

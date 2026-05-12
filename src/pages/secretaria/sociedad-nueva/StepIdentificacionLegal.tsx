@@ -2,7 +2,7 @@ import { applyTipoSocialDefaults } from "@/lib/secretaria/sociedad-onboarding/de
 import type { IdentificationDraft, SociedadOnboardingDraft, TipoSocial, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { Field } from "./shared/Field";
 import { SelectField } from "./shared/SelectField";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 
 const TIPO_SOCIAL_OPTIONS = [
   { value: "SA", label: "S.A. - Sociedad Anonima" },

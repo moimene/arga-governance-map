@@ -1,6 +1,6 @@
 import type { RegistryDraft, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { Field } from "./shared/Field";
-import { issueForField } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 
 export function StepDomicilioCnaeRegistro({
   draft,

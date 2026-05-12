@@ -7,10 +7,6 @@ const SEVERITY_CLASS: Record<ValidationIssue["severity"], string> = {
   WARN: "border-[var(--status-info)] bg-[var(--g-surface-card)] text-[var(--status-info)]",
 };
 
-export function issueForField(issues: ValidationIssue[] | undefined, field: string) {
-  return (issues ?? []).find((issue) => issue.field === field || issue.field.startsWith(`${field}.`));
-}
-
 export function IssueList({ issues = [] }: { issues?: ValidationIssue[] }) {
   if (issues.length === 0) return null;
 

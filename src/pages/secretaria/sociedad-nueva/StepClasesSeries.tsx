@@ -2,7 +2,8 @@ import { Plus, Trash2 } from "lucide-react";
 import type { ShareClassDraft, ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 import { CheckboxField } from "./shared/CheckboxField";
 import { Field } from "./shared/Field";
-import { issueForField, IssueList } from "./shared/IssueList";
+import { IssueList } from "./shared/IssueList";
+import { issueForField } from "./shared/issues";
 import { NumberField } from "./shared/NumberField";
 
 function emptyClass(index: number): ShareClassDraft {

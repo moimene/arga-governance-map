@@ -21,6 +21,33 @@ export interface SociedadRow {
   person_id: string; // FK persons (PJ)
   parent_entity_id: string | null;
   ownership_percentage: number | null;
+  constitution_date: string | null;
+  registration_date: string | null;
+  registry_location: string | null;
+  registry_volume: string | null;
+  registry_folio: string | null;
+  registry_sheet: string | null;
+  registry_inscription: string | null;
+  lei_code: string | null;
+  cnae_primary: string | null;
+  cnae_secondary: string[] | null;
+  corporate_purpose: string | null;
+  duration: string | null;
+  fiscal_year_close: string | null;
+  address: string | null;
+  address_street: string | null;
+  address_number: string | null;
+  address_floor: string | null;
+  postal_code: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  website: string | null;
+  corporate_email: string | null;
+  regulated_sector: string | null;
+  group_role: string | null;
+  onboarding_status: "OPERATIVA" | "INCOMPLETA_CARGOS" | "INCOMPLETA_DATOS" | "BORRADOR" | null;
+  support_docs_metadata: Record<string, unknown> | null;
   created_at: string | null;
 }
 
