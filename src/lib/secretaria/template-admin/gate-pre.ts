@@ -4,7 +4,12 @@
  * Sprint 1 — Spec §5.
  */
 
-import type { GatePreIssue, GatePreResult, PlantillaCandidate } from "./types";
+import type {
+  EstadoPlantilla,
+  GatePreIssue,
+  GatePreResult,
+  PlantillaCandidate,
+} from "./types";
 import { isOrganoCanonico, normalizeOrganoTipo } from "./organo-canonico";
 import { detectActiveDuplicate } from "./functional-key";
 import { evaluateSemanticRules } from "./gate-pre-semantic";
@@ -29,14 +34,16 @@ const EXTENDED_KNOWN_ORGANOS = new Set(["JUNTA_GENERAL_O_CONSEJO"]);
 export type GatePreContext = {
   tenantId: string;
   existingActiveTemplates: PlantillaCandidate[];
+  targetEstado?: EstadoPlantilla;
 };
 
 export function validateTemplateForActivation(
   template: PlantillaCandidate,
   ctx: GatePreContext,
 ): GatePreResult {
+  const target = ctx.targetEstado ?? "ACTIVA";
   const issues: GatePreIssue[] = [];
-  collectMetadataIssues(template, issues);
+  collectMetadataIssues(template, issues, target);
   collectCapa1Issues(template, issues);
   collectCapa2Issues(template, issues);
   collectCapa3Issues(template, issues);
@@ -52,7 +59,11 @@ function summarize(issues: GatePreIssue[]): GatePreResult {
   return { ok: summary.blocking === 0, issues, summary };
 }
 
-function collectMetadataIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
+function collectMetadataIssues(
+  t: PlantillaCandidate,
+  issues: GatePreIssue[],
+  target: EstadoPlantilla,
+): void {
   const organoOk =
     t.organo_tipo &&
     (isOrganoCanonico(t.organo_tipo) || EXTENDED_KNOWN_ORGANOS.has(t.organo_tipo));
@@ -87,20 +98,30 @@ function collectMetadataIssues(t: PlantillaCandidate, issues: GatePreIssue[]): v
       field: "referencia_legal",
     });
   }
-  if (!t.aprobada_por || t.aprobada_por === "" || /^(falta|pendiente)/i.test(t.aprobada_por)) {
+  const requiresApproval = target === "APROBADA" || target === "ACTIVA";
+  if (requiresApproval) {
+    if (!t.aprobada_por || t.aprobada_por === "" || /^(falta|pendiente)/i.test(t.aprobada_por)) {
+      issues.push({
+        severity: "BLOCKING",
+        code: "META_APROBADA_POR",
+        message: "aprobada_por requerido para llegar a APROBADA/ACTIVA",
+        field: "aprobada_por",
+      });
+    }
+    if (!t.fecha_aprobacion) {
+      issues.push({
+        severity: "BLOCKING",
+        code: "META_APROBADA_POR",
+        message: "fecha_aprobacion requerida para llegar a APROBADA/ACTIVA",
+        field: "fecha_aprobacion",
+      });
+    }
+  } else if (!t.aprobada_por || !t.fecha_aprobacion) {
     issues.push({
-      severity: "BLOCKING",
-      code: "META_APROBADA_POR",
-      message: "aprobada_por no puede ser null/vacío/placeholder",
-      field: "aprobada_por",
-    });
-  }
-  if (!t.fecha_aprobacion) {
-    issues.push({
-      severity: "BLOCKING",
-      code: "META_APROBADA_POR",
-      message: "fecha_aprobacion no puede ser null",
-      field: "fecha_aprobacion",
+      severity: "INFO",
+      code: "META_APROBADA_POR_PENDING",
+      message: "aprobada_por/fecha_aprobacion pendientes; requeridos al promover a APROBADA",
+      field: !t.aprobada_por ? "aprobada_por" : "fecha_aprobacion",
     });
   }
 }

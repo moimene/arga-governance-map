@@ -29,9 +29,11 @@
  *   Si una fila tiene `summary.blocking > 0`, su action queda
  *   `SKIP_BLOCKING` y NO se inserta aunque venga `--commit`.
  *
- * - Idempotencia: `computeIdempotencyKey(plantillaId, version)` con bucket
- *   5s garantiza que reintentos accidentales del operador no dupliquen
- *   filas en `plantilla_changelog`.
+ * - Idempotencia limitada: `computeIdempotencyKey(plantillaId, version)`
+ *   solo cubre dobles inserts simultáneos del changelog dentro de la misma
+ *   ejecución (5s bucket por plantilla recién creada). NO previene duplicados
+ *   entre runs distintos del batch: ejecuta siempre dry-run y revisa el plan
+ *   tabular antes de `--commit`.
  *
  * Refs: docs/superpowers/specs/2026-05-12-gestor-plantillas-sprint1-design.md §6.2
  */

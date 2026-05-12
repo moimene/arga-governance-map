@@ -49,6 +49,29 @@ describe("gate-pre — metadata BLOCKING", () => {
     expect(r.issues.some((i) => i.code === "META_APROBADA_POR")).toBe(true);
   });
 
+  it("META_APROBADA_POR_PENDING es INFO para target BORRADOR", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({ aprobada_por: null, fecha_aprobacion: null }),
+      { ...emptyCtx, targetEstado: "BORRADOR" },
+    );
+    expect(
+      r.issues.some((i) => i.code === "META_APROBADA_POR" && i.severity === "BLOCKING"),
+    ).toBe(false);
+    expect(
+      r.issues.some((i) => i.code === "META_APROBADA_POR_PENDING" && i.severity === "INFO"),
+    ).toBe(true);
+    expect(r.summary.blocking).toBe(0);
+  });
+
+  it("META_APROBADA_POR sigue BLOCKING para target ACTIVA", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({ aprobada_por: null, fecha_aprobacion: null }),
+      { ...emptyCtx, targetEstado: "ACTIVA" },
+    );
+    expect(r.summary.blocking).toBeGreaterThan(0);
+    expect(r.issues.some((i) => i.code === "META_APROBADA_POR")).toBe(true);
+  });
+
   it("plantilla válida no produce issues de META", () => {
     const r = validateTemplateForActivation(baseTemplate(), emptyCtx);
     const metaIssues = r.issues.filter((i) => i.code.startsWith("META_"));

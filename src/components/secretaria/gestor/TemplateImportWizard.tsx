@@ -10,8 +10,8 @@
  *     se muestran los errores línea/columna del ZodError. Si OK avanza al
  *     paso 3.
  *  3. Preflight — botón "Ejecutar preflight" invoca el hook
- *     `useImportPlantillaPackage.mutateAsync`. El hook combina parse +
- *     Gate PRE + insert. Si hay BLOCKING se muestran issues sin escribir.
+ *     `useImportPlantillaPackage.mutateAsync`. Si hay BLOCKING se muestran
+ *     issues sin escribir.
  *     Si hay WARNING se avanza al paso 4 para reconocerlas. Si todo OK
  *     se navega al catálogo con toast de éxito.
  *  4. Reconocer warnings (solo si `summary.warning > 0 && blocking === 0`):
@@ -102,6 +102,7 @@ export function TemplateImportWizard() {
     const fail = result as
       | { ok: false; reason: "PARSE_FAILED"; details: unknown }
       | { ok: false; reason: "GATE_PRE_BLOCKING"; gatePre: GatePreResult }
+      | { ok: false; reason: "WARNINGS_NEED_ACK"; gatePre: GatePreResult }
       | { ok: false; reason: "INSERT_FAILED"; details: unknown };
     if (fail.reason === "PARSE_FAILED") {
       setParseError(JSON.stringify(fail.details, null, 2));
@@ -109,6 +110,9 @@ export function TemplateImportWizard() {
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
       setGatePre(fail.gatePre);
       toast.error("Gate PRE bloqueante: corrige los issues antes de continuar");
+    } else if (fail.reason === "WARNINGS_NEED_ACK") {
+      setGatePre(fail.gatePre);
+      setStep(4);
     } else if (fail.reason === "INSERT_FAILED") {
       toast.error("Error al insertar el borrador");
     }

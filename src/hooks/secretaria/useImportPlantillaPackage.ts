@@ -12,11 +12,13 @@
  *  3. `validateTemplateForActivation(candidate, ctx)` headless. Si
  *     `summary.blocking > 0` → `{ ok: false, reason: "GATE_PRE_BLOCKING",
  *     gatePre }`. Permite mostrar los issues sin escribir nada.
- *  4. `buildDraftRow(payload, ctx)` produce el shape Cloud.
- *  5. `createDraftFromImport(...)` (Commit 4 service) inserta en BORRADOR
+ *  4. Si Gate PRE devuelve WARNING y no llega `ackMotivo`, retorna
+ *     `WARNINGS_NEED_ACK` sin escribir.
+ *  5. `buildDraftRow(payload, ctx)` produce el shape Cloud.
+ *  6. `createDraftFromImport(...)` (Commit 4 service) inserta en BORRADOR
  *     y escribe la entry IMPORT en changelog, con rollback compensatorio
  *     si el changelog falla.
- *  6. onSuccess invalida `["plantillas_protegidas"]` y
+ *  7. onSuccess invalida `["plantillas_protegidas"]` y
  *     `["plantilla_changelog"]` para refrescar las queries del Catálogo
  *     y la Auditoría inmediatamente.
  *
@@ -47,6 +49,7 @@ export type ImportResult =
   | { ok: true; plantillaId: string; gatePre: GatePreResult }
   | { ok: false; reason: "PARSE_FAILED"; details: unknown }
   | { ok: false; reason: "GATE_PRE_BLOCKING"; gatePre: GatePreResult }
+  | { ok: false; reason: "WARNINGS_NEED_ACK"; gatePre: GatePreResult }
   | { ok: false; reason: "INSERT_FAILED"; details: unknown };
 
 export function useImportPlantillaPackage() {
@@ -109,9 +112,15 @@ export function useImportPlantillaPackage() {
       };
 
       // Step 3 — Gate PRE headless.
-      const gatePre = validateTemplateForActivation(candidate, ctx);
+      const gatePre = validateTemplateForActivation(candidate, {
+        ...ctx,
+        targetEstado: "BORRADOR",
+      });
       if (gatePre.summary.blocking > 0) {
         return { ok: false, reason: "GATE_PRE_BLOCKING", gatePre };
+      }
+      if (gatePre.summary.warning > 0 && (!req.ackMotivo || req.ackMotivo.length < 20)) {
+        return { ok: false, reason: "WARNINGS_NEED_ACK", gatePre };
       }
 
       // Step 4 + 5 — insertar borrador + changelog IMPORT.
