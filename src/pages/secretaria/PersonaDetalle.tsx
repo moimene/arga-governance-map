@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -5,7 +6,9 @@ import {
   Building2,
   Plus,
   UserCheck,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import {
   useCargosPersona,
@@ -13,6 +16,7 @@ import {
   type CargoDetailRow,
 } from "@/hooks/useCargos";
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
+import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
 
 export default function PersonaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +33,51 @@ export default function PersonaDetalle() {
   const cargosHistorico: CargoDetailRow[] = (cargos ?? []).filter(
     (c) => c.estado === "CESADO",
   );
+
+  // D4.3: estado modal "Cesar cargo". El UPDATE conserva el registro y se
+  // limita a estado='CESADO' + fecha_fin + metadata.cese_razon. El trigger
+  // fn_sync_authority_evidence propaga el cierre de vigencia al cargo
+  // certificante asociado.
+  const [cargoToCesar, setCargoToCesar] = useState<CargoDetailRow | null>(null);
+  const [fechaFin, setFechaFin] = useState<string>(
+    () => new Date().toISOString().slice(0, 10),
+  );
+  const [razon, setRazon] = useState<string>("");
+  const cesarMutation = useCesarCargo();
+  const fechaFinInputRef = useRef<HTMLInputElement>(null);
+
+  function closeCesarModal() {
+    setCargoToCesar(null);
+    setRazon("");
+  }
+
+  // Foco inicial al primer campo + Escape cierra. Cumple WCAG 2.1: focus
+  // management básico para modal accesible (role=dialog + aria-modal).
+  useEffect(() => {
+    if (!cargoToCesar) return;
+    fechaFinInputRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeCesarModal();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [cargoToCesar]);
+
+  async function handleConfirmCese() {
+    if (!cargoToCesar) return;
+    try {
+      await cesarMutation.mutateAsync({
+        condicion_id: cargoToCesar.id,
+        fecha_fin: fechaFin,
+        razon: razon || null,
+      });
+      toast.success("Cargo cesado correctamente");
+      closeCesarModal();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("No se pudo cesar el cargo: " + msg);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -135,22 +184,24 @@ export default function PersonaDetalle() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Órgano</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Desde</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Estado</th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {cargosVigentes.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   Sin cargos vigentes.
                 </td>
               </tr>
             ) : (
               cargosVigentes.map((c) => {
                 const sociedadNombre = c.entity?.common_name ?? c.entity?.legal_name ?? "—";
+                const cargoLabel = CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion;
                 return (
                   <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
                     <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">
-                      {CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion}
+                      {cargoLabel}
                     </td>
                     <td className="px-6 py-3 text-sm">
                       {c.entity?.id ? (
@@ -175,6 +226,17 @@ export default function PersonaDetalle() {
                       >
                         Vigente
                       </span>
+                    </td>
+                    <td className="px-6 py-3 text-right text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setCargoToCesar(c)}
+                        className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                        aria-label={`Cesar cargo ${cargoLabel}`}
+                      >
+                        Cesar
+                      </button>
                     </td>
                   </tr>
                 );
@@ -329,6 +391,104 @@ export default function PersonaDetalle() {
           </tbody>
         </table>
       </section>
+
+      {/* D4.3: Modal Cesar cargo. UPDATE estado='CESADO' + fecha_fin + razón
+          en metadata. NO DELETE — L14 conserva histórico. El trigger
+          fn_sync_authority_evidence cierra la vigencia del cargo
+          certificante asociado en authority_evidence. */}
+      {cargoToCesar && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cesar-cargo-title"
+          aria-describedby="cesar-cargo-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-brand-3308)]/40 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeCesarModal();
+          }}
+        >
+          <div
+            className="w-full max-w-md border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+            style={{
+              borderRadius: "var(--g-radius-lg)",
+              boxShadow: "var(--g-shadow-modal)",
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2
+                id="cesar-cargo-title"
+                className="text-lg font-semibold text-[var(--g-text-primary)]"
+              >
+                Cesar cargo:{" "}
+                {CARGO_LABELS[cargoToCesar.tipo_condicion] ?? cargoToCesar.tipo_condicion}
+              </h2>
+              <button
+                type="button"
+                onClick={closeCesarModal}
+                className="-mr-2 -mt-2 p-1.5 text-[var(--g-text-secondary)] transition-colors hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                aria-label="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p
+              id="cesar-cargo-desc"
+              className="mt-1 text-sm text-[var(--g-text-secondary)]"
+            >
+              Se cerrará la vigencia. El histórico se conserva (no se borra).
+            </p>
+            <div className="mt-4 grid gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                  Fecha de cese *
+                </span>
+                <input
+                  ref={fechaFinInputRef}
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                  Razón (opcional)
+                </span>
+                <textarea
+                  value={razon}
+                  onChange={(e) => setRazon(e.target.value)}
+                  rows={3}
+                  placeholder="Renuncia, cese, expiración mandato..."
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeCesarModal}
+                className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCese}
+                disabled={cesarMutation.isPending || !fechaFin}
+                aria-busy={cesarMutation.isPending}
+                className="inline-flex items-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:pointer-events-none disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {cesarMutation.isPending ? "Cesando…" : "Confirmar cese"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
