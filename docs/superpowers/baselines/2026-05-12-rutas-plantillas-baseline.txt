@@ -1,0 +1,5 @@
+src/App.tsx:211:                  <Route path="/secretaria/plantillas" element={<Suspense fallback={<ModuleFallback />}><Plantillas /></Suspense>} />
+src/App.tsx:212:                  <Route path="/secretaria/plantillas-tracker" element={<Suspense fallback={<ModuleFallback />}><PlantillasTracker /></Suspense>} />
+src/components/secretaria/shell/navigation.ts:56:      { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
+src/components/secretaria/shell/navigation.ts:122:      { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
+src/pages/secretaria/Dashboard.tsx:924:          onClick={() => navigateSecretaria("/secretaria/plantillas-tracker")}
