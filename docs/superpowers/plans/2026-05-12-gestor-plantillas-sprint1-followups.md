@@ -57,6 +57,18 @@
 **Problema:** El spec §4 mantiene dos experiencias intencionalmente (`/plantillas` = catálogo Secretario, `/gestor-plantillas` = consola admin). El reviewer cuestiona si esto es deseable.
 **Decisión:** mantener como está según spec, pero **decidir explícitamente** en Sprint 2 si redirigir `/secretaria/plantillas` → `?tab=catalogo` para simplificar, o documentar la dualidad como decisión definitiva.
 
+### F11. Separar preflight y commit del importador
+**Archivos:** [`src/hooks/secretaria/useImportPlantillaPackage.ts`](../../src/hooks/secretaria/useImportPlantillaPackage.ts), [`src/components/secretaria/gestor/TemplateImportWizard.tsx`](../../src/components/secretaria/gestor/TemplateImportWizard.tsx)
+**Severidad:** Important
+**Problema:** Sprint 1 corrigió el bug de escritura prematura con `WARNINGS_NEED_ACK`, pero el hook sigue combinando parse, Gate PRE y creación del borrador en una sola mutación.
+**Fix:** crear `useTemplatePreflight` read-only para step 3 y dejar `useImportPlantillaPackage` como mutación explícita de step 5.
+
+### F12. Idempotencia cross-run del import batch
+**Archivo:** [`scripts/import-templates-batch.ts`](../../scripts/import-templates-batch.ts)
+**Severidad:** Important
+**Problema:** La idempotencia actual solo cubre changelog dentro de una misma ejecución. Re-ejecutar `--commit` puede insertar nuevas plantillas funcionalmente duplicadas porque cada run genera UUIDs nuevos.
+**Fix:** detectar duplicado funcional antes de cada INSERT y marcar `SKIP_DUPLICATE_FUNCTIONAL` en el plan.
+
 ---
 
 ## Nits cosméticos (no requieren acción inmediata)

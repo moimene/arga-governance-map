@@ -103,8 +103,12 @@ export type UpdateEstadoPlantillaInput = {
   nuevo_estado?: EstadoPlantillaInput | string;
   motivo?: string;
   actor?: string;
+  aprobadaPor?: string;
+  fechaAprobacion?: string;
   /** Alias legacy informativo: si no se da `actor`, se usa para identificar quién aprueba. */
   aprobada_por?: string;
+  /** Alias legacy DB-style para callers que trabajan con columnas Cloud. */
+  fecha_aprobacion?: string;
   ackWarnings?: boolean;
 };
 
@@ -137,12 +141,21 @@ export function useUpdateEstadoPlantilla() {
       if (!estadoRaw) throw new Error("estado requerido (usar 'estado' o 'nuevo_estado')");
       const estado = asEstadoPlantilla(estadoRaw);
       const actor = input.actor ?? input.aprobada_por ?? "system";
+      const aprobadaPor = input.aprobadaPor ?? input.aprobada_por;
+      const fechaAprobacion =
+        input.fechaAprobacion ??
+        input.fecha_aprobacion ??
+        (estado === "APROBADA" && aprobadaPor
+          ? new Date().toISOString().slice(0, 10)
+          : undefined);
       const result = await transitionTemplateState(
         {
           plantillaId: input.id,
           to: estado,
           motivo: input.motivo ?? "transición manual",
           actor,
+          aprobadaPor,
+          fechaAprobacion,
           ackWarnings: input.ackWarnings,
         },
         { tenantId },

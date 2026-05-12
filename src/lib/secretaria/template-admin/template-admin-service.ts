@@ -34,6 +34,8 @@ export type TransitionInput = {
   motivo: string;
   actor: string;
   ackWarnings?: boolean;
+  aprobadaPor?: string;
+  fechaAprobacion?: string;
 };
 
 export type TransitionResult =
@@ -42,6 +44,7 @@ export type TransitionResult =
   | { ok: false; reason: "GATE_PRE_BLOCKING"; issues: GatePreIssue[] }
   | { ok: false; reason: "WARNINGS_NEED_ACK"; issues: GatePreIssue[] }
   | { ok: false; reason: "INVALID_TRANSITION"; from: string; to: string }
+  | { ok: false; reason: "MISSING_APPROVAL_DATA" }
   | { ok: false; reason: "UPDATE_FAILED"; error: unknown }
   | { ok: false; reason: "CHANGELOG_FAILED"; rolledBack: boolean };
 
@@ -79,12 +82,26 @@ export async function transitionTemplateState(
     return { ok: false, reason: "INVALID_TRANSITION", from, to: input.to };
   }
 
+  const nextAprobadaPor = input.aprobadaPor ?? (current.aprobada_por as string | null);
+  const nextFechaAprobacion =
+    input.fechaAprobacion ?? (current.fecha_aprobacion as string | null);
+
+  if (input.to === "APROBADA" && (!nextAprobadaPor || !nextFechaAprobacion)) {
+    return { ok: false, reason: "MISSING_APPROVAL_DATA" };
+  }
+
   // 2. Gate PRE solo si destino es ACTIVA
   if (input.to === "ACTIVA") {
     const others = await loadAllActiveTemplates(ctx.tenantId);
-    const result = validateTemplateForActivation(current as PlantillaCandidate, {
+    const candidate = {
+      ...(current as PlantillaCandidate),
+      aprobada_por: nextAprobadaPor,
+      fecha_aprobacion: nextFechaAprobacion,
+    };
+    const result = validateTemplateForActivation(candidate, {
       tenantId: ctx.tenantId,
       existingActiveTemplates: others,
+      targetEstado: "ACTIVA",
     });
     if (result.summary.blocking > 0) {
       return { ok: false, reason: "GATE_PRE_BLOCKING", issues: result.issues };
@@ -95,9 +112,15 @@ export async function transitionTemplateState(
   }
 
   // 3. Update estado
+  const update: Record<string, unknown> = { estado: input.to };
+  if (input.to === "APROBADA" || input.to === "ACTIVA") {
+    if (input.aprobadaPor) update.aprobada_por = input.aprobadaPor;
+    if (input.fechaAprobacion) update.fecha_aprobacion = input.fechaAprobacion;
+  }
+
   const { error: e1 } = await supabase
     .from("plantillas_protegidas")
-    .update({ estado: input.to })
+    .update(update)
     .eq("id", input.plantillaId)
     .eq("tenant_id", ctx.tenantId);
   if (e1) return { ok: false, reason: "UPDATE_FAILED", error: e1 };
@@ -120,7 +143,11 @@ export async function transitionTemplateState(
     // estado avanzado sin registro en changelog (auditabilidad).
     await supabase
       .from("plantillas_protegidas")
-      .update({ estado: from })
+      .update({
+        estado: from,
+        aprobada_por: current.aprobada_por,
+        fecha_aprobacion: current.fecha_aprobacion,
+      })
       .eq("id", input.plantillaId)
       .eq("tenant_id", ctx.tenantId);
     return { ok: false, reason: "CHANGELOG_FAILED", rolledBack: true };
