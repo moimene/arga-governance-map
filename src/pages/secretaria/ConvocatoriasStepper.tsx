@@ -825,9 +825,17 @@ export default function ConvocatoriasStepper() {
 
     return {
       denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
-      domicilio_social: selectedEntity?.registration_number
-        ? `${selectedEntity?.legal_name ?? ""}`.trim()
-        : "",
+      // Codex P2 PR #3: `registration_number` es el código del Registro
+      // Mercantil (en SA: CIF). NO es domicilio. Mi fix anterior mezclaba
+      // ambos campos rellenando `domicilio_social` con `legal_name` —
+      // semánticamente incorrecto. Ahora:
+      //   - `cif` = registration_number (alias canonical de plantilla)
+      //   - `domicilio_social` queda vacío hasta que se modele como
+      //     columna canonical en `entities` (no hay fuente real hoy).
+      //     El renderTemplate marca `domicilio_social` en
+      //     unresolvedVariables y el usuario lo ve en el callout amarillo.
+      cif: selectedEntity?.registration_number ?? "",
+      domicilio_social: "",
       tipo_social: tipoSocial,
       organo_nombre: selectedBody?.name ?? "",
       organo_tipo: organoTipo,
@@ -2649,21 +2657,41 @@ export default function ConvocatoriasStepper() {
                       del proyecto lo detectaría. Mostramos badge
                       bloqueante visual aunque la emisión siga siendo
                       posible (decisión consciente del secretario). */}
-                  {effectiveBorradorTemplate && effectiveBorradorTemplate.estado === "BORRADOR" && (
+                  {/* Codex P2 PR #3 round 4: REVISADA también merece badge.
+                      `selectProcessTemplate()` automático no la usaría
+                      (sólo ACTIVA/APROBADA son operacionales), pero el
+                      selector manual sí la exponía. La probe de cierre
+                      del proyecto exige `estado='ACTIVA' AND aprobada_por
+                      IS NOT NULL` — REVISADA está en limbo. */}
+                  {effectiveBorradorTemplate &&
+                    (effectiveBorradorTemplate.estado === "BORRADOR" ||
+                      effectiveBorradorTemplate.estado === "REVISADA") && (
                     <div
                       className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                       role="alert"
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
-                        ⚠ Plantilla en BORRADOR — no apta para producción
+                        ⚠ Plantilla en {effectiveBorradorTemplate.estado} — no apta para producción
                       </p>
                       <p className="mt-1 text-xs text-[var(--g-text-primary)]">
-                        Esta plantilla no ha pasado por el flujo de revisión legal
-                        (BORRADOR → REVISADA → APROBADA → ACTIVA). Su uso en una
-                        convocatoria emitida queda como evidencia <em>demo / operativa</em>,
-                        sin cobertura legal de plantilla aprobada. Aprobar en
-                        Gestor de Plantillas antes de uso en producción real.
+                        {effectiveBorradorTemplate.estado === "BORRADOR" ? (
+                          <>
+                            Esta plantilla no ha pasado por el flujo de revisión legal
+                            (BORRADOR → REVISADA → APROBADA → ACTIVA). Su uso en una
+                            convocatoria emitida queda como evidencia{" "}
+                            <em>demo / operativa</em>, sin cobertura legal de plantilla
+                            aprobada.
+                          </>
+                        ) : (
+                          <>
+                            Esta plantilla ha sido revisada por Legal pero todavía
+                            no ha sido aprobada ni promovida a ACTIVA. Su uso queda
+                            como evidencia <em>demo / operativa</em> hasta que
+                            complete el ciclo REVISADA → APROBADA → ACTIVA.
+                          </>
+                        )}{" "}
+                        Promover en Gestor de Plantillas antes de uso en producción real.
                       </p>
                     </div>
                   )}
