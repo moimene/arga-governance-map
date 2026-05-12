@@ -1,7 +1,11 @@
 import { useParams, Link } from "react-router-dom";
 import { ChevronLeft, Users, Building2 } from "lucide-react";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
-import { useCargosPersona, CARGO_LABELS } from "@/hooks/useCargos";
+import {
+  useCargosPersona,
+  CARGO_LABELS,
+  type CargoDetailRow,
+} from "@/hooks/useCargos";
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 
 export default function PersonaDetalle() {
@@ -9,6 +13,16 @@ export default function PersonaDetalle() {
   const { data: p, isLoading } = usePersonaCanonical(id);
   const { data: cargos } = useCargosPersona(id);
   const { data: holdings } = useHoldingsPersona(id);
+
+  // D4.1: split cargos by estado para mostrar vigentes y cesados en
+  // secciones independientes. El histórico se conserva (L14): el cese hace
+  // UPDATE estado='CESADO' + fecha_fin, nunca DELETE.
+  const cargosVigentes: CargoDetailRow[] = (cargos ?? []).filter(
+    (c) => c.estado === "VIGENTE",
+  );
+  const cargosHistorico: CargoDetailRow[] = (cargos ?? []).filter(
+    (c) => c.estado === "CESADO",
+  );
 
   if (isLoading) {
     return (
@@ -74,13 +88,82 @@ export default function PersonaDetalle() {
         </dl>
       </section>
 
+      {/* D4.1: Cargos vigentes — estado === 'VIGENTE' */}
       <section
         className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
         <div className="border-b border-[var(--g-border-subtle)] px-6 py-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
-            Cargos y condiciones
+            Cargos vigentes
+          </h2>
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-[var(--g-surface-subtle)]">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Cargo</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Sociedad</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Órgano</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Desde</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Estado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--g-border-subtle)]">
+            {cargosVigentes.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                  Sin cargos vigentes.
+                </td>
+              </tr>
+            ) : (
+              cargosVigentes.map((c) => {
+                const sociedadNombre = c.entity?.common_name ?? c.entity?.legal_name ?? "—";
+                return (
+                  <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
+                    <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">
+                      {CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {c.entity?.id ? (
+                        <Link
+                          to={`/secretaria/sociedades/${c.entity.id}`}
+                          className="text-[var(--g-brand-3308)] hover:underline"
+                        >
+                          {sociedadNombre}
+                        </Link>
+                      ) : (
+                        <span className="text-[var(--g-text-secondary)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">
+                      {c.body?.name ?? "—"}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.fecha_inicio}</td>
+                    <td className="px-6 py-3 text-sm">
+                      <span
+                        className="inline-flex items-center bg-[var(--status-success)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        Vigente
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      {/* D4.1: Histórico — estado === 'CESADO'. L14: el cese conserva el
+          registro, nunca hace DELETE. */}
+      <section
+        className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="border-b border-[var(--g-border-subtle)] px-6 py-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+            Histórico (cesados)
           </h2>
         </div>
         <table className="w-full">
@@ -95,14 +178,14 @@ export default function PersonaDetalle() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
-            {!cargos || cargos.length === 0 ? (
+            {cargosHistorico.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
-                  Sin cargos registrados.
+                  Sin cargos cesados todavía.
                 </td>
               </tr>
             ) : (
-              cargos.map((c) => {
+              cargosHistorico.map((c) => {
                 const sociedadNombre = c.entity?.common_name ?? c.entity?.legal_name ?? "—";
                 return (
                   <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
@@ -130,14 +213,10 @@ export default function PersonaDetalle() {
                     </td>
                     <td className="px-6 py-3 text-sm">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium ${
-                          c.estado === "VIGENTE"
-                            ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                            : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                        }`}
+                        className="inline-flex items-center bg-[var(--g-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
-                        {c.estado}
+                        Cesado
                       </span>
                     </td>
                   </tr>
