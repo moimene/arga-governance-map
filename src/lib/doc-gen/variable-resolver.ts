@@ -103,7 +103,73 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
 
   if (error || !data) return {};
 
-  return {
+  // Cargar entity_settings de la sociedad (overrides explícitos)
+  const { data: settings } = await supabase
+    .from("entity_settings")
+    .select("key, value")
+    .eq("entity_id", entityId)
+    .eq("tenant_id", tenantId);
+
+  // Codex P2 round 15: dual representation para keys booleanas.
+  // - `es_cotizada` / `es_unipersonal` → string "SÍ"/"NO" (v2 spec canonical,
+  //   usado en `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}`)
+  // - `is_cotizada` / `is_unipersonal` → boolean alias (legacy compat para
+  //   `{{#if es_cotizada}}` migrated → `{{#if is_cotizada}}`)
+  //
+  // Decisión: la canonical key sigue el spec v2 (string). El alias `is_*`
+  // permite a plantillas legacy migrar a forma boolean correcta sin romper
+  // el contrato spec.
+  const YES_NO_KEYS = new Set(["es_cotizada", "es_unipersonal"]);
+  const normalizeYesNoIfApplicable = (key: string, value: unknown): unknown => {
+    if (!YES_NO_KEYS.has(key)) return value;
+    if (typeof value === "boolean") return value ? "SÍ" : "NO";
+    if (typeof value === "string") {
+      const norm = value.trim().toUpperCase();
+      if (norm === "SÍ" || norm === "SI" || norm === "TRUE" || norm === "YES") return "SÍ";
+      if (norm === "NO" || norm === "FALSE") return "NO";
+    }
+    return value;
+  };
+  const yesNoToBool = (value: unknown): boolean | undefined => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const norm = value.trim().toUpperCase();
+      if (norm === "SÍ" || norm === "SI" || norm === "TRUE" || norm === "YES") return true;
+      if (norm === "NO" || norm === "FALSE") return false;
+    }
+    return undefined;
+  };
+
+  const settingsByKey: Record<string, unknown> = {};
+  for (const row of (settings ?? []) as Array<{ key: string; value: unknown }>) {
+    // value es JSONB — convertirlo a tipo nativo + normalizar canonical SÍ/NO
+    settingsByKey[row.key] = normalizeYesNoIfApplicable(row.key, row.value);
+  }
+
+  // Cargar catalog defaults para claves no overrideadas
+  const { data: catalog } = await supabase
+    .from("entity_settings_catalog")
+    .select("key, default_value")
+    .eq("estado_catalog", "ACTIVA");
+
+  // Campos derivados de la fila entities (legacy — fuente de verdad cuando existe valor real).
+  // IMPORTANTE: estos valores deben ganar sobre catalog defaults para claves que solapan
+  // (ej. tipo_social existe como columna real en entities Y como catalog key con default 'SA').
+  // Si tipo_social = 'SL' en BD, NO debe ser sobrescrito por el default 'SA' del catalog.
+  // Codex P2 round 15: derivar "SÍ"/"NO" string desde la columna entities
+  // (canonical v2 spec). El alias boolean `is_*` se añade abajo en el spread
+  // final para plantillas legacy que necesitan Handlebars `{{#if}}` directo.
+  const yesNoFromColumn = (val: unknown): string | undefined => {
+    if (val === true) return "SÍ";
+    if (val === false) return "NO";
+    return undefined;
+  };
+  const esCotizadaFromEntity = yesNoFromColumn((data as { es_cotizada?: unknown }).es_cotizada);
+  const esUnipersonalFromEntity = yesNoFromColumn(
+    (data as { es_unipersonal?: unknown }).es_unipersonal,
+  );
+
+  const legacyFieldsRaw: Record<string, unknown> = {
     name: data.common_name || data.legal_name,
     tax_id: data.tax_id || data.registration_number,
     registration_number: data.registration_number,
@@ -121,9 +187,117 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     hoja: data.registry_sheet || "—",
     inscripcion: data.registry_inscription || "—",
     lugar: data.city || data.address || "—",
-    tipo_social: data.tipo_social || data.legal_form, // SA, SL
+    tipo_social: data.tipo_social || data.legal_form,
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
+    // Codex P2 round 12: derivar es_cotizada / es_unipersonal de la fila
+    // entities (columnas booleanas reales). ARGA Seguros está seeded como
+    // entities.es_cotizada=true; sin esto, el resolver caía al catalog default
+    // 'NO' → plantillas con {{ENTIDAD.es_cotizada}} o condicionales MAR/cotizada
+    // renderizaban la rama no-listed. Solo se exponen cuando la columna tiene
+    // valor (true/false); si es NULL, undefined → catalog default gana.
+    ...(esCotizadaFromEntity !== undefined ? { es_cotizada: esCotizadaFromEntity } : {}),
+    ...(esUnipersonalFromEntity !== undefined ? { es_unipersonal: esUnipersonalFromEntity } : {}),
   };
+
+  // Codex P2 round 8: dos conjuntos distintos.
+  //
+  // 1. `legacyKeysWithRealValue` — keys con dato real (≠ null/undefined/"—").
+  //    Solo estas excluyen al catalog default (BD real gana sobre catalog).
+  //    Si la BD tiene `tipo_social='SL'`, el catalog default 'SA' no debe pisar.
+  //
+  // 2. `legacyKeysToExposeAsFallback` — keys con cualquier valor (incluyendo "—").
+  //    Estas se exponen al spread final para que plantillas legacy que
+  //    referencian {{cif}}, {{domicilio_social}}, {{tomo}}, etc. encuentren al
+  //    menos el placeholder "—" en entities con datos sparse (antes el resolver
+  //    siempre devolvía el "—"; filtrarlo rompía plantillas legacy).
+  const legacyKeysWithRealValue = new Set(
+    Object.entries(legacyFieldsRaw)
+      .filter(([, v]) => v !== undefined && v !== null && v !== "—")
+      .map(([k]) => k),
+  );
+  const legacyKeysToExposeAsFallback = new Set(
+    Object.entries(legacyFieldsRaw)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k]) => k),
+  );
+
+  // Codex P2 round 13: precedencia v2 spec canónica.
+  //   1. catalog defaults (más bajo)
+  //   2. entities columna real (legacy fields con valor real)
+  //   3. entity_settings (overrides explícitos del admin — MÁS ALTO)
+  //
+  // Mi fix round 5 había puesto legacy fields encima de entity_settings, pero
+  // eso violaba la spec v2: si un admin define
+  // `entity_settings.es_cotizada="NO"`, su override debe ganar incluso si
+  // `entities.es_cotizada=true`. La columna `entities` es legacy/canónica, el
+  // settings explícito es la configuración deseada de la sociedad.
+  //
+  // Catalog defaults se excluyen para keys donde HAY un valor explícito
+  // (settings o legacy con valor real) — el catalog es fallback puro.
+  const catalogDefaults: Record<string, unknown> = {};
+  for (const row of (catalog ?? []) as Array<{ key: string; default_value: unknown }>) {
+    if (
+      row.default_value !== null &&
+      !(row.key in settingsByKey) &&
+      !legacyKeysWithRealValue.has(row.key)
+    ) {
+      // Codex P2 round 15: normalizar a SÍ/NO canonical en catalog defaults
+      catalogDefaults[row.key] = normalizeYesNoIfApplicable(row.key, row.default_value);
+    }
+  }
+
+  // Codex P2 round 15: compute aliases boolean (`is_cotizada`, `is_unipersonal`)
+  // derivados del valor canonical resuelto. Esto cierra la trinidad de
+  // representaciones para Handlebars:
+  //   - `{{es_cotizada}}` → "SÍ" o "NO" (v2 canonical, eq comparable)
+  //   - `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}` → matchea correctamente
+  //   - `{{#if is_cotizada}}` → true cuando "SÍ" (legacy {{#if}} pattern)
+  const finalValues: Record<string, unknown> = {
+    // Capa 1: catalog defaults (fallback final si nada más responde)
+    ...catalogDefaults,
+    // Capa 2: entities columna real — gana sobre catalog, NO gana sobre settings
+    ...legacyOverridesForRealColumns(legacyFieldsRaw, legacyKeysToExposeAsFallback, legacyKeysWithRealValue),
+    // Capa 3: entity_settings (admin overrides) — gana sobre todo
+    ...settingsByKey,
+  };
+  for (const yesNoKey of YES_NO_KEYS) {
+    const aliasKey = yesNoKey.replace(/^es_/, "is_");
+    if (aliasKey !== yesNoKey) {
+      const bool = yesNoToBool(finalValues[yesNoKey]);
+      if (bool !== undefined) finalValues[aliasKey] = bool;
+    }
+  }
+  return finalValues;
+}
+
+/**
+ * Devuelve las legacy keys que deben exponerse al consumidor final.
+ *
+ * Ordenamiento dentro del spread: las keys con valor real se aplican LAST
+ * para que ganen sobre catalog/settings; las keys con "—" placeholder se
+ * exponen también pero como capa más baja del propio spread (rellenan huecos
+ * cuando ni catalog ni settings ni legacy real las cubren).
+ *
+ * Codex P2 round 8: separar "BD tiene info útil" de "BD tiene placeholder
+ * al menos" para no romper plantillas legacy que renderizan literal "—".
+ */
+function legacyOverridesForRealColumns(
+  legacyFieldsRaw: Record<string, unknown>,
+  legacyKeysToExposeAsFallback: Set<string>,
+  legacyKeysWithRealValue: Set<string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  // Primero las keys con placeholder ("—") como capa baja
+  for (const key of legacyKeysToExposeAsFallback) {
+    if (!legacyKeysWithRealValue.has(key)) {
+      out[key] = legacyFieldsRaw[key];
+    }
+  }
+  // Después las keys con valor real para que ganen
+  for (const key of legacyKeysWithRealValue) {
+    out[key] = legacyFieldsRaw[key];
+  }
+  return out;
 }
 
 // ── Body (organ) resolver ────────────────────────────────────────────────────
@@ -644,8 +818,47 @@ export async function resolveVariables(
       }
       if (!found) {
         unresolved.push(v.variable);
+        // R4: log warning for observability without throwing — render still produces ""
+        // for missing keys, so migration progressiva is safe (capa1 puede referenciar
+        // claves antes de que la entidad/catalog las tengan pobladas).
+        console.warn("[variable-resolver] unresolved key", {
+          variable: v.variable,
+          fuente: v.fuente,
+          normalizedFuente,
+          agreementId: context.agreementId,
+          entityId: context.entityId,
+        });
       }
     }
+  }
+
+  // Nested namespace objects — soporte dotted v2 (`{{ENTIDAD.cargo_secretario_label}}`,
+  // `{{#if (eq ENTIDAD.es_cotizada "SÍ")}}`). Handlebars navega objetos anidados
+  // para placeholders punteados; al exponer cada source map completo bajo su clave
+  // categórica, las plantillas pueden usar tanto la forma legacy plana como la nueva
+  // forma dotted sin romper compatibilidad. Las claves "ENTIDAD", "ORGANO", etc. son
+  // todas mayúsculas para evitar colisiones con variables planas de capa2 (que son
+  // siempre minúsculas o snake_case).
+  for (const [namespace, sourceVars] of Object.entries(sourceMap)) {
+    if (Object.keys(sourceVars).length === 0) continue;
+    // Sólo añadir el namespace si no colisiona con una key plana ya resuelta.
+    // (No esperamos colisiones — los namespaces son MAYÚSCULAS y las keys planas
+    // son snake_case — pero el guard previene corromper datos si una plantilla
+    // futura usara una key "ENTIDAD" plana.)
+    if (!(namespace in values)) {
+      values[namespace] = sourceVars;
+    }
+  }
+
+  // Codex P2 round 16: alias `entities` lowercase para plantillas legacy/audited
+  // que usan `{{entities.name}}` o `{{#if (eq entities.es_cotizada "SÍ")}}`.
+  // El audit script (`scripts/audit-entity-settings-keys.ts`) acepta
+  // `entities.*` como legacy syntax válido — sin este alias, esas plantillas
+  // pasan audit pero renderizan blanks porque Handlebars no encontraba el
+  // namespace. Solo se añade el alias para ENTIDAD (no para ORGANO/REUNION/...)
+  // porque solo ese tiene una contraparte lowercase en el audit.
+  if (sourceMap.ENTIDAD && Object.keys(sourceMap.ENTIDAD).length > 0 && !("entities" in values)) {
+    values.entities = sourceMap.ENTIDAD;
   }
 
   return { values, resolved, unresolved, errors };

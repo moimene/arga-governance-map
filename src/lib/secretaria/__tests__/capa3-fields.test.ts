@@ -122,4 +122,80 @@ describe("capa3-fields", () => {
       legacyKeyMap: {},
     });
   });
+
+  describe("Codex P2 round 5: preserva default + opciones", () => {
+    it("preserva field.default cuando viene en el row", () => {
+      const fields = normalizeCapa3Fields([
+        { campo: "modalidad", obligatoriedad: "OBLIGATORIO", descripcion: "Modalidad", default: "PRESENCIAL" },
+      ]);
+      expect(fields).toHaveLength(1);
+      expect(fields[0].default).toBe("PRESENCIAL");
+    });
+
+    it("preserva field.opciones cuando es array de strings", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "modalidad",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad",
+          opciones: ["PRESENCIAL", "TELEMATICA", "MIXTA"],
+        },
+      ]);
+      expect(fields[0].opciones).toEqual(["PRESENCIAL", "TELEMATICA", "MIXTA"]);
+    });
+
+    it("acepta opciones numéricas convertidas a string", () => {
+      const fields = normalizeCapa3Fields([
+        { campo: "numero", obligatoriedad: "OPCIONAL", descripcion: "Número", opciones: [1, 2, 3] },
+      ]);
+      expect(fields[0].opciones).toEqual(["1", "2", "3"]);
+    });
+
+    it("rechaza opciones que no son strings ni números", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "x",
+          obligatoriedad: "OPCIONAL",
+          descripcion: "x",
+          opciones: ["valido", { foo: "bar" }, null, true, "tambien_valido"],
+        },
+      ]);
+      expect(fields[0].opciones).toEqual(["valido", "tambien_valido"]);
+    });
+
+    it("descarta default si no está incluido en opciones (defensa)", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "modalidad",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad",
+          default: "RAREZA",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ]);
+      expect(fields[0].default).toBeUndefined();
+      expect(fields[0].opciones).toEqual(["PRESENCIAL", "TELEMATICA"]);
+    });
+
+    it("preserva default + opciones consistentes", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "modalidad",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad",
+          default: "PRESENCIAL",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ]);
+      expect(fields[0].default).toBe("PRESENCIAL");
+      expect(fields[0].opciones).toEqual(["PRESENCIAL", "TELEMATICA"]);
+    });
+
+    it("opciones vacío se descarta (sin renderizar select vacío)", () => {
+      const fields = normalizeCapa3Fields([
+        { campo: "x", obligatoriedad: "OPCIONAL", descripcion: "x", opciones: [] },
+      ]);
+      expect(fields[0].opciones).toBeUndefined();
+    });
+  });
 });

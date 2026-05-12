@@ -28,4 +28,69 @@ describe("validateCapa3", () => {
       canal_telematico: "Canal telematico: campo obligatorio.",
     });
   });
+
+  describe("Codex P2 round 5: valida lista cerrada de opciones", () => {
+    it("acepta valor dentro de opciones", () => {
+      const fields = [
+        {
+          campo: "modalidad",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ];
+      expect(validateCapa3(fields, { modalidad: "PRESENCIAL" })).toEqual({});
+    });
+
+    it("rechaza valor fuera de opciones", () => {
+      const fields = [
+        {
+          campo: "modalidad",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ];
+      expect(validateCapa3(fields, { modalidad: "MIXTA" })).toEqual({
+        modalidad:
+          "Modalidad: valor fuera de las opciones permitidas (PRESENCIAL, TELEMATICA).",
+      });
+    });
+
+    it("campo opcional con valor fuera de opciones también se rechaza", () => {
+      const fields = [
+        {
+          campo: "modalidad",
+          obligatoriedad: "OPCIONAL",
+          descripcion: "Modalidad",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ];
+      expect(validateCapa3(fields, { modalidad: "OTRA" })).toHaveProperty("modalidad");
+    });
+
+    it("campo opcional sin valor no dispara validación de opciones", () => {
+      const fields = [
+        {
+          campo: "modalidad",
+          obligatoriedad: "OPCIONAL",
+          descripcion: "Modalidad",
+          opciones: ["PRESENCIAL", "TELEMATICA"],
+        },
+      ];
+      expect(validateCapa3(fields, { modalidad: "" })).toEqual({});
+    });
+
+    it("opciones vacío no aplica validación de lista cerrada", () => {
+      const fields = [
+        {
+          campo: "modalidad",
+          obligatoriedad: "OPCIONAL",
+          descripcion: "Modalidad",
+          opciones: [],
+        },
+      ];
+      expect(validateCapa3(fields, { modalidad: "CUALQUIERA" })).toEqual({});
+    });
+  });
 });

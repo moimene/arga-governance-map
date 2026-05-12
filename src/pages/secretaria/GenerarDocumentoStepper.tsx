@@ -31,9 +31,11 @@ import { useAgreement, type AgreementFull } from "@/hooks/useAgreementCompliance
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { usePlantillaWithOverrides } from "@/hooks/usePlantillaWithOverrides";
 import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
+import { BloquesSectorialesPanel } from "@/components/secretaria/BloquesSectorialesPanel";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
@@ -91,7 +93,7 @@ function valueAsText(value: unknown): string {
 }
 
 function buildDefaultCapa3Values(
-  fields: Array<{ campo: string }>,
+  fields: Array<{ campo: string; default?: string; opciones?: string[] }>,
   agreement: AgreementFull,
   resolvedVars: Record<string, unknown>,
 ): Record<string, string> {
@@ -117,9 +119,26 @@ function buildDefaultCapa3Values(
     ].join("\n");
 
   const defaults: Record<string, string> = {};
+  // Keys cuyo default proviene de override explícito (incluyendo "") — el
+  // filtro final preserva éstas tal cual; las de heurística sí se filtran.
+  const overrideExplicitKeys = new Set<string>();
   for (const field of fields) {
     const key = field.campo;
     const normalizedKey = key.toLowerCase();
+
+    // Codex P2 round 5+16: si la capa3 (incluyendo override de entidad)
+    // declara un `default`, gana sobre las heurísticas por nombre.
+    // Round 16: empty string "" también cuenta como override válido — el SQL
+    // contract distingue NULL (sin override) de "" (override explícito para
+    // limpiar el campo). Solo si field.default es undefined caemos a
+    // heurísticas. Esto permite a un admin override "vaciar" el campo
+    // sin que las heurísticas lo repueblen con texto canonical antiguo.
+    if (typeof field.default === "string") {
+      defaults[key] = field.default;
+      overrideExplicitKeys.add(key);
+      continue;
+    }
+
     if (normalizedKey === "tabla_respuestas" || normalizedKey.includes("respuestas")) {
       defaults[key] = responseSummary;
     } else if (
@@ -136,7 +155,11 @@ function buildDefaultCapa3Values(
     }
   }
 
-  return Object.fromEntries(Object.entries(defaults).filter(([, value]) => value.trim().length > 0));
+  return Object.fromEntries(
+    Object.entries(defaults).filter(
+      ([k, value]) => overrideExplicitKeys.has(k) || value.trim().length > 0,
+    ),
+  );
 }
 
 function inferDocumentTypeForComposer(
@@ -222,6 +245,50 @@ export default function GenerarDocumentoStepper() {
   const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
   const agreementEntityName = agreement?.entities?.common_name ?? undefined;
+
+  // Load entity-scoped capa3 overrides for the selected plantilla. When
+  // entity_id is unavailable (loading or missing) the hook degrades to the
+  // canonical capa3 — no breakage. See src/hooks/usePlantillaWithOverrides.ts.
+  const {
+    capa3_editables: overriddenCapa3Editables,
+    warnCompatibility: capa3OverridesWarnCompat,
+    isLoading: overridesLoading,
+    hasLoadedOverrides,
+  } = usePlantillaWithOverrides(
+    selectedPlantilla?.id,
+    agreement?.entity_id ?? undefined,
+  );
+
+  // Effective plantilla = canonical plantilla with capa3_editables replaced by
+  // the entity-scoped merged version. All other fields (capa1_inmutable,
+  // capa2_variables, version, …) are preserved verbatim. We never mutate the
+  // canonical object.
+  //
+  // Codex P2: During the overrides fetch, `overriddenCapa3Editables` falls back
+  // to EMPTY_CAPA3 (empty array). If we blindly replaced capa3_editables with
+  // that, Step 2 would render with zero required fields and the user could
+  // generate a document without filling them. Preserve the canonical
+  // capa3_editables until the overrides query has actually resolved.
+  const effectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (!selectedPlantilla) return null;
+    if (overridesLoading || !hasLoadedOverrides) {
+      return selectedPlantilla;
+    }
+    return {
+      ...selectedPlantilla,
+      capa3_editables: overriddenCapa3Editables as PlantillaProtegidaRow["capa3_editables"],
+    };
+  }, [selectedPlantilla, overriddenCapa3Editables, overridesLoading, hasLoadedOverrides]);
+
+  useEffect(() => {
+    if (capa3OverridesWarnCompat) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[GenerarDocumentoStepper] Hay overrides Capa 3 con compatible_with_canonical_version distinto a la plantilla actual; se han ignorado.",
+      );
+    }
+  }, [capa3OverridesWarnCompat]);
+
   const missingRequiredCapa2 = useMemo(() => {
     if (!selectedPlantilla) return [];
     return (selectedPlantilla.capa2_variables ?? [])
@@ -241,8 +308,8 @@ export default function GenerarDocumentoStepper() {
     [compatiblePlantillas, requestedPlantillaId],
   );
   const normalizedCapa3Fields = useMemo(
-    () => normalizeCapa3Fields(selectedPlantilla?.capa3_editables),
-    [selectedPlantilla?.capa3_editables],
+    () => normalizeCapa3Fields(effectivePlantilla?.capa3_editables),
+    [effectivePlantilla?.capa3_editables],
   );
   const normalizedCapa3Values = useMemo(
     () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values).values,
@@ -255,6 +322,18 @@ export default function GenerarDocumentoStepper() {
 
   useEffect(() => {
     if (!agreement || !selectedPlantilla) return;
+    // Codex P2 round 9: bloquear la hidratación de defaults hasta que los
+    // overrides estén cargados. Antes: el primer render con
+    // hasLoadedOverrides=false usaba el canonical `effectivePlantilla` →
+    // normalizedCapa3Fields traía SOLO los defaults canónicos/heurísticos →
+    // se populaba capa3Values → cuando los overrides arribaban, el effect
+    // skipeaba (next[key]?.trim() truthy) → entity-specific
+    // default_value_override nunca llegaba al formulario ni al documento.
+    //
+    // Solución: si entityId está disponible pero los overrides no han cargado
+    // todavía, esperar. Si entityId NO está disponible (agreement aún se
+    // resuelve, etc.), permitimos defaults (no hay overrides posibles).
+    if (agreement.entity_id && !hasLoadedOverrides) return;
     const defaults = buildDefaultCapa3Values(normalizedCapa3Fields, agreement, resolvedVars);
     if (Object.keys(defaults).length === 0) return;
     setCapa3Values((current) => {
@@ -267,7 +346,7 @@ export default function GenerarDocumentoStepper() {
       }
       return changed ? next : current;
     });
-  }, [agreement, normalizedCapa3Fields, resolvedVars, selectedPlantilla]);
+  }, [agreement, normalizedCapa3Fields, resolvedVars, selectedPlantilla, hasLoadedOverrides]);
 
   const buildComposerRequest = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
@@ -392,15 +471,15 @@ export default function GenerarDocumentoStepper() {
   // ── Step 4: Render preview ───────────────────────────────────────────────
 
   const handleRenderPreview = useCallback(async () => {
-    if (!selectedPlantilla?.capa1_inmutable) {
+    if (!selectedPlantilla?.capa1_inmutable || !effectivePlantilla) {
       setRenderError("La plantilla no tiene contenido capa1.");
       return;
     }
 
     try {
-      const request = await buildComposerRequest(selectedPlantilla);
+      const request = await buildComposerRequest(effectivePlantilla);
       const prepared = await prepareDocumentComposition(request, normalizedCapa3Values, {
-        plantilla: selectedPlantilla,
+        plantilla: effectivePlantilla,
         baseVariables: resolvedVars,
         normativeSnapshot,
       });
@@ -435,7 +514,7 @@ export default function GenerarDocumentoStepper() {
     }
 
     setStep(3);
-  }, [selectedPlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
+  }, [selectedPlantilla, effectivePlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
 
   const handleDraftCapa3 = useCallback(async () => {
     if (!selectedPlantilla) return;
@@ -584,12 +663,12 @@ export default function GenerarDocumentoStepper() {
   // ── Step 5: Configure draft and generate DOCX ───────────────────────────
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedPlantilla || !preparedDraft) return;
+    if (!selectedPlantilla || !effectivePlantilla || !preparedDraft) return;
 
     setIsGenerating(true);
     try {
       const result = await finalizeEditableDocumentDraft(preparedDraft, editableDraftText, {
-        plantilla: selectedPlantilla,
+        plantilla: effectivePlantilla,
         baseVariables: resolvedVars,
         archiveDraft: false,
         normativeSnapshot,
@@ -621,7 +700,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, normativeSnapshot]);
+  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, effectivePlantilla, normativeSnapshot]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {
@@ -945,6 +1024,25 @@ export default function GenerarDocumentoStepper() {
               Complete los campos que requiere esta plantilla. Los campos obligatorios deben rellenarse antes de generar.
             </p>
 
+            {/* Reviewer adversarial CRÍTICO #2: warnCompatibility visible al usuario.
+                Si la entidad tiene overrides obsoletos por version mismatch, el secretario
+                debe verlo antes de firmar — no solo en console.warn. */}
+            {capa3OverridesWarnCompat ? (
+              <div
+                role="alert"
+                className="border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <p className="font-medium">Overrides Capa 3 incompatibles</p>
+                <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                  Esta entidad tiene overrides para una versión anterior de la plantilla. Se han
+                  ignorado los overrides incompatibles y se usan los valores canónicos. Para
+                  reactivarlos, actualice <code className="font-mono text-xs">compatible_with_canonical_version</code> a{" "}
+                  <code className="font-mono text-xs">{selectedPlantilla.version}</code>.
+                </p>
+              </div>
+            ) : null}
+
             {normalizedCapa3Fields.length > 0 ? (
               <div
                 className="flex flex-col gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -991,6 +1089,35 @@ export default function GenerarDocumentoStepper() {
                 setDraftCloudId(null);
               }}
             />
+
+            {/* Codex P2 round 8: cablear BloquesSectorialesPanel.
+                El panel sugiere bloques sectoriales aprobados (MAR cotizadas,
+                BCE banca, etc.) que se appendean al campo_libre_sectorial.
+                Cada inserción crea un row WORM en bloque_insertions.
+                Solo se monta si la plantilla declara `campo_libre_sectorial`
+                en su capa3 (graceful degradation §5.3) y el agreement tiene
+                entity_id resuelto. */}
+            {agreement?.entity_id && agreement?.id && normalizedCapa3Fields.some((f) => f.campo === "campo_libre_sectorial") ? (
+              <BloquesSectorialesPanel
+                entityId={agreement.entity_id}
+                agreementId={agreement.id}
+                materia={agreement.agreement_kind ?? ""}
+                capa3Editables={normalizedCapa3Fields as unknown as Array<{ campo: string; [k: string]: unknown }>}
+                campoLibreValue={normalizedCapa3Values["campo_libre_sectorial"] ?? ""}
+                onCampoLibreChange={(newValue) => {
+                  setCapa3Values((current) => ({ ...current, campo_libre_sectorial: newValue }));
+                  setCapa3Errors({});
+                  setPreparedDraft(null);
+                  setEditableDraftText("");
+                  setCompositionResult(null);
+                  setDocxBuffer(null);
+                  setContentHash("");
+                  setDraftPersistenceStatus("idle");
+                  setDraftPersistenceMessage(null);
+                  setDraftCloudId(null);
+                }}
+              />
+            ) : null}
 
             {Object.keys(capa3Errors).length > 0 && (
               <div
