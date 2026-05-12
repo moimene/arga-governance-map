@@ -156,21 +156,40 @@ export function buildInitialCapitalStructure(draft: SociedadOnboardingDraft) {
   };
 }
 
+// Canonical key para dedup de socios: prefiere tax_id normalizado (caso real
+// del bug: PersonaPicker crea row1 con holder.key="new-1" y row2 con
+// holder.key="new-2" para la misma persona en 2 clases distintas). Si tax_id
+// esta vacio (CT-007/CT-008 ya bloquean en validation, pero el builder debe
+// ser robusto), cae a holder.key. Misma fn se usa para sociosByKey y para
+// holder_key del holding para que ambos sigan apuntando a la misma entrada
+// del payload (review Codex P2).
+function canonicalHolderKey(holder: { key?: string; tax_id?: string }): string {
+  const tax = holder.tax_id?.trim();
+  if (tax) return `tax:${tax.toUpperCase()}`;
+  return `key:${holder.key ?? ""}`;
+}
+
 export function buildInitialCapTable(draft: SociedadOnboardingDraft) {
   const sociosByKey = new Map<string, Record<string, unknown>>();
   const capital_holdings = draft.capTable.map((entry) => {
     if (!entry.is_treasury && entry.holder) {
-      sociosByKey.set(entry.holder.key || entry.holder.tax_id, {
-        key: entry.holder.key || entry.holder.tax_id,
-        tax_id: entry.holder.tax_id,
-        full_name: entry.holder.full_name,
-        denomination: entry.holder.denomination,
-        person_type: entry.holder.person_type,
-        email: entry.holder.email,
-      });
+      const canon = canonicalHolderKey(entry.holder);
+      // Solo set si no existe ya: prevenir overwrite de info parcial de la
+      // 2a row sobre la 1a (full_name, denomination, etc. pueden diferir
+      // entre rows del mismo socio si la UI no los sincroniza).
+      if (!sociosByKey.has(canon)) {
+        sociosByKey.set(canon, {
+          key: canon,
+          tax_id: entry.holder.tax_id,
+          full_name: entry.holder.full_name,
+          denomination: entry.holder.denomination,
+          person_type: entry.holder.person_type,
+          email: entry.holder.email,
+        });
+      }
     }
     return {
-      holder_key: entry.is_treasury ? "__TREASURY__" : (entry.holder?.key || entry.holder?.tax_id),
+      holder_key: entry.is_treasury ? "__TREASURY__" : (entry.holder ? canonicalHolderKey(entry.holder) : undefined),
       holder_tax_id: entry.holder?.tax_id,
       share_class_code: entry.share_class_code,
       numero_titulos: Number(entry.numero_titulos || 0),
