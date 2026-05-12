@@ -39,6 +39,21 @@
  *   - Idempotent: re-running the script on an already-archived
  *     duplicate is a no-op (detected by tax_id prefix ARCHIVED-).
  *
+ * TYPE A vs TYPE B (P1 Codex iter-4 fix):
+ *   `detectDuplicates()` returns two kinds of pairs:
+ *     - Type A — both rows share the SAME real tax_id (NIF/CIF/etc.).
+ *                Certain duplicate. SAFE for `--apply --auto-detect`.
+ *     - Type B — one canonical row + one PENDIENTE-* placeholder whose
+ *                `full_name` matches after normalisation. HEURISTIC —
+ *                a placeholder may legitimately represent a different
+ *                legal subject that happens to share a name fragment
+ *                (e.g. "Cartera ARGA Madrid" placeholder vs canonical
+ *                "Cartera ARGA SLU"). Requires HUMAN confirmation.
+ *
+ *   `--auto-detect` applies Type A only. Type B pairs are printed with
+ *   a warning and skipped; the operator must opt-in per pair via
+ *   `--pair=<canonical_id>:<duplicate_id>`.
+ *
  * IMPORTANT — IDEMPOTENCY, NOT ATOMICITY:
  *   Each migrateFk runs as an independent PostgREST transaction.
  *   supabase-js cannot wrap multiple statements in a single tx from the
@@ -475,6 +490,13 @@ interface DuplicatePair {
   canonical: PersonRow;
   duplicate: PersonRow;
   reason: string;
+  /**
+   * "A" = same real tax_id (certain duplicate, safe for --auto-detect).
+   * "B" = canonical + PENDIENTE-* name match (heuristic, requires
+   *       --pair=<canonical>:<duplicate> opt-in). See SAFETY block at
+   *       the top of the file.
+   */
+  type: "A" | "B";
 }
 
 interface PreflightResult {
@@ -527,6 +549,7 @@ async function detectDuplicates(supabase: SupabaseClient): Promise<DuplicatePair
         canonical,
         duplicate: dup,
         reason: `Type A (real tax_id ${taxId} shared between ${group.length} rows)`,
+        type: "A",
       });
     }
   }
@@ -554,6 +577,7 @@ async function detectDuplicates(supabase: SupabaseClient): Promise<DuplicatePair
           canonical: canon,
           duplicate: pend,
           reason: `Type B (name match — HEURISTIC, human confirmation required): "${canon.full_name}" ↔ "${pend.full_name}"`,
+          type: "B",
         });
       }
     }
@@ -781,6 +805,11 @@ async function preflightCheck(
 // --------------------------------------------------------------------
 function renderPair(pair: DuplicatePair, pf: PreflightResult) {
   const lines: string[] = [];
+  const typeLabel =
+    pair.type === "A"
+      ? "Type A (certain — same real tax_id)"
+      : "Type B (heuristic — requires --pair to apply)";
+  lines.push(`  [${typeLabel}]`);
   lines.push(`  Canonical: ${pair.canonical.full_name} [tax=${pair.canonical.tax_id ?? "NULL"}] id=${pair.canonical.id}`);
   lines.push(`  Duplicate: ${pair.duplicate.full_name} [tax=${pair.duplicate.tax_id ?? "NULL"}] id=${pair.duplicate.id}`);
   lines.push(`  Reason   : ${pair.reason}`);
@@ -990,17 +1019,45 @@ async function main() {
   if (dryRun) {
     const okCount = preflightResults.filter((r) => r.pf.ok).length;
     const failCount = preflightResults.length - okCount;
+    const typeAOk = preflightResults.filter((r) => r.pf.ok && r.pair.type === "A").length;
+    const typeBOk = preflightResults.filter((r) => r.pf.ok && r.pair.type === "B").length;
     console.log("Summary:");
     console.log(`  ${okCount} pair(s) ready to consolidate (preflight OK)`);
+    console.log(`     - Type A (safe for --auto-detect): ${typeAOk}`);
+    console.log(`     - Type B (require explicit --pair):  ${typeBOk}`);
     console.log(`  ${failCount} pair(s) blocked by preflight conflicts`);
     console.log("");
-    console.log("DRY RUN complete. Re-run with --apply --auto-detect (or --pair=) to consolidate.");
+    console.log("DRY RUN complete. Re-run with --apply --auto-detect for Type A,");
+    console.log("or --apply --pair=<canonical>:<duplicate> for any pair (incl. Type B after review).");
     return;
   }
 
   // --- Apply mode (D2.2 will fill this in) -------------------------
   if (apply && autoDetect) {
-    for (const { pair, pf } of preflightResults) {
+    // P1 Codex iter-4 (commit a0e96eb): only Type A pairs are safe to
+    // auto-apply. Type B (canonical + PENDIENTE-* name match) is a
+    // heuristic — a placeholder may legitimately represent a different
+    // legal subject. Skip Type B here and require explicit --pair= opt-in.
+    const typeAResults = preflightResults.filter(({ pair }) => pair.type === "A");
+    const typeBResults = preflightResults.filter(({ pair }) => pair.type === "B");
+
+    if (typeBResults.length > 0) {
+      console.log(
+        `Skipping ${typeBResults.length} Type B (heuristic name-match) pair(s) in --auto-detect mode:`,
+      );
+      for (const { pair } of typeBResults) {
+        console.log(
+          `   - "${pair.canonical.full_name}" (${pair.canonical.tax_id ?? "NULL"}) ` +
+            `↔ "${pair.duplicate.full_name}" (${pair.duplicate.tax_id ?? "NULL"})`,
+        );
+      }
+      console.log(
+        `   Use --pair=<canonical_id>:<duplicate_id> to apply each Type B explicitly after human review.`,
+      );
+      console.log("");
+    }
+
+    for (const { pair, pf } of typeAResults) {
       if (!pf.ok) {
         console.error(`SKIP (preflight fail): ${pair.duplicate.full_name}`);
         for (const c of pf.conflicts) console.error(`   - ${c}`);
@@ -1008,7 +1065,7 @@ async function main() {
       }
       await applyConsolidation(supabase, pair);
     }
-    console.log("\nDone.");
+    console.log("\nDone (Type A only — Type B require explicit --pair=).");
     return;
   }
 
