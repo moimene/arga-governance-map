@@ -43,6 +43,37 @@ export function useRepresentanteAdminPJ(
   });
 }
 
+/**
+ * Lookup TODAS las representaciones VIGENTE ADMIN_PJ_REPRESENTANTE de una PJ
+ * (across all entities). Devuelve Map entity_id → representative_person_id.
+ *
+ * Usado por PersonaDetalle para verificar per-sociedad si la PJ tiene
+ * representante asignado, en lugar de basarse en persons.representative_person_id
+ * que es un atajo legacy compartido entre sociedades (P2 Codex iteration-1).
+ */
+export function useRepresentantesAdminPJByPerson(representedPersonId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!tenantId && !!representedPersonId,
+    queryKey: ["representaciones", tenantId, "admin_pj_by_person", representedPersonId],
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase
+        .from("representaciones")
+        .select("entity_id, representative_person_id")
+        .eq("tenant_id", tenantId!)
+        .eq("represented_person_id", representedPersonId!)
+        .eq("scope", "ADMIN_PJ_REPRESENTANTE")
+        .is("effective_to", null);
+      if (error) throw error;
+      const map = new Map<string, string>();
+      for (const row of (data ?? []) as Array<{ entity_id: string; representative_person_id: string }>) {
+        map.set(row.entity_id, row.representative_person_id);
+      }
+      return map;
+    },
+  });
+}
+
 export interface UpsertRepresentanteInput {
   represented_person_id: string; // PJ
   representative_person_id: string; // PF

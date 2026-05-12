@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useCargos";
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
+import { useRepresentantesAdminPJByPerson } from "@/hooks/useRepresentantesAdminPJ";
 import {
   requiresRepresentative,
   type TipoCondicionCargo,
@@ -106,14 +107,25 @@ export default function PersonaDetalle() {
   // permanente sólo es exigible cuando la PJ ocupa un cargo admin
   // (ADMIN_UNICO/SOLIDARIO/MANCOMUNADO/PJ/CONSEJERO); como SOCIO no
   // requiere representante (L1).
-  const cargosAdminSinRep: CargoDetailRow[] = cargosVigentes.filter((c) =>
-    requiresRepresentative(
-      { person_type: p.person_type },
-      c.tipo_condicion as TipoCondicionCargo,
-    ),
-  );
-  const needsRepresentanteWarning =
-    p.person_type === "PJ" && cargosAdminSinRep.length > 0 && !p.representative;
+  //
+  // P2 Codex iteration-1: verificar representación PER entity_id usando
+  // `representaciones` directamente, no `persons.representative_person_id`
+  // (atajo legacy global que es compartido entre sociedades).
+  const { data: representantesByEntity } = useRepresentantesAdminPJByPerson(p.id);
+
+  const cargosAdminSinRep: CargoDetailRow[] = cargosVigentes.filter((c) => {
+    if (
+      !requiresRepresentative(
+        { person_type: p.person_type },
+        c.tipo_condicion as TipoCondicionCargo,
+      )
+    ) {
+      return false;
+    }
+    // Verificar representación VIGENTE per entity_id
+    return !(representantesByEntity?.has(c.entity_id) ?? false);
+  });
+  const needsRepresentanteWarning = p.person_type === "PJ" && cargosAdminSinRep.length > 0;
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
