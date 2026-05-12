@@ -7,7 +7,18 @@ export type EntityContext = {
   tipo_social?: string | null;        // 'SA' | 'SL' | 'SLU' | 'SAU'
   es_cotizada?: boolean | null;
   es_unipersonal?: boolean | null;
-  tipo_organo_admin?: string | null;  // 'ADMIN_UNICO' | 'ADMIN_SOLIDARIO' | 'ADMIN_MANCOMUNADO' | 'CDA' | 'JUNTA' | etc.
+  /**
+   * Régimen de administración (formal canónico en `entities.tipo_organo_admin`).
+   * Valores aceptados por el CHECK constraint del schema canónico
+   * (`20260421_000019_modelo_canonico_base.sql`):
+   *   'ADMIN_UNICO' | 'ADMIN_SOLIDARIOS' | 'ADMIN_MANCOMUNADOS' | 'CDA'
+   * Adicionalmente aceptamos formas singulares (`ADMIN_SOLIDARIO`,
+   * `ADMIN_MANCOMUNADO`) y alias (`CONSEJO`, `CONSEJO_ADMINISTRACION`,
+   * `CONSEJO_MANCOMUNADO`) presentes en seeds legacy o configuraciones
+   * derivadas de `condiciones_persona.tipo_condicion` (que usa el singular
+   * para describir el CARGO individual, no el régimen colectivo).
+   */
+  tipo_organo_admin?: string | null;
 };
 
 export type CapabilitiesContext = {
@@ -78,6 +89,33 @@ const COLLEGIATE_BODY_TYPES = new Set([
 ]);
 
 const UNIPERSONAL_ADMIN_TYPES = new Set(["ADMIN_UNICO", "ADMINISTRADOR_UNICO"]);
+
+/**
+ * Régimen mancomunado de administración. Aceptamos:
+ *  - `ADMIN_MANCOMUNADOS` (canónico del schema en `entities.tipo_organo_admin`)
+ *  - `ADMIN_MANCOMUNADO` (singular legacy — algunas seeds antiguas)
+ *  - `CONSEJO_MANCOMUNADO` (alias derivado del config del órgano)
+ */
+const MANCOMUNADO_ADMIN_TYPES = new Set([
+  "ADMIN_MANCOMUNADOS",
+  "ADMIN_MANCOMUNADO",
+  "CONSEJO_MANCOMUNADO",
+]);
+
+/**
+ * Régimen solidario de administración. Aceptamos:
+ *  - `ADMIN_SOLIDARIOS` (canónico del schema)
+ *  - `ADMIN_SOLIDARIO` (singular legacy)
+ */
+const SOLIDARIO_ADMIN_TYPES = new Set(["ADMIN_SOLIDARIOS", "ADMIN_SOLIDARIO"]);
+
+export function isMancomunadoAdmin(tipoOrganoAdmin: string | null | undefined): boolean {
+  return MANCOMUNADO_ADMIN_TYPES.has(String(tipoOrganoAdmin ?? "").toUpperCase());
+}
+
+export function isSolidarioAdmin(tipoOrganoAdmin: string | null | undefined): boolean {
+  return SOLIDARIO_ADMIN_TYPES.has(String(tipoOrganoAdmin ?? "").toUpperCase());
+}
 
 function upper(value: string | null | undefined) {
   return String(value ?? "").toUpperCase();
@@ -200,7 +238,7 @@ export function canShowAdoptionModeCta(
   adoptionMode: "MEETING" | "UNIVERSAL" | "NO_SESSION" | "UNIPERSONAL_SOCIO" | "UNIPERSONAL_ADMIN" | "CO_APROBACION" | "SOLIDARIO"
 ): boolean {
   const tipoSocial = upper(ctx.entity?.tipo_social);
-  const admin = upper(ctx.entity?.tipo_organo_admin);
+  const adminRaw = ctx.entity?.tipo_organo_admin;
   const colegiado = entityHasCollegiateBody(ctx);
   const unipersonal = entityHasUnipersonalAdmin(ctx);
 
@@ -215,9 +253,11 @@ export function canShowAdoptionModeCta(
       // SLU/SAU implícitamente; o entity es_unipersonal flag al nivel socio
       return tipoSocial === "SLU" || tipoSocial === "SAU" || Boolean(ctx.entity?.es_unipersonal);
     case "CO_APROBACION":
-      return admin === "ADMIN_MANCOMUNADO" || admin === "CONSEJO_MANCOMUNADO";
+      // Acepta plural canónico (ADMIN_MANCOMUNADOS) + singular legacy + alias
+      return isMancomunadoAdmin(adminRaw);
     case "SOLIDARIO":
-      return admin === "ADMIN_SOLIDARIO";
+      // Acepta plural canónico (ADMIN_SOLIDARIOS) + singular legacy
+      return isSolidarioAdmin(adminRaw);
     default:
       return false;
   }

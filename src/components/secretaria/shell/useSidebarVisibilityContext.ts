@@ -4,11 +4,13 @@ import { useCapabilityMatrix } from "@/hooks/useCapabilityMatrix";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useUserRole } from "@/hooks/useUserRole";
-import type {
-  SidebarVisibilityContext,
-  CapabilitiesContext,
-  ReadinessContext,
-  EntityContext,
+import {
+  isMancomunadoAdmin,
+  isSolidarioAdmin,
+  type SidebarVisibilityContext,
+  type CapabilitiesContext,
+  type ReadinessContext,
+  type EntityContext,
 } from "@/lib/secretaria/sidebar-visibility";
 import type { SecretariaScopeController } from "./types";
 
@@ -105,8 +107,11 @@ export function useSidebarVisibility(
     }
     const admin = String(entity?.tipo_organo_admin ?? "").toUpperCase();
     if (admin === "ADMIN_UNICO" || admin === "ADMINISTRADOR_UNICO") modes.add("UNIPERSONAL_ADMIN");
-    if (admin === "ADMIN_MANCOMUNADO" || admin === "CONSEJO_MANCOMUNADO") modes.add("CO_APROBACION");
-    if (admin === "ADMIN_SOLIDARIO") modes.add("SOLIDARIO");
+    // isMancomunadoAdmin / isSolidarioAdmin aceptan tanto el plural canónico
+    // del schema (`ADMIN_MANCOMUNADOS`, `ADMIN_SOLIDARIOS`) como el singular
+    // legacy y alias derivados del config del órgano.
+    if (isMancomunadoAdmin(admin)) modes.add("CO_APROBACION");
+    if (isSolidarioAdmin(admin)) modes.add("SOLIDARIO");
     const tipo = String(entity?.tipo_social ?? "").toUpperCase();
     if (tipo === "SLU" || tipo === "SAU" || entity?.es_unipersonal) modes.add("UNIPERSONAL_SOCIO");
     return Array.from(modes);

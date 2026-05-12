@@ -11,6 +11,8 @@ import {
   getVisibleSidebarSections,
   isItemDisabled,
   isItemVisible,
+  isMancomunadoAdmin,
+  isSolidarioAdmin,
   type SidebarVisibilityContext,
   type VisibleSecretariaNavGroup,
   type VisibleSecretariaNavItem,
@@ -254,15 +256,37 @@ describe("sidebar-visibility — CTAs contextuales en páginas", () => {
     expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_social: "SA" } }), "UNIPERSONAL_SOCIO")).toBe(false);
   });
 
-  it("canShowAdoptionModeCta(CO_APROBACION) requiere ADMIN_MANCOMUNADO o CONSEJO_MANCOMUNADO", () => {
+  it("canShowAdoptionModeCta(CO_APROBACION) acepta plural canónico (ADMIN_MANCOMUNADOS), singular legacy y alias CONSEJO_MANCOMUNADO", () => {
+    // Plural canónico (entities.tipo_organo_admin del schema)
+    expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_MANCOMUNADOS" } }), "CO_APROBACION")).toBe(true);
+    // Singular legacy (seeds antiguas, cargos individuales)
     expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_MANCOMUNADO" } }), "CO_APROBACION")).toBe(true);
+    // Alias derivado del config del órgano
     expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "CONSEJO_MANCOMUNADO" } }), "CO_APROBACION")).toBe(true);
+    // No mancomunado → oculto
     expect(canShowAdoptionModeCta(baseCtx(), "CO_APROBACION")).toBe(false);
+    expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_UNICO" } }), "CO_APROBACION")).toBe(false);
   });
 
-  it("canShowAdoptionModeCta(SOLIDARIO) requiere ADMIN_SOLIDARIO", () => {
+  it("canShowAdoptionModeCta(SOLIDARIO) acepta plural canónico (ADMIN_SOLIDARIOS) y singular legacy", () => {
+    expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_SOLIDARIOS" } }), "SOLIDARIO")).toBe(true);
     expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_SOLIDARIO" } }), "SOLIDARIO")).toBe(true);
     expect(canShowAdoptionModeCta(baseCtx(), "SOLIDARIO")).toBe(false);
+    expect(canShowAdoptionModeCta(baseCtx({ entity: { tipo_organo_admin: "ADMIN_MANCOMUNADOS" } }), "SOLIDARIO")).toBe(false);
+  });
+
+  it("isMancomunadoAdmin / isSolidarioAdmin son case-insensitive y aceptan null/undefined", () => {
+    expect(isMancomunadoAdmin("admin_mancomunados")).toBe(true);
+    expect(isMancomunadoAdmin("ADMIN_MANCOMUNADO")).toBe(true);
+    expect(isMancomunadoAdmin("Consejo_Mancomunado")).toBe(true);
+    expect(isMancomunadoAdmin(null)).toBe(false);
+    expect(isMancomunadoAdmin(undefined)).toBe(false);
+    expect(isMancomunadoAdmin("ADMIN_UNICO")).toBe(false);
+
+    expect(isSolidarioAdmin("admin_solidarios")).toBe(true);
+    expect(isSolidarioAdmin("ADMIN_SOLIDARIO")).toBe(true);
+    expect(isSolidarioAdmin(null)).toBe(false);
+    expect(isSolidarioAdmin("ADMIN_MANCOMUNADOS")).toBe(false);
   });
 
   it("canShowCertificationCta requiere capability CERTIFICATION", () => {
