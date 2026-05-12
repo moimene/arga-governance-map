@@ -12,6 +12,7 @@ export type TipoCondicion =
   | "PRESIDENTE"
   | "SECRETARIO"
   | "VICEPRESIDENTE"
+  | "VICESECRETARIO"
   | "CONSEJERO_COORDINADOR";
 
 export type FuenteDesignacion =
@@ -78,6 +79,7 @@ const CARGOS_ORGANO_COLEGIADO: TipoCondicion[] = [
   "PRESIDENTE",
   "VICEPRESIDENTE",
   "SECRETARIO",
+  "VICESECRETARIO",
   "CONSEJERO_COORDINADOR",
 ];
 
@@ -215,5 +217,6 @@ export const CARGO_LABELS: Record<TipoCondicion, string> = {
   PRESIDENTE: "Presidente",
   VICEPRESIDENTE: "Vicepresidente",
   SECRETARIO: "Secretario",
+  VICESECRETARIO: "Vicesecretario",
   CONSEJERO_COORDINADOR: "Consejero coordinador",
 };

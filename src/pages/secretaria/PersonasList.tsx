@@ -1,5 +1,5 @@
 import { Building2, Users, Search, Plus, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { usePersonasEnriquecidas, type PersonType } from "@/hooks/usePersonasCanonical";
@@ -27,6 +27,7 @@ function formatCapital(value: number | null): string {
 
 export default function PersonasList() {
   const scope = useSecretariaScope();
+  const navigate = useNavigate();
   const [personType, setPersonType] = useState<PersonType | "">("");
   const [search, setSearch] = useState("");
   const [tipoCondicion, setTipoCondicion] = useState<TipoCondicion | "">("");
@@ -292,11 +293,21 @@ export default function PersonasList() {
                 ? p.holdings_vigentes.filter((h) => h.entity_id === scopedEntityId)
                 : p.holdings_vigentes;
 
+            const personaHref = scope.createScopedTo(`/secretaria/personas/${p.id}`);
             return (
-              <Link
+              <div
                 key={p.id}
-                to={scope.createScopedTo(`/secretaria/personas/${p.id}`)}
-                className="block border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-4 transition-colors hover:bg-[var(--g-surface-subtle)]/50"
+                role="link"
+                tabIndex={0}
+                aria-label={`Abrir ficha de ${p.full_name}`}
+                onClick={() => navigate(personaHref)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate(personaHref);
+                  }
+                }}
+                className="block cursor-pointer border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-4 transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)]"
                 style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
@@ -373,7 +384,24 @@ export default function PersonasList() {
                 {p.email ? (
                   <p className="mt-4 break-words text-xs text-[var(--g-text-secondary)]">{p.email}</p>
                 ) : null}
-              </Link>
+
+                <div
+                  className="mt-3 flex justify-end"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  role="presentation"
+                >
+                  <Link
+                    to={scope.createScopedTo(`/secretaria/cargos/nuevo?personId=${p.id}`)}
+                    className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                    aria-label={`Asignar cargo a ${p.full_name}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Asignar cargo
+                  </Link>
+                </div>
+              </div>
             );
           })
         )}
@@ -397,18 +425,21 @@ export default function PersonasList() {
                 {isSociedadMode ? "Participación" : "Es socio en"}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">Correo</th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   Cargando…
                 </td>
               </tr>
             ) : !data || data.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   {hasAnyFilter
                     ? "Ninguna persona coincide con los filtros."
                     : isSociedadMode
@@ -503,6 +534,20 @@ export default function PersonasList() {
                     </td>
 
                     <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{p.email ?? "—"}</td>
+
+                    {/* Acciones */}
+                    <td className="px-6 py-3 text-right text-sm">
+                      <Link
+                        to={scope.createScopedTo(`/secretaria/cargos/nuevo?personId=${p.id}`)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                        aria-label={`Asignar cargo a ${p.full_name}`}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Asignar cargo
+                      </Link>
+                    </td>
                   </tr>
                 );
               })
