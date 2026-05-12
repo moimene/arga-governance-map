@@ -438,7 +438,13 @@ BEGIN
       v_share_class_id,
       COALESCE(NULLIF(v_item ->> 'numero_titulos', '')::numeric, 0),
       NULLIF(v_item ->> 'porcentaje_capital', '')::numeric,
-      COALESCE(NULLIF(v_item ->> 'voting_rights', '')::boolean, true),
+      -- voting_rights se fuerza a false si is_treasury=true (contrato D6
+      -- spec §2.5 Q6: autocartera con voting_rights=false). Evita que un
+      -- caller que omite voting_rights pero marca is_treasury deje
+      -- capital_holdings.voting_rights=true, lo que confundiría a UI/exports
+      -- aunque fn_refresh_parte_votante_entity ya zerea pesos.
+      COALESCE(NULLIF(v_item ->> 'voting_rights', '')::boolean, true)
+        AND NOT COALESCE(NULLIF(v_item ->> 'is_treasury', '')::boolean, false),
       COALESCE(NULLIF(v_item ->> 'is_treasury', '')::boolean, false),
       COALESCE(NULLIF(v_item ->> 'effective_from', '')::date, CURRENT_DATE),
       COALESCE(v_item -> 'metadata', '{}'::jsonb)
