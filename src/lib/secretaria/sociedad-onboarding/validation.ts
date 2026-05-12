@@ -89,6 +89,16 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   if (draft.shareClasses.length > 0 && totalTitles > 0 && classTitles !== totalTitles) {
     issues.push(issue("CL-002", "shareClasses.numero_titulos", "La suma de titulos por clase debe coincidir con el total."));
   }
+  // CL-003: el class_code no puede ser blank/vacio. Sin este check, si el
+  // usuario borra un codigo, el dropdown de cap-table puede cargar codes
+  // vacios y la RPC luego falla con "share class class_code is required"
+  // -> server rollback en lugar de error inline (review Codex P2).
+  for (const sc of draft.shareClasses) {
+    if (!sc.class_code || sc.class_code.trim() === "") {
+      issues.push(issue("CL-003", "shareClasses.class_code", "El codigo de cada clase/serie es obligatorio."));
+      break;
+    }
+  }
 
   if (draft.capTable.length === 0) {
     issues.push(issue("CT-001", "capTable", "El cap table inicial esta vacio.", "BLOCK_OPERATIONAL"));
@@ -124,6 +134,20 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   for (const shareClass of draft.shareClasses) {
     if ((titlesByClass[shareClass.class_code] ?? 0) > num(shareClass.numero_titulos)) {
       issues.push(issue("CT-003", `capTable.${shareClass.class_code}`, "Hay mas titulos asignados que emitidos para una clase."));
+    }
+  }
+
+  // CT-007: holding no-treasury sin holder seleccionado bloquea. Sin este
+  // check, los holdings sin socio "se descartaban silenciosamente" del
+  // calculo CT-004/CT-005 y la RPC luego fallaba con "holder not resolved"
+  // -> server rollback (review Codex P2).
+  for (const entry of draft.capTable) {
+    if (!entry.is_treasury && !entry.holder) {
+      issues.push(issue(
+        "CT-007",
+        `capTable.${entry.key}.holder`,
+        "Cada socio debe estar identificado (NIF/CIF o nueva persona). Marca la fila como autocartera si no aplica."
+      ));
     }
   }
 
@@ -210,8 +234,8 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     1: ["S-005", "S-006", "R-002"],
     2: ["O-002", "CT-005"],
     3: ["C-001", "C-002", "C-003", "C-004"],
-    4: ["CL-001", "CL-002"],
-    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "P-001"],
+    4: ["CL-001", "CL-002", "CL-003"],
+    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "P-001"],
     6: ["O-001", "O-002"],
     7: ["CA-001", "CA-002", "AU-001", "PJ-001"],
     8: ["R-001", "R-002"],
