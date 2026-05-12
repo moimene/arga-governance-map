@@ -45,7 +45,7 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
 | L13 | Vacancia presidencial | **Legal y transitoria**. Máximo razonable 90 días sin cobertura. Preside Vicepresidente o suplente estatutario. | CNMV/Código Buen Gobierno (cotizadas) |
 | L14 | Cese + nombramiento sucesor | **Pueden ser actos separados**. No forzar transaccionalidad. | Práctica habitual del CdA |
 | L15 | Presidentes de comisiones del CdA | **No certifican societariamente**. Solo firman actas de la comisión. | RRM art. 109 reserva certificación a Secretario del CdA con VºBº del Presidente del CdA |
-| L16 | Pestaña "Autoridad certificante" | Limitada a: Secretario CdA, Vicesecretario CdA, Presidente CdA, Vicepresidente CdA, Administrador único, Socio único | RRM art. 109; LSC para unipersonales |
+| L16 | Pestaña "Autoridad certificante" | Limitada a: Secretario CdA + Vicesecretario CdA (**rol: certificante**); Presidente CdA + Vicepresidente CdA (**rol: VºBº**); Administrador único, Socio único (rol mixto en sus propios actos). La UI debe distinguir visualmente "Certificante" vs "VºBº" — son funciones distintas según RRM art. 109. | RRM art. 109; LSC para unipersonales |
 | L17 | VICESECRETARIO | **Es cargo societario inscribible**. Certifica en suplencia del Secretario. Debe estar en BD y en "Autoridad certificante" como suplente. | RRM arts. 109, 124; LSC art. 529 octies |
 | L18 | COMISIONADO | **NO es cargo societario inscribible**. Rol operativo interno de comité. **DESCARTADO del scope** de Personas y Cargos. | RRM art. 124 (no enumerado) |
 | L19 | Unicidad NIF/CIF | **Dos identidades distintas con mismo NIF/CIF es siempre error.** UNIQUE constraint obligatorio. | AEAT (identificador único) |
@@ -112,9 +112,14 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
 - Script de consolidación `scripts/consolidate-duplicate-persons.ts`:
   - Detecta pares `(tax_id canónico, persona PENDIENTE/duplicada)` por `full_name` similarity + tax_id pattern
   - Lista candidatos para confirmación humana antes de ejecutar
+  - **Pre-flight check obligatorio**: detectar si la persona duplicada tiene `condiciones_persona` VIGENTES. Si las tiene, el script:
+    1. Lista los cargos vigentes del duplicado vs los del canónico
+    2. Si hay solapamiento `(person, entity, body, tipo_condicion)` que violaría `ux_condicion_vigente` al migrar, **aborta con error claro** y pide intervención humana (cesar cargo del duplicado primero, o decidir cuál mantener)
+    3. Si NO hay solapamiento, procede a migrar referencias
   - Migra referencias: `condiciones_persona.person_id`, `condiciones_persona.representative_person_id`, `capital_holdings.holder_person_id`, `representaciones.represented_person_id`/`representative_person_id`, `meeting_attendees.attendee_person_id`, `persons.representative_person_id`
-  - Soft-archive de la duplicada (NO DELETE — preserva audit y FK histórica)
+  - Soft-archive de la duplicada (NO DELETE — preserva audit y FK histórica). Mecanismo: añadir `tax_id` con prefijo `ARCHIVED-<timestamp>-<original_tax_id>` para liberar el unique constraint.
   - Idempotente
+- **Actualización del seed canónico** `scripts/seed-demo-arga-canonico.ts`: tras la consolidación, alinear el seed con los IDs canónicos consolidados (no recrear duplicados al regenerar datos demo).
 
 - En `PersonaNuevaStepper.tsx`: aviso `taxIdConflict.kind === 'person'` pasa de warning a **BLOQUEO**.
   - Botón pasa de "Continuar" a "Abrir ficha existente" → navega a `/secretaria/personas/<id>`.
@@ -219,7 +224,12 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
   - Chip "Inscrito en RM" (verde, `--status-success`) si `inscripcion_rm_referencia IS NOT NULL`.
   - Chip "Pendiente inscripción" (amarillo, `--status-warning`) si `inscripcion_rm_referencia IS NULL`.
 
-- En `EmitirCertificacionButton.tsx`: bloqueo duro si el cargo certificante seleccionado no tiene `inscripcion_rm_referencia` (toast error + botón deshabilitado).
+- En `EmitirCertificacionButton.tsx`: **doble verificación de inscripción RM** (refinamiento legal post-spec):
+  - Cargo certificante (Secretario o Vicesecretario en suplencia): debe tener `inscripcion_rm_referencia IS NOT NULL`.
+  - Cargo VºBº (Presidente o Vicepresidente en suplencia): debe tener `inscripcion_rm_referencia IS NOT NULL`.
+  - Si cualquiera de los dos falta → bloqueo duro + toast informativo identificando cuál falla.
+  - El UI distingue claramente "Certificante" (Secretario/Vicesecretario) y "VºBº" (Presidente/Vicepresidente) — son roles distintos del mismo acto (RRM art. 109).
+- En la query `usePresidenteVigente`: garantizar que tras el backfill de P3, los 20 PRESIDENTEs vigentes del demo resuelven correctamente (criterio explícito en §8). Hoy 10 devuelven null por hueco en `authority_evidence` — el efecto colateral del backfill lo arregla, pero se valida explícitamente.
 
 ---
 
@@ -233,8 +243,10 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
 
 **Pre-requisito:** las tres migraciones se aplican a Cloud (`hzqwefkwsxopwrmtksbg`) vía MCP `apply_migration` con confirmación del usuario, dentro del paquete de sprint, una vez aprobado el plan implementable por writing-plans. NO se aplican sin verificación previa de:
 - `bun run db:check-target` pasa
-- Script de consolidación de duplicados ya ejecutado (si no, UNIQUE puede fallar)
+- Script de consolidación de duplicados ya ejecutado y verificado (si no, UNIQUE puede fallar)
 - Tests schema actualizados para reflejar VICESECRETARIO
+- **Pre-flight en preview branch Supabase** (vía MCP `create_branch`): probar las 3 migraciones en clon del demo project, ejecutar smoke tests, verificar que el backfill correctivo no pierde filas, antes de aplicar a la rama principal. Si el preview falla, abortar y diagnosticar antes de tocar Cloud demo.
+- **Coordinación con sprint paralelo** (Harvey plantillas B1-B9 visibles en `docs/superpowers/plans/2026-05-10-*`): confirmar con el responsable de ese trabajo que mis migraciones (UNIQUE tax_id, VICESECRETARIO en CHECK, trigger RM) no entran en conflicto con las plantillas que construyen sobre el modelo canónico. Si hay solapamiento, secuenciar para que mis migraciones vayan ANTES (las plantillas dependen del schema, no al revés).
 
 ---
 
@@ -303,6 +315,9 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
 | VICESECRETARIO añadido pero sin UX completa | Baja | Bajo | Sprint inmediato lo incluye en BD + dropdowns; UX detallada (suplencia activación) va en A' |
 | Datos demo E2E vuelven a aparecer al correr tests | Alta | Bajo | Filtro UI excluye `[E2E REAL]` y `PENDIENTE-` — los tests siguen funcionando pero no contaminan dropdowns producción |
 | Demo Garrigues anticipa fecha | Media | Alto | Sprint priorizado para entregar P1 primero (alta+cese, día 3) — si falta tiempo, P2 y P3 son nice-to-have parcial |
+| Conflicto con sprint paralelo Harvey plantillas B1-B9 | Media | Alto | Coordinación previa con responsable de Harvey antes de aplicar migraciones; secuenciar: schema primero, plantillas después. Si Harvey está en preview branch propio, hacer rebase sobre las migraciones de este sprint |
+| Migración falla a medio aplicar en Cloud demo (sin rollback automático) | Baja | Crítico | Pre-flight obligatorio en preview branch Supabase (MCP `create_branch`) antes de tocar la rama principal. Smoke tests en preview verifican backfill correctivo, sync trigger y UNIQUE. Solo si pasan, aplicar a Cloud demo |
+| Tests E2E rompen porque `excludeTestData` filtra sus propios datos | Media | Bajo | Cada test E2E recibe `excludeTestData: false` explícitamente vía wrapper de setup; el default `true` es solo para producción demo. Doc de migración para tests en spec de tests |
 
 ---
 
@@ -338,9 +353,12 @@ El sprint inmediato resuelve los puntos 1, 3, 5 a nivel BD y los tres síntomas 
 
 ### Demo readiness criteria (validación Garrigues semana 19-23 mayo)
 
+- **Dropdowns sin duplicados visibles** (criterio prioritario — primera cosa que detecta un auditor): los selectores de persona/sociedad en `PersonasList`, `DesignarAdminStepper`, `PersonaNuevaStepper` y demás muestran "Cartera ARGA" exactamente 1 vez, "ARGA Seguros" exactamente 1 vez. Sin filas `[E2E REAL]` ni `PENDIENTE-*` salvo en modo test explícito.
 - Plantilla `DISTRIBUCION_CARGOS` (UUID a09cc4bf-...) puede ejecutarse end-to-end con datos del CdA de ARGA Seguros sin huecos visibles.
 - Plantilla `CESE_CONSEJERO` (UUID ba214d42-...) puede ejecutarse y el cargo cesa correctamente (vigencia cerrada, histórico preservado).
-- Pestaña "Autoridad certificante" de ARGA Seguros muestra los 4 cargos certificantes (Presidente, Vicepresidente, Secretario, Vicesecretario si aplica) con chip "Inscrito en RM" verde donde corresponde y "Pendiente inscripción" amarillo en el resto.
+- Pestaña "Autoridad certificante" de ARGA Seguros muestra los 4 cargos (Presidente, Vicepresidente, Secretario, Vicesecretario si aplica) con **etiquetas de rol distinguibles** ("Certificante" para Secretario/Vicesecretario, "VºBº" para Presidente/Vicepresidente) y chip "Inscrito en RM" verde donde corresponde y "Pendiente inscripción" amarillo en el resto.
+- `usePresidenteVigente` resuelve correctamente para los 20 PRESIDENTEs vigentes del demo (validación explícita post-backfill — hoy 10 devuelven null por hueco en `authority_evidence`).
+- `EmitirCertificacionButton` bloquea con toast diferenciado si falta `inscripcion_rm_referencia` en el cargo certificante O en el cargo VºBº (verificación dual).
 
 ---
 
