@@ -55,8 +55,17 @@ export const SEMVER =
 // Se acepta también RDLeg, LMV, CCom, RDLey, LOSSEAR. Estados Soporte
 // Interno (CONVOCATORIA_PRE / EXPEDIENTE_PRE) están exentos a nivel
 // Gate PRE (`organo_tipo === "SOPORTE_INTERNO"`), no aquí.
+//
+// Calibración Sprint 1 / Commit 7 (D6): se añade LGSM (Ley General de
+// Sociedades Mercantiles, México) como ley aceptada para soportar batches
+// multi-jurisdicción importados por el script `import-templates-batch.ts`.
+// El batch FIRMA_LEGAL_BATCH es la vía para incorporar plantillas legacy
+// firmadas offline por el Comité Legal, incluyendo jurisdicciones MX/BR
+// donde la referencia legal nativa no es LSC. La adición sólo amplía el
+// conjunto aceptado; no rechaza ningún caso previamente válido (tests del
+// schema y de Gate PRE siguen pasando).
 export const REF_LEGAL_PATTERN =
-  /(?:(?:Art\.|Arts\.|art\.|arts\.).*?\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR)\b)|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR)\b.*?(?:Art\.|Arts\.|art\.|arts\.))|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR)\b)/;
+  /(?:(?:Art\.|Arts\.|art\.|arts\.).*?\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b)|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b.*?(?:Art\.|Arts\.|art\.|arts\.))|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b)/;
 
 // MateriaEnum: unión cerrada de materias soportadas v1. Sin duplicados.
 // Calibrado D15: incluye las 39 materias presentes en Cloud + cubre los

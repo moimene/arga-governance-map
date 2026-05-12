@@ -1,0 +1,52 @@
+{
+  "schema_version": "secretaria.template_import.v1",
+  "mode": "FIRMA_LEGAL_BATCH",
+  "batch_meta": {
+    "aprobada_por": "Comité Legal Garrigues — Secretaría Societaria (demo)",
+    "fecha_aprobacion": "2026-05-12",
+    "motivo": "FIRMA_LEGAL_BATCH"
+  },
+  "templates": [
+    {
+      "schema_version": "secretaria.template_import.v1",
+      "template": {
+        "tipo": "MODELO_ACUERDO",
+        "materia": "AUMENTO_CAPITAL",
+        "materia_acuerdo": "AUMENTO_CAPITAL",
+        "jurisdiccion": "MX",
+        "version": "1.0.0",
+        "organo_tipo": "JUNTA_GENERAL",
+        "adoption_mode": "MEETING",
+        "referencia_legal": "Art. 182 LGSM"
+      },
+      "capa1_inmutable": "PRIMERO.- Aprobar el aumento de capital social de {{entities.name}} en la cuantía de {{importe_aumento}} pesos mexicanos mediante la emisión de {{numero_acciones}} acciones, conforme al artículo 182 de la Ley General de Sociedades Mercantiles.",
+      "capa2_variables": [
+        { "variable": "entities.name", "fuente": "entities.name", "condicion": "SIEMPRE" }
+      ],
+      "capa3_editables": [
+        { "campo": "importe_aumento", "obligatoriedad": "OBLIGATORIO", "descripcion": "Importe en MXN" },
+        { "campo": "numero_acciones", "obligatoriedad": "OBLIGATORIO", "descripcion": "Número de acciones a emitir" }
+      ]
+    },
+    {
+      "schema_version": "secretaria.template_import.v1",
+      "template": {
+        "tipo": "MODELO_ACUERDO",
+        "materia": "DISTRIBUCION_DIVIDENDOS",
+        "materia_acuerdo": "DISTRIBUCION_DIVIDENDOS",
+        "jurisdiccion": "BR",
+        "version": "1.0.0",
+        "organo_tipo": "JUNTA_GENERAL",
+        "adoption_mode": "MEETING",
+        "referencia_legal": "Art. 132 LSC"
+      },
+      "capa1_inmutable": "PRIMEIRO.- Aprovar a distribuição de dividendos de {{entities.name}} no valor de {{importe_dividendos}} reais, conforme proposta do Conselho de Administração, em cumprimento aos artigos aplicáveis da Lei das Sociedades por Ações.",
+      "capa2_variables": [
+        { "variable": "entities.name", "fuente": "entities.name", "condicion": "SIEMPRE" }
+      ],
+      "capa3_editables": [
+        { "campo": "importe_dividendos", "obligatoriedad": "OBLIGATORIO", "descripcion": "Monto en BRL" }
+      ]
+    }
+  ]
+}
