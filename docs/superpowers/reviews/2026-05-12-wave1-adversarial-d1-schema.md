@@ -176,4 +176,145 @@ Las 3 migraciones SQL son sustancialmente correctas y respetan las decisiones le
 
 ---
 
+## Addendum tras input legal — verificación de los 4 puntos Garrigues + gap D2.2
+
+**Fecha:** 2026-05-12 (post-veredicto inicial)
+**Fuente legal:** Ruflo memory `personas-cargos / wave1-legal-verdict` (Equipo Legal Garrigues)
+**Verdict legal:** APPROVE con 4 addenda de verificación para el adversarial reviewer.
+
+El veredicto base **se mantiene en NEEDS-CHANGES**, ahora con **5 críticas H** (en lugar de 3) por descubrimiento legal adicional + 1 nueva crítica H para Wave 2 D2.
+
+### A. `v_cargos_certificantes` en migración 000064 — **[H] BUG LEGAL**
+
+**Esperado por legal Garrigues:**
+- INCLUIR: `PRESIDENTE, VICEPRESIDENTE, SECRETARIO, VICESECRETARIO, ADMIN_UNICO, ADMIN_SOLIDARIO, ADMIN_MANCOMUNADO`
+- EXCLUIR: `CONSEJERO`, `CONSEJERO_COORDINADOR`, presidentes de comisión
+
+**Encontrado en `supabase/migrations/20260513_000064_authority_evidence_trigger_rm_fields.sql:13-17`:**
+```sql
+v_cargos_certificantes text[] := ARRAY[
+  'ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO',
+  'PRESIDENTE','VICEPRESIDENTE','SECRETARIO','VICESECRETARIO',
+  'CONSEJERO_COORDINADOR'   -- ← BUG LEGAL: debe REMOVERSE
+];
+```
+
+**Diagnóstico:**
+- Contiene `CONSEJERO_COORDINADOR`, que el equipo legal Garrigues confirma NO certifica societariamente (RRM art. 109 reserva certificación a Secretario con VºBº de Presidente; el Consejero Coordinador es un rol de gobierno corporativo en cotizadas pero no firma actas/certificaciones).
+- El trigger ORIGINAL en Cloud (pre-000064) **ya incluía** `CONSEJERO_COORDINADOR` — confirmado vía probe `pg_get_functiondef(fn_sync_authority_evidence)`. Es un bug legacy preservado, no introducido por el builder. Pero el plan D1.2 y la nueva migración 000064 lo PROPAGAN.
+- La migración era una oportunidad de limpieza legal post-validación. El builder copió literal del plan sin desafiar el array.
+- Backfill B (líneas 105-109 de 000064) **TAMBIÉN incluye `CONSEJERO_COORDINADOR`** en su IN-list. Si alguno existe vigente en `condiciones_persona` (Cloud probe: 0 hoy, pero podría haber en el futuro), el backfill crearía `authority_evidence` para él incorrectamente.
+
+**Risk:** Si `CONSEJERO_COORDINADOR` permanece, futuras `condiciones_persona` con ese tipo generan filas en `authority_evidence`. La UI "Autoridad certificante" podría exponer al Consejero Coordinador como certificante autorizado → contrato legal incorrecto frente a auditor Garrigues + LSC art. 529 septies habilita al CC para coordinar pero NO para certificar.
+
+**Fix:**
+1. Remover `'CONSEJERO_COORDINADOR'` del `v_cargos_certificantes` (línea 16 — quedaría sin la última entry; el array previo termina con `'VICESECRETARIO',`).
+2. Remover `'CONSEJERO_COORDINADOR'` del IN-list del Backfill B (línea 108).
+3. Considerar añadir un script de limpieza para borrar las filas `authority_evidence` con `cargo='CONSEJERO_COORDINADOR'` existentes en Cloud (probe: hay 0 hoy según la enumeración de cargos).
+
+### B. `chk_condicion_body_coherente` en migración 000065 — **PASS**
+
+**Esperado por legal Garrigues:**
+- body_id IS NULL → `{SOCIO, ADMIN_UNICO, ADMIN_SOLIDARIO, ADMIN_MANCOMUNADO, ADMIN_PJ}` (la PJ admin NO pertenece a órgano)
+- body_id IS NOT NULL → `{CONSEJERO, PRESIDENTE, SECRETARIO, VICEPRESIDENTE, VICESECRETARIO, CONSEJERO_COORDINADOR}`
+
+**Encontrado en `supabase/migrations/20260513_000065_condiciones_persona_vicesecretario.sql:22-29`:**
+```sql
+ADD CONSTRAINT chk_condicion_body_coherente CHECK (
+  (tipo_condicion IN ('SOCIO','ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO','ADMIN_PJ')
+    AND body_id IS NULL)
+  OR
+  (tipo_condicion IN ('CONSEJERO','PRESIDENTE','SECRETARIO','VICEPRESIDENTE','VICESECRETARIO','CONSEJERO_COORDINADOR')
+    AND body_id IS NOT NULL)
+);
+```
+
+**Diagnóstico:** Match exacto con el requerimiento legal. `ADMIN_PJ` correctamente en grupo NULL (línea 24); `VICESECRETARIO` correctamente en grupo NOT NULL (línea 27). **PASS — sin cambios necesarios.**
+
+### C. Exclusión `FREE-FLOAT-` en migración 000063 — **PASS (necesaria, no defensiva)**
+
+**Probe Cloud read-only ejecutado:**
+```sql
+SELECT COUNT(*), tax_ids, names FROM persons
+WHERE tenant_id = '00000000-...0001' AND tax_id LIKE 'FREE-FLOAT-%';
+```
+
+**Resultado:** 1 fila — `tax_id='FREE-FLOAT-ARGA'`, `full_name='Mercado libre (free float agregado)'`.
+
+**Diagnóstico:** Existe exactamente 1 placeholder legítimo para el agregado del free float de ARGA Seguros (30.31% según estructura corporativa del CdA en `CLAUDE.md`). Si se diera de baja `FREE-FLOAT-` del WHERE de exclusión, **no causaría un problema HOY** (solo hay 1 fila, no es duplicado), pero **rompería el invariante futuro** si en algún momento se necesitan agregados free float por jurisdicción (BR, MX, PT) — habría que crear `FREE-FLOAT-BRASIL`, `FREE-FLOAT-MEXICO`, etc., todos con su propio tax_id placeholder. Mantener la exclusión es **correcto y conservador**. PASS.
+
+### D. Orden de aplicación a Cloud — **[H] CRÍTICA (ya flageada en veredicto base, reconfirmada por legal)**
+
+**Re-confirmación:** 000063 fallará si se aplica a Cloud demo antes de la consolidación D2. Confirmado vía probe:
+- `tax_id='B88888888'` × 2 ("PRUEBA 1" + "SEGUROS TEST A, SL").
+
+**Riesgo legal adicional:** El plan menciona en `docs/superpowers/specs/` que "Cartera ARGA ×3" y "ARGA Seguros ×2" están en Cloud. Mi probe enumeró las `OTHER` y `REAL_CIF_SA_SL` pero no encontré `Cartera ARGA` literal ×3 con tax_id real — los placeholders están bajo `PENDIENTE-*`. Re-validar pre-consolidación a través de `consolidate-duplicate-persons.ts --dry-run` para enumerar los pares exactos. Si quedan duplicados reales no detectados (legacy seeds), 000063 explota.
+
+**Fix (reconfirmado):**
+1. Comentario explícito en el header de 000063: `-- PREREQUISITE: scripts/consolidate-duplicate-persons.ts --apply must run FIRST. See plan D2.`
+2. Idealmente, pre-flight check SQL incluido al inicio de la migración.
+
+### E. Gap técnico — D2.2 lista incompleta de tablas + bug de nombre de columna — **[H] CRÍTICA WAVE 2**
+
+**Cloud probe enumeró 47 columnas FK referenciando `persons.id`.** Plan D2.2 (`docs/superpowers/plans/2026-05-12-personas-cargos-refactor-implementation.md:980-989`) lista solo 9.
+
+**Tablas/columnas con FK a `persons.id` que el plan D2.2 OMITE y que pueden orphanar datos al archivar la persona duplicada:**
+
+| Tabla | Columna | Severidad | Razón |
+|---|---|---|---|
+| `entities` | `person_id` | **CRÍTICA** | Entity-as-PJ link. Si la persona duplicada es el PJ canónico para una sociedad, archivarla rompe el bridge identidad↔entidad. **Probe confirma 2 rows para B88888888** |
+| `meetings` | `president_id` | ALTA | Histórico de quién presidió reuniones |
+| `meetings` | `secretary_id` | ALTA | Histórico de secretarios de reuniones |
+| `minutes` | `signed_by_president_id` | ALTA | Quién firmó el acta |
+| `minutes` | `signed_by_secretary_id` | ALTA | Quién firmó el acta |
+| `meeting_attendees` | `represented_by_id` | MEDIA | Representación en reunión específica |
+| `certifications` | `certifier_id` | ALTA | Histórico de certificadores |
+| `unipersonal_decisions` | `decided_by_id` | ALTA | Decisiones unipersonales del demo |
+| `attestations` | `person_id` | MEDIA | Declaraciones del módulo TGMS |
+| `capital_movements` | `person_id` | ALTA | WORM table — movimientos de capital |
+| `conflicts_of_interest` | `person_id` | MEDIA | COI declarado |
+| `delegations` | `delegate_id`, `grantor_id` | MEDIA | Delegaciones de voto |
+| `no_session_notificaciones` | `person_id` | ALTA | Notificaciones (CASCADE — al archivar tax_id, no se borra pero se desreferencia conceptualmente) |
+| `no_session_respuestas` | `person_id` | ALTA | Respuestas en acuerdos sin sesión |
+| `no_session_expedientes` | `propuesta_firmada_por` | MEDIA | ON DELETE SET NULL — sobrevive pero pierde firma |
+| `secretaria_role_assignments` | `person_id` | MEDIA | Asignaciones de rol RBAC |
+| `user_profiles` | `person_id` | ALTA | Link auth.users ↔ persons |
+| `role_book` | `person_id` | MEDIA | Histórico cargos legacy |
+
+**Bug adicional confirmado por probe:**
+- Plan D2.2 línea 985: `{ table: "meeting_attendees", column: "attendee_person_id" }`. **El nombre real de la columna en Cloud es `person_id`**, no `attendee_person_id`. El script así escrito intentaría `update({attendee_person_id: ...})` que erroriza por columna inexistente, dejando `meeting_attendees` sin migrar y rompiendo el flujo del script en el primer pair.
+
+**Tablas mencionadas por legal pero NO existentes en Cloud:**
+- `agreements.proponent_person_id` — **NO existe** (probe confirma que `agreements` solo tiene `unipersonal_decision_id` con string "person"). Falsa pista del legal verdict.
+- `decisiones_unipersonales` — **NO existe**, el nombre real es `unipersonal_decisions` (en inglés). Pero esa tabla SÍ tiene FK `decided_by_id` que falta en D2.2.
+- `no_session_resolutions.*` — verificar (no apareció en el listado de 47 FK; las tablas reales son `no_session_respuestas` y `no_session_expedientes`).
+
+**Fix para Wave 2 builder:**
+1. Reescribir la lista `tables` en `applyConsolidation` con las 47 FK enumeradas en Cloud (filtrar las que NO representan "identity holder" — e.g. `incidents.assigned_to` es rol operativo, no identidad — pero documentar la decisión por columna).
+2. **Corregir el nombre `attendee_person_id` → `person_id`** en `meeting_attendees`.
+3. Añadir `entities.person_id` con tratamiento especial: si una persona duplicada es el PJ-link de una entity, **el script debe abortar con error explícito** (no se debe archivar una persona que es la identidad canónica de una sociedad sin antes mover el `entities.person_id` al canónico).
+4. Para tablas con `ON DELETE CASCADE` (`no_session_notificaciones`, `no_session_respuestas`): decidir si se mueven al canónico (preferible para audit trail) o se aceptan como histórico de la persona archivada.
+5. Pre-flight check expandido para enumerar TODOS los tipos de referencia, no solo `condiciones_persona`.
+
+### Resumen del addendum
+
+| Punto | Veredicto | Acción |
+|---|---|---|
+| A. `v_cargos_certificantes` sin CONSEJERO_COORDINADOR | **FAIL — bug legal H** | Remover de array + Backfill B en 000064 |
+| B. `chk_condicion_body_coherente` particionado | PASS | Sin acción |
+| C. FREE-FLOAT- exclusión necesaria | PASS | Mantener exclusión (1 fila legítima existe) |
+| D. Orden 000063 vs D2 | **FAIL — H (ya flageado)** | Comentario prerequisito + pre-flight |
+| E. D2.2 lista de tablas incompleta + bug nombre columna | **FAIL — H para Wave 2 builder** | Reescribir lista con 47 FK + corregir `attendee_person_id` |
+
+**Veredicto consolidado actualizado: NEEDS-CHANGES.** Total críticas H ahora son **5** (3 originales + Punto A nuevo + Punto E para Wave 2):
+
+1. Tests TS no compilan (`supabaseTestClient` no existe)
+2. Trigger pierde `SET search_path`
+3. 000063 fallará en Cloud sin D2 previa (duplicate B88888888)
+4. `v_cargos_certificantes` incluye CONSEJERO_COORDINADOR (bug legal)
+5. D2.2 lista solo 9 de 47 FK + bug en nombre `attendee_person_id` (Wave 2 builder)
+
+---
+
 🤖 Generated by Adversarial Reviewer Agent (claude-flow)
+🔄 Addendum tras input legal Garrigues — 2026-05-12
