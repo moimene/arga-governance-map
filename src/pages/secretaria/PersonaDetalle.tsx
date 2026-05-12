@@ -7,6 +7,7 @@ import {
   Plus,
   UserCheck,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
@@ -17,6 +18,10 @@ import {
 } from "@/hooks/useCargos";
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
+import {
+  requiresRepresentative,
+  type TipoCondicionCargo,
+} from "@/lib/secretaria/cargo-validation";
 
 export default function PersonaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -95,6 +100,21 @@ export default function PersonaDetalle() {
     );
   }
 
+  // D4.4: detección "PJ administradora sin representante PF permanente"
+  // (L2: LSC art. 212 bis + RRM art. 143). Subconjunto de los cargos
+  // vigentes filtrados por requiresRepresentative — la persona física
+  // permanente sólo es exigible cuando la PJ ocupa un cargo admin
+  // (ADMIN_UNICO/SOLIDARIO/MANCOMUNADO/PJ/CONSEJERO); como SOCIO no
+  // requiere representante (L1).
+  const cargosAdminSinRep: CargoDetailRow[] = cargosVigentes.filter((c) =>
+    requiresRepresentative(
+      { person_type: p.person_type },
+      c.tipo_condicion as TipoCondicionCargo,
+    ),
+  );
+  const needsRepresentanteWarning =
+    p.person_type === "PJ" && cargosAdminSinRep.length > 0 && !p.representative;
+
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <div className="mb-4">
@@ -142,6 +162,44 @@ export default function PersonaDetalle() {
           )}
         </div>
       </div>
+
+      {/* D4.4: aviso PJ administradora sin representante PF permanente.
+          LSC art. 212 bis + RRM art. 143 (L2): mientras no haya
+          representante PF, la PJ no podrá emitir certificación con este
+          cargo. */}
+      {needsRepresentanteWarning && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-3 border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle
+            className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-warning)]"
+            aria-hidden="true"
+          />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Esta persona jurídica administradora requiere representante PF permanente
+              (LSC art. 212 bis) — pendiente de asignar.
+            </p>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Tiene cargo(s) admin vigente(s):{" "}
+              {cargosAdminSinRep
+                .map((c) => CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion)
+                .join(", ")}
+              . Hasta que se designe, no se podrá emitir certificación con este cargo.
+            </p>
+            <Link
+              to={`/secretaria/personas/${p.id}/representante/nuevo`}
+              className="mt-2 inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              Asignar representante
+            </Link>
+          </div>
+        </div>
+      )}
 
       <section
         className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
