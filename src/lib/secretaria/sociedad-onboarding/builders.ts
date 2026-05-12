@@ -110,16 +110,24 @@ export function buildInitialBodies(draft: SociedadOnboardingDraft, baseSlug = sl
     ["riesgos", "COMISION_RIESGOS", "Comision de Riesgos"],
   ];
 
-  for (const [flag, body_key, name] of comisiones) {
-    if (!draft.organos.comisiones[flag]) continue;
-    bodies.push({
-      body_key,
-      slug: `${baseSlug}-${body_key.toLowerCase()}-${suffix}`,
-      name,
-      body_type: "COMISION",
-      config: { organo_tipo: body_key, voto_calidad_presidente: false },
-      quorum_rule: { voto_calidad_presidente: false },
-    });
+  // Comisiones solo aplican si la administracion es CDA. Si el usuario habilita
+  // comisiones con CDA y luego cambia a ADMIN_UNICO/SOLIDARIOS/MANCOMUNADOS,
+  // los checkboxes se ocultan en UI pero los flags del draft pueden persistir.
+  // Sin este guard, el builder crearia COMISION_* governing_bodies orphan
+  // sobre formas no-colegiadas que el usuario no puede ver ni limpiar antes
+  // del submit (review Codex P2).
+  if (draft.profile.tipo_organo_admin === "CDA") {
+    for (const [flag, body_key, name] of comisiones) {
+      if (!draft.organos.comisiones[flag]) continue;
+      bodies.push({
+        body_key,
+        slug: `${baseSlug}-${body_key.toLowerCase()}-${suffix}`,
+        name,
+        body_type: "COMISION",
+        config: { organo_tipo: body_key, voto_calidad_presidente: false },
+        quorum_rule: { voto_calidad_presidente: false },
+      });
+    }
   }
 
   return bodies;
@@ -170,7 +178,23 @@ export function buildInitialCapTable(draft: SociedadOnboardingDraft) {
       voting_rights: entry.is_treasury ? false : entry.voting_rights,
       is_treasury: entry.is_treasury,
       effective_from: draft.capital.effective_from,
-      metadata: {},
+      // representante_junta: persistido como metadata para que junta posterior
+      // pueda materializar el JUNTA_PROXY al convocar reunion. La spec D6 §2.3
+      // dice "no se persiste en alta como representaciones", pero hasta entonces
+      // perder el dato declarado por el usuario es peor: la sociedad nace
+      // OPERATIVA sin pista de quien representa al PJ socio. Guardarlo en
+      // metadata es referencia ligera, no contrato legal (review Codex P2).
+      metadata:
+        !entry.is_treasury &&
+        entry.holder?.person_type === "PJ" &&
+        entry.representante_junta?.tax_id
+          ? {
+              representante_junta: {
+                tax_id: entry.representante_junta.tax_id,
+                full_name: entry.representante_junta.full_name,
+              },
+            }
+          : {},
     };
   });
 
