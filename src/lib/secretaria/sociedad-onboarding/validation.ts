@@ -151,6 +151,20 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     }
   }
 
+  // CT-008: holder no-treasury con tax_id blank bloquea. PersonaPicker puede
+  // crear nuevo socio sin NIF/CIF; entry.holder queda truthy pero tax_id vacio
+  // y la RPC falla con "socio tax_id is required" -> server rollback (review
+  // Codex P2).
+  for (const entry of draft.capTable) {
+    if (!entry.is_treasury && entry.holder && (!entry.holder.tax_id || entry.holder.tax_id.trim() === "")) {
+      issues.push(issue(
+        "CT-008",
+        `capTable.${entry.key}.holder.tax_id`,
+        "El NIF/CIF del socio es obligatorio. Identificalo antes de seguir."
+      ));
+    }
+  }
+
   const sociosNoTreasury = nonTreasury(draft.capTable).filter((entry) => entry.holder);
   const uniqueHolderKeys = new Set(sociosNoTreasury.map((entry) => entry.holder?.tax_id || entry.holder?.key));
   if (isUnipersonalTipo(draft.identification.tipo_social) && uniqueHolderKeys.size > 1) {
@@ -235,7 +249,7 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     2: ["O-002", "CT-005"],
     3: ["C-001", "C-002", "C-003", "C-004"],
     4: ["CL-001", "CL-002", "CL-003"],
-    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "P-001"],
+    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "P-001"],
     6: ["O-001", "O-002"],
     7: ["CA-001", "CA-002", "AU-001", "PJ-001"],
     8: ["R-001", "R-002"],

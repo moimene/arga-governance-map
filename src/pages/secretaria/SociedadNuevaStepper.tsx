@@ -263,6 +263,15 @@ export default function SociedadNuevaStepper() {
           es_cotizada: draft.es_cotizada,
           entity_status: "Active",
           materiality: "Medium",
+          // El legacy stepper no ejecuta TX2 (no crea cargos), pero hasta que
+          // /secretaria/sociedades/nueva monte el nuevo flujo D6 (StepRevisionCreacion
+          // + RPC + adaptador) esta ruta es el único alta operativo en producción
+          // demo. La migración 000067 introdujo default 'INCOMPLETA_CARGOS' pesimista
+          // para nuevas filas creadas vía RPC, pero las creadas por este stepper
+          // legacy deben seguir naciendo OPERATIVA para no ensuciar la demo con
+          // sociedades flagged incompletas que sí están operativas en la práctica.
+          // Eliminar este override cuando la ruta se migre al flujo D6 (review Codex P2).
+          onboarding_status: "OPERATIVA",
         })
         .select()
         .single();
