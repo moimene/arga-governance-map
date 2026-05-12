@@ -64,7 +64,6 @@ const DecisionUnipersonalStepper = lazy(() => import("@/pages/secretaria/Decisio
 const LibrosObligatorios = lazy(() => import("@/pages/secretaria/LibrosObligatorios"));
 const LibroSocios = lazy(() => import("@/pages/secretaria/LibroSocios"));
 const Plantillas = lazy(() => import("@/pages/secretaria/Plantillas"));
-const PlantillasTracker = lazy(() => import("@/pages/secretaria/PlantillasTracker"));
 const GestorPlantillas = lazy(() => import("@/pages/secretaria/GestorPlantillas"));
 const Calendario = lazy(() => import("@/pages/secretaria/Calendario"));
 const ProcesosGrupo = lazy(() => import("@/pages/secretaria/ProcesosGrupo"));
@@ -210,7 +209,10 @@ const App = () => (
                   <Route path="/secretaria/libros" element={<Suspense fallback={<ModuleFallback />}><LibrosObligatorios /></Suspense>} />
                   <Route path="/secretaria/libro-socios" element={<Suspense fallback={<ModuleFallback />}><LibroSocios /></Suspense>} />
                   <Route path="/secretaria/plantillas" element={<Suspense fallback={<ModuleFallback />}><Plantillas /></Suspense>} />
-                  <Route path="/secretaria/plantillas-tracker" element={<Suspense fallback={<ModuleFallback />}><PlantillasTracker /></Suspense>} />
+                  <Route
+                    path="/secretaria/plantillas-tracker"
+                    element={<Navigate to="/secretaria/gestor-plantillas?tab=metricas" replace />}
+                  />
                   <Route path="/secretaria/gestor-plantillas" element={<Suspense fallback={<ModuleFallback />}><GestorPlantillas /></Suspense>} />
                   <Route path="/secretaria/calendario" element={<Suspense fallback={<ModuleFallback />}><Calendario /></Suspense>} />
                   <Route path="/secretaria/procesos-grupo" element={<Suspense fallback={<ModuleFallback />}><ProcesosGrupo /></Suspense>} />
