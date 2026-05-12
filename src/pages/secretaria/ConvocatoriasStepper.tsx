@@ -768,12 +768,14 @@ export default function ConvocatoriasStepper() {
   }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo, requestedPlantillaId]);
 
   const [selectedBorradorTemplateId, setSelectedBorradorTemplateId] = useState<string | null>(null);
-  const effectiveBorradorTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
-    if (selectedBorradorTemplateId) {
-      return plantillasProtegidas.find((p) => p.id === selectedBorradorTemplateId) ?? autoSelectedTemplate;
-    }
-    return autoSelectedTemplate;
-  }, [autoSelectedTemplate, plantillasProtegidas, selectedBorradorTemplateId]);
+  // Codex P2 PR #3 round 7: el efectivo SE RESUELVE DESDE `candidateTemplates`
+  // (no desde la lista completa). Si el usuario selecciona una plantilla en
+  // Paso 7 y luego vuelve a Paso 1 a cambiar entidad/jurisdicción/órgano,
+  // candidateTemplates re-filtra y la plantilla previamente seleccionada
+  // puede dejar de ser compatible. En ese caso caemos a auto (compatible
+  // con el nuevo contexto) en vez de seguir trazando texto legal para
+  // contexto incorrecto. Nota: el useMemo necesita ver `candidateTemplates`
+  // declarado abajo — declaramos primero el filter, luego el effective.
 
   // Codex P2 PR #3 round 6: el selector manual debe filtrar por la misma
   // metadata que `selectProcessTemplate()` aplica en auto-selección, para
@@ -813,6 +815,33 @@ export default function ConvocatoriasStepper() {
       return organoOk;
     });
   }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo]);
+
+  // Codex P2 PR #3 round 7 — declaración tras candidateTemplates: resuelve
+  // `selectedBorradorTemplateId` ÚNICAMENTE en la lista filtrada por
+  // contexto actual. Si la plantilla seleccionada manualmente ya no es
+  // compatible (cambio de entidad/jurisdicción/órgano tras la selección),
+  // cae a `autoSelectedTemplate`.
+  const effectiveBorradorTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (selectedBorradorTemplateId) {
+      const matchedInCurrent = candidateTemplates.find((p) => p.id === selectedBorradorTemplateId);
+      if (matchedInCurrent) return matchedInCurrent;
+      // La selección previa ya no encaja con el contexto actual.
+      return autoSelectedTemplate;
+    }
+    return autoSelectedTemplate;
+  }, [autoSelectedTemplate, candidateTemplates, selectedBorradorTemplateId]);
+
+  // Limpiar `selectedBorradorTemplateId` cuando ya no exista en la lista
+  // filtrada, para que el selector NO muestre un valor stale. Evita
+  // confusión visual: el `<select>` mostraría "— Seleccionar plantilla —"
+  // mientras el id en estado sigue siendo el anterior.
+  useEffect(() => {
+    if (!selectedBorradorTemplateId) return;
+    const stillCompatible = candidateTemplates.some((p) => p.id === selectedBorradorTemplateId);
+    if (!stillCompatible) {
+      setSelectedBorradorTemplateId(null);
+    }
+  }, [candidateTemplates, selectedBorradorTemplateId]);
 
   const borradorCapa3Fields = useMemo(
     () =>

@@ -720,5 +720,67 @@ describe('evaluarConvocatoria', () => {
       expect(result.canalesExigidos).toContain('BORME');
       expect(result.canalesExigidos).toContain('DIARIO_OFICIAL');
     });
+
+    // Codex P2 round 7 PR #3: filtrar códigos abstractos non-junta.
+    it('CdA: filtra códigos abstractos del rule_pack (CONVOCATORIA_CONSEJO)', () => {
+      const packWithAbstractCode = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+            SL: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [packWithAbstractCode],
+        [],
+      );
+      // Abstract code se elimina (Paso 5 UI no lo puede satisfacer)
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      // Concretos del pack se preservan
+      expect(result.canalesExigidos).toContain('EMAIL_SIMPLE');
+    });
+
+    it('CdA: filtra NOTIFICACION_GENERICA y NOTIFICACION_DIRECTA', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['NOTIFICACION_GENERICA', 'NOTIFICACION_DIRECTA', 'ERDS'],
+            SL: ['NOTIFICACION_GENERICA', 'ERDS'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_DIRECTA');
+      expect(result.canalesExigidos).toContain('ERDS');
+    });
+
+    it('JGA: NO filtra códigos del pack (sólo aplica filtro a non-junta)', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['NOTIFICACION_GENERICA', 'WEB_SOCIEDAD'],
+            SL: ['NOTIFICACION_GENERICA'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        [pack],
+        [],
+      );
+      // Para junta, los códigos del pack se mantienen tal cual.
+      expect(result.canalesExigidos).toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
+    });
   });
 });

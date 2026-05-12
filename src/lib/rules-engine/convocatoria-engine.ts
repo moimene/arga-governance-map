@@ -152,7 +152,26 @@ export function evaluarConvocatoria(
   //         lo ocultaba → reminder perpetuo "CHANNEL_REMINDER" falso
   //         (Codex P2 PR #3).
   // ================================================================
-  const canalesExigidos = calcularCanales(input, packs, overrides);
+  let canalesExigidos = calcularCanales(input, packs, overrides);
+
+  // Codex P2 round 7: filtrar canales abstractos del rule_pack que no
+  // tienen counterpart concreto seleccionable en la UI. Los packs de
+  // CONSEJO usan códigos genéricos tipo `CONVOCATORIA_CONSEJO` o
+  // `NOTIFICACION_GENERICA`, pero Paso 5 sólo ofrece EMAIL_SIMPLE,
+  // CORREO_CERTIFICADO, ERDS, BUROFAX. `channelSatisfiesReminder()` no
+  // los reconoce como equivalentes → reminder perpetuamente pending.
+  // Para órganos NO junta, eliminamos los códigos abstractos del
+  // contrato de reminders; el secretario elige cualquier canal directo.
+  if (!isJunta) {
+    const ABSTRACT_NON_JUNTA_CODES = new Set([
+      'CONVOCATORIA_CONSEJO',
+      'CONVOCATORIA_COMISION',
+      'CONVOCATORIA_COMITE',
+      'NOTIFICACION_GENERICA',
+      'NOTIFICACION_DIRECTA',
+    ]);
+    canalesExigidos = canalesExigidos.filter((c) => !ABSTRACT_NON_JUNTA_CODES.has(c));
+  }
 
   if (isJunta && input.tipoSocial === 'SA' && !input.webInscrita) {
     if (!canalesExigidos.includes('BORME')) {
