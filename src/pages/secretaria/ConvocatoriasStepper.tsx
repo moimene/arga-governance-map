@@ -17,6 +17,7 @@ import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
+import { supabase } from "@/integrations/supabase/client";
 import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
@@ -992,10 +993,49 @@ export default function ConvocatoriasStepper() {
     };
   }, []);
 
+  // Codex P2 round 8 PR #3: hash del contexto bajo el que se generó (o
+  // editó) el borrador. Cuando el contexto cambia (entidad / órgano /
+  // fecha / agenda / plantilla / capa3), comparamos contra este hash
+  // para mostrar al usuario que su borrador editado puede haber quedado
+  // stale. Sólo trackeamos los campos que afectan el render.
+  const borradorContextHash = useMemo(() => {
+    const agendaSignature = agendaItems
+      .filter((i) => i.titulo.trim())
+      .map((i) => `${i.titulo}|${i.materia}|${i.tipo}|${i.kind ?? ""}|${i.propuesta_acuerdo ?? ""}`)
+      .join("");
+    const capa3Signature = Object.entries(borradorCapa3Values)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("");
+    return [
+      selectedEntityId ?? "",
+      selectedBodyId ?? "",
+      tipoConvocatoria,
+      fechaReunion,
+      horaReunion,
+      lugar,
+      formatoReunion,
+      habilitarSegunda ? `2:${fechaReunion2}|${horaReunion2}` : "1",
+      channels.slice().sort().join(","),
+      effectiveBorradorTemplate?.id ?? "",
+      effectiveBorradorTemplate?.version ?? "",
+      capa3Signature,
+      agendaSignature,
+    ].join("");
+  }, [
+    selectedEntityId, selectedBodyId, tipoConvocatoria,
+    fechaReunion, horaReunion, lugar, formatoReunion,
+    habilitarSegunda, fechaReunion2, horaReunion2,
+    channels, effectiveBorradorTemplate?.id, effectiveBorradorTemplate?.version,
+    borradorCapa3Values, agendaItems,
+  ]);
+
+  const borradorLastRenderHashRef = useRef<string>("");
+
   const regenerateBorrador = useCallback(() => {
     if (!effectiveBorradorTemplate?.capa1_inmutable) {
       setBorradorTexto("");
       setRenderUnresolved([]);
+      borradorLastRenderHashRef.current = borradorContextHash;
       return;
     }
     // Cada llamada incrementa el token; sólo el último vuelve a setState.
@@ -1011,8 +1051,10 @@ export default function ConvocatoriasStepper() {
       setBorradorTexto(result.text);
       setRenderUnresolved(result.unresolvedVariables);
       setBorradorDirty(false);
+      // Tras render limpio el hash queda alineado con el contexto actual.
+      borradorLastRenderHashRef.current = borradorContextHash;
     });
-  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values]);
+  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values, borradorContextHash]);
 
   // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si:
   //   1. usuario está actualmente en Paso 7 (evita imports dinámicos y
@@ -1024,6 +1066,15 @@ export default function ConvocatoriasStepper() {
       regenerateBorrador();
     }
   }, [current, regenerateBorrador, borradorDirty]);
+
+  // Codex P2 round 8 PR #3: detectar stale draft. Si el usuario editó el
+  // textarea (dirty) y luego cambió el contexto upstream (entidad / órgano
+  // / agenda / etc.), `borradorTexto` ya no refleja la metadata persistida.
+  // No descartamos el texto del usuario (puede ser intencional) — el flag
+  // alimenta un callout visual + bloquea emisión hasta resolución
+  // explícita.
+  const borradorIsStale = borradorDirty && borradorLastRenderHashRef.current !== "" &&
+    borradorLastRenderHashRef.current !== borradorContextHash;
 
   const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
     ? []
@@ -1336,6 +1387,12 @@ export default function ConvocatoriasStepper() {
             : null,
           included_required: includedRequiredDocuments,
           missing_required: missingRequiredDocuments,
+          // Codex P2 round 8 PR #3: marcamos los adjuntos como `intended`
+          // en el trace inicial (antes de los uploads). Tras los uploads,
+          // `handleEmitir` hace UPDATE de `reminders_trace` con el status
+          // real de cada archivo (`uploaded` / `failed` + error_message).
+          // Sin este patch, el trace mentía afirmando upload exitoso de
+          // archivos que en realidad fallaron en Storage o INSERT.
           uploaded_references: adjuntos.map((adjunto) => ({
             id: adjunto.id,
             nombre: adjunto.alias || adjunto.file.name,
@@ -1343,6 +1400,7 @@ export default function ConvocatoriasStepper() {
             file_name: adjunto.file.name,
             size_bytes: adjunto.file.size,
             mime: adjunto.file.type || null,
+            upload_status: "intended" as const,
           })),
         },
         recipients: {
@@ -1411,6 +1469,10 @@ export default function ConvocatoriasStepper() {
       let okCount = 0;
       let failCount = 0;
       const failMessages: string[] = [];
+      // Por adjunto: registra el outcome (ok | failed + msg) — usado luego
+      // para parchear `reminders_trace.documents.uploaded_references` con
+      // el status real (Codex P2 round 8 PR #3).
+      const outcomesById = new Map<string, { ok: true } | { ok: false; msg: string }>();
       if (adjuntos.length > 0) {
         setUploadStatus({ ok: 0, failed: 0, messages: [], inFlight: adjuntos.length });
         type UploadOutcome =
@@ -1434,6 +1496,7 @@ export default function ConvocatoriasStepper() {
           const outcome = result.value;
           if (outcome.ok === true) {
             okCount += 1;
+            outcomesById.set(outcome.adjunto.id, { ok: true });
             continue;
           }
           // outcome.ok === false aquí → TS estrecha a la variante con msg.
@@ -1441,11 +1504,55 @@ export default function ConvocatoriasStepper() {
           const failedAdjunto = outcome.adjunto;
           const failedMsg = outcome.msg;
           failMessages.push(`${failedAdjunto.file.name}: ${failedMsg}`);
+          outcomesById.set(failedAdjunto.id, { ok: false, msg: failedMsg });
           setAdjuntos((prev) =>
             prev.map((a) => (a.id === failedAdjunto.id ? { ...a, error: failedMsg } : a)),
           );
         }
         setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages, inFlight: 0 });
+
+        // PATCH reminders_trace para reflejar status real de cada adjunto.
+        // Sin esto, el trace original decía `upload_status: 'intended'`
+        // para todos, escondiendo los fallos del audit.
+        const existingTrace = (created.reminders_trace ?? {}) as Record<string, unknown>;
+        const existingDocuments = (existingTrace.documents ?? {}) as Record<string, unknown>;
+        const existingUploaded = (existingDocuments.uploaded_references ?? []) as Array<Record<string, unknown>>;
+        const patchedUploaded = existingUploaded.map((entry) => {
+          const id = typeof entry.id === "string" ? entry.id : null;
+          const outcome = id ? outcomesById.get(id) : undefined;
+          if (!outcome) {
+            return { ...entry, upload_status: "unknown" };
+          }
+          if (outcome.ok === true) {
+            return { ...entry, upload_status: "uploaded", upload_error: null };
+          }
+          // outcome.ok === false aquí — extraemos msg de forma narrowing-
+          // friendly para evitar problemas de control-flow en map callbacks.
+          const failureMsg = outcome.msg;
+          return { ...entry, upload_status: "failed", upload_error: failureMsg };
+        });
+        const patchedTrace = {
+          ...existingTrace,
+          documents: {
+            ...existingDocuments,
+            uploaded_references: patchedUploaded,
+            uploaded_summary: { ok: okCount, failed: failCount },
+          },
+        };
+        const { error: patchError } = await supabase
+          .from("convocatorias")
+          .update({ reminders_trace: patchedTrace } as never)
+          .eq("id", created.id);
+        if (patchError) {
+          // No bloqueamos la emisión — solo log para que un futuro audit
+          // detecte que el patch del trace falló y el shape original
+          // permanece (con `upload_status: 'intended'`).
+          // eslint-disable-next-line no-console
+          console.warn("[convocatorias] reminders_trace patch skipped", {
+            convocatoriaId: created.id,
+            message: patchError.message,
+          });
+        }
       }
 
       setEmitidoId(created.id);
@@ -2855,6 +2962,49 @@ export default function ConvocatoriasStepper() {
                     {renderUnresolved.length > 8 ? ` y ${renderUnresolved.length - 8} más` : ""}.
                   </p>
                 )}
+
+                {/* Codex P2 round 8 PR #3: borrador stale cuando el contexto
+                    upstream (entidad, órgano, fecha, agenda, plantilla)
+                    cambió tras el último render limpio. Bloquea la emisión
+                    hasta que el usuario decida explícitamente: regenerar
+                    desde plantilla o confirmar que el texto editado sigue
+                    siendo correcto. */}
+                {borradorIsStale && (
+                  <div
+                    className="mt-2 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-card)] p-2"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                    role="alert"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-error)]">
+                      ⚠ Borrador desactualizado — contexto cambió
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                      Editaste manualmente el texto y después cambiaste alguno
+                      de: entidad, órgano, fecha, orden del día, canales,
+                      plantilla o capa 3. El texto puede haberse quedado
+                      desfasado respecto a la metadata que se persistirá. Pulsa{" "}
+                      <span className="font-semibold">"Regenerar desde plantilla"</span>{" "}
+                      para reincorporar el contexto nuevo o confirma manualmente
+                      que el texto sigue siendo válido (Paso 8 emite tal cual).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Confirmación explícita: el usuario asume el texto
+                        // como válido y lo desbloquea — actualizamos el hash
+                        // de referencia al contexto actual.
+                        borradorLastRenderHashRef.current = borradorContextHash;
+                        // Forzamos re-render quitando el estado stale.
+                        // (borradorDirty se mantiene true como evidencia.)
+                        setBorradorTexto((prev) => prev);
+                      }}
+                      className="mt-2 border border-[var(--status-warning)] bg-transparent px-2 py-1 text-[11px] text-[var(--status-warning)] hover:bg-[var(--g-surface-subtle)]"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      Conservar texto como válido bajo mi responsabilidad
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3042,14 +3192,17 @@ export default function ConvocatoriasStepper() {
             {isLastStep ? (
               <button
                 type="button"
-                disabled={createConvocatoria.isPending || uploadStatus.inFlight > 0}
+                disabled={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorIsStale}
                 onClick={handleEmitir}
                 aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0}
+                title={borradorIsStale ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de emitir." : undefined}
                 className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Send className="h-4 w-4" />
-                {uploadStatus.inFlight > 0
+                {borradorIsStale
+                  ? "Borrador stale — resolver Paso 7"
+                  : uploadStatus.inFlight > 0
                   ? `Subiendo ${uploadStatus.inFlight} adjunto(s)…`
                   : createConvocatoria.isPending
                   ? "Emitiendo…"
