@@ -177,14 +177,35 @@ Contenido:
    - `corporate_email text`
    - `regulated_sector text` (`'BANCA' | 'SEGUROS' | 'ENERGIA' | 'TELECOM' | 'OTRO' | null`)
    - `group_role text` (`'INDEPENDIENTE' | 'MATRIZ' | 'FILIAL' | 'PARTICIPADA'`)
-   - `onboarding_status text` (`'OPERATIVA' | 'INCOMPLETA_CARGOS' | 'INCOMPLETA_DATOS' | 'BORRADOR'`) **default `'INCOMPLETA_CARGOS'`** (estado pesimista: la sociedad nace incompleta y solo se promueve a `'OPERATIVA'` cuando TX2 confirma éxito).
+   - `onboarding_status text` (`'OPERATIVA' | 'INCOMPLETA_CARGOS' | 'INCOMPLETA_DATOS' | 'BORRADOR'`) — **estado pesimista para nuevas filas, `OPERATIVA` para legacy** (orden de migración crítico, ver abajo).
    - `support_docs_metadata jsonb` (default `'{}'::jsonb`)
 
    **Justificación del default pesimista (post review Codex):** si fuera `'OPERATIVA'`, cualquier escenario donde TX1 commitea pero TX2 no se ejecuta — navegador cerrado, adapter throw entre RPC y UPDATE, red caída antes del UPDATE final — dejaría una sociedad marcada operativa sin cargos/representantes/authority_evidence. Con default pesimista, el peor caso de TX2 no completado deja la sociedad correctamente marcada `INCOMPLETA_CARGOS`, visible al usuario para que complete los cargos desde Designar admin / Asignar cargo.
 
-   Backfill: las filas legacy (sociedades creadas antes de esta migración) reciben `onboarding_status = 'OPERATIVA'` en una sentencia `UPDATE entities SET onboarding_status = 'OPERATIVA' WHERE onboarding_status IS NULL` dentro de la propia migración `000067`. Las nuevas filas nacen con default pesimista.
+   **Orden de migración para `onboarding_status` (crítico):**
 
-   Todas las columnas son `NULL`-able para no romper filas legacy. La validación de operatividad es responsabilidad del cliente (validators puros) y del CHECK `onboarding_status` (futuro).
+   ```sql
+   -- Paso 1: añadir columna SIN default. Las filas legacy quedan con NULL,
+   -- que es lo que el backfill del paso 2 puede detectar y actualizar.
+   ALTER TABLE entities ADD COLUMN onboarding_status text;
+
+   -- Paso 2: backfill explícito de filas legacy a 'OPERATIVA'. Sin esto
+   -- (o si lo hiciéramos después del default), las sociedades preexistentes
+   -- quedarían marcadas como INCOMPLETA_CARGOS, lo cual ensucia toda la
+   -- demo. El WHERE IS NULL es seguro porque ninguna fila tiene aún
+   -- onboarding_status asignado.
+   UPDATE entities SET onboarding_status = 'OPERATIVA' WHERE onboarding_status IS NULL;
+
+   -- Paso 3: ahora sí, set default pesimista para futuras inserts. Postgres
+   -- aplica este DEFAULT solo a INSERTs nuevos cuando el valor no se
+   -- proporciona; no toca filas existentes (porque ya tienen valor del
+   -- paso 2).
+   ALTER TABLE entities ALTER COLUMN onboarding_status SET DEFAULT 'INCOMPLETA_CARGOS';
+   ```
+
+   **Por qué este orden y no `ADD COLUMN ... DEFAULT 'INCOMPLETA_CARGOS'` directo (review Codex):** Postgres aplica el DEFAULT inmediatamente al añadir la columna, escribiendo `'INCOMPLETA_CARGOS'` en TODAS las filas existentes. El `UPDATE ... WHERE IS NULL` posterior no matchearía ninguna fila y la demo quedaría llena de sociedades flagged incomplete. El orden add-without-default → backfill → set-default es el patrón seguro estándar para migraciones con backfill.
+
+   Todas las columnas (excepto la regla anterior para `onboarding_status`) son `NULL`-able para no romper filas legacy. La validación de operatividad es responsabilidad del cliente (validators puros) y del CHECK `onboarding_status` (futuro).
 
 2. **Función `fn_crear_sociedad_legal_y_capital`** (SECURITY DEFINER, lenguaje plpgsql):
    - Firma: `(p_tenant_id uuid, p_payload jsonb) RETURNS jsonb`
