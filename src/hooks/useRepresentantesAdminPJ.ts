@@ -53,10 +53,19 @@ export interface UpsertRepresentanteInput {
 }
 
 /**
- * Designa representante PF para PJ administradora. Si ya existe representación
- * VIGENTE para el par (PJ, entity), la cierra (effective_to=hoy) antes de
- * insertar la nueva. También sincroniza persons.representative_person_id
- * (dual-write durante Plan A' transition — ver spec §6).
+ * Designa representante PF para PJ administradora.
+ *
+ * IMPLEMENTACIÓN — NO ATOMICITY, BEST-EFFORT REVERT:
+ * supabase-js no expone transacciones cliente. Esta función usa try/catch
+ * con revert manual: si el INSERT falla tras cerrar la representación
+ * previa, intenta re-abrirla (UPDATE effective_to=null). Casos catastróficos
+ * (insert fail + revert fail) se loggean en consola.
+ *
+ * Atomicity real (RPC SECURITY DEFINER fn_designar_representante) está
+ * diferida a Plan A' (ver spec §6).
+ *
+ * También sincroniza persons.representative_person_id (dual-write durante
+ * transición Plan A' — deprecable cuando UI lea solo de representaciones).
  *
  * Importante: el UNIQUE ux_representaciones_vigente cubre
  * (entity_id, represented_person_id, scope, COALESCE(meeting_id, sentinel))
@@ -70,49 +79,71 @@ export function useUpsertRepresentanteAdminPJ() {
     mutationFn: async (input: UpsertRepresentanteInput): Promise<{ id: string }> => {
       if (!tenantId) throw new Error("Tenant no inicializado");
 
-      // 1. Cerrar representación VIGENTE previa (si existe)
+      // 1. Snapshot la representación previa VIGENTE (si existe) para revert path
       const today = new Date().toISOString().slice(0, 10);
-      const { error: closeErr } = await supabase
+      const { data: previaArray, error: lookupErr } = await supabase
         .from("representaciones")
-        .update({ effective_to: today })
+        .select("id, effective_to")
         .eq("tenant_id", tenantId)
         .eq("represented_person_id", input.represented_person_id)
         .eq("entity_id", input.entity_id)
         .eq("scope", "ADMIN_PJ_REPRESENTANTE")
         .is("effective_to", null);
-      if (closeErr) throw closeErr;
+      if (lookupErr) throw lookupErr;
+      const previaIds: string[] = (previaArray ?? []).map((r) => r.id as string);
 
-      // 2. Insertar nueva representación
+      // 2. Close previa (UPDATE effective_to=today)
+      if (previaIds.length > 0) {
+        const { error: closeErr } = await supabase
+          .from("representaciones")
+          .update({ effective_to: today })
+          .in("id", previaIds);
+        if (closeErr) throw closeErr;
+      }
+
+      // 3. Insert nueva — wrapped en try/catch para revert si falla
       const evidence: Record<string, unknown> = {};
       if (input.inscripcion_rm_referencia) evidence.rm_ref = input.inscripcion_rm_referencia;
       if (input.inscripcion_rm_fecha) evidence.rm_fecha = input.inscripcion_rm_fecha;
 
-      const { data, error } = await supabase
-        .from("representaciones")
-        .insert({
-          tenant_id: tenantId,
-          represented_person_id: input.represented_person_id,
-          representative_person_id: input.representative_person_id,
-          entity_id: input.entity_id,
-          scope: "ADMIN_PJ_REPRESENTANTE",
-          effective_from: input.effective_from,
-          evidence,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from("representaciones")
+          .insert({
+            tenant_id: tenantId,
+            represented_person_id: input.represented_person_id,
+            representative_person_id: input.representative_person_id,
+            entity_id: input.entity_id,
+            scope: "ADMIN_PJ_REPRESENTANTE",
+            effective_from: input.effective_from,
+            evidence,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
 
-      // 3. Dual-write a persons.representative_person_id (legacy, deprecable
-      //    en Plan A'). Mantiene el campo en sync para consumidores antiguos
-      //    que aún leen el shortcut sin pasar por representaciones.
-      const { error: dualErr } = await supabase
-        .from("persons")
-        .update({ representative_person_id: input.representative_person_id })
-        .eq("id", input.represented_person_id)
-        .eq("tenant_id", tenantId);
-      if (dualErr) throw dualErr;
+        // 4. Dual-write a persons.representative_person_id (legacy)
+        await supabase
+          .from("persons")
+          .update({ representative_person_id: input.representative_person_id })
+          .eq("id", input.represented_person_id)
+          .eq("tenant_id", tenantId);
 
-      return { id: (data as { id: string }).id };
+        return { id: (data as { id: string }).id };
+      } catch (insertErr) {
+        // Revert: re-open la representación previa cerrada en paso 2
+        if (previaIds.length > 0) {
+          const { error: revertErr } = await supabase
+            .from("representaciones")
+            .update({ effective_to: null })
+            .in("id", previaIds);
+          if (revertErr) {
+            // Catastrophic: insert failed AND revert failed. Log both for forensics.
+            console.error("CRITICAL: insert failed + revert failed", { insertErr, revertErr });
+          }
+        }
+        throw insertErr;
+      }
     },
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ["representaciones", tenantId] });
