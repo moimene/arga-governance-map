@@ -43,7 +43,8 @@
 **Archivos:** [`gate-pre.ts:27`](../../src/lib/secretaria/template-admin/gate-pre.ts) vs [`template-import-schema.ts:153`](../../src/lib/secretaria/template-admin/template-import-schema.ts)
 **Severidad:** Important
 **Problema:** Gate PRE acepta este organo via `EXTENDED_KNOWN_ORGANOS`, pero el schema del importer lo rechaza. Plantillas con este valor pasan Gate PRE pero no pueden re-importarse via wizard.
-**Fix:** decidir destino canónico — (a) añadir a `ORGANO_CANONICO` con deprecation note y migrar la única plantilla afectada, o (b) eliminar del Gate PRE y forzar normalización antes de Gate PRE.
+**Decisión 2026-05-12:** opción (a). Añadir `JUNTA_GENERAL_O_CONSEJO` al enum del schema con deprecation note. Mantener compatibilidad de import para la plantilla activa afectada (`ACTA_ACUERDO_ESCRITO` / acuerdo sin sesión) y normalizarla a dos variantes, una por órgano, cuando el Comité Legal firme la corrección.
+**Fix Sprint 2:** actualizar schema + tests para aceptar el valor deprecado; documentar la normalización futura como remediación legal, no como bloqueo técnico.
 
 ### F7. `useImportPlantillaPackage` invalida queries en `{ok:false}`
 **Archivo:** [`src/hooks/secretaria/useImportPlantillaPackage.ts:138-141`](../../src/hooks/secretaria/useImportPlantillaPackage.ts)
@@ -53,9 +54,10 @@
 
 ### F8. Coexistencia `/secretaria/plantillas` con `/secretaria/gestor-plantillas`
 **Archivo:** [`src/App.tsx:210, :215`](../../src/App.tsx)
-**Severidad:** Decision pending
+**Severidad:** Product decision closed
 **Problema:** El spec §4 mantiene dos experiencias intencionalmente (`/plantillas` = catálogo Secretario, `/gestor-plantillas` = consola admin). El reviewer cuestiona si esto es deseable.
-**Decisión:** mantener como está según spec, pero **decidir explícitamente** en Sprint 2 si redirigir `/secretaria/plantillas` → `?tab=catalogo` para simplificar, o documentar la dualidad como decisión definitiva.
+**Decisión 2026-05-12:** mantener la dualidad como decisión definitiva. Las audiencias son distintas: Secretario funcional en `/secretaria/plantillas`, Legal Ops/admin en `/secretaria/gestor-plantillas`. Fusionarlas añadiría RBAC condicional y ruido operativo sin beneficio claro.
+**Acción:** no redirigir `/secretaria/plantillas`. Mantener documentación de producto y navegación diferenciadas.
 
 ### F11. Separar preflight y commit del importador
 **Archivos:** [`src/hooks/secretaria/useImportPlantillaPackage.ts`](../../src/hooks/secretaria/useImportPlantillaPackage.ts), [`src/components/secretaria/gestor/TemplateImportWizard.tsx`](../../src/components/secretaria/gestor/TemplateImportWizard.tsx)
@@ -98,4 +100,4 @@
 
 ## Tracking
 
-Cuando se planifique Sprint 2, copiar F1–F8 al plan inicial. F1, F2, F3, F4 son ~1 jornada combinada. F5 es ~0.5 jornadas. F6 requiere decisión legal (consultar Comité antes). F7 es ~30 min. F8 requiere decisión de producto.
+Cuando se planifique Sprint 2, copiar F1–F7, F11 y F12 al plan inicial. F1, F2, F3, F4 son ~1 jornada combinada. F5 es ~0.5 jornadas. F6 ya tiene destino canónico decidido; requiere implementación técnica y remediación legal posterior. F7 es ~30 min. F8 queda cerrado como decisión de producto: no requiere implementación.
