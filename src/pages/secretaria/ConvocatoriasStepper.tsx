@@ -1093,8 +1093,20 @@ export default function ConvocatoriasStepper() {
   // No descartamos el texto del usuario (puede ser intencional) — el flag
   // alimenta un callout visual + bloquea emisión hasta resolución
   // explícita.
-  const borradorIsStale = borradorDirty && borradorLastRenderHashRef.current !== "" &&
-    borradorLastRenderHashRef.current !== borradorContextHash;
+  //
+  // Codex P2 round 11 PR #3: el botón "Conservar texto como válido" debe
+  // poder DESBLOQUEAR la emisión. Si solo mutamos refs + setState con el
+  // mismo valor, React bail-out y `borradorIsStale` se queda true en el
+  // render. Añadimos un state real `staleAcknowledgedHash` que el usuario
+  // setea para confirmar bajo qué contexto aceptó el texto. Mientras
+  // siga igual al contextHash actual, el texto se considera explícitamente
+  // válido. Si el contexto cambia de nuevo, vuelve a stale.
+  const [staleAcknowledgedHash, setStaleAcknowledgedHash] = useState<string>("");
+  const borradorIsStale =
+    borradorDirty &&
+    borradorLastRenderHashRef.current !== "" &&
+    borradorLastRenderHashRef.current !== borradorContextHash &&
+    staleAcknowledgedHash !== borradorContextHash;
 
   const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
     ? []
@@ -3018,13 +3030,16 @@ export default function ConvocatoriasStepper() {
                     <button
                       type="button"
                       onClick={() => {
-                        // Confirmación explícita: el usuario asume el texto
-                        // como válido y lo desbloquea — actualizamos el hash
-                        // de referencia al contexto actual.
+                        // Codex P2 round 11 PR #3: confirmación explícita.
+                        // Actualizamos el hash de referencia para alinear
+                        // los refs con el contexto actual, Y el state
+                        // `staleAcknowledgedHash` para forzar re-render
+                        // (refs solos no disparan re-render → React
+                        // bail-out con setBorradorTexto(prev=>prev)).
+                        // `borradorDirty` se mantiene true como evidencia
+                        // de que el texto fue editado manualmente.
                         borradorLastRenderHashRef.current = borradorContextHash;
-                        // Forzamos re-render quitando el estado stale.
-                        // (borradorDirty se mantiene true como evidencia.)
-                        setBorradorTexto((prev) => prev);
+                        setStaleAcknowledgedHash(borradorContextHash);
                       }}
                       className="mt-2 border border-[var(--status-warning)] bg-transparent px-2 py-1 text-[11px] text-[var(--status-warning)] hover:bg-[var(--g-surface-subtle)]"
                       style={{ borderRadius: "var(--g-radius-sm)" }}
