@@ -8,6 +8,7 @@ BEGIN;
 CREATE OR REPLACE FUNCTION fn_sync_authority_evidence()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path TO 'public', 'extensions'
 AS $$
 DECLARE
   v_cargos_certificantes text[] := ARRAY[
