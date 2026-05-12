@@ -168,12 +168,12 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
 // cotizadas (LMV / Código de Buen Gobierno CNMV). NO cambia la clase de
 // materia (sigue siendo ORDINARIA/ESTATUTARIA/ESTRUCTURAL para el motor),
 // pero activa advertencias en la UI si la entidad es cotizada:
-//   - OPERACIONES_VINCULADAS: art. 529 ter.h + 530 LSC → comisión auditoría
+//   - OPERACION_VINCULADA: art. 529 ter.h + 530 LSC → comisión auditoría
 //     + aprobación CdA + comunicación CNMV (>5% balance) o folleto si afecta
 //     al mercado.
 //   - PROGRAMA_RECOMPRA: art. 277 LSC + Reglamento UE 596/2014 (abuso de
 //     mercado) → autorización JGA + notificación CNMV + ventanas trading.
-//   - RETRIBUCION_CONSEJEROS: art. 529 novodecies LSC → informe anual
+//   - REMUNERACION_CONSEJEROS: art. 529 novodecies LSC → informe anual
 //     vinculante + voto consultivo cotizadas.
 const AGENDA_MATERIAS = [
   // Ordinarias (gestión recurrente del órgano)
@@ -185,9 +185,15 @@ const AGENDA_MATERIAS = [
   { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
   { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
   { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "RETRIBUCION_CONSEJEROS", label: "Política / informe de retribución de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  // Canonical id `REMUNERACION_CONSEJEROS` (materia_catalog 20260424_000033).
+  { value: "REMUNERACION_CONSEJEROS", label: "Política / informe de remuneración de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "OPERACIONES_VINCULADAS", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  // Codex P2 round 9 PR #3: id canonical singular `OPERACION_VINCULADA`
+  // (verificado en supabase/migrations/20260420_000017_seed_rule_packs_v2.sql).
+  // El plural ("OPERACIONES_VINCULADAS") rompía el match con el rule_pack
+  // aprobado → convocatoria perdía payload LMV (comisión auditoría +
+  // CNMV) y caía a warning genérico. Label visible plural por UX.
+  { value: "OPERACION_VINCULADA", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 
@@ -201,8 +207,9 @@ const AGENDA_MATERIAS = [
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
   { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
   { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: true },
-  { value: "CAMBIO_DENOMINACION", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-  { value: "CAMBIO_DOMICILIO", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  // Canonical ids con sufijo `_SOCIAL` (materia_catalog 20260424_000033).
+  { value: "CAMBIO_DENOMINACION_SOCIAL", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "CAMBIO_DOMICILIO_SOCIAL", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
 
   // Estructurales (escritura pública + RM)
   { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
@@ -222,11 +229,11 @@ const AGENDA_MATERIAS = [
 // LMV cotizada advertencias específicas por materia. Texto enseña al
 // secretario qué especialidad cotizada aplica y dónde está la referencia.
 const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
-  OPERACIONES_VINCULADAS:
+  OPERACION_VINCULADA:
     "SA cotizada: requiere informe de la Comisión de Auditoría (art. 529 ter.h LSC) + aprobación del Consejo. Si la operación supera el 5% del balance debe comunicarse a CNMV (art. 530 LSC).",
   PROGRAMA_RECOMPRA:
     "SA cotizada: autorización JGA (art. 277 LSC) + notificación CNMV + cumplimiento de ventanas de trading (Reglamento UE 596/2014 sobre abuso de mercado).",
-  RETRIBUCION_CONSEJEROS:
+  REMUNERACION_CONSEJEROS:
     "SA cotizada: informe anual de remuneraciones vinculante + voto consultivo de la JGA sobre la política de retribución (art. 529 novodecies LSC).",
   EMISION_OBLIGACIONES:
     "SA cotizada: posible obligación de folleto informativo CNMV (Reglamento UE 2017/1129) cuando la emisión se ofrezca al público.",
