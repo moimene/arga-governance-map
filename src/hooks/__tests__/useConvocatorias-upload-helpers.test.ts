@@ -18,13 +18,37 @@ import {
   ATTACHMENT_MAX_BYTES,
 } from "../useConvocatorias";
 
+// Codex P1 (PR #3): en Vitest/jsdom NI Blob NI File implementan
+// `arrayBuffer()` — el método existe en el browser y en Bun pero no en
+// jsdom 26.x. Polyfill mínimo local para los tests que NO toca el código
+// de producción (en runtime real arrayBuffer existe nativo). El polyfill
+// se aplica idempotente: si la implementación ya existe (Bun) se mantiene.
+function makeFile(contents: string | Uint8Array, name = "test.bin"): File {
+  const bytes = typeof contents === "string"
+    ? new TextEncoder().encode(contents)
+    : contents;
+  const file = new File([bytes], name);
+  if (typeof file.arrayBuffer !== "function") {
+    Object.defineProperty(file, "arrayBuffer", {
+      configurable: true,
+      value: async () => {
+        // Devolver una copia desacoplada (slice) para evitar que el caller
+        // mute el Uint8Array original al pasar el buffer a SubtleCrypto.
+        const view = bytes;
+        return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
+      },
+    });
+  }
+  return file;
+}
+
 describe("computeFileHashSha512", () => {
   it("string vacío → SHA-512 conocido (RFC test vector)", async () => {
     // SHA-512 de string vacío:
     // cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce
     // 47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
-    const blob = new Blob([""]);
-    const hash = await computeFileHashSha512(blob as File);
+    const file = makeFile("", "empty.txt");
+    const hash = await computeFileHashSha512(file);
     expect(hash).toBe(
       "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
     );
@@ -34,33 +58,33 @@ describe("computeFileHashSha512", () => {
     // SHA-512("abc") =
     // ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a
     // 2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f
-    const blob = new Blob(["abc"]);
-    const hash = await computeFileHashSha512(blob as File);
+    const file = makeFile("abc", "abc.txt");
+    const hash = await computeFileHashSha512(file);
     expect(hash).toBe(
       "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
     );
   });
 
   it("longitud del hash es siempre 128 chars (SHA-512 hex)", async () => {
-    const blob = new Blob([new Uint8Array(1024 * 1024)]); // 1 MB de ceros
-    const hash = await computeFileHashSha512(blob as File);
+    const file = makeFile(new Uint8Array(1024 * 1024), "blob.bin"); // 1 MB de ceros
+    const hash = await computeFileHashSha512(file);
     expect(hash).toHaveLength(128);
     expect(hash).toMatch(/^[0-9a-f]{128}$/);
   });
 
   it("dos archivos con el mismo contenido producen el mismo hash", async () => {
-    const a = new Blob(["mismo contenido"]);
-    const b = new Blob(["mismo contenido"]);
-    const ha = await computeFileHashSha512(a as File);
-    const hb = await computeFileHashSha512(b as File);
+    const a = makeFile("mismo contenido", "a.txt");
+    const b = makeFile("mismo contenido", "b.txt");
+    const ha = await computeFileHashSha512(a);
+    const hb = await computeFileHashSha512(b);
     expect(ha).toBe(hb);
   });
 
   it("dos archivos con contenido distinto producen hashes distintos", async () => {
-    const a = new Blob(["contenido A"]);
-    const b = new Blob(["contenido B"]);
-    const ha = await computeFileHashSha512(a as File);
-    const hb = await computeFileHashSha512(b as File);
+    const a = makeFile("contenido A", "a.txt");
+    const b = makeFile("contenido B", "b.txt");
+    const ha = await computeFileHashSha512(a);
+    const hb = await computeFileHashSha512(b);
     expect(ha).not.toBe(hb);
   });
 });
