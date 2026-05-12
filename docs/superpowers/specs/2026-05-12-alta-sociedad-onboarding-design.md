@@ -50,9 +50,9 @@ Esto es un commit aislado, ~1–2h de trabajo. La frontera está sellada porque 
 
 **Paso 11 "Revisión y creación" ejecuta dos transacciones secuenciales:**
 
-#### TX1 — RPC `fn_crear_sociedad_legal_y_capital` (atómica server-side)
+#### TX1 — RPC `fn_crear_sociedad_legal_y_capital` (fase server-side, atómica por excepción)
 
-Una sola RPC PL/pgSQL que envuelve en `BEGIN … COMMIT` las inserciones a las 9 tablas no-personales:
+Una sola RPC PL/pgSQL que ejecuta las inserciones a las 9 tablas no-personales como **una única unidad atómica**. NO emite `BEGIN`/`COMMIT`/`ROLLBACK` (Postgres prohíbe transaction control en funciones — ver §5.1 punto 2); la atomicidad se garantiza porque cualquier `RAISE EXCEPTION` o fallo de `INSERT` revierte automáticamente todos los cambios de esta invocación al propagarse al caller. Inserciones:
 
 1. `persons` (PJ de la sociedad)
 2. `entities` (con todos los campos legales: domicilio, CNAE, RM desglosado, LEI, fechas, propósito) — el `onboarding_status` se inserta como **estado pesimista** (`'INCOMPLETA_CARGOS'`); solo TX2 confirmado puede promoverlo a `'OPERATIVA'`.
@@ -64,11 +64,11 @@ Una sola RPC PL/pgSQL que envuelve en `BEGIN … COMMIT` las inserciones a las 9
 8. `entity_settings` (solo claves catalogadas en `entity_settings_catalog`)
 9. `rule_param_overrides` (solo si el draft incluye estatutos/reglas)
 
-Si **cualquier** paso falla, `ROLLBACK` atómico — no queda basura en BD.
+Si **cualquier** paso falla, Postgres revierte automáticamente todos los inserts de la función — no queda basura en BD.
 
 La RPC **no escribe** `condiciones_persona`, `representaciones` ni `authority_evidence`. Esos pertenecen al carril Personas/Cargos y se hacen en TX2.
 
-#### TX2 — Adaptador `adapters.ts` (client-side, post-COMMIT de TX1)
+#### TX2 — Adaptador `adapters.ts` (fase client-side, post-RPC TX1 ok)
 
 Después de que TX1 retorna `entity_id`, ejecuta secuencialmente:
 1. Lookup/creación de `persons` para cada cargo (PF + PJ admin con representante PF).
@@ -443,9 +443,9 @@ Sin cambios respecto al plan original §6. Resumen de tablas tocadas:
 | `governing_bodies` | RPC TX1 | Paso 11 |
 | `entity_settings` (filtrado por catálogo) | RPC TX1 | Paso 11 |
 | `rule_param_overrides` | RPC TX1 | Paso 11 |
-| `persons` (PF cargos + PF reps) | Adaptador TX2 | Paso 11 post-COMMIT |
-| `condiciones_persona` | Adaptador TX2 | Paso 11 post-COMMIT |
-| `representaciones` (scope `ADMIN_PJ_REPRESENTANTE` solamente) | Adaptador TX2 | Paso 11 post-COMMIT, solo si hay cargos `tipo_condicion='ADMIN_PJ'` |
+| `persons` (PF cargos + PF reps) | Adaptador TX2 | Paso 11 post-RPC TX1 ok |
+| `condiciones_persona` | Adaptador TX2 | Paso 11 post-RPC TX1 ok |
+| `representaciones` (scope `ADMIN_PJ_REPRESENTANTE` solamente) | Adaptador TX2 | Paso 11 post-RPC TX1 ok, solo si hay cargos `tipo_condicion='ADMIN_PJ'` |
 | `authority_evidence` | Trigger (carril Personas/Cargos) | Auto-propagado |
 | `entities.support_docs_metadata` | RPC TX1 | Paso 11 |
 | `entities.onboarding_status` | Cliente | Post-TX2 |
