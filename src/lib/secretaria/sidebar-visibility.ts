@@ -173,34 +173,48 @@ function upper(value: string | null | undefined) {
 }
 
 export function entityHasCollegiateBody(ctx: SidebarVisibilityContext): boolean {
-  // 1) Veto fuerte desde tipo_organo_admin: si el régimen es ADMIN_UNICO/
-  //    ADMIN_SOLIDARIOS/ADMIN_MANCOMUNADOS, NO es colegiado, ni siquiera
-  //    si los bodies persistidos tienen body_type="CDA" por convención
-  //    legacy del SociedadNuevaStepper.
   const admin = ctx.entity?.tipo_organo_admin;
-  if (isNonCollegiateAdmin(admin)) return false;
-  // 2) Régimen explícitamente colegiado en la entidad
+  const bodyTypes = ctx.bodyTypes ?? [];
+  const organoTipos = ctx.organoTipos ?? [];
+
+  // 1) Admin colegiado EXPLÍCITO (CDA/CONSEJO/CONSEJO_ADMIN) → true.
+  //    La entidad opera CdA real; tiene además junta general.
   if (isCollegiateAdmin(admin)) return true;
 
-  // 3) Veto secundario desde body configs: si algún body declara organo_tipo
-  //    no colegiado en su config, esa estructura administrativa no es
-  //    colegiada. (Caso: entidad sin tipo_organo_admin pero bodies con
-  //    config.organo_tipo poblado.)
-  const organoTipos = ctx.organoTipos ?? [];
-  if (organoTipos.some((tipo) => isNonCollegiateAdmin(tipo))) return false;
-  if (organoTipos.some((tipo) => isCollegiateAdmin(tipo))) return true;
+  // 2) `organo_tipo` colegiado explícito en algún body → true.
+  //    Cubre CONSEJO_ADMIN, CONSEJO, etc. declarados en config.
+  if (organoTipos.some((t) => isCollegiateAdmin(t))) return true;
 
-  // 4) Fallback final a body_types. Sólo se llega aquí cuando no hay
-  //    información de régimen ni en la entidad ni en los configs. Aceptamos
-  //    Junta General, Comisiones, etc., como colegiadas; NO usamos "CDA"
-  //    aquí porque ese body_type es ambiguo (ver SociedadNuevaStepper).
-  const bodyTypes = ctx.bodyTypes ?? [];
-  return bodyTypes.some((bt) => {
-    const upperBt = upper(bt);
-    // Excluir CDA del fallback — el régimen real estaría en config/admin
-    if (upperBt === "CDA") return false;
-    return COLLEGIATE_BODY_TYPES.has(upperBt);
+  // 3) `organo_tipo` JUNTA_GENERAL explícito → true. SociedadNuevaStepper
+  //    distingue JUNTA_GENERAL vs SOCIO_UNICO en config.organo_tipo del
+  //    body JUNTA: una sociedad con varios socios tiene JUNTA_GENERAL y
+  //    NECESITA flujos colegiados (Convocatorias/Reuniones/Actas), aunque
+  //    el régimen de administración sea ADMIN_UNICO/ADMIN_SOLIDARIOS/
+  //    ADMIN_MANCOMUNADOS (Codex P2 #5).
+  if (organoTipos.some((t) => upper(t) === "JUNTA_GENERAL")) return true;
+
+  // 4) Body explícitamente colegiado NO ambiguo (JUNTA / COMISION /
+  //    COMITE / CONSEJO_ADMINISTRACION en bodyTypes). CDA se excluye
+  //    porque es ambiguo (SociedadNuevaStepper lo usa para todos los
+  //    regímenes administrativos, no solo CdA real).
+  const hasNonCdaCollegiateBody = bodyTypes.some((bt) => {
+    const u = upper(bt);
+    return u !== "CDA" && COLLEGIATE_BODY_TYPES.has(u);
   });
+  if (hasNonCdaCollegiateBody) {
+    // Veto unipersonal: si la sociedad es realmente unipersonal (socio
+    // único), la "junta" es decisión unilateral, no colegiada.
+    const isUnipersonalSocio =
+      organoTipos.some((t) => upper(t) === "SOCIO_UNICO") ||
+      Boolean(ctx.entity?.es_unipersonal);
+    if (isUnipersonalSocio) return false;
+    return true;
+  }
+
+  // 5) Solo queda body CDA ambiguo (sin admin/organo_tipo colegiado
+  //    explícito ni junta) → NO colegiado. Es el caso legacy que el veto
+  //    pretende capturar: SLU + ADMIN_UNICO + body CDA solo.
+  return false;
 }
 
 export function entityHasUnipersonalAdmin(ctx: SidebarVisibilityContext): boolean {

@@ -227,6 +227,50 @@ describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA l
     expect(canShowAdoptionModeCta(ctxSolidarioSinModes, "SOLIDARIO")).toBe(true);
   });
 
+  it("Codex P2 #5: SL no-unipersonal + ADMIN_UNICO + bodies [CDA, JUNTA] con JUNTA_GENERAL → SÍ colegiado (preservar junta de socios)", () => {
+    // SociedadNuevaStepper crea SIEMPRE un body JUNTA + un body de admin
+    // (CDA con organo_tipo del régimen). Una SL no unipersonal con
+    // administrador único todavía necesita Convocatorias/Reuniones/Actas
+    // para operar la junta general de socios.
+    const ctx = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_UNICO", es_unipersonal: false },
+      bodyTypes: ["CDA", "JUNTA"],
+      organoTipos: ["ADMIN_UNICO", "JUNTA_GENERAL"],
+      adoptionModes: ["MEETING", "UNIVERSAL", "NO_SESSION", "UNIPERSONAL_ADMIN"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "MEETING")).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "UNIVERSAL")).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "UNIPERSONAL_ADMIN")).toBe(true);
+  });
+
+  it("Codex P2 #5: SL + ADMIN_SOLIDARIOS + bodies [CDA, JUNTA] con JUNTA_GENERAL → SÍ colegiado (preservar junta de socios)", () => {
+    const ctx = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_SOLIDARIOS", es_unipersonal: false },
+      bodyTypes: ["CDA", "JUNTA"],
+      organoTipos: ["ADMIN_SOLIDARIOS", "JUNTA_GENERAL"],
+      adoptionModes: ["MEETING", "UNIVERSAL", "NO_SESSION", "SOLIDARIO"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(true);
+    expect(canShowAdoptionModeCta(ctx, "SOLIDARIO")).toBe(true);
+  });
+
+  it("Veto unipersonal preservado: SLU + ADMIN_UNICO + bodies [CDA, JUNTA] con SOCIO_UNICO → NO colegiado", () => {
+    // En cambio, una SLU efectivamente unipersonal (SOCIO_UNICO en
+    // organoTipos o es_unipersonal=true) NO debe activar flujos de junta
+    // colegiada — la "junta" es decisión unilateral del socio único.
+    const ctx = baseCtx({
+      entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO", es_unipersonal: true },
+      bodyTypes: ["CDA", "JUNTA"],
+      organoTipos: ["ADMIN_UNICO", "SOCIO_UNICO"],
+      adoptionModes: ["UNIPERSONAL_ADMIN", "UNIPERSONAL_SOCIO"],
+    });
+    expect(entityHasCollegiateBody(ctx)).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "MEETING")).toBe(false);
+  });
+
   it("isNonCollegiateAdmin / isCollegiateAdmin clasifican correctamente", () => {
     expect(isNonCollegiateAdmin("ADMIN_UNICO")).toBe(true);
     expect(isNonCollegiateAdmin("ADMIN_SOLIDARIOS")).toBe(true);
