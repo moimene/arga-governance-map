@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Check, ChevronLeft, AlertTriangle, Info } from "lucide-react";
+import { Users, Check, ChevronLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePersonasCanonical, type PersonType } from "@/hooks/usePersonasCanonical";
@@ -117,8 +117,12 @@ export default function PersonaNuevaStepper() {
   const canNext = (() => {
     if (step === 0) return !!draft.person_type;
     if (step === 1) {
-      // G1.3: bloquea avance si el tax_id ya pertenece a una sociedad gestionada.
-      if (taxIdConflict?.kind === "entity") return false;
+      // L19/G1.3: NIF/CIF debe ser unico por tenant. Bloqueamos ambos casos:
+      //  - "entity": el NIF ya pertenece a una sociedad gestionada.
+      //  - "person": ya existe persona con ese NIF (no es entity). La BD
+      //    rechazaria con UNIQUE de todos modos; el bloqueo previo evita el
+      //    intento y propone abrir la ficha existente.
+      if (taxIdConflict?.kind === "entity" || taxIdConflict?.kind === "person") return false;
       return draft.full_name.trim() && draft.tax_id.trim();
     }
     return true;
@@ -273,22 +277,25 @@ export default function PersonaNuevaStepper() {
               )}
               {!checkingTaxId && taxIdConflict?.kind === "person" && (
                 <div
-                  role="status"
+                  role="alert"
                   aria-live="polite"
-                  className="flex items-start gap-2 border border-[var(--status-warning)]/40 bg-[var(--g-surface-muted)] p-2 text-xs text-[var(--g-text-primary)]"
+                  className="flex items-start gap-2 border border-[var(--status-error)]/40 bg-[var(--status-error)]/10 p-2 text-xs text-[var(--g-text-primary)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" />
-                  <div>
-                    Ya existe una persona con este NIF:{" "}
-                    <strong>{taxIdConflict.person_name}</strong>.{" "}
-                    <Link
-                      to={`/secretaria/personas/${taxIdConflict.person_id}`}
-                      className="text-[var(--g-brand-3308)] underline"
-                    >
-                      Ver ficha
-                    </Link>{" "}
-                    · La base de datos rechazará el alta si el NIF tiene clave única.
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-error)]" />
+                  <div className="flex-1">
+                    Ya existe una persona con este NIF/CIF:{" "}
+                    <strong>{taxIdConflict.person_name}</strong>. Para evitar duplicidades, abre la
+                    ficha existente y vincula desde ahí.
+                    <div className="mt-2">
+                      <Link
+                        to={`/secretaria/personas/${taxIdConflict.person_id}`}
+                        className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-2.5 py-1 text-xs font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        Abrir ficha existente
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}
