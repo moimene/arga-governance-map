@@ -141,6 +141,15 @@ export function EmitirCertificacionButton({
     if (bloqueaRM) return;
     setBusy(true);
     try {
+      // P2 Codex iter-3 (commit 49ba53b): si el AE encontrado es VICESECRETARIO
+      // (fallback porque no hay SECRETARIO vigente), pasamos su cargo real al
+      // RPC, no el certificanteRole default ("SECRETARIO"). Sin esto,
+      // fn_generar_certificacion busca AE por SECRETARIO y falla con
+      // "No hay autoridad vigente para SECRETARIO" o registra rol incorrecto.
+      // L17 coherence: el vicesecretario certifica en suplencia (RRM art. 109
+      // + LSC 529 octies), debe identificarse correctamente en el RPC.
+      const effectiveCertificanteRole = certificanteAE?.cargo ?? certificanteRole;
+
       // Paso 1 — fn_generar_certificacion
       const { data: certId, error: e1 } = await supabase.rpc(
         "fn_generar_certificacion",
@@ -148,7 +157,7 @@ export function EmitirCertificacionButton({
           p_minute_id: minuteId,
           p_tipo: "ACUERDO",
           p_agreements_certified: agreementIds,
-          p_certificante_role: certificanteRole,
+          p_certificante_role: effectiveCertificanteRole,
           p_visto_bueno_persona_id: vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
         },
       );
