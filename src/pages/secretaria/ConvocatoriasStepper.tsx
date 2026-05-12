@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -12,7 +12,11 @@ import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccion
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
-import { useCreateConvocatoria, type AgendaItem } from "@/hooks/useConvocatorias";
+import { useCreateConvocatoria, useUploadConvocatoriaAttachment, type AgendaItem } from "@/hooks/useConvocatorias";
+import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
+import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { Capa3Form } from "@/components/secretaria/Capa3Form";
+import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
 import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
@@ -35,8 +39,9 @@ const STEPS = [
   { n: 3, label: "Orden del día",           hint: "Clasificar ítems en ordinaria / estatutaria / estructural" },
   { n: 4, label: "Destinatarios",           hint: "Miembros del órgano que recibirán la convocatoria" },
   { n: 5, label: "Canales de publicación",  hint: "BORME / PSM / JORNAL / web corporativa / ERDS" },
-  { n: 6, label: "Adjuntos",               hint: "Documentos de referencia y propuestas que se adjuntan" },
-  { n: 7, label: "Revisión y emisión",      hint: "Verificación de compliance y emisión definitiva" },
+  { n: 6, label: "Adjuntos",                hint: "Documentos de referencia y propuestas que se adjuntan" },
+  { n: 7, label: "Borrador documento",      hint: "Plantilla + capa 3 editable + borrador final del texto" },
+  { n: 8, label: "Revisión y emisión",      hint: "Verificación de compliance y emisión definitiva" },
 ];
 
 const JURIS_FLAGS: Record<string, string> = { ES: "🇪🇸", PT: "🇵🇹", BR: "🇧🇷", MX: "🇲🇽" };
@@ -112,9 +117,10 @@ const AGENDA_TIPOS = [
 ] as const;
 
 // agenda_item.kind v1.3: naturaleza del punto del orden del día.
-// Solo los puntos DECISORIO se someten a votación y materializan como
-// acuerdo registrable. INFORMATIVO y DELIBERATIVO no producen acuerdo y
-// por tanto no exigen materia / mayoría / propuesta de acuerdo.
+// Solo los puntos DECISORIO (label visible: "Acuerdo") se someten a votación
+// y materializan como acuerdo registrable. INFORMATIVO y DELIBERATIVO no
+// producen acuerdo y por tanto no exigen materia / mayoría / propuesta de
+// acuerdo. El enum DB mantiene "DECISORIO"; solo la etiqueta de UI cambia.
 const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] = [
   {
     value: "INFORMATIVO",
@@ -128,8 +134,8 @@ const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] =
   },
   {
     value: "DECISORIO",
-    label: "Decisorio",
-    helper: "Sometible a votación y materializable como acuerdo.",
+    label: "Acuerdo",
+    helper: "Propuesta concreta sometible a votación y materializable como acuerdo registrable.",
   },
 ];
 
@@ -158,13 +164,38 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
 ];
 
 const AGENDA_MATERIAS = [
+  // Ordinarias (gestión recurrente del órgano)
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false },
+  { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false },
   { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false },
+  { value: "DISTRIBUCION_RESERVAS", label: "Distribución de reservas / dividendo a cuenta", tipo: "ORDINARIA", inscribible: false },
   { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true },
-  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento de auditor", tipo: "ORDINARIA", inscribible: true },
+  { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true },
+  { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true },
+  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true },
+  { value: "RETRIBUCION_CONSEJEROS", label: "Política / informe de retribución de consejeros", tipo: "ORDINARIA", inscribible: false },
+  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true },
+  { value: "OPERACIONES_VINCULADAS", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false },
+  { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false },
+  { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false },
+
+  // Estatutarias (mayoría reforzada art. 199/201 LSC)
   { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ESTATUTARIA", inscribible: false },
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
+  { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "CAMBIO_DENOMINACION", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "CAMBIO_DOMICILIO", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true },
+
+  // Estructurales (escritura pública + RM)
+  { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true },
+  { value: "FUSION", label: "Fusión", tipo: "ESTRUCTURAL", inscribible: true },
+  { value: "ESCISION", label: "Escisión", tipo: "ESTRUCTURAL", inscribible: true },
+  { value: "DISOLUCION", label: "Disolución", tipo: "ESTRUCTURAL", inscribible: true },
+  { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true },
+  { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
+
   // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
   // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
   // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
@@ -356,6 +387,7 @@ export default function ConvocatoriasStepper() {
     ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/convocatorias";
   const createConvocatoria = useCreateConvocatoria();
+  const uploadAttachment = useUploadConvocatoriaAttachment();
   const { data: cloudRequestedPlantilla, isLoading: requestedPlantillaLoading } =
     usePlantillaProtegida(requestedPlantillaId ?? undefined);
   const localRequestedPlantilla = useMemo(
@@ -474,6 +506,7 @@ export default function ConvocatoriasStepper() {
     jurisdiction,
     convocationType: tipoConvocatoria,
     tipoSocial,
+    organoTipo,
   });
 
   const convocatoriaInput: ConvocatoriaInput = {
@@ -672,6 +705,130 @@ export default function ConvocatoriasStepper() {
     setTemplateCapa3Errors({});
     setTemplateCapa3Open(false);
   }
+  // ── Step 7: Borrador documento ────────────────────────────────────────────
+  // Carga plantillas tipo CONVOCATORIA, selecciona la mejor candidata por
+  // organoTipo + jurisdiction, expone capa3 editable y un textarea con el
+  // borrador renderizado (capa1 con variables sustituidas). El secretario
+  // puede editar el texto antes de emitir; se persiste en
+  // `convocatorias.convocatoria_text`.
+  const { data: plantillasProtegidas = [] } = usePlantillasProtegidas();
+  const convocatoriaTemplateTypes = useMemo(
+    () =>
+      tipoSocial === "SL" || tipoSocial === "SLU"
+        ? ["CONVOCATORIA_SL_NOTIFICACION", "CONVOCATORIA"]
+        : ["CONVOCATORIA", "CONVOCATORIA_SL_NOTIFICACION"],
+    [tipoSocial],
+  );
+  const autoSelectedTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (!plantillasProtegidas.length) return null;
+    return selectProcessTemplate(
+      plantillasProtegidas,
+      convocatoriaTemplateTypes,
+      { jurisdiction, organoTipo },
+      requestedPlantillaId ?? undefined,
+    );
+  }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo, requestedPlantillaId]);
+
+  const [selectedBorradorTemplateId, setSelectedBorradorTemplateId] = useState<string | null>(null);
+  const effectiveBorradorTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (selectedBorradorTemplateId) {
+      return plantillasProtegidas.find((p) => p.id === selectedBorradorTemplateId) ?? autoSelectedTemplate;
+    }
+    return autoSelectedTemplate;
+  }, [autoSelectedTemplate, plantillasProtegidas, selectedBorradorTemplateId]);
+
+  const candidateTemplates = useMemo(
+    () =>
+      plantillasProtegidas.filter(
+        (p) =>
+          convocatoriaTemplateTypes.includes(p.tipo) &&
+          (p.estado === "ACTIVA" || p.estado === "APROBADA" || p.estado === "REVISADA" || p.estado === "BORRADOR"),
+      ),
+    [plantillasProtegidas, convocatoriaTemplateTypes],
+  );
+
+  const borradorCapa3Fields = useMemo(
+    () =>
+      (effectiveBorradorTemplate?.capa3_editables ?? []).map((f) => ({
+        campo: f.campo,
+        obligatoriedad: f.obligatoriedad ?? "OPCIONAL",
+        descripcion: f.descripcion ?? "",
+      })),
+    [effectiveBorradorTemplate],
+  );
+  const [borradorCapa3Values, setBorradorCapa3Values] = useState<Record<string, string>>({});
+
+  // Reset capa3 cuando cambia la plantilla efectiva
+  useEffect(() => {
+    setBorradorCapa3Values({});
+  }, [effectiveBorradorTemplate?.id]);
+
+  const borradorVariables = useMemo<Record<string, unknown>>(() => {
+    const memberNames = activeMandates
+      .filter((m) => !excludedPersonIds.has(m.person_id))
+      .map((m) => m.full_name)
+      .filter(Boolean);
+    return {
+      denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+      tipo_social: tipoSocial,
+      organo_nombre: selectedBody?.name ?? "",
+      organo_tipo: organoTipo,
+      jurisdiction,
+      tipo_convocatoria: tipoConvocatoria,
+      fecha_junta: fechaReunion,
+      hora_junta: horaReunion,
+      lugar,
+      formato_reunion: formatoReunion,
+      fecha_segunda: habilitarSegunda ? fechaReunion2 : "",
+      hora_segunda: habilitarSegunda ? horaReunion2 : "",
+      antelacion_dias_requerida: evaluacionV2.antelacionDiasRequerida,
+      fecha_limite_publicacion: evaluacionV2.fechaLimitePublicacion,
+      canales: channels.map((c) => channelLabel(c, channelOpts)).join(", "),
+      orden_dia: agendaItems
+        .filter((i) => i.titulo.trim())
+        .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+        .join("\n"),
+      destinatarios: memberNames.join(", "),
+      destinatarios_lista: memberNames.map((n) => `· ${n}`).join("\n"),
+    };
+  }, [
+    activeMandates, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
+    jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
+    habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
+    evaluacionV2.fechaLimitePublicacion, channels, channelOpts, agendaItems,
+  ]);
+
+  const [borradorTexto, setBorradorTexto] = useState<string>("");
+  const [borradorDirty, setBorradorDirty] = useState(false);
+  const [renderUnresolved, setRenderUnresolved] = useState<string[]>([]);
+
+  const regenerateBorrador = useCallback(() => {
+    if (!effectiveBorradorTemplate?.capa1_inmutable) {
+      setBorradorTexto("");
+      setRenderUnresolved([]);
+      return;
+    }
+    // Import dinámico de renderTemplate para evitar ciclo en setup.
+    void import("@/lib/doc-gen/template-renderer").then(({ renderTemplate }) => {
+      const merged = { ...borradorVariables, ...borradorCapa3Values };
+      const result = renderTemplate({
+        template: effectiveBorradorTemplate.capa1_inmutable!,
+        variables: merged,
+      });
+      setBorradorTexto(result.text);
+      setRenderUnresolved(result.unresolvedVariables);
+      setBorradorDirty(false);
+    });
+  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values]);
+
+  // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si no
+  // está "dirty" (usuario no ha editado manualmente el texto).
+  useEffect(() => {
+    if (!borradorDirty) {
+      regenerateBorrador();
+    }
+  }, [regenerateBorrador, borradorDirty]);
+
   const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
     ? []
     : Array.from(new Set(evaluacionV2.canalesExigidos)).map((channel) => {
@@ -686,7 +843,21 @@ export default function ConvocatoriasStepper() {
   const pendingLegalChannelReminders = legalChannelReminderItems.filter((item) => !item.selectedVia);
 
   // ── Step 6 ──
-  const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; descripcion: string }[]>([]);
+  // Cada adjunto mantiene el File en memoria; el upload a Storage + INSERT
+  // en `attachments` se ejecuta tras crear la convocatoria (handleEmitir).
+  // Si el usuario abandona antes de emitir no quedan huérfanos en Storage.
+  const [adjuntos, setAdjuntos] = useState<{
+    id: string;
+    file: File;
+    alias: string;
+    descripcion: string;
+    error?: string;
+  }[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<{ ok: number; failed: number; messages: string[] }>({
+    ok: 0,
+    failed: 0,
+    messages: [],
+  });
   const [documentosIncluidos, setDocumentosIncluidos] = useState<Set<string>>(new Set());
   const requiredDocuments = evaluacionV2.documentosObligatorios;
   // BATCH 8.6 (ronda 2 U-D): mapear cada documento obligatorio a las
@@ -719,13 +890,23 @@ export default function ConvocatoriasStepper() {
     ? []
     : requiredDocuments.filter((doc) => !documentosIncluidos.has(doc.id));
   const documentReminderOk = missingRequiredDocuments.length === 0;
-  function addAdjunto() {
-    setAdjuntos((prev) => [...prev, { id: crypto.randomUUID(), nombre: "", descripcion: "" }]);
+  function handleFilesSelected(files: FileList | null) {
+    if (!files) return;
+    const next: typeof adjuntos = [];
+    for (const file of Array.from(files)) {
+      next.push({
+        id: crypto.randomUUID(),
+        file,
+        alias: file.name,
+        descripcion: "",
+      });
+    }
+    setAdjuntos((prev) => [...prev, ...next]);
   }
   function removeAdjunto(id: string) {
     setAdjuntos((prev) => prev.filter((a) => a.id !== id));
   }
-  function updateAdjunto(id: string, field: "nombre" | "descripcion", val: string) {
+  function updateAdjunto(id: string, field: "alias" | "descripcion", val: string) {
     setAdjuntos((prev) => prev.map((a) => a.id === id ? { ...a, [field]: val } : a));
   }
   function toggleDocumentoIncluido(id: string) {
@@ -914,13 +1095,14 @@ export default function ConvocatoriasStepper() {
             : null,
           included_required: includedRequiredDocuments,
           missing_required: missingRequiredDocuments,
-          uploaded_references: adjuntos
-            .filter((adjunto) => adjunto.nombre.trim().length > 0)
-            .map((adjunto) => ({
-              id: adjunto.id,
-              nombre: adjunto.nombre,
-              descripcion: adjunto.descripcion,
-            })),
+          uploaded_references: adjuntos.map((adjunto) => ({
+            id: adjunto.id,
+            nombre: adjunto.alias || adjunto.file.name,
+            descripcion: adjunto.descripcion,
+            file_name: adjunto.file.name,
+            size_bytes: adjunto.file.size,
+            mime: adjunto.file.type || null,
+          })),
         },
         recipients: {
           total_active: activeMandates.length,
@@ -975,10 +1157,48 @@ export default function ConvocatoriasStepper() {
             };
           }),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
+        convocatoria_text: borradorTexto.trim() ? borradorTexto : null,
         ...buildConvocatoriaTrace(),
       });
+
+      // Upload de adjuntos: best-effort (no bloquea la emisión). Si alguno
+      // falla, se marca en estado local y la convocatoria queda emitida.
+      let okCount = 0;
+      let failCount = 0;
+      const failMessages: string[] = [];
+      if (adjuntos.length > 0) {
+        for (const adjunto of adjuntos) {
+          try {
+            await uploadAttachment.mutateAsync({
+              convocatoriaId: created.id,
+              file: adjunto.file,
+            });
+            okCount += 1;
+          } catch (err) {
+            failCount += 1;
+            const msg = err instanceof Error ? err.message : "Error de subida";
+            failMessages.push(`${adjunto.file.name}: ${msg}`);
+            setAdjuntos((prev) =>
+              prev.map((a) => (a.id === adjunto.id ? { ...a, error: msg } : a)),
+            );
+          }
+        }
+        setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages });
+      }
+
       setEmitidoId(created.id);
-      toast.success("Convocatoria emitida correctamente");
+      if (failCount === 0) {
+        toast.success(
+          adjuntos.length > 0
+            ? `Convocatoria emitida con ${okCount} adjunto(s)`
+            : "Convocatoria emitida correctamente",
+        );
+      } else {
+        toast.warning(
+          `Convocatoria emitida; ${okCount} adjunto(s) subidos, ${failCount} fallaron`,
+          { description: failMessages[0] },
+        );
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       toast.error("No se pudo emitir la convocatoria", { description: msg });
@@ -1008,6 +1228,27 @@ export default function ConvocatoriasStepper() {
             La convocatoria ha quedado registrada. Los destinatarios recibirán la notificación
             según los canales seleccionados.
           </p>
+          {(uploadStatus.ok > 0 || uploadStatus.failed > 0) && (
+            <div
+              className={`mt-4 border p-3 text-left text-xs ${
+                uploadStatus.failed === 0
+                  ? "border-[var(--g-sec-300)] bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                  : "border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+              }`}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="font-medium">
+                Adjuntos: {uploadStatus.ok} subido(s) · {uploadStatus.failed} fallido(s)
+              </p>
+              {uploadStatus.messages.length > 0 && (
+                <ul className="mt-1 space-y-0.5">
+                  {uploadStatus.messages.map((m, i) => (
+                    <li key={i} className="text-[var(--status-error)]">{m}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="mt-6 flex justify-center gap-3">
             <button
               type="button"
@@ -1332,12 +1573,20 @@ export default function ConvocatoriasStepper() {
               )}
 
               {selectedEntityId && selectedBodyId && (
-                <RuleResolutionPanel
-                  loading={ruleResolutionsLoading}
-                  error={ruleResolutionsError}
-                  ruleResolutions={ruleResolutions}
-                  payloadsCompatible={allRulePayloadsCompatible}
-                />
+                <div
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Reglas LSC aplicables
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Las reglas (rule packs + overrides) se resolverán automáticamente
+                    cuando definas el orden del día en el Paso 3. Solo los puntos
+                    marcados como <span className="font-semibold">Acuerdo</span> activan
+                    el motor LSC.
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -1556,10 +1805,19 @@ export default function ConvocatoriasStepper() {
             <div className="mt-6 space-y-4">
               <p className="text-xs text-[var(--g-text-secondary)]">
                 Añade los puntos del orden del día. Clasifica cada punto según su
-                naturaleza (informativo, deliberativo o decisorio); solo los puntos
-                decisorios requieren materia, clase LSC y propuesta de acuerdo, y se
+                naturaleza (informativo, deliberativo o acuerdo); solo los puntos
+                de acuerdo requieren materia, clase LSC y propuesta concreta, y se
                 someten al motor de validez.
               </p>
+
+              {agendaRuleSpecs.length > 0 && (
+                <RuleResolutionPanel
+                  loading={ruleResolutionsLoading}
+                  error={ruleResolutionsError}
+                  ruleResolutions={ruleResolutions}
+                  payloadsCompatible={allRulePayloadsCompatible}
+                />
+              )}
 
               <div className="space-y-3">
                 {agendaItems.map((item, idx) => {
@@ -2060,7 +2318,10 @@ export default function ConvocatoriasStepper() {
                   className="border border-dashed border-[var(--g-border-subtle)] p-6 text-center"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <p className="text-sm text-[var(--g-text-secondary)]">No hay adjuntos añadidos.</p>
+                  <p className="text-sm text-[var(--g-text-secondary)]">
+                    No hay adjuntos añadidos. Los archivos se subirán al emitir la convocatoria
+                    y quedarán archivados con SHA-512 en <code>attachments</code>.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2070,19 +2331,29 @@ export default function ConvocatoriasStepper() {
                       className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center border border-[var(--g-border-subtle)] p-2"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
-                      <input
-                        type="text"
-                        value={a.nombre}
-                        onChange={(e) => updateAdjunto(a.id, "nombre", e.target.value)}
-                        placeholder="Nombre del documento"
-                        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      />
+                      <div className="min-w-0">
+                        <input
+                          type="text"
+                          value={a.alias}
+                          onChange={(e) => updateAdjunto(a.id, "alias", e.target.value)}
+                          placeholder="Alias visible"
+                          aria-label="Alias del documento"
+                          className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        />
+                        <p className="mt-1 truncate text-[10px] text-[var(--g-text-secondary)]">
+                          {a.file.name} · {(a.file.size / 1024).toFixed(0)} KB · {a.file.type || "desconocido"}
+                        </p>
+                        {a.error && (
+                          <p className="mt-0.5 text-[10px] text-[var(--status-error)]">{a.error}</p>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={a.descripcion}
                         onChange={(e) => updateAdjunto(a.id, "descripcion", e.target.value)}
                         placeholder="Descripción (opcional)"
+                        aria-label="Descripción del adjunto"
                         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       />
@@ -2099,20 +2370,148 @@ export default function ConvocatoriasStepper() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={addAdjunto}
-                className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              <label
+                className="inline-flex cursor-pointer items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                Añadir adjunto
-              </button>
+                Añadir adjuntos (PDF / DOCX / XLSX / PPT / CSV / TXT / PNG / JPG, ≤25 MB)
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFilesSelected(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
           )}
 
-          {/* ── PASO 7: Revisión y emisión ── */}
+          {/* ── PASO 7: Borrador documento ── */}
           {current === 7 && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                  Borrador del documento de convocatoria
+                </p>
+              </div>
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Se aplica la plantilla protegida correspondiente al órgano y forma jurídica.
+                Capa 1 (texto inmutable) + Capa 2 (variables resueltas del expediente) +
+                Capa 3 (campos editables) componen el borrador. El texto final queda
+                persistido en <code>convocatoria_text</code> al emitir.
+              </p>
+
+              {candidateTemplates.length === 0 ? (
+                <div
+                  className="border border-[var(--status-warning)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Sin plantilla CONVOCATORIA disponible
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    No hay plantillas protegidas de tipo CONVOCATORIA o
+                    CONVOCATORIA_SL_NOTIFICACION cargadas en el tenant. Puedes escribir el
+                    texto del borrador manualmente, pero perderás trazabilidad de plantilla
+                    legal aprobada.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+                    Plantilla seleccionada
+                  </label>
+                  <select
+                    value={effectiveBorradorTemplate?.id ?? ""}
+                    onChange={(e) => {
+                      setSelectedBorradorTemplateId(e.target.value || null);
+                      setBorradorDirty(false);
+                    }}
+                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <option value="">— Seleccionar plantilla —</option>
+                    {candidateTemplates.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.tipo} · v{p.version} · {p.estado}
+                        {p.organo_tipo ? ` · ${p.organo_tipo}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {effectiveBorradorTemplate && (
+                    <p className="text-[11px] text-[var(--g-text-secondary)]">
+                      ID {effectiveBorradorTemplate.id.slice(0, 8)} ·{" "}
+                      {effectiveBorradorTemplate.referencia_legal ?? "Sin referencia legal anotada"}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {borradorCapa3Fields.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-text-secondary)]">
+                    Capa 3 — campos editables
+                  </p>
+                  <Capa3Form
+                    fields={borradorCapa3Fields}
+                    values={borradorCapa3Values}
+                    onChange={setBorradorCapa3Values}
+                    telematicaEnabled={formatoReunion !== "PRESENCIAL"}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+                    Texto del borrador (editable)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={regenerateBorrador}
+                    disabled={!effectiveBorradorTemplate?.capa1_inmutable}
+                    className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] px-2 py-1 text-[11px] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-40"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    Regenerar desde plantilla
+                  </button>
+                </div>
+                <textarea
+                  value={borradorTexto}
+                  onChange={(e) => {
+                    setBorradorTexto(e.target.value);
+                    setBorradorDirty(true);
+                  }}
+                  rows={16}
+                  placeholder={effectiveBorradorTemplate?.capa1_inmutable ? "Borrador generado desde plantilla…" : "Sin plantilla aplicada — escribe el texto manualmente o continúa sin texto."}
+                  className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 font-mono text-sm leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+                <div className="flex items-center justify-between text-[11px] text-[var(--g-text-secondary)]">
+                  <span>{borradorTexto.length} caracteres</span>
+                  {borradorDirty && (
+                    <span className="text-[var(--status-warning)]">
+                      Editado manualmente — "Regenerar" descartará tus cambios.
+                    </span>
+                  )}
+                </div>
+                {renderUnresolved.length > 0 && (
+                  <p className="text-[11px] text-[var(--status-warning)]">
+                    Variables sin valor en la plantilla: {renderUnresolved.slice(0, 8).join(", ")}
+                    {renderUnresolved.length > 8 ? ` y ${renderUnresolved.length - 8} más` : ""}.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── PASO 8: Revisión y emisión ── */}
+          {current === 8 && (
             <div className="mt-6 space-y-5">
               {/* Summary grid */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2272,8 +2671,8 @@ export default function ConvocatoriasStepper() {
               {/* Destinatarios count */}
               <p className="text-xs text-[var(--g-text-secondary)]">
                 <span className="font-semibold">{activeMandates.length - excludedPersonIds.size}</span> destinatario(s)
-                {adjuntos.filter((a) => a.nombre.trim()).length > 0 && (
-                  <> · <span className="font-semibold">{adjuntos.filter((a) => a.nombre.trim()).length}</span> adjunto(s)</>
+                {adjuntos.length > 0 && (
+                  <> · <span className="font-semibold">{adjuntos.length}</span> adjunto(s)</>
                 )}
               </p>
             </div>
