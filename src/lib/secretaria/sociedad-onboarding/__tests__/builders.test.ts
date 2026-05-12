@@ -86,6 +86,16 @@ function draftBase(): SociedadOnboardingDraft {
       fecha_inicio: "2026-05-12",
       fuente_designacion: "ESCRITURA",
     },
+    // Tercer board member para satisfacer CA-004 con consejo_min=3 default
+    // (Secretario no cuenta como consejero a efectos de board count).
+    {
+      key: "consejero1",
+      tipo_condicion: "CONSEJERO",
+      bodyKey: "CDA",
+      persona: pf("CONS1", "44444444D"),
+      fecha_inicio: "2026-05-12",
+      fuente_designacion: "ESCRITURA",
+    },
   ];
   return draft;
 }
@@ -121,7 +131,9 @@ describe("sociedad onboarding builders", () => {
     const capTable = buildInitialCapTable(draft);
 
     expect(capTable.socios).toHaveLength(1);
-    expect(capTable.capital_holdings[0].holder_key).toBe("ACC1");
+    // canonicalHolderKey() emite `tax:<NIF>` cuando hay tax_id, no el row key
+    // local "ACC1". Treasury mantiene "__TREASURY__".
+    expect(capTable.capital_holdings[0].holder_key).toBe("tax:11111111A");
     expect(capTable.capital_holdings[1].holder_key).toBe("__TREASURY__");
     expect(capTable.capital_holdings[1].voting_rights).toBe(false);
   });
