@@ -87,6 +87,29 @@
  *   operator), wrap in a `fn_consolidate_person` RPC SECURITY DEFINER —
  *   deferred to Plan A'.
  *
+ * STALE PREFLIGHT GUARD (P2 Codex iter-7):
+ *   In --auto-detect mode, the batch initial preflight is treated as
+ *   advisory only. Before applying each consolidation, the script
+ *   re-runs preflightCheck for that specific pair to catch collisions
+ *   that emerged from previous merges in the same batch.
+ *
+ *   Example: 3 rows share tax_id X (canonical A, duplicates B and C).
+ *   At batch start, preflightCheck(A,B) and preflightCheck(A,C) both
+ *   pass — canonical A is "clean" relative to each duplicate. After
+ *   merging pair (A, B) onto A, the canonical now holds a VIGENTE
+ *   cargo previously held only by B. If C carried a cargo with the
+ *   same (entity_id, body_id, tipo_condicion) key, the initial
+ *   preflight missed the collision but the re-check before applying
+ *   (A, C) catches it — preventing 23505 mid-Phase-1 with partial
+ *   FK migrations already committed.
+ *
+ *   ARGA demo (95 personas, 1 dup B88888888) does not exercise this
+ *   path, but the guard is correctness-required for tenants with 3+
+ *   duplicates of the same real identity.
+ *
+ *   Note: preflightCheck() is read-only (SELECT-only queries) so the
+ *   extra round-trip is safe and bounded by the FK probe count.
+ *
  * Usage:
  *   bun run scripts/consolidate-duplicate-persons.ts --dry-run
  *   bun run scripts/consolidate-duplicate-persons.ts --apply --auto-detect
@@ -1061,6 +1084,25 @@ async function main() {
       if (!pf.ok) {
         console.error(`SKIP (preflight fail): ${pair.duplicate.full_name}`);
         for (const c of pf.conflicts) console.error(`   - ${c}`);
+        continue;
+      }
+      // P2 Codex iter-7: re-run preflight inmediatamente antes de cada apply
+      // para detectar colisiones acumuladas por merges previos en este batch.
+      // El preflight inicial (línea ~1013) puede estar stale si previous
+      // applyConsolidation ha movido rows al canonical creando nuevas
+      // colisiones unique-constraint. Ver STALE PREFLIGHT GUARD en el
+      // header del script.
+      const freshPreflight = await preflightCheck(supabase, pair);
+      if (!freshPreflight.ok) {
+        console.error(
+          `SKIP (stale preflight — conflict surfaced after batch start): ${pair.duplicate.full_name}`,
+        );
+        for (const c of freshPreflight.conflicts) {
+          console.error(`   - ${c} (re-checked)`);
+        }
+        console.error(
+          `   → Re-run script after resolving conflict manually.`,
+        );
         continue;
       }
       await applyConsolidation(supabase, pair);
