@@ -229,6 +229,8 @@ const App = () => (
                   <Route path="/secretaria/sociedades/:id/transmision" element={<Suspense fallback={<ModuleFallback />}><TransmisionStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/admin/nuevo" element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/reglas"     element={<Suspense fallback={<ModuleFallback />}><ReglasAplicables /></Suspense>} />
+                  {/* D5.2: alta de cargo cross-context (entrada desde PersonasList ?personId=...). */}
+                  <Route path="/secretaria/cargos/nuevo"               element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
                   <Route path="/secretaria/personas"                  element={<Suspense fallback={<ModuleFallback />}><PersonasList /></Suspense>} />
                   <Route path="/secretaria/personas/nueva"            element={<Suspense fallback={<ModuleFallback />}><PersonaNuevaStepper /></Suspense>} />
                   <Route path="/secretaria/personas/:id"              element={<Suspense fallback={<ModuleFallback />}><PersonaDetalle /></Suspense>} />
