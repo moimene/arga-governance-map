@@ -3101,8 +3101,21 @@ export default function ConvocatoriasStepper() {
                     // `regenerateBorrador`), pending quedaba bloqueado en
                     // true para siempre, dejando "Siguiente" + "Emitir"
                     // deshabilitados.
+                    //
+                    // Codex P2 round 16 PR #3: además registrar baseline
+                    // del hash de contexto en `borradorLastRenderHashRef`.
+                    // Si el usuario edita ANTES de que el primer render
+                    // del template se complete, el ref queda en "" y
+                    // `borradorIsStale` (que requiere ref !== "") nunca
+                    // dispara aunque luego cambie el contexto upstream.
+                    // Marcamos el contexto actual como baseline del edit
+                    // manual para que cambios posteriores SÍ disparen el
+                    // stale guard.
                     regenerateTokenRef.current += 1;
                     setBorradorRenderPending(false);
+                    if (borradorLastRenderHashRef.current === "") {
+                      borradorLastRenderHashRef.current = borradorContextHash;
+                    }
                     setBorradorTexto(e.target.value);
                     setBorradorDirty(true);
                   }}
