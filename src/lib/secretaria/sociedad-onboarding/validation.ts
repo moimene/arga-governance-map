@@ -315,6 +315,18 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     // 1 solo admin la sociedad seria imposible de operar tras TX2 (review
     // Codex P2).
     const forma = draft.profile.forma_administracion;
+    // AU-003: ADMINISTRADOR_UNICO acepta exactamente 1 administrador. Sin este
+    // check, dos cargos ADMIN_UNICO/ADMIN_PJ distintos pasaban (matching.length>0)
+    // y TX2 persistia ambos, dejando el body UNIPERSONAL_ADMIN con multiples
+    // administradores activos. La sociedad luego se promovia OPERATIVA con
+    // estado incoherente (review Codex P2).
+    if (forma === "ADMINISTRADOR_UNICO" && matching.length > 1) {
+      issues.push(issue(
+        "AU-003",
+        "cargos",
+        `El administrador unico admite exactamente 1 cargo pero hay ${matching.length}. Cesa los sobrantes o cambia la forma de administracion.`
+      ));
+    }
     if ((forma === "ADMINISTRADORES_SOLIDARIOS" || forma === "ADMINISTRADORES_MANCOMUNADOS") && matching.length < 2) {
       issues.push(issue(
         "AU-002",
@@ -395,7 +407,7 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     4: ["CL-001", "CL-002", "CL-003", "CL-004", "CL-005"],
     5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "CT-011", "P-001"],
     6: ["O-001", "O-002"],
-    7: ["CA-001", "CA-002", "CA-003", "CA-004", "AU-001", "AU-002", "PJ-001"],
+    7: ["CA-001", "CA-002", "CA-003", "CA-004", "AU-001", "AU-002", "AU-003", "PJ-001"],
     8: ["R-001", "R-002"],
     9: [],
     10: [],
