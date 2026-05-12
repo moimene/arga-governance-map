@@ -208,23 +208,28 @@ export function checkNoticePeriodByType(params: {
   tipoSocial?: string;       // 'SA' | 'SL' | 'SLU' | 'SAU'
   organoTipo?: string;       // 'JGA' | 'JGE' | 'CDA' | 'COMISION' | 'COMITE'
 }): boolean {
-  // SLU/SAU: no convocatoria requerida (art. 173.3 LSC — solo comunicar al RM)
-  if (params.tipoSocial === 'SLU' || params.tipoSocial === 'SAU') return true;
   if (params.convocationType === "UNIVERSAL") return true; // no requiere plazo
-  const today = new Date();
-  const meeting = new Date(params.meetingDate);
-  const diffDays = Math.floor((meeting.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   // Plazos por órgano (defaults estatutarios típicos ARGA / reglamento CdA).
   // Las juntas usan LSC art. 176; CdA y comisiones usan los estatutos
   // ("convocatoria razonable" — LSC art. 246.2). Si los estatutos del
   // tenant exigen otro plazo, el rule_pack del órgano hace override desde
   // el motor V2 (calcularAntelacion).
+  //
+  // Codex P2 round 14 PR #3: el bypass SLU/SAU (art. 173.3 LSC) SOLO
+  // exime juntas, no consejos/comisiones. Estaba antes que el check
+  // organoTipo → CdA de una SLU pasaba el plazo aunque el reglamento
+  // del consejo exigiera 5 días. Movemos el bypass DENTRO del bloque
+  // junta para que el plazo del consejo se respete.
   const organoTipo = (params.organoTipo ?? "JGA").toUpperCase();
   const isJunta = organoTipo === "JGA" || organoTipo === "JGE" || organoTipo.includes("JUNTA");
   const isConsejo = !isJunta && (organoTipo === "CDA" || organoTipo.includes("CONSEJO"));
   const isComision = !isJunta && !isConsejo &&
     (organoTipo.includes("COMISION") || organoTipo.includes("COMITE"));
+
+  const today = new Date();
+  const meeting = new Date(params.meetingDate);
+  const diffDays = Math.floor((meeting.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   if (!isJunta) {
     let requiredOrgano = 5;
@@ -232,6 +237,11 @@ export function checkNoticePeriodByType(params: {
     else if (isComision) requiredOrgano = 3;
     return diffDays >= requiredOrgano;
   }
+
+  // Sólo para JUNTAS: el socio único de SLU/SAU adopta decisiones sin
+  // convocatoria formal (art. 15 + 173.3 LSC). Esto NO aplica a sesiones
+  // de CdA / comisiones — esas siguen sujetas al reglamento del órgano.
+  if (params.tipoSocial === 'SLU' || params.tipoSocial === 'SAU') return true;
 
   // Para juntas, los plazos por jurisdicción + tipo de convocatoria.
   const minDays: Record<string, Record<string, number>> = {
