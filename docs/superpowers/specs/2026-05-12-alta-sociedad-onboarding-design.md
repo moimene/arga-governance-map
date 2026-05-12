@@ -212,7 +212,22 @@ Contenido:
    - El `p_payload` contiene 9 sub-objetos: `sociedad_pj`, `entity`, `capital_profile`, `share_classes` (array), `socios` (array), `capital_holdings` (array), `governing_bodies` (array), `entity_settings` (array de pares clave/valor), `rule_param_overrides` (array)
    - Returns `jsonb` con `{ entity_id, person_id, body_ids: {...}, share_class_ids: {...}, holding_ids: [...], settings_skipped: [...] }`
    - Errores se propagan vía `RAISE EXCEPTION` con `ERRCODE` específico para que el cliente sepa qué falló (`'P0001'` con `MESSAGE` informativo)
-   - Internamente: BEGIN → 9 inserts secuenciales → COMMIT (transacción implícita de la función)
+   - **Atomicidad sin transaction control explícito (review Codex):** la función `LANGUAGE plpgsql` invocada vía Supabase RPC **no debe emitir `BEGIN`/`COMMIT`/`ROLLBACK`** — PostgreSQL prohíbe transaction control statements dentro de funciones; ya se ejecutan dentro de la transacción del caller. La atomicidad de los 9 inserts viene del hecho de que toda la función es una sola unidad atómica: si cualquier `INSERT` o `RAISE EXCEPTION` falla, Postgres revierte automáticamente todos los cambios realizados dentro de la función. Implementación correcta:
+     ```sql
+     CREATE OR REPLACE FUNCTION fn_crear_sociedad_legal_y_capital(p_tenant_id uuid, p_payload jsonb)
+     RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+     DECLARE
+       v_entity_id uuid; v_person_id uuid; -- etc.
+     BEGIN  -- ← este BEGIN es el inicio del bloque PL/pgSQL, NO de una transacción
+       -- 9 inserts secuenciales con RAISE EXCEPTION en cualquier error
+       INSERT INTO persons ... RETURNING id INTO v_person_id;
+       INSERT INTO entities ... RETURNING id INTO v_entity_id;
+       -- ... etc.
+       RETURN jsonb_build_object('entity_id', v_entity_id, ...);
+     END;  -- ← cierre del bloque, NO un COMMIT
+     $$;
+     ```
+     El `BEGIN ... END` aquí es sintaxis de bloque plpgsql, NO control transaccional. Cualquier excepción propagada (incluso `RAISE EXCEPTION`) hace que Postgres revierta TODOS los inserts de esta invocación automáticamente.
 
 3. **RLS:** la función es SECURITY DEFINER pero **valida `p_tenant_id` contra el tenant del caller autenticado**. La implementación concreta del mapeo `auth.uid() → tenant_id` se resuelve **durante fase B** revisando cómo lo hacen las RPCs existentes (`fn_generar_acta`, `fn_firmar_certificacion`, `fn_cerrar_votaciones_vencidas`) — todas usan el mismo patrón. Si el patrón existente es `current_setting('request.jwt.claims', true)::jsonb->>'tenant_id'`, se reutiliza tal cual. Si no coincide con `p_tenant_id`, `RAISE EXCEPTION 'tenant_mismatch' USING ERRCODE = 'P0001'`.
 
@@ -334,21 +349,42 @@ async function guardarSociedad() {
     return;
   }
 
-  // 3. TX2 — adaptador personas/cargos
+  // 3. TX2 — adaptador personas/cargos (envuelto en try/catch para capturar
+  //    fallos catastróficos: network, RLS unexpected, error inesperado de
+  //    Supabase. Sin este try/catch, un throw del adaptador abortaría la
+  //    ejecución antes de mostrar banner UX y antes del navigate, dejando
+  //    al usuario en el wizard creyendo que falló todo cuando TX1 ya
+  //    persistió la sociedad. Documentado tras review Codex.)
   const ctx = buildAdapterContext(tx1.data);
-  const cargosResult = await persistInitialCargos(ctx, draft.cargos);
-  // Solo cargos con tipo_condicion='ADMIN_PJ' generan filas en `representaciones`
-  // con scope='ADMIN_PJ_REPRESENTANTE'. PJ accionistas con representante de junta
-  // se modelizan vía JUNTA_PROXY por junta concreta, no en alta.
-  const repsInput = draft.cargos
-    .filter(c => c.tipo_condicion === 'ADMIN_PJ' && c.persona.representante)
-    .map(c => ({
-      represented: c.persona,
-      representante: c.persona.representante!,
-      effective_from: c.fecha_inicio,
-      fuente: c.fuente_designacion,
-    }));
-  const repsResult = await persistInitialRepresentaciones(ctx, repsInput);
+  let cargosResult: Awaited<ReturnType<typeof persistInitialCargos>>;
+  let repsResult: Awaited<ReturnType<typeof persistInitialRepresentaciones>>;
+  try {
+    cargosResult = await persistInitialCargos(ctx, draft.cargos);
+    // Solo cargos con tipo_condicion='ADMIN_PJ' generan filas en `representaciones`
+    // con scope='ADMIN_PJ_REPRESENTANTE'. PJ accionistas con representante de junta
+    // se modelizan vía JUNTA_PROXY por junta concreta, no en alta.
+    const repsInput = draft.cargos
+      .filter(c => c.tipo_condicion === 'ADMIN_PJ' && c.persona.representante)
+      .map(c => ({
+        represented: c.persona,
+        representante: c.persona.representante!,
+        effective_from: c.fecha_inicio,
+        fuente: c.fuente_designacion,
+      }));
+    repsResult = await persistInitialRepresentaciones(ctx, repsInput);
+  } catch (tx2Err) {
+    // TX2 throw catastrófico. TX1 ya commiteada → la sociedad existe en BD
+    // con su default pesimista `INCOMPLETA_CARGOS` o `INCOMPLETA_DATOS`.
+    // NO promovemos a OPERATIVA. Banner UX + navigate para que el usuario
+    // no rerun toda la creación.
+    console.error('[alta-sociedad] TX2 catastrófico:', tx2Err);
+    toast.warning(
+      'Sociedad creada. Los cargos no se pudieron designar por un error inesperado. ' +
+        'Completarlos en Designar admin / Asignar cargo.'
+    );
+    navigate(`/secretaria/sociedades/${entityId}`);
+    return;
+  }
 
   const totalFailed = cargosResult.failedCargos.length + repsResult.failedReps.length;
 
