@@ -18,6 +18,11 @@ export interface EntityRow {
   materiality: string;
   secretary_owner_id: string | null;
   person_id?: string | null;
+  // Columna canonical (boolean) en `entities`. El override admin vive en
+  // `entity_settings` y gana sobre esta columna (variable-resolver línea
+  // 231). Para el ConvocatoriasStepper la heurística rápida es esta columna,
+  // que coincide para ARGA (SA cotizada IBEX 35).
+  es_cotizada?: boolean | null;
 }
 
 export interface EntityWithParent extends EntityRow {
