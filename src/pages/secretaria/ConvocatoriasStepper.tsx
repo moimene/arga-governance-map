@@ -851,21 +851,55 @@ export default function ConvocatoriasStepper() {
     }
   }, [candidateTemplates, selectedBorradorTemplateId]);
 
-  const borradorCapa3Fields = useMemo(
-    () =>
-      (effectiveBorradorTemplate?.capa3_editables ?? []).map((f) => ({
-        campo: f.campo,
-        obligatoriedad: f.obligatoriedad ?? "OPCIONAL",
-        descripcion: f.descripcion ?? "",
-      })),
-    [effectiveBorradorTemplate],
-  );
+  // Codex P2 round 15 PR #3: preservar `opciones` y `default` del shape
+  // canonical de capa3_editables. Sin esto:
+  //   - Capa3Form renderiza textarea libre en vez de `<select>` con
+  //     opciones cerradas → datos fuera de lista permitida.
+  //   - El default sugerido no se prefillea — el usuario tiene que
+  //     escribir desde cero aunque la plantilla traiga un valor por defecto.
+  //   - `validateCapa3` no rechaza valores fuera de `opciones` (la guarda
+  //     del round 5 en capa3-form-validation depende de que el campo
+  //     llegue con `opciones`).
+  const borradorCapa3Fields = useMemo(() => {
+    const raw = (effectiveBorradorTemplate?.capa3_editables ?? []) as Array<{
+      campo?: string;
+      obligatoriedad?: string;
+      descripcion?: string;
+      opciones?: unknown[];
+      default?: unknown;
+    }>;
+    return raw
+      .filter((f): f is { campo: string } & typeof f => typeof f.campo === "string" && f.campo.length > 0)
+      .map((f) => {
+        const opciones = Array.isArray(f.opciones)
+          ? f.opciones.filter((o): o is string => typeof o === "string")
+          : undefined;
+        const defaultValue = typeof f.default === "string" ? f.default : undefined;
+        return {
+          campo: f.campo,
+          obligatoriedad: f.obligatoriedad ?? "OPCIONAL",
+          descripcion: f.descripcion ?? "",
+          ...(opciones && opciones.length > 0 ? { opciones } : {}),
+          ...(defaultValue !== undefined ? { default: defaultValue } : {}),
+        };
+      });
+  }, [effectiveBorradorTemplate]);
   const [borradorCapa3Values, setBorradorCapa3Values] = useState<Record<string, string>>({});
 
-  // Reset capa3 cuando cambia la plantilla efectiva
+  // Reset capa3 + prefill defaults cuando cambia la plantilla efectiva.
+  // Codex P2 round 15: el reset previo solo ponía `{}`; ahora prefilleamos
+  // los defaults de la plantilla para que el usuario no tenga que retipear
+  // valores ya sugeridos por Legal.
   useEffect(() => {
-    setBorradorCapa3Values({});
-  }, [effectiveBorradorTemplate?.id]);
+    const prefills: Record<string, string> = {};
+    for (const f of borradorCapa3Fields) {
+      const def = (f as { default?: string }).default;
+      if (typeof def === "string" && def.length > 0) {
+        prefills[f.campo] = def;
+      }
+    }
+    setBorradorCapa3Values(prefills);
+  }, [effectiveBorradorTemplate?.id, borradorCapa3Fields]);
 
   const borradorVariables = useMemo<Record<string, unknown>>(() => {
     const memberNames = activeMandates

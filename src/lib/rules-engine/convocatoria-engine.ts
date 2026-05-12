@@ -161,7 +161,16 @@ export function evaluarConvocatoria(
   // CORREO_CERTIFICADO, ERDS, BUROFAX. `channelSatisfiesReminder()` no
   // los reconoce como equivalentes → reminder perpetuamente pending.
   // Para órganos NO junta, eliminamos los códigos abstractos del
-  // contrato de reminders; el secretario elige cualquier canal directo.
+  // contrato de reminders.
+  //
+  // Codex P2 round 15: si tras filtrar quedan CERO canales para non-
+  // junta, garantizamos al menos un canal concreto (ERDS — preferido
+  // por trazabilidad QTSP + acuse legal) para que el reminder dispare
+  // y el secretario tenga que confirmar al menos un canal de
+  // notificación directa al miembro. Sin esto, una convocatoria CdA
+  // con pack que sólo trae códigos abstractos podía emitirse sin
+  // canales y sin reminder, contradiciendo el explain node "art. 246
+  // LSC: notificación individual obligatoria".
   if (!isJunta) {
     const ABSTRACT_NON_JUNTA_CODES = new Set([
       'CONVOCATORIA_CONSEJO',
@@ -171,6 +180,19 @@ export function evaluarConvocatoria(
       'NOTIFICACION_DIRECTA',
     ]);
     canalesExigidos = canalesExigidos.filter((c) => !ABSTRACT_NON_JUNTA_CODES.has(c));
+    if (canalesExigidos.length === 0) {
+      canalesExigidos.push('ERDS');
+      explainNodes.push(
+        createExplainNode(
+          'Canales: fallback ERDS para notificación directa',
+          'SISTEMA',
+          'art. 246 LSC + Codex round 15',
+          'OK',
+          `${organoTipoUpper}: rule_pack sólo declaraba códigos abstractos; se exige ERDS como mínimo concreto de notificación certificada al miembro.`,
+          undefined
+        )
+      );
+    }
   }
 
   if (isJunta && input.tipoSocial === 'SA' && !input.webInscrita) {
@@ -442,7 +464,7 @@ function restarDias(fechaJunta: string, dias: number): string {
  */
 function createExplainNode(
   regla: string,
-  fuente: 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO',
+  fuente: 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO' | 'SISTEMA',
   referencia: string,
   resultado: EvalSeverity,
   mensaje: string,

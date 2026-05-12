@@ -782,5 +782,51 @@ describe('evaluarConvocatoria', () => {
       expect(result.canalesExigidos).toContain('NOTIFICACION_GENERICA');
       expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
     });
+
+    // Codex P2 round 15 PR #3: fallback ERDS cuando filtro deja non-
+    // junta sin canales concretos.
+    it('CdA con pack 100% abstracto: fallback ERDS añadido', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'NOTIFICACION_GENERICA'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).toContain('ERDS');
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      expect(fallbackNode).toBeDefined();
+      expect(fallbackNode?.fuente).toBe('SISTEMA');
+    });
+
+    it('CdA con pack que ya tiene canal concreto: no añade fallback', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'BUROFAX'],
+            SL: ['BUROFAX'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('BUROFAX');
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      expect(fallbackNode).toBeUndefined();
+    });
   });
 });
