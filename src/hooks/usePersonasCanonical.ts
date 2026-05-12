@@ -125,6 +125,52 @@ export function usePersonasEnriquecidas(filter?: {
     ],
     enabled: !!tenantId,
     queryFn: async (): Promise<PersonaEnriquecida[]> => {
+      // P2 Codex iter-5: pre-filter person_ids cuando hay entity_id o tipo_condicion filter
+      // para evitar que el cap (subido a 2000) corte personas alfabéticamente tardías
+      // que estén linked a la sociedad/cargo target.
+      // Bug original: con limit(200), tenants con >200 personas perdían silenciosamente
+      // matches en sociedad-mode o cargo-filter views porque el cap se aplicaba ANTES del
+      // client-side cross-join contra condiciones_persona y capital_holdings.
+      let targetPersonIds: Set<string> | null = null;
+
+      if (filter?.entity_id || filter?.tipo_condicion) {
+        targetPersonIds = new Set<string>();
+
+        // Pre-query a condiciones_persona para resolver person_ids con cargo vigente
+        // que cumpla el filtro (entity_id y/o tipo_condicion).
+        let cpQ = supabase
+          .from("condiciones_persona")
+          .select("person_id")
+          .eq("tenant_id", tenantId!)
+          .eq("estado", "VIGENTE");
+        if (filter.entity_id) cpQ = cpQ.eq("entity_id", filter.entity_id);
+        if (filter.tipo_condicion) cpQ = cpQ.eq("tipo_condicion", filter.tipo_condicion);
+        const { data: cpData, error: cpErr } = await cpQ;
+        if (cpErr) throw cpErr;
+        for (const row of (cpData ?? []) as Array<{ person_id: string }>) {
+          targetPersonIds.add(row.person_id);
+        }
+
+        // Si el filter es solo entity_id (sin tipo_condicion específico), también
+        // hacemos union con capital_holdings — el filtro post-join también acepta
+        // matching por holding, así que el pre-query debe incluir ese set.
+        if (filter.entity_id && !filter.tipo_condicion) {
+          const { data: chData, error: chErr } = await supabase
+            .from("capital_holdings")
+            .select("holder_person_id")
+            .eq("tenant_id", tenantId!)
+            .eq("entity_id", filter.entity_id)
+            .is("effective_to", null);
+          if (chErr) throw chErr;
+          for (const row of (chData ?? []) as Array<{ holder_person_id: string }>) {
+            targetPersonIds.add(row.holder_person_id);
+          }
+        }
+
+        // Si el set está vacío tras pre-filter, no hay matches posibles → return temprano.
+        if (targetPersonIds.size === 0) return [];
+      }
+
       // 1. Personas (con filtros propios de la tabla persons)
       let personsQ = supabase.from("persons").select("*").eq("tenant_id", tenantId!);
       if (filter?.person_type) personsQ = personsQ.eq("person_type", filter.person_type);
@@ -134,7 +180,13 @@ export function usePersonasEnriquecidas(filter?: {
           `full_name.ilike.%${s}%,tax_id.ilike.%${s}%,denomination.ilike.%${s}%,email.ilike.%${s}%`,
         );
       }
-      personsQ = personsQ.order("full_name", { ascending: true }).limit(200);
+      if (targetPersonIds) {
+        // P2 Codex iter-5: restringir a person_ids que cumplen el pre-filter entity/cargo.
+        personsQ = personsQ.in("id", Array.from(targetPersonIds));
+      }
+      // Cap 2000 (10× del anterior 200) — sigue siendo bounded pero ya no corta
+      // resultados relevantes cuando el pre-filter por entity/cargo está activo.
+      personsQ = personsQ.order("full_name", { ascending: true }).limit(2000);
 
       // 2. Cargos VIGENTES + joins a entity y body (todo el tenant).
       const cargosQ = supabase
