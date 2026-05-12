@@ -99,6 +99,24 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
       break;
     }
   }
+  // CL-004: codigos duplicados rompen UNIQUE (entity_id, class_code) en server
+  // (schema canonico 000019). Sin este check, dos clases con mismo code pasan
+  // validacion pero la RPC falla con duplicate key constraint -> server rollback
+  // (review Codex P2).
+  const seenClassCodes = new Set<string>();
+  for (const sc of draft.shareClasses) {
+    const code = sc.class_code?.trim();
+    if (!code) continue;
+    if (seenClassCodes.has(code)) {
+      issues.push(issue(
+        "CL-004",
+        "shareClasses.class_code",
+        `El codigo "${code}" esta duplicado. Cada clase/serie debe tener un codigo unico.`
+      ));
+      break;
+    }
+    seenClassCodes.add(code);
+  }
 
   if (draft.capTable.length === 0) {
     issues.push(issue("CT-001", "capTable", "El cap table inicial esta vacio.", "BLOCK_OPERATIONAL"));
@@ -116,7 +134,20 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   // evita el round-trip al servidor (review Codex P2).
   const declaredClassCodes = new Set(draft.shareClasses.map((c) => c.class_code).filter(Boolean));
   for (const entry of draft.capTable) {
-    const code = entry.share_class_code;
+    const code = entry.share_class_code?.trim();
+    // CT-009: blank class_code en holding cuando hay clases declaradas. Caso real:
+    // holding agregado antes de declarar clases, luego clase agregada pero el
+    // holding queda sin code. Mi guard previo `if (code && ...)` saltaba este
+    // caso; RPC luego falla con "capital_holding refers to undeclared
+    // share_class_code" -> rollback (review Codex P2).
+    if (!code && draft.shareClasses.length > 0) {
+      issues.push(issue(
+        "CT-009",
+        `capTable.${entry.key}.share_class_code`,
+        "Asigna una clase/serie declarada en el paso 5 a este holding."
+      ));
+      continue;
+    }
     if (code && !declaredClassCodes.has(code)) {
       issues.push(issue(
         "CT-006",
@@ -198,8 +229,22 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     }
   } else {
     const expected = adminCargoTiposForForma(draft);
-    if (!draft.cargos.some((cargo) => expected.includes(cargo.tipo_condicion) && cargo.persona)) {
+    const matching = draft.cargos.filter((cargo) => expected.includes(cargo.tipo_condicion) && cargo.persona);
+    if (matching.length === 0) {
       issues.push(issue("AU-001", "cargos", "La forma de administracion elegida requiere administrador inicial."));
+    }
+    // AU-002: las formas plurales (ADMIN_SOLIDARIOS, ADMIN_MANCOMUNADOS)
+    // requieren minimo 2 administradores. Caso especialmente critico en
+    // mancomunados porque el builder configura firmas_requeridas: 2 -> con
+    // 1 solo admin la sociedad seria imposible de operar tras TX2 (review
+    // Codex P2).
+    const forma = draft.profile.forma_administracion;
+    if ((forma === "ADMINISTRADORES_SOLIDARIOS" || forma === "ADMINISTRADORES_MANCOMUNADOS") && matching.length < 2) {
+      issues.push(issue(
+        "AU-002",
+        "cargos",
+        `La administracion ${forma === "ADMINISTRADORES_SOLIDARIOS" ? "solidaria" : "mancomunada"} requiere al menos 2 administradores.`
+      ));
     }
   }
 
@@ -248,10 +293,10 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     1: ["S-005", "S-006", "R-002"],
     2: ["O-002", "CT-005"],
     3: ["C-001", "C-002", "C-003", "C-004"],
-    4: ["CL-001", "CL-002", "CL-003"],
-    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "P-001"],
+    4: ["CL-001", "CL-002", "CL-003", "CL-004"],
+    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "P-001"],
     6: ["O-001", "O-002"],
-    7: ["CA-001", "CA-002", "AU-001", "PJ-001"],
+    7: ["CA-001", "CA-002", "AU-001", "AU-002", "PJ-001"],
     8: ["R-001", "R-002"],
     9: [],
     10: [],
