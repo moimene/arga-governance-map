@@ -40,7 +40,7 @@ Adaptador real consumiendo hooks **actuales en `main`** (`usePersonasCanonical`,
 **Cuando `feature/personas-cargos-refactor` mergee a `main` (D7 cerrado)**, hacemos `git merge main` en nuestra rama y sustituimos las llamadas directas a Supabase del adaptador por los hooks de mutación del otro carril:
 - `useCondicionesPersonaMutations` para `condiciones_persona`
 - `useUpsertRepresentanteAdminPJ` para `representaciones`
-- (lookup persona por NIF y creación con respeto a `UNIQUE(tenant_id, tax_id)` ya garantizado por migración `000063` del otro carril)
+- Lookup persona por NIF + creación condicional: **lookup-first sigue siendo el patrón obligatorio** (ver §5.1 paso 5 de la RPC y §5.2 del adaptador). La migración `000063` del otro carril añade `UNIQUE(tenant_id, tax_id)` como garantía adicional de integridad, pero el adaptador NO se debe rediseñar a usar `ON CONFLICT` — el lookup-first es robusto en ambos estados (sin UNIQUE en `main` actual, con UNIQUE post-merge) y evita la trampa de `ON CONFLICT DO NOTHING RETURNING id` que no devuelve row en colisión.
 
 Esto es un commit aislado, ~1–2h de trabajo. La frontera está sellada porque toda la integración con personas/cargos vive en `adapters.ts`.
 
@@ -561,7 +561,7 @@ Patrón obligatorio: `forwardRef`, `aria-label` en iconos, `aria-invalid` + `ari
 |---|---|---|---|
 | Schema de `entities` choca con migración paralela del otro carril | Media | Alto | Coordinar nombres de columna con `variable-resolver.ts`; no renombrar existentes |
 | RPC TX1 falla por payload mal formado | Media | Alto | Validators puros + tests en `validation.test.ts` antes de invocar RPC |
-| Adaptador TX2 con NIFs duplicados rompe UNIQUE | Media | Medio | Lookup-then-create con `ON CONFLICT DO NOTHING`; tests `adapters.test.ts` |
+| Adaptador TX2 duplica personas o pierde ids por NIF reusado | Media | Medio | **Lookup-first explícito** (`SELECT id FROM persons WHERE tenant_id=… AND tax_id=…`; si NULL, `INSERT … RETURNING id`). Patrón obligatorio en TX1 (§5.1 paso 5) Y en TX2 (§5.2). NO usar `ON CONFLICT DO NOTHING RETURNING id` — no devuelve row en colisión. Tests `adapters.test.ts` cubren ambos caminos (insert nuevo + reuse). |
 | Refactor del adaptador cuando mergea Personas/Cargos rompe build | Baja | Medio | Adaptador encapsulado en una sola capa; commit aislado documentado |
 | Cap table denominador incorrecto en quórum | Media | Alto | Tests de integración con `/secretaria/reuniones/:id` calculando quórum real |
 | Estado `INCOMPLETA_CARGOS` confunde al usuario | Media | Bajo | Banner UX explícito con CTA directo a remediación |
