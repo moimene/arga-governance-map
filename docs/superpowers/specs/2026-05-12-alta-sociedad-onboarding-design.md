@@ -229,7 +229,23 @@ Contenido:
      ```
      El `BEGIN ... END` aquí es sintaxis de bloque plpgsql, NO control transaccional. Cualquier excepción propagada (incluso `RAISE EXCEPTION`) hace que Postgres revierta TODOS los inserts de esta invocación automáticamente.
 
-3. **RLS:** la función es SECURITY DEFINER pero **valida `p_tenant_id` contra el tenant del caller autenticado**. La implementación concreta del mapeo `auth.uid() → tenant_id` se resuelve **durante fase B** revisando cómo lo hacen las RPCs existentes (`fn_generar_acta`, `fn_firmar_certificacion`, `fn_cerrar_votaciones_vencidas`) — todas usan el mismo patrón. Si el patrón existente es `current_setting('request.jwt.claims', true)::jsonb->>'tenant_id'`, se reutiliza tal cual. Si no coincide con `p_tenant_id`, `RAISE EXCEPTION 'tenant_mismatch' USING ERRCODE = 'P0001'`.
+3. **RLS + role check (review Codex P1):** la función es SECURITY DEFINER y por tanto **bypassa RLS de las tablas** — esto convierte la autorización en responsabilidad explícita de la propia función. NO basta con validar tenant: cualquier usuario `authenticated` en el tenant (AUDITOR, CONSEJERO, MIEMBRO) podría crear sociedades arbitrarias si solo verificamos `p_tenant_id`. La función DEBE invocar al inicio los helpers existentes (`supabase/migrations/20260504193000_000052_secretaria_p0_rpc_hardening.sql`):
+
+   ```sql
+   -- Paso 1: tenant access (compara p_tenant_id con tenant del caller via JWT)
+   PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
+
+   -- Paso 2: role allowed — solo SECRETARIA_CORPORATIVA o ADMIN_SISTEMA pueden
+   -- crear sociedades. AUDITOR, CONSEJERO, MIEMBRO, COMITE_LEGAL NO pueden.
+   PERFORM fn_secretaria_assert_role_allowed(
+     p_tenant_id,
+     ARRAY['SECRETARIA_CORPORATIVA', 'ADMIN_SISTEMA']
+   );
+   ```
+
+   Ambos helpers ya `RAISE EXCEPTION` apropiada (`tenant_mismatch` o `forbidden`) con `ERRCODE` específico si el caller no cumple. El service role (migraciones, seeds) está exento automáticamente vía `fn_secretaria_is_service_role()` dentro del helper.
+
+   **Pattern confirmado** observando RPCs endurecidas existentes (`fn_generar_acta`, `fn_firmar_certificacion`, `fn_cerrar_votaciones_vencidas`) — todas siguen este orden tenant→role antes de cualquier escritura.
 
 4. **GRANT:** `EXECUTE ON FUNCTION fn_crear_sociedad_legal_y_capital TO authenticated`.
 
