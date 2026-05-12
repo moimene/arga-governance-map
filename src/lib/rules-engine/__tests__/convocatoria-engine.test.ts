@@ -785,7 +785,7 @@ describe('evaluarConvocatoria', () => {
 
     // Codex P2 round 15 PR #3: fallback ERDS cuando filtro deja non-
     // junta sin canales concretos.
-    it('CdA con pack 100% abstracto: fallback ERDS añadido', () => {
+    it('CdA con pack 100% abstracto: fallback ERDS añadido (ES default)', () => {
       const pack = createTestPack({
         convocatoria: {
           ...createTestPack().convocatoria,
@@ -796,7 +796,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA' },
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'ES' },
         [pack],
         [],
       );
@@ -806,6 +806,63 @@ describe('evaluarConvocatoria', () => {
       const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
       expect(fallbackNode).toBeDefined();
       expect(fallbackNode?.fuente).toBe('SISTEMA');
+    });
+
+    // Codex P2 round 17 PR #3: fallback por jurisdicción.
+    it('CdA BR con pack abstracto: fallback EMAIL_SIMPLE (único directo en BR)', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'BR' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('EMAIL_SIMPLE');
+      expect(result.canalesExigidos).not.toContain('ERDS');
+    });
+
+    it('CdA MX con pack abstracto: fallback CORREO_CERTIFICADO', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'MX' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('CORREO_CERTIFICADO');
+      expect(result.canalesExigidos).not.toContain('ERDS');
+    });
+
+    it('CdA sin jurisdiction (legacy): asume ES → ERDS', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' /* sin jurisdiction */ },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('ERDS');
     });
 
     it('CdA con pack que ya tiene canal concreto: no añade fallback', () => {

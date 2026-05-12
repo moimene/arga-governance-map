@@ -181,14 +181,27 @@ export function evaluarConvocatoria(
     ]);
     canalesExigidos = canalesExigidos.filter((c) => !ABSTRACT_NON_JUNTA_CODES.has(c));
     if (canalesExigidos.length === 0) {
-      canalesExigidos.push('ERDS');
+      // Codex P2 round 17 PR #3: el fallback debe ser un canal que la UI
+      // de la jurisdicción del tenant SÍ ofrezca y `channelSatisfiesReminder`
+      // pueda mapear a algo seleccionable. ERDS funciona en ES/PT/MX (con
+      // QTSP) pero no aparece en CHANNEL_OPTIONS.BR → CdA brasileño con
+      // pack abstracto quedaba con reminder eterno tras EMAIL_SIMPLE.
+      const jurisdictionUpper = (input.jurisdiction ?? 'ES').toUpperCase();
+      const FALLBACK_NON_JUNTA: Record<string, string> = {
+        ES: 'ERDS',           // EAD Trust QTSP — preferido por trazabilidad
+        PT: 'ERDS',           // misma cobertura QTSP eIDAS
+        MX: 'CORREO_CERTIFICADO', // QTSP no obligatorio; correo certificado equivalente
+        BR: 'EMAIL_SIMPLE',   // único canal directo en CHANNEL_OPTIONS.BR
+      };
+      const fallback = FALLBACK_NON_JUNTA[jurisdictionUpper] ?? 'EMAIL_SIMPLE';
+      canalesExigidos.push(fallback);
       explainNodes.push(
         createExplainNode(
-          'Canales: fallback ERDS para notificación directa',
+          `Canales: fallback ${fallback} para notificación directa`,
           'SISTEMA',
-          'art. 246 LSC + Codex round 15',
+          'art. 246 LSC + Codex round 15/17',
           'OK',
-          `${organoTipoUpper}: rule_pack sólo declaraba códigos abstractos; se exige ERDS como mínimo concreto de notificación certificada al miembro.`,
+          `${organoTipoUpper} (${jurisdictionUpper}): rule_pack sólo declaraba códigos abstractos; se exige ${fallback} como mínimo concreto disponible en la UI de la jurisdicción.`,
           undefined
         )
       );

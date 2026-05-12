@@ -568,6 +568,11 @@ export default function ConvocatoriasStepper() {
     materias: agendaItems
       .filter((i) => (i.kind ?? "DELIBERATIVO") === "DECISORIO")
       .map((i) => i.materia),
+    // Codex P2 round 17 PR #3: jurisdiction es necesaria para elegir el
+    // canal de fallback non-junta que la UI de cada país sí puede
+    // ofrecer (ERDS para ES/PT, CORREO_CERTIFICADO para MX,
+    // EMAIL_SIMPLE para BR).
+    jurisdiction,
   };
   const evaluacionV2 = evaluarConvocatoria(
     convocatoriaInput,

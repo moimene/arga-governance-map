@@ -414,6 +414,14 @@ export interface ConvocatoriaInput {
   primeraConvocatoria: boolean;
   esJuntaUniversal: boolean;
   materias: string[];
+  /**
+   * Jurisdicción ISO-like del tenant ('ES' | 'PT' | 'BR' | 'MX').
+   * Opcional para retro-compat con llamadas legacy; cuando se pasa,
+   * el motor lo usa en decisiones como el fallback de canal para
+   * convocatorias non-junta (Codex P2 round 17 PR #3). Si está
+   * ausente, se asume 'ES' (default LSC).
+   */
+  jurisdiction?: string;
 }
 
 export interface ConvocatoriaOutput extends EvaluacionResult {
