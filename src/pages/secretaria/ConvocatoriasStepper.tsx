@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -12,7 +12,12 @@ import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccion
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
-import { useCreateConvocatoria, type AgendaItem } from "@/hooks/useConvocatorias";
+import { useCreateConvocatoria, useUploadConvocatoriaAttachment, type AgendaItem } from "@/hooks/useConvocatorias";
+import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
+import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { Capa3Form } from "@/components/secretaria/Capa3Form";
+import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
+import { supabase } from "@/integrations/supabase/client";
 import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
@@ -35,8 +40,9 @@ const STEPS = [
   { n: 3, label: "Orden del día",           hint: "Clasificar ítems en ordinaria / estatutaria / estructural" },
   { n: 4, label: "Destinatarios",           hint: "Miembros del órgano que recibirán la convocatoria" },
   { n: 5, label: "Canales de publicación",  hint: "BORME / PSM / JORNAL / web corporativa / ERDS" },
-  { n: 6, label: "Adjuntos",               hint: "Documentos de referencia y propuestas que se adjuntan" },
-  { n: 7, label: "Revisión y emisión",      hint: "Verificación de compliance y emisión definitiva" },
+  { n: 6, label: "Adjuntos",                hint: "Documentos de referencia y propuestas que se adjuntan" },
+  { n: 7, label: "Borrador documento",      hint: "Plantilla + capa 3 editable + borrador final del texto" },
+  { n: 8, label: "Revisión y emisión",      hint: "Verificación de compliance y emisión definitiva" },
 ];
 
 const JURIS_FLAGS: Record<string, string> = { ES: "🇪🇸", PT: "🇵🇹", BR: "🇧🇷", MX: "🇲🇽" };
@@ -112,9 +118,10 @@ const AGENDA_TIPOS = [
 ] as const;
 
 // agenda_item.kind v1.3: naturaleza del punto del orden del día.
-// Solo los puntos DECISORIO se someten a votación y materializan como
-// acuerdo registrable. INFORMATIVO y DELIBERATIVO no producen acuerdo y
-// por tanto no exigen materia / mayoría / propuesta de acuerdo.
+// Solo los puntos DECISORIO (label visible: "Acuerdo") se someten a votación
+// y materializan como acuerdo registrable. INFORMATIVO y DELIBERATIVO no
+// producen acuerdo y por tanto no exigen materia / mayoría / propuesta de
+// acuerdo. El enum DB mantiene "DECISORIO"; solo la etiqueta de UI cambia.
 const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] = [
   {
     value: "INFORMATIVO",
@@ -128,8 +135,8 @@ const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] =
   },
   {
     value: "DECISORIO",
-    label: "Decisorio",
-    helper: "Sometible a votación y materializable como acuerdo.",
+    label: "Acuerdo",
+    helper: "Propuesta concreta sometible a votación y materializable como acuerdo registrable.",
   },
 ];
 
@@ -157,20 +164,86 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
   },
 ];
 
+// `lmvCotizada=true` marca materias con especialidades aplicables a SA
+// cotizadas (LMV / Código de Buen Gobierno CNMV). NO cambia la clase de
+// materia (sigue siendo ORDINARIA/ESTATUTARIA/ESTRUCTURAL para el motor),
+// pero activa advertencias en la UI si la entidad es cotizada:
+//   - OPERACION_VINCULADA: art. 529 ter.h + 530 LSC → comisión auditoría
+//     + aprobación CdA + comunicación CNMV (>5% balance) o folleto si afecta
+//     al mercado.
+//   - PROGRAMA_RECOMPRA: art. 277 LSC + Reglamento UE 596/2014 (abuso de
+//     mercado) → autorización JGA + notificación CNMV + ventanas trading.
+//   - REMUNERACION_CONSEJEROS: art. 529 novodecies LSC → informe anual
+//     vinculante + voto consultivo cotizadas.
 const AGENDA_MATERIAS = [
-  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false },
-  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false },
-  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true },
-  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento de auditor", tipo: "ORDINARIA", inscribible: true },
-  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
+  // Ordinarias (gestión recurrente del órgano)
+  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "DISTRIBUCION_RESERVAS", label: "Distribución de reservas / dividendo a cuenta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  // Canonical id `REMUNERACION_CONSEJEROS` (materia_catalog 20260424_000033).
+  { value: "REMUNERACION_CONSEJEROS", label: "Política / informe de remuneración de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  // Codex P2 round 9 PR #3: id canonical singular `OPERACION_VINCULADA`
+  // (verificado en supabase/migrations/20260420_000017_seed_rule_packs_v2.sql).
+  // El plural ("OPERACIONES_VINCULADAS") rompía el match con el rule_pack
+  // aprobado → convocatoria perdía payload LMV (comisión auditoría +
+  // CNMV) y caía a warning genérico. Label visible plural por UX.
+  { value: "OPERACION_VINCULADA", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+
+  // Estatutarias (mayoría reforzada art. 199/201 LSC)
+  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  // MODIFICACION_REGLAMENTO es ORDINARIA: reglamento del consejo/junta NO
+  // es estatutos (jerarquía LEY → ESTATUTOS → REGLAMENTO). Art. 285-290 LSC
+  // aplica sólo a modificación estatutaria; el reglamento se aprueba por
+  // mayoría legal del órgano competente.
+  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: true },
+  // Canonical ids con sufijo `_SOCIAL` (materia_catalog 20260424_000033).
+  { value: "CAMBIO_DENOMINACION_SOCIAL", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "CAMBIO_DOMICILIO_SOCIAL", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+
+  // Estructurales (escritura pública + RM)
+  { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
+  { value: "FUSION", label: "Fusión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "ESCISION", label: "Escisión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "DISOLUCION", label: "Disolución", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
+  { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false, lmvCotizada: true },
+
   // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
   // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
   // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
   // tipo correcto y aceptar que no hay rule pack aplicable.
-  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false },
+  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 ] as const;
+
+// LMV cotizada advertencias específicas por materia. Texto enseña al
+// secretario qué especialidad cotizada aplica y dónde está la referencia.
+const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
+  OPERACION_VINCULADA:
+    "SA cotizada: requiere informe de la Comisión de Auditoría (art. 529 ter.h LSC) + aprobación del Consejo. Si la operación supera el 5% del balance debe comunicarse a CNMV (art. 530 LSC).",
+  PROGRAMA_RECOMPRA:
+    "SA cotizada: autorización JGA (art. 277 LSC) + notificación CNMV + cumplimiento de ventanas de trading (Reglamento UE 596/2014 sobre abuso de mercado).",
+  REMUNERACION_CONSEJEROS:
+    "SA cotizada: informe anual de remuneraciones vinculante + voto consultivo de la JGA sobre la política de retribución (art. 529 novodecies LSC).",
+  EMISION_OBLIGACIONES:
+    "SA cotizada: posible obligación de folleto informativo CNMV (Reglamento UE 2017/1129) cuando la emisión se ofrezca al público.",
+  FUSION: "SA cotizada: documento de fusión + informe del consejo + posible folleto CNMV si afecta a accionistas minoritarios.",
+  ESCISION: "SA cotizada: documento de escisión + posible folleto CNMV.",
+  CESION_GLOBAL:
+    "SA cotizada: posible hecho relevante a CNMV si afecta a porción significativa del patrimonio social.",
+  AUTORIZACION_OPERACION_ESTRUCTURAL:
+    "SA cotizada: revisar especialidades LMV (informe a CNMV, autorización de la JGA si supera umbrales).",
+};
 
 // Materias que NO se envían al motor V2 (puntos libres sin regla).
 const MATERIAS_LIBRES = new Set<string>(["OTROS_LIBRE"]);
@@ -356,6 +429,7 @@ export default function ConvocatoriasStepper() {
     ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/convocatorias";
   const createConvocatoria = useCreateConvocatoria();
+  const uploadAttachment = useUploadConvocatoriaAttachment();
   const { data: cloudRequestedPlantilla, isLoading: requestedPlantillaLoading } =
     usePlantillaProtegida(requestedPlantillaId ?? undefined);
   const localRequestedPlantilla = useMemo(
@@ -474,6 +548,7 @@ export default function ConvocatoriasStepper() {
     jurisdiction,
     convocationType: tipoConvocatoria,
     tipoSocial,
+    organoTipo,
   });
 
   const convocatoriaInput: ConvocatoriaInput = {
@@ -481,7 +556,11 @@ export default function ConvocatoriasStepper() {
     organoTipo,
     adoptionMode: "MEETING",
     fechaJunta: meetingIso,
-    esCotizada: false,
+    // Lectura canonical desde `entities.es_cotizada` (override en
+     // entity_settings no se aplica aquí — el motor V2 lo recibe ya
+     // resuelto desde variable-resolver en otros flujos. Para el motor
+     // de convocatoria nos basta la columna directa).
+    esCotizada: Boolean(selectedEntity?.es_cotizada),
     webInscrita: true,
     primeraConvocatoria: true,
     esJuntaUniversal: tipoConvocatoria === "UNIVERSAL",
@@ -489,6 +568,11 @@ export default function ConvocatoriasStepper() {
     materias: agendaItems
       .filter((i) => (i.kind ?? "DELIBERATIVO") === "DECISORIO")
       .map((i) => i.materia),
+    // Codex P2 round 17 PR #3: jurisdiction es necesaria para elegir el
+    // canal de fallback non-junta que la UI de cada país sí puede
+    // ofrecer (ERDS para ES/PT, CORREO_CERTIFICADO para MX,
+    // EMAIL_SIMPLE para BR).
+    jurisdiction,
   };
   const evaluacionV2 = evaluarConvocatoria(
     convocatoriaInput,
@@ -672,6 +756,422 @@ export default function ConvocatoriasStepper() {
     setTemplateCapa3Errors({});
     setTemplateCapa3Open(false);
   }
+  // ── Step 7: Borrador documento ────────────────────────────────────────────
+  // Carga plantillas tipo CONVOCATORIA, selecciona la mejor candidata por
+  // organoTipo + jurisdiction, expone capa3 editable y un textarea con el
+  // borrador renderizado (capa1 con variables sustituidas). El secretario
+  // puede editar el texto antes de emitir; se persiste en
+  // `convocatorias.convocatoria_text`.
+  const { data: plantillasProtegidas = [] } = usePlantillasProtegidas();
+  const convocatoriaTemplateTypes = useMemo(
+    () =>
+      tipoSocial === "SL" || tipoSocial === "SLU"
+        ? ["CONVOCATORIA_SL_NOTIFICACION", "CONVOCATORIA"]
+        : ["CONVOCATORIA", "CONVOCATORIA_SL_NOTIFICACION"],
+    [tipoSocial],
+  );
+  const autoSelectedTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (!plantillasProtegidas.length) return null;
+    return selectProcessTemplate(
+      plantillasProtegidas,
+      convocatoriaTemplateTypes,
+      { jurisdiction, organoTipo },
+      requestedPlantillaId ?? undefined,
+    );
+  }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo, requestedPlantillaId]);
+
+  const [selectedBorradorTemplateId, setSelectedBorradorTemplateId] = useState<string | null>(null);
+  // Codex P2 PR #3 round 7: el efectivo SE RESUELVE DESDE `candidateTemplates`
+  // (no desde la lista completa). Si el usuario selecciona una plantilla en
+  // Paso 7 y luego vuelve a Paso 1 a cambiar entidad/jurisdicción/órgano,
+  // candidateTemplates re-filtra y la plantilla previamente seleccionada
+  // puede dejar de ser compatible. En ese caso caemos a auto (compatible
+  // con el nuevo contexto) en vez de seguir trazando texto legal para
+  // contexto incorrecto. Nota: el useMemo necesita ver `candidateTemplates`
+  // declarado abajo — declaramos primero el filter, luego el effective.
+
+  // Codex P2 PR #3 round 6: el selector manual debe filtrar por la misma
+  // metadata que `selectProcessTemplate()` aplica en auto-selección, para
+  // que el usuario no pueda elegir plantillas de otra jurisdicción
+  // (PT/MX/BR) ni de un órgano incompatible (CdA vs JGA) y persistir texto
+  // legal en contexto erróneo. Las plantillas globales (jurisdiccion o
+  // organo_tipo == null/vacío) se consideran compatibles con cualquier
+  // contexto — son plantillas-marco multi-jurisdicción.
+  const candidateTemplates = useMemo(() => {
+    const jurisdictionUpper = (jurisdiction ?? "").toUpperCase();
+    const organoTipoUpper = (organoTipo ?? "").toUpperCase();
+    return plantillasProtegidas.filter((p) => {
+      if (!convocatoriaTemplateTypes.includes(p.tipo)) return false;
+      const estadoOk =
+        p.estado === "ACTIVA" ||
+        p.estado === "APROBADA" ||
+        p.estado === "REVISADA" ||
+        p.estado === "BORRADOR";
+      if (!estadoOk) return false;
+
+      // Jurisdicción: plantilla global (null/vacía) o coincide con la
+      // jurisdicción de la entidad.
+      const plantillaJurisdiccion = (p.jurisdiccion ?? "").toUpperCase();
+      const jurisdiccionOk =
+        !plantillaJurisdiccion || !jurisdictionUpper || plantillaJurisdiccion === jurisdictionUpper;
+      if (!jurisdiccionOk) return false;
+
+      // Órgano: plantilla global (null/vacía) o coincide con el
+      // organoTipo del órgano seleccionado. Matching tolerante por
+      // substring para variantes (CDA ↔ CONSEJO_ADMINISTRACION).
+      const plantillaOrgano = (p.organo_tipo ?? "").toUpperCase();
+      if (!plantillaOrgano || !organoTipoUpper) return true;
+      const organoOk =
+        plantillaOrgano === organoTipoUpper ||
+        plantillaOrgano.includes(organoTipoUpper) ||
+        organoTipoUpper.includes(plantillaOrgano);
+      return organoOk;
+    });
+  }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo]);
+
+  // Codex P2 PR #3 round 7 — declaración tras candidateTemplates: resuelve
+  // `selectedBorradorTemplateId` ÚNICAMENTE en la lista filtrada por
+  // contexto actual. Si la plantilla seleccionada manualmente ya no es
+  // compatible (cambio de entidad/jurisdicción/órgano tras la selección),
+  // cae a `autoSelectedTemplate`.
+  const effectiveBorradorTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (selectedBorradorTemplateId) {
+      const matchedInCurrent = candidateTemplates.find((p) => p.id === selectedBorradorTemplateId);
+      if (matchedInCurrent) return matchedInCurrent;
+      // La selección previa ya no encaja con el contexto actual.
+      return autoSelectedTemplate;
+    }
+    return autoSelectedTemplate;
+  }, [autoSelectedTemplate, candidateTemplates, selectedBorradorTemplateId]);
+
+  // Limpiar `selectedBorradorTemplateId` cuando ya no exista en la lista
+  // filtrada, para que el selector NO muestre un valor stale. Evita
+  // confusión visual: el `<select>` mostraría "— Seleccionar plantilla —"
+  // mientras el id en estado sigue siendo el anterior.
+  useEffect(() => {
+    if (!selectedBorradorTemplateId) return;
+    const stillCompatible = candidateTemplates.some((p) => p.id === selectedBorradorTemplateId);
+    if (!stillCompatible) {
+      setSelectedBorradorTemplateId(null);
+    }
+  }, [candidateTemplates, selectedBorradorTemplateId]);
+
+  // Codex P2 round 15 PR #3: preservar `opciones` y `default` del shape
+  // canonical de capa3_editables. Sin esto:
+  //   - Capa3Form renderiza textarea libre en vez de `<select>` con
+  //     opciones cerradas → datos fuera de lista permitida.
+  //   - El default sugerido no se prefillea — el usuario tiene que
+  //     escribir desde cero aunque la plantilla traiga un valor por defecto.
+  //   - `validateCapa3` no rechaza valores fuera de `opciones` (la guarda
+  //     del round 5 en capa3-form-validation depende de que el campo
+  //     llegue con `opciones`).
+  const borradorCapa3Fields = useMemo(() => {
+    const raw = (effectiveBorradorTemplate?.capa3_editables ?? []) as Array<{
+      campo?: string;
+      obligatoriedad?: string;
+      descripcion?: string;
+      opciones?: unknown[];
+      default?: unknown;
+    }>;
+    return raw
+      .filter((f): f is { campo: string } & typeof f => typeof f.campo === "string" && f.campo.length > 0)
+      .map((f) => {
+        const opciones = Array.isArray(f.opciones)
+          ? f.opciones.filter((o): o is string => typeof o === "string")
+          : undefined;
+        const defaultValue = typeof f.default === "string" ? f.default : undefined;
+        return {
+          campo: f.campo,
+          obligatoriedad: f.obligatoriedad ?? "OPCIONAL",
+          descripcion: f.descripcion ?? "",
+          ...(opciones && opciones.length > 0 ? { opciones } : {}),
+          ...(defaultValue !== undefined ? { default: defaultValue } : {}),
+        };
+      });
+  }, [effectiveBorradorTemplate]);
+  const [borradorCapa3Values, setBorradorCapa3Values] = useState<Record<string, string>>({});
+
+  // Reset capa3 + prefill defaults cuando cambia la plantilla efectiva.
+  // Codex P2 round 15: el reset previo solo ponía `{}`; ahora prefilleamos
+  // los defaults de la plantilla para que el usuario no tenga que retipear
+  // valores ya sugeridos por Legal.
+  useEffect(() => {
+    const prefills: Record<string, string> = {};
+    for (const f of borradorCapa3Fields) {
+      const def = (f as { default?: string }).default;
+      if (typeof def === "string" && def.length > 0) {
+        prefills[f.campo] = def;
+      }
+    }
+    setBorradorCapa3Values(prefills);
+  }, [effectiveBorradorTemplate?.id, borradorCapa3Fields]);
+
+  const borradorVariables = useMemo<Record<string, unknown>>(() => {
+    const memberNames = activeMandates
+      .filter((m) => !excludedPersonIds.has(m.person_id))
+      .map((m) => m.full_name)
+      .filter(Boolean);
+    // Codex P1 PR #3 round 3: la plantilla CONVOCATORIA_SL_NOTIFICACION
+    // de migration 20260419_000009 usa aliases canonical del contrato
+    // variables-plantillas v1.1:
+    //   - `{{lugar_junta}}` (alias de `lugar`)
+    //   - `{{tipo_junta}}` / `{{tipo_junta_texto}}` (alias de `tipo_convocatoria`)
+    //   - `{{#if segunda_convocatoria}}` (boolean, NO `habilitarSegunda`)
+    //   - `{{fecha_segunda_convocatoria}}` / `{{hora_segunda_convocatoria}}`
+    //     (aliases largos, NO `fecha_segunda` / `hora_segunda`)
+    //   - `{{domicilio_social}}`
+    // Sin estos aliases, las plantillas omiten la sección de 2ª convocatoria
+    // y otros bloques aun cuando el usuario los ha rellenado. Exponemos
+    // ambos nombres (corto y largo) para retro-compat con plantillas legacy.
+    const tipoJuntaTexto =
+      tipoConvocatoria === "ORDINARIA" ? "Junta General Ordinaria"
+      : tipoConvocatoria === "EXTRAORDINARIA" ? "Junta General Extraordinaria"
+      : "Junta Universal";
+
+    return {
+      denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+      // Codex P2 PR #3: `registration_number` es el código del Registro
+      // Mercantil (en SA: CIF). NO es domicilio. Mi fix anterior mezclaba
+      // ambos campos rellenando `domicilio_social` con `legal_name` —
+      // semánticamente incorrecto. Ahora:
+      //   - `cif` = registration_number (alias canonical de plantilla)
+      //   - `domicilio_social` queda vacío hasta que se modele como
+      //     columna canonical en `entities` (no hay fuente real hoy).
+      //     El renderTemplate marca `domicilio_social` en
+      //     unresolvedVariables y el usuario lo ve en el callout amarillo.
+      cif: selectedEntity?.registration_number ?? "",
+      domicilio_social: "",
+      // Codex P2 PR #3 round 6: la plantilla CONVOCATORIA (migration
+      // 20260419_000008_ajustes_revision_legal) usa `{{#if forma_social == 'SA'}}`
+      // mientras nosotros exponíamos solo `tipo_social`. Sin el alias
+      // canonical, SA caía al rama else y el texto emitía "socios" en
+      // vez de "accionistas" + párrafo de derecho-de-información SL.
+      tipo_social: tipoSocial,
+      forma_social: tipoSocial,
+      organo_nombre: selectedBody?.name ?? "",
+      organo_tipo: organoTipo,
+      jurisdiction,
+
+      // Aliases tipo de junta
+      tipo_convocatoria: tipoConvocatoria,
+      tipo_junta: tipoConvocatoria,
+      tipo_junta_texto: tipoJuntaTexto,
+
+      // Aliases lugar
+      lugar,
+      lugar_junta: lugar,
+
+      // Fecha / hora primera convocatoria. Codex P2 round 10 PR #3:
+      // la plantilla CONVOCATORIA usa `{{fecha_primera_convocatoria}}` y
+      // `{{hora_primera_convocatoria}}` (aliases canonical largos),
+      // mientras nosotros exponíamos solo `fecha_junta` / `hora_junta`.
+      // Sin aliases largos, el render del Paso 7 dejaba en blanco la
+      // hora de primera convocatoria aunque el usuario la hubiera
+      // rellenado en Paso 2.
+      fecha_junta: fechaReunion,
+      hora_junta: horaReunion,
+      fecha_primera_convocatoria: fechaReunion,
+      hora_primera_convocatoria: horaReunion,
+      fecha_emision: new Date().toISOString().slice(0, 10),
+
+      formato_reunion: formatoReunion,
+
+      // Segunda convocatoria — boolean + aliases canonical + cortos.
+      segunda_convocatoria: habilitarSegunda,
+      fecha_segunda: habilitarSegunda ? fechaReunion2 : "",
+      hora_segunda: habilitarSegunda ? horaReunion2 : "",
+      fecha_segunda_convocatoria: habilitarSegunda ? fechaReunion2 : "",
+      hora_segunda_convocatoria: habilitarSegunda ? horaReunion2 : "",
+
+      antelacion_dias_requerida: evaluacionV2.antelacionDiasRequerida,
+      fecha_limite_publicacion: evaluacionV2.fechaLimitePublicacion,
+      canales: channels.map((c) => channelLabel(c, channelOpts)).join(", "),
+      // Codex P1 PR #3: las plantillas reales (verificado en migration
+      // 20260419_000009) hacen `{{#each orden_dia}}{{ordinal}}. {{descripcion_punto}}{{/each}}`.
+      // Con un string newline-delimited, Handlebars itera caracter por caracter
+      // y produce bloque vacío. Pasamos array de objetos con el shape
+      // exacto que el template espera (contrato variables-plantillas v1.1).
+      orden_dia: agendaItems
+        .filter((i) => i.titulo.trim())
+        .map((i, idx) => ({
+          ordinal: idx + 1,
+          descripcion_punto: i.titulo,
+          kind: i.kind ?? "DELIBERATIVO",
+          materia: i.kind === "DECISORIO" ? i.materia : null,
+          materia_label: i.kind === "DECISORIO" ? labelMateria(i.materia) : null,
+          tipo: i.tipo,
+          inscribible: i.inscribible,
+          propuesta_acuerdo: i.kind === "DECISORIO" ? (i.propuesta_acuerdo ?? null) : null,
+        })),
+      // Plain-text fallback para plantillas legacy que esperaban string
+      // newline-delimited (compatibilidad backwards).
+      orden_dia_texto: agendaItems
+        .filter((i) => i.titulo.trim())
+        .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+        .join("\n"),
+      destinatarios: memberNames.join(", "),
+      // Misma protección para `destinatarios`: si la plantilla espera
+      // `{{#each destinatarios_lista}}{{nombre}}{{/each}}`, le damos array;
+      // si espera string concatenado, usa `destinatarios`.
+      destinatarios_lista: activeMandates
+        .filter((m) => !excludedPersonIds.has(m.person_id) && m.full_name)
+        .map((m) => ({
+          nombre: m.full_name,
+          email: m.email ?? null,
+          rol: m.role ?? null,
+        })),
+    };
+  }, [
+    activeMandates, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
+    jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
+    habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
+    evaluacionV2.fechaLimitePublicacion, channels, channelOpts, agendaItems,
+  ]);
+
+  const [borradorTexto, setBorradorTexto] = useState<string>("");
+  const [borradorDirty, setBorradorDirty] = useState(false);
+  const [renderUnresolved, setRenderUnresolved] = useState<string[]>([]);
+  // Codex P2 round 12 PR #3: render-pending state. El import dinámico de
+  // `template-renderer` es async; entre que el usuario llega al Paso 7 y
+  // el render completa, `borradorTexto` puede estar vacío. Si el usuario
+  // click "Siguiente" en ese intervalo, llegaría al Paso 8 con
+  // `convocatoria_text: null` aunque hay plantilla aprobada. Bloqueamos
+  // `canAdvance` mientras pending=true.
+  const [borradorRenderPending, setBorradorRenderPending] = useState(false);
+
+  // Guard contra setState tras unmount o tras nueva regeneración (cancela
+  // promesas en vuelo). Sin esto, navegar fuera de Paso 7 mientras el
+  // import dinámico de `template-renderer` resuelve produciría un React
+  // warning "Can't perform a state update on an unmounted component" y
+  // dejaría escrituras race que sobreescriben edits manuales del usuario.
+  const isMountedRef = useRef(true);
+  const regenerateTokenRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Codex P2 round 8 PR #3: hash del contexto bajo el que se generó (o
+  // editó) el borrador. Cuando el contexto cambia (entidad / órgano /
+  // fecha / agenda / plantilla / capa3), comparamos contra este hash
+  // para mostrar al usuario que su borrador editado puede haber quedado
+  // stale. Sólo trackeamos los campos que afectan el render.
+  const borradorContextHash = useMemo(() => {
+    const agendaSignature = agendaItems
+      .filter((i) => i.titulo.trim())
+      .map((i) => `${i.titulo}|${i.materia}|${i.tipo}|${i.kind ?? ""}|${i.propuesta_acuerdo ?? ""}`)
+      .join("");
+    const capa3Signature = Object.entries(borradorCapa3Values)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("");
+    return [
+      selectedEntityId ?? "",
+      selectedBodyId ?? "",
+      tipoConvocatoria,
+      fechaReunion,
+      horaReunion,
+      lugar,
+      formatoReunion,
+      habilitarSegunda ? `2:${fechaReunion2}|${horaReunion2}` : "1",
+      channels.slice().sort().join(","),
+      effectiveBorradorTemplate?.id ?? "",
+      effectiveBorradorTemplate?.version ?? "",
+      capa3Signature,
+      agendaSignature,
+    ].join("");
+  }, [
+    selectedEntityId, selectedBodyId, tipoConvocatoria,
+    fechaReunion, horaReunion, lugar, formatoReunion,
+    habilitarSegunda, fechaReunion2, horaReunion2,
+    channels, effectiveBorradorTemplate?.id, effectiveBorradorTemplate?.version,
+    borradorCapa3Values, agendaItems,
+  ]);
+
+  const borradorLastRenderHashRef = useRef<string>("");
+
+  const regenerateBorrador = useCallback(() => {
+    if (!effectiveBorradorTemplate?.capa1_inmutable) {
+      setBorradorTexto("");
+      setRenderUnresolved([]);
+      setBorradorRenderPending(false);
+      borradorLastRenderHashRef.current = borradorContextHash;
+      return;
+    }
+    // Cada llamada incrementa el token; sólo el último vuelve a setState.
+    const token = ++regenerateTokenRef.current;
+    // Codex P2 round 12 PR #3: marca render pendiente para bloquear
+    // navegación adelante (canAdvance) y emisión hasta que el render
+    // complete o sea cancelado.
+    setBorradorRenderPending(true);
+    void import("@/lib/doc-gen/template-renderer").then(({ renderTemplate }) => {
+      // Cancelado si: componente desmontado o llegó una regeneración nueva
+      // (la `onChange` del textarea también incrementa el token — Codex
+      // P2 round 10 PR #3). El check de token cubre el caso edit-during-
+      // import, este guard es defensa en profundidad para imports muy
+      // lentos donde el render rezagado de otra plantilla no debe pisar
+      // un texto que el usuario ya empezó a editar.
+      if (!isMountedRef.current) return;
+      if (token !== regenerateTokenRef.current) {
+        // Cancelado por una llamada posterior — la nueva ya habrá puesto
+        // pending=true; no lo bajamos aquí porque la nueva sigue activa.
+        return;
+      }
+      const merged = { ...borradorVariables, ...borradorCapa3Values };
+      const result = renderTemplate({
+        template: effectiveBorradorTemplate.capa1_inmutable!,
+        variables: merged,
+      });
+      setBorradorTexto(result.text);
+      setRenderUnresolved(result.unresolvedVariables);
+      setBorradorDirty(false);
+      setBorradorRenderPending(false);
+      // Tras render limpio el hash queda alineado con el contexto actual.
+      borradorLastRenderHashRef.current = borradorContextHash;
+    }).catch(() => {
+      // Si el import o el render fallan, libera el pending para no
+      // dejar el botón Siguiente bloqueado para siempre.
+      if (!isMountedRef.current) return;
+      if (token === regenerateTokenRef.current) {
+        setBorradorRenderPending(false);
+      }
+    });
+  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values, borradorContextHash]);
+
+  // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si:
+  //   1. usuario está actualmente en Paso 7 (evita imports dinámicos y
+  //      setStates durante Paso 1-6 que cambian fecha/orden/etc.); cuando
+  //      el usuario llega al Paso 7 el effect dispara una sola vez.
+  //   2. no está "dirty" (no sobreescribir edits manuales del usuario).
+  useEffect(() => {
+    if (current === 7 && !borradorDirty) {
+      regenerateBorrador();
+    }
+  }, [current, regenerateBorrador, borradorDirty]);
+
+  // Codex P2 round 8 PR #3: detectar stale draft. Si el usuario editó el
+  // textarea (dirty) y luego cambió el contexto upstream (entidad / órgano
+  // / agenda / etc.), `borradorTexto` ya no refleja la metadata persistida.
+  // No descartamos el texto del usuario (puede ser intencional) — el flag
+  // alimenta un callout visual + bloquea emisión hasta resolución
+  // explícita.
+  //
+  // Codex P2 round 11 PR #3: el botón "Conservar texto como válido" debe
+  // poder DESBLOQUEAR la emisión. Si solo mutamos refs + setState con el
+  // mismo valor, React bail-out y `borradorIsStale` se queda true en el
+  // render. Añadimos un state real `staleAcknowledgedHash` que el usuario
+  // setea para confirmar bajo qué contexto aceptó el texto. Mientras
+  // siga igual al contextHash actual, el texto se considera explícitamente
+  // válido. Si el contexto cambia de nuevo, vuelve a stale.
+  const [staleAcknowledgedHash, setStaleAcknowledgedHash] = useState<string>("");
+  const borradorIsStale =
+    borradorDirty &&
+    borradorLastRenderHashRef.current !== "" &&
+    borradorLastRenderHashRef.current !== borradorContextHash &&
+    staleAcknowledgedHash !== borradorContextHash;
+
   const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
     ? []
     : Array.from(new Set(evaluacionV2.canalesExigidos)).map((channel) => {
@@ -686,7 +1186,27 @@ export default function ConvocatoriasStepper() {
   const pendingLegalChannelReminders = legalChannelReminderItems.filter((item) => !item.selectedVia);
 
   // ── Step 6 ──
-  const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; descripcion: string }[]>([]);
+  // Cada adjunto mantiene el File en memoria; el upload a Storage + INSERT
+  // en `attachments` se ejecuta tras crear la convocatoria (handleEmitir).
+  // Si el usuario abandona antes de emitir no quedan huérfanos en Storage.
+  const [adjuntos, setAdjuntos] = useState<{
+    id: string;
+    file: File;
+    alias: string;
+    descripcion: string;
+    error?: string;
+  }[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<{
+    ok: number;
+    failed: number;
+    messages: string[];
+    inFlight: number;
+  }>({
+    ok: 0,
+    failed: 0,
+    messages: [],
+    inFlight: 0,
+  });
   const [documentosIncluidos, setDocumentosIncluidos] = useState<Set<string>>(new Set());
   const requiredDocuments = evaluacionV2.documentosObligatorios;
   // BATCH 8.6 (ronda 2 U-D): mapear cada documento obligatorio a las
@@ -719,13 +1239,23 @@ export default function ConvocatoriasStepper() {
     ? []
     : requiredDocuments.filter((doc) => !documentosIncluidos.has(doc.id));
   const documentReminderOk = missingRequiredDocuments.length === 0;
-  function addAdjunto() {
-    setAdjuntos((prev) => [...prev, { id: crypto.randomUUID(), nombre: "", descripcion: "" }]);
+  function handleFilesSelected(files: FileList | null) {
+    if (!files) return;
+    const next: typeof adjuntos = [];
+    for (const file of Array.from(files)) {
+      next.push({
+        id: crypto.randomUUID(),
+        file,
+        alias: file.name,
+        descripcion: "",
+      });
+    }
+    setAdjuntos((prev) => [...prev, ...next]);
   }
   function removeAdjunto(id: string) {
     setAdjuntos((prev) => prev.filter((a) => a.id !== id));
   }
-  function updateAdjunto(id: string, field: "nombre" | "descripcion", val: string) {
+  function updateAdjunto(id: string, field: "alias" | "descripcion", val: string) {
     setAdjuntos((prev) => prev.map((a) => a.id === id ? { ...a, [field]: val } : a));
   }
   function toggleDocumentoIncluido(id: string) {
@@ -741,11 +1271,33 @@ export default function ConvocatoriasStepper() {
   }
 
   // ── Validation gates ──
+  // Codex P2 round 12 PR #3: capa3 fields obligatorios deben rellenarse
+  // antes de avanzar de Paso 7. Sin este gate, una plantilla con campos
+  // OBLIGATORIO permitía emitir con valores vacíos → render incompleto
+  // del `convocatoria_text` que omite secciones críticas.
+  //
+  // Codex P2 round 13 PR #3: pasar `telematicaEnabled` real para que la
+  // validación reconozca campos `OBLIGATORIO_SI_TELEMATICA` cuando el
+  // formato es TELEMATICA o MIXTA. Sin esto los campos condicionales
+  // (ej. `instrucciones_telematica`) no bloqueaban aunque la UI los
+  // marcara visualmente como required.
+  const telematicaEnabled = formatoReunion !== "PRESENCIAL";
+  const borradorCapa3MissingRequired = useMemo(
+    () => validateCapa3(borradorCapa3Fields, borradorCapa3Values, telematicaEnabled),
+    [borradorCapa3Fields, borradorCapa3Values, telematicaEnabled],
+  );
+  const borradorCapa3HasMissing = Object.keys(borradorCapa3MissingRequired).length > 0;
+
   function canAdvance(): boolean {
     switch (current) {
       case 1: return !!selectedEntity && !!selectedBody && !readinessBlocked;
       case 2: return !!fechaReunion && !!lugar;
       case 3: return agendaItems.some((i) => i.titulo.trim().length > 0);
+      // Codex P2 round 12: bloqueamos avance del Paso 7 si:
+      //   - el render del borrador está aún pendiente (import dinámico)
+      //   - hay capa3 obligatorios sin rellenar
+      // El stale guard (round 8) sigue actuando en el botón Emitir del 8.
+      case 7: return !borradorRenderPending && !borradorCapa3HasMissing;
       default: return true;
     }
   }
@@ -809,6 +1361,40 @@ export default function ConvocatoriasStepper() {
     }));
     const includedRequiredDocuments = requiredDocuments.filter((doc) => documentosIncluidos.has(doc.id));
 
+    // Codex P2 PR #3 round 5: trazabilidad de la plantilla efectivamente
+    // usada para renderizar `convocatoria_text` (Paso 7). Sin esto, drafts
+    // emitidos vía auto-selección o selección manual en Paso 7 quedaban
+    // sin pista del template id/version/source que generó el texto legal
+    // → no auditables hacia atrás. requestedPlantilla solo cubre el flujo
+    // `?plantilla=` (handoff externo), que es minoritario.
+    const borradorTemplateTrace = effectiveBorradorTemplate
+      ? {
+          id: effectiveBorradorTemplate.id,
+          tipo: effectiveBorradorTemplate.tipo,
+          version: effectiveBorradorTemplate.version,
+          estado: effectiveBorradorTemplate.estado,
+          aprobada_por: effectiveBorradorTemplate.aprobada_por,
+          fecha_aprobacion: effectiveBorradorTemplate.fecha_aprobacion,
+          referencia_legal: effectiveBorradorTemplate.referencia_legal,
+          organo_tipo: effectiveBorradorTemplate.organo_tipo,
+          jurisdiccion: effectiveBorradorTemplate.jurisdiccion,
+          source_of_truth: effectiveBorradorTemplate.estado === "ACTIVA" && effectiveBorradorTemplate.aprobada_por
+            ? "approved_template"
+            : "demo_or_operative_template",
+          // Distinción manual vs auto-seleccionada: si el usuario tocó el
+          // selector, `selectedBorradorTemplateId` no es null.
+          selection_mode: selectedBorradorTemplateId ? "manual" : "auto",
+          capa3_fields_count: effectiveBorradorTemplate.capa3_editables?.length ?? 0,
+          capa3_values: borradorCapa3Values,
+          // Render outcome: el texto editable del usuario puede haber
+          // divergido del render canonical de la plantilla. Marcamos el
+          // estado dirty para que auditoría sepa que el draft fue editado
+          // manualmente tras el render inicial.
+          borrador_dirty: borradorDirty,
+          render_unresolved: renderUnresolved,
+        }
+      : null;
+
     return {
       rule_trace: {
         schema_version: 1,
@@ -839,6 +1425,10 @@ export default function ConvocatoriasStepper() {
               trace_evidence: requestedTemplateTraceEvidence,
             }
             : null,
+          // Plantilla del Paso 7 (auto-selected o manual) — la que de
+          // hecho generó `convocatoria_text` cuando lo hubo. Independiente
+          // de `selected_template` (que vincula handoff externo).
+          borrador_template: borradorTemplateTrace,
         },
         rule_resolutions: ruleResolutions.map(serializeRuleResolution),
         dual_evaluation: noticeDoubleEvaluation,
@@ -898,6 +1488,7 @@ export default function ConvocatoriasStepper() {
           })),
         },
         documents: {
+          borrador_template: borradorTemplateTrace,
           selected_template: requestedPlantilla
             ? {
               id: requestedPlantilla.id,
@@ -914,13 +1505,21 @@ export default function ConvocatoriasStepper() {
             : null,
           included_required: includedRequiredDocuments,
           missing_required: missingRequiredDocuments,
-          uploaded_references: adjuntos
-            .filter((adjunto) => adjunto.nombre.trim().length > 0)
-            .map((adjunto) => ({
-              id: adjunto.id,
-              nombre: adjunto.nombre,
-              descripcion: adjunto.descripcion,
-            })),
+          // Codex P2 round 8 PR #3: marcamos los adjuntos como `intended`
+          // en el trace inicial (antes de los uploads). Tras los uploads,
+          // `handleEmitir` hace UPDATE de `reminders_trace` con el status
+          // real de cada archivo (`uploaded` / `failed` + error_message).
+          // Sin este patch, el trace mentía afirmando upload exitoso de
+          // archivos que en realidad fallaron en Storage o INSERT.
+          uploaded_references: adjuntos.map((adjunto) => ({
+            id: adjunto.id,
+            nombre: adjunto.alias || adjunto.file.name,
+            descripcion: adjunto.descripcion,
+            file_name: adjunto.file.name,
+            size_bytes: adjunto.file.size,
+            mime: adjunto.file.type || null,
+            upload_status: "intended" as const,
+          })),
         },
         recipients: {
           total_active: activeMandates.length,
@@ -975,10 +1574,118 @@ export default function ConvocatoriasStepper() {
             };
           }),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
+        convocatoria_text: borradorTexto.trim() ? borradorTexto : null,
         ...buildConvocatoriaTrace(),
       });
+
+      // Upload de adjuntos paralelo con Promise.allSettled — la convocatoria
+      // ya está creada en DB (rollback no es viable sin DELETE), así que
+      // ejecutamos uploads en paralelo y reportamos fallos parciales. El
+      // usuario podrá reintentar adjuntos fallidos desde el detalle.
+      // Indicador "Subiendo X de N" gracias a un counter que se incrementa
+      // cuando cada promesa termina (no estrictamente ordenado pero útil).
+      let okCount = 0;
+      let failCount = 0;
+      const failMessages: string[] = [];
+      // Por adjunto: registra el outcome (ok | failed + msg) — usado luego
+      // para parchear `reminders_trace.documents.uploaded_references` con
+      // el status real (Codex P2 round 8 PR #3).
+      const outcomesById = new Map<string, { ok: true } | { ok: false; msg: string }>();
+      if (adjuntos.length > 0) {
+        setUploadStatus({ ok: 0, failed: 0, messages: [], inFlight: adjuntos.length });
+        type UploadOutcome =
+          | { adjunto: typeof adjuntos[number]; ok: true }
+          | { adjunto: typeof adjuntos[number]; ok: false; msg: string };
+        const results = await Promise.allSettled(
+          adjuntos.map<Promise<UploadOutcome>>((adjunto) =>
+            uploadAttachment
+              .mutateAsync({ convocatoriaId: created.id, file: adjunto.file })
+              .then((): UploadOutcome => ({ adjunto, ok: true }))
+              .catch((err: unknown): UploadOutcome => ({
+                adjunto,
+                ok: false,
+                msg: err instanceof Error ? err.message : "Error de subida",
+              })),
+          ),
+        );
+        for (const result of results) {
+          // allSettled SIEMPRE devuelve fulfilled aquí (porque hacemos catch).
+          if (result.status !== "fulfilled") continue;
+          const outcome = result.value;
+          if (outcome.ok === true) {
+            okCount += 1;
+            outcomesById.set(outcome.adjunto.id, { ok: true });
+            continue;
+          }
+          // outcome.ok === false aquí → TS estrecha a la variante con msg.
+          failCount += 1;
+          const failedAdjunto = outcome.adjunto;
+          const failedMsg = outcome.msg;
+          failMessages.push(`${failedAdjunto.file.name}: ${failedMsg}`);
+          outcomesById.set(failedAdjunto.id, { ok: false, msg: failedMsg });
+          setAdjuntos((prev) =>
+            prev.map((a) => (a.id === failedAdjunto.id ? { ...a, error: failedMsg } : a)),
+          );
+        }
+        setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages, inFlight: 0 });
+
+        // PATCH reminders_trace para reflejar status real de cada adjunto.
+        // Sin esto, el trace original decía `upload_status: 'intended'`
+        // para todos, escondiendo los fallos del audit.
+        const existingTrace = (created.reminders_trace ?? {}) as Record<string, unknown>;
+        const existingDocuments = (existingTrace.documents ?? {}) as Record<string, unknown>;
+        const existingUploaded = (existingDocuments.uploaded_references ?? []) as Array<Record<string, unknown>>;
+        const patchedUploaded = existingUploaded.map((entry) => {
+          const id = typeof entry.id === "string" ? entry.id : null;
+          const outcome = id ? outcomesById.get(id) : undefined;
+          if (!outcome) {
+            return { ...entry, upload_status: "unknown" };
+          }
+          if (outcome.ok === true) {
+            return { ...entry, upload_status: "uploaded", upload_error: null };
+          }
+          // outcome.ok === false aquí — extraemos msg de forma narrowing-
+          // friendly para evitar problemas de control-flow en map callbacks.
+          const failureMsg = outcome.msg;
+          return { ...entry, upload_status: "failed", upload_error: failureMsg };
+        });
+        const patchedTrace = {
+          ...existingTrace,
+          documents: {
+            ...existingDocuments,
+            uploaded_references: patchedUploaded,
+            uploaded_summary: { ok: okCount, failed: failCount },
+          },
+        };
+        const { error: patchError } = await supabase
+          .from("convocatorias")
+          .update({ reminders_trace: patchedTrace } as never)
+          .eq("id", created.id);
+        if (patchError) {
+          // No bloqueamos la emisión — solo log para que un futuro audit
+          // detecte que el patch del trace falló y el shape original
+          // permanece (con `upload_status: 'intended'`).
+          // eslint-disable-next-line no-console
+          console.warn("[convocatorias] reminders_trace patch skipped", {
+            convocatoriaId: created.id,
+            message: patchError.message,
+          });
+        }
+      }
+
       setEmitidoId(created.id);
-      toast.success("Convocatoria emitida correctamente");
+      if (failCount === 0) {
+        toast.success(
+          adjuntos.length > 0
+            ? `Convocatoria emitida con ${okCount} adjunto(s)`
+            : "Convocatoria emitida correctamente",
+        );
+      } else {
+        toast.warning(
+          `Convocatoria emitida; ${okCount} adjunto(s) subidos, ${failCount} fallaron`,
+          { description: failMessages[0] },
+        );
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       toast.error("No se pudo emitir la convocatoria", { description: msg });
@@ -1008,6 +1715,27 @@ export default function ConvocatoriasStepper() {
             La convocatoria ha quedado registrada. Los destinatarios recibirán la notificación
             según los canales seleccionados.
           </p>
+          {(uploadStatus.ok > 0 || uploadStatus.failed > 0) && (
+            <div
+              className={`mt-4 border p-3 text-left text-xs ${
+                uploadStatus.failed === 0
+                  ? "border-[var(--g-sec-300)] bg-[var(--g-sec-100)] text-[var(--g-text-primary)]"
+                  : "border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]"
+              }`}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="font-medium">
+                Adjuntos: {uploadStatus.ok} subido(s) · {uploadStatus.failed} fallido(s)
+              </p>
+              {uploadStatus.messages.length > 0 && (
+                <ul className="mt-1 space-y-0.5">
+                  {uploadStatus.messages.map((m, i) => (
+                    <li key={i} className="text-[var(--status-error)]">{m}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="mt-6 flex justify-center gap-3">
             <button
               type="button"
@@ -1332,12 +2060,20 @@ export default function ConvocatoriasStepper() {
               )}
 
               {selectedEntityId && selectedBodyId && (
-                <RuleResolutionPanel
-                  loading={ruleResolutionsLoading}
-                  error={ruleResolutionsError}
-                  ruleResolutions={ruleResolutions}
-                  payloadsCompatible={allRulePayloadsCompatible}
-                />
+                <div
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Reglas LSC aplicables
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Las reglas (rule packs + overrides) se resolverán automáticamente
+                    cuando definas el orden del día en el Paso 3. Solo los puntos
+                    marcados como <span className="font-semibold">Acuerdo</span> activan
+                    el motor LSC.
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -1436,7 +2172,7 @@ export default function ConvocatoriasStepper() {
                     </span>
                   </div>
 
-                  {ruleResolutions.length > 0 && (
+                  {ruleResolutions.length > 0 ? (
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
                       <MiniFact label="Rule packs" value={String(ruleResolutions.filter((r) => r.rulePack).length)} />
                       <MiniFact label="Antelación" value={`${evaluacionV2.antelacionDiasRequerida} días`} />
@@ -1446,6 +2182,20 @@ export default function ConvocatoriasStepper() {
                         value={noticeDoubleEvaluation.converged ? "Convergente" : "Divergente"}
                       />
                     </div>
+                  ) : (
+                    /* B1 — sin items DECISORIO en el orden del día, el
+                       motor V2 corre con 0 rule packs y cae a defaults por
+                       organoTipo (LSC art. 176 para juntas, art. 246.2 +
+                       reglamento para CdA). Mostramos copy contextual que
+                       explica QUÉ default está aplicando para que el
+                       secretario sepa que la antelación es orientativa
+                       hasta definir el orden del día. */
+                    <p className="mt-3 text-[11px] text-[var(--g-text-secondary)]">
+                      Cálculo orientativo con defaults por órgano
+                      ({organoTipo}). Las reglas específicas se resolverán al
+                      definir el orden del día en el Paso 3 (sólo los puntos
+                      marcados como Acuerdo activan rule packs).
+                    </p>
                   )}
 
                   {!evaluacionV2.ok && fechaReunion && (
@@ -1556,10 +2306,19 @@ export default function ConvocatoriasStepper() {
             <div className="mt-6 space-y-4">
               <p className="text-xs text-[var(--g-text-secondary)]">
                 Añade los puntos del orden del día. Clasifica cada punto según su
-                naturaleza (informativo, deliberativo o decisorio); solo los puntos
-                decisorios requieren materia, clase LSC y propuesta de acuerdo, y se
+                naturaleza (informativo, deliberativo o acuerdo); solo los puntos
+                de acuerdo requieren materia, clase LSC y propuesta concreta, y se
                 someten al motor de validez.
               </p>
+
+              {agendaRuleSpecs.length > 0 && (
+                <RuleResolutionPanel
+                  loading={ruleResolutionsLoading}
+                  error={ruleResolutionsError}
+                  ruleResolutions={ruleResolutions}
+                  payloadsCompatible={allRulePayloadsCompatible}
+                />
+              )}
 
               <div className="space-y-3">
                 {agendaItems.map((item, idx) => {
@@ -1737,6 +2496,31 @@ export default function ConvocatoriasStepper() {
                             <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
                           </label>
                         </div>
+
+                        {/* M2 — Advertencia LMV cotizada. Aparece sólo si la
+                            entidad es cotizada (`entities.es_cotizada=true`)
+                            Y la materia tiene `lmvCotizada: true` en el
+                            catálogo. No bloquea ni modifica el motor; sirve
+                            de recordatorio al secretario sobre la
+                            especialidad aplicable (CNMV, comisión auditoría,
+                            ventanas trading, folleto, etc.). */}
+                        {Boolean(selectedEntity?.es_cotizada) &&
+                          (AGENDA_MATERIAS.find((m) => m.value === item.materia)?.lmvCotizada ?? false) && (
+                          <div
+                            className="mt-3 ml-5 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                            role="note"
+                            aria-label="Advertencia LMV cotizada"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
+                              ⚠ Especialidad LMV — SA cotizada
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                              {LMV_COTIZADA_ADVERTENCIAS[item.materia] ??
+                                "SA cotizada: revisar especialidades LMV / CNMV aplicables a esta materia antes de convocar."}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Propuesta de acuerdo concreta — art. 197.1 / 287 LSC.
                             Texto que el secretario redacta para el punto y que
@@ -2060,7 +2844,10 @@ export default function ConvocatoriasStepper() {
                   className="border border-dashed border-[var(--g-border-subtle)] p-6 text-center"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <p className="text-sm text-[var(--g-text-secondary)]">No hay adjuntos añadidos.</p>
+                  <p className="text-sm text-[var(--g-text-secondary)]">
+                    No hay adjuntos añadidos. Los archivos se subirán al emitir la convocatoria
+                    y quedarán archivados con SHA-512 en <code>attachments</code>.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2070,19 +2857,29 @@ export default function ConvocatoriasStepper() {
                       className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center border border-[var(--g-border-subtle)] p-2"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
-                      <input
-                        type="text"
-                        value={a.nombre}
-                        onChange={(e) => updateAdjunto(a.id, "nombre", e.target.value)}
-                        placeholder="Nombre del documento"
-                        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      />
+                      <div className="min-w-0">
+                        <input
+                          type="text"
+                          value={a.alias}
+                          onChange={(e) => updateAdjunto(a.id, "alias", e.target.value)}
+                          placeholder="Alias visible"
+                          aria-label="Alias del documento"
+                          className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        />
+                        <p className="mt-1 truncate text-[10px] text-[var(--g-text-secondary)]">
+                          {a.file.name} · {(a.file.size / 1024).toFixed(0)} KB · {a.file.type || "desconocido"}
+                        </p>
+                        {a.error && (
+                          <p className="mt-0.5 text-[10px] text-[var(--status-error)]">{a.error}</p>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={a.descripcion}
                         onChange={(e) => updateAdjunto(a.id, "descripcion", e.target.value)}
                         placeholder="Descripción (opcional)"
+                        aria-label="Descripción del adjunto"
                         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--g-brand-3308)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       />
@@ -2099,20 +2896,305 @@ export default function ConvocatoriasStepper() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={addAdjunto}
-                className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              <label
+                className="inline-flex cursor-pointer items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-1.5 text-xs text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                Añadir adjunto
-              </button>
+                Añadir adjuntos (PDF / DOCX / XLSX / PPT / CSV / TXT / PNG / JPG, ≤25 MB)
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFilesSelected(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
           )}
 
-          {/* ── PASO 7: Revisión y emisión ── */}
+          {/* ── PASO 7: Borrador documento ── */}
           {current === 7 && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                  Borrador del documento de convocatoria
+                </p>
+              </div>
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Se aplica la plantilla protegida correspondiente al órgano y forma jurídica.
+                Capa 1 (texto inmutable) + Capa 2 (variables resueltas del expediente) +
+                Capa 3 (campos editables) componen el borrador. El texto final queda
+                persistido en <code>convocatoria_text</code> al emitir.
+              </p>
+
+              {candidateTemplates.length === 0 ? (
+                <div
+                  className="border border-[var(--status-warning)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    Sin plantilla CONVOCATORIA disponible
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    No hay plantillas protegidas de tipo CONVOCATORIA o
+                    CONVOCATORIA_SL_NOTIFICACION cargadas en el tenant. Puedes escribir el
+                    texto del borrador manualmente, pero perderás trazabilidad de plantilla
+                    legal aprobada.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+                    Plantilla seleccionada
+                  </label>
+                  <select
+                    value={effectiveBorradorTemplate?.id ?? ""}
+                    onChange={(e) => {
+                      setSelectedBorradorTemplateId(e.target.value || null);
+                      setBorradorDirty(false);
+                    }}
+                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <option value="">— Seleccionar plantilla —</option>
+                    {candidateTemplates.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.tipo} · v{p.version} · {p.estado}
+                        {p.organo_tipo ? ` · ${p.organo_tipo}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {effectiveBorradorTemplate && (
+                    <p className="text-[11px] text-[var(--g-text-secondary)]">
+                      ID {effectiveBorradorTemplate.id.slice(0, 8)} ·{" "}
+                      {effectiveBorradorTemplate.referencia_legal ?? "Sin referencia legal anotada"}
+                    </p>
+                  )}
+
+                  {/* M4 — Badge BORRADOR / no apta para producción.
+                      El flujo de plantillas protegidas exige
+                      BORRADOR → REVISADA → APROBADA → ACTIVA con
+                      `aprobada_por IS NOT NULL` en estado ACTIVA. Una
+                      convocatoria emitida con plantilla en BORRADOR rompe
+                      la cadena de trazabilidad legal — la probe de cierre
+                      del proyecto lo detectaría. Mostramos badge
+                      bloqueante visual aunque la emisión siga siendo
+                      posible (decisión consciente del secretario). */}
+                  {/* Codex P2 PR #3 round 4: REVISADA también merece badge.
+                      `selectProcessTemplate()` automático no la usaría
+                      (sólo ACTIVA/APROBADA son operacionales), pero el
+                      selector manual sí la exponía. La probe de cierre
+                      del proyecto exige `estado='ACTIVA' AND aprobada_por
+                      IS NOT NULL` — REVISADA está en limbo. */}
+                  {effectiveBorradorTemplate &&
+                    (effectiveBorradorTemplate.estado === "BORRADOR" ||
+                      effectiveBorradorTemplate.estado === "REVISADA") && (
+                    <div
+                      className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                      role="alert"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
+                        ⚠ Plantilla en {effectiveBorradorTemplate.estado} — no apta para producción
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                        {effectiveBorradorTemplate.estado === "BORRADOR" ? (
+                          <>
+                            Esta plantilla no ha pasado por el flujo de revisión legal
+                            (BORRADOR → REVISADA → APROBADA → ACTIVA). Su uso en una
+                            convocatoria emitida queda como evidencia{" "}
+                            <em>demo / operativa</em>, sin cobertura legal de plantilla
+                            aprobada.
+                          </>
+                        ) : (
+                          <>
+                            Esta plantilla ha sido revisada por Legal pero todavía
+                            no ha sido aprobada ni promovida a ACTIVA. Su uso queda
+                            como evidencia <em>demo / operativa</em> hasta que
+                            complete el ciclo REVISADA → APROBADA → ACTIVA.
+                          </>
+                        )}{" "}
+                        Promover en Gestor de Plantillas antes de uso en producción real.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {borradorCapa3Fields.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-text-secondary)]">
+                    Capa 3 — campos editables
+                  </p>
+                  <Capa3Form
+                    fields={borradorCapa3Fields}
+                    values={borradorCapa3Values}
+                    onChange={setBorradorCapa3Values}
+                    telematicaEnabled={formatoReunion !== "PRESENCIAL"}
+                  />
+                  {/* Codex P2 round 12 PR #3: gate visible cuando faltan
+                      campos obligatorios. El botón "Siguiente" queda
+                      disabled por canAdvance() — este banner explica al
+                      secretario por qué. */}
+                  {borradorCapa3HasMissing && (
+                    <p className="text-[11px] text-[var(--status-error)]">
+                      ⚠ Faltan campos obligatorios de la plantilla:{" "}
+                      {Object.keys(borradorCapa3MissingRequired).join(", ")}.
+                      No se puede avanzar al Paso 8 hasta rellenarlos.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Codex P2 round 12 PR #3: aviso render pendiente. Si el
+                  usuario llega al Paso 7 con plantilla seleccionada y el
+                  import dinámico aún no resolvió, el textarea está vacío.
+                  canAdvance() bloquea pasar a Paso 8 y este aviso explica
+                  por qué el botón "Siguiente" no está habilitado. */}
+              {borradorRenderPending && (
+                <div
+                  className="border-l-4 border-[var(--status-info)] bg-[var(--g-surface-card)] p-2"
+                  style={{ borderRadius: "var(--g-radius-sm)" }}
+                  role="status"
+                  aria-busy="true"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-info)]">
+                    ⏳ Cargando motor de plantillas…
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Renderizando el borrador desde la plantilla. Espera unos segundos
+                    antes de avanzar al Paso 8.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+                    Texto del borrador (editable)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={regenerateBorrador}
+                    disabled={!effectiveBorradorTemplate?.capa1_inmutable}
+                    className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] px-2 py-1 text-[11px] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-40"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    Regenerar desde plantilla
+                  </button>
+                </div>
+                <textarea
+                  value={borradorTexto}
+                  onChange={(e) => {
+                    // Codex P2 round 10 PR #3: cualquier edit manual del
+                    // usuario invalida el token de cualquier render async
+                    // pendiente. Sin esto, un import dinámico de
+                    // `template-renderer` rezagado podía resolver tras los
+                    // primeros keystrokes, ejecutar setBorradorTexto +
+                    // setBorradorDirty(false), y borrar silenciosamente
+                    // los edits del usuario.
+                    //
+                    // Codex P2 round 13 PR #3: además limpiar
+                    // `borradorRenderPending`. El callback async con token
+                    // stale hace early-return sin tocar pending — si el
+                    // cancelador fue un edit manual (no otra
+                    // `regenerateBorrador`), pending quedaba bloqueado en
+                    // true para siempre, dejando "Siguiente" + "Emitir"
+                    // deshabilitados.
+                    //
+                    // Codex P2 round 16 PR #3: además registrar baseline
+                    // del hash de contexto en `borradorLastRenderHashRef`.
+                    // Si el usuario edita ANTES de que el primer render
+                    // del template se complete, el ref queda en "" y
+                    // `borradorIsStale` (que requiere ref !== "") nunca
+                    // dispara aunque luego cambie el contexto upstream.
+                    // Marcamos el contexto actual como baseline del edit
+                    // manual para que cambios posteriores SÍ disparen el
+                    // stale guard.
+                    regenerateTokenRef.current += 1;
+                    setBorradorRenderPending(false);
+                    if (borradorLastRenderHashRef.current === "") {
+                      borradorLastRenderHashRef.current = borradorContextHash;
+                    }
+                    setBorradorTexto(e.target.value);
+                    setBorradorDirty(true);
+                  }}
+                  rows={16}
+                  placeholder={effectiveBorradorTemplate?.capa1_inmutable ? "Borrador generado desde plantilla…" : "Sin plantilla aplicada — escribe el texto manualmente o continúa sin texto."}
+                  className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 font-mono text-sm leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+                <div className="flex items-center justify-between text-[11px] text-[var(--g-text-secondary)]">
+                  <span>{borradorTexto.length} caracteres</span>
+                  {borradorDirty && (
+                    <span className="text-[var(--status-warning)]">
+                      Editado manualmente — "Regenerar" descartará tus cambios.
+                    </span>
+                  )}
+                </div>
+                {renderUnresolved.length > 0 && (
+                  <p className="text-[11px] text-[var(--status-warning)]">
+                    Variables sin valor en la plantilla: {renderUnresolved.slice(0, 8).join(", ")}
+                    {renderUnresolved.length > 8 ? ` y ${renderUnresolved.length - 8} más` : ""}.
+                  </p>
+                )}
+
+                {/* Codex P2 round 8 PR #3: borrador stale cuando el contexto
+                    upstream (entidad, órgano, fecha, agenda, plantilla)
+                    cambió tras el último render limpio. Bloquea la emisión
+                    hasta que el usuario decida explícitamente: regenerar
+                    desde plantilla o confirmar que el texto editado sigue
+                    siendo correcto. */}
+                {borradorIsStale && (
+                  <div
+                    className="mt-2 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-card)] p-2"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                    role="alert"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-error)]">
+                      ⚠ Borrador desactualizado — contexto cambió
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                      Editaste manualmente el texto y después cambiaste alguno
+                      de: entidad, órgano, fecha, orden del día, canales,
+                      plantilla o capa 3. El texto puede haberse quedado
+                      desfasado respecto a la metadata que se persistirá. Pulsa{" "}
+                      <span className="font-semibold">"Regenerar desde plantilla"</span>{" "}
+                      para reincorporar el contexto nuevo o confirma manualmente
+                      que el texto sigue siendo válido (Paso 8 emite tal cual).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Codex P2 round 11 PR #3: confirmación explícita.
+                        // Actualizamos el hash de referencia para alinear
+                        // los refs con el contexto actual, Y el state
+                        // `staleAcknowledgedHash` para forzar re-render
+                        // (refs solos no disparan re-render → React
+                        // bail-out con setBorradorTexto(prev=>prev)).
+                        // `borradorDirty` se mantiene true como evidencia
+                        // de que el texto fue editado manualmente.
+                        borradorLastRenderHashRef.current = borradorContextHash;
+                        setStaleAcknowledgedHash(borradorContextHash);
+                      }}
+                      className="mt-2 border border-[var(--status-warning)] bg-transparent px-2 py-1 text-[11px] text-[var(--status-warning)] hover:bg-[var(--g-surface-subtle)]"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      Conservar texto como válido bajo mi responsabilidad
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── PASO 8: Revisión y emisión ── */}
+          {current === 8 && (
             <div className="mt-6 space-y-5">
               {/* Summary grid */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2272,8 +3354,8 @@ export default function ConvocatoriasStepper() {
               {/* Destinatarios count */}
               <p className="text-xs text-[var(--g-text-secondary)]">
                 <span className="font-semibold">{activeMandates.length - excludedPersonIds.size}</span> destinatario(s)
-                {adjuntos.filter((a) => a.nombre.trim()).length > 0 && (
-                  <> · <span className="font-semibold">{adjuntos.filter((a) => a.nombre.trim()).length}</span> adjunto(s)</>
+                {adjuntos.length > 0 && (
+                  <> · <span className="font-semibold">{adjuntos.length}</span> adjunto(s)</>
                 )}
               </p>
             </div>
@@ -2294,14 +3376,39 @@ export default function ConvocatoriasStepper() {
             {isLastStep ? (
               <button
                 type="button"
-                disabled={createConvocatoria.isPending}
+                disabled={
+                  createConvocatoria.isPending ||
+                  uploadStatus.inFlight > 0 ||
+                  borradorIsStale ||
+                  borradorRenderPending ||
+                  borradorCapa3HasMissing
+                }
                 onClick={handleEmitir}
-                aria-busy={createConvocatoria.isPending}
+                aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorRenderPending}
+                title={
+                  borradorIsStale
+                    ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de emitir."
+                    : borradorRenderPending
+                    ? "El motor de plantillas aún no terminó de renderizar. Espera unos segundos."
+                    : borradorCapa3HasMissing
+                    ? `Faltan campos obligatorios de capa 3 en Paso 7: ${Object.keys(borradorCapa3MissingRequired).join(", ")}.`
+                    : undefined
+                }
                 className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Send className="h-4 w-4" />
-                {createConvocatoria.isPending ? "Emitiendo…" : "Emitir convocatoria"}
+                {borradorIsStale
+                  ? "Borrador stale — resolver Paso 7"
+                  : borradorRenderPending
+                  ? "Renderizando borrador…"
+                  : borradorCapa3HasMissing
+                  ? "Capa 3 incompleta — Paso 7"
+                  : uploadStatus.inFlight > 0
+                  ? `Subiendo ${uploadStatus.inFlight} adjunto(s)…`
+                  : createConvocatoria.isPending
+                  ? "Emitiendo…"
+                  : "Emitir convocatoria"}
               </button>
             ) : (
               <button

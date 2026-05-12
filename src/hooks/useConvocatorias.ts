@@ -289,3 +289,157 @@ export function useCreateConvocatoria() {
     },
   });
 }
+
+// ── Adjuntos ──────────────────────────────────────────────────────────────
+//
+// MIME types soportados (lista cerrada para evitar ejecutables / scripts).
+const ATTACHMENT_ALLOWED_MIME = new Set<string>([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
+  "text/csv",
+  "text/plain",
+  "image/png",
+  "image/jpeg",
+]);
+
+// Sniff MIME desde la extensión cuando `file.type` viene vacío
+// (típico en Mac Finder + Safari, drag-and-drop antiguos). Mantiene la
+// lista cerrada — extensiones no mapeadas → rechazo explícito en lugar
+// de bypass como octet-stream (riesgo de subir ejecutables).
+const ATTACHMENT_EXTENSION_TO_MIME: Record<string, string> = {
+  pdf:  "application/pdf",
+  doc:  "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls:  "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt:  "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  csv:  "text/csv",
+  txt:  "text/plain",
+  png:  "image/png",
+  jpg:  "image/jpeg",
+  jpeg: "image/jpeg",
+};
+
+export const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+
+export interface UploadAttachmentInput {
+  convocatoriaId: string;
+  file: File;
+  agendaItemIndex?: number | null;
+}
+
+export interface UploadAttachmentResult {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_hash: string;
+}
+
+export async function computeFileHashSha512(file: File | Blob): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error("Web Crypto API no disponible");
+  const digest = await subtle.digest("SHA-512", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
+}
+
+/**
+ * Resuelve el MIME efectivo del fichero. Si `file.type` está presente
+ * y permitido, se usa tal cual. Si está vacío, se sniffa por extensión
+ * contra la lista cerrada. Si tras el sniff sigue sin coincidir con un
+ * MIME permitido → throw (NO se admite `application/octet-stream`).
+ */
+export function resolveAttachmentMime(file: { name: string; type: string }): string {
+  const declared = file.type?.trim().toLowerCase();
+  if (declared) {
+    if (!ATTACHMENT_ALLOWED_MIME.has(declared)) {
+      throw new Error(`Tipo de archivo no permitido: ${declared}`);
+    }
+    return declared;
+  }
+  const dot = file.name.lastIndexOf(".");
+  const ext = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+  const sniffed = ATTACHMENT_EXTENSION_TO_MIME[ext];
+  if (!sniffed || !ATTACHMENT_ALLOWED_MIME.has(sniffed)) {
+    throw new Error(
+      `Tipo de archivo no permitido: MIME vacío y extensión "${ext || "(sin extensión)"}" no admitida`,
+    );
+  }
+  return sniffed;
+}
+
+/**
+ * Sube un fichero a Storage (bucket `matter-documents`) e inserta la fila
+ * correspondiente en `attachments`. Lanza si el MIME no está permitido o el
+ * tamaño supera el límite. Idempotencia: cada llamada genera un id distinto
+ * y un path único; reintentos crean filas extra (responsabilidad del caller
+ * deduplicar).
+ */
+export function useUploadConvocatoriaAttachment() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UploadAttachmentInput): Promise<UploadAttachmentResult> => {
+      if (!tenantId) throw new Error("tenant_id no disponible");
+      const { file, convocatoriaId } = input;
+
+      if (file.size > ATTACHMENT_MAX_BYTES) {
+        throw new Error(`Archivo demasiado grande (${Math.round(file.size / (1024 * 1024))} MB > 25 MB)`);
+      }
+      // resolveAttachmentMime valida o sniffa por extensión y lanza si no
+      // hay match contra la lista cerrada (no acepta octet-stream).
+      const effectiveMime = resolveAttachmentMime({ name: file.name, type: file.type });
+
+      const hash = await computeFileHashSha512(file);
+      const safeName = sanitizeFileName(file.name);
+      const storagePath = `convocatorias/${convocatoriaId}/${crypto.randomUUID()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("matter-documents")
+        .upload(storagePath, file, {
+          contentType: effectiveMime,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from("matter-documents").getPublicUrl(storagePath);
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("attachments")
+        .insert({
+          tenant_id: tenantId,
+          convocatoria_id: convocatoriaId,
+          agenda_item_index: input.agendaItemIndex ?? null,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_hash: hash,
+        })
+        .select("id, file_name, file_url, file_hash")
+        .single();
+      if (insertError) {
+        // Limpieza best-effort para no dejar huérfanos en Storage.
+        await supabase.storage.from("matter-documents").remove([storagePath]).catch(() => undefined);
+        throw insertError;
+      }
+
+      return inserted as UploadAttachmentResult;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["attachments", tenantId, "convocatoria", variables.convocatoriaId],
+      });
+    },
+  });
+}

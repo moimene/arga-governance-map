@@ -545,4 +545,345 @@ describe('evaluarConvocatoria', () => {
     // Should have 3 unique docs (001, 002, 003)
     expect(new Set(ids).size).toBe(3);
   });
+
+  // ================================================================
+  // Test 16+: Dispatch por organoTipo (bug operativo: CdA recibía 30d)
+  // ================================================================
+  describe('antelación dispatch por organoTipo (sin packs aplicables)', () => {
+    const baseInput: ConvocatoriaInput = {
+      tipoSocial: 'SA',
+      organoTipo: 'JUNTA_GENERAL',
+      adoptionMode: 'MEETING',
+      fechaJunta: '2026-12-31',
+      esCotizada: false,
+      webInscrita: false,
+      primeraConvocatoria: true,
+      esJuntaUniversal: false,
+      materias: [],
+    };
+
+    it('Junta General SA: 30 días (LSC art. 176.1) — fuente LEY', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'JGA' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(30);
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('LEY');
+    });
+
+    it('Junta General SL: 15 días (LSC art. 176.2)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, tipoSocial: 'SL', organoTipo: 'JUNTA_GENERAL' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(15);
+    });
+
+    it('CdA: 5 días (default reglamento, NO 30) — fuente REGLAMENTO', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(5);
+      // Jerarquía: LEY → ESTATUTOS → REGLAMENTO. El plazo de CdA NO es
+      // estatutos (art. 285-290 LSC), sino reglamento del consejo
+      // (art. 246.2 LSC habla de "convocatoria razonable").
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
+    });
+
+    it('CONSEJO_ADMINISTRACION: fuente REGLAMENTO (matching liberal)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
+    });
+
+    it('Comisión delegada: fuente REGLAMENTO', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA' },
+        [],
+        [],
+      );
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
+    });
+
+    it('CONSEJO_ADMINISTRACION: 5 días (matching liberal por substring)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(5);
+    });
+
+    it('Comisión delegada: 3 días', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(3);
+    });
+
+    it('Comité: 3 días', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'COMITE' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(3);
+    });
+
+    it('Pack del órgano con override aplicado: gana sobre default', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          antelacionDias: {
+            SA: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+            SL: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+          },
+        },
+      });
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [pack], []);
+      // Override del pack (8) gana sobre default de CdA (5).
+      expect(result.antelacionDiasRequerida).toBe(8);
+    });
+  });
+
+  // ================================================================
+  // Codex P2 PR #3: canales publicación SÓLO para juntas.
+  // ================================================================
+  describe('canales publicación pública sólo aplica a juntas', () => {
+    const baseInput: ConvocatoriaInput = {
+      tipoSocial: 'SA',
+      organoTipo: 'JUNTA_GENERAL',
+      adoptionMode: 'MEETING',
+      fechaJunta: '2026-12-31',
+      esCotizada: false,
+      webInscrita: true,
+      primeraConvocatoria: true,
+      esJuntaUniversal: false,
+      materias: [],
+    };
+
+    it('CdA SA con web inscrita: NO añade WEB_SOCIEDAD (art. 246 LSC)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+      expect(result.canalesExigidos).not.toContain('BORME');
+      expect(result.canalesExigidos).not.toContain('DIARIO_OFICIAL');
+    });
+
+    it('CdA SA sin web inscrita: NO añade BORME ni DIARIO_OFICIAL', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', webInscrita: false },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('BORME');
+      expect(result.canalesExigidos).not.toContain('DIARIO_OFICIAL');
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+    });
+
+    it('CdA: explain node menciona notificación directa al miembro', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      const canalesNode = result.explain.find((n) => n.regla.includes('Canales:'));
+      expect(canalesNode?.regla).toContain('notificación directa');
+      expect(canalesNode?.referencia).toContain('art. 246');
+    });
+
+    it('Comisión: NO añade canales públicos', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+      expect(result.canalesExigidos).not.toContain('BORME');
+    });
+
+    it('Junta SA con web inscrita: SÍ añade WEB_SOCIEDAD (caso original LSC art. 179)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
+    });
+
+    it('Junta SA sin web inscrita: SÍ añade BORME + DIARIO_OFICIAL', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: false },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('BORME');
+      expect(result.canalesExigidos).toContain('DIARIO_OFICIAL');
+    });
+
+    // Codex P2 round 7 PR #3: filtrar códigos abstractos non-junta.
+    it('CdA: filtra códigos abstractos del rule_pack (CONVOCATORIA_CONSEJO)', () => {
+      const packWithAbstractCode = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+            SL: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [packWithAbstractCode],
+        [],
+      );
+      // Abstract code se elimina (Paso 5 UI no lo puede satisfacer)
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      // Concretos del pack se preservan
+      expect(result.canalesExigidos).toContain('EMAIL_SIMPLE');
+    });
+
+    it('CdA: filtra NOTIFICACION_GENERICA y NOTIFICACION_DIRECTA', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['NOTIFICACION_GENERICA', 'NOTIFICACION_DIRECTA', 'ERDS'],
+            SL: ['NOTIFICACION_GENERICA', 'ERDS'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_DIRECTA');
+      expect(result.canalesExigidos).toContain('ERDS');
+    });
+
+    it('JGA: NO filtra códigos del pack (sólo aplica filtro a non-junta)', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['NOTIFICACION_GENERICA', 'WEB_SOCIEDAD'],
+            SL: ['NOTIFICACION_GENERICA'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        [pack],
+        [],
+      );
+      // Para junta, los códigos del pack se mantienen tal cual.
+      expect(result.canalesExigidos).toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
+    });
+
+    // Codex P2 round 15 PR #3: fallback ERDS cuando filtro deja non-
+    // junta sin canales concretos.
+    it('CdA con pack 100% abstracto: fallback ERDS añadido (ES default)', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'NOTIFICACION_GENERICA'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'ES' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
+      expect(result.canalesExigidos).toContain('ERDS');
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      expect(fallbackNode).toBeDefined();
+      expect(fallbackNode?.fuente).toBe('SISTEMA');
+    });
+
+    // Codex P2 round 17 PR #3: fallback por jurisdicción.
+    it('CdA BR con pack abstracto: fallback EMAIL_SIMPLE (único directo en BR)', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'BR' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('EMAIL_SIMPLE');
+      expect(result.canalesExigidos).not.toContain('ERDS');
+    });
+
+    it('CdA MX con pack abstracto: fallback CORREO_CERTIFICADO', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'MX' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('CORREO_CERTIFICADO');
+      expect(result.canalesExigidos).not.toContain('ERDS');
+    });
+
+    it('CdA sin jurisdiction (legacy): asume ES → ERDS', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' /* sin jurisdiction */ },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('ERDS');
+    });
+
+    it('CdA con pack que ya tiene canal concreto: no añade fallback', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO', 'BUROFAX'],
+            SL: ['BUROFAX'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA' },
+        [pack],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('BUROFAX');
+      expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      expect(fallbackNode).toBeUndefined();
+    });
+  });
 });

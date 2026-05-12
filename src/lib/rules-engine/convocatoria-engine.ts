@@ -105,9 +105,15 @@ export function evaluarConvocatoria(
 
   // ================================================================
   // Rule 1: Antelación (advance notice)
+  //
+  // Dispatch por organoTipo: las juntas (JGA/JGE) aplican LSC art. 176;
+  // los consejos / comisiones aplican estatutos o reglamento ("razonable" —
+  // LSC art. 246.2 para CdA). Sin este dispatch, un CdA recibía la
+  // antelación de junta (30 días para SA) — bug operativo.
   // ================================================================
   const antelacionDiasRequerida = calcularAntelacion(
     input.tipoSocial,
+    input.organoTipo,
     packs,
     overrides
   );
@@ -116,23 +122,93 @@ export function evaluarConvocatoria(
     antelacionDiasRequerida
   );
 
+  const organoTipoUpper = (input.organoTipo ?? 'JGA').toUpperCase();
+  const isJunta = organoTipoUpper === 'JGA' || organoTipoUpper === 'JGE' || organoTipoUpper.includes('JUNTA');
   explainNodes.push(
     createExplainNode(
       'Antelación requerida',
-      'LEY',
-      'art. 176 LSC',
+      // Jerarquía documentada: LEY → ESTATUTOS → REGLAMENTO → ACUERDO.
+      // Para juntas el plazo viene de LSC art. 176. Para CdA / comisiones el
+      // plazo lo fija el reglamento del órgano (art. 246.2 LSC habla de
+      // "convocatoria razonable" — el detalle está en el reglamento del
+      // consejo, no en estatutos). La enum `Fuente` (types.ts) ya distingue.
+      isJunta ? 'LEY' : 'REGLAMENTO',
+      isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
       'OK',
-      `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial}`,
+      isJunta
+        ? `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial} (junta)`
+        : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default reglamento del órgano; override por rule_pack)`,
       antelacionDiasRequerida
     )
   );
 
   // ================================================================
-  // Rule 2: Canales (SA sin web inscrita: BORME + diario)
+  // Rule 2: Canales — publicación pública SÓLO para juntas (LSC art. 173,
+  //         179). Los consejos / comisiones se NOTIFICAN al miembro
+  //         (art. 246 LSC) por canales directos: email, correo certificado,
+  //         ERDS, burofax. Sin este guard, una convocatoria de CdA en SA
+  //         cotizada con web inscrita recibía WEB_SOCIEDAD como canal
+  //         exigido y el filtro de la UI (CHANNELS_RELEVANT_BY_BODY_TYPE)
+  //         lo ocultaba → reminder perpetuo "CHANNEL_REMINDER" falso
+  //         (Codex P2 PR #3).
   // ================================================================
-  const canalesExigidos = calcularCanales(input, packs, overrides);
+  let canalesExigidos = calcularCanales(input, packs, overrides);
 
-  if (input.tipoSocial === 'SA' && !input.webInscrita) {
+  // Codex P2 round 7: filtrar canales abstractos del rule_pack que no
+  // tienen counterpart concreto seleccionable en la UI. Los packs de
+  // CONSEJO usan códigos genéricos tipo `CONVOCATORIA_CONSEJO` o
+  // `NOTIFICACION_GENERICA`, pero Paso 5 sólo ofrece EMAIL_SIMPLE,
+  // CORREO_CERTIFICADO, ERDS, BUROFAX. `channelSatisfiesReminder()` no
+  // los reconoce como equivalentes → reminder perpetuamente pending.
+  // Para órganos NO junta, eliminamos los códigos abstractos del
+  // contrato de reminders.
+  //
+  // Codex P2 round 15: si tras filtrar quedan CERO canales para non-
+  // junta, garantizamos al menos un canal concreto (ERDS — preferido
+  // por trazabilidad QTSP + acuse legal) para que el reminder dispare
+  // y el secretario tenga que confirmar al menos un canal de
+  // notificación directa al miembro. Sin esto, una convocatoria CdA
+  // con pack que sólo trae códigos abstractos podía emitirse sin
+  // canales y sin reminder, contradiciendo el explain node "art. 246
+  // LSC: notificación individual obligatoria".
+  if (!isJunta) {
+    const ABSTRACT_NON_JUNTA_CODES = new Set([
+      'CONVOCATORIA_CONSEJO',
+      'CONVOCATORIA_COMISION',
+      'CONVOCATORIA_COMITE',
+      'NOTIFICACION_GENERICA',
+      'NOTIFICACION_DIRECTA',
+    ]);
+    canalesExigidos = canalesExigidos.filter((c) => !ABSTRACT_NON_JUNTA_CODES.has(c));
+    if (canalesExigidos.length === 0) {
+      // Codex P2 round 17 PR #3: el fallback debe ser un canal que la UI
+      // de la jurisdicción del tenant SÍ ofrezca y `channelSatisfiesReminder`
+      // pueda mapear a algo seleccionable. ERDS funciona en ES/PT/MX (con
+      // QTSP) pero no aparece en CHANNEL_OPTIONS.BR → CdA brasileño con
+      // pack abstracto quedaba con reminder eterno tras EMAIL_SIMPLE.
+      const jurisdictionUpper = (input.jurisdiction ?? 'ES').toUpperCase();
+      const FALLBACK_NON_JUNTA: Record<string, string> = {
+        ES: 'ERDS',           // EAD Trust QTSP — preferido por trazabilidad
+        PT: 'ERDS',           // misma cobertura QTSP eIDAS
+        MX: 'CORREO_CERTIFICADO', // QTSP no obligatorio; correo certificado equivalente
+        BR: 'EMAIL_SIMPLE',   // único canal directo en CHANNEL_OPTIONS.BR
+      };
+      const fallback = FALLBACK_NON_JUNTA[jurisdictionUpper] ?? 'EMAIL_SIMPLE';
+      canalesExigidos.push(fallback);
+      explainNodes.push(
+        createExplainNode(
+          `Canales: fallback ${fallback} para notificación directa`,
+          'SISTEMA',
+          'art. 246 LSC + Codex round 15/17',
+          'OK',
+          `${organoTipoUpper} (${jurisdictionUpper}): rule_pack sólo declaraba códigos abstractos; se exige ${fallback} como mínimo concreto disponible en la UI de la jurisdicción.`,
+          undefined
+        )
+      );
+    }
+  }
+
+  if (isJunta && input.tipoSocial === 'SA' && !input.webInscrita) {
     if (!canalesExigidos.includes('BORME')) {
       canalesExigidos.push('BORME');
     }
@@ -151,7 +227,7 @@ export function evaluarConvocatoria(
     );
   }
 
-  if (input.tipoSocial === 'SA' && input.webInscrita) {
+  if (isJunta && input.tipoSocial === 'SA' && input.webInscrita) {
     if (!canalesExigidos.includes('WEB_SOCIEDAD')) {
       canalesExigidos.push('WEB_SOCIEDAD');
     }
@@ -162,6 +238,19 @@ export function evaluarConvocatoria(
         'art. 179 LSC',
         'OK',
         'SA con web inscrita debe publicar en web de la sociedad',
+        undefined
+      )
+    );
+  }
+
+  if (!isJunta) {
+    explainNodes.push(
+      createExplainNode(
+        'Canales: notificación directa al miembro',
+        'LEY',
+        'art. 246 LSC / reglamento del órgano',
+        'OK',
+        `${organoTipoUpper}: no aplica publicación pública (BORME, web). Notificación individual a cada miembro (email/correo certificado/ERDS/burofax).`,
         undefined
       )
     );
@@ -251,20 +340,40 @@ export function evaluarConvocatoria(
 /**
  * calcularAntelacion — resolve effective advance notice requirement
  *
- * Defaults: SA=30d, SL=15d
- * Apply overrides from jerarquia_normativa
+ * Despachado por organoTipo:
+ * - JGA/JGE (juntas): LSC art. 176 → SA=30, SL=15 (override via rule_pack)
+ * - CDA: LSC art. 246.2 "razonable" → default 5d (override via rule_pack)
+ * - COMISION / COMISION_DELEGADA / COMITE: estatutos / reglamento → default 3d
+ *
+ * Apply overrides from jerarquia_normativa.
  */
 function calcularAntelacion(
   tipoSocial: TipoSocial,
+  organoTipo: string | undefined,
   packs: RulePack[],
   overrides: RuleParamOverride[]
 ): number {
+  // Defaults por órgano cuando no hay pack aplicable.
+  const organoUpper = (organoTipo ?? 'JGA').toUpperCase();
+  const isJunta = organoUpper === 'JGA' || organoUpper === 'JGE' || organoUpper.includes('JUNTA');
+  const isConsejo = !isJunta && (organoUpper === 'CDA' || organoUpper.includes('CONSEJO'));
+  const isComision = !isJunta && !isConsejo &&
+    (organoUpper.includes('COMISION') || organoUpper.includes('COMITE'));
+
+  const defaultForOrgano = (): number => {
+    if (isJunta) return tipoSocial === 'SA' ? 30 : 15;
+    if (isConsejo) return 5;
+    if (isComision) return 3;
+    return 5;
+  };
+
   // Collect all rules from applicable packs
-  const antelacionFromPacks = packs.map((pack) => pack.convocatoria.antelacionDias[tipoSocial]);
+  const antelacionFromPacks = packs
+    .map((pack) => pack.convocatoria.antelacionDias[tipoSocial])
+    .filter((entry) => entry !== undefined && entry !== null);
 
   if (antelacionFromPacks.length === 0) {
-    // Fallback defaults
-    return tipoSocial === 'SA' ? 30 : 15;
+    return defaultForOrgano();
   }
 
   // Take the most restrictive (highest) value across all packs
@@ -284,7 +393,8 @@ function calcularAntelacion(
   // Apply overrides using jerarquia_normativa
   const resolved = resolverReglaEfectiva(maxAntelacion, overrides, 'mayor');
 
-  return typeof resolved.valor === 'number' ? resolved.valor : 30;
+  if (typeof resolved.valor === 'number') return resolved.valor;
+  return defaultForOrgano();
 }
 
 /**
@@ -367,7 +477,7 @@ function restarDias(fechaJunta: string, dias: number): string {
  */
 function createExplainNode(
   regla: string,
-  fuente: 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO',
+  fuente: 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO' | 'SISTEMA',
   referencia: string,
   resultado: EvalSeverity,
   mensaje: string,
