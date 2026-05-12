@@ -1,0 +1,79 @@
+/**
+ * Clave funcional para detectar duplicados activos + lista canónica de
+ * las 14 combinaciones core v1.0 que la consola garantiza cubrir.
+ * Sprint 1 — Spec §3 + §6.
+ */
+
+import type { FunctionalKey, PlantillaCandidate } from "./types";
+
+export const CORE_V1_MATERIAS: ReadonlyArray<{ organo: string; materia: string }> = [
+  { organo: "JUNTA_GENERAL", materia: "APROBACION_CUENTAS" },
+  { organo: "JUNTA_GENERAL", materia: "DISTRIBUCION_DIVIDENDOS" },
+  { organo: "JUNTA_GENERAL", materia: "NOMBRAMIENTO_CONSEJERO" },
+  { organo: "JUNTA_GENERAL", materia: "CESE_CONSEJERO" },
+  { organo: "JUNTA_GENERAL", materia: "MODIFICACION_ESTATUTOS" },
+  { organo: "JUNTA_GENERAL", materia: "AUMENTO_CAPITAL" },
+  { organo: "JUNTA_GENERAL", materia: "NOMBRAMIENTO_AUDITOR" },
+  { organo: "CONSEJO_ADMIN", materia: "DISTRIBUCION_CARGOS" },
+  { organo: "CONSEJO_ADMIN", materia: "DELEGACION_FACULTADES" },
+  { organo: "CONSEJO_ADMIN", materia: "COMITES_INTERNOS" },
+  { organo: "CONSEJO_ADMIN", materia: "POLITICAS_CORPORATIVAS" },
+  { organo: "CONSEJO_ADMIN", materia: "NOMBRAMIENTO_CONSEJERO" },
+  { organo: "CONSEJO_ADMIN", materia: "CESE_CONSEJERO" },
+  { organo: "ORGANO_ADMIN", materia: "FORMULACION_CUENTAS" },
+] as const;
+
+export const CORE_V1_MATERIAS_COUNT = CORE_V1_MATERIAS.length;
+
+function resolveMateria(row: PlantillaCandidate): string {
+  return row.materia_acuerdo ?? row.materia ?? "";
+}
+
+export function buildFunctionalKey(row: PlantillaCandidate, tenantId: string): FunctionalKey {
+  return {
+    tenantId,
+    tipo: row.tipo ?? "",
+    jurisdiccion: row.jurisdiccion ?? "",
+    materia: resolveMateria(row),
+    organoTipo: row.organo_tipo ?? "",
+    adoptionMode: row.adoption_mode ?? "",
+    tipoSocial: null,
+  };
+}
+
+export function serializeFunctionalKey(k: FunctionalKey): string {
+  return [
+    k.tenantId,
+    k.tipo,
+    k.jurisdiccion,
+    k.materia,
+    k.organoTipo,
+    k.adoptionMode,
+    k.tipoSocial ?? "",
+  ].join("|");
+}
+
+export function matchesFunctionalKey(
+  a: PlantillaCandidate,
+  b: PlantillaCandidate,
+  tenantId: string,
+): boolean {
+  return serializeFunctionalKey(buildFunctionalKey(a, tenantId)) ===
+    serializeFunctionalKey(buildFunctionalKey(b, tenantId));
+}
+
+export function detectActiveDuplicate(
+  candidate: PlantillaCandidate,
+  existingActive: PlantillaCandidate[],
+  tenantId: string,
+): PlantillaCandidate | null {
+  const candidateKey = serializeFunctionalKey(buildFunctionalKey(candidate, tenantId));
+  for (const other of existingActive) {
+    if (other.id === candidate.id) continue;
+    if (other.estado !== "ACTIVA") continue;
+    if (serializeFunctionalKey(buildFunctionalKey(other, tenantId)) === candidateKey) {
+      return other;
+    }
+  }
+  return null;
+}
