@@ -15,6 +15,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useAsignarCargo } from "@/hooks/useCondicionesPersonaMutations";
 import {
   requiresBodyId,
+  requiresRepresentative,
   isAuthorityRole,
   type TipoCondicionCargo,
 } from "@/lib/secretaria/cargo-validation";
@@ -131,6 +132,16 @@ export default function DesignarAdminStepper() {
   const personaSeleccionada = (personas ?? []).find((p) => p.id === draft.person_id);
   const personaEsPJ = personaSeleccionada?.person_type === "PJ";
 
+  // P1 Codex iteration-2: derive personRequiresRep desde helper canónico para
+  // que el gate cubra TODOS los cargos admin + CONSEJERO cuando la persona es
+  // PJ (LSC art. 212bis), no solo ADMIN_PJ.
+  const personRequiresRep = personaSeleccionada
+    ? requiresRepresentative(
+        { person_type: personaSeleccionada.person_type },
+        draft.tipo_condicion as TipoCondicionCargo,
+      )
+    : false;
+
   // Load bodies on demand
   const loadBodies = async () => {
     if (!entityId) return;
@@ -158,8 +169,11 @@ export default function DesignarAdminStepper() {
     if (step === stepIdx.sociedad) return !!entityId;
     if (step === stepIdx.cargo) {
       if (esColegiado && !draft.body_id) return false;
+      // ADMIN_PJ además exige que la persona designada sea PJ (mensaje en UI).
       if (esAdminPJ && !personaEsPJ) return false;
-      if (esAdminPJ && !draft.representative_person_id) return false;
+      // P1 Codex iteration-2: TODOS los cargos admin + CONSEJERO sobre PJ
+      // requieren representante PF (LSC art. 212bis), no solo ADMIN_PJ.
+      if (personRequiresRep && !draft.representative_person_id) return false;
       return true;
     }
     if (step === stepIdx.designacion) return !!draft.fuente_designacion && !!draft.fecha_inicio;
@@ -179,7 +193,7 @@ export default function DesignarAdminStepper() {
         inscripcion_rm_referencia: draft.inscripcion_rm_referencia || null,
         inscripcion_rm_fecha: draft.inscripcion_rm_fecha || null,
         representative_person_id:
-          esAdminPJ && draft.representative_person_id ? draft.representative_person_id : null,
+          personRequiresRep && draft.representative_person_id ? draft.representative_person_id : null,
       });
 
       // L15-L17: el trigger fn_sync_authority_evidence solo actúa sobre los
@@ -405,34 +419,44 @@ export default function DesignarAdminStepper() {
               </label>
             )}
 
-            {esAdminPJ && (
-              <>
-                {!personaEsPJ && draft.person_id && (
-                  <div className="md:col-span-2 rounded-md bg-[var(--status-warning)]/10 p-3 text-xs text-[var(--g-text-primary)]">
-                    El cargo ADMIN_PJ requiere que la persona designada sea PJ. Cambia a otra persona o selecciona otro tipo de cargo.
-                  </div>
-                )}
-                <label className="flex flex-col gap-1 md:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-                    Representante permanente (PF) *
-                  </span>
-                  <select
-                    value={draft.representative_person_id}
-                    onChange={(e) => update("representative_person_id", e.target.value)}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="">— Seleccionar PF —</option>
-                    {(personas ?? [])
-                      .filter((p) => p.person_type === "PF")
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              </>
+            {/* ADMIN_PJ exige adicionalmente que la persona sea PJ — mensaje informativo. */}
+            {esAdminPJ && !personaEsPJ && draft.person_id && (
+              <div className="md:col-span-2 rounded-md bg-[var(--status-warning)]/10 p-3 text-xs text-[var(--g-text-primary)]">
+                El cargo ADMIN_PJ requiere que la persona designada sea PJ. Cambia a otra persona o selecciona otro tipo de cargo.
+              </div>
+            )}
+
+            {/*
+              P1 Codex iteration-2: selector de representante PF visible cuando
+              `personRequiresRep` (LSC art. 212bis). Esto cubre ADMIN_UNICO,
+              ADMIN_SOLIDARIO, ADMIN_MANCOMUNADO, ADMIN_PJ y CONSEJERO si la
+              persona seleccionada es PJ.
+            */}
+            {personRequiresRep && (
+              <label className="flex flex-col gap-1 md:col-span-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                  Representante permanente (PF) *
+                </span>
+                <select
+                  value={draft.representative_person_id}
+                  onChange={(e) => update("representative_person_id", e.target.value)}
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  aria-required="true"
+                >
+                  <option value="">— Seleccionar PF —</option>
+                  {(personas ?? [])
+                    .filter((p) => p.person_type === "PF")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-[11px] text-[var(--g-text-secondary)]">
+                  LSC art. 212 bis: la PJ administradora designa persona natural permanente.
+                </span>
+              </label>
             )}
           </div>
         )}
@@ -500,7 +524,7 @@ export default function DesignarAdminStepper() {
                   value={bodies.find((b) => b.id === draft.body_id)?.name ?? "—"}
                 />
               )}
-              {esAdminPJ && (
+              {personRequiresRep && (
                 <Field
                   label="Representante"
                   value={
