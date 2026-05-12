@@ -141,7 +141,7 @@ src/lib/doc-gen/variable-resolver.ts
 
 - [ ] Run `bun run typecheck`.
 - [ ] Run focused tests already related to Secretaria schema:
-  `bun test src/test/schema/rpcs-acta-cert.test.ts src/test/schema/secretaria-p0-transactional-rpcs.test.ts`.
+  `bun run test -- src/test/schema/rpcs-acta-cert.test.ts src/test/schema/secretaria-p0-transactional-rpcs.test.ts`.
 - [ ] If baseline fails due unrelated carril changes, stop and document. Do not patch unrelated failures.
 
 **Exit:** known baseline before implementation.
@@ -210,7 +210,7 @@ src/lib/doc-gen/variable-resolver.ts
 - [ ] Add RPC existence probe using Supabase RPC with dummy payload, accepting business errors but not "function does not exist".
 - [ ] Add tests for tenant mismatch and forbidden role only if existing test helpers can authenticate as those roles; otherwise assert the migration invokes the helpers and document manual Cloud verification.
 - [ ] Run:
-  `bun test src/test/schema/fn-crear-sociedad-legal-y-capital.test.ts src/test/schema/entities-legal-fields.test.ts`.
+  `bun run test -- src/test/schema/fn-crear-sociedad-legal-y-capital.test.ts src/test/schema/entities-legal-fields.test.ts`.
 - [ ] Commit D1 before any human applies Cloud SQL.
 - [ ] Ask the human to apply migration via MCP Supabase after `bun run db:check-target` passes.
 
@@ -553,9 +553,9 @@ src/lib/doc-gen/variable-resolver.ts
 
 - [ ] Run `bun run typecheck`.
 - [ ] Run focused unit/schema tests:
-  `bun test src/lib/secretaria/sociedad-onboarding src/test/schema/fn-crear-sociedad-legal-y-capital.test.ts src/test/schema/entities-legal-fields.test.ts`.
+  `bun run test -- src/lib/secretaria/sociedad-onboarding src/test/schema/fn-crear-sociedad-legal-y-capital.test.ts src/test/schema/entities-legal-fields.test.ts`.
 - [ ] Run full test suite if focused tests pass:
-  `bun test`.
+  `bun run test`.
 - [ ] Run `bun run lint`.
 - [ ] Run `bun run build`.
 - [ ] No new lint warnings beyond known baseline unless documented and justified.
