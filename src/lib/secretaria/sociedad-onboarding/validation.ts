@@ -197,18 +197,25 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   // del schema canonico rechaza la 2a row -> rollback. Las filas se identifican
   // por holder.tax_id (o holder.key si tax_id falta) + share_class_code (review
   // Codex P2).
+  // CT-010: tambien aplica a autocartera. La RPC resuelve cada fila treasury
+  // a entity.person_id (la PJ propia de la sociedad), por lo que dos rows
+  // autocartera misma clase tambien rompen UNIQUE ux_capital_holdings_vigente
+  // (review Codex P2). Treasury usa key sintetico "__TREASURY__".
   const seenHoldings = new Set<string>();
   for (const entry of draft.capTable) {
-    if (entry.is_treasury) continue;
-    const holderKey = entry.holder?.tax_id?.trim() || entry.holder?.key || "";
     const classKey = entry.share_class_code?.trim() || "";
-    if (!holderKey || !classKey) continue;
+    if (!classKey) continue;
+    const holderKey = entry.is_treasury
+      ? "__TREASURY__"
+      : entry.holder?.tax_id?.trim()?.toUpperCase() || entry.holder?.key || "";
+    if (!holderKey) continue;
     const composite = `${holderKey}::${classKey}`;
     if (seenHoldings.has(composite)) {
+      const who = entry.is_treasury ? "la autocartera" : "el mismo socio";
       issues.push(issue(
         "CT-010",
         `capTable.${entry.key}`,
-        `Hay dos filas para el mismo socio y la misma clase/serie "${classKey}". Combina los titulos en una sola fila.`
+        `Hay dos filas para ${who} y la misma clase/serie "${classKey}". Combina los titulos en una sola fila.`
       ));
     }
     seenHoldings.add(composite);

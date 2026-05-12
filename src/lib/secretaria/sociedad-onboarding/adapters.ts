@@ -26,7 +26,13 @@ function bodyIdForCargo(ctx: AdapterContext, cargo: CargoInputDraft) {
   if (!cargo.bodyKey) return null;
   if (cargo.bodyKey === "JUNTA") return ctx.bodyJuntaId;
   if (cargo.bodyKey === "ADMIN") return ctx.bodyAdminId;
-  if (cargo.bodyKey === "CDA") return ctx.bodyConsejoId ?? ctx.bodyAdminId;
+  // bodyKey="CDA" solo es valido si existe bodyConsejoId. Si la forma admin
+  // es ADMIN_UNICO/SOLIDARIOS/MANCOMUNADOS, bodyConsejoId es null y el
+  // fallback previo a ctx.bodyAdminId persistia un cargo PRESIDENTE/CONSEJERO
+  // sobre un body no-colegiado, contaminando fn_refresh_parte_votante_body
+  // que lo trataba como voting member (review Codex P2). Retornar null
+  // marca el cargo como failed con mensaje claro en TX2.
+  if (cargo.bodyKey === "CDA") return ctx.bodyConsejoId ?? null;
   return ctx.bodyComisiones[cargo.bodyKey] ?? null;
 }
 

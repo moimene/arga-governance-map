@@ -77,6 +77,15 @@ function completeDraft(): SociedadOnboardingDraft {
       fecha_inicio: "2026-05-12",
       fuente_designacion: "ESCRITURA",
     },
+    // Tercer board member para satisfacer CA-004 con consejo_min=3 default.
+    {
+      key: "consejero1",
+      tipo_condicion: "CONSEJERO",
+      bodyKey: "CDA",
+      persona: pf("CONS1", "44444444D"),
+      fecha_inicio: "2026-05-12",
+      fuente_designacion: "ESCRITURA",
+    },
   ];
   return draft;
 }
