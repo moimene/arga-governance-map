@@ -118,17 +118,36 @@ export function useCesarCargo() {
   return useMutation({
     mutationFn: async (input: CesarCargoInput): Promise<void> => {
       if (!tenantId) throw new Error("Tenant no inicializado");
+
+      // Fetch existing metadata para merge (P2 Codex iteration-1).
+      // El UPDATE de metadata reemplazaría el JSONB entero, perdiendo
+      // campos previos (seed/audit/source). Hacemos SELECT-merge-UPDATE
+      // con spread para conservarlos.
+      let mergedMetadata: Record<string, unknown> | undefined;
+      if (input.razon) {
+        const { data: existing, error: fetchErr } = await supabase
+          .from("condiciones_persona")
+          .select("metadata")
+          .eq("id", input.condicion_id)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (fetchErr) throw fetchErr;
+        const prior = (existing?.metadata as Record<string, unknown> | null) ?? {};
+        mergedMetadata = {
+          ...prior,
+          cese_razon: input.razon,
+          cesado_at: new Date().toISOString(),
+        };
+      }
+
       const update: Record<string, unknown> = {
         estado: "CESADO",
         fecha_fin: input.fecha_fin,
       };
-      if (input.razon) {
+      if (mergedMetadata) {
         // Persiste la razón en metadata para conservar el motivo del cese
         // junto con el timestamp. NO se hace DELETE (L14).
-        update.metadata = {
-          cese_razon: input.razon,
-          cesado_at: new Date().toISOString(),
-        };
+        update.metadata = mergedMetadata;
       }
       const { error } = await supabase
         .from("condiciones_persona")
