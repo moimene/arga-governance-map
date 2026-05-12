@@ -642,4 +642,83 @@ describe('evaluarConvocatoria', () => {
       expect(result.antelacionDiasRequerida).toBe(8);
     });
   });
+
+  // ================================================================
+  // Codex P2 PR #3: canales publicación SÓLO para juntas.
+  // ================================================================
+  describe('canales publicación pública sólo aplica a juntas', () => {
+    const baseInput: ConvocatoriaInput = {
+      tipoSocial: 'SA',
+      organoTipo: 'JUNTA_GENERAL',
+      adoptionMode: 'MEETING',
+      fechaJunta: '2026-12-31',
+      esCotizada: false,
+      webInscrita: true,
+      primeraConvocatoria: true,
+      esJuntaUniversal: false,
+      materias: [],
+    };
+
+    it('CdA SA con web inscrita: NO añade WEB_SOCIEDAD (art. 246 LSC)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+      expect(result.canalesExigidos).not.toContain('BORME');
+      expect(result.canalesExigidos).not.toContain('DIARIO_OFICIAL');
+    });
+
+    it('CdA SA sin web inscrita: NO añade BORME ni DIARIO_OFICIAL', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', webInscrita: false },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('BORME');
+      expect(result.canalesExigidos).not.toContain('DIARIO_OFICIAL');
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+    });
+
+    it('CdA: explain node menciona notificación directa al miembro', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      const canalesNode = result.explain.find((n) => n.regla.includes('Canales:'));
+      expect(canalesNode?.regla).toContain('notificación directa');
+      expect(canalesNode?.referencia).toContain('art. 246');
+    });
+
+    it('Comisión: NO añade canales públicos', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).not.toContain('WEB_SOCIEDAD');
+      expect(result.canalesExigidos).not.toContain('BORME');
+    });
+
+    it('Junta SA con web inscrita: SÍ añade WEB_SOCIEDAD (caso original LSC art. 179)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
+    });
+
+    it('Junta SA sin web inscrita: SÍ añade BORME + DIARIO_OFICIAL', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'JGA', webInscrita: false },
+        [],
+        [],
+      );
+      expect(result.canalesExigidos).toContain('BORME');
+      expect(result.canalesExigidos).toContain('DIARIO_OFICIAL');
+    });
+  });
 });

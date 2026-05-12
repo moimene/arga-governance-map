@@ -143,11 +143,18 @@ export function evaluarConvocatoria(
   );
 
   // ================================================================
-  // Rule 2: Canales (SA sin web inscrita: BORME + diario)
+  // Rule 2: Canales — publicación pública SÓLO para juntas (LSC art. 173,
+  //         179). Los consejos / comisiones se NOTIFICAN al miembro
+  //         (art. 246 LSC) por canales directos: email, correo certificado,
+  //         ERDS, burofax. Sin este guard, una convocatoria de CdA en SA
+  //         cotizada con web inscrita recibía WEB_SOCIEDAD como canal
+  //         exigido y el filtro de la UI (CHANNELS_RELEVANT_BY_BODY_TYPE)
+  //         lo ocultaba → reminder perpetuo "CHANNEL_REMINDER" falso
+  //         (Codex P2 PR #3).
   // ================================================================
   const canalesExigidos = calcularCanales(input, packs, overrides);
 
-  if (input.tipoSocial === 'SA' && !input.webInscrita) {
+  if (isJunta && input.tipoSocial === 'SA' && !input.webInscrita) {
     if (!canalesExigidos.includes('BORME')) {
       canalesExigidos.push('BORME');
     }
@@ -166,7 +173,7 @@ export function evaluarConvocatoria(
     );
   }
 
-  if (input.tipoSocial === 'SA' && input.webInscrita) {
+  if (isJunta && input.tipoSocial === 'SA' && input.webInscrita) {
     if (!canalesExigidos.includes('WEB_SOCIEDAD')) {
       canalesExigidos.push('WEB_SOCIEDAD');
     }
@@ -177,6 +184,19 @@ export function evaluarConvocatoria(
         'art. 179 LSC',
         'OK',
         'SA con web inscrita debe publicar en web de la sociedad',
+        undefined
+      )
+    );
+  }
+
+  if (!isJunta) {
+    explainNodes.push(
+      createExplainNode(
+        'Canales: notificación directa al miembro',
+        'LEY',
+        'art. 246 LSC / reglamento del órgano',
+        'OK',
+        `${organoTipoUpper}: no aplica publicación pública (BORME, web). Notificación individual a cada miembro (email/correo certificado/ERDS/burofax).`,
         undefined
       )
     );
