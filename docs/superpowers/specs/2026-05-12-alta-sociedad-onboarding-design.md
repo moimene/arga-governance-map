@@ -55,10 +55,10 @@ Esto es un commit aislado, ~1–2h de trabajo. La frontera está sellada porque 
 Una sola RPC PL/pgSQL que envuelve en `BEGIN … COMMIT` las inserciones a las 9 tablas no-personales:
 
 1. `persons` (PJ de la sociedad)
-2. `entities` (con todos los campos legales: domicilio, CNAE, RM desglosado, LEI, fechas, propósito)
+2. `entities` (con todos los campos legales: domicilio, CNAE, RM desglosado, LEI, fechas, propósito) — el `onboarding_status` se inserta como **estado pesimista** (`'INCOMPLETA_CARGOS'`); solo TX2 confirmado puede promoverlo a `'OPERATIVA'`.
 3. `entity_capital_profile` (estado `VIGENTE`)
 4. `share_classes` (1..N clases/series)
-5. `persons` (socios PF/PJ — `INSERT … ON CONFLICT (tenant_id, tax_id) DO NOTHING RETURNING id`)
+5. `persons` (socios PF/PJ — **lookup-first dentro de la RPC**: `SELECT id FROM persons WHERE tenant_id = p_tenant AND tax_id = v_tax LIMIT 1`; si NULL → `INSERT … RETURNING id`. `ON CONFLICT DO NOTHING RETURNING id` NO se usa porque no devuelve row en colisión, y además requiere UNIQUE constraint que en `main` actual no existe — la `UNIQUE(tenant_id, tax_id)` se añade por migración `000063` del carril Personas/Cargos, aún no en `main`. El lookup-first es independiente de esa migración y robusto en ambos estados.)
 6. `capital_holdings` (cap table inicial, soporta `is_treasury=true`)
 7. `governing_bodies` (Junta + órgano admin + Consejo + comisiones si aplica)
 8. `entity_settings` (solo claves catalogadas en `entity_settings_catalog`)
@@ -177,8 +177,12 @@ Contenido:
    - `corporate_email text`
    - `regulated_sector text` (`'BANCA' | 'SEGUROS' | 'ENERGIA' | 'TELECOM' | 'OTRO' | null`)
    - `group_role text` (`'INDEPENDIENTE' | 'MATRIZ' | 'FILIAL' | 'PARTICIPADA'`)
-   - `onboarding_status text` (`'OPERATIVA' | 'INCOMPLETA_CARGOS' | 'INCOMPLETA_DATOS' | 'BORRADOR'`) **default `'OPERATIVA'`** — solo se baja explícitamente si validaciones fallan
+   - `onboarding_status text` (`'OPERATIVA' | 'INCOMPLETA_CARGOS' | 'INCOMPLETA_DATOS' | 'BORRADOR'`) **default `'INCOMPLETA_CARGOS'`** (estado pesimista: la sociedad nace incompleta y solo se promueve a `'OPERATIVA'` cuando TX2 confirma éxito).
    - `support_docs_metadata jsonb` (default `'{}'::jsonb`)
+
+   **Justificación del default pesimista (post review Codex):** si fuera `'OPERATIVA'`, cualquier escenario donde TX1 commitea pero TX2 no se ejecuta — navegador cerrado, adapter throw entre RPC y UPDATE, red caída antes del UPDATE final — dejaría una sociedad marcada operativa sin cargos/representantes/authority_evidence. Con default pesimista, el peor caso de TX2 no completado deja la sociedad correctamente marcada `INCOMPLETA_CARGOS`, visible al usuario para que complete los cargos desde Designar admin / Asignar cargo.
+
+   Backfill: las filas legacy (sociedades creadas antes de esta migración) reciben `onboarding_status = 'OPERATIVA'` en una sentencia `UPDATE entities SET onboarding_status = 'OPERATIVA' WHERE onboarding_status IS NULL` dentro de la propia migración `000067`. Las nuevas filas nacen con default pesimista.
 
    Todas las columnas son `NULL`-able para no romper filas legacy. La validación de operatividad es responsabilidad del cliente (validators puros) y del CHECK `onboarding_status` (futuro).
 
@@ -289,6 +293,12 @@ async function guardarSociedad() {
   }
 
   // 2. TX1
+  //
+  // `buildRpcPayload` decide el `entity.onboarding_status` inicial:
+  //  - 'INCOMPLETA_DATOS' si result.blockingOperational tiene CT-001/CT-002/S-005/S-006 etc.
+  //  - 'INCOMPLETA_CARGOS' (el default del schema) en cualquier otro caso.
+  // En NINGÚN caso TX1 envía 'OPERATIVA' — esa promoción es solo
+  // post-TX2 confirmado.
   let entityId: string;
   try {
     const tx1 = await supabase.rpc('fn_crear_sociedad_legal_y_capital', {
@@ -321,19 +331,35 @@ async function guardarSociedad() {
 
   const totalFailed = cargosResult.failedCargos.length + repsResult.failedReps.length;
 
-  if (totalFailed === 0) {
-    // Promoción automática a OPERATIVA si todas las validaciones pasan
-    await supabase
+  // El default del schema es pesimista (INCOMPLETA_CARGOS). Solo PROMOVEMOS
+  // a OPERATIVA cuando TX2 confirma éxito completo Y no había issues
+  // blockingOperational en validación local (esos generan INCOMPLETA_DATOS
+  // desde TX1 y no se promueven con cargos al día — la sociedad sigue
+  // teniendo cap table < 100% o domicilio incompleto). Si TX2 falla parcial
+  // o total (incluido throw del adapter o crash entre líneas), la sociedad
+  // queda en su default INCOMPLETA_CARGOS o INCOMPLETA_DATOS según TX1 —
+  // correcto sin necesidad de escribir nada adicional.
+  const hasOperationalIssues = result.blockingOperational.length > 0;
+  if (totalFailed === 0 && !hasOperationalIssues) {
+    const { error: promoteErr } = await supabase
       .from('entities')
       .update({ onboarding_status: 'OPERATIVA' })
       .eq('id', entityId);
-    toast.success('Sociedad creada y operativa');
+    if (promoteErr) {
+      // El UPDATE falló pero TX2 sí persistió cargos. Sociedad queda en
+      // INCOMPLETA_CARGOS (default); el usuario verá el banner aunque
+      // tenga todos los cargos. Mejor que el opuesto: marcar OPERATIVA
+      // sin tener cargos.
+      console.error('[alta-sociedad] promoción a OPERATIVA falló:', promoteErr);
+      toast.warning(
+        'Sociedad creada con cargos. No se pudo marcar como operativa automáticamente. Verifica en el detalle.'
+      );
+    } else {
+      toast.success('Sociedad creada y operativa');
+    }
   } else {
-    // Sociedad creada pero con cargos pendientes
-    await supabase
-      .from('entities')
-      .update({ onboarding_status: 'INCOMPLETA_CARGOS' })
-      .eq('id', entityId);
+    // No-op: la sociedad ya está en INCOMPLETA_CARGOS (default). Solo
+    // mensaje al usuario.
     toast.warning(
       `Sociedad creada con ${totalFailed} cargos pendientes. Completar en Designar admin / Asignar cargo.`
     );
@@ -515,14 +541,14 @@ Patrón obligatorio: `forwardRef`, `aria-label` en iconos, `aria-invalid` + `ari
 6. Sociedad creada sin cap table al 100% → `onboarding_status='INCOMPLETA_DATOS'`, banner UX.
 7. Sociedad creada con TX1 ok pero TX2 fallando → `onboarding_status='INCOMPLETA_CARGOS'`, banner UX con CTA "Designar admin / Asignar cargo".
 8. SAU/SLU con más de un socio → bloquea avance en paso 6 con mensaje claro.
-9. PJ accionista con voto sin representante PF → bloquea avance en paso 6.
+9. PJ accionista con voto sin representante declarado → **warning visible** en paso 6 (no bloquea avance); P-001 baja a warning porque el `JUNTA_PROXY` se crea por junta concreta, no en alta. Coherente con §7 P-001.
 10. Cap table > 100% por clase → bloquea avance en paso 6.
 11. Mayoría reforzada < simple → bloquea avance en paso 9.
 12. Sociedad creada aparece en `SociedadesList` y `SociedadDetalle` con todos los datos legales tecleados (denominación, NIF, tipo social, jurisdicción, RM, LEI, CNAE, domicilio, propósito, cierre fiscal, web, email corporativo).
 13. Sociedad operativa puede iniciar `/secretaria/convocatorias/nueva` y aparecer en selector de entidad.
 14. Sociedad operativa puede iniciar `/secretaria/reuniones/nueva` y calcular quórum con cap table real.
 15. Sociedad operativa puede emitir certificación si tiene presidente+secretario en `authority_evidence`.
-16. NO se duplica persona por NIF/CIF (delegado a `UNIQUE(tenant_id, tax_id)` de migración `000063` del otro carril + `ON CONFLICT DO NOTHING` en TX1).
+16. NO se duplica persona por NIF/CIF — TX1 usa **lookup-first** dentro de la RPC (`SELECT id FROM persons WHERE tenant_id = … AND tax_id = …`). Robusto en ausencia de `UNIQUE(tenant_id, tax_id)` (migración `000063` del otro carril aún no en `main`); cuando mergee, sigue siendo correcto.
 17. NO se escribe en `mandates` (tabla legacy).
 18. `bun run typecheck`, `bun run test`, `bun run lint`, `bun run build` pasan sin regresiones (baseline: 582 pass / 66 skipped, lint 23 warnings conocidos). Tests nuevos del sprint añaden cobertura; no se permiten nuevos errores ni warnings inéditos.
 19. `bun run db:check-target` apunta al proyecto correcto antes de aplicar migración.
