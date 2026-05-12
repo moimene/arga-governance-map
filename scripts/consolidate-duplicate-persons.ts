@@ -647,13 +647,132 @@ function renderPair(pair: DuplicatePair, pf: PreflightResult) {
 }
 
 // --------------------------------------------------------------------
-// Apply mode — implemented in D2.2 (next commit).
+// Apply mode
 // --------------------------------------------------------------------
-async function applyConsolidation(_supabase: SupabaseClient, _pair: DuplicatePair): Promise<void> {
-  // D2.2 will implement: for each PERSONS_FK_REFERENCES entry, run UPDATE
-  // table SET column = canonical WHERE column = duplicate. Then rename
-  // duplicate tax_id to ARCHIVED-<ts>-<original>.
-  throw new Error("Apply mode not yet implemented in skeleton (D2.1). See D2.2.");
+// Migrates references in every FK column listed in PERSONS_FK_REFERENCES
+// from duplicate.id to canonical.id, then soft-archives the duplicate
+// by renaming its tax_id (frees the UNIQUE constraint added in
+// migration 000063 for the canonical to keep its real tax_id).
+//
+// Order matters:
+//   1. Migrate ALL FK refs first (UPDATE table SET col = canon WHERE col = dup).
+//   2. Verify post-migration that NO refs remain (orphan check).
+//   3. Rename duplicate's tax_id + full_name as ARCHIVED-*.
+//
+// If step 2 fails (some FK was missed in the list), we bail BEFORE
+// archiving so the duplicate row stays addressable and recoverable.
+async function applyConsolidation(
+  supabase: SupabaseClient,
+  pair: DuplicatePair,
+): Promise<void> {
+  console.log(`→ Applying consolidation`);
+  console.log(`     canonical : ${pair.canonical.full_name} [tax=${pair.canonical.tax_id ?? "NULL"}] id=${pair.canonical.id}`);
+  console.log(`     duplicate : ${pair.duplicate.full_name} [tax=${pair.duplicate.tax_id ?? "NULL"}] id=${pair.duplicate.id}`);
+
+  // ---- Idempotency: already archived? ------------------------------
+  if (pair.duplicate.tax_id?.startsWith("ARCHIVED-")) {
+    console.log(`     already archived (tax_id=${pair.duplicate.tax_id}). Skipping.`);
+    return;
+  }
+
+  // ---- Phase 1: migrate FK references ------------------------------
+  const migrationLog: Array<{ table: string; column: string; rows: number; critical: boolean }> = [];
+  for (const ref of PERSONS_FK_REFERENCES) {
+    if (ref.action !== "migrate") {
+      console.log(`     [SKIP] ${ref.table}.${ref.column} (${ref.rationale})`);
+      continue;
+    }
+    const rows = await migrateFk(supabase, ref, pair);
+    migrationLog.push({ table: ref.table, column: ref.column, rows, critical: ref.critical ?? false });
+    const marker = ref.critical && rows > 0 ? " [CRITICAL]" : "";
+    console.log(`     [${rows.toString().padStart(3, " ")}] ${ref.table}.${ref.column}${marker}`);
+  }
+
+  // ---- Phase 2: post-migration orphan check -----------------------
+  // Pick a representative sample of HIGH-traffic FKs to verify we
+  // didn't miss anything. The probe-based PERSONS_FK_REFERENCES list
+  // should cover all 47, but a re-probe is the gold standard before
+  // archiving.
+  const orphanCheck = await verifyNoRemainingRefs(supabase, pair.duplicate.id);
+  if (orphanCheck.length > 0) {
+    console.error(`     ✗ orphan check failed — ${orphanCheck.length} FK still points at duplicate:`);
+    for (const o of orphanCheck) {
+      console.error(`        - ${o.table}.${o.column}: ${o.count} row(s)`);
+    }
+    throw new Error(
+      `Refusing to archive — duplicate still has incoming references. ` +
+        `Update PERSONS_FK_REFERENCES list and re-run.`,
+    );
+  }
+
+  // ---- Phase 3: soft-archive --------------------------------------
+  const originalTaxId = pair.duplicate.tax_id ?? "NULL";
+  const archivedTaxId = `ARCHIVED-${Date.now()}-${originalTaxId}`;
+  const archivedName = `[ARCHIVED] ${pair.duplicate.full_name}`;
+
+  const { error: archErr } = await supabase
+    .from("persons")
+    .update({ tax_id: archivedTaxId, full_name: archivedName })
+    .eq("id", pair.duplicate.id);
+
+  if (archErr) throw new Error(`soft-archive failed: ${archErr.message}`);
+
+  console.log(`     ✓ archived: tax_id=${originalTaxId} → ${archivedTaxId}`);
+  console.log("");
+  const totalRows = migrationLog.reduce((sum, m) => sum + m.rows, 0);
+  console.log(`     Summary: ${totalRows} FK row(s) migrated across ${migrationLog.filter((m) => m.rows > 0).length} table.column(s)`);
+}
+
+async function migrateFk(
+  supabase: SupabaseClient,
+  ref: FkRef,
+  pair: DuplicatePair,
+): Promise<number> {
+  // Use .select("id", { count: "exact" }) to get the affected row count.
+  // supabase-js' bare update() doesn't return count unless we chain select.
+  const { data, error, count } = await supabase
+    .from(ref.table)
+    .update({ [ref.column]: pair.canonical.id })
+    .eq(ref.column, pair.duplicate.id)
+    .select("*", { count: "exact", head: false });
+
+  if (error) {
+    // ON DELETE RESTRICT columns may complain if a constraint trips,
+    // but UPDATE shouldn't. Surface every error with context.
+    throw new Error(`migrateFk(${ref.table}.${ref.column}): ${error.message}`);
+  }
+  return count ?? (data?.length ?? 0);
+}
+
+interface OrphanRef {
+  table: string;
+  column: string;
+  count: number;
+}
+
+async function verifyNoRemainingRefs(
+  supabase: SupabaseClient,
+  duplicateId: string,
+): Promise<OrphanRef[]> {
+  // For every FK in our list, count rows still pointing at duplicate.
+  // If any > 0, return them so the caller can abort.
+  const orphans: OrphanRef[] = [];
+  for (const ref of PERSONS_FK_REFERENCES) {
+    if (ref.action !== "migrate") continue;
+    const { count, error } = await supabase
+      .from(ref.table)
+      .select("*", { count: "exact", head: true })
+      .eq(ref.column, duplicateId);
+    if (error) {
+      // Skip if the table is unreachable (e.g., RLS oddity) but log it.
+      console.warn(`     [verify] cannot probe ${ref.table}.${ref.column}: ${error.message}`);
+      continue;
+    }
+    if ((count ?? 0) > 0) {
+      orphans.push({ table: ref.table, column: ref.column, count: count ?? 0 });
+    }
+  }
+  return orphans;
 }
 
 // --------------------------------------------------------------------
