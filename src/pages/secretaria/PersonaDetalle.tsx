@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { forwardRef, useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -6,11 +6,12 @@ import {
   Building2,
   Plus,
   UserCheck,
+  Edit3,
   X,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
+import { usePersonaCanonical, useUpdatePersona } from "@/hooks/usePersonasCanonical";
 import {
   useCargosPersona,
   CARGO_LABELS,
@@ -20,6 +21,7 @@ import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
 import { useRepresentantesAdminPJByPerson } from "@/hooks/useRepresentantesAdminPJ";
 import {
+  isAuthorityRole,
   requiresRepresentative,
   type TipoCondicionCargo,
 } from "@/lib/secretaria/cargo-validation";
@@ -55,10 +57,34 @@ export default function PersonaDetalle() {
   const [razon, setRazon] = useState<string>("");
   const cesarMutation = useCesarCargo();
   const fechaFinInputRef = useRef<HTMLInputElement>(null);
+  const updatePersonaMutation = useUpdatePersona();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState({
+    full_name: "",
+    tax_id: "",
+    email: "",
+    denomination: "",
+  });
+  const editNameInputRef = useRef<HTMLInputElement>(null);
 
   function closeCesarModal() {
     setCargoToCesar(null);
     setRazon("");
+  }
+
+  function openEditPersona() {
+    if (!p) return;
+    setEditDraft({
+      full_name: p.full_name ?? "",
+      tax_id: p.tax_id ?? "",
+      email: p.email ?? "",
+      denomination: p.denomination ?? "",
+    });
+    setEditOpen(true);
+  }
+
+  function closeEditPersona() {
+    setEditOpen(false);
   }
 
   // Foco inicial al primer campo + Escape cierra. Cumple WCAG 2.1: focus
@@ -73,6 +99,16 @@ export default function PersonaDetalle() {
     return () => document.removeEventListener("keydown", onKey);
   }, [cargoToCesar]);
 
+  useEffect(() => {
+    if (!editOpen) return;
+    editNameInputRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeEditPersona();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editOpen]);
+
   async function handleConfirmCese() {
     if (!cargoToCesar) return;
     try {
@@ -86,6 +122,24 @@ export default function PersonaDetalle() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error("No se pudo cesar el cargo: " + msg);
+    }
+  }
+
+  async function handleSavePersona() {
+    if (!p) return;
+    try {
+      await updatePersonaMutation.mutateAsync({
+        id: p.id,
+        full_name: editDraft.full_name,
+        tax_id: editDraft.tax_id || null,
+        email: editDraft.email || null,
+        denomination: p.person_type === "PJ" ? editDraft.denomination || null : null,
+      });
+      toast.success("Persona actualizada correctamente");
+      closeEditPersona();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("No se pudo actualizar la persona: " + msg);
     }
   }
 
@@ -128,6 +182,15 @@ export default function PersonaDetalle() {
     return !(representantesByEntity?.has(c.entity_id) ?? false);
   });
   const needsRepresentanteWarning = p.person_type === "PJ" && cargosAdminSinRep.length > 0;
+  const representantesVigentes = representantesByEntity
+    ? Array.from(representantesByEntity.values())
+    : [];
+  const representantesLabel =
+    representantesVigentes.length > 0
+      ? representantesVigentes
+          .map((r) => `${r.full_name}${r.tax_id ? ` (${r.tax_id})` : ""}`)
+          .join(", ")
+      : "—";
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -156,6 +219,15 @@ export default function PersonaDetalle() {
             montarán en App.tsx en Wave 5; por ahora los enlaces apuntan a
             su URL definitiva aunque la vista aún no esté disponible. */}
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openEditPersona}
+            className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Edit3 className="h-4 w-4" aria-hidden="true" />
+            Editar datos
+          </button>
           <Link
             to={`/secretaria/cargos/nuevo?personId=${p.id}`}
             className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
@@ -171,7 +243,7 @@ export default function PersonaDetalle() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <UserCheck className="h-4 w-4" aria-hidden="true" />
-              {p.representative?.full_name ? "Editar representante" : "Asignar representante"}
+              {representantesVigentes.length > 0 ? "Editar representante" : "Asignar representante"}
             </Link>
           )}
         </div>
@@ -231,8 +303,8 @@ export default function PersonaDetalle() {
           <Field label="Denominación" value={p.denomination ?? "—"} />
           {p.person_type === "PJ" ? (
             <Field
-              label="Representante"
-              value={p.representative?.full_name ?? "—"}
+              label="Representantes vigentes"
+              value={representantesLabel}
             />
           ) : null}
         </dl>
@@ -270,6 +342,11 @@ export default function PersonaDetalle() {
               cargosVigentes.map((c) => {
                 const sociedadNombre = c.entity?.common_name ?? c.entity?.legal_name ?? "—";
                 const cargoLabel = CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion;
+                const authorityStatus = isAuthorityRole(c.tipo_condicion as TipoCondicionCargo)
+                  ? c.inscripcion_rm_referencia
+                    ? "Inscrito"
+                    : "Pendiente RM"
+                  : null;
                 return (
                   <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
                     <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">
@@ -298,6 +375,19 @@ export default function PersonaDetalle() {
                       >
                         Vigente
                       </span>
+                      {authorityStatus ? (
+                        <span
+                          className={
+                            "ml-2 inline-flex items-center px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)] " +
+                            (authorityStatus === "Inscrito"
+                              ? "bg-[var(--status-success)]"
+                              : "bg-[var(--status-warning)]")
+                          }
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          {authorityStatus}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-6 py-3 text-right text-sm">
                       <button
@@ -464,6 +554,91 @@ export default function PersonaDetalle() {
         </table>
       </section>
 
+      {editOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="editar-persona-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-brand-3308)]/40 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEditPersona();
+          }}
+        >
+          <div
+            className="w-full max-w-lg border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+            style={{
+              borderRadius: "var(--g-radius-lg)",
+              boxShadow: "var(--g-shadow-modal)",
+            }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2
+                id="editar-persona-title"
+                className="text-lg font-semibold text-[var(--g-text-primary)]"
+              >
+                Editar persona
+              </h2>
+              <button
+                type="button"
+                onClick={closeEditPersona}
+                className="-mr-2 -mt-2 p-1.5 text-[var(--g-text-secondary)] transition-colors hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                aria-label="Cerrar modal"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <EditInput
+                ref={editNameInputRef}
+                label="Nombre"
+                value={editDraft.full_name}
+                onChange={(value) => setEditDraft((d) => ({ ...d, full_name: value }))}
+                required
+              />
+              <EditInput
+                label="NIF/CIF"
+                value={editDraft.tax_id}
+                onChange={(value) => setEditDraft((d) => ({ ...d, tax_id: value }))}
+              />
+              <EditInput
+                label="Email"
+                value={editDraft.email}
+                onChange={(value) => setEditDraft((d) => ({ ...d, email: value }))}
+                type="email"
+              />
+              {p.person_type === "PJ" ? (
+                <EditInput
+                  label="Denominación"
+                  value={editDraft.denomination}
+                  onChange={(value) => setEditDraft((d) => ({ ...d, denomination: value }))}
+                />
+              ) : null}
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEditPersona}
+                className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePersona}
+                disabled={updatePersonaMutation.isPending || !editDraft.full_name.trim()}
+                aria-busy={updatePersonaMutation.isPending}
+                className="inline-flex items-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:pointer-events-none disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {updatePersonaMutation.isPending ? "Guardando…" : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* D4.3: Modal Cesar cargo. UPDATE estado='CESADO' + fecha_fin + razón
           en metadata. NO DELETE — L14 conserva histórico. El trigger
           fn_sync_authority_evidence cierra la vigencia del cargo
@@ -573,3 +748,33 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+
+const EditInput = forwardRef<
+  HTMLInputElement,
+  {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: string;
+    required?: boolean;
+  }
+>(function EditInput({ label, value, onChange, type = "text", required = false }, ref) {
+  const inputId = `persona-edit-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+        {label}
+      </span>
+      <input
+        ref={ref}
+        id={inputId}
+        type={type}
+        required={required}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none transition-colors focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      />
+    </label>
+  );
+});

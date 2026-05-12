@@ -20,8 +20,8 @@ export interface AsignarCargoInput {
 }
 
 /**
- * Designa un cargo (INSERT en condiciones_persona) con validación de
- * coherence body_id ↔ tipo_condicion en cliente (antes de tocar BD).
+ * Designa un cargo vía RPC transaccional `fn_designar_cargo` con validación
+ * de coherence body_id ↔ tipo_condicion en cliente (antes de tocar BD).
  *
  * El CHECK constraint `chk_condicion_body_coherente` en BD también lo
  * enforza, pero la guarda cliente da error legible inmediato sin
@@ -29,9 +29,10 @@ export interface AsignarCargoInput {
  * exige `body_id`; si es admin no colegiado / socio, exige `body_id`
  * NULL.
  *
- * El trigger `fn_sync_authority_evidence` propaga automáticamente una
- * fila VIGENTE en `authority_evidence` para los cargos certificantes
- * (L15-L17). No es necesario insertar manualmente.
+ * La RPC aplica tenant/capability/authority checks, cierra singletons
+ * previos en la misma transacción (L12-C) y deja que el trigger
+ * `fn_sync_authority_evidence` propague `authority_evidence` para los
+ * cargos certificantes (L15-L17).
  */
 export function useAsignarCargo() {
   const { tenantId } = useTenantContext();
@@ -56,30 +57,30 @@ export function useAsignarCargo() {
         );
       }
 
-      const payload: Record<string, unknown> = {
-        tenant_id: tenantId,
-        person_id: input.person_id,
-        entity_id: input.entity_id,
-        body_id: input.body_id,
-        tipo_condicion: input.tipo_condicion,
-        estado: "VIGENTE",
-        fecha_inicio: input.fecha_inicio,
-        fecha_fin: null,
-        fuente_designacion: input.fuente_designacion,
-        inscripcion_rm_referencia: input.inscripcion_rm_referencia ?? null,
-        inscripcion_rm_fecha: input.inscripcion_rm_fecha ?? null,
-      };
-      if (input.representative_person_id) {
-        payload.representative_person_id = input.representative_person_id;
-      }
-
-      const { data, error } = await supabase
-        .from("condiciones_persona")
-        .insert(payload)
-        .select("id")
-        .single();
+      const { data, error } = await supabase.rpc("fn_designar_cargo", {
+        p_tenant_id: tenantId,
+        p_person_id: input.person_id,
+        p_entity_id: input.entity_id,
+        p_body_id: input.body_id,
+        p_tipo_condicion: input.tipo_condicion,
+        p_fecha_inicio: input.fecha_inicio,
+        p_fuente_designacion: input.fuente_designacion,
+        p_inscripcion_rm_referencia: input.inscripcion_rm_referencia ?? null,
+        p_inscripcion_rm_fecha: input.inscripcion_rm_fecha ?? null,
+        p_representative_person_id: input.representative_person_id ?? null,
+        p_cesar_singleton_previo: true,
+        p_idempotency_key: [
+          "designar",
+          tenantId,
+          input.person_id,
+          input.entity_id,
+          input.body_id ?? "no-body",
+          input.tipo_condicion,
+          input.fecha_inicio,
+        ].join(":"),
+      });
       if (error) throw error;
-      return { id: (data as { id: string }).id };
+      return { id: String(data) };
     },
     onSuccess: (_data, input) => {
       // Invalidate relevant caches
@@ -102,11 +103,13 @@ export interface CesarCargoInput {
 }
 
 /**
- * Cesa un cargo (UPDATE estado=CESADO + fecha_fin + razón en metadata).
+ * Cesa un cargo vía RPC transaccional (estado=CESADO + fecha_fin +
+ * razón en metadata).
  *
  * L14: el cese conserva el histórico — NUNCA hace DELETE. El registro
  * permanece consultable en el histórico de la persona/órgano. La razón
- * (si se proporciona) se almacena en `metadata.cese_razon`.
+ * (si se proporciona) se almacena en `metadata.cese_razon` dentro de
+ * `fn_cesar_cargo`, con tenant/capability/authority checks.
  *
  * El trigger `fn_sync_authority_evidence` propaga el CESADO a
  * `authority_evidence` automáticamente, cerrando la vigencia del cargo
@@ -119,44 +122,22 @@ export function useCesarCargo() {
     mutationFn: async (input: CesarCargoInput): Promise<void> => {
       if (!tenantId) throw new Error("Tenant no inicializado");
 
-      // Fetch existing metadata para merge (P2 Codex iteration-1).
-      // El UPDATE de metadata reemplazaría el JSONB entero, perdiendo
-      // campos previos (seed/audit/source). Hacemos SELECT-merge-UPDATE
-      // con spread para conservarlos.
-      let mergedMetadata: Record<string, unknown> | undefined;
-      if (input.razon) {
-        const { data: existing, error: fetchErr } = await supabase
-          .from("condiciones_persona")
-          .select("metadata")
-          .eq("id", input.condicion_id)
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
-        if (fetchErr) throw fetchErr;
-        const prior = (existing?.metadata as Record<string, unknown> | null) ?? {};
-        mergedMetadata = {
-          ...prior,
-          cese_razon: input.razon,
-          cesado_at: new Date().toISOString(),
-        };
-      }
-
-      const update: Record<string, unknown> = {
-        estado: "CESADO",
-        fecha_fin: input.fecha_fin,
-      };
-      if (mergedMetadata) {
-        // Persiste la razón en metadata para conservar el motivo del cese
-        // junto con el timestamp. NO se hace DELETE (L14).
-        update.metadata = mergedMetadata;
-      }
-      const { error } = await supabase
-        .from("condiciones_persona")
-        .update(update)
-        .eq("id", input.condicion_id)
-        .eq("tenant_id", tenantId);
+      const { error } = await supabase.rpc("fn_cesar_cargo", {
+        p_tenant_id: tenantId,
+        p_condicion_id: input.condicion_id,
+        p_fecha_fin: input.fecha_fin,
+        p_razon: input.razon ?? null,
+        p_idempotency_key: [
+          "cesar",
+          tenantId,
+          input.condicion_id,
+          input.fecha_fin,
+          input.razon ?? "",
+        ].join(":"),
+      });
       if (error) throw error;
-      // trigger fn_sync_authority_evidence propaga el CESADO a
-      // authority_evidence (cierre de vigencia del cargo certificante).
+      // La RPC no borra históricos; el trigger fn_sync_authority_evidence
+      // propaga el CESADO a authority_evidence.
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cargos", tenantId] });

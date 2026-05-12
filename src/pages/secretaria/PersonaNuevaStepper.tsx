@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Users, Check, ChevronLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { usePersonasCanonical, type PersonType } from "@/hooks/usePersonasCanonical";
+import type { PersonType } from "@/hooks/usePersonasCanonical";
 import { useTenantContext } from "@/context/TenantContext";
 
 // G1.3: tipo del resultado del precheck de colisión de tax_id.
@@ -21,7 +21,6 @@ interface Draft {
   tax_id: string;
   email: string;
   denomination: string; // solo PJ
-  representative_person_id: string; // solo PJ
 }
 
 const EMPTY: Draft = {
@@ -30,7 +29,6 @@ const EMPTY: Draft = {
   tax_id: "",
   email: "",
   denomination: "",
-  representative_person_id: "",
 };
 
 const STEPS = ["Tipo", "Datos", "Confirmar"];
@@ -41,9 +39,6 @@ export default function PersonaNuevaStepper() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
-
-  // lista PF disponibles (para elegir representante si es PJ)
-  const { data: personasPF } = usePersonasCanonical({ person_type: "PF" });
 
   // G1.3: precheck colisión tax_id.
   const [taxIdConflict, setTaxIdConflict] = useState<TaxIdConflict>(null);
@@ -140,9 +135,6 @@ export default function PersonaNuevaStepper() {
       };
       if (draft.person_type === "PJ") {
         payload.denomination = draft.denomination.trim() || draft.full_name.trim();
-        if (draft.representative_person_id) {
-          payload.representative_person_id = draft.representative_person_id;
-        }
       }
       const { data: person, error } = await supabase
         .from("persons")
@@ -315,27 +307,6 @@ export default function PersonaNuevaStepper() {
                   onChange={(v) => update("denomination", v)}
                   placeholder="ARGA Cartera"
                 />
-                <label className="flex flex-col gap-1 md:col-span-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-                    Representante permanente (PF)
-                  </span>
-                  <select
-                    value={draft.representative_person_id}
-                    onChange={(e) => update("representative_person_id", e.target.value)}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="">— Sin asignar —</option>
-                    {(personasPF ?? []).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-[11px] text-[var(--g-text-secondary)]">
-                    Obligatorio si esta PJ actuará como administrador (admin PJ).
-                  </span>
-                </label>
               </>
             )}
           </div>
@@ -354,14 +325,6 @@ export default function PersonaNuevaStepper() {
               {draft.person_type === "PJ" && (
                 <>
                   <Field label="Denominación comercial" value={draft.denomination || "—"} />
-                  <Field
-                    label="Representante"
-                    value={
-                      draft.representative_person_id
-                        ? (personasPF ?? []).find((p) => p.id === draft.representative_person_id)?.full_name ?? "—"
-                        : "—"
-                    }
-                  />
                 </>
               )}
             </dl>

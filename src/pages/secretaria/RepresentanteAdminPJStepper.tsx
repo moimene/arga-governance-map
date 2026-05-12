@@ -25,8 +25,8 @@
  *     pueden designar como representante.
  *   - useUpsertRepresentanteAdminPJ persiste: cierra la rep. VIGENTE
  *     previa (si la hay) y crea la nueva en `representaciones` scope
- *     ADMIN_PJ_REPRESENTANTE. Sincroniza tambien
- *     persons.representative_person_id (dual-write Plan A').
+ *     ADMIN_PJ_REPRESENTANTE. `persons.representative_person_id` queda
+ *     deprecado en Sprint 2.
  *
  * Garrigues UX:
  *   - Tokens `var(--g-*)` y `var(--status-*)` exclusivamente.

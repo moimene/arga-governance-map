@@ -6,6 +6,7 @@ export interface MandateWithCapital {
   id: string;
   body_id: string;
   person_id: string;
+  entity_id: string;
   role: string | null;
   type: string | null;
   start_date: string | null;
@@ -44,7 +45,8 @@ export interface RepresentanteValidationError {
 
 /**
  * Load all mandates for a body with person capital information.
- * Returns mandate data enriched with person_type, denomination, and representative_person_id.
+ * Returns mandate data enriched with person_type, denomination, and
+ * representative_person_id resolved from canonical `representaciones`.
  *
  * F6.2: Migrado de `mandates` a `condiciones_persona` (SSOT canónica).
  * El shape MandateWithCapital se preserva para compatibilidad con consumidores.
@@ -54,21 +56,24 @@ export interface RepresentanteValidationError {
  * los validadores toman person_id y resuelven el capital por separado.
  */
 export function usePersonasConCapital(bodyId: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!bodyId,
-    queryKey: ["condiciones_persona", "withCapital", bodyId],
+    enabled: !!bodyId && !!tenantId,
+    queryKey: ["condiciones_persona", "withCapital", tenantId, bodyId],
     staleTime: 60_000,
     queryFn: async (): Promise<MandateWithCapital[]> => {
       const { data, error } = await supabase
         .from("condiciones_persona")
         .select(
-          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id!inner(person_type, full_name, denomination, representative_person_id)"
+          "id, entity_id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id!inner(person_type, full_name, denomination)"
         )
+        .eq("tenant_id", tenantId!)
         .eq("body_id", bodyId!)
         .order("tipo_condicion", { ascending: true });
       if (error) throw error;
       type CondRaw = {
         id: string;
+        entity_id: string;
         body_id: string;
         person_id: string;
         tipo_condicion: string | null;
@@ -79,11 +84,40 @@ export function usePersonasConCapital(bodyId: string | undefined) {
           person_type?: string | null;
           full_name?: string | null;
           denomination?: string | null;
-          representative_person_id?: string | null;
         } | null;
       };
-      return ((data ?? []) as CondRaw[]).map((m) => ({
+
+      const rows = (data ?? []) as CondRaw[];
+      const pjRows = rows.filter((m) => m.person?.person_type === "PJ" || m.person?.person_type === "JURIDICA");
+      const representativeByEntityPerson = new Map<string, string>();
+
+      if (pjRows.length > 0) {
+        const personIds = Array.from(new Set(pjRows.map((m) => m.person_id)));
+        const entityIds = Array.from(new Set(pjRows.map((m) => m.entity_id)));
+        const { data: reps, error: repsErr } = await supabase
+          .from("representaciones")
+          .select("entity_id, represented_person_id, representative_person_id")
+          .eq("tenant_id", tenantId!)
+          .eq("scope", "ADMIN_PJ_REPRESENTANTE")
+          .is("effective_to", null)
+          .in("represented_person_id", personIds)
+          .in("entity_id", entityIds);
+        if (repsErr) throw repsErr;
+        for (const rep of (reps ?? []) as Array<{
+          entity_id: string;
+          represented_person_id: string;
+          representative_person_id: string;
+        }>) {
+          representativeByEntityPerson.set(
+            `${rep.entity_id}:${rep.represented_person_id}`,
+            rep.representative_person_id,
+          );
+        }
+      }
+
+      return rows.map((m) => ({
         id: m.id,
+        entity_id: m.entity_id,
         body_id: m.body_id,
         person_id: m.person_id,
         role: m.tipo_condicion,
@@ -95,7 +129,7 @@ export function usePersonasConCapital(bodyId: string | undefined) {
         porcentaje_capital: null,
         tiene_derecho_voto: null,
         clase_accion: null,
-        representative_person_id: m.person?.representative_person_id ?? null,
+        representative_person_id: representativeByEntityPerson.get(`${m.entity_id}:${m.person_id}`) ?? null,
         person_type: m.person?.person_type ?? null,
         denomination: m.person?.denomination ?? null,
         full_name: m.person?.full_name ?? null,
