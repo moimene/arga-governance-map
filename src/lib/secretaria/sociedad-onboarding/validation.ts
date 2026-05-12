@@ -98,6 +98,24 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     issues.push(issue("CT-002", "capTable.numero_titulos", "El cap table debe sumar el 100% de los titulos.", "BLOCK_OPERATIONAL"));
   }
 
+  // CT-006: codigos referenciados en cap-table deben estar declarados en el paso 5.
+  // Sin este check, el validador pasaba si los titulos totales cuadraban aunque algun
+  // holding apuntara a una clase no declarada. La RPC TX1 ya rechaza ese payload con
+  // RAISE EXCEPTION en fn_crear_sociedad_legal_y_capital, por lo que el usuario
+  // llegaba al submit, recibia un rollback y perdia trabajo. Detectarlo inline aqui
+  // evita el round-trip al servidor (review Codex P2).
+  const declaredClassCodes = new Set(draft.shareClasses.map((c) => c.class_code).filter(Boolean));
+  for (const entry of draft.capTable) {
+    const code = entry.share_class_code;
+    if (code && !declaredClassCodes.has(code)) {
+      issues.push(issue(
+        "CT-006",
+        `capTable.${entry.key}.share_class_code`,
+        `La clase/serie "${code}" no esta declarada en el paso 5; declarala antes de asignar titulos.`
+      ));
+    }
+  }
+
   const titlesByClass = draft.capTable.reduce<Record<string, number>>((acc, item) => {
     const code = item.share_class_code;
     acc[code] = (acc[code] ?? 0) + num(item.numero_titulos);
