@@ -163,49 +163,79 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
   },
 ];
 
+// `lmvCotizada=true` marca materias con especialidades aplicables a SA
+// cotizadas (LMV / Código de Buen Gobierno CNMV). NO cambia la clase de
+// materia (sigue siendo ORDINARIA/ESTATUTARIA/ESTRUCTURAL para el motor),
+// pero activa advertencias en la UI si la entidad es cotizada:
+//   - OPERACIONES_VINCULADAS: art. 529 ter.h + 530 LSC → comisión auditoría
+//     + aprobación CdA + comunicación CNMV (>5% balance) o folleto si afecta
+//     al mercado.
+//   - PROGRAMA_RECOMPRA: art. 277 LSC + Reglamento UE 596/2014 (abuso de
+//     mercado) → autorización JGA + notificación CNMV + ventanas trading.
+//   - RETRIBUCION_CONSEJEROS: art. 529 novodecies LSC → informe anual
+//     vinculante + voto consultivo cotizadas.
 const AGENDA_MATERIAS = [
   // Ordinarias (gestión recurrente del órgano)
-  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false },
-  { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false },
-  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false },
-  { value: "DISTRIBUCION_RESERVAS", label: "Distribución de reservas / dividendo a cuenta", tipo: "ORDINARIA", inscribible: false },
-  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true },
-  { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true },
-  { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true },
-  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true },
-  { value: "RETRIBUCION_CONSEJEROS", label: "Política / informe de retribución de consejeros", tipo: "ORDINARIA", inscribible: false },
-  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true },
-  { value: "OPERACIONES_VINCULADAS", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false },
-  { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false },
-  { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false },
+  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "DISTRIBUCION_RESERVAS", label: "Distribución de reservas / dividendo a cuenta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "RETRIBUCION_CONSEJEROS", label: "Política / informe de retribución de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "OPERACIONES_VINCULADAS", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 
   // Estatutarias (mayoría reforzada art. 199/201 LSC)
-  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
   // MODIFICACION_REGLAMENTO es ORDINARIA: reglamento del consejo/junta NO
   // es estatutos (jerarquía LEY → ESTATUTOS → REGLAMENTO). Art. 285-290 LSC
   // aplica sólo a modificación estatutaria; el reglamento se aprueba por
   // mayoría legal del órgano competente.
-  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ORDINARIA", inscribible: false },
-  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "CAMBIO_DENOMINACION", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "CAMBIO_DOMICILIO", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true },
+  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: true },
+  { value: "CAMBIO_DENOMINACION", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "CAMBIO_DOMICILIO", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
 
   // Estructurales (escritura pública + RM)
-  { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true },
-  { value: "FUSION", label: "Fusión", tipo: "ESTRUCTURAL", inscribible: true },
-  { value: "ESCISION", label: "Escisión", tipo: "ESTRUCTURAL", inscribible: true },
-  { value: "DISOLUCION", label: "Disolución", tipo: "ESTRUCTURAL", inscribible: true },
-  { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true },
-  { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false },
+  { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
+  { value: "FUSION", label: "Fusión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "ESCISION", label: "Escisión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "DISOLUCION", label: "Disolución", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
+  { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
+  { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false, lmvCotizada: true },
 
   // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
   // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
   // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
   // tipo correcto y aceptar que no hay rule pack aplicable.
-  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false },
+  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 ] as const;
+
+// LMV cotizada advertencias específicas por materia. Texto enseña al
+// secretario qué especialidad cotizada aplica y dónde está la referencia.
+const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
+  OPERACIONES_VINCULADAS:
+    "SA cotizada: requiere informe de la Comisión de Auditoría (art. 529 ter.h LSC) + aprobación del Consejo. Si la operación supera el 5% del balance debe comunicarse a CNMV (art. 530 LSC).",
+  PROGRAMA_RECOMPRA:
+    "SA cotizada: autorización JGA (art. 277 LSC) + notificación CNMV + cumplimiento de ventanas de trading (Reglamento UE 596/2014 sobre abuso de mercado).",
+  RETRIBUCION_CONSEJEROS:
+    "SA cotizada: informe anual de remuneraciones vinculante + voto consultivo de la JGA sobre la política de retribución (art. 529 novodecies LSC).",
+  EMISION_OBLIGACIONES:
+    "SA cotizada: posible obligación de folleto informativo CNMV (Reglamento UE 2017/1129) cuando la emisión se ofrezca al público.",
+  FUSION: "SA cotizada: documento de fusión + informe del consejo + posible folleto CNMV si afecta a accionistas minoritarios.",
+  ESCISION: "SA cotizada: documento de escisión + posible folleto CNMV.",
+  CESION_GLOBAL:
+    "SA cotizada: posible hecho relevante a CNMV si afecta a porción significativa del patrimonio social.",
+  AUTORIZACION_OPERACION_ESTRUCTURAL:
+    "SA cotizada: revisar especialidades LMV (informe a CNMV, autorización de la JGA si supera umbrales).",
+};
 
 // Materias que NO se envían al motor V2 (puntos libres sin regla).
 const MATERIAS_LIBRES = new Set<string>(["OTROS_LIBRE"]);
@@ -518,7 +548,11 @@ export default function ConvocatoriasStepper() {
     organoTipo,
     adoptionMode: "MEETING",
     fechaJunta: meetingIso,
-    esCotizada: false,
+    // Lectura canonical desde `entities.es_cotizada` (override en
+     // entity_settings no se aplica aquí — el motor V2 lo recibe ya
+     // resuelto desde variable-resolver en otros flujos. Para el motor
+     // de convocatoria nos basta la columna directa).
+    esCotizada: Boolean(selectedEntity?.es_cotizada),
     webInscrita: true,
     primeraConvocatoria: true,
     esJuntaUniversal: tipoConvocatoria === "UNIVERSAL",
@@ -843,13 +877,16 @@ export default function ConvocatoriasStepper() {
     });
   }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values]);
 
-  // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si no
-  // está "dirty" (usuario no ha editado manualmente el texto).
+  // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si:
+  //   1. usuario está actualmente en Paso 7 (evita imports dinámicos y
+  //      setStates durante Paso 1-6 que cambian fecha/orden/etc.); cuando
+  //      el usuario llega al Paso 7 el effect dispara una sola vez.
+  //   2. no está "dirty" (no sobreescribir edits manuales del usuario).
   useEffect(() => {
-    if (!borradorDirty) {
+    if (current === 7 && !borradorDirty) {
       regenerateBorrador();
     }
-  }, [regenerateBorrador, borradorDirty]);
+  }, [current, regenerateBorrador, borradorDirty]);
 
   const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
     ? []
@@ -1734,7 +1771,7 @@ export default function ConvocatoriasStepper() {
                     </span>
                   </div>
 
-                  {ruleResolutions.length > 0 && (
+                  {ruleResolutions.length > 0 ? (
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
                       <MiniFact label="Rule packs" value={String(ruleResolutions.filter((r) => r.rulePack).length)} />
                       <MiniFact label="Antelación" value={`${evaluacionV2.antelacionDiasRequerida} días`} />
@@ -1744,6 +1781,20 @@ export default function ConvocatoriasStepper() {
                         value={noticeDoubleEvaluation.converged ? "Convergente" : "Divergente"}
                       />
                     </div>
+                  ) : (
+                    /* B1 — sin items DECISORIO en el orden del día, el
+                       motor V2 corre con 0 rule packs y cae a defaults por
+                       organoTipo (LSC art. 176 para juntas, art. 246.2 +
+                       reglamento para CdA). Mostramos copy contextual que
+                       explica QUÉ default está aplicando para que el
+                       secretario sepa que la antelación es orientativa
+                       hasta definir el orden del día. */
+                    <p className="mt-3 text-[11px] text-[var(--g-text-secondary)]">
+                      Cálculo orientativo con defaults por órgano
+                      ({organoTipo}). Las reglas específicas se resolverán al
+                      definir el orden del día en el Paso 3 (sólo los puntos
+                      marcados como Acuerdo activan rule packs).
+                    </p>
                   )}
 
                   {!evaluacionV2.ok && fechaReunion && (
@@ -2044,6 +2095,31 @@ export default function ConvocatoriasStepper() {
                             <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
                           </label>
                         </div>
+
+                        {/* M2 — Advertencia LMV cotizada. Aparece sólo si la
+                            entidad es cotizada (`entities.es_cotizada=true`)
+                            Y la materia tiene `lmvCotizada: true` en el
+                            catálogo. No bloquea ni modifica el motor; sirve
+                            de recordatorio al secretario sobre la
+                            especialidad aplicable (CNMV, comisión auditoría,
+                            ventanas trading, folleto, etc.). */}
+                        {Boolean(selectedEntity?.es_cotizada) &&
+                          (AGENDA_MATERIAS.find((m) => m.value === item.materia)?.lmvCotizada ?? false) && (
+                          <div
+                            className="mt-3 ml-5 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                            role="note"
+                            aria-label="Advertencia LMV cotizada"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
+                              ⚠ Especialidad LMV — SA cotizada
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                              {LMV_COTIZADA_ADVERTENCIAS[item.materia] ??
+                                "SA cotizada: revisar especialidades LMV / CNMV aplicables a esta materia antes de convocar."}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Propuesta de acuerdo concreta — art. 197.1 / 287 LSC.
                             Texto que el secretario redacta para el punto y que
@@ -2497,6 +2573,34 @@ export default function ConvocatoriasStepper() {
                       ID {effectiveBorradorTemplate.id.slice(0, 8)} ·{" "}
                       {effectiveBorradorTemplate.referencia_legal ?? "Sin referencia legal anotada"}
                     </p>
+                  )}
+
+                  {/* M4 — Badge BORRADOR / no apta para producción.
+                      El flujo de plantillas protegidas exige
+                      BORRADOR → REVISADA → APROBADA → ACTIVA con
+                      `aprobada_por IS NOT NULL` en estado ACTIVA. Una
+                      convocatoria emitida con plantilla en BORRADOR rompe
+                      la cadena de trazabilidad legal — la probe de cierre
+                      del proyecto lo detectaría. Mostramos badge
+                      bloqueante visual aunque la emisión siga siendo
+                      posible (decisión consciente del secretario). */}
+                  {effectiveBorradorTemplate && effectiveBorradorTemplate.estado === "BORRADOR" && (
+                    <div
+                      className="border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                      role="alert"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
+                        ⚠ Plantilla en BORRADOR — no apta para producción
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                        Esta plantilla no ha pasado por el flujo de revisión legal
+                        (BORRADOR → REVISADA → APROBADA → ACTIVA). Su uso en una
+                        convocatoria emitida queda como evidencia <em>demo / operativa</em>,
+                        sin cobertura legal de plantilla aprobada. Aprobar en
+                        Gestor de Plantillas antes de uso en producción real.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
