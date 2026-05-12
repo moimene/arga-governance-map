@@ -270,6 +270,29 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     }
   }
 
+  // CA-003: cada cargo con persona declarada debe tener tax_id no-blank. Sin
+  // este check, TX1 crea la sociedad pero TX2 persistInitialCargos throws en
+  // resolvePersonByTaxIdOrCreate cuando tax_id.trim() es vacio, dejando la
+  // sociedad partially creada con cargos pendientes (review Codex P2).
+  // Igual constraint para representante de ADMIN_PJ.
+  for (const cargo of draft.cargos) {
+    if (cargo.persona && (!cargo.persona.tax_id || cargo.persona.tax_id.trim() === "")) {
+      issues.push(issue(
+        "CA-003",
+        `cargos.${cargo.key}.persona.tax_id`,
+        "El NIF/CIF de cada cargo es obligatorio. Identifica la persona antes de seguir."
+      ));
+    }
+    if (cargo.tipo_condicion === "ADMIN_PJ" && cargo.persona?.representante &&
+        (!cargo.persona.representante.tax_id || cargo.persona.representante.tax_id.trim() === "")) {
+      issues.push(issue(
+        "CA-003",
+        `cargos.${cargo.key}.persona.representante.tax_id`,
+        "El NIF del representante PF del ADMIN_PJ es obligatorio."
+      ));
+    }
+  }
+
   for (const cargo of draft.cargos) {
     if (cargo.tipo_condicion === "ADMIN_PJ" && !cargo.persona?.representante) {
       issues.push(issue("PJ-001", `cargos.${cargo.key}.persona.representante`, "Administrador PJ requiere representante permanente PF."));
@@ -318,7 +341,7 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     4: ["CL-001", "CL-002", "CL-003", "CL-004"],
     5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "P-001"],
     6: ["O-001", "O-002"],
-    7: ["CA-001", "CA-002", "AU-001", "AU-002", "PJ-001"],
+    7: ["CA-001", "CA-002", "CA-003", "AU-001", "AU-002", "PJ-001"],
     8: ["R-001", "R-002"],
     9: [],
     10: [],
