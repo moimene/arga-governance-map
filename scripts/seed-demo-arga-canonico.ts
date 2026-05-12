@@ -44,6 +44,16 @@
  *      (represented_person_id, scope, COALESCE(effective_to, ...)), so we
  *      also use SELECT-then-INSERT-if-missing.
  *
+ *   7. (Wave 2 D2.4 — 2026-05-12) Migration 000063 added
+ *      UNIQUE(tenant_id, tax_id) on persons. updatePjTaxId() now
+ *      pre-checks that no OTHER person row already holds the target
+ *      tax_id before updating, so re-running the seed in the presence
+ *      of duplicates (introduced by manual flows, tests, etc.) does
+ *      NOT crash with a 23505. If a duplicate is detected, the seed
+ *      exits with a CLEAR pointer to scripts/consolidate-duplicate-persons.ts.
+ *      upsertMercadoLibre() also pre-checks for the canonical tax_id
+ *      already existing on a different id (rare edge case).
+ *
  * Idempotency: every write is tolerant of prior runs. The script can be
  * rerun safely — UPDATEs are deterministic, INSERTs check existence first,
  * and holdings use the close-then-insert pattern.
@@ -206,6 +216,28 @@ async function updatePjTaxId(entityId: string, taxId: string, label: string) {
         `id=${entityId} err=${entErr?.message}`
     );
   }
+
+  // Pre-check (Wave 2 D2.4): is the target tax_id already held by a
+  // DIFFERENT person row? If yes, migration 000063's UNIQUE(tenant_id, tax_id)
+  // will cause UPDATE to fail with 23505. Detect this BEFORE running the
+  // UPDATE so the operator gets an actionable message, not a Postgres
+  // constraint trace.
+  const { data: clash } = await supabase
+    .from("persons")
+    .select("id, full_name")
+    .eq("tenant_id", TENANT)
+    .eq("tax_id", taxId)
+    .neq("id", ent.person_id)
+    .maybeSingle();
+  if (clash) {
+    throw new Error(
+      `updatePjTaxId(${label}): tax_id "${taxId}" is already held by another person ` +
+        `(id=${clash.id} full_name="${clash.full_name}"). Run ` +
+        `scripts/consolidate-duplicate-persons.ts --dry-run to identify and ` +
+        `resolve the duplicate before re-seeding.`,
+    );
+  }
+
   const { error } = await supabase
     .from("persons")
     .update({ tax_id: taxId, full_name: label, denomination: label })
@@ -215,6 +247,23 @@ async function updatePjTaxId(entityId: string, taxId: string, label: string) {
 }
 
 async function upsertMercadoLibre() {
+  // Wave 2 D2.4: pre-check that no DIFFERENT row holds the target
+  // tax_id. If yes → exit clean with actionable hint.
+  const { data: clash } = await supabase
+    .from("persons")
+    .select("id, full_name")
+    .eq("tenant_id", TENANT)
+    .eq("tax_id", TAX_ID_MERCADO_LIBRE)
+    .neq("id", PJ_MERCADO_LIBRE_ID)
+    .maybeSingle();
+  if (clash) {
+    throw new Error(
+      `upsertMercadoLibre: tax_id "${TAX_ID_MERCADO_LIBRE}" is already held by another person ` +
+        `(id=${clash.id} full_name="${clash.full_name}"). Run ` +
+        `scripts/consolidate-duplicate-persons.ts --dry-run to resolve.`,
+    );
+  }
+
   const { data: existing } = await supabase
     .from("persons")
     .select("id")
