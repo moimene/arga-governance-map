@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { isProductionPerson } from "@/lib/secretaria/persona-filters";
 
 type MaybeJoin<T> = T | T[] | null | undefined;
 
@@ -54,10 +55,25 @@ export interface PersonaEnriquecida extends PersonaRow {
 export function usePersonasCanonical(filter?: {
   person_type?: PersonType;
   search?: string;
+  /**
+   * Si `true` (default), filtra fixtures E2E, personas archivadas y
+   * placeholders PENDIENTE-* del resultado vía `isProductionPerson`.
+   * Los tests E2E que necesiten ver sus fixtures pueden pasar `false`
+   * explícitamente.
+   */
+  excludeTestData?: boolean;
 }) {
   const { tenantId } = useTenantContext();
+  const exclude = filter?.excludeTestData ?? true;
   return useQuery({
-    queryKey: ["personas_canonical", tenantId, "list", filter?.person_type ?? "all", filter?.search ?? ""],
+    queryKey: [
+      "personas_canonical",
+      tenantId,
+      "list",
+      filter?.person_type ?? "all",
+      filter?.search ?? "",
+      exclude,
+    ],
     enabled: !!tenantId,
     queryFn: async (): Promise<PersonaRow[]> => {
       let q = supabase.from("persons").select("*").eq("tenant_id", tenantId!);
@@ -68,7 +84,8 @@ export function usePersonasCanonical(filter?: {
       }
       const { data, error } = await q.order("full_name", { ascending: true }).limit(200);
       if (error) throw error;
-      return (data ?? []) as PersonaRow[];
+      const rows = (data ?? []) as PersonaRow[];
+      return exclude ? rows.filter(isProductionPerson) : rows;
     },
   });
 }
@@ -86,8 +103,15 @@ export function usePersonasEnriquecidas(filter?: {
   search?: string;
   tipo_condicion?: string; // opcional: filtra personas que tengan ese cargo vigente
   entity_id?: string;      // opcional: filtra personas con cargo O holding en esa entity
+  /**
+   * Si `true` (default), filtra fixtures E2E, personas archivadas y
+   * placeholders PENDIENTE-* del resultado vía `isProductionPerson`.
+   * Tests E2E pueden pasar `false` para ver sus fixtures.
+   */
+  excludeTestData?: boolean;
 }) {
   const { tenantId } = useTenantContext();
+  const exclude = filter?.excludeTestData ?? true;
   return useQuery({
     queryKey: [
       "personas_canonical",
@@ -97,6 +121,7 @@ export function usePersonasEnriquecidas(filter?: {
       filter?.search ?? "",
       filter?.tipo_condicion ?? "all",
       filter?.entity_id ?? "all",
+      exclude,
     ],
     enabled: !!tenantId,
     queryFn: async (): Promise<PersonaEnriquecida[]> => {
@@ -143,6 +168,11 @@ export function usePersonasEnriquecidas(filter?: {
       if (cargosR.error) throw cargosR.error;
       if (holdingsR.error) throw holdingsR.error;
 
+      // Filtro test data sobre el listado base ANTES de cruzar con cargos /
+      // holdings — mantiene los agregados limpios sin que se filtren después.
+      const personsRows = (personsR.data ?? []) as PersonaRow[];
+      const personsFiltered = exclude ? personsRows.filter(isProductionPerson) : personsRows;
+
       type CargoRaw = {
         person_id: string;
         tipo_condicion: string;
@@ -188,7 +218,7 @@ export function usePersonasEnriquecidas(filter?: {
       }
 
       // Cruzar + aplicar filtros cargo/entity (post-join).
-      const enriched: PersonaEnriquecida[] = ((personsR.data ?? []) as PersonaRow[]).map((p) => ({
+      const enriched: PersonaEnriquecida[] = personsFiltered.map((p) => ({
         ...p,
         cargos_vigentes: cargosByPerson.get(p.id) ?? [],
         holdings_vigentes: holdingsByPerson.get(p.id) ?? [],
