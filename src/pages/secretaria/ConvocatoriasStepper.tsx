@@ -822,12 +822,40 @@ export default function ConvocatoriasStepper() {
       antelacion_dias_requerida: evaluacionV2.antelacionDiasRequerida,
       fecha_limite_publicacion: evaluacionV2.fechaLimitePublicacion,
       canales: channels.map((c) => channelLabel(c, channelOpts)).join(", "),
+      // Codex P1 PR #3: las plantillas reales (verificado en migration
+      // 20260419_000009) hacen `{{#each orden_dia}}{{ordinal}}. {{descripcion_punto}}{{/each}}`.
+      // Con un string newline-delimited, Handlebars itera caracter por caracter
+      // y produce bloque vacío. Pasamos array de objetos con el shape
+      // exacto que el template espera (contrato variables-plantillas v1.1).
       orden_dia: agendaItems
+        .filter((i) => i.titulo.trim())
+        .map((i, idx) => ({
+          ordinal: idx + 1,
+          descripcion_punto: i.titulo,
+          kind: i.kind ?? "DELIBERATIVO",
+          materia: i.kind === "DECISORIO" ? i.materia : null,
+          materia_label: i.kind === "DECISORIO" ? labelMateria(i.materia) : null,
+          tipo: i.tipo,
+          inscribible: i.inscribible,
+          propuesta_acuerdo: i.kind === "DECISORIO" ? (i.propuesta_acuerdo ?? null) : null,
+        })),
+      // Plain-text fallback para plantillas legacy que esperaban string
+      // newline-delimited (compatibilidad backwards).
+      orden_dia_texto: agendaItems
         .filter((i) => i.titulo.trim())
         .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
         .join("\n"),
       destinatarios: memberNames.join(", "),
-      destinatarios_lista: memberNames.map((n) => `· ${n}`).join("\n"),
+      // Misma protección para `destinatarios`: si la plantilla espera
+      // `{{#each destinatarios_lista}}{{nombre}}{{/each}}`, le damos array;
+      // si espera string concatenado, usa `destinatarios`.
+      destinatarios_lista: activeMandates
+        .filter((m) => !excludedPersonIds.has(m.person_id) && m.full_name)
+        .map((m) => ({
+          nombre: m.full_name,
+          email: m.email ?? null,
+          rol: m.role ?? null,
+        })),
     };
   }, [
     activeMandates, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
