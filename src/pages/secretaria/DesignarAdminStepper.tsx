@@ -207,6 +207,35 @@ export default function DesignarAdminStepper() {
 
   async function guardar() {
     if (!entityId) return;
+
+    // P2 Codex iter-8: defensive validation final — verifica que si la persona
+    // requiere representante (L2 art. 212bis), el draft lo tiene. Cubre el caso
+    // edge de race condition donde el gate canNext se pasó con personaSeleccionada
+    // aún en loading state.
+    const personaFinal = personaPreselected ?? personaSeleccionada;
+    if (personaFinal) {
+      const needsRep = requiresRepresentative(
+        { person_type: personaFinal.person_type },
+        draft.tipo_condicion as TipoCondicionCargo,
+      );
+      if (needsRep && !draft.representative_person_id) {
+        toast.error(
+          "Esta persona jurídica requiere representante PF permanente (LSC art. 212 bis). " +
+            "Selecciona uno antes de guardar.",
+        );
+        return;
+      }
+    } else if (personIdFromUrl) {
+      // personaFinal NO debería ser undefined aquí si pasamos canNext. Si lo es,
+      // algo se rompió en el flujo — abort + telemetría.
+      console.error("guardar() called with personIdFromUrl set but personaFinal undefined", {
+        personIdFromUrl,
+        draftPersonId: draft.person_id,
+      });
+      toast.error("No se pudo cargar la persona seleccionada. Recarga la página e intenta de nuevo.");
+      return;
+    }
+
     try {
       await asignarMutation.mutateAsync({
         person_id: draft.person_id,
