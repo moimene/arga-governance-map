@@ -1,5 +1,11 @@
 import { useParams, Link } from "react-router-dom";
-import { ChevronLeft, Users, Building2 } from "lucide-react";
+import {
+  ChevronLeft,
+  Users,
+  Building2,
+  Plus,
+  UserCheck,
+} from "lucide-react";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import {
   useCargosPersona,
@@ -62,6 +68,29 @@ export default function PersonaDetalle() {
           <p className="text-sm text-[var(--g-text-secondary)]">
             {p.person_type === "PJ" ? "Persona jurídica" : "Persona física"} · {p.tax_id ?? "sin NIF"}
           </p>
+        </div>
+        {/* D4.2: acciones por persona. TODO D5.2/D5.3: rutas destino se
+            montarán en App.tsx en Wave 5; por ahora los enlaces apuntan a
+            su URL definitiva aunque la vista aún no esté disponible. */}
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            to={`/secretaria/cargos/nuevo?personId=${p.id}`}
+            className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Asignar cargo
+          </Link>
+          {p.person_type === "PJ" && (
+            <Link
+              to={`/secretaria/personas/${p.id}/representante/nuevo`}
+              className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <UserCheck className="h-4 w-4" aria-hidden="true" />
+              {p.representative?.full_name ? "Editar representante" : "Asignar representante"}
+            </Link>
+          )}
         </div>
       </div>
 
