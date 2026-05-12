@@ -82,7 +82,11 @@ export function usePersonasCanonical(filter?: {
         const s = filter.search.trim();
         q = q.or(`full_name.ilike.%${s}%,tax_id.ilike.%${s}%,denomination.ilike.%${s}%,email.ilike.%${s}%`);
       }
-      const { data, error } = await q.order("full_name", { ascending: true }).limit(200);
+      // P2 Codex iter-6: cap subido a 2000 (mirror del fix iter-5 sobre usePersonasEnriquecidas).
+      // Necesario para selectores que dependen del list completo (RepresentanteAdminPJStepper
+      // selector PF para LSC 212 bis). Tenants futuros >2000 personas requieren searchable
+      // selector — Plan A' diferido.
+      const { data, error } = await q.order("full_name", { ascending: true }).limit(2000);
       if (error) throw error;
       const rows = (data ?? []) as PersonaRow[];
       return exclude ? rows.filter(isProductionPerson) : rows;
