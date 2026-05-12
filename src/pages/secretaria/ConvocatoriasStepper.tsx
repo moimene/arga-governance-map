@@ -922,9 +922,17 @@ export default function ConvocatoriasStepper() {
       lugar,
       lugar_junta: lugar,
 
-      // Fecha / hora primera convocatoria
+      // Fecha / hora primera convocatoria. Codex P2 round 10 PR #3:
+      // la plantilla CONVOCATORIA usa `{{fecha_primera_convocatoria}}` y
+      // `{{hora_primera_convocatoria}}` (aliases canonical largos),
+      // mientras nosotros exponíamos solo `fecha_junta` / `hora_junta`.
+      // Sin aliases largos, el render del Paso 7 dejaba en blanco la
+      // hora de primera convocatoria aunque el usuario la hubiera
+      // rellenado en Paso 2.
       fecha_junta: fechaReunion,
       hora_junta: horaReunion,
+      fecha_primera_convocatoria: fechaReunion,
+      hora_primera_convocatoria: horaReunion,
       fecha_emision: new Date().toISOString().slice(0, 10),
 
       formato_reunion: formatoReunion,
@@ -1048,7 +1056,12 @@ export default function ConvocatoriasStepper() {
     // Cada llamada incrementa el token; sólo el último vuelve a setState.
     const token = ++regenerateTokenRef.current;
     void import("@/lib/doc-gen/template-renderer").then(({ renderTemplate }) => {
-      // Cancelado si: componente desmontado o llegó una regeneración nueva.
+      // Cancelado si: componente desmontado o llegó una regeneración nueva
+      // (la `onChange` del textarea también incrementa el token — Codex
+      // P2 round 10 PR #3). El check de token cubre el caso edit-during-
+      // import, este guard es defensa en profundidad para imports muy
+      // lentos donde el render rezagado de otra plantilla no debe pisar
+      // un texto que el usuario ya empezó a editar.
       if (!isMountedRef.current || token !== regenerateTokenRef.current) return;
       const merged = { ...borradorVariables, ...borradorCapa3Values };
       const result = renderTemplate({
@@ -2947,6 +2960,14 @@ export default function ConvocatoriasStepper() {
                 <textarea
                   value={borradorTexto}
                   onChange={(e) => {
+                    // Codex P2 round 10 PR #3: cualquier edit manual del
+                    // usuario invalida el token de cualquier render async
+                    // pendiente. Sin esto, un import dinámico de
+                    // `template-renderer` rezagado podía resolver tras los
+                    // primeros keystrokes, ejecutar setBorradorTexto +
+                    // setBorradorDirty(false), y borrar silenciosamente
+                    // los edits del usuario.
+                    regenerateTokenRef.current += 1;
                     setBorradorTexto(e.target.value);
                     setBorradorDirty(true);
                   }}
