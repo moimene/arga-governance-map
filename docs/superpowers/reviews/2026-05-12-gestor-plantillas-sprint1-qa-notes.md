@@ -82,6 +82,6 @@ Resultado:
 3. Arrancar app y entrar como `demo@arga-seguros.com`.
 4. Verificar `/secretaria/gestor-plantillas` con rol `SECRETARIO`: 5/7 tabs visibles, sin Importar/Validacion.
 5. Con rol `ADMIN_TENANT`, recorrer importer con paquete warning-only: debe pedir ACK sin crear BORRADOR previo.
-6. Validar transicion `REVISADA -> APROBADA` con firma y despues `APROBADA -> ACTIVA`.
-7. Revisar Auditoria/Metadatos: una sola entrada de changelog por import con ACK.
+6. Usar el BORRADOR creado por ese import para recorrer el workflow completo: `BORRADOR -> REVISADA -> APROBADA` con firma -> `ACTIVA`.
+7. Revisar Auditoria/Metadatos: una sola entrada de changelog por import con ACK y changelog coherente por cada transicion.
 8. Confirmar que no se ejecutaron migraciones ni cambios de Supabase durante la QA.
