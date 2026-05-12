@@ -57,6 +57,18 @@ Reglas:
 - **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
 - **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
 
+### Taxonomía sidebar Secretaría — decisión 2026-05-12
+
+Tras el rediseño del menú lateral (`src/lib/secretaria/sidebar-visibility.ts` + `navigation.ts`) la nueva taxonomía de secciones en modo sociedad es **CONTEXTO / EXPEDIENTES / REGISTRO / CONFIGURACIÓN Y REGLAS**, con item "Procesos" para `/secretaria/calendario`.
+
+Crítica impeccable conocida (no bloqueante, deuda intencional):
+
+- **"REGISTRO" colisiona con Registro Mercantil** en jerga jurídica. Aceptado como decisión de marca interna; revisar si en demo a cliente surge fricción. Alternativas pendientes: "Libros y depósito", "Libros y cumplimiento".
+- **"Procesos" para `/calendario` tiene 3 signos contradictorios** (label "Procesos" / icono `Calendar` / página `Calendario.tsx`). Decisión: dejar el label en sidebar; reconciliar (icono `Workflow` + renombrar página) cuando se aborde el rework de Procesos societarios completo.
+- **"Configuración y reglas"** se mantiene aunque el tono sea SaaS-flavored. Posible refactor a "Reglas y modelos" o "Normativa aplicable" en sprint futuro.
+
+Recordatorio: **no usar "Registro" en código, copies o tests para referirse al Registro Mercantil** mientras esta sección exista — esa función es del Tramitador registral. El item "Procesos" navega a `/secretaria/calendario`; cualquier selector E2E debe usar `[data-sidebar-item="Procesos"]` (atributo estable) en lugar de texto.
+
 ### Módulos Garrigues — doble identidad
 
 Los módulos GRC Compass (`/grc/*`), Secretaría Societaria (`/secretaria/*`) y AI Governance (`/ai-governance/*`) son:

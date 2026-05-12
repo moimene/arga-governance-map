@@ -4,8 +4,13 @@ import { BookOpen, ChevronLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/secretaria/GlobalSearch";
+import {
+  getVisibleSidebarSections,
+  isItemDisabled,
+} from "@/lib/secretaria/sidebar-visibility";
 import { getNavGroups } from "./navigation";
 import { ScopeSwitcher } from "./ScopeSwitcher";
+import { useSidebarVisibility } from "./useSidebarVisibilityContext";
 import type { SecretariaScopeController } from "./types";
 
 interface SecretariaSidebarProps {
@@ -17,10 +22,77 @@ interface SecretariaSidebarContentProps {
   onNavigate?: () => void;
 }
 
+/**
+ * Skeleton "honesto" — sólo renderiza placeholders para items que NO tienen
+ * filtros entity-dependent, evitando el height jump cuando el render real
+ * filtra items con `requiresCollegiateBody`, `requiresUnipersonalAdmin`, etc.
+ *
+ * Items que SÍ aparecen en skeleton:
+ *   - Sin `visibility` rule (siempre visibles)
+ *   - Sólo con `requiresEntity: true` (visible si modo sociedad + entidad)
+ *
+ * Items que NO aparecen en skeleton (estructura puede o no incluirlos):
+ *   - `requiresCollegiateBody`, `requiresUnipersonalAdmin`, `requiresCotizada`,
+ *     `excludesIfCotizada`, `requiresBodyType` → depende de la entidad
+ *   - `requiresCapability` → depende de capability_matrix + rol
+ *   - `excludesIfReferenceOnly` → depende de readiness
+ *
+ * Esto produce un skeleton menor o igual que el render final, sin saltos
+ * estructurales hacia arriba al hidratar.
+ */
+function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?: boolean; requiresUnipersonalAdmin?: boolean; requiresCotizada?: boolean; excludesIfCotizada?: boolean; requiresBodyType?: string[]; requiresCapability?: string; excludesIfReferenceOnly?: boolean } }): boolean {
+  const v = item.visibility;
+  if (!v) return true;
+  if (v.requiresCollegiateBody) return false;
+  if (v.requiresUnipersonalAdmin) return false;
+  if (v.requiresCotizada) return false;
+  if (v.excludesIfCotizada) return false;
+  if (v.requiresBodyType && v.requiresBodyType.length > 0) return false;
+  if (v.requiresCapability) return false;
+  if (v.excludesIfReferenceOnly) return false;
+  return true;
+}
+
+function SecretariaSidebarSkeleton({ groups }: { groups: ReturnType<typeof getNavGroups> }) {
+  const stableGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter(isEntityIndependentItem) }))
+    .filter((group) => group.items.length > 0);
+
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Cargando estructura del menú">
+      {stableGroups.map((group) => (
+        <div key={group.label} className="space-y-1" data-sidebar-skeleton-section={group.label}>
+          <span className="block px-3 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sidebar-foreground))]/35">
+            {group.label}
+          </span>
+          {group.items.map((item, idx) => (
+            <span
+              key={`${group.label}-${item.to}-${idx}`}
+              className="mb-0.5 flex h-9 items-center gap-2.5 px-3"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              aria-hidden="true"
+            >
+              <span className="h-4 w-4 shrink-0 bg-[hsl(var(--sidebar-foreground))]/15" style={{ borderRadius: "2px" }} />
+              <span
+                className="h-3 bg-[hsl(var(--sidebar-foreground))]/10"
+                style={{
+                  borderRadius: "var(--g-radius-sm)",
+                  width: `${Math.min(80, 40 + (item.label.length * 4))}%`,
+                }}
+              />
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarContentProps) {
   const navigate = useNavigate();
-  const groups = getNavGroups(scope.mode);
-  const hasSelectedEntity = Boolean(scope.selectedEntity);
+  const allGroups = getNavGroups(scope.mode);
+  const { context: visibilityCtx, isInitialLoading } = useSidebarVisibility(scope);
+  const groups = getVisibleSidebarSections(allGroups, visibilityCtx);
 
   return (
     <>
@@ -40,31 +112,44 @@ function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarConten
         <ScopeSwitcher scope={scope} />
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navegación de Secretaría Societaria">
+      <nav
+        className="flex-1 overflow-y-auto px-2 py-3"
+        aria-label="Navegación de Secretaría Societaria"
+        data-sidebar-mode={scope.mode}
+      >
         <div className="mb-3">
           <GlobalSearch scope={scope} />
         </div>
 
-        <div className="space-y-4">
+        {isInitialLoading ? <SecretariaSidebarSkeleton groups={allGroups} /> : null}
+
+        <div className="space-y-4" hidden={isInitialLoading}>
           {groups.map((group) => (
-            <div key={group.label} className="space-y-1">
+            <div key={group.label} className="space-y-1" data-sidebar-section={group.label}>
               <span className="block px-3 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--sidebar-foreground))]/55">
                 {group.label}
               </span>
 
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const disabled = scope.mode === "sociedad" && item.requiresEntity && !hasSelectedEntity;
+                const disabled = isItemDisabled(item, visibilityCtx);
                 const itemTo =
                   item.selectedEntityRoute && scope.selectedEntity
                     ? `/secretaria/sociedades/${scope.selectedEntity.id}`
                     : item.to;
 
                 if (disabled) {
+                  // Item disabled: usamos role="link" + aria-disabled + tabIndex=-1
+                  // para que sea anunciado correctamente por screen readers como
+                  // "enlace deshabilitado" sin entrar en el tab order.
                   return (
                     <span
-                      key={item.to}
+                      key={`${group.label}-${item.to}-${item.label}`}
+                      role="link"
                       aria-disabled="true"
+                      tabIndex={-1}
+                      data-sidebar-item={item.label}
+                      data-sidebar-item-disabled="true"
                       className="mb-0.5 flex cursor-not-allowed items-center gap-2.5 px-3 py-2 text-[13px] text-[hsl(var(--sidebar-foreground))]/45"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
@@ -76,10 +161,11 @@ function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarConten
 
                 return (
                   <NavLink
-                    key={item.to}
+                    key={`${group.label}-${item.to}-${item.label}`}
                     to={scope.createScopedTo(itemTo)}
                     end={item.end}
                     onClick={onNavigate}
+                    data-sidebar-item={item.label}
                     className={({ isActive }) =>
                       cn(
                         "mb-0.5 flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]",
