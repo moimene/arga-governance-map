@@ -775,15 +775,44 @@ export default function ConvocatoriasStepper() {
     return autoSelectedTemplate;
   }, [autoSelectedTemplate, plantillasProtegidas, selectedBorradorTemplateId]);
 
-  const candidateTemplates = useMemo(
-    () =>
-      plantillasProtegidas.filter(
-        (p) =>
-          convocatoriaTemplateTypes.includes(p.tipo) &&
-          (p.estado === "ACTIVA" || p.estado === "APROBADA" || p.estado === "REVISADA" || p.estado === "BORRADOR"),
-      ),
-    [plantillasProtegidas, convocatoriaTemplateTypes],
-  );
+  // Codex P2 PR #3 round 6: el selector manual debe filtrar por la misma
+  // metadata que `selectProcessTemplate()` aplica en auto-selección, para
+  // que el usuario no pueda elegir plantillas de otra jurisdicción
+  // (PT/MX/BR) ni de un órgano incompatible (CdA vs JGA) y persistir texto
+  // legal en contexto erróneo. Las plantillas globales (jurisdiccion o
+  // organo_tipo == null/vacío) se consideran compatibles con cualquier
+  // contexto — son plantillas-marco multi-jurisdicción.
+  const candidateTemplates = useMemo(() => {
+    const jurisdictionUpper = (jurisdiction ?? "").toUpperCase();
+    const organoTipoUpper = (organoTipo ?? "").toUpperCase();
+    return plantillasProtegidas.filter((p) => {
+      if (!convocatoriaTemplateTypes.includes(p.tipo)) return false;
+      const estadoOk =
+        p.estado === "ACTIVA" ||
+        p.estado === "APROBADA" ||
+        p.estado === "REVISADA" ||
+        p.estado === "BORRADOR";
+      if (!estadoOk) return false;
+
+      // Jurisdicción: plantilla global (null/vacía) o coincide con la
+      // jurisdicción de la entidad.
+      const plantillaJurisdiccion = (p.jurisdiccion ?? "").toUpperCase();
+      const jurisdiccionOk =
+        !plantillaJurisdiccion || !jurisdictionUpper || plantillaJurisdiccion === jurisdictionUpper;
+      if (!jurisdiccionOk) return false;
+
+      // Órgano: plantilla global (null/vacía) o coincide con el
+      // organoTipo del órgano seleccionado. Matching tolerante por
+      // substring para variantes (CDA ↔ CONSEJO_ADMINISTRACION).
+      const plantillaOrgano = (p.organo_tipo ?? "").toUpperCase();
+      if (!plantillaOrgano || !organoTipoUpper) return true;
+      const organoOk =
+        plantillaOrgano === organoTipoUpper ||
+        plantillaOrgano.includes(organoTipoUpper) ||
+        organoTipoUpper.includes(plantillaOrgano);
+      return organoOk;
+    });
+  }, [plantillasProtegidas, convocatoriaTemplateTypes, jurisdiction, organoTipo]);
 
   const borradorCapa3Fields = useMemo(
     () =>
@@ -836,7 +865,13 @@ export default function ConvocatoriasStepper() {
       //     unresolvedVariables y el usuario lo ve en el callout amarillo.
       cif: selectedEntity?.registration_number ?? "",
       domicilio_social: "",
+      // Codex P2 PR #3 round 6: la plantilla CONVOCATORIA (migration
+      // 20260419_000008_ajustes_revision_legal) usa `{{#if forma_social == 'SA'}}`
+      // mientras nosotros exponíamos solo `tipo_social`. Sin el alias
+      // canonical, SA caía al rama else y el texto emitía "socios" en
+      // vez de "accionistas" + párrafo de derecho-de-información SL.
       tipo_social: tipoSocial,
+      forma_social: tipoSocial,
       organo_nombre: selectedBody?.name ?? "",
       organo_tipo: organoTipo,
       jurisdiction,
