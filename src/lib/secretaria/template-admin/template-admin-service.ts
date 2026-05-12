@@ -46,7 +46,13 @@ export type TransitionResult =
   | { ok: false; reason: "INVALID_TRANSITION"; from: string; to: string }
   | { ok: false; reason: "MISSING_APPROVAL_DATA" }
   | { ok: false; reason: "UPDATE_FAILED"; error: unknown }
-  | { ok: false; reason: "CHANGELOG_FAILED"; rolledBack: boolean };
+  | {
+      ok: false;
+      reason: "CHANGELOG_FAILED";
+      rolledBack: boolean;
+      error?: unknown;
+      rollbackError?: unknown;
+    };
 
 export const TRANSITION_MATRIX: Record<EstadoPlantilla, EstadoPlantilla[]> = {
   BORRADOR: ["REVISADA", "ARCHIVADA"],
@@ -138,19 +144,39 @@ export async function transitionTemplateState(
       autor: input.actor,
     });
     return { ok: true, plantillaId: input.plantillaId, from, to: input.to, changelogId };
-  } catch {
+  } catch (err) {
     // Rollback: revertir estado a "from" para no dejar la plantilla en un
     // estado avanzado sin registro en changelog (auditabilidad).
-    await supabase
-      .from("plantillas_protegidas")
-      .update({
-        estado: from,
-        aprobada_por: current.aprobada_por,
-        fecha_aprobacion: current.fecha_aprobacion,
-      })
-      .eq("id", input.plantillaId)
-      .eq("tenant_id", ctx.tenantId);
-    return { ok: false, reason: "CHANGELOG_FAILED", rolledBack: true };
+    try {
+      const { error: rollbackError } = await supabase
+        .from("plantillas_protegidas")
+        .update({
+          estado: from,
+          aprobada_por: current.aprobada_por,
+          fecha_aprobacion: current.fecha_aprobacion,
+        })
+        .eq("id", input.plantillaId)
+        .eq("tenant_id", ctx.tenantId);
+
+      if (rollbackError) {
+        return {
+          ok: false,
+          reason: "CHANGELOG_FAILED",
+          rolledBack: false,
+          error: err,
+          rollbackError,
+        };
+      }
+      return { ok: false, reason: "CHANGELOG_FAILED", rolledBack: true, error: err };
+    } catch (rollbackError) {
+      return {
+        ok: false,
+        reason: "CHANGELOG_FAILED",
+        rolledBack: false,
+        error: err,
+        rollbackError,
+      };
+    }
   }
 }
 

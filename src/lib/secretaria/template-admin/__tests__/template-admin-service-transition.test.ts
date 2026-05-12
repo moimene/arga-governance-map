@@ -32,6 +32,15 @@ vi.mock("@/integrations/supabase/client", () => {
     };
   }
 
+  function changelogLookupChain() {
+    const chain = {
+      eq: vi.fn(() => chain),
+      ilike: vi.fn(() => chain),
+      limit: vi.fn(async () => ({ data: [], error: null })),
+    };
+    return chain;
+  }
+
   return {
     supabase: {
       from: vi.fn((table: string) => {
@@ -43,13 +52,7 @@ vi.mock("@/integrations/supabase/client", () => {
         }
         if (table === "plantilla_changelog") {
           return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                ilike: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-                })),
-              })),
-            })),
+            select: vi.fn(() => changelogLookupChain()),
             insert: vi.fn(() => changelogInsertChain()),
           };
         }

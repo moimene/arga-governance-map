@@ -9,15 +9,13 @@
  *  2. Subir JSON — file input. Al parsear con `JSON.parse` y `parseImport`
  *     se muestran los errores línea/columna del ZodError. Si OK avanza al
  *     paso 3.
- *  3. Preflight — botón "Ejecutar preflight" invoca el hook
- *     `useImportPlantillaPackage.mutateAsync`. Si hay BLOCKING se muestran
- *     issues sin escribir.
- *     Si hay WARNING se avanza al paso 4 para reconocerlas. Si todo OK
- *     se navega al catálogo con toast de éxito.
+ *  3. Preflight — botón "Ejecutar preflight" invoca `useTemplatePreflight`.
+ *     Si hay BLOCKING se muestran issues sin escribir. Si hay WARNING se
+ *     avanza al paso 4 para reconocerlas. Si todo OK se avanza al paso 5.
  *  4. Reconocer warnings (solo si `summary.warning > 0 && blocking === 0`):
- *     textarea ≥20 chars. Al pulsar Continuar se re-ejecuta la mutation
- *     pasando `ackMotivo` que termina en el changelog como evidencia.
- *  5. (Implícito) Crear borrador — efecto secundario de la mutation final.
+ *     textarea ≥20 chars. Al pulsar Continuar se avanza al paso 5.
+ *  5. Crear borrador — invoca `useImportPlantillaPackage` como commit
+ *     explícito. Re-ejecuta preflight defensivo y escribe changelog.
  *
  * Tokens Garrigues estrictos; sin emojis; ARIA-labels en botones icon-only.
  */
@@ -27,6 +25,7 @@ import { Upload, AlertTriangle, CheckCircle2, Loader2, Download } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useImportPlantillaPackage } from "@/hooks/secretaria/useImportPlantillaPackage";
+import { useTemplatePreflight } from "@/hooks/secretaria/useTemplatePreflight";
 import { parseImport } from "@/lib/secretaria/template-admin/template-importer";
 import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
 
@@ -48,6 +47,7 @@ export function TemplateImportWizard() {
   const [gatePre, setGatePre] = useState<GatePreResult | null>(null);
   const [ack, setAck] = useState("");
   const navigate = useNavigate();
+  const preflightMut = useTemplatePreflight();
   const importMut = useImportPlantillaPackage();
 
   function onFile(file: File) {
@@ -71,8 +71,8 @@ export function TemplateImportWizard() {
           );
         } else {
           setParseError(null);
+          setStep(3);
         }
-        setStep(3);
       } catch (e) {
         setParseError(e instanceof Error ? e.message : "JSON inválido");
       }
@@ -80,23 +80,19 @@ export function TemplateImportWizard() {
     reader.readAsText(file);
   }
 
-  async function runPreflight(withAck?: string) {
+  async function runPreflight() {
     setGatePre(null);
-    const result = await importMut.mutateAsync({
-      json,
-      ackMotivo: withAck && withAck.length >= 20 ? withAck : undefined,
-    });
+    const result = await preflightMut.mutateAsync({ json });
     // Narrowing manual del discriminated union (strictNullChecks=false):
     // TS no estrecha de forma fiable, así que tipeamos cada rama.
     if (result.ok) {
-      const ok = result as { ok: true; plantillaId: string; gatePre: GatePreResult };
+      const ok = result as { ok: true; gatePre: GatePreResult };
       setGatePre(ok.gatePre);
-      if (ok.gatePre.summary.warning > 0 && !withAck) {
+      if (ok.gatePre.summary.warning > 0) {
         setStep(4);
         return;
       }
-      toast.success("Borrador creado correctamente");
-      navigate(`/secretaria/gestor-plantillas?tab=catalogo`);
+      setStep(5);
       return;
     }
     const fail = result as
@@ -109,6 +105,40 @@ export function TemplateImportWizard() {
       toast.error("Error de schema: revisa el JSON");
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
       setGatePre(fail.gatePre);
+      toast.error("Gate PRE bloqueante: corrige los issues antes de continuar");
+    } else if (fail.reason === "WARNINGS_NEED_ACK") {
+      setGatePre(fail.gatePre);
+      setStep(4);
+    } else if (fail.reason === "INSERT_FAILED") {
+      toast.error("Error al insertar el borrador");
+    }
+  }
+
+  async function createDraft() {
+    const result = await importMut.mutateAsync({
+      json,
+      ackMotivo: ack.length >= 20 ? ack : undefined,
+    });
+    if (result.ok) {
+      const ok = result as { ok: true; plantillaId: string; gatePre: GatePreResult };
+      setGatePre(ok.gatePre);
+      toast.success("Borrador creado correctamente");
+      navigate(`/secretaria/gestor-plantillas?tab=catalogo`);
+      return;
+    }
+
+    const fail = result as
+      | { ok: false; reason: "PARSE_FAILED"; details: unknown }
+      | { ok: false; reason: "GATE_PRE_BLOCKING"; gatePre: GatePreResult }
+      | { ok: false; reason: "WARNINGS_NEED_ACK"; gatePre: GatePreResult }
+      | { ok: false; reason: "INSERT_FAILED"; details: unknown };
+    if (fail.reason === "PARSE_FAILED") {
+      setParseError(JSON.stringify(fail.details, null, 2));
+      setStep(2);
+      toast.error("Error de schema: revisa el JSON");
+    } else if (fail.reason === "GATE_PRE_BLOCKING") {
+      setGatePre(fail.gatePre);
+      setStep(3);
       toast.error("Gate PRE bloqueante: corrige los issues antes de continuar");
     } else if (fail.reason === "WARNINGS_NEED_ACK") {
       setGatePre(fail.gatePre);
@@ -232,11 +262,11 @@ export function TemplateImportWizard() {
           <button
             type="button"
             onClick={() => runPreflight()}
-            disabled={importMut.isPending || !!parseError || !json}
+            disabled={preflightMut.isPending || !!parseError || !json}
             className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {importMut.isPending ? (
+            {preflightMut.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
@@ -318,15 +348,12 @@ export function TemplateImportWizard() {
           <div className="mt-4 flex gap-3">
             <button
               type="button"
-              onClick={() => runPreflight(ack)}
-              disabled={ack.length < 20 || importMut.isPending}
+              onClick={() => setStep(5)}
+              disabled={ack.length < 20}
               className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              {importMut.isPending && (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              )}
-              Continuar y crear borrador
+              Continuar
             </button>
             <button
               type="button"
@@ -335,6 +362,49 @@ export function TemplateImportWizard() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Volver al preflight
+            </button>
+          </div>
+        </section>
+      )}
+
+      {step === 5 && (
+        <section
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <h2 className="mb-3 text-lg font-semibold text-[var(--g-text-primary)]">
+            5. Crear borrador
+          </h2>
+          <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
+            El preflight no tiene bloqueantes. Al crear el borrador se
+            re-ejecuta Gate PRE y se registra la importación en auditoría.
+          </p>
+          {gatePre && (
+            <p className="mb-4 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+              {gatePre.summary.blocking} bloqueantes · {gatePre.summary.warning}{" "}
+              warnings · {gatePre.summary.info} info
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={createDraft}
+              disabled={importMut.isPending || !json}
+              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {importMut.isPending && (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              Crear borrador
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(gatePre?.summary.warning ? 4 : 3)}
+              className="px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Volver
             </button>
           </div>
         </section>

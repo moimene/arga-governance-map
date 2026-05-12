@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { ORGANO_CANONICO, ORGANO_ALIAS, normalizeOrganoTipo, isOrganoCanonico } from "../organo-canonico";
 
 describe("organo-canonico", () => {
-  it("acepta los 10 valores canónicos", () => {
+  it("acepta los 11 valores canónicos, incluyendo deprecado", () => {
     const canonicos = [
-      "JUNTA_GENERAL", "CONSEJO_ADMIN", "ORGANO_ADMIN",
+      "JUNTA_GENERAL", "JUNTA_GENERAL_O_CONSEJO", "CONSEJO_ADMIN", "ORGANO_ADMIN",
       "SOCIO_UNICO", "ADMIN_UNICO",
       "ADMIN_CONJUNTA_O_COAPROBADORES", "ADMIN_SOLIDARIOS",
       "COMISION_DELEGADA", "SOPORTE_INTERNO", "DERIVADO_DEL_ACTO",
@@ -52,7 +52,7 @@ describe("organo-canonico", () => {
     );
   });
 
-  it("ORGANO_CANONICO tiene 10 entradas", () => {
-    expect(ORGANO_CANONICO.length).toBe(10);
+  it("ORGANO_CANONICO tiene 11 entradas", () => {
+    expect(ORGANO_CANONICO.length).toBe(11);
   });
 });

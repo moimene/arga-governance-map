@@ -5,6 +5,9 @@
 
 export const ORGANO_CANONICO = [
   "JUNTA_GENERAL",
+  // Valor deprecado: compatibilidad temporal para ACTA_ACUERDO_ESCRITO /
+  // ACUERDO_SIN_SESION hasta desdoblar la plantilla en variantes por órgano.
+  "JUNTA_GENERAL_O_CONSEJO",
   "CONSEJO_ADMIN",
   "ORGANO_ADMIN",
   "SOCIO_UNICO",

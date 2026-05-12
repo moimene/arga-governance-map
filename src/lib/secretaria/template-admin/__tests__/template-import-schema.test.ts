@@ -56,6 +56,28 @@ describe("TemplateImportSchema", () => {
     expect(r.success).toBe(false);
   });
 
+  it("rechaza metadata de fila dentro de template (strict inner)", () => {
+    const r = TemplateImportSchema.safeParse({
+      ...validPayload,
+      template: {
+        ...validPayload.template,
+        aprobada_por: "Comité Legal Garrigues",
+      },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("acepta organo_tipo deprecado JUNTA_GENERAL_O_CONSEJO", () => {
+    const r = TemplateImportSchema.safeParse({
+      ...validPayload,
+      template: {
+        ...validPayload.template,
+        organo_tipo: "JUNTA_GENERAL_O_CONSEJO",
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
   it("rechaza variable con espacios o barras (notación documental)", () => {
     // Calibración D15: el pattern original pedía multi-segment estrictamente,
     // pero Cloud usa también single-segment (`nombre_entidad`) en plantillas

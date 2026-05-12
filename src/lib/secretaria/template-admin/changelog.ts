@@ -59,14 +59,24 @@ export async function appendChangelog(entry: ChangelogEntry): Promise<{ id: stri
   const idempotencyKey = computeIdempotencyKey(entry.plantillaId, entry.toVersion);
   const motivoConHash = `${entry.motivo} [${idempotencyKey}]`;
 
-  // Verificar si ya existe entrada idempotente
-  const { data: existing } = await supabase
+  // Verificar si ya existe entrada idempotente. El token se busca con
+  // corchetes completos para evitar colisiones por substring.
+  const { data: existing, error: lookupError } = await supabase
     .from("plantilla_changelog")
     .select("id")
+    .eq("tenant_id", entry.tenantId)
     .eq("plantilla_id", entry.plantillaId)
-    .ilike("motivo", `%${idempotencyKey}%`)
-    .maybeSingle();
-  if (existing) return { id: existing.id as string };
+    .ilike("motivo", `%[${idempotencyKey}]%`)
+    .limit(1);
+  if (lookupError) {
+    throw new TemplateAdminError(
+      "CHANGELOG_LOOKUP_FAILED",
+      "Failed to check changelog idempotency",
+      lookupError,
+    );
+  }
+  const existingRow = existing?.[0];
+  if (existingRow) return { id: existingRow.id as string };
 
   const { data, error } = await supabase
     .from("plantilla_changelog")
