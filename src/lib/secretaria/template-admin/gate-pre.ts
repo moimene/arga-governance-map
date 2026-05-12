@@ -14,7 +14,10 @@ const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[
 // versión estricta (Art./Arts. ... LSC) bloqueaba plantillas existentes que
 // usan formatos como "LSC (cuentas anuales)" o "Arts. 295 LSC". La regla
 // se calibra para aceptar referencias bien formadas y rechazar "n/a", "".
-const REF_LEGAL_PATTERN = /\b(LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|CNMV|CC)\b/;
+// Calibración Sprint 1 / Commit 7 (D6): se añade LGSM (Ley General de
+// Sociedades Mercantiles, México) para soportar batches FIRMA_LEGAL_BATCH
+// multi-jurisdicción importados por `import-templates-batch.ts`.
+const REF_LEGAL_PATTERN = /\b(LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|CNMV|CC|LGSM)\b/;
 const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
 const HELPER_ALLOWLIST = new Set(["if", "else", "each", "unless", "with"]);
 const PROTECTED_PREFIXES = ["ENTIDAD.", "ORGANO.", "REUNION.", "EXPEDIENTE.", "SISTEMA.", "QTSP."];
