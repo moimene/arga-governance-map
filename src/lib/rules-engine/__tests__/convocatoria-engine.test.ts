@@ -577,10 +577,31 @@ describe('evaluarConvocatoria', () => {
       expect(result.antelacionDiasRequerida).toBe(15);
     });
 
-    it('CdA: 5 días (default reglamento, NO 30) — fuente ESTATUTOS', () => {
+    it('CdA: 5 días (default reglamento, NO 30) — fuente REGLAMENTO', () => {
       const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [], []);
       expect(result.antelacionDiasRequerida).toBe(5);
-      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('ESTATUTOS');
+      // Jerarquía: LEY → ESTATUTOS → REGLAMENTO. El plazo de CdA NO es
+      // estatutos (art. 285-290 LSC), sino reglamento del consejo
+      // (art. 246.2 LSC habla de "convocatoria razonable").
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
+    });
+
+    it('CONSEJO_ADMINISTRACION: fuente REGLAMENTO (matching liberal)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
+    });
+
+    it('Comisión delegada: fuente REGLAMENTO', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA' },
+        [],
+        [],
+      );
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('REGLAMENTO');
     });
 
     it('CONSEJO_ADMINISTRACION: 5 días (matching liberal por substring)', () => {

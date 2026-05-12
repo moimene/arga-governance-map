@@ -127,12 +127,17 @@ export function evaluarConvocatoria(
   explainNodes.push(
     createExplainNode(
       'Antelación requerida',
-      isJunta ? 'LEY' : 'ESTATUTOS',
+      // Jerarquía documentada: LEY → ESTATUTOS → REGLAMENTO → ACUERDO.
+      // Para juntas el plazo viene de LSC art. 176. Para CdA / comisiones el
+      // plazo lo fija el reglamento del órgano (art. 246.2 LSC habla de
+      // "convocatoria razonable" — el detalle está en el reglamento del
+      // consejo, no en estatutos). La enum `Fuente` (types.ts) ya distingue.
+      isJunta ? 'LEY' : 'REGLAMENTO',
       isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
       'OK',
       isJunta
         ? `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial} (junta)`
-        : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default estatutario; override por rule_pack del órgano)`,
+        : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default reglamento del órgano; override por rule_pack)`,
       antelacionDiasRequerida
     )
   );
