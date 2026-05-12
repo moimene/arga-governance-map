@@ -1,14 +1,15 @@
 /**
  * Phase B5 — UI driving destructive del ConvocatoriasStepper.
  *
- * Drives los 7 pasos del stepper end-to-end con sociedad sintética CdA SA:
+ * Drives los 8 pasos del stepper end-to-end con sociedad sintética CdA SA:
  *   1. Sociedad y órgano (select entity + body + tipo ORDINARIA)
  *   2. Fecha y plazo legal (date + lugar)
  *   3. Orden del día (1 punto APROBACION_CUENTAS)
  *   4. Destinatarios (default — body members cargan automáticamente)
  *   5. Canales de publicación (default recomendados WEB_CORPORATIVA + ERDS)
  *   6. Adjuntos (skip)
- *   7. Revisión y emisión → click "Emitir convocatoria"
+ *   7. Borrador documento (skip — fixture sintética no carga plantillas)
+ *   8. Revisión y emisión → click "Emitir convocatoria"
  *
  * Verificación Cloud: convocatorias row con estado='EMITIDA',
  *   body_id correcto, tipo_convocatoria='ORDINARIA', agenda_items array
@@ -482,9 +483,20 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await expect(next6).toBeEnabled({ timeout: 10_000 });
     await next6.click();
 
-    // ── PASO 7: Revisión y emisión ─────────────────────────────────
+    // ── PASO 7: Borrador documento (skip) ──────────────────────────
+    // En la fixture sintética el tenant no tiene plantillas CONVOCATORIA
+    // protegidas; el Paso 7 renderiza el aviso "Sin plantilla disponible"
+    // pero `canAdvance` default true permite continuar sin texto.
     await expect(
-      page.getByRole('heading', { name: /Paso 7\. Revisión y emisión/i }),
+      page.getByRole('heading', { name: /Paso 7\. Borrador documento/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    const next7 = page.getByRole('button', { name: /^Siguiente$/i });
+    await expect(next7).toBeEnabled({ timeout: 10_000 });
+    await next7.click();
+
+    // ── PASO 8: Revisión y emisión ─────────────────────────────────
+    await expect(
+      page.getByRole('heading', { name: /Paso 8\. Revisión y emisión/i }),
     ).toBeVisible({ timeout: 10_000 });
     // El botón principal cambia de "Siguiente" a "Emitir convocatoria"
     const emitirBtn = page.getByRole('button', { name: /Emitir convocatoria/i });
@@ -493,7 +505,8 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await emitirBtn.click();
 
     // Tras éxito el stepper renderiza un success screen in-page (NO hay redirect).
-    // Esperamos al toast "Convocatoria emitida correctamente" o al banner verde.
+    // Sin adjuntos el toast es "Convocatoria emitida correctamente"; con
+    // adjuntos el copy cambia (no aplica aquí porque skip Paso 6).
     await expect(
       page.getByText(/Convocatoria emitida correctamente/i).first(),
     ).toBeVisible({ timeout: 30_000 });
