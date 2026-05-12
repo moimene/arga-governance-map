@@ -105,9 +105,15 @@ export function evaluarConvocatoria(
 
   // ================================================================
   // Rule 1: Antelación (advance notice)
+  //
+  // Dispatch por organoTipo: las juntas (JGA/JGE) aplican LSC art. 176;
+  // los consejos / comisiones aplican estatutos o reglamento ("razonable" —
+  // LSC art. 246.2 para CdA). Sin este dispatch, un CdA recibía la
+  // antelación de junta (30 días para SA) — bug operativo.
   // ================================================================
   const antelacionDiasRequerida = calcularAntelacion(
     input.tipoSocial,
+    input.organoTipo,
     packs,
     overrides
   );
@@ -116,13 +122,17 @@ export function evaluarConvocatoria(
     antelacionDiasRequerida
   );
 
+  const organoTipoUpper = (input.organoTipo ?? 'JGA').toUpperCase();
+  const isJunta = organoTipoUpper === 'JGA' || organoTipoUpper === 'JGE' || organoTipoUpper.includes('JUNTA');
   explainNodes.push(
     createExplainNode(
       'Antelación requerida',
-      'LEY',
-      'art. 176 LSC',
+      isJunta ? 'LEY' : 'ESTATUTOS',
+      isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
       'OK',
-      `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial}`,
+      isJunta
+        ? `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial} (junta)`
+        : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default estatutario; override por rule_pack del órgano)`,
       antelacionDiasRequerida
     )
   );
@@ -251,20 +261,40 @@ export function evaluarConvocatoria(
 /**
  * calcularAntelacion — resolve effective advance notice requirement
  *
- * Defaults: SA=30d, SL=15d
- * Apply overrides from jerarquia_normativa
+ * Despachado por organoTipo:
+ * - JGA/JGE (juntas): LSC art. 176 → SA=30, SL=15 (override via rule_pack)
+ * - CDA: LSC art. 246.2 "razonable" → default 5d (override via rule_pack)
+ * - COMISION / COMISION_DELEGADA / COMITE: estatutos / reglamento → default 3d
+ *
+ * Apply overrides from jerarquia_normativa.
  */
 function calcularAntelacion(
   tipoSocial: TipoSocial,
+  organoTipo: string | undefined,
   packs: RulePack[],
   overrides: RuleParamOverride[]
 ): number {
+  // Defaults por órgano cuando no hay pack aplicable.
+  const organoUpper = (organoTipo ?? 'JGA').toUpperCase();
+  const isJunta = organoUpper === 'JGA' || organoUpper === 'JGE' || organoUpper.includes('JUNTA');
+  const isConsejo = !isJunta && (organoUpper === 'CDA' || organoUpper.includes('CONSEJO'));
+  const isComision = !isJunta && !isConsejo &&
+    (organoUpper.includes('COMISION') || organoUpper.includes('COMITE'));
+
+  const defaultForOrgano = (): number => {
+    if (isJunta) return tipoSocial === 'SA' ? 30 : 15;
+    if (isConsejo) return 5;
+    if (isComision) return 3;
+    return 5;
+  };
+
   // Collect all rules from applicable packs
-  const antelacionFromPacks = packs.map((pack) => pack.convocatoria.antelacionDias[tipoSocial]);
+  const antelacionFromPacks = packs
+    .map((pack) => pack.convocatoria.antelacionDias[tipoSocial])
+    .filter((entry) => entry !== undefined && entry !== null);
 
   if (antelacionFromPacks.length === 0) {
-    // Fallback defaults
-    return tipoSocial === 'SA' ? 30 : 15;
+    return defaultForOrgano();
   }
 
   // Take the most restrictive (highest) value across all packs
@@ -284,7 +314,8 @@ function calcularAntelacion(
   // Apply overrides using jerarquia_normativa
   const resolved = resolverReglaEfectiva(maxAntelacion, overrides, 'mayor');
 
-  return typeof resolved.valor === 'number' ? resolved.valor : 30;
+  if (typeof resolved.valor === 'number') return resolved.valor;
+  return defaultForOrgano();
 }
 
 /**

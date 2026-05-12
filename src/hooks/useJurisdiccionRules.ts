@@ -196,12 +196,17 @@ export function checkNoticePeriod(
  * @deprecated T20 — usar evaluarConvocatoria() del Motor V2.
  * Mantenida como wrapper compatible; internamente delega al motor V2
  * cuando los packs están disponibles. Fallback V1 para retrocompatibilidad.
+ *
+ * Despacha por `organoTipo` para no aplicar plazos de Junta General a un
+ * Consejo de Administración (LSC art. 176 es para JGA/JGE; art. 246.2 deja
+ * el plazo de CdA a "razonable" — defaults estatutarios típicos: 5 días).
  */
 export function checkNoticePeriodByType(params: {
   meetingDate: string;       // ISO date
   jurisdiction: string;      // 'ES' | 'BR' | 'MX' | 'PT'
   convocationType: string;   // 'ORDINARIA' | 'EXTRAORDINARIA' | 'UNIVERSAL'
   tipoSocial?: string;       // 'SA' | 'SL' | 'SLU' | 'SAU'
+  organoTipo?: string;       // 'JGA' | 'JGE' | 'CDA' | 'COMISION' | 'COMITE'
 }): boolean {
   // SLU/SAU: no convocatoria requerida (art. 173.3 LSC — solo comunicar al RM)
   if (params.tipoSocial === 'SLU' || params.tipoSocial === 'SAU') return true;
@@ -210,6 +215,25 @@ export function checkNoticePeriodByType(params: {
   const meeting = new Date(params.meetingDate);
   const diffDays = Math.floor((meeting.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
+  // Plazos por órgano (defaults estatutarios típicos ARGA / reglamento CdA).
+  // Las juntas usan LSC art. 176; CdA y comisiones usan los estatutos
+  // ("convocatoria razonable" — LSC art. 246.2). Si los estatutos del
+  // tenant exigen otro plazo, el rule_pack del órgano hace override desde
+  // el motor V2 (calcularAntelacion).
+  const organoTipo = (params.organoTipo ?? "JGA").toUpperCase();
+  const isJunta = organoTipo === "JGA" || organoTipo === "JGE" || organoTipo.includes("JUNTA");
+  const isConsejo = !isJunta && (organoTipo === "CDA" || organoTipo.includes("CONSEJO"));
+  const isComision = !isJunta && !isConsejo &&
+    (organoTipo.includes("COMISION") || organoTipo.includes("COMITE"));
+
+  if (!isJunta) {
+    let requiredOrgano = 5;
+    if (isConsejo) requiredOrgano = 5;
+    else if (isComision) requiredOrgano = 3;
+    return diffDays >= requiredOrgano;
+  }
+
+  // Para juntas, los plazos por jurisdicción + tipo de convocatoria.
   const minDays: Record<string, Record<string, number>> = {
     ES: { ORDINARIA: 30, EXTRAORDINARIA: 30 }, // LSC art. 176.1 — SA: 1 mes mínimo
     BR: { ORDINARIA: 8,  EXTRAORDINARIA: 3 },

@@ -545,4 +545,80 @@ describe('evaluarConvocatoria', () => {
     // Should have 3 unique docs (001, 002, 003)
     expect(new Set(ids).size).toBe(3);
   });
+
+  // ================================================================
+  // Test 16+: Dispatch por organoTipo (bug operativo: CdA recibía 30d)
+  // ================================================================
+  describe('antelación dispatch por organoTipo (sin packs aplicables)', () => {
+    const baseInput: ConvocatoriaInput = {
+      tipoSocial: 'SA',
+      organoTipo: 'JUNTA_GENERAL',
+      adoptionMode: 'MEETING',
+      fechaJunta: '2026-12-31',
+      esCotizada: false,
+      webInscrita: false,
+      primeraConvocatoria: true,
+      esJuntaUniversal: false,
+      materias: [],
+    };
+
+    it('Junta General SA: 30 días (LSC art. 176.1) — fuente LEY', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'JGA' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(30);
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('LEY');
+    });
+
+    it('Junta General SL: 15 días (LSC art. 176.2)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, tipoSocial: 'SL', organoTipo: 'JUNTA_GENERAL' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(15);
+    });
+
+    it('CdA: 5 días (default reglamento, NO 30) — fuente ESTATUTOS', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(5);
+      expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('ESTATUTOS');
+    });
+
+    it('CONSEJO_ADMINISTRACION: 5 días (matching liberal por substring)', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(5);
+    });
+
+    it('Comisión delegada: 3 días', () => {
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'COMISION_DELEGADA' },
+        [],
+        [],
+      );
+      expect(result.antelacionDiasRequerida).toBe(3);
+    });
+
+    it('Comité: 3 días', () => {
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'COMITE' }, [], []);
+      expect(result.antelacionDiasRequerida).toBe(3);
+    });
+
+    it('Pack del órgano con override aplicado: gana sobre default', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          antelacionDias: {
+            SA: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+            SL: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+          },
+        },
+      });
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [pack], []);
+      // Override del pack (8) gana sobre default de CdA (5).
+      expect(result.antelacionDiasRequerida).toBe(8);
+    });
+  });
 });
