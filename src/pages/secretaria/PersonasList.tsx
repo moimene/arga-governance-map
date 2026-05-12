@@ -1,6 +1,6 @@
 import { Building2, Users, Search, Plus, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { usePersonasEnriquecidas, type PersonType } from "@/hooks/usePersonasCanonical";
 import { useSociedades } from "@/hooks/useSociedades";
@@ -14,6 +14,8 @@ const PERSON_TYPE_CHIP: Record<PersonType, string> = {
   PF: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   PJ: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
 };
+
+const PAGE_SIZE = 25;
 
 function personTypeLabel(type: PersonType | null): string {
   if (type === "PF") return "Persona física";
@@ -32,6 +34,7 @@ export default function PersonasList() {
   const [search, setSearch] = useState("");
   const [tipoCondicion, setTipoCondicion] = useState<TipoCondicion | "">("");
   const [entityId, setEntityId] = useState<string>("");
+  const [page, setPage] = useState(1);
 
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
@@ -48,6 +51,13 @@ export default function PersonasList() {
 
   const hasAnyFilter = !!search || !!personType || !!tipoCondicion || (!isSociedadMode && !!entityId);
   const resultCount = data?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(resultCount / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = (data ?? []).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, personType, tipoCondicion, scopedEntityId]);
   const sociedadMetrics = useMemo(() => {
     if (!isSociedadMode || !scopedEntityId || !data) return null;
 
@@ -283,7 +293,7 @@ export default function PersonasList() {
                 : "No hay personas registradas."}
           </div>
         ) : (
-          data.map((p) => {
+          pageRows.map((p) => {
             const cargosVisibles =
               isSociedadMode && scopedEntityId
                 ? p.cargos_vigentes.filter((c) => c.entity_id === scopedEntityId)
@@ -448,7 +458,7 @@ export default function PersonasList() {
                 </td>
               </tr>
             ) : (
-              data.map((p) => {
+              pageRows.map((p) => {
                 const cargosVisibles =
                   isSociedadMode && scopedEntityId
                     ? p.cargos_vigentes.filter((c) => c.entity_id === scopedEntityId)
@@ -557,9 +567,38 @@ export default function PersonasList() {
       </div>
 
       {data && data.length > 0 && (
-        <div className="mt-3 text-xs text-[var(--g-text-secondary)]">
-          {data.length} persona{data.length === 1 ? "" : "s"}
-          {isSociedadMode ? " vinculadas a la sociedad" : hasAnyFilter ? " con los filtros aplicados" : ""}
+        <div className="mt-3 flex flex-col gap-2 text-xs text-[var(--g-text-secondary)] sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Mostrando {(currentPage - 1) * PAGE_SIZE + 1}-
+            {Math.min(currentPage * PAGE_SIZE, data.length)} de {data.length} persona
+            {data.length === 1 ? "" : "s"}
+            {isSociedadMode ? " vinculadas a la sociedad" : hasAnyFilter ? " con los filtros aplicados" : ""}
+          </span>
+          {totalPages > 1 ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:pointer-events-none disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Anterior
+              </button>
+              <span>
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:pointer-events-none disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Siguiente
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

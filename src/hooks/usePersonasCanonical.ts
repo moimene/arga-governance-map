@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { isProductionPerson } from "@/lib/secretaria/persona-filters";
@@ -55,6 +55,7 @@ export interface PersonaEnriquecida extends PersonaRow {
 export function usePersonasCanonical(filter?: {
   person_type?: PersonType;
   search?: string;
+  limit?: number;
   /**
    * Si `true` (default), filtra fixtures E2E, personas archivadas y
    * placeholders PENDIENTE-* del resultado vía `isProductionPerson`.
@@ -72,6 +73,7 @@ export function usePersonasCanonical(filter?: {
       "list",
       filter?.person_type ?? "all",
       filter?.search ?? "",
+      filter?.limit ?? 2000,
       exclude,
     ],
     enabled: !!tenantId,
@@ -82,11 +84,9 @@ export function usePersonasCanonical(filter?: {
         const s = filter.search.trim();
         q = q.or(`full_name.ilike.%${s}%,tax_id.ilike.%${s}%,denomination.ilike.%${s}%,email.ilike.%${s}%`);
       }
-      // P2 Codex iter-6: cap subido a 2000 (mirror del fix iter-5 sobre usePersonasEnriquecidas).
-      // Necesario para selectores que dependen del list completo (RepresentanteAdminPJStepper
-      // selector PF para LSC 212 bis). Tenants futuros >2000 personas requieren searchable
-      // selector — Plan A' diferido.
-      const { data, error } = await q.order("full_name", { ascending: true }).limit(2000);
+      const { data, error } = await q
+        .order("full_name", { ascending: true })
+        .limit(filter?.limit ?? 2000);
       if (error) throw error;
       const rows = (data ?? []) as PersonaRow[];
       return exclude ? rows.filter(isProductionPerson) : rows;
@@ -305,15 +305,67 @@ export function usePersonaCanonical(id: string | undefined) {
     queryFn: async (): Promise<PersonaDetailRow | null> => {
       const { data, error } = await supabase
         .from("persons")
-        .select(`
-          *,
-          representative:representative_person_id(id, full_name, tax_id)
-        `)
+        .select("*")
         .eq("tenant_id", tenantId!)
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
       return (data as PersonaDetailRow) ?? null;
+    },
+  });
+}
+
+export interface UpdatePersonaInput {
+  id: string;
+  full_name: string;
+  tax_id?: string | null;
+  email?: string | null;
+  denomination?: string | null;
+}
+
+export function useUpdatePersona() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdatePersonaInput): Promise<PersonaRow> => {
+      if (!tenantId) throw new Error("Tenant no inicializado");
+      if (!input.id) throw new Error("Persona no informada");
+      const fullName = input.full_name.trim();
+      if (!fullName) throw new Error("El nombre es obligatorio");
+
+      const { error } = await supabase.rpc("fn_update_persona", {
+        p_tenant_id: tenantId,
+        p_person_id: input.id,
+        p_full_name: fullName,
+        p_tax_id: input.tax_id?.trim() || null,
+        p_email: input.email?.trim() || null,
+        p_denomination: input.denomination?.trim() || null,
+        p_idempotency_key: [
+          "update-persona",
+          tenantId,
+          input.id,
+          fullName,
+          input.tax_id?.trim() ?? "",
+          input.email?.trim() ?? "",
+          input.denomination?.trim() ?? "",
+        ].join(":"),
+      });
+      if (error) throw error;
+
+      const { data, error: fetchError } = await supabase
+        .from("persons")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("id", input.id)
+        .single();
+      if (fetchError) throw fetchError;
+      return data as PersonaRow;
+    },
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId] });
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId, "byId", input.id] });
+      qc.invalidateQueries({ queryKey: ["cargos", tenantId, "byPerson", input.id] });
     },
   });
 }

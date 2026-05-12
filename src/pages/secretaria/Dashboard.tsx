@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useAutoScanVacanciasPresidencia } from "@/hooks/useNotifications";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -707,6 +708,7 @@ function QuickAction({
 
 export default function SecretariaDashboard() {
   const navigate = useNavigate();
+  useAutoScanVacanciasPresidencia();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis(scopedEntityId);

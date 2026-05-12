@@ -4,7 +4,7 @@ import { Gavel, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSociedad, useSociedades } from "@/hooks/useSociedades";
-import { usePersonasCanonical, usePersonaCanonical } from "@/hooks/usePersonasCanonical";
+import { usePersonasCanonical, usePersonaCanonical, type PersonaRow } from "@/hooks/usePersonasCanonical";
 import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 import {
   CARGO_LABELS,
@@ -13,7 +13,6 @@ import {
 } from "@/hooks/useCargos";
 import { useTenantContext } from "@/context/TenantContext";
 import { useAsignarCargo } from "@/hooks/useCondicionesPersonaMutations";
-import { useUpsertRepresentanteAdminPJ } from "@/hooks/useRepresentantesAdminPJ";
 import {
   requiresBodyId,
   requiresRepresentative,
@@ -81,7 +80,20 @@ export default function DesignarAdminStepper() {
   const [entityId, setEntityId] = useState<string>(entityIdFromUrl);
   const { data: sociedad } = useSociedad(entityId || undefined);
   const { data: sociedades } = useSociedades();
-  const { data: personas } = usePersonasCanonical({});
+  const [personaSearch, setPersonaSearch] = useState("");
+  const { data: personas } = usePersonasCanonical({
+    search: personaSearch,
+    excludeTestData: true,
+    limit: personaSearch.trim() ? 50 : 200,
+  });
+  const [representanteSearch, setRepresentanteSearch] = useState("");
+  const { data: personasPF } = usePersonasCanonical({
+    person_type: "PF",
+    search: representanteSearch,
+    excludeTestData: true,
+    limit: representanteSearch.trim() ? 50 : 200,
+  });
+  const [personaSeleccionadaSnapshot, setPersonaSeleccionadaSnapshot] = useState<PersonaRow | null>(null);
   // P2 Codex iter-6: fetch byId la persona preselected para no depender del cap del list query.
   // Cubre el caso en que la persona pasada por ?personId= está alfabéticamente fuera del cap.
   const { data: personaPreselected } = usePersonaCanonical(personIdFromUrl || undefined);
@@ -100,10 +112,6 @@ export default function DesignarAdminStepper() {
   });
 
   const asignarMutation = useAsignarCargo();
-  // P2 Codex iteration-2: dual persistence — tras INSERT cargo, también
-  // upsert a representaciones (fuente canónica leída por banner per-sociedad
-  // de PersonaDetalle via useRepresentantesAdminPJByPerson).
-  const upsertRepMutation = useUpsertRepresentanteAdminPJ();
 
   // STEPS dinámicos. Sin sociedad seleccionada por URL, insertamos "Sociedad".
   const STEPS = needsSociedadStep
@@ -141,11 +149,27 @@ export default function DesignarAdminStepper() {
   // Usa `requiresBodyId` como fuente de verdad (cargo-validation.ts).
   const esColegiado = requiresBodyId(draft.tipo_condicion as TipoCondicionCargo);
   const esAdminPJ = draft.tipo_condicion === "ADMIN_PJ";
+  useEffect(() => {
+    if (!draft.person_id) {
+      setPersonaSeleccionadaSnapshot(null);
+      return;
+    }
+    const current =
+      personaPreselected?.id === draft.person_id
+        ? personaPreselected
+        : (personas ?? []).find((p) => p.id === draft.person_id);
+    if (current) setPersonaSeleccionadaSnapshot(current);
+  }, [draft.person_id, personaPreselected, personas]);
+
   // P2 Codex iter-6: prioridad al preselected byId (siempre disponible aunque esté fuera del cap),
-  // fallback al list que el usuario puede haber cambiado interactivamente.
+  // luego snapshot de la selección activa, y finalmente el list visible.
+  // Esto evita perder el tipo PF/PJ si el usuario cambia la búsqueda y la
+  // fila seleccionada sale del resultado actual.
   const personaSeleccionada =
     personaPreselected && personaPreselected.id === draft.person_id
       ? personaPreselected
+      : personaSeleccionadaSnapshot?.id === draft.person_id
+        ? personaSeleccionadaSnapshot
       : (personas ?? []).find((p) => p.id === draft.person_id);
   const personaEsPJ = personaSeleccionada?.person_type === "PJ";
 
@@ -208,11 +232,28 @@ export default function DesignarAdminStepper() {
   async function guardar() {
     if (!entityId) return;
 
+    // Sprint 2 iter-9: defensive identity validation final. Si la ruta venía
+    // de una ficha `/personas/:id`, nunca permitimos que un dato preselected
+    // stale valide una persona distinta a la del draft/URL.
+    if (personIdFromUrl && draft.person_id !== personIdFromUrl) {
+      console.error("guardar() persona mismatch between URL and draft", {
+        personIdFromUrl,
+        draftPersonId: draft.person_id,
+      });
+      toast.error("La persona seleccionada no coincide con la ficha de origen. Recarga e intenta de nuevo.");
+      return;
+    }
+
     // P2 Codex iter-8: defensive validation final — verifica que si la persona
     // requiere representante (L2 art. 212bis), el draft lo tiene. Cubre el caso
     // edge de race condition donde el gate canNext se pasó con personaSeleccionada
     // aún en loading state.
-    const personaFinal = personaPreselected ?? personaSeleccionada;
+    const personaFinal =
+      personaPreselected?.id === draft.person_id
+        ? personaPreselected
+        : personaSeleccionada?.id === draft.person_id
+          ? personaSeleccionada
+          : null;
     if (personaFinal) {
       const needsRep = requiresRepresentative(
         { person_type: personaFinal.person_type },
@@ -250,33 +291,9 @@ export default function DesignarAdminStepper() {
           personRequiresRep && draft.representative_person_id ? draft.representative_person_id : null,
       });
 
-      // P2 Codex iteration-2: si hay representative_person_id, también upsert
-      // a representaciones (canonical source post-Fix #2 iter-1). Sin esto, el
-      // banner per-sociedad de PersonaDetalle (que lee de
-      // useRepresentantesAdminPJByPerson) alertaría falsamente "PJ sin rep".
-      //
-      // Try/catch: el cargo ya quedó creado en condiciones_persona. Si el
-      // upsert a representaciones falla, mostramos warning informativo pero
-      // no rompemos el flujo — el banner per-sociedad alertará al usuario
-      // para que complete la designación desde la ficha de persona. RPC
-      // atómica (fn_designar_representante) queda diferida a Plan A'.
-      if (personRequiresRep && draft.representative_person_id) {
-        try {
-          await upsertRepMutation.mutateAsync({
-            represented_person_id: draft.person_id,
-            representative_person_id: draft.representative_person_id,
-            entity_id: entityId,
-            effective_from: draft.fecha_inicio,
-            inscripcion_rm_referencia: draft.inscripcion_rm_referencia || null,
-            inscripcion_rm_fecha: draft.inscripcion_rm_fecha || null,
-          });
-        } catch (repErr) {
-          console.warn("Cargo creado pero upsert a representaciones falló:", repErr);
-          toast.warning(
-            `Cargo guardado, pero la representación canónica no se persistió. Completa la designación desde la ficha de persona (/secretaria/personas/${draft.person_id}).`,
-          );
-        }
-      }
+      // Sprint 2: fn_designar_cargo persiste la representación canónica en
+      // la misma transacción cuando representative_person_id está informado.
+      // No hacemos dual-write ni segundo upsert cliente.
 
       // L15-L17: el trigger fn_sync_authority_evidence solo actúa sobre los
       // cargos certificantes. Avisamos al usuario para que sepa si el cargo
@@ -383,11 +400,29 @@ export default function DesignarAdminStepper() {
           <div className="grid grid-cols-1 gap-4">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                Buscar persona
+              </span>
+              <input
+                value={personaSearch}
+                onChange={(e) => setPersonaSearch(e.target.value)}
+                placeholder="Nombre, NIF/CIF o email"
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
                 Persona designada *
               </span>
               <select
                 value={draft.person_id}
-                onChange={(e) => update("person_id", e.target.value)}
+                onChange={(e) => {
+                  const nextPersonId = e.target.value;
+                  update("person_id", nextPersonId);
+                  setPersonaSeleccionadaSnapshot(
+                    (personas ?? []).find((p) => p.id === nextPersonId) ?? null,
+                  );
+                }}
                 className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
@@ -517,6 +552,16 @@ export default function DesignarAdminStepper() {
             {personRequiresRep && (
               <label className="flex flex-col gap-1 md:col-span-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                  Buscar representante PF
+                </span>
+                <input
+                  value={representanteSearch}
+                  onChange={(e) => setRepresentanteSearch(e.target.value)}
+                  placeholder="Nombre, NIF o email"
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
                   Representante permanente (PF) *
                 </span>
                 <select
@@ -527,13 +572,11 @@ export default function DesignarAdminStepper() {
                   aria-required="true"
                 >
                   <option value="">— Seleccionar PF —</option>
-                  {(personas ?? [])
-                    .filter((p) => p.person_type === "PF")
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
-                      </option>
-                    ))}
+                  {(personasPF ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
+                    </option>
+                  ))}
                 </select>
                 <span className="text-[11px] text-[var(--g-text-secondary)]">
                   LSC art. 212 bis: la PJ administradora designa persona natural permanente.
@@ -610,7 +653,7 @@ export default function DesignarAdminStepper() {
                 <Field
                   label="Representante"
                   value={
-                    (personas ?? []).find((p) => p.id === draft.representative_person_id)?.full_name ?? "—"
+                    (personasPF ?? []).find((p) => p.id === draft.representative_person_id)?.full_name ?? "—"
                   }
                 />
               )}
@@ -646,12 +689,12 @@ export default function DesignarAdminStepper() {
           <button
             type="button"
             onClick={guardar}
-            disabled={asignarMutation.isPending || upsertRepMutation.isPending}
-            aria-busy={asignarMutation.isPending || upsertRepMutation.isPending}
+            disabled={asignarMutation.isPending}
+            aria-busy={asignarMutation.isPending}
             className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {asignarMutation.isPending || upsertRepMutation.isPending ? "Registrando…" : "Designar"}
+            {asignarMutation.isPending ? "Registrando…" : "Designar"}
           </button>
         )}
       </div>

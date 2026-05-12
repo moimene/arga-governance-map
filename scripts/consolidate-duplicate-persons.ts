@@ -54,38 +54,17 @@
  *   a warning and skipped; the operator must opt-in per pair via
  *   `--pair=<canonical_id>:<duplicate_id>`.
  *
- * IMPORTANT — IDEMPOTENCY, NOT ATOMICITY:
- *   Each migrateFk runs as an independent PostgREST transaction.
- *   supabase-js cannot wrap multiple statements in a single tx from the
- *   client, and we deliberately do NOT introduce an RPC SECURITY DEFINER
- *   for this sprint (deferred to Plan A').
+ * IMPORTANT — RPC ATOMICITY:
+ *   --dry-run still uses this script's SELECT-only inventory and advisory
+ *   preflight for operator review.
  *
- *   Consequence: if a mid-Phase-1 UPDATE fails (RLS oddity, dropped
- *   connection, manual Ctrl-C), prior UPDATEs are COMMITTED and
- *   Phase 3 (soft-archive) has NOT run. The duplicate's tax_id stays
- *   on its original value.
- *
- *   Recovery is by re-running the script:
- *     - detectDuplicates() still sees the duplicate (tax_id is not ARCHIVED-).
- *     - preflightCheck() re-evaluates. Some collisions that existed before
- *       Phase 1 may now be GONE (refs already moved), but new ones may
- *       appear because canonical has absorbed some refs already. Read the
- *       output carefully.
- *     - Phase 1 re-runs all UPDATEs. Already-migrated rows are no-ops
- *       (WHERE column = duplicate.id matches zero rows after first run).
- *     - Phase 2 orphan check confirms cleanliness.
- *     - Phase 3 archives.
- *
- *   To prove recoverability empirically, run with --apply --pair=<canon>:<dup>
- *   against a fabricated test pair in a Cloud preview branch, fault-inject
- *   by SIGTERM mid-Phase-1, then re-run — the final state must match a
- *   clean run. A scaffolding script for this (`test-consolidate-recoverability.ts`)
- *   is TODO for Plan A'; until then, the recovery flow is documented but
- *   not regression-tested.
- *
- *   If atomicity is required (e.g. production multi-pair batch with no
- *   operator), wrap in a `fn_consolidate_person` RPC SECURITY DEFINER —
- *   deferred to Plan A'.
+ *   --apply now delegates the write path to SECURITY DEFINER RPC
+ *   `fn_consolidate_person`. The RPC locks both persons, re-runs preflight
+ *   inside the same transaction, migrates mutable FK references, preserves
+ *   no_session_* / capital_movements WORM references, soft-archives the
+ *   duplicate, and records idempotency. The old client-side FK loop is kept
+ *   only as historical reference for coverage review, not as apply source
+ *   of truth.
  *
  * STALE PREFLIGHT GUARD (P2 Codex iter-7):
  *   In --auto-detect mode, the batch initial preflight is treated as
@@ -851,18 +830,9 @@ function renderPair(pair: DuplicatePair, pf: PreflightResult) {
 // --------------------------------------------------------------------
 // Apply mode
 // --------------------------------------------------------------------
-// Migrates references in every FK column listed in PERSONS_FK_REFERENCES
-// from duplicate.id to canonical.id, then soft-archives the duplicate
-// by renaming its tax_id (frees the UNIQUE constraint added in
-// migration 000063 for the canonical to keep its real tax_id).
-//
-// Order matters:
-//   1. Migrate ALL FK refs first (UPDATE table SET col = canon WHERE col = dup).
-//   2. Verify post-migration that NO refs remain (orphan check).
-//   3. Rename duplicate's tax_id + full_name as ARCHIVED-*.
-//
-// If step 2 fails (some FK was missed in the list), we bail BEFORE
-// archiving so the duplicate row stays addressable and recoverable.
+// Delegates the write path to fn_consolidate_person. The script still owns
+// discovery, Type A/B gating, dry-run reporting, and human-readable logs; the
+// RPC owns atomicity and the authoritative FK rewrite.
 async function applyConsolidation(
   supabase: SupabaseClient,
   pair: DuplicatePair,
@@ -877,104 +847,43 @@ async function applyConsolidation(
     return;
   }
 
-  // ---- Phase 1: migrate FK references ------------------------------
-  const migrationLog: Array<{ table: string; column: string; rows: number; critical: boolean }> = [];
-  for (const ref of PERSONS_FK_REFERENCES) {
-    if (ref.action !== "migrate") {
-      console.log(`     [SKIP] ${ref.table}.${ref.column} (${ref.rationale})`);
-      continue;
-    }
-    const rows = await migrateFk(supabase, ref, pair);
-    migrationLog.push({ table: ref.table, column: ref.column, rows, critical: ref.critical ?? false });
-    const marker = ref.critical && rows > 0 ? " [CRITICAL]" : "";
-    console.log(`     [${rows.toString().padStart(3, " ")}] ${ref.table}.${ref.column}${marker}`);
-  }
+  const idempotencyKey = [
+    "person-consolidate",
+    TENANT_ID,
+    pair.canonical.id,
+    pair.duplicate.id,
+  ].join(":");
 
-  // ---- Phase 2: post-migration orphan check -----------------------
-  // Pick a representative sample of HIGH-traffic FKs to verify we
-  // didn't miss anything. The probe-based PERSONS_FK_REFERENCES list
-  // should cover all 47, but a re-probe is the gold standard before
-  // archiving.
-  const orphanCheck = await verifyNoRemainingRefs(supabase, pair.duplicate.id);
-  if (orphanCheck.length > 0) {
-    console.error(`     ✗ orphan check failed — ${orphanCheck.length} FK still points at duplicate:`);
-    for (const o of orphanCheck) {
-      console.error(`        - ${o.table}.${o.column}: ${o.count} row(s)`);
-    }
-    throw new Error(
-      `Refusing to archive — duplicate still has incoming references. ` +
-        `Update PERSONS_FK_REFERENCES list and re-run.`,
-    );
-  }
-
-  // ---- Phase 3: soft-archive --------------------------------------
-  const originalTaxId = pair.duplicate.tax_id ?? "NULL";
-  const archivedTaxId = `ARCHIVED-${Date.now()}-${originalTaxId}`;
-  const archivedName = `[ARCHIVED] ${pair.duplicate.full_name}`;
-
-  const { error: archErr } = await supabase
-    .from("persons")
-    .update({ tax_id: archivedTaxId, full_name: archivedName })
-    .eq("id", pair.duplicate.id);
-
-  if (archErr) throw new Error(`soft-archive failed: ${archErr.message}`);
-
-  console.log(`     ✓ archived: tax_id=${originalTaxId} → ${archivedTaxId}`);
-  console.log("");
-  const totalRows = migrationLog.reduce((sum, m) => sum + m.rows, 0);
-  console.log(`     Summary: ${totalRows} FK row(s) migrated across ${migrationLog.filter((m) => m.rows > 0).length} table.column(s)`);
-}
-
-async function migrateFk(
-  supabase: SupabaseClient,
-  ref: FkRef,
-  pair: DuplicatePair,
-): Promise<number> {
-  // Use .select("id", { count: "exact" }) to get the affected row count.
-  // supabase-js' bare update() doesn't return count unless we chain select.
-  const { data, error, count } = await supabase
-    .from(ref.table)
-    .update({ [ref.column]: pair.canonical.id })
-    .eq(ref.column, pair.duplicate.id)
-    .select("*", { count: "exact", head: false });
+  const { data, error } = await supabase.rpc("fn_consolidate_person", {
+    p_tenant_id: TENANT_ID,
+    p_canonical_person_id: pair.canonical.id,
+    p_duplicate_person_id: pair.duplicate.id,
+    p_reason: pair.reason,
+    p_idempotency_key: idempotencyKey,
+  });
 
   if (error) {
-    // ON DELETE RESTRICT columns may complain if a constraint trips,
-    // but UPDATE shouldn't. Surface every error with context.
-    throw new Error(`migrateFk(${ref.table}.${ref.column}): ${error.message}`);
+    throw new Error(`fn_consolidate_person failed: ${error.message}`);
   }
-  return count ?? (data?.length ?? 0);
-}
 
-interface OrphanRef {
-  table: string;
-  column: string;
-  count: number;
-}
+  const result = (data ?? {}) as {
+    status?: string;
+    updates?: Record<string, unknown>;
+    worm_reference_counts?: Record<string, unknown>;
+    worm_skipped_tables?: string[];
+  };
 
-async function verifyNoRemainingRefs(
-  supabase: SupabaseClient,
-  duplicateId: string,
-): Promise<OrphanRef[]> {
-  // For every FK in our list, count rows still pointing at duplicate.
-  // If any > 0, return them so the caller can abort.
-  const orphans: OrphanRef[] = [];
-  for (const ref of PERSONS_FK_REFERENCES) {
-    if (ref.action !== "migrate") continue;
-    const { count, error } = await supabase
-      .from(ref.table)
-      .select("*", { count: "exact", head: true })
-      .eq(ref.column, duplicateId);
-    if (error) {
-      // Skip if the table is unreachable (e.g., RLS oddity) but log it.
-      console.warn(`     [verify] cannot probe ${ref.table}.${ref.column}: ${error.message}`);
-      continue;
-    }
-    if ((count ?? 0) > 0) {
-      orphans.push({ table: ref.table, column: ref.column, count: count ?? 0 });
-    }
+  console.log(`     ✓ RPC status: ${result.status ?? "unknown"}`);
+  if (result.updates && Object.keys(result.updates).length > 0) {
+    console.log(`     updates: ${JSON.stringify(result.updates)}`);
   }
-  return orphans;
+  if (result.worm_reference_counts && Object.keys(result.worm_reference_counts).length > 0) {
+    console.log(`     WORM refs preserved: ${JSON.stringify(result.worm_reference_counts)}`);
+  }
+  if (result.worm_skipped_tables && result.worm_skipped_tables.length > 0) {
+    console.log(`     WORM tables skipped: ${result.worm_skipped_tables.join(", ")}`);
+  }
+  console.log("");
 }
 
 // --------------------------------------------------------------------
