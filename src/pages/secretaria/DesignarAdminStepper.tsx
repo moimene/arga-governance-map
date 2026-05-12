@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useCargos";
 import { useTenantContext } from "@/context/TenantContext";
 import { useAsignarCargo } from "@/hooks/useCondicionesPersonaMutations";
+import { useUpsertRepresentanteAdminPJ } from "@/hooks/useRepresentantesAdminPJ";
 import {
   requiresBodyId,
   requiresRepresentative,
@@ -92,6 +93,10 @@ export default function DesignarAdminStepper() {
   });
 
   const asignarMutation = useAsignarCargo();
+  // P2 Codex iteration-2: dual persistence — tras INSERT cargo, también
+  // upsert a representaciones (fuente canónica leída por banner per-sociedad
+  // de PersonaDetalle via useRepresentantesAdminPJByPerson).
+  const upsertRepMutation = useUpsertRepresentanteAdminPJ();
 
   // STEPS dinámicos. Sin sociedad seleccionada por URL, insertamos "Sociedad".
   const STEPS = needsSociedadStep
@@ -195,6 +200,34 @@ export default function DesignarAdminStepper() {
         representative_person_id:
           personRequiresRep && draft.representative_person_id ? draft.representative_person_id : null,
       });
+
+      // P2 Codex iteration-2: si hay representative_person_id, también upsert
+      // a representaciones (canonical source post-Fix #2 iter-1). Sin esto, el
+      // banner per-sociedad de PersonaDetalle (que lee de
+      // useRepresentantesAdminPJByPerson) alertaría falsamente "PJ sin rep".
+      //
+      // Try/catch: el cargo ya quedó creado en condiciones_persona. Si el
+      // upsert a representaciones falla, mostramos warning informativo pero
+      // no rompemos el flujo — el banner per-sociedad alertará al usuario
+      // para que complete la designación desde la ficha de persona. RPC
+      // atómica (fn_designar_representante) queda diferida a Plan A'.
+      if (personRequiresRep && draft.representative_person_id) {
+        try {
+          await upsertRepMutation.mutateAsync({
+            represented_person_id: draft.person_id,
+            representative_person_id: draft.representative_person_id,
+            entity_id: entityId,
+            effective_from: draft.fecha_inicio,
+            inscripcion_rm_referencia: draft.inscripcion_rm_referencia || null,
+            inscripcion_rm_fecha: draft.inscripcion_rm_fecha || null,
+          });
+        } catch (repErr) {
+          console.warn("Cargo creado pero upsert a representaciones falló:", repErr);
+          toast.warning(
+            `Cargo guardado, pero la representación canónica no se persistió. Completa la designación desde la ficha de persona (/secretaria/personas/${draft.person_id}).`,
+          );
+        }
+      }
 
       // L15-L17: el trigger fn_sync_authority_evidence solo actúa sobre los
       // cargos certificantes. Avisamos al usuario para que sepa si el cargo
@@ -564,12 +597,12 @@ export default function DesignarAdminStepper() {
           <button
             type="button"
             onClick={guardar}
-            disabled={asignarMutation.isPending}
-            aria-busy={asignarMutation.isPending}
+            disabled={asignarMutation.isPending || upsertRepMutation.isPending}
+            aria-busy={asignarMutation.isPending || upsertRepMutation.isPending}
             className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {asignarMutation.isPending ? "Registrando…" : "Designar"}
+            {asignarMutation.isPending || upsertRepMutation.isPending ? "Registrando…" : "Designar"}
           </button>
         )}
       </div>
