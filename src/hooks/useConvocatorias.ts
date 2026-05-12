@@ -326,7 +326,7 @@ const ATTACHMENT_EXTENSION_TO_MIME: Record<string, string> = {
   jpeg: "image/jpeg",
 };
 
-const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+export const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export interface UploadAttachmentInput {
   convocatoriaId: string;
@@ -341,7 +341,7 @@ export interface UploadAttachmentResult {
   file_hash: string;
 }
 
-async function computeFileHashSha512(file: File): Promise<string> {
+export async function computeFileHashSha512(file: File | Blob): Promise<string> {
   const buffer = await file.arrayBuffer();
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) throw new Error("Web Crypto API no disponible");
@@ -351,7 +351,7 @@ async function computeFileHashSha512(file: File): Promise<string> {
     .join("");
 }
 
-function sanitizeFileName(name: string): string {
+export function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
 }
 
