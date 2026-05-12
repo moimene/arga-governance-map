@@ -707,6 +707,60 @@ document_url: string | null;
 ```
 Eliminados los casts `as { approval_workflow?: ... }` y `as { document_url?: ... }` en `ExpedienteAcuerdo.tsx`. Único cast residual: `a.approval_workflow as ApprovalStep[] | null` (narrowing JSONB genérico → tipo concreto, inevitable).
 
+### Sprint 1 Gestor de Plantillas — 2026-05-12 (commits 3076b45 → HEAD)
+
+Refactor de la consola de plantillas que consolida tres vistas dispersas (`/secretaria/plantillas`, `/secretaria/plantillas-tracker`, `/admin/PlantillasMantenimiento`) en una única consola unificada `/secretaria/gestor-plantillas` con sistema de tabs por query param y RBAC granular. Cierra deuda histórica de la consola de gestión documental.
+
+**Documentos de referencia:**
+- Spec: `docs/superpowers/specs/2026-05-12-gestor-plantillas-sprint1-design.md`
+- Plan: `docs/superpowers/plans/2026-05-12-gestor-plantillas-sprint1-plan.md`
+
+**Commits del sprint:**
+
+| Commit | SHA | Descripción |
+|---|---|---|
+| 1 | `3076b45` | Baseline plantillas pre-refactor (Backup A) |
+| 2 | `d84e223` | template-admin module — types + enums + functional key (Fase 0) |
+| 3 | `8f539df` | Gate PRE headless (Fase 8-parcial) |
+| 4 | `c029b88` | template-admin service + changelog (Fase 7-parcial) |
+| 5 | `7b9203c` | Consola unificada gestor-plantillas — tabs + RBAC (Fase 1) |
+| 6 | `02db42a` | Importer JSON wizard (Fase 2) |
+| 7 | `40dc3db` | Batch FIRMA_LEGAL_BATCH service-role script (D6) |
+| 8 | `HEAD` (this commit) | Cleanup páginas legacy + actualización CLAUDE.md |
+
+**Arquitectura tabs (query param `?tab=`):**
+
+| Tab | Ruta | RBAC | Notas |
+|---|---|---|---|
+| `dashboard` | `/secretaria/gestor-plantillas?tab=dashboard` | SECRETARIO / COMPLIANCE / ADMIN_TENANT (lectura) | KPIs principales |
+| `catalogo` | `?tab=catalogo` | SECRETARIO (lectura) | Listado público de plantillas ACTIVA |
+| `cobertura` | `?tab=cobertura` | SECRETARIO / COMPLIANCE (lectura) | Matriz materia × jurisdicción |
+| `importar` | `?tab=importar` | **ADMIN_TENANT** (escritura) | Wizard JSON 3 pasos |
+| `metricas` | `?tab=metricas` | SECRETARIO / COMPLIANCE (lectura) | Absorbe `PlantillasTracker.tsx` legacy |
+| `auditoria` | `?tab=auditoria` | SECRETARIO / COMPLIANCE (lectura) | Absorbe `PlantillasMantenimiento.tsx` legacy |
+| `validacion` | `?tab=validacion` | **ADMIN_TENANT** (escritura) | Gate PRE headless |
+
+**Realidad RBAC en demo:**
+- El usuario demo (`demo@arga-seguros.com`) es **SECRETARIO**, no ADMIN_TENANT.
+- Las pestañas Importar y Validación quedan **bloqueadas con `AlertBanner`** en demo a menos que se siembre un user con rol ADMIN_TENANT en `rbac_user_roles`.
+- Los e2e específicos de RBAC (`e2e/24-secretaria-gestor-rbac.spec.ts`) cubren ambos caminos.
+
+**Redirect 301:**
+- `/secretaria/plantillas-tracker` → `/secretaria/gestor-plantillas?tab=metricas` (registrado en `src/App.tsx` ~línea 212).
+- `/admin/PlantillasMantenimiento` → **eliminada por completo**. Su contenido vive ahora en el tab `auditoria`.
+
+**Plantillas P0 conocidas (toleradas con warning):**
+- `e3697ad9-...` — `FUSION_ESCISION` (badge `ACTIVE_WITH_P0`).
+- `edd5c389-...` — `RATIFICACION_ACTOS` (badge `ACTIVE_WITH_P0`).
+- Ambas emiten `WARNING` runtime cuando se usan, pero no se bloquean. Pendientes de corrección por **Comité Legal de Plantillas**. Lista canónica en `src/lib/secretaria/template-admin/known-p0.ts`.
+
+**Library canónica `src/lib/secretaria/template-admin/`:**
+Esta es la **ubicación canónica** para futuras adiciones a las reglas del Gate PRE (estructurales y semánticas), el importer JSON, el cálculo de functional key y los helpers de Supabase asociados. Cualquier nueva regla de validación debe añadirse a `gate-pre.ts` o `gate-pre-semantic.ts` con su test unitario asociado. NO duplicar lógica de gate en componentes UI; los tabs consumen exclusivamente del servicio.
+
+**Páginas eliminadas en Commit 8:**
+- `src/pages/secretaria/PlantillasTracker.tsx` — Su contenido vive ahora en `src/components/secretaria/gestor/MetricasTab.tsx`. KPIs extraídos a `KpiCard.tsx` reusable.
+- `src/pages/admin/PlantillasMantenimiento.tsx` — Su contenido vive ahora en `src/components/secretaria/gestor/AuditoriaTab.tsx`. El directorio `src/pages/admin/` se eliminó al quedar vacío.
+
 **Próximos — Sprint F (multi-jurisdicción)**
 
 Sprint F (multi-jurisdicción): BR/MX/PT, SCIM, BYOK, particionado.
@@ -902,8 +956,11 @@ export function useXxx(param?: string) {
   <Route path="/secretaria/libros"                       element={<LibrosObligatorios />} />
   <Route path="/secretaria/libro-socios"                 element={<LibroSocios />} />
   <Route path="/secretaria/plantillas"                   element={<Plantillas />} />
-  <Route path="/secretaria/plantillas-tracker"           element={<PlantillasTracker />} />
   <Route path="/secretaria/gestor-plantillas"            element={<GestorPlantillas />} />
+  {/* Tabs: ?tab=dashboard|catalogo|cobertura|importar|metricas|auditoria|validacion */}
+  <Route path="/secretaria/plantillas-tracker"
+         element={<Navigate to="/secretaria/gestor-plantillas?tab=metricas" replace />} />
+  {/* /admin/PlantillasMantenimiento — ELIMINADA (contenido en tab Auditoría) */}
   <Route path="/secretaria/calendario"                   element={<Calendario />} />
   <Route path="/secretaria/procesos-grupo"               element={<ProcesosGrupo />} />
   <Route path="/secretaria/acuerdos/:id"                 element={<ExpedienteAcuerdo />} />
@@ -949,8 +1006,8 @@ src/
     DecisionesUnipersonales.tsx     T9
     DecisionDetalle.tsx             T9
     LibrosObligatorios.tsx          T10
-    Plantillas.tsx                  T11  + H4: CTA "Usar esta plantilla" para ACTIVA
-    GestorPlantillas.tsx            T11  + H5: editor inline capa1 para BORRADOR
+    Plantillas.tsx                  T11  Catálogo de uso (público SECRETARIO) + H4: CTA "Usar esta plantilla" para ACTIVA
+    GestorPlantillas.tsx            T11+Sprint1  Consola unificada por tabs (?tab=dashboard|catalogo|cobertura|importar|metricas|auditoria|validacion) con RBAC
     ExpedienteAcuerdo.tsx           T14  Timeline 8 estados + compliance snapshot
     GenerarDocumentoStepper.tsx     A5   DOCX gen + QTSP QES + Storage archival
     BoardPack.tsx                   B6   9 secciones ejecutivas + DL-2/DL-5
@@ -985,6 +1042,18 @@ src/
     EvidenceForenseSection.tsx      B4   SHA-512 bundles + chain verification UI
     SLODashboard.tsx                B7   3 gauges (latency, error rate, uptime)
     ErrorBoundary.tsx               C5   Global error boundary + "Reintentar"
+    secretaria/gestor/                   Sprint1: tabs de la consola unificada de plantillas
+      DashboardTab.tsx                   Tab dashboard — KPIs principales
+      CatalogoTab.tsx                    Tab catálogo — listado público de plantillas
+      CoberturaLegalTab.tsx              Tab cobertura — matriz materia × jurisdicción
+      ImportarTab.tsx                    Tab importar — wizard JSON (ADMIN_TENANT)
+      MetricasTab.tsx                    Tab métricas — absorbe PlantillasTracker.tsx legacy
+      AuditoriaTab.tsx                   Tab auditoría — absorbe PlantillasMantenimiento.tsx legacy
+      ValidacionTab.tsx                  Tab validación — Gate PRE headless (ADMIN_TENANT)
+      TemplateImportWizard.tsx           Wizard 3 pasos: upload → validar → confirmar
+      AlertBanner.tsx                    Banner aviso RBAC + warnings P0
+      KpiCard.tsx                        Card KPI extraído de PlantillasTracker.tsx
+      tab-guards.ts                      Guards RBAC por tab (ADMIN_TENANT vs SECRETARIO)
 
   lib/
     rules-engine/                        Motor de reglas LSC completo (15 archivos)
@@ -1005,6 +1074,20 @@ src/
       docx-generator.ts                 DOCX generation via docx-js
     secretaria/
       status-labels.ts                  H2: mapa central STATUS_LABEL + fn statusLabel()
+      template-admin/                   Sprint1: librería canónica para administración de plantillas
+        types.ts                        Tipos base + enums + estados workflow
+        functional-key.ts               Functional key calc (materia+jurisdiccion+tipoSocial+...)
+        gate-pre.ts                     Gate PRE structural checks (headless)
+        gate-pre-semantic.ts            Gate PRE semantic checks (variables + placeholders)
+        template-admin-service.ts       Service capa para acciones CRUD + workflow
+        template-importer.ts            Importer JSON (Fase 2)
+        template-import-schema.ts       Zod schema para validar JSON importado
+        organo-canonico.ts              Normalización órgano canónico
+        changelog.ts                    Changelog de transiciones de plantilla
+        known-p0.ts                     Lista de plantillas P0 toleradas con warning
+        cloud-helpers.ts                Helpers Supabase para operaciones de gestor
+        sample.ts                       Datos sample para tests
+        index.ts                        Barrel exports
     telemetry.ts                    B7   OTel-compatible event tracking stub
 ```
 
