@@ -35,6 +35,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileSignature, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 import { useHasCapability } from "@/hooks/useCapabilityMatrix";
 import {
   useAuthorityEvidence,
@@ -42,6 +43,7 @@ import {
   CARGO_CERT_LABELS,
   type AuthorityEvidenceDetailRow,
 } from "@/hooks/useAuthorityEvidence";
+import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 
 export interface EmitirCertificacionButtonProps {
   minuteId: string;
@@ -72,6 +74,7 @@ export function EmitirCertificacionButton({
   disabledReason,
 }: EmitirCertificacionButtonProps) {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
   const canCertify = useHasCapability(userRole, "CERTIFICATION");
   const { data: presidenteAE } = usePresidenteVigente(entityId ?? undefined, bodyId);
   // Para el dual check necesitamos resolver:
@@ -132,12 +135,18 @@ export function EmitirCertificacionButton({
 
   if (!canCertify) return null;
   if (!entityId) return null;
+  const invalidAgreementRefs = agreementIds.filter((agreementId) => !isUuidReference(agreementId));
   const effectiveDisabledReason =
-    disabledReason ?? (agreementIds.length === 0 ? "No hay acuerdos proclamables para certificar." : null);
+    disabledReason ??
+    (invalidAgreementRefs.length > 0
+      ? "La certificación contiene referencias por punto sin Acuerdo 360 materializado."
+      : agreementIds.length === 0
+        ? "No hay acuerdos proclamables para certificar."
+        : null);
 
   async function handleClick() {
     if (busy) return;
-    if (disabledReason || agreementIds.length === 0) return;
+    if (effectiveDisabledReason) return;
     if (bloqueaRM) return;
     setBusy(true);
     try {
@@ -185,6 +194,8 @@ export function EmitirCertificacionButton({
       toast.success(`Certificación emitida`, {
         description: `Referencia operativa demo creada (${String(uri)}). Pendiente de audit/retention/legal hold; no constituye evidencia final productiva.`,
       });
+      queryClient.invalidateQueries({ queryKey: ["certifications", tenantId, "byMinute", minuteId] });
+      queryClient.invalidateQueries({ queryKey: ["certification_plan", tenantId, "forMinute", minuteId] });
       queryClient.invalidateQueries({ queryKey: ["certifications"] });
       queryClient.invalidateQueries({ queryKey: ["certification_plan"] });
       onEmitted?.(certificationId, String(uri));

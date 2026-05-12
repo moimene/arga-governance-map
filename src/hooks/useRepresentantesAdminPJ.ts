@@ -112,10 +112,10 @@ export interface UpsertRepresentanteInput {
  * Sprint 2: `persons.representative_person_id` queda deprecado como source
  * de lectura/escritura. La fuente canónica es `representaciones`.
  *
- * Importante: el UNIQUE ux_representaciones_vigente cubre
+ * Importante: el UNIQUE ux_representaciones_vigente cubre tenant_id +
  * (entity_id, represented_person_id, scope, COALESCE(meeting_id, sentinel))
  * WHERE effective_to IS NULL. La RPC serializa por advisory lock para evitar
- * colisiones concurrentes.
+ * colisiones concurrentes y evitar cross-tenant conflict targets.
  */
 export function useUpsertRepresentanteAdminPJ() {
   const { tenantId } = useTenantContext();
@@ -139,6 +139,8 @@ export function useUpsertRepresentanteAdminPJ() {
           input.represented_person_id,
           input.representative_person_id,
           input.effective_from,
+          input.inscripcion_rm_referencia?.trim() ?? "",
+          input.inscripcion_rm_fecha ?? "",
         ].join(":"),
       });
       if (error) throw error;

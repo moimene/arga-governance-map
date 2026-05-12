@@ -426,7 +426,8 @@ src/hooks/useSii.ts
 ### Fase 2 — COMPLETADA (commit `9e6b7e5`): Módulo Secretaría Societaria (`/secretaria/*`)
 
 T1→T14 completos: 15 tablas + `agreements` + triggers + seed, SecretariaLayout
-con tokens `--g-*`, Dashboard con KPIs, Convocatorias (lista + stepper 7 pasos),
+con tokens `--g-*`, Dashboard con KPIs, Convocatorias (lista + stepper 8 pasos:
+Borrador documento en Paso 7 y Revisión y emisión en Paso 8),
 Reuniones (stepper 6 pasos crea agreements), Actas + Certificaciones vinculadas
 a `agreement_id`, Tramitador (stepper 5 pasos), Acuerdos sin sesión (tracker
 unanimidad), Decisiones unipersonales, Libros con alertas de legalización,
@@ -993,7 +994,7 @@ src/
     Dashboard.tsx                   T3   KPIs + próximas reuniones + acuerdos pendientes
     ConvocatoriasList.tsx           T4
     ConvocatoriaDetalle.tsx         T4
-    ConvocatoriasStepper.tsx        T4   7 pasos, motor V2 integrado
+    ConvocatoriasStepper.tsx        T4   8 pasos, motor V2 integrado, borrador documento en Paso 7
     ReunionesLista.tsx              T5
     ReunionStepper.tsx              T5   :id 6 pasos conectados; /nueva intake read-only para handoffs
     ActasLista.tsx                  T6

@@ -22,7 +22,7 @@ describe("certification registry intake", () => {
     expect(intake.explicitAgreementIds).toEqual(["5905ee89-3fb4-4a03-9cda-7523d45f75d4"]);
     expect(intake.pointReferences).toEqual(["meeting:meeting-1:point:2"]);
     expect(intake.unresolvedPointReferences).toEqual(["meeting:meeting-1:point:2"]);
-    expect(intake.readyForRegistry).toBe(true);
+    expect(intake.readyForRegistry).toBe(false);
     expect(intake.warnings).toContain("point_references_without_agreement_id");
     expect(intake.warnings).not.toContain("no_registry_agreement_reference");
   });
@@ -42,6 +42,7 @@ describe("certification registry intake", () => {
     expect(intake.resolvedPointAgreementIds).toEqual(["5905ee89-3fb4-4a03-9cda-7523d45f75d4"]);
     expect(intake.pointReferences).toEqual(["meeting:meeting-1:point:2"]);
     expect(intake.unresolvedPointReferences).toHaveLength(0);
+    expect(intake.readyForRegistry).toBe(true);
     expect(intake.warnings).toContain("point_references_resolved_to_agreement_id");
     expect(intake.warnings).not.toContain("point_references_without_agreement_id");
     expect(intake.warnings).not.toContain("no_registry_agreement_reference");

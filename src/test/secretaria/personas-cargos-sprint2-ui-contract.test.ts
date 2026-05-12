@@ -32,6 +32,11 @@ const personaDetalle = readFileSync(
   "utf8",
 );
 
+const representanteAdminStepper = readFileSync(
+  join(process.cwd(), "src/pages/secretaria/RepresentanteAdminPJStepper.tsx"),
+  "utf8",
+);
+
 const personaNueva = readFileSync(
   join(process.cwd(), "src/pages/secretaria/PersonaNuevaStepper.tsx"),
   "utf8",
@@ -76,6 +81,16 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
     expect(designarStepper).not.toMatch(/const personaFinal = personaPreselected \?\? personaSeleccionada/);
   });
 
+  it("preserves sociedad scope and refuses silent cargo submit without entity", () => {
+    const guardarBlock = designarStepper.match(/async function guardar\(\)[\s\S]*?^\s*}\n\n\s{2}\/\/ Sólo bloqueamos/m)?.[0];
+    expect(guardarBlock).toBeTruthy();
+    expect(personaDetalle).toMatch(/useSecretariaScope/);
+    expect(personaDetalle).toMatch(/createScopedTo\(`\/secretaria\/cargos\/nuevo\?personId=\$\{p\.id\}`\)/);
+    expect(designarStepper).toMatch(/setEntityId\(entityIdFromUrl\)/);
+    expect(guardarBlock).toMatch(/Selecciona una sociedad antes de designar el cargo/);
+    expect(guardarBlock).not.toMatch(/if \(!entityId\) return;/);
+  });
+
   it("deprecates persons.representative_person_id as UI write/read source", () => {
     expect(representantesHook).toMatch(/fuente canónica es `representaciones`/);
     expect(representantesHook).toMatch(/supabase\.rpc\("fn_upsert_representante_admin_pj"/);
@@ -110,9 +125,16 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
     expect(designarStepper).toMatch(/personaSearch/);
     expect(designarStepper).toMatch(/setPersonaSearch/);
     expect(designarStepper).toMatch(/personaSeleccionadaSnapshot/);
+    expect(designarStepper).toMatch(/representanteSeleccionadoSnapshot/);
+    expect(designarStepper).toMatch(/representantePreselected\?\.id === draft\.representative_person_id/);
     expect(designarStepper).toMatch(/representanteSearch/);
     expect(designarStepper).toMatch(/person_type:\s*"PF"/);
     expect(designarStepper).toMatch(/limit:\s*personaSearch\.trim\(\) \? 50 : 200/);
+    expect(representanteAdminStepper).toMatch(/representativeSearch/);
+    expect(representanteAdminStepper).toMatch(/setRepresentativeSearch/);
+    expect(representanteAdminStepper).toMatch(/search:\s*representativeSearch/);
+    expect(representanteAdminStepper).toMatch(/limit:\s*representativeSearch\.trim\(\) \? 50 : 200/);
+    expect(representanteAdminStepper).toMatch(/representanteSeleccionadoSnapshot/);
   });
 
   it("paginates PersonasList instead of rendering every row at once", () => {
@@ -123,10 +145,17 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
   });
 
   it("wires L13-B presidential vacancy scan as non-blocking dashboard notification job", () => {
+    const scanBlock = notificationsHook.match(
+      /export function useAutoScanVacanciasPresidencia\(\)[\s\S]*?^}/m,
+    )?.[0];
+    expect(scanBlock).toBeTruthy();
     expect(notificationsHook).toMatch(/useAutoScanVacanciasPresidencia/);
     expect(notificationsHook).toMatch(/supabase\.rpc\("fn_scan_vacancias_presidencia"/);
     expect(notificationsHook).toMatch(/retry:\s*false/);
     expect(notificationsHook).toMatch(/Vacancia presidencial scan skipped/);
+    expect(scanBlock).toMatch(/queryKey:\s*\["vacancia-presidencia-scan", tenantId\]/);
+    expect(scanBlock).toMatch(/queryKey:\s*\["notifications", "all"\], exact:\s*true/);
+    expect(scanBlock).not.toMatch(/queryKey:\s*\["notifications"\]\s*\}/);
     expect(secretariaDashboard).toMatch(/useAutoScanVacanciasPresidencia\(\)/);
   });
 });

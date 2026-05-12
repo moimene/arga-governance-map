@@ -46,7 +46,6 @@ export function applyCapa3Overrides(
   const overridesByCampo = new Map<string, Capa3OverrideRow>();
   for (const o of overrides) {
     if (canonicalVersion !== undefined && o.compatible_with_canonical_version !== canonicalVersion) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[plantilla-overrides] Override ignorado para campo "${o.campo}": compatible_with_canonical_version=${o.compatible_with_canonical_version} no coincide con plantilla.version=${canonicalVersion}`,
       );

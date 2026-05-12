@@ -20,6 +20,7 @@ import {
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
 import { useRepresentantesAdminPJByPerson } from "@/hooks/useRepresentantesAdminPJ";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   isAuthorityRole,
   requiresRepresentative,
@@ -31,6 +32,7 @@ export default function PersonaDetalle() {
   const { data: p, isLoading } = usePersonaCanonical(id);
   const { data: cargos } = useCargosPersona(id);
   const { data: holdings } = useHoldingsPersona(id);
+  const secretariaScope = useSecretariaScope();
   // P2 Codex iteration-1: hook llamado aquí (no después de los early returns)
   // para cumplir rules-of-hooks. El hook se desactiva internamente vía
   // `enabled: !!tenantId && !!representedPersonId` si id es undefined.
@@ -229,7 +231,7 @@ export default function PersonaDetalle() {
             Editar datos
           </button>
           <Link
-            to={`/secretaria/cargos/nuevo?personId=${p.id}`}
+            to={secretariaScope.createScopedTo(`/secretaria/cargos/nuevo?personId=${p.id}`)}
             className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >

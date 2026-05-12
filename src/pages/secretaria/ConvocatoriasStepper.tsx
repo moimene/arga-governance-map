@@ -428,6 +428,9 @@ export default function ConvocatoriasStepper() {
   const scopedListPath = isSociedadScoped && scopedEntityId
     ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/convocatorias";
+  const scopedReunionesPath = isSociedadScoped && scopedEntityId
+    ? `/secretaria/reuniones?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+    : "/secretaria/reuniones";
   const createConvocatoria = useCreateConvocatoria();
   const uploadAttachment = useUploadConvocatoriaAttachment();
   const { data: cloudRequestedPlantilla, isLoading: requestedPlantillaLoading } =
@@ -1665,7 +1668,6 @@ export default function ConvocatoriasStepper() {
           // No bloqueamos la emisión — solo log para que un futuro audit
           // detecte que el patch del trace falló y el shape original
           // permanece (con `upload_status: 'intended'`).
-          // eslint-disable-next-line no-console
           console.warn("[convocatorias] reminders_trace patch skipped", {
             convocatoriaId: created.id,
             message: patchError.message,
@@ -1747,7 +1749,7 @@ export default function ConvocatoriasStepper() {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/secretaria/reuniones")}
+              onClick={() => navigate(scopedReunionesPath)}
               className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >

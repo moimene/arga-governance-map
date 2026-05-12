@@ -65,7 +65,7 @@ export function EmitirCertificacionAcuerdoButton({
       if (emitError) throw new Error(`Emitir: ${emitError.message}`);
 
       toast.success("Certificación emitida", {
-        description: `Referencia operativa demo creada (${String(uri)}). Preparada para registro; no implica envío al Registro Mercantil.`,
+        description: `Referencia operativa demo creada (${String(uri)}). Pendiente de audit/retention/legal hold; no constituye evidencia final productiva ni implica envío al Registro Mercantil.`,
       });
       queryClient.invalidateQueries({ queryKey: ["certifications"] });
       queryClient.invalidateQueries({ queryKey: ["agreements"] });

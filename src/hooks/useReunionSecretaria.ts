@@ -370,10 +370,15 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
   //    reclasificaciones humanas previas como SSOT).
   if (updateCandidates.length > 0) {
     const candidateIds = updateCandidates.map((c) => c.id);
-    const { data: changelogRows } = await supabase
+    const { data: changelogRows, error: changelogErr } = await supabase
       .from("agenda_item_kind_changelog")
       .select("agenda_item_id")
       .in("agenda_item_id", candidateIds);
+    if (changelogErr) {
+      throw new Error(
+        `No se pudo comprobar el historial de reclasificación de agenda_items: ${changelogErr.message}.`,
+      );
+    }
     const idsWithChangelog = new Set(
       ((changelogRows ?? []) as Array<{ agenda_item_id: string }>).map((r) => r.agenda_item_id),
     );
@@ -387,10 +392,8 @@ async function materializeAgendaItemsForConvocatoriaMeeting(
         })
         .eq("id", candidate.id);
       if (updErr) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[materializeAgendaItems] reconcile UPDATE ${candidate.id} falló:`,
-          updErr.message,
+        throw new Error(
+          `Reconciliación de agenda_item ${candidate.id} falló: ${updErr.message}. La reunión no queda preparada para votación.`,
         );
       }
     }
@@ -867,11 +870,38 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
 
 export function useGenerarActa() {
   return useMutation({
-    mutationFn: async ({ meetingId, content }: { meetingId: string; content: string }) => {
+    mutationFn: async ({
+      meetingId,
+      content,
+      entityId,
+      bodyId,
+      sessionKind = "MEETING",
+      snapshotType,
+    }: {
+      meetingId: string;
+      content: string;
+      entityId: string;
+      bodyId: string;
+      sessionKind?: "MEETING" | "NO_SESSION" | "UNIPERSONAL";
+      snapshotType: "ECONOMICO" | "POLITICO" | "UNIVERSAL";
+    }) => {
+      const { data: snapshotId, error: snapshotError } = await supabase.rpc(
+        "fn_crear_censo_snapshot",
+        {
+          p_meeting_id: meetingId,
+          p_session_kind: sessionKind,
+          p_entity_id: entityId,
+          p_body_id: bodyId,
+          p_snapshot_type: snapshotType,
+        },
+      );
+      if (snapshotError) throw snapshotError;
+      if (!snapshotId) throw new Error("No se pudo crear el snapshot WORM de censo para el acta.");
+
       const { data, error } = await supabase.rpc("fn_generar_acta", {
         p_meeting_id: meetingId,
         p_content: content,
-        p_snapshot_id: null,
+        p_snapshot_id: snapshotId,
       });
       if (error) throw error;
       return data as string;

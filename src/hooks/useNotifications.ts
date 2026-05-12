@@ -71,7 +71,7 @@ export function useAutoScanVacanciasPresidencia() {
   const qc = useQueryClient();
 
   return useQuery({
-    queryKey: ["notifications", "vacancia-presidencia-scan", tenantId],
+    queryKey: ["vacancia-presidencia-scan", tenantId],
     enabled: !!tenantId,
     retry: false,
     staleTime: 60 * 60 * 1000,
@@ -86,7 +86,8 @@ export function useAutoScanVacanciasPresidencia() {
       }
 
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ["notifications"] }),
+        qc.invalidateQueries({ queryKey: ["notifications", "all"], exact: true }),
+        qc.invalidateQueries({ queryKey: ["notifications", "unreadCount"], exact: true }),
         qc.invalidateQueries({ queryKey: ["dashboard", "alerts"] }),
       ]);
 

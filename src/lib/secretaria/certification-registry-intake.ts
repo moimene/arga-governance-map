@@ -71,7 +71,11 @@ export function buildCertificationRegistryIntake(
   const signatureStatus = input.signatureStatus ?? "UNKNOWN";
   const signed = signatureStatus === "SIGNED";
   const hasEvidenceBundle = Boolean(input.evidenceId);
-  const readyForRegistry = signed && hasEvidenceBundle;
+  const readyForRegistry =
+    signed &&
+    hasEvidenceBundle &&
+    unresolvedPointReferences.length === 0 &&
+    agreementIds.length > 0;
   const warnings = [
     signed ? null : "certification_not_signed",
     hasEvidenceBundle ? null : "evidence_bundle_not_linked",

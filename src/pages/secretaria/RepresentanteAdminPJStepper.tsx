@@ -33,11 +33,15 @@
  *   - aria-busy en el boton de submit.
  *   - Sidebar/back via Link normal (no anidado).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronLeft, UserCheck } from "lucide-react";
 import { toast } from "sonner";
-import { usePersonaCanonical, usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import {
+  usePersonaCanonical,
+  usePersonasCanonical,
+  type PersonaRow,
+} from "@/hooks/usePersonasCanonical";
 import { useCargosPersona } from "@/hooks/useCargos";
 import { useUpsertRepresentanteAdminPJ } from "@/hooks/useRepresentantesAdminPJ";
 import {
@@ -52,7 +56,13 @@ export default function RepresentanteAdminPJStepper() {
   const navigate = useNavigate();
   const { data: pj, isLoading: pjLoading } = usePersonaCanonical(id);
   const { data: cargosPersona } = useCargosPersona(id);
-  const { data: personasPF } = usePersonasCanonical({ person_type: "PF" });
+  const [representativeSearch, setRepresentativeSearch] = useState("");
+  const { data: personasPF } = usePersonasCanonical({
+    person_type: "PF",
+    search: representativeSearch,
+    excludeTestData: true,
+    limit: representativeSearch.trim() ? 50 : 200,
+  });
 
   // Sociedades en las que la PJ tiene cargo admin vigente que requiere
   // representante (L2). Solo aplica si la persona es PJ — la guarda visual
@@ -76,9 +86,31 @@ export default function RepresentanteAdminPJStepper() {
   const [step, setStep] = useState(0);
   const [entityId, setEntityId] = useState<string>("");
   const [representativeId, setRepresentativeId] = useState<string>("");
+  const [representanteSeleccionadoSnapshot, setRepresentanteSeleccionadoSnapshot] =
+    useState<PersonaRow | null>(null);
+  const { data: representativePreselected } = usePersonaCanonical(representativeId || undefined);
   const [rmRef, setRmRef] = useState("");
   const [rmFecha, setRmFecha] = useState("");
   const upsertMutation = useUpsertRepresentanteAdminPJ();
+
+  useEffect(() => {
+    if (!representativeId) {
+      setRepresentanteSeleccionadoSnapshot(null);
+      return;
+    }
+    const current =
+      representativePreselected?.id === representativeId
+        ? representativePreselected
+        : (personasPF ?? []).find((p) => p.id === representativeId);
+    if (current) setRepresentanteSeleccionadoSnapshot(current);
+  }, [representativeId, representativePreselected, personasPF]);
+
+  const representanteSeleccionado =
+    representativePreselected?.id === representativeId
+      ? representativePreselected
+      : representanteSeleccionadoSnapshot?.id === representativeId
+        ? representanteSeleccionadoSnapshot
+        : (personasPF ?? []).find((p) => p.id === representativeId);
 
   // Guarda de entrada — id obligatorio.
   if (!id) {
@@ -136,7 +168,6 @@ export default function RepresentanteAdminPJStepper() {
   }
 
   const sociedadSeleccionada = sociedadesUnicas.find((c) => c.entity_id === entityId);
-  const representanteSeleccionado = (personasPF ?? []).find((p) => p.id === representativeId);
 
   return (
     <div className="mx-auto max-w-[820px] p-6">
@@ -227,15 +258,38 @@ export default function RepresentanteAdminPJStepper() {
           <div className="grid grid-cols-1 gap-4">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                Buscar representante PF
+              </span>
+              <input
+                value={representativeSearch}
+                onChange={(e) => setRepresentativeSearch(e.target.value)}
+                placeholder="Nombre, NIF o email"
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
                 Representante PF *
               </span>
               <select
                 value={representativeId}
-                onChange={(e) => setRepresentativeId(e.target.value)}
+                onChange={(e) => {
+                  const nextRepresentativeId = e.target.value;
+                  setRepresentativeId(nextRepresentativeId);
+                  setRepresentanteSeleccionadoSnapshot(
+                    (personasPF ?? []).find((p) => p.id === nextRepresentativeId) ?? null,
+                  );
+                }}
                 className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <option value="">— Seleccionar PF existente —</option>
+                {representanteSeleccionado &&
+                  !(personasPF ?? []).some((p) => p.id === representanteSeleccionado.id) && (
+                    <option value={representanteSeleccionado.id}>
+                      {representanteSeleccionado.full_name}
+                      {representanteSeleccionado.tax_id ? ` · ${representanteSeleccionado.tax_id}` : ""}
+                    </option>
+                  )}
                 {(personasPF ?? []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name}

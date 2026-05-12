@@ -215,7 +215,9 @@ export default function ActaDetalle() {
     ? "Cargando snapshot legal de la reunión"
     : !certificationPlan?.hasPointSnapshots
       ? "Falta snapshot legal por punto. Vuelve a Votaciones y registra el resultado con motor."
-      : certificationRefs.length === 0
+      : certificationPointRefs.length > 0
+        ? "Materializa todos los puntos proclamables como Acuerdo 360 antes de emitir certificación."
+      : certificationAgreementRefs.length === 0
         ? "No hay acuerdos societariamente proclamables para certificar"
         : null;
   const certificationReadinessReason =
@@ -585,7 +587,7 @@ export default function ActaDetalle() {
                   minuteId={id}
                   entityId={acta.entity_id}
                   bodyId={acta.body_id}
-                  agreementIds={certificationRefs}
+                  agreementIds={certificationAgreementRefs}
                   userRole={primaryRole}
                   disabledReason={certificationGateReason}
                 />
@@ -614,7 +616,7 @@ export default function ActaDetalle() {
                         </div>
                         <div className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
                           {c.agreements_certified?.length ?? 0} acuerdo(s) certificados ·
-                          {c.requires_qualified_signature ? " firma cualificada" : " firma simple"}
+                          {c.requires_qualified_signature ? " firma QES demo" : " firma simple"}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">

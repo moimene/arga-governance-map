@@ -317,7 +317,7 @@ Cada flujo invoca los gates relevantes y produce el snapshot final.
 
 ### 5.2 Ciclo: convocatoria de reunión (B5)
 
-**Stepper**: `ConvocatoriasStepper` (7 pasos), ruta `/secretaria/convocatorias/nueva`.
+**Stepper**: `ConvocatoriasStepper` (8 pasos), ruta `/secretaria/convocatorias/nueva`.
 
 **Pre-condiciones:**
 - Entity activa con `useEntityDemoReadiness` ≠ `'reference_only'` (requiere
@@ -336,7 +336,8 @@ Cada flujo invoca los gates relevantes y produce el snapshot final.
 | 4 | Destinatarios | mandates activos del body cargan automáticamente, opcional `excludedPersonIds` | true |
 | 5 | Canales de publicación | `publication_channels[]` (defaults recomendados por jurisdicción: ES → WEB_CORPORATIVA + ERDS; PT → JORNAL_OFICIAL; BR → DIARIO_OFICIAL; MX → DOF) | true |
 | 6 | Adjuntos | `adjuntos[]` con `{nombre, descripcion}` opcional | true |
-| 7 | Revisión y emisión | (resumen) | true |
+| 7 | Borrador documento | plantilla, Capa 3 editable y borrador final del texto | true |
+| 8 | Revisión y emisión | resumen, verificación de compliance y emisión definitiva | true |
 
 **Motor V2 evalúa en paralelo** (no bloquea, advierte):
 - `evaluacionV2.antelacionDiasRequerida`: días requeridos según jurisdicción/tipo (SA art. 176 LSC = 1 mes ordinaria, SL = 15 días).

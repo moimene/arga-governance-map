@@ -2850,6 +2850,21 @@ function buildActaContent(
   return lines.join("\n");
 }
 
+type CensoSnapshotType = "ECONOMICO" | "POLITICO" | "UNIVERSAL";
+
+function inferCensoSnapshotType(
+  meeting: {
+    meeting_type?: string | null;
+    quorum_data?: Record<string, unknown> | null;
+    governing_bodies?: { body_type?: string | null } | null;
+  } | null | undefined,
+): CensoSnapshotType {
+  const raw = `${meeting?.meeting_type ?? ""} ${meeting?.governing_bodies?.body_type ?? ""}`.toUpperCase();
+  if (meeting?.quorum_data?.junta_universal === true || raw.includes("UNIVERSAL")) return "UNIVERSAL";
+  if (raw.includes("JUNTA")) return "ECONOMICO";
+  return "POLITICO";
+}
+
 function CierreStep({ meetingId }: { meetingId?: string }) {
   const navigate = useNavigate();
   const { data: meeting } = useReunionById(meetingId);
@@ -2862,17 +2877,35 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const adoptedWithoutAgreement = resolutions.filter(
     (resolution) => resolution.status === "ADOPTED" && !resolution.agreement_id
   );
+  const censoEntityId = meeting?.governing_bodies?.entity_id ?? null;
+  const censoBodyId = meeting?.body_id ?? null;
+  const censoSnapshotType = inferCensoSnapshotType(meeting);
+  const canCreateCensoSnapshot = Boolean(censoEntityId && censoBodyId);
   const canGenerateMinute =
-    resolutions.length > 0 && adoptedWithoutAgreement.length === 0 && !existingMinute?.id;
+    resolutions.length > 0 &&
+    adoptedWithoutAgreement.length === 0 &&
+    !existingMinute?.id &&
+    canCreateCensoSnapshot;
 
   function handleConfirmar() {
     if (!meetingId || adoptedWithoutAgreement.length > 0) {
       toast.error("No se puede generar el acta: hay acuerdos adoptados sin expediente Acuerdo 360.");
       return;
     }
+    if (!censoEntityId || !censoBodyId) {
+      toast.error("No se puede generar el acta: falta sociedad u órgano para crear el snapshot WORM de censo.");
+      return;
+    }
     const content = buildActaContent(meeting, attendees, resolutions);
     generarActa.mutate(
-      { meetingId, content },
+      {
+        meetingId,
+        content,
+        entityId: censoEntityId,
+        bodyId: censoBodyId,
+        sessionKind: "MEETING",
+        snapshotType: censoSnapshotType,
+      },
       {
         onSuccess: (id) => {
           setMinuteId(id);
@@ -3038,6 +3071,8 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         title={
           existingMinute?.id
             ? "La reunión ya tiene un acta operativa vinculada"
+            : !canCreateCensoSnapshot
+              ? "Falta sociedad u órgano para crear el snapshot WORM de censo"
             : adoptedWithoutAgreement.length > 0
               ? "Recalcula las resoluciones adoptadas sin Acuerdo 360 antes de generar el acta"
               : undefined
@@ -3109,6 +3144,14 @@ function ReunionIntake() {
   const source = searchParams.get("source");
   const event = searchParams.get("event") ?? searchParams.get("handoff");
   const sourceId = searchParams.get("source_id") ?? searchParams.get("ai_incident");
+  const scopedEntityId =
+    searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
+  const scopedConvocatoriasPath = scopedEntityId
+    ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+    : "/secretaria/convocatorias";
+  const scopedNuevaConvocatoriaPath = scopedEntityId
+    ? `/secretaria/convocatorias/nueva?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+    : "/secretaria/convocatorias/nueva";
   const isCrossModule = source === "grc" || source === "aims";
   const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
 
@@ -3164,7 +3207,7 @@ function ReunionIntake() {
           aria-label="Opciones para crear una reunión"
         >
           <Link
-            to="/secretaria/convocatorias/nueva"
+            to={scopedNuevaConvocatoriaPath}
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
@@ -3177,7 +3220,7 @@ function ReunionIntake() {
           </Link>
 
           <Link
-            to="/secretaria/convocatorias"
+            to={scopedConvocatoriasPath}
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
@@ -3195,13 +3238,19 @@ function ReunionIntake() {
 
 export default function ReunionStepper() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const scopedEntityId =
+    searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
+  const backTo = scopedEntityId
+    ? `/secretaria/reuniones?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+    : "/secretaria/reuniones";
   if (!id) return <ReunionIntake />;
 
   return (
     <StepperShell
       eyebrow="Secretaría · Reunión"
       title="Asistente de sesión societaria"
-      backTo="/secretaria/reuniones"
+      backTo={backTo}
       steps={buildSteps(id)}
     />
   );

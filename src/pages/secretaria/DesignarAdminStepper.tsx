@@ -94,6 +94,8 @@ export default function DesignarAdminStepper() {
     limit: representanteSearch.trim() ? 50 : 200,
   });
   const [personaSeleccionadaSnapshot, setPersonaSeleccionadaSnapshot] = useState<PersonaRow | null>(null);
+  const [representanteSeleccionadoSnapshot, setRepresentanteSeleccionadoSnapshot] =
+    useState<PersonaRow | null>(null);
   // P2 Codex iter-6: fetch byId la persona preselected para no depender del cap del list query.
   // Cubre el caso en que la persona pasada por ?personId= está alfabéticamente fuera del cap.
   const { data: personaPreselected } = usePersonaCanonical(personIdFromUrl || undefined);
@@ -110,6 +112,9 @@ export default function DesignarAdminStepper() {
     inscripcion_rm_fecha: "",
     fecha_inicio: new Date().toISOString().slice(0, 10),
   });
+  const { data: representantePreselected } = usePersonaCanonical(
+    draft.representative_person_id || undefined,
+  );
 
   const asignarMutation = useAsignarCargo();
 
@@ -173,6 +178,25 @@ export default function DesignarAdminStepper() {
       : (personas ?? []).find((p) => p.id === draft.person_id);
   const personaEsPJ = personaSeleccionada?.person_type === "PJ";
 
+  useEffect(() => {
+    if (!draft.representative_person_id) {
+      setRepresentanteSeleccionadoSnapshot(null);
+      return;
+    }
+    const current =
+      representantePreselected?.id === draft.representative_person_id
+        ? representantePreselected
+        : (personasPF ?? []).find((p) => p.id === draft.representative_person_id);
+    if (current) setRepresentanteSeleccionadoSnapshot(current);
+  }, [draft.representative_person_id, representantePreselected, personasPF]);
+
+  const representanteSeleccionado =
+    representantePreselected?.id === draft.representative_person_id
+      ? representantePreselected
+      : representanteSeleccionadoSnapshot?.id === draft.representative_person_id
+        ? representanteSeleccionadoSnapshot
+        : (personasPF ?? []).find((p) => p.id === draft.representative_person_id);
+
   // P1 Codex iteration-2: derive personRequiresRep desde helper canónico para
   // que el gate cubra TODOS los cargos admin + CONSEJERO cuando la persona es
   // PJ (LSC art. 212bis), no solo ADMIN_PJ.
@@ -196,6 +220,17 @@ export default function DesignarAdminStepper() {
   };
 
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
+  // Sprint 2 adversarial: el ScopeSwitcher puede añadir ?entity= justo
+  // después de navegar desde una ficha de persona. Sin esta sincronización,
+  // el wizard queda con entityId vacío y el submit se convierte en no-op.
+  useEffect(() => {
+    if (!entityIdFromUrl || entityIdFromUrl === entityId) return;
+    setEntityId(entityIdFromUrl);
+    setBodies([]);
+    setDraft((d) => ({ ...d, body_id: bodyIdFromUrl || "" }));
+  }, [bodyIdFromUrl, entityId, entityIdFromUrl]);
+
   const next = () => {
     // Carga órganos al entrar en el step Cargo si vamos a necesitar el dropdown.
     if (step === stepIdx.cargo && esColegiado && bodies.length === 0) {
@@ -230,7 +265,10 @@ export default function DesignarAdminStepper() {
   })();
 
   async function guardar() {
-    if (!entityId) return;
+    if (!entityId) {
+      toast.error("Selecciona una sociedad antes de designar el cargo.");
+      return;
+    }
 
     // Sprint 2 iter-9: defensive identity validation final. Si la ruta venía
     // de una ficha `/personas/:id`, nunca permitimos que un dato preselected
@@ -566,12 +604,25 @@ export default function DesignarAdminStepper() {
                 </span>
                 <select
                   value={draft.representative_person_id}
-                  onChange={(e) => update("representative_person_id", e.target.value)}
+                  onChange={(e) => {
+                    const nextRepresentativeId = e.target.value;
+                    update("representative_person_id", nextRepresentativeId);
+                    setRepresentanteSeleccionadoSnapshot(
+                      (personasPF ?? []).find((p) => p.id === nextRepresentativeId) ?? null,
+                    );
+                  }}
                   className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none focus:border-[var(--g-brand-3308)] focus:ring-2 focus:ring-[var(--g-brand-3308)]/20"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                   aria-required="true"
                 >
                   <option value="">— Seleccionar PF —</option>
+                  {representanteSeleccionado &&
+                    !(personasPF ?? []).some((p) => p.id === representanteSeleccionado.id) && (
+                      <option value={representanteSeleccionado.id}>
+                        {representanteSeleccionado.full_name}{" "}
+                        {representanteSeleccionado.tax_id ? `· ${representanteSeleccionado.tax_id}` : ""}
+                      </option>
+                    )}
                   {(personasPF ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.full_name} {p.tax_id ? `· ${p.tax_id}` : ""}
@@ -652,9 +703,7 @@ export default function DesignarAdminStepper() {
               {personRequiresRep && (
                 <Field
                   label="Representante"
-                  value={
-                    (personasPF ?? []).find((p) => p.id === draft.representative_person_id)?.full_name ?? "—"
-                  }
+                  value={representanteSeleccionado?.full_name ?? "—"}
                 />
               )}
               <Field label="Fuente" value={draft.fuente_designacion} />

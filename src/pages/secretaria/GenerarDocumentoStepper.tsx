@@ -92,6 +92,23 @@ function valueAsText(value: unknown): string {
   return "";
 }
 
+function unresolvedVariableNames(variables: unknown): string[] {
+  if (!Array.isArray(variables)) return [];
+  return Array.from(
+    new Set(
+      (variables as Capa2Variable[])
+        .map((variable) => variable.variable)
+        .filter((variable): variable is string => Boolean(variable?.trim())),
+    ),
+  );
+}
+
+function evidenceStatusLabel(status: string | null | undefined) {
+  if (status === "DEMO_OPERATIVA") return "Evidencia demo operativa";
+  if (!status) return "Evidencia no informada";
+  return status;
+}
+
 function buildDefaultCapa3Values(
   fields: Array<{ campo: string; default?: string; opciones?: string[] }>,
   agreement: AgreementFull,
@@ -282,7 +299,6 @@ export default function GenerarDocumentoStepper() {
 
   useEffect(() => {
     if (capa3OverridesWarnCompat) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[GenerarDocumentoStepper] Hay overrides Capa 3 con compatible_with_canonical_version distinto a la plantilla actual; se han ignorado.",
       );
@@ -450,8 +466,12 @@ export default function GenerarDocumentoStepper() {
           );
           setResolvedVars(result.values);
           setUnresolvedVars(result.unresolved);
-        } catch {
-          setUnresolvedVars([]);
+          setRenderError(null);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setResolvedVars({});
+          setUnresolvedVars(unresolvedVariableNames(plantilla.capa2_variables));
+          setRenderError(`No se pudieron resolver las variables de la plantilla: ${msg}`);
         } finally {
           setIsResolving(false);
         }
@@ -638,17 +658,21 @@ export default function GenerarDocumentoStepper() {
 
       if (result.ok) {
         const docUrl = result.documentUrl || null;
-        setArchiveUrl(docUrl);
-        setArchiveStatus("archived");
-        // C5: write document_url back to the agreement record
         if (docUrl && agreement?.id && tenantId) {
-          await supabase
+          const { error: linkError } = await supabase
             .from("agreements")
             .update({ document_url: docUrl })
             .eq("id", agreement.id)
             .eq("tenant_id", tenantId);
+          if (linkError) {
+            throw new Error(
+              `Documento archivado, pero no se pudo vincular al expediente: ${linkError.message}`,
+            );
+          }
           qc.invalidateQueries({ queryKey: ["agreement", tenantId, agreement.id] });
         }
+        setArchiveUrl(docUrl);
+        setArchiveStatus("archived");
       } else {
         setArchiveError(result.error || "Error al archivar el documento");
         setArchiveStatus("error");
@@ -1243,7 +1267,7 @@ export default function GenerarDocumentoStepper() {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
                     <span className="font-medium text-[var(--g-text-primary)]">Trazabilidad del sistema</span>
                     <span className="font-mono">{preparedDraft.request.request_id.slice(0, 12)}</span>
-                    <span>{preparedDraft.request.evidence_status}</span>
+                    <span>{evidenceStatusLabel(preparedDraft.request.evidence_status)}</span>
                     {draftCloudId ? <span className="font-mono">draft {draftCloudId.slice(0, 8)}</span> : null}
                   </div>
                   {draftPersistenceMessage ? (
@@ -1340,7 +1364,7 @@ export default function GenerarDocumentoStepper() {
                 <div className="mt-3 grid gap-2 text-xs text-[var(--g-text-secondary)] sm:grid-cols-2">
                   <p>
                     <span className="font-medium text-[var(--g-text-primary)]">Boundary:</span>{" "}
-                    {compositionResult.request.document_type} · {compositionResult.request.evidence_status}
+                    {compositionResult.request.document_type} · {evidenceStatusLabel(compositionResult.request.evidence_status)}
                   </p>
                   <p>
                     <span className="font-medium text-[var(--g-text-primary)]">Plantilla:</span>{" "}
@@ -1521,7 +1545,7 @@ export default function GenerarDocumentoStepper() {
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Documento archivado correctamente</span>
+                    <span className="text-sm font-medium">Documento archivado como evidencia demo operativa</span>
                   </div>
                   {archiveUrl && (
                     <p className="text-xs text-[var(--g-text-secondary)]">
@@ -1541,15 +1565,18 @@ export default function GenerarDocumentoStepper() {
                       className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      Archivado
+                      Evidencia demo
                     </span>
                     <span
                       className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      Vinculado al expediente
+                      Enlace guardado en expediente
                     </span>
                   </div>
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    No constituye evidencia final productiva; pendiente de audit, retention y legal hold.
+                  </p>
                   {/* Verificador Offline HTML — GAS spec item */}
                   <button
                     type="button"

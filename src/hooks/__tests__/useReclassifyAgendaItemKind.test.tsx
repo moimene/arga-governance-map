@@ -24,6 +24,9 @@ const callLog: string[] = [];
 const mockFromSelect = vi.fn();
 const mockFromUpdate = vi.fn();
 const mockRpc = vi.fn();
+const rpcResponseStore: { current: { data: unknown; error: unknown } } = {
+  current: { data: null, error: null },
+};
 
 function makeMaybeSingleChain(rowProvider: () => { data: unknown; error: unknown }) {
   const chain = {
@@ -98,7 +101,7 @@ vi.mock("@/integrations/supabase/client", () => {
       rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
         callLog.push(`rpc:${name}`);
         mockRpc(name, args);
-        return { data: null, error: null };
+        return rpcResponseStore.current;
       }),
     },
   };
@@ -158,6 +161,7 @@ describe("useReclassifyAgendaItemKind", () => {
       data: { kind: "DELIBERATIVO" },
       error: null,
     };
+    rpcResponseStore.current = { data: null, error: null };
   });
 
   it("happy path: SECRETARIO + DRAFT + CONSEJO → RPC antes de UPDATE, success", async () => {
@@ -314,15 +318,10 @@ describe("useReclassifyAgendaItemKind", () => {
 
   it("RPC reclassify_agenda_item_kind falla: aborta sin commitear cambio", async () => {
     const { result } = renderHook(() => useReclassifyAgendaItemKind(), { wrapper });
-
-    // Capturar la implementación actual y sustituirla puntualmente
-    const { supabase } = await import("@/integrations/supabase/client");
-    const rpcSpy = vi
-      .spyOn(supabase, "rpc")
-      .mockImplementationOnce(
-        // @ts-expect-error mock with simplified shape — runtime contract is { data, error }
-        async () => ({ data: null, error: { message: "reclassify_agenda_item_kind falló" } }),
-      );
+    rpcResponseStore.current = {
+      data: null,
+      error: { message: "reclassify_agenda_item_kind falló" },
+    };
 
     await expect(
       result.current.mutateAsync({
@@ -334,7 +333,6 @@ describe("useReclassifyAgendaItemKind", () => {
     ).rejects.toThrow(/reclassify_agenda_item_kind falló/);
 
     expect(mockFromUpdate).not.toHaveBeenCalled();
-    rpcSpy.mockRestore();
   });
 
   it("invalida queries en success: agenda_items[meetingId] + agenda_item_kind_changelog[id]", async () => {

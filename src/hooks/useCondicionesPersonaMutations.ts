@@ -77,6 +77,10 @@ export function useAsignarCargo() {
           input.body_id ?? "no-body",
           input.tipo_condicion,
           input.fecha_inicio,
+          input.fuente_designacion,
+          input.inscripcion_rm_referencia?.trim() ?? "",
+          input.inscripcion_rm_fecha ?? "",
+          input.representative_person_id ?? "",
         ].join(":"),
       });
       if (error) throw error;
