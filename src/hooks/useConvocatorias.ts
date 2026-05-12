@@ -307,6 +307,25 @@ const ATTACHMENT_ALLOWED_MIME = new Set<string>([
   "image/jpeg",
 ]);
 
+// Sniff MIME desde la extensión cuando `file.type` viene vacío
+// (típico en Mac Finder + Safari, drag-and-drop antiguos). Mantiene la
+// lista cerrada — extensiones no mapeadas → rechazo explícito en lugar
+// de bypass como octet-stream (riesgo de subir ejecutables).
+const ATTACHMENT_EXTENSION_TO_MIME: Record<string, string> = {
+  pdf:  "application/pdf",
+  doc:  "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls:  "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt:  "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  csv:  "text/csv",
+  txt:  "text/plain",
+  png:  "image/png",
+  jpg:  "image/jpeg",
+  jpeg: "image/jpeg",
+};
+
 const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export interface UploadAttachmentInput {
@@ -337,6 +356,31 @@ function sanitizeFileName(name: string): string {
 }
 
 /**
+ * Resuelve el MIME efectivo del fichero. Si `file.type` está presente
+ * y permitido, se usa tal cual. Si está vacío, se sniffa por extensión
+ * contra la lista cerrada. Si tras el sniff sigue sin coincidir con un
+ * MIME permitido → throw (NO se admite `application/octet-stream`).
+ */
+export function resolveAttachmentMime(file: { name: string; type: string }): string {
+  const declared = file.type?.trim().toLowerCase();
+  if (declared) {
+    if (!ATTACHMENT_ALLOWED_MIME.has(declared)) {
+      throw new Error(`Tipo de archivo no permitido: ${declared}`);
+    }
+    return declared;
+  }
+  const dot = file.name.lastIndexOf(".");
+  const ext = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+  const sniffed = ATTACHMENT_EXTENSION_TO_MIME[ext];
+  if (!sniffed || !ATTACHMENT_ALLOWED_MIME.has(sniffed)) {
+    throw new Error(
+      `Tipo de archivo no permitido: MIME vacío y extensión "${ext || "(sin extensión)"}" no admitida`,
+    );
+  }
+  return sniffed;
+}
+
+/**
  * Sube un fichero a Storage (bucket `matter-documents`) e inserta la fila
  * correspondiente en `attachments`. Lanza si el MIME no está permitido o el
  * tamaño supera el límite. Idempotencia: cada llamada genera un id distinto
@@ -354,9 +398,9 @@ export function useUploadConvocatoriaAttachment() {
       if (file.size > ATTACHMENT_MAX_BYTES) {
         throw new Error(`Archivo demasiado grande (${Math.round(file.size / (1024 * 1024))} MB > 25 MB)`);
       }
-      if (file.type && !ATTACHMENT_ALLOWED_MIME.has(file.type)) {
-        throw new Error(`Tipo de archivo no permitido: ${file.type || "desconocido"}`);
-      }
+      // resolveAttachmentMime valida o sniffa por extensión y lanza si no
+      // hay match contra la lista cerrada (no acepta octet-stream).
+      const effectiveMime = resolveAttachmentMime({ name: file.name, type: file.type });
 
       const hash = await computeFileHashSha512(file);
       const safeName = sanitizeFileName(file.name);
@@ -365,7 +409,7 @@ export function useUploadConvocatoriaAttachment() {
       const { error: uploadError } = await supabase.storage
         .from("matter-documents")
         .upload(storagePath, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: effectiveMime,
           upsert: false,
         });
       if (uploadError) throw uploadError;
