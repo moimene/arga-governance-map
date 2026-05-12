@@ -1128,6 +1128,40 @@ export default function ConvocatoriasStepper() {
     }));
     const includedRequiredDocuments = requiredDocuments.filter((doc) => documentosIncluidos.has(doc.id));
 
+    // Codex P2 PR #3 round 5: trazabilidad de la plantilla efectivamente
+    // usada para renderizar `convocatoria_text` (Paso 7). Sin esto, drafts
+    // emitidos vía auto-selección o selección manual en Paso 7 quedaban
+    // sin pista del template id/version/source que generó el texto legal
+    // → no auditables hacia atrás. requestedPlantilla solo cubre el flujo
+    // `?plantilla=` (handoff externo), que es minoritario.
+    const borradorTemplateTrace = effectiveBorradorTemplate
+      ? {
+          id: effectiveBorradorTemplate.id,
+          tipo: effectiveBorradorTemplate.tipo,
+          version: effectiveBorradorTemplate.version,
+          estado: effectiveBorradorTemplate.estado,
+          aprobada_por: effectiveBorradorTemplate.aprobada_por,
+          fecha_aprobacion: effectiveBorradorTemplate.fecha_aprobacion,
+          referencia_legal: effectiveBorradorTemplate.referencia_legal,
+          organo_tipo: effectiveBorradorTemplate.organo_tipo,
+          jurisdiccion: effectiveBorradorTemplate.jurisdiccion,
+          source_of_truth: effectiveBorradorTemplate.estado === "ACTIVA" && effectiveBorradorTemplate.aprobada_por
+            ? "approved_template"
+            : "demo_or_operative_template",
+          // Distinción manual vs auto-seleccionada: si el usuario tocó el
+          // selector, `selectedBorradorTemplateId` no es null.
+          selection_mode: selectedBorradorTemplateId ? "manual" : "auto",
+          capa3_fields_count: effectiveBorradorTemplate.capa3_editables?.length ?? 0,
+          capa3_values: borradorCapa3Values,
+          // Render outcome: el texto editable del usuario puede haber
+          // divergido del render canonical de la plantilla. Marcamos el
+          // estado dirty para que auditoría sepa que el draft fue editado
+          // manualmente tras el render inicial.
+          borrador_dirty: borradorDirty,
+          render_unresolved: renderUnresolved,
+        }
+      : null;
+
     return {
       rule_trace: {
         schema_version: 1,
@@ -1158,6 +1192,10 @@ export default function ConvocatoriasStepper() {
               trace_evidence: requestedTemplateTraceEvidence,
             }
             : null,
+          // Plantilla del Paso 7 (auto-selected o manual) — la que de
+          // hecho generó `convocatoria_text` cuando lo hubo. Independiente
+          // de `selected_template` (que vincula handoff externo).
+          borrador_template: borradorTemplateTrace,
         },
         rule_resolutions: ruleResolutions.map(serializeRuleResolution),
         dual_evaluation: noticeDoubleEvaluation,
@@ -1217,6 +1255,7 @@ export default function ConvocatoriasStepper() {
           })),
         },
         documents: {
+          borrador_template: borradorTemplateTrace,
           selected_template: requestedPlantilla
             ? {
               id: requestedPlantilla.id,
