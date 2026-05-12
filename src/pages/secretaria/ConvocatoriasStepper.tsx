@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -181,7 +181,11 @@ const AGENDA_MATERIAS = [
 
   // Estatutarias (mayoría reforzada art. 199/201 LSC)
   { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true },
-  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ESTATUTARIA", inscribible: false },
+  // MODIFICACION_REGLAMENTO es ORDINARIA: reglamento del consejo/junta NO
+  // es estatutos (jerarquía LEY → ESTATUTOS → REGLAMENTO). Art. 285-290 LSC
+  // aplica sólo a modificación estatutaria; el reglamento se aprueba por
+  // mayoría legal del órgano competente.
+  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ORDINARIA", inscribible: false },
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true },
   { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true },
   { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true },
@@ -802,14 +806,32 @@ export default function ConvocatoriasStepper() {
   const [borradorDirty, setBorradorDirty] = useState(false);
   const [renderUnresolved, setRenderUnresolved] = useState<string[]>([]);
 
+  // Guard contra setState tras unmount o tras nueva regeneración (cancela
+  // promesas en vuelo). Sin esto, navegar fuera de Paso 7 mientras el
+  // import dinámico de `template-renderer` resuelve produciría un React
+  // warning "Can't perform a state update on an unmounted component" y
+  // dejaría escrituras race que sobreescriben edits manuales del usuario.
+  const isMountedRef = useRef(true);
+  const regenerateTokenRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const regenerateBorrador = useCallback(() => {
     if (!effectiveBorradorTemplate?.capa1_inmutable) {
       setBorradorTexto("");
       setRenderUnresolved([]);
       return;
     }
-    // Import dinámico de renderTemplate para evitar ciclo en setup.
+    // Cada llamada incrementa el token; sólo el último vuelve a setState.
+    const token = ++regenerateTokenRef.current;
     void import("@/lib/doc-gen/template-renderer").then(({ renderTemplate }) => {
+      // Cancelado si: componente desmontado o llegó una regeneración nueva.
+      if (!isMountedRef.current || token !== regenerateTokenRef.current) return;
       const merged = { ...borradorVariables, ...borradorCapa3Values };
       const result = renderTemplate({
         template: effectiveBorradorTemplate.capa1_inmutable!,
@@ -853,10 +875,16 @@ export default function ConvocatoriasStepper() {
     descripcion: string;
     error?: string;
   }[]>([]);
-  const [uploadStatus, setUploadStatus] = useState<{ ok: number; failed: number; messages: string[] }>({
+  const [uploadStatus, setUploadStatus] = useState<{
+    ok: number;
+    failed: number;
+    messages: string[];
+    inFlight: number;
+  }>({
     ok: 0,
     failed: 0,
     messages: [],
+    inFlight: 0,
   });
   const [documentosIncluidos, setDocumentosIncluidos] = useState<Set<string>>(new Set());
   const requiredDocuments = evaluacionV2.documentosObligatorios;
@@ -1161,29 +1189,50 @@ export default function ConvocatoriasStepper() {
         ...buildConvocatoriaTrace(),
       });
 
-      // Upload de adjuntos: best-effort (no bloquea la emisión). Si alguno
-      // falla, se marca en estado local y la convocatoria queda emitida.
+      // Upload de adjuntos paralelo con Promise.allSettled — la convocatoria
+      // ya está creada en DB (rollback no es viable sin DELETE), así que
+      // ejecutamos uploads en paralelo y reportamos fallos parciales. El
+      // usuario podrá reintentar adjuntos fallidos desde el detalle.
+      // Indicador "Subiendo X de N" gracias a un counter que se incrementa
+      // cuando cada promesa termina (no estrictamente ordenado pero útil).
       let okCount = 0;
       let failCount = 0;
       const failMessages: string[] = [];
       if (adjuntos.length > 0) {
-        for (const adjunto of adjuntos) {
-          try {
-            await uploadAttachment.mutateAsync({
-              convocatoriaId: created.id,
-              file: adjunto.file,
-            });
+        setUploadStatus({ ok: 0, failed: 0, messages: [], inFlight: adjuntos.length });
+        type UploadOutcome =
+          | { adjunto: typeof adjuntos[number]; ok: true }
+          | { adjunto: typeof adjuntos[number]; ok: false; msg: string };
+        const results = await Promise.allSettled(
+          adjuntos.map<Promise<UploadOutcome>>((adjunto) =>
+            uploadAttachment
+              .mutateAsync({ convocatoriaId: created.id, file: adjunto.file })
+              .then((): UploadOutcome => ({ adjunto, ok: true }))
+              .catch((err: unknown): UploadOutcome => ({
+                adjunto,
+                ok: false,
+                msg: err instanceof Error ? err.message : "Error de subida",
+              })),
+          ),
+        );
+        for (const result of results) {
+          // allSettled SIEMPRE devuelve fulfilled aquí (porque hacemos catch).
+          if (result.status !== "fulfilled") continue;
+          const outcome = result.value;
+          if (outcome.ok === true) {
             okCount += 1;
-          } catch (err) {
-            failCount += 1;
-            const msg = err instanceof Error ? err.message : "Error de subida";
-            failMessages.push(`${adjunto.file.name}: ${msg}`);
-            setAdjuntos((prev) =>
-              prev.map((a) => (a.id === adjunto.id ? { ...a, error: msg } : a)),
-            );
+            continue;
           }
+          // outcome.ok === false aquí → TS estrecha a la variante con msg.
+          failCount += 1;
+          const failedAdjunto = outcome.adjunto;
+          const failedMsg = outcome.msg;
+          failMessages.push(`${failedAdjunto.file.name}: ${failedMsg}`);
+          setAdjuntos((prev) =>
+            prev.map((a) => (a.id === failedAdjunto.id ? { ...a, error: failedMsg } : a)),
+          );
         }
-        setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages });
+        setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages, inFlight: 0 });
       }
 
       setEmitidoId(created.id);
@@ -2693,14 +2742,18 @@ export default function ConvocatoriasStepper() {
             {isLastStep ? (
               <button
                 type="button"
-                disabled={createConvocatoria.isPending}
+                disabled={createConvocatoria.isPending || uploadStatus.inFlight > 0}
                 onClick={handleEmitir}
-                aria-busy={createConvocatoria.isPending}
+                aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0}
                 className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Send className="h-4 w-4" />
-                {createConvocatoria.isPending ? "Emitiendo…" : "Emitir convocatoria"}
+                {uploadStatus.inFlight > 0
+                  ? `Subiendo ${uploadStatus.inFlight} adjunto(s)…`
+                  : createConvocatoria.isPending
+                  ? "Emitiendo…"
+                  : "Emitir convocatoria"}
               </button>
             ) : (
               <button
