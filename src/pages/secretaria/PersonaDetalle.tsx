@@ -29,6 +29,10 @@ export default function PersonaDetalle() {
   const { data: p, isLoading } = usePersonaCanonical(id);
   const { data: cargos } = useCargosPersona(id);
   const { data: holdings } = useHoldingsPersona(id);
+  // P2 Codex iteration-1: hook llamado aquí (no después de los early returns)
+  // para cumplir rules-of-hooks. El hook se desactiva internamente vía
+  // `enabled: !!tenantId && !!representedPersonId` si id es undefined.
+  const { data: representantesByEntity } = useRepresentantesAdminPJByPerson(id);
 
   // D4.1: split cargos by estado para mostrar vigentes y cesados en
   // secciones independientes. El histórico se conserva (L14): el cese hace
@@ -109,10 +113,8 @@ export default function PersonaDetalle() {
   // requiere representante (L1).
   //
   // P2 Codex iteration-1: verificar representación PER entity_id usando
-  // `representaciones` directamente, no `persons.representative_person_id`
-  // (atajo legacy global que es compartido entre sociedades).
-  const { data: representantesByEntity } = useRepresentantesAdminPJByPerson(p.id);
-
+  // `representaciones` directamente (mapa de useRepresentantesAdminPJByPerson),
+  // no `persons.representative_person_id` (atajo legacy global compartido).
   const cargosAdminSinRep: CargoDetailRow[] = cargosVigentes.filter((c) => {
     if (
       !requiresRepresentative(
