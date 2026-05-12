@@ -1,0 +1,36 @@
+{
+  "schema_version": "secretaria.template_import.v1",
+  "template": {
+    "tipo": "MODELO_ACUERDO",
+    "materia": "AUMENTO_CAPITAL",
+    "materia_acuerdo": "AUMENTO_CAPITAL",
+    "jurisdiccion": "BR",
+    "version": "1.0.0",
+    "organo_tipo": "JUNTA_GENERAL",
+    "adoption_mode": "MEETING",
+    "referencia_legal": "Art. 166 LSC (jurisdicción BR — referencia comparada, ver Lei 6.404/76)",
+    "snapshot_rule_pack_required": false
+  },
+  "capa1_inmutable": "PRIMEIRO.- Aprovar o aumento de capital social de {{entities.name}} na quantia de {{importe_aumento}} reais mediante a emissão de {{numero_acciones}} ações de valor nominal {{valor_nominal}} reais cada uma. Esta plantilla é uma fixture e2e exclusiva para jurisdição BR, sem colisión con plantillas ACTIVA en ES.",
+  "capa2_variables": [
+    { "variable": "entities.name", "fuente": "entities.*", "condicion": "SIEMPRE" }
+  ],
+  "capa3_editables": [
+    {
+      "campo": "importe_aumento",
+      "obligatoriedad": "OBLIGATORIO",
+      "descripcion": "Importe nominal del aumento (BRL)"
+    },
+    {
+      "campo": "numero_acciones",
+      "obligatoriedad": "OBLIGATORIO",
+      "descripcion": "Número de acciones emitidas"
+    },
+    {
+      "campo": "valor_nominal",
+      "obligatoriedad": "OBLIGATORIO",
+      "descripcion": "Valor nominal por acción (BRL)"
+    }
+  ],
+  "notas_legal": "Fixture e2e — sandboxed BR jurisdiction; no productiva."
+}
