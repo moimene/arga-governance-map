@@ -420,6 +420,23 @@ BEGIN
     v_class_code := NULLIF(v_item ->> 'share_class_code', '');
     v_share_class_id := NULLIF(v_share_class_ids ->> v_class_code, '')::uuid;
 
+    -- Contrato D6 §4 paso 6 / §10 criterio CT-003: cada holding debe pertenecer
+    -- a una clase declarada en el mismo payload. Aunque capital_holdings.share_class_id
+    -- es nullable en schema (para holdings legacy pre-modelo-canónico), el alta D6
+    -- siempre conoce la clase. Si v_share_class_id es NULL aquí significa:
+    --   - share_classes del payload está vacío (CL-001 debería bloquear antes), o
+    --   - share_class_code referenciado en el holding no fue insertado arriba.
+    -- Sin este guard, el INSERT pasaría con share_class_id=NULL y dejaría el
+    -- holding desconectado de la cap table, perdiendo metadatos de clase para
+    -- voting/economic_rights en UI/exports/rules engine.
+    IF v_share_class_id IS NULL THEN
+      RAISE EXCEPTION
+        'capital_holding refers to undeclared share_class_code: %. Expected one of %.',
+        v_class_code,
+        (SELECT array_agg(key) FROM jsonb_object_keys(v_share_class_ids) AS t(key))
+        USING ERRCODE = 'P0001';
+    END IF;
+
     INSERT INTO capital_holdings (
       tenant_id,
       entity_id,
