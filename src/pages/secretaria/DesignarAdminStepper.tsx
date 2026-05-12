@@ -185,6 +185,14 @@ export default function DesignarAdminStepper() {
     if (step === stepIdx.persona) return !!draft.person_id;
     if (step === stepIdx.sociedad) return !!entityId;
     if (step === stepIdx.cargo) {
+      // P2 Codex iter-8: bloqueo loading state — si hay personIdFromUrl pero la
+      // persona preselected aún no ha resuelto del servidor, NO permitir avanzar.
+      // Sin este gate, race condition: personaSeleccionada=undefined →
+      // personRequiresRep=false → permite guardar PJ admin sin representante
+      // (viola L2 art. 212bis).
+      if (personIdFromUrl && !personaPreselected && draft.person_id === personIdFromUrl) {
+        return false; // still loading
+      }
       if (esColegiado && !draft.body_id) return false;
       // ADMIN_PJ además exige que la persona designada sea PJ (mensaje en UI).
       if (esAdminPJ && !personaEsPJ) return false;
