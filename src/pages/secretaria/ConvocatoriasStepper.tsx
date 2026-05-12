@@ -806,19 +806,56 @@ export default function ConvocatoriasStepper() {
       .filter((m) => !excludedPersonIds.has(m.person_id))
       .map((m) => m.full_name)
       .filter(Boolean);
+    // Codex P1 PR #3 round 3: la plantilla CONVOCATORIA_SL_NOTIFICACION
+    // de migration 20260419_000009 usa aliases canonical del contrato
+    // variables-plantillas v1.1:
+    //   - `{{lugar_junta}}` (alias de `lugar`)
+    //   - `{{tipo_junta}}` / `{{tipo_junta_texto}}` (alias de `tipo_convocatoria`)
+    //   - `{{#if segunda_convocatoria}}` (boolean, NO `habilitarSegunda`)
+    //   - `{{fecha_segunda_convocatoria}}` / `{{hora_segunda_convocatoria}}`
+    //     (aliases largos, NO `fecha_segunda` / `hora_segunda`)
+    //   - `{{domicilio_social}}`
+    // Sin estos aliases, las plantillas omiten la sección de 2ª convocatoria
+    // y otros bloques aun cuando el usuario los ha rellenado. Exponemos
+    // ambos nombres (corto y largo) para retro-compat con plantillas legacy.
+    const tipoJuntaTexto =
+      tipoConvocatoria === "ORDINARIA" ? "Junta General Ordinaria"
+      : tipoConvocatoria === "EXTRAORDINARIA" ? "Junta General Extraordinaria"
+      : "Junta Universal";
+
     return {
       denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+      domicilio_social: selectedEntity?.registration_number
+        ? `${selectedEntity?.legal_name ?? ""}`.trim()
+        : "",
       tipo_social: tipoSocial,
       organo_nombre: selectedBody?.name ?? "",
       organo_tipo: organoTipo,
       jurisdiction,
+
+      // Aliases tipo de junta
       tipo_convocatoria: tipoConvocatoria,
+      tipo_junta: tipoConvocatoria,
+      tipo_junta_texto: tipoJuntaTexto,
+
+      // Aliases lugar
+      lugar,
+      lugar_junta: lugar,
+
+      // Fecha / hora primera convocatoria
       fecha_junta: fechaReunion,
       hora_junta: horaReunion,
-      lugar,
+      fecha_emision: new Date().toISOString().slice(0, 10),
+
       formato_reunion: formatoReunion,
+
+      // Segunda convocatoria — boolean + aliases canonical + cortos.
+      segunda_convocatoria: habilitarSegunda,
       fecha_segunda: habilitarSegunda ? fechaReunion2 : "",
       hora_segunda: habilitarSegunda ? horaReunion2 : "",
+      fecha_segunda_convocatoria: habilitarSegunda ? fechaReunion2 : "",
+      hora_segunda_convocatoria: habilitarSegunda ? horaReunion2 : "",
+
       antelacion_dias_requerida: evaluacionV2.antelacionDiasRequerida,
       fecha_limite_publicacion: evaluacionV2.fechaLimitePublicacion,
       canales: channels.map((c) => channelLabel(c, channelOpts)).join(", "),

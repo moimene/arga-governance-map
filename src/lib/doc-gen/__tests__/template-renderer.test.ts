@@ -106,4 +106,66 @@ describe("template-renderer", () => {
       expect(occurrences).toBe(1);
     });
   });
+
+  // ================================================================
+  // Codex P1 round 3 PR #3: alias canonical de plantilla — la plantilla
+  // CONVOCATORIA_SL_NOTIFICACION espera `segunda_convocatoria`,
+  // `fecha_segunda_convocatoria`, `hora_segunda_convocatoria`,
+  // `lugar_junta`. El stepper expone ambos nombres (cortos y largos)
+  // para retro-compat con plantillas legacy.
+  // ================================================================
+  describe("alias canonical CONVOCATORIA_SL_NOTIFICACION (Codex P1 round 3)", () => {
+    it("segunda_convocatoria=true renderiza el bloque y los aliases largos", () => {
+      const rendered = renderTemplate({
+        template:
+          "{{#if segunda_convocatoria}}" +
+          "Segunda convocatoria: {{fecha_segunda_convocatoria}} a las {{hora_segunda_convocatoria}}" +
+          "{{else}}Sin segunda convocatoria{{/if}}",
+        variables: {
+          segunda_convocatoria: true,
+          fecha_segunda_convocatoria: "2026-06-15",
+          hora_segunda_convocatoria: "10:30",
+        },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).toContain("Segunda convocatoria: 2026-06-15 a las 10:30");
+      expect(rendered.text).not.toContain("Sin segunda convocatoria");
+    });
+
+    it("segunda_convocatoria=false oculta el bloque", () => {
+      const rendered = renderTemplate({
+        template:
+          "{{#if segunda_convocatoria}}Sí{{else}}No{{/if}}",
+        variables: {
+          segunda_convocatoria: false,
+        },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).toContain("No");
+      expect(rendered.text).not.toContain("Sí");
+    });
+
+    it("lugar_junta alias resuelve cuando la plantilla pide el nombre largo", () => {
+      const rendered = renderTemplate({
+        template: "Lugar: {{lugar_junta}}",
+        variables: {
+          lugar: "Sede social",
+          lugar_junta: "Sede social", // alias provided
+        },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).toContain("Lugar: Sede social");
+    });
+
+    it("tipo_junta_texto resuelve el texto humano de la convocatoria", () => {
+      const rendered = renderTemplate({
+        template: "Convocatoria de {{tipo_junta_texto}}",
+        variables: {
+          tipo_junta_texto: "Junta General Ordinaria",
+        },
+      });
+      expect(rendered.ok).toBe(true);
+      expect(rendered.text).toContain("Convocatoria de Junta General Ordinaria");
+    });
+  });
 });
