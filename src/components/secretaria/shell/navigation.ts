@@ -17,18 +17,36 @@ import {
   UserCircle,
   Users,
 } from "lucide-react";
-import type { SecretariaMode, SecretariaNavGroup, SecretariaNavItem } from "./types";
+import type {
+  VisibleSecretariaNavGroup,
+  VisibleSecretariaNavItem,
+} from "@/lib/secretaria/sidebar-visibility";
+import type { SecretariaMode } from "./types";
 
+export type SecretariaNavGroup = VisibleSecretariaNavGroup;
+export type SecretariaNavItem = VisibleSecretariaNavItem;
+
+/**
+ * Modo "grupo" — vista cross-sociedad del Secretario General de grupo.
+ * Se mantienen labels alineados con la taxonomía nueva: PANEL, OPERATIVA,
+ * CONFIGURACIÓN Y REGLAS (la "biblioteca legal" se unificó como
+ * "Configuración y reglas" para coincidir con el modo sociedad).
+ */
 export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
-    label: "Dirección de grupo",
+    label: "Panel de grupo",
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
       { label: "Sociedades", to: "/secretaria/sociedades", icon: Building2 },
       { label: "Personas", to: "/secretaria/personas", icon: UserCircle },
-      { label: "Board Pack", to: "/secretaria/board-pack", icon: Briefcase },
+      {
+        label: "Board Pack",
+        to: "/secretaria/board-pack",
+        icon: Briefcase,
+        visibility: { requiresCapability: "canCertify" },
+      },
       { label: "Campañas de grupo", to: "/secretaria/procesos-grupo", icon: Repeat2 },
-      { label: "Calendario", to: "/secretaria/calendario", icon: Calendar },
+      { label: "Procesos", to: "/secretaria/calendario", icon: Calendar },
       { label: "Multi-jurisdicción", to: "/secretaria/multi-jurisdiccion", icon: Globe },
     ],
   },
@@ -38,11 +56,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Convocatorias", to: "/secretaria/convocatorias", icon: Bell },
       { label: "Reuniones", to: "/secretaria/reuniones", icon: Users },
       { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
-      {
-        label: "Decisiones unipersonales",
-        to: "/secretaria/decisiones-unipersonales",
-        icon: Building2,
-      },
+      { label: "Decisiones unipersonales", to: "/secretaria/decisiones-unipersonales", icon: Building2 },
       { label: "Acuerdos sin sesión", to: "/secretaria/acuerdos-sin-sesion", icon: ScrollText },
       { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel },
       { label: "Libro de socios", to: "/secretaria/libro-socios", icon: BookOpen },
@@ -50,92 +64,182 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     ],
   },
   {
-    label: "Biblioteca legal",
+    label: "Configuración y reglas",
     items: [
       { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
-      { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+      { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
 ];
 
+/**
+ * Modo "sociedad" — vista enfocada en una entidad concreta. Cada item lleva
+ * reglas de visibilidad declarativas que el sidebar evalúa contra el contexto
+ * (capability_matrix, tipo_social, tipo_organo_admin, body_types vigentes,
+ * readiness). El centralizador `getVisibleSidebarSections` aplica los filtros
+ * y poda secciones enteras cuando no queda ningún item visible.
+ *
+ * Sections (taxonomía 2026-05-12):
+ *   CONTEXTO                  — anatomía societaria
+ *   EXPEDIENTES               — flujos de adopción de acuerdos
+ *   REGISTRO                  — libros, calendario, multi-jurisdicción
+ *   CONFIGURACIÓN Y REGLAS    — reglas legales y plantillas
+ */
 export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
   {
-    label: "Contexto de sociedad",
+    label: "Contexto",
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
+      // Sociedades: un solo item que en modo sociedad navega a la ficha
+      // activa (selectedEntityRoute) y en modo grupo a la lista. El acceso
+      // a "Nueva sociedad" vive en la propia página SociedadesList — no
+      // necesita un segundo item duplicado en el sidebar.
       {
-        label: "Ficha societaria",
+        label: "Sociedades",
         to: "/secretaria/sociedades",
         icon: Building2,
-        requiresEntity: true,
         selectedEntityRoute: true,
       },
-      // BATCH 4 (ronda 2): "Catálogo sociedades" navega al listado
-      // completo y permite crear nueva sociedad incluso estando en modo
-      // sociedad scopeada. Sin esto, el usuario en scope ARGA no tiene
-      // forma de descubrir el botón "Nueva sociedad" de SociedadesList.
-      {
-        label: "Catálogo sociedades",
-        to: "/secretaria/sociedades",
-        icon: Building2,
-      },
       { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
-      { label: "Board Pack", to: "/secretaria/board-pack", icon: Briefcase, requiresEntity: true },
+      {
+        label: "Board Pack",
+        to: "/secretaria/board-pack",
+        icon: Briefcase,
+        requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresCollegiateBody: true,
+          requiresCapability: "canCertify",
+          excludesIfReferenceOnly: true,
+        },
+      },
     ],
   },
   {
-    label: "Expedientes de la sociedad",
+    label: "Expedientes",
     items: [
-      { label: "Convocatorias", to: "/secretaria/convocatorias", icon: Bell, requiresEntity: true },
-      { label: "Reuniones", to: "/secretaria/reuniones", icon: Users, requiresEntity: true },
-      { label: "Actas", to: "/secretaria/actas", icon: FileSignature, requiresEntity: true },
+      {
+        label: "Convocatorias",
+        to: "/secretaria/convocatorias",
+        icon: Bell,
+        requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresCollegiateBody: true,
+          excludesIfReferenceOnly: true,
+        },
+      },
+      {
+        label: "Reuniones",
+        to: "/secretaria/reuniones",
+        icon: Users,
+        requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresCollegiateBody: true,
+          excludesIfReferenceOnly: true,
+        },
+      },
+      {
+        label: "Actas",
+        to: "/secretaria/actas",
+        icon: FileSignature,
+        requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresCollegiateBody: true,
+        },
+      },
       {
         label: "Decisiones unipersonales",
         to: "/secretaria/decisiones-unipersonales",
         icon: Building2,
         requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresUnipersonalAdmin: true,
+        },
       },
       {
+        // La página AcuerdosSinSesion es entry point para 3 flujos:
+        //   - NO_SESSION (unanimidad, requiere colegiado)
+        //   - CO_APROBACION (ADMIN_MANCOMUNADOS — k de n)
+        //   - SOLIDARIO (ADMIN_SOLIDARIOS — administrador único de los solidarios)
+        // No filtramos por colegialidad: si la entidad soporta CUALQUIERA
+        // de esos 3 modos, el item debe aparecer y la página decide qué
+        // CTAs renderizar. Los CTAs internos usan canShowAdoptionModeCta.
         label: "Acuerdos sin sesión",
         to: "/secretaria/acuerdos-sin-sesion",
         icon: ScrollText,
         requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresAdoptionMode: ["NO_SESSION", "CO_APROBACION", "SOLIDARIO"],
+          excludesIfReferenceOnly: true,
+        },
       },
-      { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel, requiresEntity: true },
+      {
+        label: "Tramitador registral",
+        to: "/secretaria/tramitador",
+        icon: Gavel,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
     ],
   },
   {
-    label: "Libros y cumplimiento",
+    label: "Registro",
     items: [
-      { label: "Libro de socios", to: "/secretaria/libro-socios", icon: BookOpen, requiresEntity: true },
-      { label: "Libros obligatorios", to: "/secretaria/libros", icon: Library, requiresEntity: true },
-      { label: "Calendario", to: "/secretaria/calendario", icon: Calendar, requiresEntity: true },
+      {
+        label: "Libro de socios",
+        to: "/secretaria/libro-socios",
+        icon: BookOpen,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Libros obligatorios",
+        to: "/secretaria/libros",
+        icon: Library,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Procesos",
+        to: "/secretaria/calendario",
+        icon: Calendar,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
       { label: "Multi-jurisdicción", to: "/secretaria/multi-jurisdiccion", icon: Globe },
     ],
   },
   {
-    label: "Biblioteca aplicable",
+    label: "Configuración y reglas",
     items: [
       { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
-      { label: "Revision documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+      { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
 ];
 
 const ALL_NAV_ITEMS: SecretariaNavItem[] = [...GRUPO_NAV_GROUPS, ...SOCIEDAD_NAV_GROUPS]
   .flatMap((group) => group.items)
-  .filter((item, index, items) => items.findIndex((candidate) => candidate.to === item.to) === index);
+  .filter(
+    (item, index, items) =>
+      items.findIndex((candidate) => candidate.to === item.to && candidate.label === item.label) === index
+  );
 
 function routeMatches(pathname: string, item: SecretariaNavItem) {
   if (item.end) return pathname === item.to;
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-export function getNavGroups(mode: SecretariaMode) {
+export function getNavGroups(mode: SecretariaMode): SecretariaNavGroup[] {
   return mode === "sociedad" ? SOCIEDAD_NAV_GROUPS : GRUPO_NAV_GROUPS;
 }
 

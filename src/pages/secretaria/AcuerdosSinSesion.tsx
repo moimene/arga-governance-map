@@ -4,7 +4,8 @@ import { ScrollText, Plus, CheckCircle2, XCircle, MinusCircle } from "lucide-rea
 import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-import { useSecretariaScope } from "@/components/secretaria/shell";
+import { canShowAdoptionModeCta } from "@/lib/secretaria/sidebar-visibility";
+import { useSecretariaScope, useSidebarVisibility } from "@/components/secretaria/shell";
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -20,9 +21,24 @@ export default function AcuerdosSinSesion() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
+  const { context: visibilityCtx, isInitialLoading: ctxLoading } = useSidebarVisibility(scope);
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useAcuerdosSinSesionList(scopedEntityId);
   const closeExpired = useCloseExpiredVotaciones();
+
+  // En modo grupo no aplicamos filtros — el usuario opera multi-sociedad y
+  // todos los flujos están disponibles. En modo sociedad respetamos la
+  // forma de administración de la entidad: NO_SESSION sólo para colegiados,
+  // CO_APROBACION sólo para mancomunado, SOLIDARIO sólo para solidario.
+  //
+  // Durante la hidratación inicial (ctxLoading), tratamos los CTAs como
+  // "potencialmente visibles" para evitar el blink (los 3 desaparecerían
+  // momentáneamente porque canShowAdoptionModeCta retorna false cuando
+  // ctx.entity == null). Cuando llegan los datos reales, los CTAs no
+  // aplicables se ocultan en el siguiente render.
+  const showNoSession = scope.mode === "grupo" || ctxLoading || canShowAdoptionModeCta(visibilityCtx, "NO_SESSION");
+  const showCoAprobacion = scope.mode === "grupo" || ctxLoading || canShowAdoptionModeCta(visibilityCtx, "CO_APROBACION");
+  const showSolidario = scope.mode === "grupo" || ctxLoading || canShowAdoptionModeCta(visibilityCtx, "SOLIDARIO");
 
   function handleCloseExpired() {
     closeExpired.mutate(undefined, {
@@ -90,33 +106,42 @@ export default function AcuerdosSinSesion() {
           >
             {closeExpired.isPending ? "Cerrando..." : "Cerrar vencidas"}
           </button>
-          <button
-            type="button"
-            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/nuevo"))}
-            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Plus className="h-4 w-4" />
-            Sin sesión (unanimidad)
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/co-aprobacion"))}
-            className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Plus className="h-4 w-4" />
-            Co-aprobación (k de n)
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/solidario"))}
-            className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Plus className="h-4 w-4" />
-            Administrador solidario
-          </button>
+          {showNoSession ? (
+            <button
+              type="button"
+              onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/nuevo"))}
+              data-cta="no-session"
+              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Plus className="h-4 w-4" />
+              Sin sesión (unanimidad)
+            </button>
+          ) : null}
+          {showCoAprobacion ? (
+            <button
+              type="button"
+              onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/co-aprobacion"))}
+              data-cta="co-aprobacion"
+              className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Plus className="h-4 w-4" />
+              Co-aprobación (k de n)
+            </button>
+          ) : null}
+          {showSolidario ? (
+            <button
+              type="button"
+              onClick={() => navigate(scope.createScopedTo("/secretaria/acuerdos-sin-sesion/solidario"))}
+              data-cta="solidario"
+              className="inline-flex items-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Plus className="h-4 w-4" />
+              Administrador solidario
+            </button>
+          ) : null}
         </div>
       </div>
 

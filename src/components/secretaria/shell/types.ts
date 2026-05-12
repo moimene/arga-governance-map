@@ -1,4 +1,7 @@
-import type { LucideIcon } from "lucide-react";
+import type {
+  VisibleSecretariaNavGroup,
+  VisibleSecretariaNavItem,
+} from "@/lib/secretaria/sidebar-visibility";
 
 export type SecretariaMode = "grupo" | "sociedad";
 
@@ -12,19 +15,12 @@ export interface SecretariaEntityOption {
   materiality: string;
 }
 
-export interface SecretariaNavItem {
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  end?: boolean;
-  requiresEntity?: boolean;
-  selectedEntityRoute?: boolean;
-}
-
-export interface SecretariaNavGroup {
-  label: string;
-  items: SecretariaNavItem[];
-}
+/**
+ * Item de navegación visible (mismo contrato que el legacy SecretariaNavItem
+ * pero con campo opcional `visibility` que el sidebar centralizado evalúa).
+ */
+export type SecretariaNavItem = VisibleSecretariaNavItem;
+export type SecretariaNavGroup = VisibleSecretariaNavGroup;
 
 export interface SecretariaScopeController {
   mode: SecretariaMode;
