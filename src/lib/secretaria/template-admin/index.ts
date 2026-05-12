@@ -21,6 +21,7 @@ export * from "./known-p0";
 export * from "./cloud-helpers";
 export * from "./gate-pre";
 export * from "./gate-pre-semantic";
+export * from "./import-preflight";
 export {
   VARIABLE_PATTERN as VARIABLE_PATTERN_IMPORT,
   SEMVER as SEMVER_IMPORT,

@@ -145,11 +145,11 @@ export const AdoptionModeEnum = z.enum([
   "SOLIDARIO",
 ]);
 
-// OrganoCanonicoEnum: derivado de ORGANO_CANONICO (Commit 2). El cast a
-// `[string, ...string[]]` es necesario porque `z.enum` requiere una tupla
-// no-vacía y `ORGANO_CANONICO` es `readonly` const tuple. La conversión
-// preserva los valores; los tipos derivados quedan `string` pero a nivel
-// runtime la enum acepta exactamente los mismos literales.
+// OrganoCanonicoEnum: derivado de ORGANO_CANONICO. Incluye el valor
+// deprecado `JUNTA_GENERAL_O_CONSEJO` para re-importar la plantilla activa
+// legacy de acuerdos sin sesión hasta que Comité Legal firme su desdoble.
+// El cast a `[string, ...string[]]` es necesario porque `z.enum` requiere
+// una tupla no-vacía y `ORGANO_CANONICO` es `readonly` const tuple.
 export const OrganoCanonicoEnum = z.enum(
   ORGANO_CANONICO as unknown as [string, ...string[]],
 );
@@ -268,23 +268,25 @@ export const Capa3FieldSchema = z.object({
 export const TemplateImportSchema = z
   .object({
     schema_version: z.literal("secretaria.template_import.v1"),
-    template: z.object({
-      tipo: TipoEnum,
-      materia: MateriaEnum,
-      materia_acuerdo: z.string().optional(),
-      jurisdiccion: z.enum(["ES", "BR", "MX", "PT", "UK", "FR", "DE"]),
-      version: z.string().regex(SEMVER),
-      organo_tipo: OrganoCanonicoEnum,
-      // Calibración D15: tipos no-acuerdo (CERTIFICACION, INFORME_*) tienen
-      // `adoption_mode = null` en Cloud porque no son decisiones adoptables.
-      // Schema acepta `null` para esos casos; el wizard exige string al
-      // editar MODELO_ACUERDO.
-      adoption_mode: AdoptionModeEnum.nullable(),
-      referencia_legal: z.string().regex(REF_LEGAL_PATTERN),
-      tipo_social: z.enum(["SA", "SL", "SLU", "SAU"]).optional().nullable(),
-      snapshot_rule_pack_required: z.boolean().optional(),
-      contrato_variables_version: z.string().optional(),
-    }),
+    template: z
+      .object({
+        tipo: TipoEnum,
+        materia: MateriaEnum,
+        materia_acuerdo: z.string().optional(),
+        jurisdiccion: z.enum(["ES", "BR", "MX", "PT", "UK", "FR", "DE"]),
+        version: z.string().regex(SEMVER),
+        organo_tipo: OrganoCanonicoEnum,
+        // Calibración D15: tipos no-acuerdo (CERTIFICACION, INFORME_*) tienen
+        // `adoption_mode = null` en Cloud porque no son decisiones adoptables.
+        // Schema acepta `null` para esos casos; el wizard exige string al
+        // editar MODELO_ACUERDO.
+        adoption_mode: AdoptionModeEnum.nullable(),
+        referencia_legal: z.string().regex(REF_LEGAL_PATTERN),
+        tipo_social: z.enum(["SA", "SL", "SLU", "SAU"]).optional().nullable(),
+        snapshot_rule_pack_required: z.boolean().optional(),
+        contrato_variables_version: z.string().optional(),
+      })
+      .strict(),
     capa1_inmutable: z.string().min(100),
     capa2_variables: z.array(
       z.object({

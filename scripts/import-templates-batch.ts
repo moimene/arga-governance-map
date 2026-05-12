@@ -25,15 +25,17 @@
  *   estricto). Si falla, sale con código 1 imprimiendo `issues`.
  *
  * - Gate PRE por fila: ejecuta `validateTemplateForActivation` contra
- *   las plantillas ACTIVA ya en Cloud (control de duplicados funcionales).
- *   Si una fila tiene `summary.blocking > 0`, su action queda
- *   `SKIP_BLOCKING` y NO se inserta aunque venga `--commit`.
+ *   las plantillas ACTIVA ya en Cloud (control de duplicados activos).
+ *   Además detecta duplicados funcionales cross-run contra plantillas
+ *   BORRADOR/REVISADA/APROBADA/ACTIVA y contra filas previas del mismo
+ *   batch. Si una fila tiene `summary.blocking > 0`, su action queda
+ *   `SKIP_BLOCKING`; si ya existe clave funcional, queda
+ *   `SKIP_DUPLICATE_FUNCTIONAL`. Ninguna se inserta con `--commit`.
  *
- * - Idempotencia limitada: `computeIdempotencyKey(plantillaId, version)`
- *   solo cubre dobles inserts simultáneos del changelog dentro de la misma
- *   ejecución (5s bucket por plantilla recién creada). NO previene duplicados
- *   entre runs distintos del batch: ejecuta siempre dry-run y revisa el plan
- *   tabular antes de `--commit`.
+ * - Idempotencia: `computeIdempotencyKey(plantillaId, version)` cubre dobles
+ *   inserts simultáneos del changelog dentro de la misma ejecución. La
+ *   idempotencia cross-run del batch se cubre con la detección funcional
+ *   previa al INSERT.
  *
  * Refs: docs/superpowers/specs/2026-05-12-gestor-plantillas-sprint1-design.md §6.2
  */
@@ -47,6 +49,7 @@ import {
 import { buildDraftRow } from "../src/lib/secretaria/template-admin/template-importer";
 import { validateTemplateForActivation } from "../src/lib/secretaria/template-admin/gate-pre";
 import { computeIdempotencyKey } from "../src/lib/secretaria/template-admin/changelog";
+import { detectFunctionalDuplicate } from "../src/lib/secretaria/template-admin/functional-key";
 import type { PlantillaCandidate } from "../src/lib/secretaria/template-admin/types";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
@@ -55,8 +58,9 @@ type PlanRow = {
   index: number;
   materia: string;
   jurisdiccion: string;
-  action: "DRY_RUN_INSERT" | "INSERT" | "SKIP_BLOCKING";
+  action: "DRY_RUN_INSERT" | "INSERT" | "SKIP_BLOCKING" | "SKIP_DUPLICATE_FUNCTIONAL";
   issues: number;
+  duplicate_id?: string;
 };
 
 async function main(): Promise<void> {
@@ -91,26 +95,29 @@ async function main(): Promise<void> {
   }
   const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-  // 3. Cargar plantillas ACTIVA para detectar duplicados funcionales en
-  //    Gate PRE (DUP_ACTIVE_FUNCTIONAL_KEY). Si Cloud está inalcanzable
+  // 3. Cargar plantillas no-terminales para detectar duplicados funcionales
+  //    cross-run y derivar el subconjunto ACTIVA que necesita Gate PRE
+  //    (DUP_ACTIVE_FUNCTIONAL_KEY). Si Cloud está inalcanzable
   //    (dry-run en máquina sin red), seguimos con lista vacía — el plan
   //    aún se imprime, y el operador verá los issues semánticos pre-Cloud
-  //    en consola. Para `--commit` la falta de duplicados es conservadora:
+  //    en consola. Para `--commit` la falta de duplicados es arriesgada:
   //    podría ocultar colisiones reales, por lo que registramos warning.
-  const { data: active, error: activeErr } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from("plantillas_protegidas")
     .select(
       "id, tipo, materia, materia_acuerdo, jurisdiccion, version, estado, organo_tipo, adoption_mode, aprobada_por, fecha_aprobacion, referencia_legal, capa1_inmutable, capa2_variables, capa3_editables",
     )
     .eq("tenant_id", TENANT_ID)
-    .eq("estado", "ACTIVA");
-  if (activeErr) {
+    .in("estado", ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"]);
+  if (existingErr) {
     console.warn(
-      "Aviso: no se pudo cargar plantillas ACTIVA (Cloud inalcanzable). El plan se imprimirá sin detección de duplicados funcionales.",
-      activeErr.message,
+      "Aviso: no se pudo cargar plantillas existentes (Cloud inalcanzable). El plan se imprimirá sin detección de duplicados funcionales.",
+      existingErr.message,
     );
   }
-  const existingActive = (active ?? []) as PlantillaCandidate[];
+  const existingTemplates = (existing ?? []) as PlantillaCandidate[];
+  const existingActive = existingTemplates.filter((t) => t.estado === "ACTIVA");
+  const functionalScope: PlantillaCandidate[] = [...existingTemplates];
 
   // 4. Construir plan tabular (sin escribir todavía).
   const plan: PlanRow[] = [];
@@ -138,13 +145,22 @@ async function main(): Promise<void> {
       tenantId: TENANT_ID,
       existingActiveTemplates: existingActive,
     });
+    const duplicate = detectFunctionalDuplicate(candidate, functionalScope, TENANT_ID, {
+      states: ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"],
+    });
 
     const action: PlanRow["action"] =
       gate.summary.blocking > 0
         ? "SKIP_BLOCKING"
-        : commit
-          ? "INSERT"
-          : "DRY_RUN_INSERT";
+        : duplicate
+          ? "SKIP_DUPLICATE_FUNCTIONAL"
+          : commit
+            ? "INSERT"
+            : "DRY_RUN_INSERT";
+
+    if (!duplicate && gate.summary.blocking === 0) {
+      functionalScope.push(candidate);
+    }
 
     plan.push({
       index: i,
@@ -152,6 +168,7 @@ async function main(): Promise<void> {
       jurisdiccion: t.template.jurisdiccion,
       action,
       issues: gate.summary.blocking,
+      duplicate_id: duplicate?.id,
     });
   }
 

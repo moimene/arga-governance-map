@@ -26,11 +26,6 @@ const REF_LEGAL_PATTERN = /\b(LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|CNMV|CC|L
 const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
 const HELPER_ALLOWLIST = new Set(["if", "else", "each", "unless", "with"]);
 const PROTECTED_PREFIXES = ["ENTIDAD.", "ORGANO.", "REUNION.", "EXPEDIENTE.", "SISTEMA.", "QTSP."];
-// Calibración Cloud (D16): organos legítimos en datos reales que no están en
-// la canonical enum de Commit 2. Se aceptan en Gate PRE sin BLOCKING porque
-// son legítimos en la data productiva. La enum canónica permanece estricta.
-const EXTENDED_KNOWN_ORGANOS = new Set(["JUNTA_GENERAL_O_CONSEJO"]);
-
 export type GatePreContext = {
   tenantId: string;
   existingActiveTemplates: PlantillaCandidate[];
@@ -66,7 +61,7 @@ function collectMetadataIssues(
 ): void {
   const organoOk =
     t.organo_tipo &&
-    (isOrganoCanonico(t.organo_tipo) || EXTENDED_KNOWN_ORGANOS.has(t.organo_tipo));
+    isOrganoCanonico(t.organo_tipo);
   if (!organoOk) {
     const normalized = t.organo_tipo ? normalizeOrganoTipo(t.organo_tipo) : null;
     issues.push({

@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
 
 if (typeof vi.hoisted !== "function") {
   (vi as { hoisted?: <T>(factory: () => T) => T }).hoisted = <T,>(factory: () => T) => factory();
 }
 
 const mocks = vi.hoisted(() => ({
-  createDraftFromImport: vi.fn(),
-  loadAllActiveTemplates: vi.fn(),
-  parseImport: vi.fn(),
-  buildDraftRow: vi.fn(),
+  runTemplateImportPreflight: vi.fn(),
   invalidateQueries: vi.fn(),
+  plantillaInsertCalls: [] as Array<Record<string, unknown>>,
+  changelogInsertCalls: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -40,18 +40,54 @@ vi.mock("@/hooks/useCurrentUser", () => ({
   }),
 }));
 
-vi.mock("@/lib/secretaria/template-admin/template-admin-service", () => ({
-  createDraftFromImport: mocks.createDraftFromImport,
+vi.mock("@/lib/secretaria/template-admin/import-preflight", () => ({
+  runTemplateImportPreflight: mocks.runTemplateImportPreflight,
 }));
 
-vi.mock("@/lib/secretaria/template-admin/cloud-helpers", () => ({
-  loadAllActiveTemplates: mocks.loadAllActiveTemplates,
-}));
+vi.mock("@/integrations/supabase/client", () => {
+  function changelogLookupChain() {
+    const chain = {
+      eq: vi.fn(() => chain),
+      ilike: vi.fn(() => chain),
+      limit: vi.fn(async () => ({ data: [], error: null })),
+    };
+    return chain;
+  }
 
-vi.mock("@/lib/secretaria/template-admin/template-importer", () => ({
-  parseImport: mocks.parseImport,
-  buildDraftRow: mocks.buildDraftRow,
-}));
+  return {
+    supabase: {
+      from: vi.fn((table: string) => {
+        if (table === "plantillas_protegidas") {
+          return {
+            insert: vi.fn((row: Record<string, unknown>) => {
+              mocks.plantillaInsertCalls.push(row);
+              return {
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({ data: { id: "tpl-new" }, error: null })),
+                })),
+              };
+            }),
+            delete: vi.fn(() => ({ eq: vi.fn() })),
+          };
+        }
+        if (table === "plantilla_changelog") {
+          return {
+            select: vi.fn(() => changelogLookupChain()),
+            insert: vi.fn((row: Record<string, unknown>) => {
+              mocks.changelogInsertCalls.push(row);
+              return {
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({ data: { id: "log-new" }, error: null })),
+                })),
+              };
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    },
+  };
+});
 
 import { useImportPlantillaPackage } from "../useImportPlantillaPackage";
 
@@ -67,52 +103,85 @@ const validPayload = {
     referencia_legal: "Art. 160 LSC",
   },
   capa1_inmutable: "PRIMERO.- Aprobar cuentas.".padEnd(120, "x"),
-  capa2_variables: [
-    { variable: "ENTIDAD.denominacion_social", fuente: "ENTIDAD", condicion: "SIEMPRE" },
-  ],
+  capa2_variables: [],
   capa3_editables: [],
+};
+
+const warningGate: GatePreResult = {
+  ok: true,
+  issues: [
+    {
+      severity: "WARNING",
+      code: "GEN_IF_COUNT",
+      message: "warning",
+    },
+  ],
+  summary: { blocking: 0, warning: 1, info: 0 },
 };
 
 describe("useImportPlantillaPackage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.parseImport.mockReturnValue({ ok: true, payload: validPayload });
-    mocks.loadAllActiveTemplates.mockResolvedValue([]);
-    mocks.buildDraftRow.mockReturnValue({ tipo: "MODELO_ACUERDO" });
-    mocks.createDraftFromImport.mockResolvedValue({ plantillaId: "tpl-new" });
+    mocks.runTemplateImportPreflight.mockResolvedValue({
+      ok: false,
+      reason: "WARNINGS_NEED_ACK",
+      gatePre: warningGate,
+    });
+    mocks.plantillaInsertCalls = [];
+    mocks.changelogInsertCalls = [];
   });
 
   it("no escribe BORRADOR si hay warnings sin ackMotivo", async () => {
     const hook = useImportPlantillaPackage();
     const outcome = await hook.mutateAsync({ json: { ok: true } });
 
-    expect(outcome.ok).toBe(false);
-    expect(outcome).toMatchObject({ reason: "WARNINGS_NEED_ACK" });
-    if (!outcome.ok && outcome.reason === "WARNINGS_NEED_ACK") {
-      expect(outcome.gatePre.summary.warning).toBeGreaterThan(0);
-      expect(outcome.gatePre.issues.some((issue) => issue.code === "LEGACY_FUENTE_ENTIDAD")).toBe(true);
-    }
-    expect(mocks.createDraftFromImport).not.toHaveBeenCalled();
+    expect(outcome).toEqual({
+      ok: false,
+      reason: "WARNINGS_NEED_ACK",
+      gatePre: warningGate,
+    });
+    expect(mocks.plantillaInsertCalls).toEqual([]);
+    expect(mocks.changelogInsertCalls).toEqual([]);
+    expect(mocks.invalidateQueries).not.toHaveBeenCalled();
+    expect(mocks.runTemplateImportPreflight).toHaveBeenCalledWith({
+      json: { ok: true },
+      tenantId: "tenant-1",
+      ackMotivo: undefined,
+      requireWarningAck: true,
+    });
   });
 
-  it("escribe BORRADOR cuando warnings vienen con ackMotivo válido", async () => {
+  it("escribe BORRADOR cuando warnings vienen con ackMotivo valido", async () => {
+    mocks.runTemplateImportPreflight.mockResolvedValue({
+      ok: true,
+      payload: validPayload,
+      gatePre: warningGate,
+    });
+
     const hook = useImportPlantillaPackage();
     const outcome = await hook.mutateAsync({
       json: { ok: true },
-      ackMotivo: "Warnings revisadas por Comité Legal el 12/05/2026.",
+      ackMotivo: "Warnings revisadas por Comite Legal el 12/05/2026.",
     });
 
-    expect(outcome.ok).toBe(true);
-    expect(outcome).toMatchObject({ plantillaId: "tpl-new" });
-    if (outcome.ok) {
-      expect(outcome.gatePre.summary.warning).toBeGreaterThan(0);
-    }
-    expect(mocks.createDraftFromImport).toHaveBeenCalledTimes(1);
-    expect(mocks.createDraftFromImport).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ackMotivo: "Warnings revisadas por Comité Legal el 12/05/2026.",
-      }),
-      { tenantId: "tenant-1" },
-    );
+    expect(outcome).toEqual({
+      ok: true,
+      plantillaId: "tpl-new",
+      gatePre: warningGate,
+    });
+    expect(mocks.plantillaInsertCalls).toHaveLength(1);
+    expect(mocks.changelogInsertCalls).toHaveLength(1);
+    expect(mocks.changelogInsertCalls[0]).toMatchObject({
+      tenant_id: "tenant-1",
+      plantilla_id: "tpl-new",
+      autor: "legal@arga-seguros.com",
+      to_version: "1.0.0",
+    });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["plantillas_protegidas"],
+    });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["plantilla_changelog"],
+    });
   });
 });

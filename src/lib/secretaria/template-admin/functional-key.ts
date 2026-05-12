@@ -67,10 +67,22 @@ export function detectActiveDuplicate(
   existingActive: PlantillaCandidate[],
   tenantId: string,
 ): PlantillaCandidate | null {
+  return detectFunctionalDuplicate(candidate, existingActive, tenantId, {
+    states: ["ACTIVA"],
+  });
+}
+
+export function detectFunctionalDuplicate(
+  candidate: PlantillaCandidate,
+  existingTemplates: PlantillaCandidate[],
+  tenantId: string,
+  options: { states?: string[] } = {},
+): PlantillaCandidate | null {
+  const states = options.states ? new Set(options.states) : null;
   const candidateKey = serializeFunctionalKey(buildFunctionalKey(candidate, tenantId));
-  for (const other of existingActive) {
+  for (const other of existingTemplates) {
     if (other.id === candidate.id) continue;
-    if (other.estado !== "ACTIVA") continue;
+    if (states && !states.has(other.estado)) continue;
     if (serializeFunctionalKey(buildFunctionalKey(other, tenantId)) === candidateKey) {
       return other;
     }

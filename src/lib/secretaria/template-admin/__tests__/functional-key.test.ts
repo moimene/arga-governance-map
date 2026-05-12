@@ -3,6 +3,7 @@ import {
   CORE_V1_MATERIAS,
   CORE_V1_MATERIAS_COUNT,
   buildFunctionalKey,
+  detectFunctionalDuplicate,
   serializeFunctionalKey,
   matchesFunctionalKey,
 } from "../functional-key";
@@ -75,5 +76,27 @@ describe("functional-key", () => {
     expect(set.has("CONSEJO_ADMIN|DISTRIBUCION_CARGOS")).toBe(true);
     expect(set.has("ORGANO_ADMIN|FORMULACION_CUENTAS")).toBe(true);
     expect(set.has("CONSEJO_ADMIN|COMITES_INTERNOS")).toBe(true);
+  });
+
+  it("detectFunctionalDuplicate encuentra duplicados no-terminales", () => {
+    const candidate = baseRow({ id: "candidate", estado: "REVISADA" });
+    const duplicate = baseRow({ id: "existing-draft", estado: "BORRADOR" });
+
+    expect(
+      detectFunctionalDuplicate(candidate, [duplicate], "t1", {
+        states: ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"],
+      })?.id,
+    ).toBe("existing-draft");
+  });
+
+  it("detectFunctionalDuplicate respeta filtro de estados", () => {
+    const candidate = baseRow({ id: "candidate", estado: "REVISADA" });
+    const archived = baseRow({ id: "archived", estado: "ARCHIVADA" });
+
+    expect(
+      detectFunctionalDuplicate(candidate, [archived], "t1", {
+        states: ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"],
+      }),
+    ).toBeNull();
   });
 });
