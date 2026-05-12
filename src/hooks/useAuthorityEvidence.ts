@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
+// CONSEJERO_COORDINADOR removed 2026-05-12: alineación con W1 fix commit 63a8639.
+// El trigger fn_sync_authority_evidence ya no crea AE para este cargo (RRM art. 109
+// reserva certificación a Secretario con VºBº del Presidente). Decisión legal L15-L16.
 export type CargoCertificante =
   | "ADMIN_UNICO"
   | "ADMIN_SOLIDARIO"
@@ -9,8 +12,7 @@ export type CargoCertificante =
   | "PRESIDENTE"
   | "VICEPRESIDENTE"
   | "SECRETARIO"
-  | "VICESECRETARIO"
-  | "CONSEJERO_COORDINADOR";
+  | "VICESECRETARIO";
 
 export type FuenteDesignacion =
   | "ACTA_NOMBRAMIENTO"
@@ -154,5 +156,4 @@ export const CARGO_CERT_LABELS: Record<CargoCertificante, string> = {
   VICEPRESIDENTE: "Vicepresidente",
   SECRETARIO: "Secretario",
   VICESECRETARIO: "Vicesecretario",
-  CONSEJERO_COORDINADOR: "Consejero coordinador",
 };

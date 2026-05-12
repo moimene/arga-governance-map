@@ -756,7 +756,10 @@ export function useFirmantesVigentes(entityId?: string, bodyId?: string | null) 
         .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)
         .eq("estado", "VIGENTE")
-        .in("cargo", ["PRESIDENTE", "SECRETARIO", "VICEPRESIDENTE", "VICESECRETARIO", "ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "CONSEJERO_COORDINADOR"]);
+        // CONSEJERO_COORDINADOR removed 2026-05-12: alineación con W1 fix commit 63a8639.
+        // El trigger fn_sync_authority_evidence ya no crea AE para este cargo (RRM art. 109
+        // reserva certificación a Secretario con VºBº del Presidente). Decisión legal L15-L16.
+        .in("cargo", ["PRESIDENTE", "SECRETARIO", "VICEPRESIDENTE", "VICESECRETARIO", "ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO"]);
       if (bodyId !== undefined && bodyId !== null) {
         q = q.eq("body_id", bodyId);
       }
