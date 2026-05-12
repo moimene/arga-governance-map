@@ -1236,9 +1236,16 @@ export default function ConvocatoriasStepper() {
   // antes de avanzar de Paso 7. Sin este gate, una plantilla con campos
   // OBLIGATORIO permitía emitir con valores vacíos → render incompleto
   // del `convocatoria_text` que omite secciones críticas.
+  //
+  // Codex P2 round 13 PR #3: pasar `telematicaEnabled` real para que la
+  // validación reconozca campos `OBLIGATORIO_SI_TELEMATICA` cuando el
+  // formato es TELEMATICA o MIXTA. Sin esto los campos condicionales
+  // (ej. `instrucciones_telematica`) no bloqueaban aunque la UI los
+  // marcara visualmente como required.
+  const telematicaEnabled = formatoReunion !== "PRESENCIAL";
   const borradorCapa3MissingRequired = useMemo(
-    () => validateCapa3(borradorCapa3Fields, borradorCapa3Values),
-    [borradorCapa3Fields, borradorCapa3Values],
+    () => validateCapa3(borradorCapa3Fields, borradorCapa3Values, telematicaEnabled),
+    [borradorCapa3Fields, borradorCapa3Values, telematicaEnabled],
   );
   const borradorCapa3HasMissing = Object.keys(borradorCapa3MissingRequired).length > 0;
 
@@ -3052,7 +3059,16 @@ export default function ConvocatoriasStepper() {
                     // primeros keystrokes, ejecutar setBorradorTexto +
                     // setBorradorDirty(false), y borrar silenciosamente
                     // los edits del usuario.
+                    //
+                    // Codex P2 round 13 PR #3: además limpiar
+                    // `borradorRenderPending`. El callback async con token
+                    // stale hace early-return sin tocar pending — si el
+                    // cancelador fue un edit manual (no otra
+                    // `regenerateBorrador`), pending quedaba bloqueado en
+                    // true para siempre, dejando "Siguiente" + "Emitir"
+                    // deshabilitados.
                     regenerateTokenRef.current += 1;
+                    setBorradorRenderPending(false);
                     setBorradorTexto(e.target.value);
                     setBorradorDirty(true);
                   }}
