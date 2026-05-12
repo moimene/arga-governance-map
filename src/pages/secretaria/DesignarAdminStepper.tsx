@@ -4,7 +4,7 @@ import { Gavel, Check, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSociedad, useSociedades } from "@/hooks/useSociedades";
-import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
+import { usePersonasCanonical, usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
 import {
   CARGO_LABELS,
@@ -82,6 +82,9 @@ export default function DesignarAdminStepper() {
   const { data: sociedad } = useSociedad(entityId || undefined);
   const { data: sociedades } = useSociedades();
   const { data: personas } = usePersonasCanonical({});
+  // P2 Codex iter-6: fetch byId la persona preselected para no depender del cap del list query.
+  // Cubre el caso en que la persona pasada por ?personId= está alfabéticamente fuera del cap.
+  const { data: personaPreselected } = usePersonaCanonical(personIdFromUrl || undefined);
   const [bodies, setBodies] = useState<BodyRow[]>([]);
 
   const [step, setStep] = useState<number>(startStep);
@@ -138,7 +141,12 @@ export default function DesignarAdminStepper() {
   // Usa `requiresBodyId` como fuente de verdad (cargo-validation.ts).
   const esColegiado = requiresBodyId(draft.tipo_condicion as TipoCondicionCargo);
   const esAdminPJ = draft.tipo_condicion === "ADMIN_PJ";
-  const personaSeleccionada = (personas ?? []).find((p) => p.id === draft.person_id);
+  // P2 Codex iter-6: prioridad al preselected byId (siempre disponible aunque esté fuera del cap),
+  // fallback al list que el usuario puede haber cambiado interactivamente.
+  const personaSeleccionada =
+    personaPreselected && personaPreselected.id === draft.person_id
+      ? personaPreselected
+      : (personas ?? []).find((p) => p.id === draft.person_id);
   const personaEsPJ = personaSeleccionada?.person_type === "PJ";
 
   // P1 Codex iteration-2: derive personRequiresRep desde helper canónico para
