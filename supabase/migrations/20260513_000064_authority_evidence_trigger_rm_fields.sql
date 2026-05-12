@@ -13,8 +13,11 @@ AS $$
 DECLARE
   v_cargos_certificantes text[] := ARRAY[
     'ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO',
-    'PRESIDENTE','VICEPRESIDENTE','SECRETARIO','VICESECRETARIO',
-    'CONSEJERO_COORDINADOR'
+    'PRESIDENTE','VICEPRESIDENTE','SECRETARIO','VICESECRETARIO'
+    -- CONSEJERO_COORDINADOR NO certifica (RRM art. 109).
+    -- Es líder independiente del CdA (LSC 529 septies) pero la
+    -- facultad de certificar es exclusiva del Secretario con VºBº
+    -- del Presidente. Decisión legal Garrigues 2026-05-12.
   ];
 BEGIN
   IF TG_OP = 'INSERT' AND NEW.tipo_condicion = ANY (v_cargos_certificantes) THEN
@@ -71,7 +74,10 @@ BEGIN
 END;
 $$;
 
--- Backfill A: rellenar campos RM en AEs vigentes con valores actuales de condiciones_persona
+-- Backfill A: rellenar campos RM en AEs vigentes con valores actuales de condiciones_persona.
+-- NOTA: filas AE preexistentes con cargo='CONSEJERO_COORDINADOR' NO se purgan en este sprint
+-- (heredadas del trigger legacy). El nuevo trigger ya no las crea para nuevos cargos.
+-- Plan A' sprint posterior decidirá si purgar via UPDATE estado='CESADO' explícito.
 UPDATE authority_evidence ae
 SET inscripcion_rm_referencia = cp.inscripcion_rm_referencia,
     inscripcion_rm_fecha = cp.inscripcion_rm_fecha,
@@ -105,9 +111,9 @@ FROM condiciones_persona cp
 WHERE cp.estado = 'VIGENTE'
   AND cp.tipo_condicion IN (
     'ADMIN_UNICO','ADMIN_SOLIDARIO','ADMIN_MANCOMUNADO',
-    'PRESIDENTE','VICEPRESIDENTE','SECRETARIO','VICESECRETARIO',
-    'CONSEJERO_COORDINADOR'
+    'PRESIDENTE','VICEPRESIDENTE','SECRETARIO','VICESECRETARIO'
   )
+  -- NOTA: CONSEJERO_COORDINADOR excluido por L15-L16 (RRM art. 109).
   AND NOT EXISTS (
     SELECT 1 FROM authority_evidence ae
     WHERE ae.tenant_id = cp.tenant_id
