@@ -168,6 +168,28 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     }
   }
 
+  // CT-010: holdings duplicados (mismo holder, misma clase). El UNIQUE
+  // ux_capital_holdings_vigente (entity_id, holder_person_id, share_class_id)
+  // del schema canonico rechaza la 2a row -> rollback. Las filas se identifican
+  // por holder.tax_id (o holder.key si tax_id falta) + share_class_code (review
+  // Codex P2).
+  const seenHoldings = new Set<string>();
+  for (const entry of draft.capTable) {
+    if (entry.is_treasury) continue;
+    const holderKey = entry.holder?.tax_id?.trim() || entry.holder?.key || "";
+    const classKey = entry.share_class_code?.trim() || "";
+    if (!holderKey || !classKey) continue;
+    const composite = `${holderKey}::${classKey}`;
+    if (seenHoldings.has(composite)) {
+      issues.push(issue(
+        "CT-010",
+        `capTable.${entry.key}`,
+        `Hay dos filas para el mismo socio y la misma clase/serie "${classKey}". Combina los titulos en una sola fila.`
+      ));
+    }
+    seenHoldings.add(composite);
+  }
+
   // CT-007: holding no-treasury sin holder seleccionado bloquea. Sin este
   // check, los holdings sin socio "se descartaban silenciosamente" del
   // calculo CT-004/CT-005 y la RPC luego fallaba con "holder not resolved"
@@ -294,7 +316,7 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     2: ["O-002", "CT-005"],
     3: ["C-001", "C-002", "C-003", "C-004"],
     4: ["CL-001", "CL-002", "CL-003", "CL-004"],
-    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "P-001"],
+    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "P-001"],
     6: ["O-001", "O-002"],
     7: ["CA-001", "CA-002", "AU-001", "AU-002", "PJ-001"],
     8: ["R-001", "R-002"],
