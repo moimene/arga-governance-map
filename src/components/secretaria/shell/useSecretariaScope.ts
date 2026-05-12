@@ -142,11 +142,22 @@ export function useSecretariaScope(): SecretariaScopeController {
       const entityId = selectedEntity?.id ?? selectedEntityId;
       if (!entityId) return to;
 
-      const [pathname, existingSearch = ""] = to.split("?");
+      // Codex P2 round 11: hash-aware splitting.
+      // Antes: `to.split("?")` solo separaba query, dejando `#hash` dentro
+      // del pathname → al re-appendar `?params`, el resultado era
+      // `/path#hash?params` y React Router metía todos los params dentro
+      // del fragment.
+      //
+      // Ahora: extraer hash primero, luego query del path puro.
+      // Resultado canónico: `pathname?query#hash` (RFC 3986).
+      const [pathAndSearch, hash = ""] = to.split("#");
+      const [pathname, existingSearch = ""] = pathAndSearch.split("?");
       const params = new URLSearchParams(existingSearch);
       params.set(SCOPE_PARAM, "sociedad");
       params.set(ENTITY_PARAM, entityId);
-      return `${pathname}?${params.toString()}`;
+      const search = `?${params.toString()}`;
+      const hashSuffix = hash ? `#${hash}` : "";
+      return `${pathname}${search}${hashSuffix}`;
     },
     [mode, selectedEntity?.id, selectedEntityId]
   );

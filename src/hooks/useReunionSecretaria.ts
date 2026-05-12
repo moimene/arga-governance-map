@@ -263,6 +263,140 @@ export function useMeetingForConvocatoria(
   });
 }
 
+/**
+ * Materializa o reconcilia `agenda_items` rows desde los puntos de la convocatoria.
+ *
+ * Comportamiento (Codex P2 round 10 — UPDATE + INSERT, no solo gaps):
+ *   - Rows faltantes (order_number ausente) → INSERT.
+ *   - Rows existentes con kind=DELIBERATIVO (default conservador) Y la
+ *     convocatoria declara un kind distinto → UPDATE para reconciliar.
+ *     Solo se updatea cuando el row NO tiene historial en
+ *     `agenda_item_kind_changelog` (es decir, el kind actual es el default
+ *     legacy del flujo previo, no una reclasificación humana explícita).
+ *   - Rows con changelog se respetan: una reclasificación humana es SSOT.
+ *
+ * Idempotente. Se ejecuta tanto en NEW meetings como en reused.
+ */
+async function materializeAgendaItemsForConvocatoriaMeeting(
+  meetingId: string,
+  tenantId: string,
+  convocatoria: ConvocatoriaForMeetingSchedule,
+): Promise<void> {
+  const agendaPoints = convocatoria.agenda_items ?? [];
+  if (agendaPoints.length === 0) return;
+  // 1. SELECT existing rows con id+order_number+kind para reconciliar
+  const { data: existingRows, error: selErr } = await supabase
+    .from("agenda_items")
+    .select("id, order_number, kind")
+    .eq("meeting_id", meetingId)
+    .eq("tenant_id", tenantId);
+  if (selErr) {
+    // Codex P2 round 15: abortar en lugar de loguear. Si el lookup falla
+    // (RLS drift, transient PostgREST), no podemos garantizar idempotencia
+    // y el usuario llegaría a voting con BD posiblemente inconsistente.
+    // Mejor fallar temprano con mensaje claro.
+    throw new Error(
+      `Lookup de agenda_items existentes falló: ${selErr.message}. No se puede garantizar la materialización idempotente; reintenta la operación.`,
+    );
+  }
+  const existingByOrder = new Map<number, { id: string; kind: string | null }>();
+  for (const row of (existingRows ?? []) as Array<{
+    id: string;
+    order_number: number | null;
+    kind: string | null;
+  }>) {
+    if (typeof row.order_number === "number") {
+      existingByOrder.set(row.order_number, { id: row.id, kind: row.kind });
+    }
+  }
+
+  // 2. Determinar inserts (gaps) y updates (legacy default ≠ convocatoria)
+  const rowsToInsert: Array<{
+    tenant_id: string;
+    meeting_id: string;
+    order_number: number;
+    title: string;
+    kind: string;
+    decision_subtype: string | null;
+  }> = [];
+  const updateCandidates: Array<{
+    id: string;
+    desired_kind: string;
+    desired_decision_subtype: string | null;
+  }> = [];
+
+  agendaPoints.forEach((point, index) => {
+    const orderNumber = index + 1;
+    const existing = existingByOrder.get(orderNumber);
+    const desiredKind = point.kind ?? "DELIBERATIVO";
+    const desiredSubtype = point.decision_subtype ?? null;
+    if (!existing) {
+      rowsToInsert.push({
+        tenant_id: tenantId,
+        meeting_id: meetingId,
+        order_number: orderNumber,
+        title: (point.titulo ?? "").trim().slice(0, 240) || `Punto ${orderNumber}`,
+        kind: desiredKind,
+        decision_subtype: desiredSubtype,
+      });
+      return;
+    }
+    // Existing row: reconciliar SOLO si current kind es legacy default
+    // (DELIBERATIVO) y la convocatoria declara algo distinto.
+    if (existing.kind === "DELIBERATIVO" && desiredKind !== "DELIBERATIVO") {
+      updateCandidates.push({
+        id: existing.id,
+        desired_kind: desiredKind,
+        desired_decision_subtype: desiredSubtype,
+      });
+    }
+  });
+
+  // 3. INSERT gaps
+  if (rowsToInsert.length > 0) {
+    const { error: insErr } = await supabase.from("agenda_items").insert(rowsToInsert);
+    if (insErr) {
+      // Codex P2 round 14: abortar en lugar de solo loguear. agenda_items
+      // ya es requerido por triggers (T5, integrity rules) — sin esos rows
+      // el usuario llega a voting/save con BD inconsistente y un error
+      // críptico aguas abajo. Mejor fallar temprano con mensaje claro.
+      throw new Error(
+        `Materialización de agenda_items falló: ${insErr.message}. La reunión existe pero la agenda no se persistió; reintenta la creación o contacta soporte.`,
+      );
+    }
+  }
+
+  // 4. UPDATE candidatos legacy → solo si NO tienen changelog (respeta
+  //    reclasificaciones humanas previas como SSOT).
+  if (updateCandidates.length > 0) {
+    const candidateIds = updateCandidates.map((c) => c.id);
+    const { data: changelogRows } = await supabase
+      .from("agenda_item_kind_changelog")
+      .select("agenda_item_id")
+      .in("agenda_item_id", candidateIds);
+    const idsWithChangelog = new Set(
+      ((changelogRows ?? []) as Array<{ agenda_item_id: string }>).map((r) => r.agenda_item_id),
+    );
+    for (const candidate of updateCandidates) {
+      if (idsWithChangelog.has(candidate.id)) continue; // respeta humano
+      const { error: updErr } = await supabase
+        .from("agenda_items")
+        .update({
+          kind: candidate.desired_kind,
+          decision_subtype: candidate.desired_decision_subtype,
+        })
+        .eq("id", candidate.id);
+      if (updErr) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[materializeAgendaItems] reconcile UPDATE ${candidate.id} falló:`,
+          updErr.message,
+        );
+      }
+    }
+  }
+}
+
 export function useCreateMeetingFromConvocatoria() {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
@@ -271,7 +405,14 @@ export function useCreateMeetingFromConvocatoria() {
       if (!tenantId) throw new Error("Tenant no disponible");
 
       const existing = await findMeetingForConvocatoria(tenantId, convocatoria.id, convocatoria);
-      if (existing) return { id: existing.id, reused: true };
+      if (existing) {
+        // Codex P1 round 9: materializar agenda_items también para meetings
+        // reused. Meetings creados por flujos previos (o emparejados manualmente
+        // por body/date) podrían no tener rows agenda_items aún; idempotencia
+        // garantiza que solo insertamos los faltantes.
+        await materializeAgendaItemsForConvocatoriaMeeting(existing.id, tenantId, convocatoria);
+        return { id: existing.id, reused: true };
+      }
 
       const payload = buildMeetingScheduleFromConvocatoria(convocatoria);
       const { data, error } = await supabase
@@ -281,7 +422,12 @@ export function useCreateMeetingFromConvocatoria() {
         .single();
 
       if (error) throw error;
-      return { id: (data as { id: string }).id, reused: false };
+      const meetingId = (data as { id: string }).id;
+
+      // Codex P1 round 8: materializar agenda_items rows desde el INSERT inicial.
+      await materializeAgendaItemsForConvocatoriaMeeting(meetingId, tenantId, convocatoria);
+
+      return { id: meetingId, reused: false };
     },
     onSuccess: (_result, convocatoria) => {
       qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
@@ -401,7 +547,11 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
       const [agendaRes, convocatoriaRes, agreementsRes] = await Promise.all([
         supabase
           .from("agenda_items")
-          .select("id, order_number, title, description")
+          // kind + decision_subtype necesarios para que mergeMeetingAgendaSources
+          // propague la clasificación a debates/votación (sin ellos, source.kind
+          // viene undefined y el merge cae a DELIBERATIVO por defecto — Codex P2
+          // round 2 + reviewer adversarial C1).
+          .select("id, order_number, title, description, kind, decision_subtype")
           .eq("meeting_id", meetingId!)
           .order("order_number", { ascending: true }),
         explicitConvocatoriaId

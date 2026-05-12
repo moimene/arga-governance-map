@@ -1,5 +1,5 @@
 // GlobalSearch — command palette Cmd+K para Secretaría (Sprint E, E-D9)
-// Busca cross-module: acuerdos, convocatorias, políticas, hallazgos, acuerdos sin sesión
+// Busca cross-module: acuerdos, convocatorias, políticas, hallazgos, acuerdos sin sesión, puntos de agenda
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,7 @@ import {
   Scale,
   AlertTriangle,
   Search,
+  ListChecks,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -25,13 +26,25 @@ import { useTenantContext } from "@/context/TenantContext";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { getNavGroups } from "@/components/secretaria/shell/navigation";
 import type { SecretariaNavItem, SecretariaScopeController } from "@/components/secretaria/shell";
+import {
+  normalizeAgendaItemKind,
+  type AgendaItemKind,
+} from "@/lib/secretaria/agenda-kind";
+import {
+  AGENDA_KIND_BADGE_LABEL,
+  AGENDA_KIND_CHIP,
+  AGENDA_KIND_HUMAN_LABEL,
+  getAgendaResultRoute,
+} from "@/lib/secretaria/agenda-search-routing";
 
 interface SearchResult {
   id: string;
   label: string;
   sublabel: string;
-  kind: "agreement" | "convocatoria" | "nosession" | "policy" | "finding";
+  kind: "agreement" | "convocatoria" | "nosession" | "policy" | "finding" | "agenda_item";
   nav_to: string;
+  agendaKind?: AgendaItemKind;
+  pendingMaterialization?: boolean;
 }
 
 type MaybeJoin<T> = T | T[] | null | undefined;
@@ -56,6 +69,7 @@ type ConvocatoriaRow = {
 type NoSessionRow = { id: string; title?: string; status: string };
 type PolicyRow = { id: string; name: string; status: string };
 type FindingRow = { id: string; code: string; title: string; severity?: string };
+type AgendaItemJoin = MaybeJoin<{ kind?: string | null; order_number?: number | null; title?: string | null }>;
 type ResolutionRow = {
   id: string;
   meeting_id: string;
@@ -64,6 +78,8 @@ type ResolutionRow = {
   resolution_text: string;
   required_majority_code: string | null;
   status: string;
+  kind_resolution?: string | null;
+  agenda_items?: AgendaItemJoin;
 };
 
 interface GlobalSearchProps {
@@ -82,6 +98,7 @@ const KIND_META = {
   nosession:   { icon: ScrollText,    group: "Acuerdos sin sesión" },
   policy:      { icon: Scale,         group: "Políticas" },
   finding:     { icon: AlertTriangle, group: "Hallazgos" },
+  agenda_item: { icon: ListChecks,    group: "Puntos del orden del día" },
 };
 
 function normalizeSearchText(value: unknown) {
@@ -210,15 +227,146 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
       if (meetingIds.length === 0) return [];
     }
 
-    let request = supabase
+    // Codex P2 round 10: UNION agenda_items.title + meeting_resolutions.text.
+    // agenda_items sigue siendo fuente primaria (preserva INFO/DELIB sin
+    // resolución), pero también unificamos resultados cuando el texto matchea
+    // resolution_text/required_majority_code/status. El producto cartesiano
+    // se deduplica por (meeting_id, order_number/agenda_item_index).
+    //
+    // Pipeline:
+    //   1a. agenda_items por title ilike (primary)
+    //   1b. meeting_resolutions por resolution_text/required_majority_code/status (paralela)
+    //   2. Resolver agenda_items para las resolutions que matchearon (enrich kind)
+    //   3. Resolver resolutions para los agenda_items que matchearon (enrich agreement_id)
+    //   4. Merge dedupe
+    let agendaRequest = supabase
+      .from("agenda_items")
+      .select("id, meeting_id, order_number, title, kind, decision_subtype")
+      .eq("tenant_id", tenantId)
+      .ilike("title", q);
+    if (meetingIds) agendaRequest = agendaRequest.in("meeting_id", meetingIds);
+
+    let resolutionRequest = supabase
       .from("meeting_resolutions")
-      .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status")
+      .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution")
       .eq("tenant_id", tenantId)
       .or(`resolution_text.ilike.${q},required_majority_code.ilike.${q},status.ilike.${q}`);
-    if (meetingIds) request = request.in("meeting_id", meetingIds);
-    const { data, error } = await request.limit(8);
-    if (error) throw error;
-    return (data ?? []) as ResolutionRow[];
+    if (meetingIds) resolutionRequest = resolutionRequest.in("meeting_id", meetingIds);
+
+    const [agendaResp, resoTextResp] = await Promise.all([
+      agendaRequest.limit(8),
+      resolutionRequest.limit(8),
+    ]);
+    if (agendaResp.error) throw agendaResp.error;
+
+    const agendaItems = (agendaResp.data ?? []) as Array<{
+      id: string;
+      meeting_id: string;
+      order_number: number;
+      title: string;
+      kind: string | null;
+      decision_subtype: string | null;
+    }>;
+    const matchedResolutions = (resoTextResp.data ?? []) as Array<{
+      id: string;
+      meeting_id: string;
+      agreement_id: string | null;
+      agenda_item_index: number;
+      resolution_text: string;
+      required_majority_code: string | null;
+      status: string;
+      kind_resolution: string | null;
+    }>;
+    if (agendaItems.length === 0 && matchedResolutions.length === 0) return [];
+
+    // Para resolutions que matchearon por texto: cargar sus agenda_items
+    const meetingIdsForReso = Array.from(new Set(matchedResolutions.map((r) => r.meeting_id)));
+    const agendaEnrichResp =
+      meetingIdsForReso.length > 0
+        ? await supabase
+            .from("agenda_items")
+            .select("meeting_id, order_number, kind, title")
+            .in("meeting_id", meetingIdsForReso)
+        : { data: [] as Array<{ meeting_id: string; order_number: number; kind: string | null; title: string | null }> };
+    const agendaByKey = new Map<string, { kind: string | null; title: string | null }>();
+    for (const ai of (agendaEnrichResp.data ?? []) as Array<{
+      meeting_id: string;
+      order_number: number;
+      kind: string | null;
+      title: string | null;
+    }>) {
+      agendaByKey.set(`${ai.meeting_id}:${ai.order_number}`, { kind: ai.kind, title: ai.title });
+    }
+
+    // Para agenda_items primaries: cargar resolutions matching (puede coincidir
+    // o no con matchedResolutions; siempre query separada para no perder agenda
+    // sin texto match en resolution).
+    const meetingIdsForAgenda = Array.from(new Set(agendaItems.map((a) => a.meeting_id)));
+    const resoEnrichResp =
+      meetingIdsForAgenda.length > 0
+        ? await supabase
+            .from("meeting_resolutions")
+            .select("id, meeting_id, agreement_id, agenda_item_index, resolution_text, required_majority_code, status, kind_resolution")
+            .eq("tenant_id", tenantId)
+            .in("meeting_id", meetingIdsForAgenda)
+        : { data: [] as typeof matchedResolutions };
+    const resolutionByKey = new Map<string, (typeof matchedResolutions)[number]>();
+    for (const r of (resoEnrichResp.data ?? []) as typeof matchedResolutions) {
+      resolutionByKey.set(`${r.meeting_id}:${r.agenda_item_index}`, r);
+    }
+
+    // Merge + dedupe por (meeting_id, agenda_item_index/order_number)
+    const seen = new Set<string>();
+    const out: Array<{
+      id: string;
+      meeting_id: string;
+      agreement_id: string | null;
+      agenda_item_index: number;
+      resolution_text: string;
+      required_majority_code: string | null;
+      status: string;
+      kind_resolution: string | null;
+      agenda_items: { kind: string | null; order_number: number; title: string | null } | null;
+    }> = [];
+
+    // Primero agenda_items hits (preservan INFO/DELIB sin resolution)
+    for (const ai of agendaItems) {
+      const key = `${ai.meeting_id}:${ai.order_number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const r = resolutionByKey.get(key);
+      out.push(
+        r
+          ? { ...r, agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title } }
+          : {
+              id: ai.id,
+              meeting_id: ai.meeting_id,
+              agreement_id: null,
+              agenda_item_index: ai.order_number,
+              resolution_text: ai.title,
+              required_majority_code: null,
+              status: "DRAFT",
+              kind_resolution: null,
+              agenda_items: { kind: ai.kind, order_number: ai.order_number, title: ai.title },
+            },
+      );
+    }
+    // Luego resolutions que matchearon por texto pero su agenda_item no
+    // estaba en la query primaria
+    for (const r of matchedResolutions) {
+      const key = `${r.meeting_id}:${r.agenda_item_index}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ai = agendaByKey.get(key);
+      out.push({
+        ...r,
+        agenda_items: ai
+          ? { kind: ai.kind, order_number: r.agenda_item_index, title: ai.title }
+          : null,
+      });
+    }
+
+    return out as unknown as ResolutionRow[];
   }
 
   const [agreements, convocatorias, nosessions, policies, findings, resolutions] = await Promise.allSettled([
@@ -297,18 +445,71 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
   if (resolutions.status === "fulfilled") {
     const existing = new Set(results.map((result) => `${result.kind}:${result.id}`));
     resolutions.value.forEach((resolution) => {
-      const resultId = resolution.agreement_id ?? resolution.id;
-      const key = `agreement:${resultId}`;
+      const agendaJoin = firstJoin(resolution.agenda_items);
+      // Authoritative source: agenda_items.kind (P4 SSOT v1.3). Defensive default DELIBERATIVO.
+      const effectiveKind: AgendaItemKind = normalizeAgendaItemKind(agendaJoin?.kind ?? "DELIBERATIVO");
+      const orderNumber = agendaJoin?.order_number ?? resolution.agenda_item_index;
+      const agendaTitle = agendaJoin?.title ?? null;
+
+      // DECISORIO con agreement materializado → result tipo agreement (route /acuerdos/:id).
+      // DECISORIO sin agreement → agenda_item con badge "pendiente materialización".
+      // DELIBERATIVO / INFORMATIVO → agenda_item (route /reuniones/:id#punto-N).
+      const isDecisorio = effectiveKind === "DECISORIO";
+      const hasAgreement = Boolean(resolution.agreement_id);
+
+      if (isDecisorio && hasAgreement) {
+        const resultId = resolution.agreement_id!;
+        const key = `agreement:${resultId}`;
+        if (existing.has(key)) return;
+        existing.add(key);
+        const navRoute = getAgendaResultRoute({
+          type: "agenda_item",
+          meeting_id: resolution.meeting_id,
+          order_number: orderNumber,
+          kind: effectiveKind,
+          agreement_id: resolution.agreement_id ?? undefined,
+          title: agendaTitle ?? "",
+        });
+        results.push({
+          id: resultId,
+          label: agendaTitle ?? resolution.required_majority_code?.replace(/_/g, " ") ?? `Punto ${orderNumber}`,
+          sublabel: `${AGENDA_KIND_HUMAN_LABEL[effectiveKind]} · ${resolution.status} · ${resolution.resolution_text.substring(0, 80)}`,
+          kind: "agreement",
+          nav_to: navRoute,
+          agendaKind: effectiveKind,
+        });
+        return;
+      }
+
+      // Agenda item result (DELIBERATIVO, INFORMATIVO, o DECISORIO pendiente).
+      const resultId = `${resolution.meeting_id}:${orderNumber}`;
+      const key = `agenda_item:${resultId}`;
       if (existing.has(key)) return;
       existing.add(key);
+
+      const pendingMaterialization = isDecisorio && !hasAgreement;
+      const sublabelParts = [
+        AGENDA_KIND_HUMAN_LABEL[effectiveKind],
+        pendingMaterialization ? "pendiente materialización" : null,
+        resolution.status,
+        resolution.resolution_text.substring(0, 80),
+      ].filter(Boolean);
+
       results.push({
         id: resultId,
-        label: resolution.required_majority_code?.replace(/_/g, " ") || `Punto ${resolution.agenda_item_index}`,
-        sublabel: `${resolution.status} · ${resolution.resolution_text.substring(0, 80)}`,
-        kind: "agreement",
-        nav_to: resolution.agreement_id
-          ? `/secretaria/acuerdos/${resolution.agreement_id}`
-          : `/secretaria/reuniones/${resolution.meeting_id}`,
+        label: agendaTitle ?? `Punto ${orderNumber}`,
+        sublabel: sublabelParts.join(" · "),
+        kind: "agenda_item",
+        nav_to: getAgendaResultRoute({
+          type: "agenda_item",
+          meeting_id: resolution.meeting_id,
+          order_number: orderNumber,
+          kind: effectiveKind,
+          agreement_id: resolution.agreement_id ?? undefined,
+          title: agendaTitle ?? "",
+        }),
+        agendaKind: effectiveKind,
+        pendingMaterialization,
       });
     });
   }
@@ -442,17 +643,38 @@ export function GlobalSearch({ scope }: GlobalSearchProps) {
               <CommandGroup heading={group}>
                 {items.map((item) => {
                   const Icon = KIND_META[item.kind].icon;
+                  const badgeKind = item.agendaKind;
                   return (
                     <CommandItem
-                      key={item.id}
+                      key={`${item.kind}:${item.id}`}
                       value={`${item.label} ${item.sublabel}`}
                       onSelect={() => handleSelect(item.nav_to)}
                     >
                       <Icon className="mr-2 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-                      <div className="flex flex-col">
-                        <span className="font-medium">{item.label}</span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium truncate">{item.label}</span>
+                          {badgeKind && (
+                            <span
+                              className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${AGENDA_KIND_CHIP[badgeKind]}`}
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                              aria-label={`Tipo de punto: ${AGENDA_KIND_HUMAN_LABEL[badgeKind]}`}
+                            >
+                              {AGENDA_KIND_BADGE_LABEL[badgeKind]}
+                            </span>
+                          )}
+                          {item.pendingMaterialization && (
+                            <span
+                              className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                              aria-label="Acuerdo pendiente de materialización"
+                            >
+                              pendiente materialización
+                            </span>
+                          )}
+                        </span>
                         {item.sublabel && (
-                          <span className="text-xs text-[var(--g-text-secondary)]">{item.sublabel}</span>
+                          <span className="text-xs text-[var(--g-text-secondary)] truncate">{item.sublabel}</span>
                         )}
                       </div>
                     </CommandItem>

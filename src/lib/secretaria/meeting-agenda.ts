@@ -1,4 +1,6 @@
 import type { MateriaClase } from "@/lib/rules-engine";
+import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
+import { normalizeAgendaItemKind } from "@/lib/secretaria/agenda-kind";
 
 export type AgendaPointOrigin =
   | "PREPARED_AGREEMENT"
@@ -18,6 +20,10 @@ export interface MeetingAgendaPoint {
   agreement_id?: string | null;
   group_campaign_id?: string | null;
   group_campaign_step?: string | null;
+  /** Codex P1 #2 fix: kind propagado desde fuente (convocatoria JSON, agenda_items row, etc.). */
+  kind?: AgendaItemKind | null;
+  /** Subtipo opcional cuando kind === DECISORIO. */
+  decision_subtype?: AgendaDecisionSubtype | null;
 }
 
 export interface MeetingAgendaItemSource {
@@ -26,6 +32,9 @@ export interface MeetingAgendaItemSource {
   title?: string | null;
   description?: string | null;
   type?: string | null;
+  /** Codex P1 #2: agenda_items.kind autoritative cuando ya existe el row. */
+  kind?: string | null;
+  decision_subtype?: string | null;
 }
 
 export interface ConvocatoriaAgendaItemSource {
@@ -36,6 +45,9 @@ export interface ConvocatoriaAgendaItemSource {
   materia?: string | null;
   tipo?: string | null;
   inscribible?: boolean | null;
+  /** Codex P1 #2: kind seteado por ConvocatoriasStepper en el JSON. */
+  kind?: string | null;
+  decision_subtype?: string | null;
 }
 
 export interface PreparedAgreementSource {
@@ -129,6 +141,10 @@ function normalizePoint(point: Partial<MeetingAgendaPoint>): MeetingAgendaPoint 
     agreement_id: point.agreement_id ?? null,
     group_campaign_id: point.group_campaign_id ?? null,
     group_campaign_step: point.group_campaign_step ?? null,
+    // Codex P1 #2: preserva kind si viene seteado; NO defaultea aquí para que
+    // resolvePointKind pueda distinguir "kind no informado" de "kind explícito".
+    kind: point.kind ?? null,
+    decision_subtype: point.decision_subtype ?? null,
   };
 }
 
@@ -148,6 +164,9 @@ function normalizeSavedDebate(value: unknown): MeetingAgendaPoint | null {
     agreement_id: typeof value.agreement_id === "string" ? value.agreement_id : null,
     group_campaign_id: typeof value.group_campaign_id === "string" ? value.group_campaign_id : null,
     group_campaign_step: typeof value.group_campaign_step === "string" ? value.group_campaign_step : null,
+    // Codex P1 #2: preserva kind desde savedDebates JSON
+    kind: typeof value.kind === "string" ? normalizeAgendaItemKind(value.kind) : null,
+    decision_subtype: typeof value.decision_subtype === "string" ? value.decision_subtype as AgendaDecisionSubtype : null,
   });
 }
 
@@ -171,6 +190,9 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
           source_table: "agenda_items",
           source_id: item.id ?? null,
           source_index: item.order_number ?? index + 1,
+          // Codex P1 #2: agenda_items.kind autoritative si viene del row
+          kind: item.kind ? normalizeAgendaItemKind(item.kind) : null,
+          decision_subtype: item.decision_subtype as AgendaDecisionSubtype | null,
         })
       );
     });
@@ -189,6 +211,12 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
         source_table: "convocatorias",
         source_id: input.convocatoriaId ?? null,
         source_index: index + 1,
+        // Codex P1 #2: kind seteado por ConvocatoriasStepper en el JSON.
+        // Crítico: sin esto, todo punto convocatoria llega a DebatePunto sin
+        // kind y resolvePointKind defaultea a DELIBERATIVO, ignorando lo que
+        // el secretario ya clasificó como DECISORIO en convocatoria.
+        kind: item.kind ? normalizeAgendaItemKind(item.kind) : null,
+        decision_subtype: item.decision_subtype as AgendaDecisionSubtype | null,
       })
     );
   });
@@ -275,6 +303,12 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
       notas: point.notas || source.notas,
       group_campaign_id: source.group_campaign_id ?? point.group_campaign_id ?? null,
       group_campaign_step: source.group_campaign_step ?? point.group_campaign_step ?? null,
+      // Codex P2 fix: propaga kind y decision_subtype desde sources autoritativos.
+      // Precedencia: saved gana sobre source — si el usuario reclasificó manualmente
+      // un punto (saved tiene kind no nulo), no se pisa con el source. Si saved es
+      // null/undefined, hereda del source (ej. DECISORIO viniendo de convocatoria).
+      kind: point.kind ?? source.kind ?? null,
+      decision_subtype: point.decision_subtype ?? source.decision_subtype ?? null,
     });
   });
 

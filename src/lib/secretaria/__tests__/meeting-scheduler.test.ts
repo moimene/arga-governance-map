@@ -86,4 +86,35 @@ describe("meeting-scheduler", () => {
       },
     ]);
   });
+
+  describe("junta_universal → quorum_data.is_universal", () => {
+    it("propaga junta_universal=true a quorum_data.is_universal=true", () => {
+      const payload = buildMeetingScheduleFromConvocatoria(convocatoria({ junta_universal: true }));
+      expect(payload.quorum_data.is_universal).toBe(true);
+      const scheduledFrom = payload.quorum_data.scheduled_from as Record<string, unknown>;
+      expect(scheduledFrom.junta_universal).toBe(true);
+    });
+
+    it("propaga junta_universal=false a quorum_data.is_universal=false", () => {
+      const payload = buildMeetingScheduleFromConvocatoria(convocatoria({ junta_universal: false }));
+      expect(payload.quorum_data.is_universal).toBe(false);
+      const scheduledFrom = payload.quorum_data.scheduled_from as Record<string, unknown>;
+      expect(scheduledFrom.junta_universal).toBe(false);
+    });
+
+    it("default conservador: junta_universal undefined → quorum_data.is_universal=false", () => {
+      const conv = convocatoria();
+      // Garantizamos que el helper no fija junta_universal por defecto
+      delete (conv as Partial<typeof conv>).junta_universal;
+      const payload = buildMeetingScheduleFromConvocatoria(conv);
+      expect(payload.quorum_data.is_universal).toBe(false);
+      const scheduledFrom = payload.quorum_data.scheduled_from as Record<string, unknown>;
+      expect(scheduledFrom.junta_universal).toBe(false);
+    });
+
+    it("default conservador: junta_universal=null → quorum_data.is_universal=false", () => {
+      const payload = buildMeetingScheduleFromConvocatoria(convocatoria({ junta_universal: null }));
+      expect(payload.quorum_data.is_universal).toBe(false);
+    });
+  });
 });

@@ -126,4 +126,144 @@ describe("meeting agenda source merge", () => {
       origin: "MEETING_FLOOR",
     });
   });
+
+  describe("kind and decision_subtype propagation on merge", () => {
+    it("propagates DECISORIO kind from convocatoria source when saved debate has no kind", () => {
+      const points = mergeMeetingAgendaSources({
+        savedDebates: [
+          {
+            punto: "Nombramiento de auditor",
+            notas: "Nota del secretario.",
+            origin: "CONVOCATORIA",
+            source_table: "convocatorias",
+            source_id: "conv-1",
+            source_index: 1,
+          },
+        ],
+        convocatoriaId: "conv-1",
+        convocatoriaItems: [
+          {
+            titulo: "Nombramiento de auditor",
+            materia: "NOMBRAMIENTO_AUDITOR",
+            tipo: "ORDINARIA",
+            kind: "DECISORIO",
+          },
+        ],
+      });
+
+      expect(points).toHaveLength(1);
+      expect(points[0].kind).toBe("DECISORIO");
+    });
+
+    it("keeps DELIBERATIVO kind from saved debate when source has DECISORIO (saved wins)", () => {
+      const points = mergeMeetingAgendaSources({
+        savedDebates: [
+          {
+            punto: "Nombramiento de auditor",
+            notas: "Reclasificado manualmente.",
+            origin: "CONVOCATORIA",
+            source_table: "convocatorias",
+            source_id: "conv-1",
+            source_index: 1,
+            kind: "DELIBERATIVO",
+          },
+        ],
+        convocatoriaId: "conv-1",
+        convocatoriaItems: [
+          {
+            titulo: "Nombramiento de auditor",
+            materia: "NOMBRAMIENTO_AUDITOR",
+            tipo: "ORDINARIA",
+            kind: "DECISORIO",
+          },
+        ],
+      });
+
+      expect(points).toHaveLength(1);
+      expect(points[0].kind).toBe("DELIBERATIVO");
+    });
+
+    it("returns null kind when both saved and source have no kind", () => {
+      const points = mergeMeetingAgendaSources({
+        savedDebates: [
+          {
+            punto: "Aprobacion de cuentas",
+            notas: "Sin kind.",
+            origin: "CONVOCATORIA",
+            source_table: "convocatorias",
+            source_id: "conv-1",
+            source_index: 1,
+          },
+        ],
+        convocatoriaId: "conv-1",
+        convocatoriaItems: [
+          {
+            titulo: "Aprobacion de cuentas",
+            materia: "APROBACION_CUENTAS",
+            tipo: "ORDINARIA",
+          },
+        ],
+      });
+
+      expect(points).toHaveLength(1);
+      expect(points[0].kind).toBeNull();
+    });
+
+    it("propagates decision_subtype from source when saved debate has none", () => {
+      const points = mergeMeetingAgendaSources({
+        savedDebates: [
+          {
+            punto: "Aprobacion de cuentas",
+            notas: "Sin subtype.",
+            origin: "CONVOCATORIA",
+            source_table: "convocatorias",
+            source_id: "conv-1",
+            source_index: 1,
+            kind: "DECISORIO",
+          },
+        ],
+        convocatoriaId: "conv-1",
+        convocatoriaItems: [
+          {
+            titulo: "Aprobacion de cuentas",
+            materia: "APROBACION_CUENTAS",
+            tipo: "ORDINARIA",
+            kind: "DECISORIO",
+            decision_subtype: "CONSTITUTIVE",
+          },
+        ],
+      });
+
+      expect(points).toHaveLength(1);
+      expect(points[0].kind).toBe("DECISORIO");
+      expect(points[0].decision_subtype).toBe("CONSTITUTIVE");
+    });
+
+    it("preserves saved kind when source has no kind field at all", () => {
+      const points = mergeMeetingAgendaSources({
+        savedDebates: [
+          {
+            punto: "Aprobacion de cuentas",
+            notas: "Kind solo en saved.",
+            origin: "CONVOCATORIA",
+            source_table: "convocatorias",
+            source_id: "conv-1",
+            source_index: 1,
+            kind: "DECISORIO",
+          },
+        ],
+        convocatoriaId: "conv-1",
+        convocatoriaItems: [
+          {
+            titulo: "Aprobacion de cuentas",
+            materia: "APROBACION_CUENTAS",
+            tipo: "ORDINARIA",
+          },
+        ],
+      });
+
+      expect(points).toHaveLength(1);
+      expect(points[0].kind).toBe("DECISORIO");
+    });
+  });
 });
