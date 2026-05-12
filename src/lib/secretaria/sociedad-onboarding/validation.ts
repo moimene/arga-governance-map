@@ -89,6 +89,18 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   if (draft.shareClasses.length > 0 && totalTitles > 0 && classTitles !== totalTitles) {
     issues.push(issue("CL-002", "shareClasses.numero_titulos", "La suma de titulos por clase debe coincidir con el total."));
   }
+  // CL-005: titles negativos en una clase pasaban si otras lo compensaban en
+  // la suma total. El schema canonico (000019) tiene CHECK numero_titulos >= 0
+  // y la RPC rolledback. Fix per-row inline (review Codex P2).
+  for (const sc of draft.shareClasses) {
+    if (num(sc.numero_titulos) < 0) {
+      issues.push(issue(
+        "CL-005",
+        `shareClasses.${sc.class_code || "?"}.numero_titulos`,
+        "El numero de titulos de una clase no puede ser negativo."
+      ));
+    }
+  }
   // CL-003: el class_code no puede ser blank/vacio. Sin este check, si el
   // usuario borra un codigo, el dropdown de cap-table puede cargar codes
   // vacios y la RPC luego falla con "share class class_code is required"
@@ -124,6 +136,18 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   const holdingTitles = draft.capTable.reduce((sum, item) => sum + num(item.numero_titulos), 0);
   if (draft.capTable.length > 0 && totalTitles > 0 && holdingTitles !== totalTitles) {
     issues.push(issue("CT-002", "capTable.numero_titulos", "El cap table debe sumar el 100% de los titulos.", "BLOCK_OPERATIONAL"));
+  }
+  // CT-011: holdings con titulos negativos pasaban si otros lo compensaban.
+  // Schema CHECK capital_holdings.numero_titulos >= 0 (000019) rolledback la
+  // RPC. Fix per-row inline (review Codex P2).
+  for (const entry of draft.capTable) {
+    if (num(entry.numero_titulos) < 0) {
+      issues.push(issue(
+        "CT-011",
+        `capTable.${entry.key}.numero_titulos`,
+        "El numero de titulos de un holding no puede ser negativo."
+      ));
+    }
   }
 
   // CT-006: codigos referenciados en cap-table deben estar declarados en el paso 5.
@@ -249,6 +273,29 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
     if (!hasCargo(draft.cargos, "PRESIDENTE") || !hasCargo(draft.cargos, "SECRETARIO")) {
       issues.push(issue("CA-002", "cargos", "El Consejo necesita presidente y secretario para certificaciones.", "BLOCK_OPERATIONAL"));
     }
+    // CA-004: el numero de consejeros debe respetar consejo_min/consejo_max
+    // declarados en organos. Default consejo_min=3. Sin este check, una CDA
+    // con solo presidente+secretario (2 consejeros) pasaba aunque min=3,
+    // dejando la sociedad incumpliendo su propio limite declarado tras TX2
+    // (review Codex P2).
+    const consMin = Number(draft.organos.consejo_min ?? 0);
+    const consMax = Number(draft.organos.consejo_max ?? 0);
+    if (consMin > 0 && consejeros.length < consMin) {
+      issues.push(issue(
+        "CA-004",
+        "cargos",
+        `El Consejo declara un minimo de ${consMin} consejeros pero solo hay ${consejeros.length}. Ajusta consejo_min o anade consejeros.`,
+        "BLOCK_OPERATIONAL"
+      ));
+    }
+    if (consMax > 0 && consejeros.length > consMax) {
+      issues.push(issue(
+        "CA-004",
+        "cargos",
+        `El Consejo declara un maximo de ${consMax} consejeros pero hay ${consejeros.length}. Ajusta consejo_max o reduce consejeros.`,
+        "BLOCK_OPERATIONAL"
+      ));
+    }
   } else {
     const expected = adminCargoTiposForForma(draft);
     const matching = draft.cargos.filter((cargo) => expected.includes(cargo.tipo_condicion) && cargo.persona);
@@ -338,10 +385,10 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     1: ["S-005", "S-006", "R-002"],
     2: ["O-002", "CT-005"],
     3: ["C-001", "C-002", "C-003", "C-004"],
-    4: ["CL-001", "CL-002", "CL-003", "CL-004"],
-    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "P-001"],
+    4: ["CL-001", "CL-002", "CL-003", "CL-004", "CL-005"],
+    5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "CT-011", "P-001"],
     6: ["O-001", "O-002"],
-    7: ["CA-001", "CA-002", "CA-003", "AU-001", "AU-002", "PJ-001"],
+    7: ["CA-001", "CA-002", "CA-003", "CA-004", "AU-001", "AU-002", "PJ-001"],
     8: ["R-001", "R-002"],
     9: [],
     10: [],

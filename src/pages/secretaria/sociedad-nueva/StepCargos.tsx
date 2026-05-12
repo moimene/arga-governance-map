@@ -55,7 +55,7 @@ export function StepCargos({
 
   return (
     <div className="space-y-4">
-      <IssueList issues={(issues ?? []).filter((issue) => ["CA-001", "CA-002", "CA-003", "AU-001", "AU-002", "PJ-001"].includes(issue.code))} />
+      <IssueList issues={(issues ?? []).filter((issue) => ["CA-001", "CA-002", "CA-003", "CA-004", "AU-001", "AU-002", "PJ-001"].includes(issue.code))} />
       <div className="flex justify-end">
         <button
           type="button"
