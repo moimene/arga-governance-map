@@ -63,7 +63,11 @@ const CARGOS_COLEGIADOS: TipoCondicion[] = [
 export default function DesignarAdminStepper() {
   const params = useParams<{ id?: string }>(); // `id` = entityId en /sociedades/:id/admin/nuevo
   const [searchParams] = useSearchParams();
-  const entityIdFromUrl = params.id ?? searchParams.get("entityId") ?? "";
+  // P2 Codex iter-5: leer también ?entity= (scope param del scope-switcher) como fallback
+  // para preservar la sociedad seleccionada cuando se entra al wizard desde un scoped view
+  // (PersonasList con scope sociedad usa createScopedTo que añade ?entity=).
+  const entityIdFromUrl =
+    params.id ?? searchParams.get("entityId") ?? searchParams.get("entity") ?? "";
   const personIdFromUrl = searchParams.get("personId") ?? "";
   const bodyIdFromUrl = searchParams.get("bodyId") ?? "";
   const navigate = useNavigate();
