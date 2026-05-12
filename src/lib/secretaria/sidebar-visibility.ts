@@ -311,8 +311,19 @@ export function canShowAdoptionModeCta(
   ctx: SidebarVisibilityContext,
   adoptionMode: "MEETING" | "UNIVERSAL" | "NO_SESSION" | "UNIPERSONAL_SOCIO" | "UNIPERSONAL_ADMIN" | "CO_APROBACION" | "SOLIDARIO"
 ): boolean {
+  // 1) Fuente autoritativa: ctx.adoptionModes (derivado por el hook agregador
+  //    de tipo_organo_admin + body.config.organo_tipo + body.config.adoption_mode).
+  //    Esto cubre el caso "tipo_organo_admin vacío pero régimen en config" sin
+  //    duplicar lógica de inferencia.
+  const adoptionModes = (ctx.adoptionModes ?? []).map(upper);
+  if (adoptionModes.includes(upper(adoptionMode))) return true;
+
+  // 2) Fallback inferido desde entity + bodyTypes + organoTipos (helpers
+  //    que sí miran organoTipos). Útil cuando el caller no agrega adoptionModes
+  //    (e.g. tests con context parcial).
   const tipoSocial = upper(ctx.entity?.tipo_social);
   const adminRaw = ctx.entity?.tipo_organo_admin;
+  const organoTipos = ctx.organoTipos ?? [];
   const colegiado = entityHasCollegiateBody(ctx);
   const unipersonal = entityHasUnipersonalAdmin(ctx);
 
@@ -322,16 +333,29 @@ export function canShowAdoptionModeCta(
     case "NO_SESSION":
       return colegiado;
     case "UNIPERSONAL_ADMIN":
-      return unipersonal;
+      // Veto unipersonal admin también desde organo_tipo del body
+      return unipersonal || organoTipos.some((t) => {
+        const u = upper(t);
+        return u === "ADMIN_UNICO" || u === "ADMINISTRADOR_UNICO";
+      });
     case "UNIPERSONAL_SOCIO":
-      // SLU/SAU implícitamente; o entity es_unipersonal flag al nivel socio
-      return tipoSocial === "SLU" || tipoSocial === "SAU" || Boolean(ctx.entity?.es_unipersonal);
+      return (
+        tipoSocial === "SLU" ||
+        tipoSocial === "SAU" ||
+        Boolean(ctx.entity?.es_unipersonal) ||
+        organoTipos.some((t) => upper(t) === "SOCIO_UNICO")
+      );
     case "CO_APROBACION":
-      // Acepta plural canónico (ADMIN_MANCOMUNADOS) + singular legacy + alias
-      return isMancomunadoAdmin(adminRaw);
+      // Acepta plural canónico + singular legacy + alias. También desde
+      // body.config.organo_tipo (ADMIN_CONJUNTA es el alias del stepper).
+      return (
+        isMancomunadoAdmin(adminRaw) ||
+        organoTipos.some((t) => isMancomunadoAdmin(t) || upper(t) === "ADMIN_CONJUNTA")
+      );
     case "SOLIDARIO":
-      // Acepta plural canónico (ADMIN_SOLIDARIOS) + singular legacy
-      return isSolidarioAdmin(adminRaw);
+      // Acepta plural canónico + singular legacy. También desde
+      // body.config.organo_tipo cuando entity.tipo_organo_admin está vacío.
+      return isSolidarioAdmin(adminRaw) || organoTipos.some((t) => isSolidarioAdmin(t));
     default:
       return false;
   }

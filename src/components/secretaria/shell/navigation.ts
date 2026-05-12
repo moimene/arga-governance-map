@@ -163,13 +163,20 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         },
       },
       {
+        // La página AcuerdosSinSesion es entry point para 3 flujos:
+        //   - NO_SESSION (unanimidad, requiere colegiado)
+        //   - CO_APROBACION (ADMIN_MANCOMUNADOS — k de n)
+        //   - SOLIDARIO (ADMIN_SOLIDARIOS — administrador único de los solidarios)
+        // No filtramos por colegialidad: si la entidad soporta CUALQUIERA
+        // de esos 3 modos, el item debe aparecer y la página decide qué
+        // CTAs renderizar. Los CTAs internos usan canShowAdoptionModeCta.
         label: "Acuerdos sin sesión",
         to: "/secretaria/acuerdos-sin-sesion",
         icon: ScrollText,
         requiresEntity: true,
         visibility: {
           requiresEntity: true,
-          requiresCollegiateBody: true,
+          requiresAdoptionMode: ["NO_SESSION", "CO_APROBACION", "SOLIDARIO"],
           excludesIfReferenceOnly: true,
         },
       },

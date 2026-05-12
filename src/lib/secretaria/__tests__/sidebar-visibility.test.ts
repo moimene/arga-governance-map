@@ -65,15 +65,19 @@ describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA l
   // cuando el régimen es no-colegiado.
 
   it("SLU + ADMIN_UNICO con body legacy CDA → NO colegiado (veto por tipo_organo_admin)", () => {
+    // En producción el hook agregador NO añadiría MEETING/UNIVERSAL/NO_SESSION
+    // a adoptionModes para esta entidad — sólo UNIPERSONAL_ADMIN/UNIPERSONAL_SOCIO.
     const ctx = baseCtx({
       entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO" },
       bodyTypes: ["CDA"],
       organoTipos: ["ADMIN_UNICO"],
+      adoptionModes: ["UNIPERSONAL_ADMIN", "UNIPERSONAL_SOCIO"],
     });
     expect(entityHasCollegiateBody(ctx)).toBe(false);
     expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
     expect(canShowAdoptionModeCta(ctx, "MEETING")).toBe(false);
     expect(canShowAdoptionModeCta(ctx, "UNIVERSAL")).toBe(false);
+    expect(canShowAdoptionModeCta(ctx, "UNIPERSONAL_ADMIN")).toBe(true);
   });
 
   it("SL + ADMIN_SOLIDARIOS (plural canónico) con body legacy CDA → NO colegiado", () => {
@@ -81,6 +85,7 @@ describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA l
       entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_SOLIDARIOS" },
       bodyTypes: ["CDA"],
       organoTipos: ["ADMIN_SOLIDARIOS"],
+      adoptionModes: ["SOLIDARIO"],
     });
     expect(entityHasCollegiateBody(ctx)).toBe(false);
     expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
@@ -92,6 +97,7 @@ describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA l
       entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_MANCOMUNADOS" },
       bodyTypes: ["CDA"],
       organoTipos: ["ADMIN_CONJUNTA"], // alias del stepper
+      adoptionModes: ["CO_APROBACION"],
     });
     expect(entityHasCollegiateBody(ctx)).toBe(false);
     expect(canShowAdoptionModeCta(ctx, "NO_SESSION")).toBe(false);
@@ -142,6 +148,83 @@ describe("sidebar-visibility — veto colegialidad (Codex P2 — body_type CDA l
       organoTipos: [],
     });
     expect(entityHasCollegiateBody(ctx)).toBe(false);
+  });
+
+  it("Acuerdos sin sesión item: visible para ADMIN_SOLIDARIOS y ADMIN_MANCOMUNADOS (Codex P2 #3)", () => {
+    // Verificación adicional: el item con requiresAdoptionMode debe permitir
+    // entrada a entidades no-colegiadas que sin embargo tienen flujos válidos
+    // (SOLIDARIO / CO_APROBACION).
+    const itemAcuerdos: VisibleSecretariaNavItem = {
+      label: "Acuerdos sin sesión",
+      to: "/x",
+      icon: Users,
+      visibility: {
+        requiresEntity: true,
+        requiresAdoptionMode: ["NO_SESSION", "CO_APROBACION", "SOLIDARIO"],
+      },
+    };
+
+    // SA + CDA (colegiado) → NO_SESSION disponible → visible
+    expect(isItemVisible(itemAcuerdos, baseCtx())).toBe(true);
+
+    // SL + ADMIN_SOLIDARIOS → SOLIDARIO disponible → visible (aunque no colegiada)
+    const solidaria = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_SOLIDARIOS" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_SOLIDARIOS"],
+      adoptionModes: ["SOLIDARIO"],
+    });
+    expect(isItemVisible(itemAcuerdos, solidaria)).toBe(true);
+
+    // SL + ADMIN_MANCOMUNADOS → CO_APROBACION disponible → visible
+    const mancomunada = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: "ADMIN_MANCOMUNADOS" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_CONJUNTA"],
+      adoptionModes: ["CO_APROBACION"],
+    });
+    expect(isItemVisible(itemAcuerdos, mancomunada)).toBe(true);
+
+    // SLU + ADMIN_UNICO → sólo UNIPERSONAL_ADMIN → fuera del set → oculto
+    const unipersonal = baseCtx({
+      entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO" },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_UNICO"],
+      adoptionModes: ["UNIPERSONAL_ADMIN", "UNIPERSONAL_SOCIO"],
+    });
+    expect(isItemVisible(itemAcuerdos, unipersonal)).toBe(false);
+  });
+
+  it("canShowAdoptionModeCta: consulta ctx.adoptionModes (Codex P2 #4) — entidad sin tipo_organo_admin pero con organo_tipo en config", () => {
+    // Caso: entity.tipo_organo_admin = null, pero body.config.organo_tipo =
+    // ADMIN_CONJUNTA. El hook agregador deriva adoptionModes=[CO_APROBACION].
+    // canShowAdoptionModeCta debe consultar el array y no solo adminRaw.
+    const ctxConfig = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_CONJUNTA"],
+      adoptionModes: ["CO_APROBACION"],
+    });
+    expect(canShowAdoptionModeCta(ctxConfig, "CO_APROBACION")).toBe(true);
+
+    // Mismo caso para SOLIDARIO via organoTipos
+    const ctxSolidario = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_SOLIDARIOS"],
+      adoptionModes: ["SOLIDARIO"],
+    });
+    expect(canShowAdoptionModeCta(ctxSolidario, "SOLIDARIO")).toBe(true);
+
+    // Fallback: si adoptionModes está vacío pero organoTipos tiene el valor,
+    // el helper sigue funcionando por inferencia directa
+    const ctxSolidarioSinModes = baseCtx({
+      entity: { tipo_social: "SL", tipo_organo_admin: null },
+      bodyTypes: ["CDA"],
+      organoTipos: ["ADMIN_SOLIDARIOS"],
+      adoptionModes: [],
+    });
+    expect(canShowAdoptionModeCta(ctxSolidarioSinModes, "SOLIDARIO")).toBe(true);
   });
 
   it("isNonCollegiateAdmin / isCollegiateAdmin clasifican correctamente", () => {
@@ -341,7 +424,12 @@ describe("sidebar-visibility — isItemDisabled (modo sociedad sin entidad selec
 describe("sidebar-visibility — CTAs contextuales en páginas", () => {
   it("canShowAdoptionModeCta(MEETING/UNIVERSAL/NO_SESSION) requiere órgano colegiado", () => {
     const colegiado = baseCtx();
-    const unipersonal = baseCtx({ bodyTypes: [], entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO" } });
+    // Unipersonal correctamente derivado por el hook: sólo UNIPERSONAL_ADMIN/SOCIO
+    const unipersonal = baseCtx({
+      bodyTypes: [],
+      entity: { tipo_social: "SLU", tipo_organo_admin: "ADMIN_UNICO" },
+      adoptionModes: ["UNIPERSONAL_ADMIN", "UNIPERSONAL_SOCIO"],
+    });
     expect(canShowAdoptionModeCta(colegiado, "MEETING")).toBe(true);
     expect(canShowAdoptionModeCta(colegiado, "UNIVERSAL")).toBe(true);
     expect(canShowAdoptionModeCta(colegiado, "NO_SESSION")).toBe(true);
