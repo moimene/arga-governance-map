@@ -992,6 +992,13 @@ export default function ConvocatoriasStepper() {
   const [borradorTexto, setBorradorTexto] = useState<string>("");
   const [borradorDirty, setBorradorDirty] = useState(false);
   const [renderUnresolved, setRenderUnresolved] = useState<string[]>([]);
+  // Codex P2 round 12 PR #3: render-pending state. El import dinámico de
+  // `template-renderer` es async; entre que el usuario llega al Paso 7 y
+  // el render completa, `borradorTexto` puede estar vacío. Si el usuario
+  // click "Siguiente" en ese intervalo, llegaría al Paso 8 con
+  // `convocatoria_text: null` aunque hay plantilla aprobada. Bloqueamos
+  // `canAdvance` mientras pending=true.
+  const [borradorRenderPending, setBorradorRenderPending] = useState(false);
 
   // Guard contra setState tras unmount o tras nueva regeneración (cancela
   // promesas en vuelo). Sin esto, navegar fuera de Paso 7 mientras el
@@ -1050,11 +1057,16 @@ export default function ConvocatoriasStepper() {
     if (!effectiveBorradorTemplate?.capa1_inmutable) {
       setBorradorTexto("");
       setRenderUnresolved([]);
+      setBorradorRenderPending(false);
       borradorLastRenderHashRef.current = borradorContextHash;
       return;
     }
     // Cada llamada incrementa el token; sólo el último vuelve a setState.
     const token = ++regenerateTokenRef.current;
+    // Codex P2 round 12 PR #3: marca render pendiente para bloquear
+    // navegación adelante (canAdvance) y emisión hasta que el render
+    // complete o sea cancelado.
+    setBorradorRenderPending(true);
     void import("@/lib/doc-gen/template-renderer").then(({ renderTemplate }) => {
       // Cancelado si: componente desmontado o llegó una regeneración nueva
       // (la `onChange` del textarea también incrementa el token — Codex
@@ -1062,7 +1074,12 @@ export default function ConvocatoriasStepper() {
       // import, este guard es defensa en profundidad para imports muy
       // lentos donde el render rezagado de otra plantilla no debe pisar
       // un texto que el usuario ya empezó a editar.
-      if (!isMountedRef.current || token !== regenerateTokenRef.current) return;
+      if (!isMountedRef.current) return;
+      if (token !== regenerateTokenRef.current) {
+        // Cancelado por una llamada posterior — la nueva ya habrá puesto
+        // pending=true; no lo bajamos aquí porque la nueva sigue activa.
+        return;
+      }
       const merged = { ...borradorVariables, ...borradorCapa3Values };
       const result = renderTemplate({
         template: effectiveBorradorTemplate.capa1_inmutable!,
@@ -1071,8 +1088,16 @@ export default function ConvocatoriasStepper() {
       setBorradorTexto(result.text);
       setRenderUnresolved(result.unresolvedVariables);
       setBorradorDirty(false);
+      setBorradorRenderPending(false);
       // Tras render limpio el hash queda alineado con el contexto actual.
       borradorLastRenderHashRef.current = borradorContextHash;
+    }).catch(() => {
+      // Si el import o el render fallan, libera el pending para no
+      // dejar el botón Siguiente bloqueado para siempre.
+      if (!isMountedRef.current) return;
+      if (token === regenerateTokenRef.current) {
+        setBorradorRenderPending(false);
+      }
     });
   }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values, borradorContextHash]);
 
@@ -1207,11 +1232,26 @@ export default function ConvocatoriasStepper() {
   }
 
   // ── Validation gates ──
+  // Codex P2 round 12 PR #3: capa3 fields obligatorios deben rellenarse
+  // antes de avanzar de Paso 7. Sin este gate, una plantilla con campos
+  // OBLIGATORIO permitía emitir con valores vacíos → render incompleto
+  // del `convocatoria_text` que omite secciones críticas.
+  const borradorCapa3MissingRequired = useMemo(
+    () => validateCapa3(borradorCapa3Fields, borradorCapa3Values),
+    [borradorCapa3Fields, borradorCapa3Values],
+  );
+  const borradorCapa3HasMissing = Object.keys(borradorCapa3MissingRequired).length > 0;
+
   function canAdvance(): boolean {
     switch (current) {
       case 1: return !!selectedEntity && !!selectedBody && !readinessBlocked;
       case 2: return !!fechaReunion && !!lugar;
       case 3: return agendaItems.some((i) => i.titulo.trim().length > 0);
+      // Codex P2 round 12: bloqueamos avance del Paso 7 si:
+      //   - el render del borrador está aún pendiente (import dinámico)
+      //   - hay capa3 obligatorios sin rellenar
+      // El stale guard (round 8) sigue actuando en el botón Emitir del 8.
+      case 7: return !borradorRenderPending && !borradorCapa3HasMissing;
       default: return true;
     }
   }
@@ -2951,6 +2991,39 @@ export default function ConvocatoriasStepper() {
                     onChange={setBorradorCapa3Values}
                     telematicaEnabled={formatoReunion !== "PRESENCIAL"}
                   />
+                  {/* Codex P2 round 12 PR #3: gate visible cuando faltan
+                      campos obligatorios. El botón "Siguiente" queda
+                      disabled por canAdvance() — este banner explica al
+                      secretario por qué. */}
+                  {borradorCapa3HasMissing && (
+                    <p className="text-[11px] text-[var(--status-error)]">
+                      ⚠ Faltan campos obligatorios de la plantilla:{" "}
+                      {Object.keys(borradorCapa3MissingRequired).join(", ")}.
+                      No se puede avanzar al Paso 8 hasta rellenarlos.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Codex P2 round 12 PR #3: aviso render pendiente. Si el
+                  usuario llega al Paso 7 con plantilla seleccionada y el
+                  import dinámico aún no resolvió, el textarea está vacío.
+                  canAdvance() bloquea pasar a Paso 8 y este aviso explica
+                  por qué el botón "Siguiente" no está habilitado. */}
+              {borradorRenderPending && (
+                <div
+                  className="border-l-4 border-[var(--status-info)] bg-[var(--g-surface-card)] p-2"
+                  style={{ borderRadius: "var(--g-radius-sm)" }}
+                  role="status"
+                  aria-busy="true"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-info)]">
+                    ⏳ Cargando motor de plantillas…
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Renderizando el borrador desde la plantilla. Espera unos segundos
+                    antes de avanzar al Paso 8.
+                  </p>
                 </div>
               )}
 
@@ -3235,16 +3308,34 @@ export default function ConvocatoriasStepper() {
             {isLastStep ? (
               <button
                 type="button"
-                disabled={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorIsStale}
+                disabled={
+                  createConvocatoria.isPending ||
+                  uploadStatus.inFlight > 0 ||
+                  borradorIsStale ||
+                  borradorRenderPending ||
+                  borradorCapa3HasMissing
+                }
                 onClick={handleEmitir}
-                aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0}
-                title={borradorIsStale ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de emitir." : undefined}
+                aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorRenderPending}
+                title={
+                  borradorIsStale
+                    ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de emitir."
+                    : borradorRenderPending
+                    ? "El motor de plantillas aún no terminó de renderizar. Espera unos segundos."
+                    : borradorCapa3HasMissing
+                    ? `Faltan campos obligatorios de capa 3 en Paso 7: ${Object.keys(borradorCapa3MissingRequired).join(", ")}.`
+                    : undefined
+                }
                 className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Send className="h-4 w-4" />
                 {borradorIsStale
                   ? "Borrador stale — resolver Paso 7"
+                  : borradorRenderPending
+                  ? "Renderizando borrador…"
+                  : borradorCapa3HasMissing
+                  ? "Capa 3 incompleta — Paso 7"
                   : uploadStatus.inFlight > 0
                   ? `Subiendo ${uploadStatus.inFlight} adjunto(s)…`
                   : createConvocatoria.isPending
