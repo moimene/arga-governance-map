@@ -72,8 +72,8 @@ La RPC **no escribe** `condiciones_persona`, `representaciones` ni `authority_ev
 
 Después de que TX1 retorna `entity_id`, ejecuta secuencialmente:
 1. Lookup/creación de `persons` para cada cargo (PF + PJ admin con representante PF).
-2. `condiciones_persona` para cada cargo del draft (administrador único, solidarios, mancomunados, consejeros, presidente, secretario, vicepresidente, coordinador, etc.).
-3. `representaciones` para representantes permanentes de admin PJ.
+2. `condiciones_persona` para cada cargo del draft con `tipo_condicion`, `fecha_inicio`, `fuente_designacion ∈ {ACTA_NOMBRAMIENTO, ESCRITURA, DECISION_UNIPERSONAL, BOOTSTRAP}` (CHECK del schema canónico, migración `000024`), `representative_person_id` solo cuando `tipo_condicion='ADMIN_PJ'`. El CHECK `chk_condicion_body_coherente` exige `body_id IS NULL` para `SOCIO/ADMIN_*` y `body_id IS NOT NULL` para `CONSEJERO/PRESIDENTE/SECRETARIO/VICEPRESIDENTE/CONSEJERO_COORDINADOR`.
+3. `representaciones` con `scope='ADMIN_PJ_REPRESENTANTE'` (único scope persistente del CHECK `chk_representacion_scope_enum`; los otros — `JUNTA_PROXY` y `CONSEJO_DELEGACION` — son operacionales y requieren `meeting_id`, no aplican al alta). Para PJ accionista con representante de junta, **no se persiste en alta**: el `JUNTA_PROXY` se crea por junta concreta en otro flujo. La tabla `representaciones` NO tiene columna `estado` — la vigencia se modela vía `effective_from` (DATE NOT NULL) y `effective_to`.
 4. `authority_evidence` queda **autopoblado** por el trigger `fn_sync_authority_evidence` (aplicado por carril Personas/Cargos en migración `000064`); NO escribimos manualmente.
 
 Si TX2 falla parcial:
@@ -99,7 +99,7 @@ Si TX2 falla parcial:
 | Q3 | RPC transaccional vs rollback cliente | RPC transaccional (`fn_crear_sociedad_legal_y_capital`). Ver §2.3. |
 | Q4 | Claves `entity_settings_catalog` | Solo las que ya existen en catálogo. Si una clave del draft no está catalogada, no insertar. Inventario verificado en fase B antes de implementar. |
 | Q5 | Refresh `parte_votante_current` | **Lazy**: el motor LSC ya consume `parte_votante_current` regenerándola cuando hace falta. No hacemos refresh eager en alta. |
-| Q6 | Autocartera | `capital_holdings.is_treasury = true` con `person_id = null`. Si schema no permite null, columna check ya cubre semántica (voting_weight=0, denominator_weight=0). Verificar en fase B. |
+| Q6 | Autocartera | `capital_holdings.is_treasury = true` con `holder_person_id = entity.person_id` (la PJ propia de la sociedad). El schema canónico (migración `000019`) declara `holder_person_id UUID NOT NULL REFERENCES persons(id)` — no permite null, por lo que modelizar la autocartera como "sociedad poseedora de sí misma" es la opción coherente. El `voting_rights=false` en la fila marca que esos títulos no computan en denominador de voto. |
 | Q7 | Cotizada nueva fuera de ARGA | **Permitida** con warning DL-2 del motor LSC. Misma política que ARGA Seguros. |
 
 ---
@@ -137,9 +137,9 @@ Persistencia actual (5 inserts cliente con rollback compensatorio):
 | 3 | **Perfil societario y grupo** | Forma admin (Único/Solidarios/Mancomunados/Consejo) coherente con tipo social. Cotizada. Sector regulado. Rol en grupo. Matriz si filial. % ownership si matriz declarada. Unipersonalidad **derivada del tipo social** (SAU/SLU lock a `true`, SA/SL editable). El warning CT-005 "SA/SL con socio único no marcado" se emite en **paso 6** al validar cap table, no aquí. | — |
 | 4 | **Capital social** | Moneda. Capital escriturado. Capital desembolsado (≤ escriturado). Número total de títulos. Valor nominal (auto-calculado, editable). Tipo de título (acción/participación). | C-001 a C-004 |
 | 5 | **Clases / series** | Lista de clases con: código, nombre, votos/título, coeficiente económico, derecho voto, derecho veto, restricciones (metadata). Mínimo 1. Sin "ORD" forzada. Suma de títulos por clase = número total de títulos del paso 4. | CL-001 |
-| 6 | **Cap table inicial** | Lista de socios (PF/PJ) con: persona (lookup por NIF o nueva), clase/serie, número títulos, % capital (auto), % voto (auto si simple). Soporta autocartera (`is_treasury`, sin persona). Soporta PJ con representante (PF requerido si voto). | CT-001 a CT-005, P-001 |
+| 6 | **Cap table inicial** | Lista de socios (PF/PJ) con: persona (lookup por NIF o nueva), clase/serie, número títulos, % capital (auto-derivado). Soporta autocartera con `is_treasury=true` y `holder_person_id = entity.person_id` (la PJ propia de la sociedad; el schema no permite null). PJ accionista con representante de junta NO se persiste en alta — el proxy de junta se crea por junta concreta. | CT-001 a CT-005 |
 | 7 | **Órganos sociales** | Junta General / Socio Único (auto según unipersonalidad). Órgano admin según forma elegida. Si Consejo: nombre, número mínimo/máximo consejeros. Comisiones opcionales (Auditoría, Nombramientos, Retribuciones, Riesgos). | O-001, O-002 |
-| 8 | **Cargos iniciales** | Si Consejo: presidente, secretario, vicepresidente, vicesecretario (opc), coordinador independiente (opc), N consejeros. Si Admin Único: 1 administrador (PF o PJ con representante). Si Solidarios/Mancomunados: N administradores. Cargo aporta `person_id`, `body_id`, `tipo_condicion`, `fecha_designacion`, `fuente_designacion`. | CA-001, CA-002, AU-001, PJ-001 |
+| 8 | **Cargos iniciales** | Si Consejo: presidente, secretario, vicepresidente, vicesecretario (opc — solo si migración `000065` del carril Personas/Cargos está en `main`), coordinador independiente (opc), N consejeros. Si Admin Único: 1 administrador (PF o PJ con representante). Si Solidarios/Mancomunados: N administradores. Cargo aporta `person_id`, `body_id`, `tipo_condicion`, `fecha_inicio`, `fuente_designacion ∈ {ACTA_NOMBRAMIENTO, ESCRITURA, DECISION_UNIPERSONAL, BOOTSTRAP}` (CHECK del schema canónico, migración `000024`). | CA-001, CA-002, AU-001, PJ-001 |
 | 9 | **Reglas y configuración** | Quórum estatutario (override). Mayorías reforzadas (override). Reglas convocatoria (plazo, medio, primera vs segunda). Voto de calidad (presidente CdA/comité). Restricciones de transmisión. Cierre ejercicio (DD-MM). | Coherencia mayoría reforzada ≥ simple |
 | 10 | **Documentos soporte** | Referencias URI/SHA-512/nombre para: escritura constitución, estatutos, certificación NIF, certificación RM, soportes cargo/capital. Guardado en `entities.support_docs_metadata jsonb`. No bloquea operatividad en sprint actual; se promoverán a `evidence_bundles` cuando cierre contrato evidence. | — |
 | 11 | **Revisión y creación** | Re-evalúa todas las validaciones. Muestra estado proyectado: `OPERATIVA` / `INCOMPLETA_CARGOS` / `INCOMPLETA_DATOS`. Botón "Crear sociedad" lanza TX1 + TX2. | Cualquier bloqueante de pasos 1–9 |
@@ -218,21 +218,27 @@ interface AdapterContext {
 }
 
 interface CargoInputDraft {
-  // del draft local
-  tipo: TipoCondicion;        // PRESIDENTE | SECRETARIO | CONSEJERO | ADMIN_UNICO | ...
-  bodyKey: 'CDA' | 'JUNTA' | 'COMISION_AUDITORIA' | ...;
+  // del draft local — nombres alineados con schema canónico (migración 000019/000024)
+  tipo_condicion: TipoCondicion;       // PRESIDENTE | SECRETARIO | CONSEJERO | ADMIN_UNICO | ADMIN_PJ | ...
+  bodyKey: 'CDA' | 'JUNTA' | 'COMISION_AUDITORIA' | 'COMISION_NOMBRAMIENTOS' | 'COMISION_RETRIBUCIONES' | 'COMISION_RIESGOS' | null;
   persona: {
     tax_id: string;
     full_name: string;
     person_type: 'PF' | 'PJ';
-    // si PJ con voto/cargo, representante obligatorio:
+    // si tipo_condicion='ADMIN_PJ', representante PF obligatorio:
     representante?: {
       tax_id: string;
       full_name: string;
     };
   };
-  fecha_designacion: string;
-  fuente_designacion: 'ESCRITURA' | 'JUNTA' | 'CONSEJO' | 'ESTATUTOS';
+  fecha_inicio: string;                // ISO date (DATE NOT NULL en schema)
+  // CHECK válido del schema canónico (000024 line ~fuente_designacion):
+  fuente_designacion: 'ACTA_NOMBRAMIENTO' | 'ESCRITURA' | 'DECISION_UNIPERSONAL' | 'BOOTSTRAP';
+  // Mapeo semántico desde el wizard:
+  //   constitución / escritura fundacional → 'ESCRITURA'
+  //   acuerdo posterior de Junta o CdA → 'ACTA_NOMBRAMIENTO'
+  //   decisión socio único → 'DECISION_UNIPERSONAL'
+  //   setup demo seed → 'BOOTSTRAP'
   metadata?: Record<string, unknown>;
 }
 
@@ -244,16 +250,28 @@ export async function persistInitialCargos(
   failedCargos: Array<{ cargo: CargoInputDraft; error: string }>;
 }>;
 
+interface RepresentacionAdminPJInput {
+  // representado = la PJ administradora ya creada o reutilizada
+  represented: { tax_id: string; full_name: string; person_type: 'PJ' };
+  // representante PF permanente
+  representante: { tax_id: string; full_name: string };
+  effective_from: string;                 // ISO date — DATE NOT NULL en schema
+  fuente: 'ACTA_NOMBRAMIENTO' | 'ESCRITURA' | 'DECISION_UNIPERSONAL' | 'BOOTSTRAP';
+}
+
+// Solo se invoca para cargos con tipo_condicion='ADMIN_PJ'. Otros scopes de
+// representaciones (JUNTA_PROXY, CONSEJO_DELEGACION) requieren meeting_id y no
+// aplican al alta de sociedad.
 export async function persistInitialRepresentaciones(
   ctx: AdapterContext,
-  representaciones: RepresentacionInputDraft[]
-): Promise<{ okCount: number; failedReps: Array<{ rep: RepresentacionInputDraft; error: string }> }>;
+  reps: RepresentacionAdminPJInput[]
+): Promise<{ okCount: number; failedReps: Array<{ rep: RepresentacionAdminPJInput; error: string }> }>;
 ```
 
 Internamente cada función:
 1. Para cada cargo/representación, hace lookup de `persons` por `(tenant_id, tax_id)`. Si existe → reutiliza id. Si no → `INSERT INTO persons` y captura el id.
-2. (Solo cargos) `INSERT INTO condiciones_persona` con `tipo`, `person_id`, `body_id`, `entity_id`, `fecha_designacion`, `fuente_designacion`, `estado='VIGENTE'`. El trigger `fn_sync_authority_evidence` (del otro carril) propaga a `authority_evidence` si el cargo es certificante.
-3. (Solo representaciones) `INSERT INTO representaciones` con `representado_person_id`, `representante_person_id`, `scope='PJ_PERMANENTE'|'ADMIN_PJ'`, `entity_id`, `estado='VIGENTE'`.
+2. (Solo cargos) `INSERT INTO condiciones_persona` con `tipo_condicion`, `person_id`, `body_id` (`NULL` para `SOCIO/ADMIN_*`; `NOT NULL` para `CONSEJERO/PRESIDENTE/SECRETARIO/VICEPRESIDENTE/CONSEJERO_COORDINADOR`; el CHECK `chk_condicion_body_coherente` lo enforza), `entity_id`, `fecha_inicio` (DATE), `fuente_designacion` (∈ {ACTA_NOMBRAMIENTO, ESCRITURA, DECISION_UNIPERSONAL, BOOTSTRAP}), `representative_person_id` solo si `tipo_condicion='ADMIN_PJ'`. El campo `estado` queda en su DEFAULT 'VIGENTE' del schema (no se setea explícito). El trigger `fn_sync_authority_evidence` (del otro carril) propaga a `authority_evidence` si el cargo es certificante.
+3. (Solo representaciones ADMIN_PJ — el único caso aplicable al alta) `INSERT INTO representaciones` con `represented_person_id` (PJ administrador), `representative_person_id` (PF), `scope='ADMIN_PJ_REPRESENTANTE'`, `entity_id`, `effective_from` (DATE NOT NULL — la tabla no tiene columna `estado`; la vigencia se modela con `effective_from`/`effective_to`), `evidence` (JSONB con `{ fuente: 'ESCRITURA' | 'ACTA_NOMBRAMIENTO', referencia: string }`). Los scopes `JUNTA_PROXY` y `CONSEJO_DELEGACION` requieren `meeting_id` por el CHECK `chk_representacion_scope_meeting` y no aplican al alta.
 
 Errores parciales no abortan: se acumulan en `failedCargos`/`failedReps` y se devuelven al caller para UX.
 
@@ -288,7 +306,18 @@ async function guardarSociedad() {
   // 3. TX2 — adaptador personas/cargos
   const ctx = buildAdapterContext(tx1.data);
   const cargosResult = await persistInitialCargos(ctx, draft.cargos);
-  const repsResult = await persistInitialRepresentaciones(ctx, draft.representaciones);
+  // Solo cargos con tipo_condicion='ADMIN_PJ' generan filas en `representaciones`
+  // con scope='ADMIN_PJ_REPRESENTANTE'. PJ accionistas con representante de junta
+  // se modelizan vía JUNTA_PROXY por junta concreta, no en alta.
+  const repsInput = draft.cargos
+    .filter(c => c.tipo_condicion === 'ADMIN_PJ' && c.persona.representante)
+    .map(c => ({
+      represented: c.persona,
+      representante: c.persona.representante!,
+      effective_from: c.fecha_inicio,
+      fuente: c.fuente_designacion,
+    }));
+  const repsResult = await persistInitialRepresentaciones(ctx, repsInput);
 
   const totalFailed = cargosResult.failedCargos.length + repsResult.failedReps.length;
 
@@ -333,7 +362,7 @@ Sin cambios respecto al plan original §6. Resumen de tablas tocadas:
 | `rule_param_overrides` | RPC TX1 | Paso 11 |
 | `persons` (PF cargos + PF reps) | Adaptador TX2 | Paso 11 post-COMMIT |
 | `condiciones_persona` | Adaptador TX2 | Paso 11 post-COMMIT |
-| `representaciones` | Adaptador TX2 | Paso 11 post-COMMIT |
+| `representaciones` (scope `ADMIN_PJ_REPRESENTANTE` solamente) | Adaptador TX2 | Paso 11 post-COMMIT, solo si hay cargos `tipo_condicion='ADMIN_PJ'` |
 | `authority_evidence` | Trigger (carril Personas/Cargos) | Auto-propagado |
 | `entities.support_docs_metadata` | RPC TX1 | Paso 11 |
 | `entities.onboarding_status` | Cliente | Post-TX2 |
@@ -361,13 +390,13 @@ Sin cambios respecto al plan original §6. Resumen de tablas tocadas:
 | CT-003 | Títulos asignados por clase > títulos emitidos de esa clase | Bloquea |
 | CT-004 | SAU/SLU con más de un socio (excl. autocartera) | Bloquea |
 | CT-005 | SA/SL con socio único no marcado | Warning + sugerencia |
-| P-001 | PJ con voto sin representante PF | Bloquea operativo |
+| P-001 | PJ **accionista** con voto sin representante declarado | Warning. El representante de junta se modela como `JUNTA_PROXY` por junta concreta (no en alta). En alta solo se registra el PJ socio en `capital_holdings`. |
 | O-001 | Sin Junta General / Socio Único | Bloquea |
 | O-002 | Sin órgano de administración | Bloquea |
 | CA-001 | CDA sin consejeros | Bloquea |
 | CA-002 | CDA sin presidente o secretario | Bloquea certificación |
 | AU-001 | ADMIN_UNICO sin administrador | Bloquea |
-| PJ-001 | Administrador PJ sin representante permanente | Bloquea |
+| PJ-001 | Administrador PJ (`tipo_condicion='ADMIN_PJ'`) sin representante permanente PF declarado | Bloquea. Persiste como `condiciones_persona.representative_person_id` + `representaciones` con `scope='ADMIN_PJ_REPRESENTANTE'`. |
 | R-001 | Mayoría reforzada < mayoría simple | Bloquea |
 | R-002 | Cierre fiscal con formato distinto a `DD-MM` | Bloquea |
 
