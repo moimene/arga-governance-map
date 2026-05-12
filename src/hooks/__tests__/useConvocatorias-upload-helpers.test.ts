@@ -18,27 +18,42 @@ import {
   ATTACHMENT_MAX_BYTES,
 } from "../useConvocatorias";
 
-// Codex P1 (PR #3): en Vitest/jsdom NI Blob NI File implementan
-// `arrayBuffer()` — el método existe en el browser y en Bun pero no en
-// jsdom 26.x. Polyfill mínimo local para los tests que NO toca el código
-// de producción (en runtime real arrayBuffer existe nativo). El polyfill
-// se aplica idempotente: si la implementación ya existe (Bun) se mantiene.
+// Codex P1 rounds 1+2 (PR #3): polyfill SIEMPRE `arrayBuffer()` en los
+// fixtures de test. Razón:
+//
+//   1. Bun expone Blob/File.arrayBuffer correctamente (devuelve ArrayBuffer
+//      compatible con SubtleCrypto). Bajo `bun test` los tests pasan sin
+//      polyfill.
+//   2. jsdom 26.x según versión puntual devuelve cosas distintas:
+//      - en algunas: el método no existe (round 1 — polyfill condicional
+//        funcionaba)
+//      - en otras: el método existe pero devuelve un Node Buffer cuyo
+//        backing store NO es transferible a `SubtleCrypto.digest` →
+//        TypeError "2nd argument is not instance of ArrayBuffer, Buffer,
+//        TypedArray, or DataView" (round 2 — el guard condicional saltaba
+//        el polyfill y caía el test del Uint8Array fixture en CI).
+//
+// Decisión: SIEMPRE override (`configurable: true`), sin checks. El test
+// fixture controla totalmente el shape devuelto a SubtleCrypto. Bun y
+// jsdom convergen al mismo path determinista. Cero impacto en producción
+// — sólo aplica al test file que define `makeFile`.
 function makeFile(contents: string | Uint8Array, name = "test.bin"): File {
   const bytes = typeof contents === "string"
     ? new TextEncoder().encode(contents)
     : contents;
   const file = new File([bytes], name);
-  if (typeof file.arrayBuffer !== "function") {
-    Object.defineProperty(file, "arrayBuffer", {
-      configurable: true,
-      value: async () => {
-        // Devolver una copia desacoplada (slice) para evitar que el caller
-        // mute el Uint8Array original al pasar el buffer a SubtleCrypto.
-        const view = bytes;
-        return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
-      },
-    });
-  }
+  Object.defineProperty(file, "arrayBuffer", {
+    configurable: true,
+    value: async () => {
+      // Construir un ArrayBuffer fresco copiando bytes (no slice del view,
+      // que conservaría el byteOffset y podría ser un SharedArrayBuffer en
+      // algunos runners). El nuevo buffer es ArrayBuffer puro, compatible
+      // garantizado con SubtleCrypto.digest.
+      const out = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(out).set(bytes);
+      return out;
+    },
+  });
   return file;
 }
 
