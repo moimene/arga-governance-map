@@ -40,11 +40,24 @@ type ChangelogRow = {
   plantilla_id: string;
   bump_type: string | null;
   motivo: string | null;
+  diff_summary: string | null;
   from_version: string | null;
   to_version: string;
   autor: string;
   created_at: string;
 };
+
+function logicalToVersion(row: ChangelogRow): string {
+  if (row.diff_summary) {
+    try {
+      const parsed = JSON.parse(row.diff_summary) as { logical_to_version?: unknown };
+      if (typeof parsed.logical_to_version === "string") return parsed.logical_to_version;
+    } catch {
+      // `diff_summary` existed before the JSON text convention; fall back below.
+    }
+  }
+  return row.to_version.split("#idemp:")[0] ?? row.to_version;
+}
 
 function useOverridesActivos() {
   const { tenantId } = useTenantContext();
@@ -272,7 +285,7 @@ export function AuditoriaTab() {
                     </td>
                     <td className="px-3 py-2 text-[var(--g-text-secondary)]">{c.bump_type ?? "—"}</td>
                     <td className="px-3 py-2 text-[var(--g-text-secondary)]">
-                      {c.from_version ?? "—"} → {c.to_version}
+                      {c.from_version ?? "—"} → {logicalToVersion(c)}
                     </td>
                     <td className="px-3 py-2 text-[var(--g-text-secondary)]">{c.autor}</td>
                     <td className="px-3 py-2 text-[var(--g-text-secondary)]">{c.motivo ?? "—"}</td>

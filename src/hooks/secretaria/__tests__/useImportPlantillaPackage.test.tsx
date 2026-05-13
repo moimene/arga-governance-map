@@ -175,7 +175,12 @@ describe("useImportPlantillaPackage", () => {
       tenant_id: "tenant-1",
       plantilla_id: "tpl-new",
       autor: "legal@arga-seguros.com",
-      to_version: "1.0.0",
+    });
+    expect(mocks.changelogInsertCalls[0].to_version).toMatch(/^1\.0\.0#idemp:[0-9a-f]{8}$/);
+    expect(JSON.parse(mocks.changelogInsertCalls[0].diff_summary as string)).toMatchObject({
+      action: "IMPORT",
+      logical_to_version: "1.0.0",
+      ack_motivo: "Warnings revisadas por Comite Legal el 12/05/2026.",
     });
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["plantillas_protegidas"],

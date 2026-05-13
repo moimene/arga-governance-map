@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { appendChangelog, buildDiffSummary } from "@/lib/secretaria/template-admin/changelog";
 import {
   transitionTemplateState,
   type TransitionResult,
@@ -178,43 +180,100 @@ export function useUpdateEstadoPlantilla() {
 export function useUpdateContenidoPlantilla() {
   const queryClient = useQueryClient();
   const { tenantId } = useTenantContext();
+  const { user } = useCurrentUser();
 
   return useMutation({
     mutationFn: async (params: {
       id: string;
       capa1_inmutable?: string;
+      capa2_variables?: Array<{ variable: string; fuente: string; condicion: string }>;
       capa3_editables?: Array<{
         campo: string;
         obligatoriedad: string;
         descripcion: string;
       }>;
       notas_legal?: string;
+      motivo?: string;
+      actor?: string;
     }) => {
+      if (!tenantId) throw new Error("tenantId requerido");
       const updates: Record<string, unknown> = {};
+      const rollback: Record<string, unknown> = {};
+      const layers: Array<"capa1" | "capa2" | "capa3" | "notas_legal"> = [];
+
+      const { data: current, error: loadError } = await supabase
+        .from("plantillas_protegidas")
+        .select("version, estado, capa1_inmutable, capa2_variables, capa3_editables, notas_legal")
+        .eq("id", params.id)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (loadError) throw loadError;
+      if (!current) throw new Error("Plantilla no encontrada");
+      if (current.estado !== "BORRADOR") {
+        throw new Error("Solo las plantillas en BORRADOR admiten edición de contenido");
+      }
 
       if (params.capa1_inmutable !== undefined) {
         updates.capa1_inmutable = params.capa1_inmutable;
+        rollback.capa1_inmutable = current.capa1_inmutable;
+        layers.push("capa1");
+      }
+
+      if (params.capa2_variables !== undefined) {
+        updates.capa2_variables = params.capa2_variables;
+        rollback.capa2_variables = current.capa2_variables;
+        layers.push("capa2");
       }
 
       if (params.capa3_editables !== undefined) {
         updates.capa3_editables = params.capa3_editables;
+        rollback.capa3_editables = current.capa3_editables;
+        layers.push("capa3");
       }
 
       if (params.notas_legal !== undefined) {
         updates.notas_legal = params.notas_legal;
+        rollback.notas_legal = current.notas_legal;
+        layers.push("notas_legal");
+      }
+
+      if (Object.keys(updates).length === 0) {
+        throw new Error("No hay cambios de contenido para guardar");
       }
 
       const { error } = await supabase
         .from("plantillas_protegidas")
         .update(updates)
         .eq("id", params.id)
-        .eq("tenant_id", tenantId!);
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
+
+      try {
+        await appendChangelog({
+          plantillaId: params.id,
+          tenantId,
+          bumpType: "PATCH",
+          motivo: `CONTENT:${layers.join(",")} | ${params.motivo ?? "edición contenido gestor"}`,
+          diffSummary: buildDiffSummary({ action: "CONTENT", layers }),
+          fromVersion: current.version as string,
+          toVersion: current.version as string,
+          autor: params.actor ?? user?.email ?? user?.id ?? "system",
+        });
+      } catch (err) {
+        await supabase
+          .from("plantillas_protegidas")
+          .update(rollback)
+          .eq("id", params.id)
+          .eq("tenant_id", tenantId);
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] });
       queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] });
     },
   });
 }

@@ -86,6 +86,41 @@ describe("appendChangelog", () => {
     expect(mockState.limitCalls).toEqual([1]);
   });
 
+  it("inserta diff_summary como texto y to_version único por evento", async () => {
+    await appendChangelog({
+      ...baseEntry,
+      diffSummary: { action: "IMPORT", ack: true },
+      ackMotivo: "Warnings revisadas por Comite Legal",
+    });
+
+    expect(mockState.insertCalls).toHaveLength(1);
+    const row = mockState.insertCalls[0];
+    expect(row.diff_summary).toEqual(expect.any(String));
+    expect(JSON.parse(row.diff_summary as string)).toMatchObject({
+      action: "IMPORT",
+      ack: true,
+      logical_to_version: "1.0.0",
+      ack_motivo: "Warnings revisadas por Comite Legal",
+    });
+    expect(row.to_version).toMatch(/^1\.0\.0#idemp:[0-9a-f]{8}$/);
+  });
+
+  it("eventos distintos sobre la misma versión no colisionan en to_version", async () => {
+    await appendChangelog({
+      ...baseEntry,
+      motivo: "STATE:BORRADOR->REVISADA",
+      diffSummary: { action: "STATE_CHANGE", from_state: "BORRADOR", to_state: "REVISADA" },
+    });
+    await appendChangelog({
+      ...baseEntry,
+      motivo: "STATE:REVISADA->APROBADA",
+      diffSummary: { action: "STATE_CHANGE", from_state: "REVISADA", to_state: "APROBADA" },
+    });
+
+    expect(mockState.insertCalls).toHaveLength(2);
+    expect(mockState.insertCalls[0].to_version).not.toBe(mockState.insertCalls[1].to_version);
+  });
+
   it("si encuentra changelog existente no inserta otro", async () => {
     mockState.lookupRows = [{ id: "existing-log" }];
 
