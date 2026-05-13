@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mocks = {
+const mocks = vi.hoisted(() => ({
   runTemplateImportPreflight: vi.fn(),
-};
+}));
 
 vi.mock("@tanstack/react-query", () => ({
   useMutation: ({

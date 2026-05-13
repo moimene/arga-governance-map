@@ -86,13 +86,20 @@ function draftBase(): SociedadOnboardingDraft {
       fecha_inicio: "2026-05-12",
       fuente_designacion: "ESCRITURA",
     },
-    // Tercer board member para satisfacer CA-004 con consejo_min=3 default
-    // (Secretario no cuenta como consejero a efectos de board count).
+    // El secretario no cuenta como consejero; presidente + 2 vocales satisfacen consejo_min=3.
     {
       key: "consejero1",
       tipo_condicion: "CONSEJERO",
       bodyKey: "CDA",
       persona: pf("CONS1", "44444444D"),
+      fecha_inicio: "2026-05-12",
+      fuente_designacion: "ESCRITURA",
+    },
+    {
+      key: "consejero2",
+      tipo_condicion: "CONSEJERO",
+      bodyKey: "CDA",
+      persona: pf("CONS2", "55555555E"),
       fecha_inicio: "2026-05-12",
       fuente_designacion: "ESCRITURA",
     },

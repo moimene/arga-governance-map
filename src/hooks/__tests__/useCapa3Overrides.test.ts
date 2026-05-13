@@ -2,29 +2,29 @@ import { describe, expect, it } from "vitest";
 import { buildCapa3OverridePayload } from "../useCapa3Overrides";
 
 describe("buildCapa3OverridePayload", () => {
-  it("construye payload válido con default, opciones y obligatoriedad", () => {
+  it("normaliza defaults, opciones y obligatoriedad", () => {
     expect(
       buildCapa3OverridePayload({
-        defaultValue: "A",
-        opciones: "A, B",
-        obligatoriedad: "OBLIGATORIO",
-        motivo: "Ajuste demo sociedad cotizada",
+        defaultValue: "  Consejo  ",
+        opciones: "Consejo, Junta",
+        obligatoriedad: "RECOMENDADO",
+        motivo: "Ajuste societario de ARGA",
       }),
     ).toEqual({
       ok: true,
       payload: {
-        defaultValueOverride: "A",
-        opcionesOverride: ["A", "B"],
-        obligatoriedadOverride: "OBLIGATORIO",
-        motivo: "Ajuste demo sociedad cotizada",
+        defaultValueOverride: "Consejo",
+        opcionesOverride: ["Consejo", "Junta"],
+        obligatoriedadOverride: "RECOMENDADO",
+        motivo: "Ajuste societario de ARGA",
       },
     });
   });
 
-  it("rechaza motivo corto", () => {
+  it("rechaza motivos demasiado cortos", () => {
     expect(
       buildCapa3OverridePayload({
-        defaultValue: "A",
+        defaultValue: "Consejo",
         opciones: "",
         obligatoriedad: "",
         motivo: "corto",
@@ -35,13 +35,13 @@ describe("buildCapa3OverridePayload", () => {
     });
   });
 
-  it("rechaza default fuera de opciones", () => {
+  it("rechaza defaults fuera de las opciones declaradas", () => {
     expect(
       buildCapa3OverridePayload({
-        defaultValue: "C",
-        opciones: "A, B",
+        defaultValue: "Consejo",
+        opciones: "Junta, Socio unico",
         obligatoriedad: "",
-        motivo: "Ajuste demo sociedad cotizada",
+        motivo: "Motivo suficiente",
       }),
     ).toEqual({
       ok: false,
@@ -49,13 +49,13 @@ describe("buildCapa3OverridePayload", () => {
     });
   });
 
-  it("rechaza filas sin ningún override", () => {
+  it("exige al menos un override efectivo", () => {
     expect(
       buildCapa3OverridePayload({
         defaultValue: "",
         opciones: "",
         obligatoriedad: "",
-        motivo: "Ajuste demo sociedad cotizada",
+        motivo: "Motivo suficiente",
       }),
     ).toEqual({
       ok: false,

@@ -145,24 +145,31 @@ function OverrideFieldRow({
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
           Default override
           <input
+            id={`${rowId}-default`}
             value={draft.defaultValue}
             onChange={(e) => setDraft((currentDraft) => ({ ...currentDraft, defaultValue: e.target.value }))}
-            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={FIELD_CLASS_NAME}
             style={{ borderRadius: "var(--g-radius-md)" }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
           Opciones override
           <input
+            id={`${rowId}-opciones`}
             value={draft.opciones}
             onChange={(e) => setDraft((currentDraft) => ({ ...currentDraft, opciones: e.target.value }))}
-            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={FIELD_CLASS_NAME}
             style={{ borderRadius: "var(--g-radius-md)" }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
           Obligatoriedad override
           <select
+            id={`${rowId}-obligatoriedad`}
             value={draft.obligatoriedad}
             onChange={(e) =>
               setDraft((currentDraft) => ({
@@ -170,7 +177,9 @@ function OverrideFieldRow({
                 obligatoriedad: e.target.value as ObligatoriedadOverride | "",
               }))
             }
-            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={FIELD_CLASS_NAME}
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             <option value="">Mantener canónico</option>
@@ -186,22 +195,29 @@ function OverrideFieldRow({
       <label className="mt-3 flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
         Motivo
         <textarea
+          id={`${rowId}-motivo`}
           value={draft.motivo}
           onChange={(e) => setDraft((currentDraft) => ({ ...currentDraft, motivo: e.target.value }))}
           rows={2}
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+          aria-invalid={!!error}
+          aria-describedby={describedBy}
+          className={FIELD_CLASS_NAME}
           style={{ borderRadius: "var(--g-radius-md)" }}
         />
       </label>
 
-      {error ? <p className="mt-2 text-xs text-[var(--status-error)]">{error}</p> : null}
+      {error ? (
+        <p id={errorId} className="mt-2 text-xs text-[var(--status-error)]">
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={save}
           disabled={!dirty || upsert.isPending || deleteOverride.isPending}
-          className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+          className={PRIMARY_BUTTON_CLASS_NAME}
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-busy={upsert.isPending}
         >
@@ -212,7 +228,7 @@ function OverrideFieldRow({
           type="button"
           onClick={() => setDraft(buildInitialDraft(current))}
           disabled={!dirty || upsert.isPending || deleteOverride.isPending}
-          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+          className={SECONDARY_BUTTON_CLASS_NAME}
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -222,7 +238,7 @@ function OverrideFieldRow({
           type="button"
           onClick={remove}
           disabled={!current || upsert.isPending || deleteOverride.isPending}
-          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+          className={SECONDARY_BUTTON_CLASS_NAME}
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-busy={deleteOverride.isPending}
         >
@@ -285,7 +301,7 @@ export function Capa3OverridesPanel({ entityId }: { entityId: string }) {
             value={plantillaId}
             onChange={(e) => setPlantillaId(e.target.value)}
             disabled={plantillas.isLoading || activeTemplates.length === 0}
-            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            className={FIELD_CLASS_NAME}
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             <option value="">Selecciona plantilla</option>

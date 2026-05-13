@@ -2,12 +2,12 @@
 
 > **For agentic workers:** use `superpowers:subagent-driven-development` or the closest available orchestration workflow when present. In this Codex session the exact `superpowers:writing-plans` skill was not installed, so this plan follows the existing `docs/superpowers/plans/*implementation.md` format.
 
-**Fecha:** 2026-05-12  
-**Modulo:** Secretaria Societaria  
-**Branch de ejecucion:** `feature/alta-sociedad-onboarding-d6`  
-**Base:** `main` after PR #6 merge (`52341b6`) plus spec fix `0c6679b`  
-**Spec:** `docs/superpowers/specs/2026-05-12-alta-sociedad-onboarding-design.md`  
-**Carril paralelo:** `feature/personas-cargos-refactor`  
+**Fecha:** 2026-05-12
+**Modulo:** Secretaria Societaria
+**Branch de ejecucion:** `feature/alta-sociedad-onboarding-d6`
+**Base:** `main` after PR #6 merge (`52341b6`) plus spec fix `0c6679b`
+**Spec:** `docs/superpowers/specs/2026-05-12-alta-sociedad-onboarding-design.md`
+**Carril paralelo:** `feature/personas-cargos-refactor`
 **Demo objetivo:** Garrigues 19-23 mayo 2026
 
 ## Goal

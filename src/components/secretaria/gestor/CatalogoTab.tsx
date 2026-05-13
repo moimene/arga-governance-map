@@ -54,6 +54,7 @@ import {
 import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-fixtures";
 import { isKnownP0 } from "@/lib/secretaria/template-admin";
 import { TriCapaEditor } from "./TriCapaEditor";
+import { useTabAccess } from "./tab-guards";
 
 const ESTADO_CONFIG: Record<string, { label: string; className: string; icon: ElementType }> = {
   BORRADOR: {
@@ -326,10 +327,12 @@ function PlantillaDetailPanel({
   scopeContextLabel?: string | null;
 }) {
   const updateEstado = useUpdateEstadoPlantilla();
+  const { canAccess } = useTabAccess();
+  const canManageTemplates = canAccess("validacion");
   const estado = safeString(plantilla.estado, "BORRADOR");
   const tipo = safeString(plantilla.tipo, "SIN_TIPO");
   const localFixture = isLocalFixture(plantilla);
-  const transition = localFixture ? undefined : TRANSITION_MAP[estado];
+  const transition = localFixture || !canManageTemplates ? undefined : TRANSITION_MAP[estado];
   const tipoLabel = TIPO_LABELS[tipo] || tipo;
   const organoLabel = plantilla.organo_tipo
     ? ORGANO_LABELS[plantilla.organo_tipo] || plantilla.organo_tipo
@@ -361,9 +364,11 @@ function PlantillaDetailPanel({
 
   const editorReadOnlyReason = localFixture
     ? "Fixture local no persistido: no admite edición tri-capa."
-    : estado !== "BORRADOR"
-      ? "Solo las plantillas en BORRADOR admiten edición tri-capa."
-      : null;
+    : !canManageTemplates
+      ? "Rol sin permisos de escritura sobre plantillas."
+      : estado !== "BORRADOR"
+        ? "Solo las plantillas en BORRADOR admiten edición tri-capa."
+        : null;
 
   return (
     <div className="flex flex-col h-full">

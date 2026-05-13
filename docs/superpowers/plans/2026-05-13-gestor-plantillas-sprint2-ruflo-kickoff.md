@@ -1,7 +1,7 @@
 # Sprint 2 Gestor de Plantillas — Kickoff Ruflo adversarial
 
-Fecha: 2026-05-13  
-Rama de trabajo: `codex/gestor-plantillas-sprint2-ruflo`  
+Fecha: 2026-05-13
+Rama de trabajo: `codex/gestor-plantillas-sprint2-ruflo`
 Baseline: `main` post PR #9 (`042253b fix(secretaria): close template manager sprint 2 debt`)
 
 ## Estado de arranque
