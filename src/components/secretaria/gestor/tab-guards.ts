@@ -5,7 +5,7 @@
  *   tabs de lectura (Dashboard, Catálogo, Cobertura legal, Métricas,
  *   Auditoría).
  * - WRITE_ROLES (ADMIN_TENANT) tienen acceso a las tabs que escriben o
- *   ejecutan procesos sensibles (Importar, Validación).
+ *   ejecutan procesos sensibles (Importar, Validación, Configuración).
  *
  * Si el usuario no tiene rol asignado todavía (carga inicial), `visibleTabs`
  * está vacío y el shell debe redirigir a Dashboard o mostrar fallback.
@@ -22,7 +22,8 @@ export type TabId =
   | "importar"
   | "metricas"
   | "auditoria"
-  | "validacion";
+  | "validacion"
+  | "configuracion";
 
 export const TAB_LABELS: Record<TabId, string> = {
   dashboard: "Dashboard",
@@ -32,6 +33,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   metricas: "Métricas",
   auditoria: "Auditoría",
   validacion: "Validación",
+  configuracion: "Configuración",
 };
 
 const READ_ROLES = ["SECRETARIO", "COMPLIANCE", "ADMIN_TENANT"] as const;
@@ -45,6 +47,7 @@ export const TAB_PERMISSIONS: Record<TabId, readonly string[]> = {
   auditoria: READ_ROLES,
   importar: WRITE_ROLES,
   validacion: WRITE_ROLES,
+  configuracion: WRITE_ROLES,
 };
 
 export interface UseTabAccessResult {

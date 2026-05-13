@@ -29,6 +29,7 @@ import { ImportarTab } from "@/components/secretaria/gestor/ImportarTab";
 import { MetricasTab } from "@/components/secretaria/gestor/MetricasTab";
 import { AuditoriaTab } from "@/components/secretaria/gestor/AuditoriaTab";
 import { ValidacionTab } from "@/components/secretaria/gestor/ValidacionTab";
+import { ConfiguracionSociedadTab } from "@/components/secretaria/gestor/ConfiguracionSociedadTab";
 
 const VALID_TABS: ReadonlySet<TabId> = new Set([
   "dashboard",
@@ -38,6 +39,7 @@ const VALID_TABS: ReadonlySet<TabId> = new Set([
   "metricas",
   "auditoria",
   "validacion",
+  "configuracion",
 ]);
 
 function isTabId(value: string | null): value is TabId {
@@ -120,6 +122,7 @@ export default function GestorPlantillas() {
         {activeTab === "metricas" ? <MetricasTab /> : null}
         {activeTab === "auditoria" ? <AuditoriaTab /> : null}
         {activeTab === "validacion" ? <ValidacionTab /> : null}
+        {activeTab === "configuracion" ? <ConfiguracionSociedadTab /> : null}
       </section>
     </main>
   );
