@@ -21,7 +21,17 @@ export interface PlantillaProtegidaRow {
   contenido_template: string | null;
   capa1_inmutable: string | null;
   capa2_variables: Array<{ variable: string; fuente: string; condicion: string }> | null;
-  capa3_editables: Array<{ campo: string; obligatoriedad: string; descripcion: string }> | null;
+  capa3_editables: Array<{
+    campo: string;
+    obligatoriedad: string;
+    descripcion?: string;
+    default?: unknown;
+    opciones?: unknown[];
+    tipo?: string;
+    label?: string;
+    requerido?: boolean;
+    [key: string]: unknown;
+  }> | null;
   referencia_legal: string | null;
   notas_legal: string | null;
   variables: unknown[];
@@ -190,7 +200,13 @@ export function useUpdateContenidoPlantilla() {
       capa3_editables?: Array<{
         campo: string;
         obligatoriedad: string;
-        descripcion: string;
+        descripcion?: string;
+        default?: unknown;
+        opciones?: unknown[];
+        tipo?: string;
+        label?: string;
+        requerido?: boolean;
+        [key: string]: unknown;
       }>;
       notas_legal?: string;
       motivo?: string;
