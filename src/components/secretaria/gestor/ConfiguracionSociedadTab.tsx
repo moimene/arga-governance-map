@@ -14,6 +14,7 @@ import {
   useUpsertEntitySetting,
   type EntitySettingRow,
 } from "@/hooks/useEntitySettings";
+import { Capa3OverridesPanel } from "./Capa3OverridesPanel";
 
 const CATEGORY_LABEL: Record<EntitySettingsCatalogRow["categoria"], string> = {
   CARGO: "Cargos y firmantes",
@@ -328,6 +329,8 @@ export function ConfiguracionSociedadTab() {
             </section>
           ))
         : null}
+
+      {selectedEntityId && !isLoading ? <Capa3OverridesPanel entityId={selectedEntityId} /> : null}
     </div>
   );
 }

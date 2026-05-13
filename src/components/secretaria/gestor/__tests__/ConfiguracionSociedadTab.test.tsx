@@ -101,6 +101,37 @@ vi.mock("@/hooks/useEntitySettings", () => ({
   }),
 }));
 
+vi.mock("@/hooks/usePlantillasProtegidas", () => ({
+  usePlantillasProtegidas: () => ({
+    isLoading: false,
+    data: [],
+  }),
+}));
+
+vi.mock("@/hooks/useCapa3Overrides", () => ({
+  useCapa3Overrides: () => ({
+    isLoading: false,
+    data: [],
+  }),
+  useUpsertCapa3Override: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useDeleteCapa3Override: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  buildCapa3OverridePayload: () => ({
+    ok: true,
+    payload: {
+      defaultValueOverride: null,
+      opcionesOverride: null,
+      obligatoriedadOverride: "OPCIONAL",
+      motivo: "Motivo suficiente",
+    },
+  }),
+}));
+
 describe("ConfiguracionSociedadTab", () => {
   beforeEach(() => {
     mockSetEntity.mockReset();
