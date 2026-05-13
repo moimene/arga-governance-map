@@ -5,6 +5,7 @@ import {
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
   Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedad } from "@/hooks/useSociedades";
@@ -146,13 +147,14 @@ export default function SociedadDetalle() {
             {s.common_name ?? s.legal_name}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-            {s.legal_name} · {s.registration_number ?? "sin NIF"} · {s.jurisdiction ?? "—"}
+            {s.legal_name} · {fiscalId(s)} · {s.jurisdiction ?? "—"}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <SociedadBadge label={model.socialLabel} />
             <SociedadBadge label={model.admin} />
             {s.es_unipersonal ? <SociedadBadge label="Unipersonal" tone="accent" /> : null}
             {s.es_cotizada ? <SociedadBadge label="Cotizada" tone="accent" /> : null}
+            {s.onboarding_status ? <SociedadOnboardingBadge status={s.onboarding_status} /> : null}
           </div>
         </div>
         <Link
@@ -164,6 +166,23 @@ export default function SociedadDetalle() {
           Reglas aplicables
         </Link>
       </div>
+
+      {s.onboarding_status && s.onboarding_status !== "OPERATIVA" ? (
+        <div
+          className="mb-5 flex items-start gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <div>
+            <p className="font-semibold text-[var(--g-text-primary)]">
+              Alta pendiente: {onboardingStatusLabel(s.onboarding_status)}
+            </p>
+            <p className="mt-1">
+              La ficha existe y es navegable, pero todavía quedan datos o cargos iniciales por completar antes de tratarla como operativa.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <SociedadOperationalOverview entityId={s.id} s={s} model={model} />
 
@@ -449,6 +468,37 @@ function SociedadBadge({ label, tone = "neutral" }: { label: string; tone?: "neu
   );
 }
 
+function onboardingStatusLabel(status: string | null | undefined) {
+  if (!status) return "Sin estado";
+  return (
+    {
+      OPERATIVA: "Operativa",
+      INCOMPLETA_CARGOS: "Incompleta: cargos",
+      INCOMPLETA_DATOS: "Incompleta: datos",
+      BORRADOR: "Borrador",
+    } as Record<string, string>
+  )[status] ?? status.replace(/_/g, " ");
+}
+
+function onboardingStatusClass(status: string | null | undefined) {
+  if (status === "OPERATIVA") return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
+  if (status === "INCOMPLETA_DATOS" || status === "INCOMPLETA_CARGOS") {
+    return "bg-[var(--status-warning)] text-[var(--g-text-inverse)]";
+  }
+  return "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
+}
+
+function SociedadOnboardingBadge({ status }: { status: string | null | undefined }) {
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold ${onboardingStatusClass(status)}`}
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      {onboardingStatusLabel(status)}
+    </span>
+  );
+}
+
 function SociedadOperationalOverview({
   entityId,
   s,
@@ -677,7 +727,32 @@ function formatVigencia(from: string | null | undefined, to: string | null | und
 }
 
 function fiscalId(s: NonNullable<ReturnType<typeof useSociedad>["data"]>) {
-  return s.registration_number ?? s.person?.tax_id ?? "—";
+  return s.person?.tax_id ?? s.registration_number ?? "—";
+}
+
+function domicilioSociedad(s: NonNullable<ReturnType<typeof useSociedad>["data"]>) {
+  if (s.address) return s.address;
+  const parts = [
+    s.address_street,
+    s.address_number,
+    s.address_floor,
+    s.postal_code,
+    s.city,
+    s.province,
+    s.country,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
+
+function registroMercantil(s: NonNullable<ReturnType<typeof useSociedad>["data"]>) {
+  const parts = [
+    s.registry_location,
+    s.registry_volume ? `Tomo ${s.registry_volume}` : "",
+    s.registry_folio ? `Folio ${s.registry_folio}` : "",
+    s.registry_sheet ? `Hoja ${s.registry_sheet}` : "",
+    s.registry_inscription ? `Inscripcion ${s.registry_inscription}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : s.registration_number ?? "—";
 }
 
 function bodyTypeLabel(bodyType: string | null | undefined) {
@@ -703,17 +778,32 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
     {
       label: "NIF / CIF",
       value: fiscalId(s),
-      help: "Identificador fiscal de la persona jurídica. Se alimenta desde entities.registration_number o la PJ canónica en persons.tax_id.",
+      help: "Identificador fiscal de la persona jurídica canónica en persons.",
     },
     {
       label: "Domicilio social",
-      value: "Pendiente de contrato de datos",
-      help: "El schema actual no tiene campo estructurado de domicilio social. Las plantillas lo capturan en Capa 3 hasta que exista columna o tabla registral.",
+      value: domicilioSociedad(s),
+      help: "Domicilio estructurado informado durante el alta D6.",
     },
     {
       label: "LEI",
-      value: "Pendiente de contrato de datos",
-      help: "El schema actual no tiene campo LEI estructurado. Es un requisito funcional para cotizadas y reporting, pero no está persistido aún.",
+      value: s.lei_code ?? "—",
+      help: "Identificador LEI si aplica a sociedad cotizada o entidad supervisada.",
+    },
+    {
+      label: "CNAE principal",
+      value: s.cnae_primary ?? "—",
+      help: "Actividad principal usada en perfil societario y documentación.",
+    },
+    {
+      label: "CNAE secundarios",
+      value: s.cnae_secondary?.length ? s.cnae_secondary.join(", ") : "—",
+      help: "Actividades secundarias declaradas en el alta.",
+    },
+    {
+      label: "Registro Mercantil",
+      value: registroMercantil(s),
+      help: "Datos registrales estructurados de tomo, folio, hoja e inscripción.",
     },
     {
       label: "Tipo social",
@@ -746,14 +836,64 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
       help: "Activa especialidades de convocatoria, publicidad, voto a distancia y advertencias LMV/CNMV.",
     },
     {
+      label: "Sector regulado",
+      value: s.regulated_sector ?? "—",
+      help: "Sector regulado declarado para rule packs y reporting.",
+    },
+    {
+      label: "Rol en grupo",
+      value: s.group_role ?? "—",
+      help: "Rol societario dentro del grupo: matriz, filial, participada o independiente.",
+    },
+    {
       label: "Jurisdicción",
       value: s.jurisdiction ?? "—",
       help: "País/ordenamiento usado para resolver rule packs y marco normativo.",
     },
     {
+      label: "Fecha constitución",
+      value: formatDate(s.constitution_date),
+      help: "Fecha de constitución persistida en la ficha legal.",
+    },
+    {
+      label: "Fecha registro",
+      value: formatDate(s.registration_date),
+      help: "Fecha de inscripción registral si se conoce.",
+    },
+    {
+      label: "Duración",
+      value: s.duration ?? "—",
+      help: "Duración societaria declarada en estatutos.",
+    },
+    {
+      label: "Cierre fiscal",
+      value: s.fiscal_year_close ?? "—",
+      help: "Día y mes de cierre fiscal en formato DD-MM.",
+    },
+    {
+      label: "Web",
+      value: s.website ?? "—",
+      help: "Sitio web corporativo declarado.",
+    },
+    {
+      label: "Email corporativo",
+      value: s.corporate_email ?? "—",
+      help: "Canal corporativo informado para documentación y notificaciones.",
+    },
+    {
       label: "Estado",
       value: s.entity_status ?? "—",
       help: "Estado operativo de la sociedad dentro del demo.",
+    },
+    {
+      label: "Estado alta",
+      value: onboardingStatusLabel(s.onboarding_status),
+      help: "Estado derivado del alta D6. Solo se promueve a operativa cuando TX2 confirma cargos y representaciones.",
+    },
+    {
+      label: "Objeto social",
+      value: s.corporate_purpose ?? "—",
+      help: "Objeto social persistido para plantillas y expedientes.",
     },
     {
       label: "Matriz",
@@ -791,8 +931,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
       <div className="mb-5 rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-primary)]">
         <p className="font-semibold text-[var(--g-brand-3308)]">Ficha maestra para generación documental</p>
         <p className="mt-1 text-[var(--g-text-secondary)]">
-          Los campos fiscales y registrales deben alimentar Capa 2. Donde el contrato de datos aún no existe,
-          la ficha lo marca explícitamente para no confundir códigos internos con datos societarios.
+          Los campos fiscales, registrales y de perfil legal alimentan Capa 2. Los códigos internos se muestran separados para no mezclarlos con datos societarios.
         </p>
       </div>
       <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">

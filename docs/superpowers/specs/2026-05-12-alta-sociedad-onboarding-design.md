@@ -235,11 +235,13 @@ Contenido:
    -- Paso 1: tenant access (compara p_tenant_id con tenant del caller via JWT)
    PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
 
-   -- Paso 2: role allowed — solo SECRETARIA_CORPORATIVA o ADMIN_SISTEMA pueden
+   -- Paso 2: role allowed — solo SECRETARIO o ADMIN_TENANT pueden
    -- crear sociedades. AUDITOR, CONSEJERO, MIEMBRO, COMITE_LEGAL NO pueden.
+   -- Códigos confirmados en migración 000052 hardening (todas las RPCs
+   -- hardened existentes usan ARRAY['SECRETARIO', 'ADMIN_TENANT']).
    PERFORM fn_secretaria_assert_role_allowed(
      p_tenant_id,
-     ARRAY['SECRETARIA_CORPORATIVA', 'ADMIN_SISTEMA']
+     ARRAY['SECRETARIO', 'ADMIN_TENANT']
    );
    ```
 
