@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   },
   { label: 'Libros obligatorios', path: '/secretaria/libros', heading: 'Libros obligatorios' },
   { label: 'Plantillas', path: '/secretaria/plantillas', heading: 'Plantillas documentales protegidas' },
-  { label: 'Gestor plantillas', path: '/secretaria/gestor-plantillas', heading: 'Plantillas con contenido jurídico' },
+  { label: 'Gestor plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gestor de Plantillas' },
   { label: 'Procesos', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
   {
     label: 'Multi-jurisdicción',
@@ -118,5 +118,15 @@ test.describe('Secretaría navigation smoke', () => {
       const routeFailures = failedSupabaseResponses.slice(failuresBeforeRoute);
       expect(routeFailures, `${item.label} ha disparado respuestas Supabase fallidas`).toEqual([]);
     }
+  });
+
+  test('redirige la ruta legacy de expediente sin sesión a la lista operativa', async ({ page }) => {
+    await page.goto('/secretaria/acuerdos-sin-sesion/expediente');
+
+    await expect(page).toHaveURL('/secretaria/acuerdos-sin-sesion');
+    await expect(page.locator('main').getByRole('heading', { name: 'Acuerdos escritos sin sesión', exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText('Ha ocurrido un error', { exact: false })).toHaveCount(0);
   });
 });

@@ -56,7 +56,6 @@ const AcuerdosSinSesion = lazy(() => import("@/pages/secretaria/AcuerdosSinSesio
 const AcuerdoSinSesionStepper = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionStepper"));
 const CoAprobacionStepper = lazy(() => import("@/pages/secretaria/CoAprobacionStepper"));
 const SolidarioStepper = lazy(() => import("@/pages/secretaria/SolidarioStepper"));
-const ExpedienteSinSesionStepper = lazy(() => import("@/pages/secretaria/ExpedienteSinSesionStepper"));
 const AcuerdoSinSesionDetalle = lazy(() => import("@/pages/secretaria/AcuerdoSinSesionDetalle"));
 const DecisionesUnipersonales = lazy(() => import("@/pages/secretaria/DecisionesUnipersonales"));
 const DecisionDetalle = lazy(() => import("@/pages/secretaria/DecisionDetalle"));
@@ -201,7 +200,7 @@ const App = () => (
                   <Route path="/secretaria/acuerdos-sin-sesion/nuevo" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/co-aprobacion" element={<Suspense fallback={<ModuleFallback />}><CoAprobacionStepper /></Suspense>} />
                   <Route path="/secretaria/acuerdos-sin-sesion/solidario" element={<Suspense fallback={<ModuleFallback />}><SolidarioStepper /></Suspense>} />
-                  <Route path="/secretaria/acuerdos-sin-sesion/expediente" element={<Suspense fallback={<ModuleFallback />}><ExpedienteSinSesionStepper /></Suspense>} />
+                  <Route path="/secretaria/acuerdos-sin-sesion/expediente" element={<Navigate to="/secretaria/acuerdos-sin-sesion" replace />} />
                   <Route path="/secretaria/acuerdos-sin-sesion/:id" element={<Suspense fallback={<ModuleFallback />}><AcuerdoSinSesionDetalle /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales" element={<Suspense fallback={<ModuleFallback />}><DecisionesUnipersonales /></Suspense>} />
                   <Route path="/secretaria/decisiones-unipersonales/nueva" element={<Suspense fallback={<ModuleFallback />}><DecisionUnipersonalStepper /></Suspense>} />

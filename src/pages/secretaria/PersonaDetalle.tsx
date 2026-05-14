@@ -217,9 +217,7 @@ export default function PersonaDetalle() {
             {p.person_type === "PJ" ? "Persona jurídica" : "Persona física"} · {p.tax_id ?? "sin NIF"}
           </p>
         </div>
-        {/* D4.2: acciones por persona. TODO D5.2/D5.3: rutas destino se
-            montarán en App.tsx en Wave 5; por ahora los enlaces apuntan a
-            su URL definitiva aunque la vista aún no esté disponible. */}
+        {/* D4.2/D5.2/D5.3: acciones por persona con rutas finales montadas. */}
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"

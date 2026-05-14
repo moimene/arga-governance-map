@@ -333,7 +333,7 @@ function MeetingSummary({ meeting }: MeetingSummaryProps) {
         <div>
           <p className="text-xs font-semibold text-[var(--g-text-secondary)] uppercase">Tipo</p>
           <p className="text-sm font-medium text-[var(--g-text-primary)] mt-1">
-            {meeting.meeting_type.replace(/_/g, " ")}
+            {String(meeting.meeting_type ?? "—").replace(/_/g, " ")}
           </p>
         </div>
       </div>

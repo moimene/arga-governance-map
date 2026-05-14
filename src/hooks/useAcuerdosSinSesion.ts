@@ -10,6 +10,14 @@ import { getRpcJsonField, isMissingSupabaseRpcError } from "@/lib/secretaria/sup
 
 export type { VoteChoice } from "@/lib/secretaria/no-session-client-guards";
 
+export interface CastNoSessionVoteInput {
+  choice: VoteChoice;
+  personId?: string | null;
+  textoRespuesta?: string | null;
+  firmaQesRef?: string | null;
+  notificacionCertificadaRef?: string | null;
+}
+
 export interface NoSessionResolutionRow {
   id: string;
   tenant_id: string;
@@ -132,8 +140,11 @@ export function useCastVote(resolutionId: string | undefined) {
   const { tenantId, personId } = useTenantContext();
 
   return useMutation({
-    mutationFn: async (choice: VoteChoice) => {
+    mutationFn: async (input: VoteChoice | CastNoSessionVoteInput) => {
       if (!resolutionId || !tenantId) return;
+      const choice = typeof input === "string" ? input : input.choice;
+      const targetPersonId = typeof input === "string" ? personId : input.personId ?? personId;
+      const isSecretaryRecorded = !!targetPersonId && !!personId && targetPersonId !== personId;
       const { data: current, error: readErr } = await supabase
         .from("no_session_resolutions")
         .select("status, requires_unanimity, votes_for, votes_against, abstentions, total_members, voting_deadline")
@@ -148,8 +159,8 @@ export function useCastVote(resolutionId: string | undefined) {
       if (!voteWindow.ok) {
         throw new Error(voteWindow.reason ?? "No se pudo registrar el voto");
       }
-      if (!personId) {
-        throw new Error("No hay persona vinculada al usuario actual para registrar el voto.");
+      if (!targetPersonId) {
+        throw new Error("No hay persona vinculada para registrar el voto.");
       }
 
       const sentido =
@@ -158,11 +169,13 @@ export function useCastVote(resolutionId: string | undefined) {
       const { error: rpcError } = await supabase.rpc("fn_no_session_cast_response", {
         p_tenant_id: tenantId,
         p_resolution_id: resolutionId,
-        p_person_id: personId,
+        p_person_id: targetPersonId,
         p_sentido: sentido,
-        p_texto_respuesta: null,
-        p_firma_qes_ref: null,
-        p_notificacion_certificada_ref: null,
+        p_texto_respuesta: typeof input === "string"
+          ? null
+          : input.textoRespuesta ?? (isSecretaryRecorded ? "Respuesta documentada por Secretaría en el expediente sin sesión." : null),
+        p_firma_qes_ref: typeof input === "string" ? null : input.firmaQesRef ?? null,
+        p_notificacion_certificada_ref: typeof input === "string" ? null : input.notificacionCertificadaRef ?? null,
       });
       if (!rpcError) return;
       if (isMissingSupabaseRpcError(rpcError)) {

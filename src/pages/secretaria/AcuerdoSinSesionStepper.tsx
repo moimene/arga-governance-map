@@ -235,7 +235,11 @@ export default function AcuerdoSinSesionStepper() {
   async function handleCastVote(personId: string, choice: VoteChoice) {
     if (memberVotes[personId]) return; // ya votó
     try {
-      await castVote.mutateAsync(choice);
+      await castVote.mutateAsync({
+        choice,
+        personId,
+        textoRespuesta: "Respuesta documentada por Secretaría durante la tramitación del acuerdo sin sesión.",
+      });
       setMemberVotes((prev) => ({ ...prev, [personId]: choice }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al registrar voto";
@@ -289,9 +293,9 @@ export default function AcuerdoSinSesionStepper() {
   // siempre falso → secretario bloqueado aunque todos hubieran votado FAVOR.
   //
   // Fix: calcular contadores también desde el state UI (memberVotes) y
-  // usar el más alto de los dos. Esto da resiliencia ante cache lag y no
-  // permite "votar de menos" — solo añade los votos que la UI ya registró
-  // pero la DB no refleja todavía.
+  // usar el más alto de los dos. memberVotes se actualiza únicamente después
+  // de que la RPC WORM acepta la respuesta de ese person_id; el cierre vuelve
+  // a recomputar en servidor y no confía en este resultado de cliente.
   const uiVotesFor = Object.values(memberVotes).filter((v) => v === "FOR").length;
   const uiVotesAgainst = Object.values(memberVotes).filter((v) => v === "AGAINST").length;
   const uiAbstentions = Object.values(memberVotes).filter((v) => v === "ABSTAIN").length;

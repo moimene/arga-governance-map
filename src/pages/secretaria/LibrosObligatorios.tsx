@@ -1,18 +1,18 @@
 import { Building2, Library, AlertTriangle, CheckCircle2, Clock, Loader2, Search, X, FileSignature, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLibrosList } from "@/hooks/useLibros";
+import { useLibrosList, type MandatoryBookRow } from "@/hooks/useLibros";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 
 // BATCH 12 (ronda 2 F-E): mapping book_kind → ruta del contenido del libro.
-// Las rutas siguen el patrón "ver registro" (no edición) para los 2 libros
-// con contenido visualizable. Los otros book_kinds quedan sin link visible
-// (no hay registro paginado todavía).
+// En cierre demo-ready no dejamos "vista no disponible": cada libro enlaza a
+// su registro natural o, como fallback, a la ficha de la sociedad.
 const BOOK_CONTENT_ROUTE: Record<string, { path: string; label: string; icon: typeof FileSignature }> = {
   ACTAS: { path: "/secretaria/actas", label: "Ver actas registradas", icon: FileSignature },
   SOCIOS: { path: "/secretaria/libro-socios", label: "Ver libro de socios", icon: BookOpen },
   ACCIONES: { path: "/secretaria/libro-socios", label: "Ver libro de acciones", icon: BookOpen },
+  SOCIO_UNICO: { path: "/secretaria/decisiones-unipersonales", label: "Ver decisiones unipersonales", icon: FileSignature },
 };
 
 const BOOK_KIND_LABEL: Record<string, string> = {
@@ -51,6 +51,16 @@ function deadlineHelp(days: number | null, isOk: boolean): string | null {
   if (days === null || isOk) return null;
   if (days >= 0) return `Vence en ${days} día${days === 1 ? "" : "s"}`;
   return `Vencido hace ${-days} día${days === -1 ? "" : "s"}`;
+}
+
+function getBookContentRoute(book: MandatoryBookRow) {
+  const known = BOOK_CONTENT_ROUTE[book.book_kind];
+  if (known) return known;
+  return {
+    path: book.entity_id ? `/secretaria/sociedades/${book.entity_id}` : "/secretaria/libros",
+    label: book.entity_id ? "Ver sociedad" : "Ver libros",
+    icon: Building2,
+  };
 }
 
 export default function LibrosObligatorios() {
@@ -235,6 +245,8 @@ export default function LibrosObligatorios() {
             const isAlert = days !== null && days <= 30 && b.legalization_status !== "LEGALIZADO";
             const isOk = b.legalization_status === "LEGALIZADO";
             const help = deadlineHelp(days, isOk);
+            const route = getBookContentRoute(b);
+            const Icon = route.icon;
 
             return (
               <article
@@ -289,6 +301,15 @@ export default function LibrosObligatorios() {
                     <dd className="mt-1 text-[var(--g-text-primary)]">{b.jurisdiction ?? "—"}</dd>
                   </div>
                 </dl>
+                <button
+                  type="button"
+                  onClick={() => navigate(scope.createScopedTo(route.path))}
+                  className="mt-4 inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {route.label}
+                </button>
               </article>
             );
           })
@@ -381,20 +402,12 @@ export default function LibrosObligatorios() {
                         {statusLabel(b.legalization_status)}
                       </span>
                     </td>
-                    {/* BATCH 12 (ronda 2 F-E): botón "Ver contenido" para libros
-                        con vista paginada existente (ACTAS → /actas; SOCIOS/
-                        ACCIONES → /libro-socios). Otros book_kinds quedan sin
-                        link visible mientras no haya vista de contenido. */}
+                    {/* BATCH 12 (ronda 2 F-E): botón "Ver contenido" para todos
+                        los book_kind mediante registro natural o fallback a
+                        ficha de sociedad. */}
                     <td className="px-6 py-4 text-sm">
                       {(() => {
-                        const route = BOOK_CONTENT_ROUTE[b.book_kind];
-                        if (!route) {
-                          return (
-                            <span className="text-xs text-[var(--g-text-secondary)]">
-                              Vista no disponible
-                            </span>
-                          );
-                        }
+                        const route = getBookContentRoute(b);
                         const Icon = route.icon;
                         return (
                           <button

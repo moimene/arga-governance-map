@@ -956,6 +956,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
 // Tab: Capital
 // ------------------------------------------------------------
 function TabCapital({ entityId }: { entityId: string }) {
+  const scope = useSecretariaScope();
   const { data: cap, isLoading } = useCapitalProfile(entityId);
   const { data: classes = [], isLoading: classesLoading } = useShareClasses(entityId);
   if (isLoading) return <div className="p-4 text-sm text-[var(--g-text-secondary)]">Cargando…</div>;
@@ -978,7 +979,7 @@ function TabCapital({ entityId }: { entityId: string }) {
           para calcular censo, quórum, derechos de voto y mayorías de Junta.
         </div>
         <Link
-          to={`/secretaria/sociedades/${entityId}/transmision`}
+          to={scope.createScopedTo(`/secretaria/sociedades/${entityId}/transmision`)}
           className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -1048,12 +1049,13 @@ function ShareClassesInlineTable({
 // Tab: Socios (capital_holdings)
 // ------------------------------------------------------------
 function TabSocios({ entityId }: { entityId: string }) {
+  const scope = useSecretariaScope();
   const { data, isLoading } = useCapitalHoldings(entityId);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Link
-          to={`/secretaria/sociedades/${entityId}/transmision`}
+          to={scope.createScopedTo(`/secretaria/sociedades/${entityId}/transmision`)}
           className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
