@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
@@ -13,10 +14,12 @@ import { useCapitalProfile, useShareClasses } from "@/hooks/useCapitalProfile";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useAdministradoresSocietarios, CARGO_LABELS } from "@/hooks/useCargos";
 import { useEntityBodies } from "@/hooks/useEntities";
-import { useRepresentaciones, SCOPE_LABELS } from "@/hooks/useRepresentacionesCanonical";
+import { useCloseRepresentacionPuntual, useRepresentaciones, SCOPE_LABELS } from "@/hooks/useRepresentacionesCanonical";
 import { useAuthorityEvidence, CARGO_CERT_LABELS } from "@/hooks/useAuthorityEvidence";
 import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
 import { useReglasAplicables } from "@/hooks/useReglasAplicables";
+import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
+import type { TipoCondicionCargo } from "@/lib/secretaria/cargo-validation";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
 type TabId =
@@ -1189,7 +1192,10 @@ function TabAdmins({ entityId }: { entityId: string }) {
             {c.fuente_designacion ?? "—"}
           </td>
           <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
-            {c.inscripcion_rm_referencia ?? "—"}
+            <RmStatusChip
+              tipoCondicion={c.tipo_condicion as TipoCondicionCargo}
+              referencia={c.inscripcion_rm_referencia}
+            />
           </td>
         </tr>
       ))}
@@ -1203,8 +1209,49 @@ function TabAdmins({ entityId }: { entityId: string }) {
 // ------------------------------------------------------------
 function TabRepresentaciones({ entityId }: { entityId: string }) {
   const { data, isLoading } = useRepresentaciones(entityId);
+  const closeRepresentacion = useCloseRepresentacionPuntual();
+
+  const handleClose = async (id: string) => {
+    const ok = window.confirm("Cerrar esta representación puntual sin borrar el histórico?");
+    if (!ok) return;
+    try {
+      await closeRepresentacion.mutateAsync({
+        id,
+        effective_to: new Date().toISOString().slice(0, 10),
+        reason: "Cierre manual desde ficha de sociedad",
+      });
+      toast.success("Representación cerrada");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo cerrar la representación";
+      toast.error(message);
+    }
+  };
+
   return (
     <div className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-[var(--g-text-secondary)]">
+          Delegaciones vigentes vinculadas a reuniones y representantes permanentes de personas jurídicas.
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            to={`/secretaria/representaciones/nueva?entityId=${entityId}&scope=JUNTA_PROXY`}
+            className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-xs font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Delegación Junta
+          </Link>
+          <Link
+            to={`/secretaria/representaciones/nueva?entityId=${entityId}&scope=CONSEJO_DELEGACION`}
+            className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Scroll className="h-3.5 w-3.5" />
+            Delegación Consejo
+          </Link>
+        </div>
+      </div>
       <div className="rounded-lg border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-secondary)]">
         Esta tabla recoge representaciones permanentes de personas jurídicas y delegaciones puntuales.
         En una representación permanente, el porcentaje indica el alcance representado, no una nueva
@@ -1213,7 +1260,7 @@ function TabRepresentaciones({ entityId }: { entityId: string }) {
     <Table
       isLoading={isLoading}
       empty="Sin representaciones vigentes."
-      headers={["Ámbito", "Representado", "Representante", "Alcance", "Vigencia", "Evidencia"]}
+      headers={["Ámbito", "Representado", "Representante", "Alcance", "Vigencia", "Evidencia", "Acciones"]}
     >
       {(data ?? []).map((r) => (
         <tr key={r.id} className="hover:bg-[var(--g-surface-subtle)]/50">
@@ -1238,6 +1285,22 @@ function TabRepresentaciones({ entityId }: { entityId: string }) {
           </td>
           <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
             {typeof r.evidence?.documento_ref === "string" ? r.evidence.documento_ref : "—"}
+          </td>
+          <td className="px-6 py-3 text-right text-xs">
+            {r.scope === "JUNTA_PROXY" || r.scope === "CONSEJO_DELEGACION" ? (
+              <button
+                type="button"
+                onClick={() => handleClose(r.id)}
+                disabled={closeRepresentacion.isPending}
+                aria-busy={closeRepresentacion.isPending}
+                className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:pointer-events-none disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Cerrar
+              </button>
+            ) : (
+              <span className="text-[var(--g-text-secondary)]">—</span>
+            )}
           </td>
         </tr>
       ))}
@@ -1279,7 +1342,10 @@ function TabAutoridad({ entityId }: { entityId: string }) {
             {formatVigencia(a.fecha_inicio, a.fecha_fin)}
           </td>
           <td className="px-6 py-3 text-xs text-[var(--g-text-secondary)]">
-            {a.inscripcion_rm_referencia ?? "—"}
+            <RmStatusChip
+              tipoCondicion={a.cargo as TipoCondicionCargo}
+              referencia={a.inscripcion_rm_referencia}
+            />
           </td>
         </tr>
       ))}

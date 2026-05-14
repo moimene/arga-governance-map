@@ -47,6 +47,16 @@ const personasList = readFileSync(
   "utf8",
 );
 
+const personasImport = readFileSync(
+  join(process.cwd(), "src/pages/secretaria/PersonasImportStepper.tsx"),
+  "utf8",
+);
+
+const rmStatusChip = readFileSync(
+  join(process.cwd(), "src/components/secretaria/RmStatusChip.tsx"),
+  "utf8",
+);
+
 const secretariaDashboard = readFileSync(
   join(process.cwd(), "src/pages/secretaria/Dashboard.tsx"),
   "utf8",
@@ -102,11 +112,11 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
   });
 
   it("renders authority RM status chips with Garrigues status tokens", () => {
-    expect(personaDetalle).toMatch(/authorityStatus/);
-    expect(personaDetalle).toMatch(/Inscrito/);
-    expect(personaDetalle).toMatch(/Pendiente RM/);
-    expect(personaDetalle).toMatch(/bg-\[var\(--status-success\)\]/);
-    expect(personaDetalle).toMatch(/bg-\[var\(--status-warning\)\]/);
+    expect(personaDetalle).toMatch(/RmStatusChip/);
+    expect(rmStatusChip).toMatch(/Inscrito/);
+    expect(rmStatusChip).toMatch(/Pendiente RM/);
+    expect(rmStatusChip).toMatch(/bg-\[var\(--status-success\)\]/);
+    expect(rmStatusChip).toMatch(/bg-\[var\(--status-warning\)\]/);
   });
 
   it("supports post-alta persona editing with mutation and accessible modal", () => {
@@ -139,9 +149,21 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
 
   it("paginates PersonasList instead of rendering every row at once", () => {
     expect(personasList).toMatch(/const PAGE_SIZE = 25/);
+    expect(personasCanonicalHook).toMatch(/usePersonasEnriquecidasPage/);
+    expect(personasCanonicalHook).toMatch(/select\("\*", \{ count: "exact" \}\)/);
+    expect(personasCanonicalHook).toMatch(/\.range\(from, to\)/);
     expect(personasList).toMatch(/pageRows/);
     expect(personasList).toMatch(/Mostrando/);
     expect(personasList).toMatch(/Página \{currentPage\} de \{totalPages\}/);
+  });
+
+  it("adds CSV and Excel import with dry-run plus RPC apply", () => {
+    expect(personasImport).toMatch(/xlsx/);
+    expect(personasImport).toMatch(/parseFile/);
+    expect(personasImport).toMatch(/existingTaxIds/);
+    expect(personasImport).toMatch(/useImportPersonaRow/);
+    expect(personasImport).toMatch(/useAsignarCargo/);
+    expect(personasCanonicalHook).toMatch(/fn_import_persona_row/);
   });
 
   it("wires L13-B presidential vacancy scan as non-blocking dashboard notification job", () => {

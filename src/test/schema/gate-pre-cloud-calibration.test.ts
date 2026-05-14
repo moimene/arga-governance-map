@@ -6,7 +6,7 @@ import { loadAllActiveTemplates } from "@/lib/secretaria/template-admin/cloud-he
 import { KNOWN_P0_TEMPLATE_IDS } from "@/lib/secretaria/template-admin/known-p0";
 
 describe.skipIf(!hasAdminClient())("Gate PRE — calibración Cloud (D16)", () => {
-  it("sobre las 41 ACTIVA produce exactamente 2 BLOCKING (FUSION + RATIFICACION)", async () => {
+  it("sobre las ACTIVA no conserva P0 semánticos tolerados", async () => {
     const active = await loadAllActiveTemplates(DEMO_TENANT);
     const ctx = { tenantId: DEMO_TENANT, existingActiveTemplates: active };
     const blockingIds: string[] = [];
@@ -19,8 +19,6 @@ describe.skipIf(!hasAdminClient())("Gate PRE — calibración Cloud (D16)", () =
       }
     }
     expect(blockingIds.sort()).toEqual([...KNOWN_P0_TEMPLATE_IDS].sort());
-    // El total de issues BLOCKING debe ser al menos 2 (una por plantilla P0). Puede ser más
-    // si el motor detecta otras condiciones agregadas, pero esto debe documentarse aquí.
-    expect(totalBlocking).toBeGreaterThanOrEqual(2);
+    expect(totalBlocking).toBe(0);
   });
 });

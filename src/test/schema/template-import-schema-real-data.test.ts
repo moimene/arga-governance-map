@@ -10,10 +10,9 @@
  *
  * Skips documentados:
  *
- *  - **P0 conocidos** (`KNOWN_P0_TEMPLATE_IDS`): excluidos porque su
- *    capa1_inmutable falla la regla semántica (`SEM_FUSION_EXPERTO_*`,
- *    `SEM_RATIFICACION_*`), pero ese fallo es de Gate PRE semántico, no
- *    de schema. Para schema sí parsean.
+ *  - **P0 conocidos** (`KNOWN_P0_TEMPLATE_IDS`): normalmente vacío. Si
+ *    Legal vuelve a aislar alguna plantilla ACTIVA por P0 semántico, se
+ *    excluirá aquí porque ese fallo es de Gate PRE semántico, no de schema.
  *
  *  - **SOPORTE_INTERNO** (`organo_tipo === "SOPORTE_INTERNO"`): la regla
  *    `referencia_legal` exime a estos tipos en Gate PRE porque son
@@ -71,8 +70,8 @@ describe.skipIf(!hasAdminClient())("template-import-schema vs Cloud (D15)", () =
     let skipped = 0;
 
     for (const t of activas) {
-      // Skip 1: P0 conocidos — falla regla semántica, no schema. Documentado
-      // en KNOWN_P0_TEMPLATES (FUSION_ESCISION, RATIFICACION_ACTOS).
+      // Skip 1: P0 conocidos — falla regla semántica, no schema. Lista
+      // normalmente vacía tras el closeout 2026-05-14.
       if (isKnownP0(t.id)) {
         skipped += 1;
         continue;

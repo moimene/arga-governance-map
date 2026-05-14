@@ -79,10 +79,12 @@ const SociedadNuevaStepper = lazy(() => import("@/pages/secretaria/SociedadNueva
 const PersonasList = lazy(() => import("@/pages/secretaria/PersonasList"));
 const PersonaDetalle = lazy(() => import("@/pages/secretaria/PersonaDetalle"));
 const PersonaNuevaStepper = lazy(() => import("@/pages/secretaria/PersonaNuevaStepper"));
+const PersonasImportStepper = lazy(() => import("@/pages/secretaria/PersonasImportStepper"));
 const AnadirSocioStepper = lazy(() => import("@/pages/secretaria/AnadirSocioStepper"));
 const TransmisionStepper = lazy(() => import("@/pages/secretaria/TransmisionStepper"));
 const DesignarAdminStepper = lazy(() => import("@/pages/secretaria/DesignarAdminStepper"));
 const RepresentanteAdminPJStepper = lazy(() => import("@/pages/secretaria/RepresentanteAdminPJStepper"));
+const RepresentacionPuntualStepper = lazy(() => import("@/pages/secretaria/RepresentacionPuntualStepper"));
 const ReglasAplicables = lazy(() => import("@/pages/secretaria/ReglasAplicables"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
@@ -235,9 +237,11 @@ const App = () => (
                   <Route path="/secretaria/cargos/nuevo"               element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
                   <Route path="/secretaria/personas"                  element={<Suspense fallback={<ModuleFallback />}><PersonasList /></Suspense>} />
                   <Route path="/secretaria/personas/nueva"            element={<Suspense fallback={<ModuleFallback />}><PersonaNuevaStepper /></Suspense>} />
+                  <Route path="/secretaria/personas/importar"         element={<Suspense fallback={<ModuleFallback />}><PersonasImportStepper /></Suspense>} />
                   <Route path="/secretaria/personas/:id"              element={<Suspense fallback={<ModuleFallback />}><PersonaDetalle /></Suspense>} />
                   {/* D5.3: wizard 3 pasos PJ -> representante PF (L2). */}
                   <Route path="/secretaria/personas/:id/representante/nuevo" element={<Suspense fallback={<ModuleFallback />}><RepresentanteAdminPJStepper /></Suspense>} />
+                  <Route path="/secretaria/representaciones/nueva" element={<Suspense fallback={<ModuleFallback />}><RepresentacionPuntualStepper /></Suspense>} />
                 </Route>
                 {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
                 <Route

@@ -1,8 +1,8 @@
-import { Building2, Users, Search, Plus, X } from "lucide-react";
+import { Building2, Users, Search, Plus, X, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-import { usePersonasEnriquecidas, type PersonType } from "@/hooks/usePersonasCanonical";
+import { usePersonasEnriquecidasPage, type PersonType } from "@/hooks/usePersonasCanonical";
 import { useSociedades } from "@/hooks/useSociedades";
 import { CARGO_LABELS, type TipoCondicion } from "@/hooks/useCargos";
 
@@ -42,24 +42,30 @@ export default function PersonasList() {
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
 
   const { data: sociedades } = useSociedades();
-  const { data, isLoading } = usePersonasEnriquecidas({
+  const { data: pageData, isLoading } = usePersonasEnriquecidasPage({
     person_type: personType || undefined,
     search,
     tipo_condicion: tipoCondicion || undefined,
     entity_id: scopedEntityId || undefined,
+    page,
+    pageSize: PAGE_SIZE,
   });
 
   const hasAnyFilter = !!search || !!personType || !!tipoCondicion || (!isSociedadMode && !!entityId);
-  const resultCount = data?.length ?? 0;
+  const data = useMemo(() => pageData?.rows ?? [], [pageData?.rows]);
+  const resultCount = pageData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(resultCount / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = (data ?? []).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = data;
 
   useEffect(() => {
     setPage(1);
   }, [search, personType, tipoCondicion, scopedEntityId]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
   const sociedadMetrics = useMemo(() => {
-    if (!isSociedadMode || !scopedEntityId || !data) return null;
+    if (!isSociedadMode || !scopedEntityId || !data.length) return null;
 
     const cargosVigentes = data.reduce(
       (total, persona) =>
@@ -74,12 +80,12 @@ export default function PersonasList() {
     ).length;
 
     return {
-      personas: data.length,
+      personas: resultCount,
       cargosVigentes,
       socios,
       miembrosOrganos,
     };
-  }, [data, isSociedadMode, scopedEntityId]);
+  }, [data, isSociedadMode, scopedEntityId, resultCount]);
 
   const clearFilters = () => {
     setSearch("");
@@ -105,14 +111,24 @@ export default function PersonasList() {
               : "Personas físicas y jurídicas del modelo canónico: socios, administradores, miembros de órganos y representantes."}
           </p>
         </div>
-        <Link
-          to={scope.createScopedTo("/secretaria/personas/nueva")}
-          className="inline-flex w-full items-center justify-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] sm:w-auto"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <Plus className="h-4 w-4" />
-          Nueva persona
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            to={scope.createScopedTo("/secretaria/personas/importar")}
+            className="inline-flex w-full items-center justify-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] sm:w-auto"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Upload className="h-4 w-4" />
+            Importar
+          </Link>
+          <Link
+            to={scope.createScopedTo("/secretaria/personas/nueva")}
+            className="inline-flex w-full items-center justify-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-semibold text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] sm:w-auto"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Plus className="h-4 w-4" />
+            Nueva persona
+          </Link>
+        </div>
       </div>
 
       {isSociedadMode && (
@@ -279,9 +295,9 @@ export default function PersonasList() {
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-6 text-center text-sm text-[var(--g-text-secondary)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
-            Cargando personas...
+                Cargando personas...
           </div>
-        ) : !data || data.length === 0 ? (
+        ) : data.length === 0 ? (
           <div
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-6 text-center text-sm text-[var(--g-text-secondary)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -447,7 +463,7 @@ export default function PersonasList() {
                   Cargando…
                 </td>
               </tr>
-            ) : !data || data.length === 0 ? (
+            ) : data.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   {hasAnyFilter
@@ -566,12 +582,12 @@ export default function PersonasList() {
         </table>
       </div>
 
-      {data && data.length > 0 && (
+      {resultCount > 0 && (
         <div className="mt-3 flex flex-col gap-2 text-xs text-[var(--g-text-secondary)] sm:flex-row sm:items-center sm:justify-between">
           <span>
             Mostrando {(currentPage - 1) * PAGE_SIZE + 1}-
-            {Math.min(currentPage * PAGE_SIZE, data.length)} de {data.length} persona
-            {data.length === 1 ? "" : "s"}
+            {Math.min(currentPage * PAGE_SIZE, resultCount)} de {resultCount} persona
+            {resultCount === 1 ? "" : "s"}
             {isSociedadMode ? " vinculadas a la sociedad" : hasAnyFilter ? " con los filtros aplicados" : ""}
           </span>
           {totalPages > 1 ? (

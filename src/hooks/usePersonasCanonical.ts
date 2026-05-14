@@ -52,6 +52,11 @@ export interface PersonaEnriquecida extends PersonaRow {
   holdings_vigentes: PersonaHoldingAgregado[];
 }
 
+export interface PersonaEnriquecidaPage {
+  rows: PersonaEnriquecida[];
+  total: number;
+}
+
 export function usePersonasCanonical(filter?: {
   person_type?: PersonType;
   search?: string;
@@ -297,6 +302,190 @@ export function usePersonasEnriquecidas(filter?: {
   });
 }
 
+/**
+ * Variante paginada en servidor para la lista operativa de personas.
+ * Mantiene los agregados acotados a las personas de la pagina actual.
+ */
+export function usePersonasEnriquecidasPage(filter?: {
+  person_type?: PersonType;
+  search?: string;
+  tipo_condicion?: string;
+  entity_id?: string;
+  page?: number;
+  pageSize?: number;
+  excludeTestData?: boolean;
+}) {
+  const { tenantId } = useTenantContext();
+  const exclude = filter?.excludeTestData ?? true;
+  const page = Math.max(1, filter?.page ?? 1);
+  const pageSize = Math.max(1, Math.min(filter?.pageSize ?? 25, 100));
+
+  return useQuery({
+    queryKey: [
+      "personas_canonical",
+      tenantId,
+      "enriquecidas_page",
+      filter?.person_type ?? "all",
+      filter?.search ?? "",
+      filter?.tipo_condicion ?? "all",
+      filter?.entity_id ?? "all",
+      page,
+      pageSize,
+      exclude,
+    ],
+    enabled: !!tenantId,
+    queryFn: async (): Promise<PersonaEnriquecidaPage> => {
+      let targetPersonIds: Set<string> | null = null;
+
+      if (filter?.entity_id || filter?.tipo_condicion) {
+        targetPersonIds = new Set<string>();
+
+        let cpQ = supabase
+          .from("condiciones_persona")
+          .select("person_id")
+          .eq("tenant_id", tenantId!)
+          .eq("estado", "VIGENTE");
+        if (filter.entity_id) cpQ = cpQ.eq("entity_id", filter.entity_id);
+        if (filter.tipo_condicion) cpQ = cpQ.eq("tipo_condicion", filter.tipo_condicion);
+        const { data: cpData, error: cpErr } = await cpQ;
+        if (cpErr) throw cpErr;
+        for (const row of (cpData ?? []) as Array<{ person_id: string }>) {
+          targetPersonIds.add(row.person_id);
+        }
+
+        if (filter.entity_id && !filter.tipo_condicion) {
+          const { data: chData, error: chErr } = await supabase
+            .from("capital_holdings")
+            .select("holder_person_id")
+            .eq("tenant_id", tenantId!)
+            .eq("entity_id", filter.entity_id)
+            .is("effective_to", null);
+          if (chErr) throw chErr;
+          for (const row of (chData ?? []) as Array<{ holder_person_id: string }>) {
+            targetPersonIds.add(row.holder_person_id);
+          }
+        }
+
+        if (targetPersonIds.size === 0) return { rows: [], total: 0 };
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let personsQ = supabase
+        .from("persons")
+        .select("*", { count: "exact" })
+        .eq("tenant_id", tenantId!);
+      if (filter?.person_type) personsQ = personsQ.eq("person_type", filter.person_type);
+      if (filter?.search && filter.search.trim().length > 0) {
+        const s = filter.search.trim();
+        personsQ = personsQ.or(
+          `full_name.ilike.%${s}%,tax_id.ilike.%${s}%,denomination.ilike.%${s}%,email.ilike.%${s}%`,
+        );
+      }
+      if (targetPersonIds) {
+        personsQ = personsQ.in("id", Array.from(targetPersonIds));
+      }
+
+      const personsR = await personsQ
+        .order("full_name", { ascending: true })
+        .range(from, to);
+      if (personsR.error) throw personsR.error;
+
+      const personsRows = (personsR.data ?? []) as PersonaRow[];
+      const personsFiltered = exclude ? personsRows.filter(isProductionPerson) : personsRows;
+      const pagePersonIds = personsFiltered.map((p) => p.id);
+      if (pagePersonIds.length === 0) {
+        return { rows: [], total: personsR.count ?? 0 };
+      }
+
+      const cargosQ = supabase
+        .from("condiciones_persona")
+        .select(`
+          person_id,
+          tipo_condicion,
+          entity_id,
+          body_id,
+          entity:entity_id(id, common_name, legal_name),
+          body:body_id(id, name)
+        `)
+        .eq("tenant_id", tenantId!)
+        .eq("estado", "VIGENTE")
+        .in("person_id", pagePersonIds);
+
+      const holdingsQ = supabase
+        .from("capital_holdings")
+        .select(`
+          holder_person_id,
+          entity_id,
+          porcentaje_capital,
+          effective_to,
+          entity:entity_id(id, common_name, legal_name)
+        `)
+        .eq("tenant_id", tenantId!)
+        .is("effective_to", null)
+        .in("holder_person_id", pagePersonIds);
+
+      const [cargosR, holdingsR] = await Promise.all([cargosQ, holdingsQ]);
+      if (cargosR.error) throw cargosR.error;
+      if (holdingsR.error) throw holdingsR.error;
+
+      type CargoRaw = {
+        person_id: string;
+        tipo_condicion: string;
+        entity_id: string;
+        body_id: string | null;
+        entity?: MaybeJoin<{ id: string; common_name: string | null; legal_name: string }>;
+        body?: MaybeJoin<{ id: string; name: string }>;
+      };
+      type HoldingRaw = {
+        holder_person_id: string;
+        entity_id: string;
+        porcentaje_capital: number | null;
+        entity?: MaybeJoin<{ id: string; common_name: string | null; legal_name: string }>;
+      };
+
+      const cargosByPerson = new Map<string, PersonaCargoAgregado[]>();
+      for (const c of (cargosR.data ?? []) as unknown as CargoRaw[]) {
+        const entity = firstJoin(c.entity);
+        const body = firstJoin(c.body);
+        const entry: PersonaCargoAgregado = {
+          tipo_condicion: c.tipo_condicion,
+          entity_id: c.entity_id,
+          entity_name: entity?.common_name ?? entity?.legal_name ?? "—",
+          body_id: c.body_id,
+          body_name: body?.name ?? null,
+        };
+        const arr = cargosByPerson.get(c.person_id) ?? [];
+        arr.push(entry);
+        cargosByPerson.set(c.person_id, arr);
+      }
+
+      const holdingsByPerson = new Map<string, PersonaHoldingAgregado[]>();
+      for (const h of (holdingsR.data ?? []) as unknown as HoldingRaw[]) {
+        const entity = firstJoin(h.entity);
+        const entry: PersonaHoldingAgregado = {
+          entity_id: h.entity_id,
+          entity_name: entity?.common_name ?? entity?.legal_name ?? "—",
+          porcentaje_capital: h.porcentaje_capital,
+        };
+        const arr = holdingsByPerson.get(h.holder_person_id) ?? [];
+        arr.push(entry);
+        holdingsByPerson.set(h.holder_person_id, arr);
+      }
+
+      return {
+        rows: personsFiltered.map((p) => ({
+          ...p,
+          cargos_vigentes: cargosByPerson.get(p.id) ?? [],
+          holdings_vigentes: holdingsByPerson.get(p.id) ?? [],
+        })),
+        total: personsR.count ?? personsFiltered.length,
+      };
+    },
+  });
+}
+
 export function usePersonaCanonical(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -321,6 +510,46 @@ export interface UpdatePersonaInput {
   tax_id?: string | null;
   email?: string | null;
   denomination?: string | null;
+}
+
+export interface ImportPersonaRowInput {
+  full_name: string;
+  person_type: PersonType;
+  tax_id?: string | null;
+  email?: string | null;
+  denomination?: string | null;
+  row_key: string;
+}
+
+export function useImportPersonaRow() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: ImportPersonaRowInput): Promise<{ id: string }> => {
+      if (!tenantId) throw new Error("Tenant no inicializado");
+      const { data, error } = await supabase.rpc("fn_import_persona_row", {
+        p_tenant_id: tenantId,
+        p_full_name: input.full_name.trim(),
+        p_person_type: input.person_type,
+        p_tax_id: input.tax_id?.trim() || null,
+        p_email: input.email?.trim() || null,
+        p_denomination: input.denomination?.trim() || null,
+        p_idempotency_key: [
+          "import-persona-row",
+          tenantId,
+          input.row_key,
+          input.tax_id?.trim() ?? "",
+          input.full_name.trim(),
+        ].join(":"),
+      });
+      if (error) throw error;
+      return { id: String(data) };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId] });
+    },
+  });
 }
 
 export function useUpdatePersona() {

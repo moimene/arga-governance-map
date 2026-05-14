@@ -20,12 +20,24 @@ import {
 import { useHoldingsPersona } from "@/hooks/useCapitalHoldings";
 import { useCesarCargo } from "@/hooks/useCondicionesPersonaMutations";
 import { useRepresentantesAdminPJByPerson } from "@/hooks/useRepresentantesAdminPJ";
+import { SCOPE_LABELS, useRepresentacionesHistoriaByPerson } from "@/hooks/useRepresentacionesCanonical";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
 import {
-  isAuthorityRole,
   requiresRepresentative,
   type TipoCondicionCargo,
 } from "@/lib/secretaria/cargo-validation";
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("es-ES");
+}
+
+function formatVigencia(from: string | null | undefined, to: string | null | undefined) {
+  return `${formatDate(from)} → ${to ? formatDate(to) : "vigente"}`;
+}
 
 export default function PersonaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +49,7 @@ export default function PersonaDetalle() {
   // para cumplir rules-of-hooks. El hook se desactiva internamente vía
   // `enabled: !!tenantId && !!representedPersonId` si id es undefined.
   const { data: representantesByEntity } = useRepresentantesAdminPJByPerson(id);
+  const { data: representacionesHistoria } = useRepresentacionesHistoriaByPerson(id);
 
   // D4.1: split cargos by estado para mostrar vigentes y cesados en
   // secciones independientes. El histórico se conserva (L14): el cese hace
@@ -310,6 +323,47 @@ export default function PersonaDetalle() {
         </dl>
       </section>
 
+      {representacionesHistoria && representacionesHistoria.length > 0 ? (
+        <section
+          className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="border-b border-[var(--g-border-subtle)] px-6 py-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Histórico de representaciones
+            </h2>
+          </div>
+          <div className="divide-y divide-[var(--g-border-subtle)]">
+            {representacionesHistoria.map((r) => {
+              const isRepresented = r.represented_person_id === p.id;
+              const counterparty = isRepresented ? r.representative : r.represented;
+              return (
+                <div
+                  key={r.id}
+                  className="grid gap-2 px-6 py-3 text-sm md:grid-cols-[180px_minmax(0,1fr)_180px]"
+                >
+                  <div className="font-semibold text-[var(--g-text-primary)]">
+                    {SCOPE_LABELS[r.scope] ?? r.scope}
+                  </div>
+                  <div className="min-w-0 text-[var(--g-text-secondary)]">
+                    {isRepresented ? "Representado por" : "Representa a"}{" "}
+                    <span className="font-semibold text-[var(--g-text-primary)]">
+                      {counterparty?.full_name ?? "—"}
+                    </span>
+                    {r.meeting?.scheduled_start ? (
+                      <span> · {new Date(r.meeting.scheduled_start).toLocaleDateString("es-ES")}</span>
+                    ) : null}
+                  </div>
+                  <div className="text-[var(--g-text-secondary)]">
+                    {formatVigencia(r.effective_from, r.effective_to)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {/* D4.1: Cargos vigentes — estado === 'VIGENTE' */}
       <section
         className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -342,11 +396,6 @@ export default function PersonaDetalle() {
               cargosVigentes.map((c) => {
                 const sociedadNombre = c.entity?.common_name ?? c.entity?.legal_name ?? "—";
                 const cargoLabel = CARGO_LABELS[c.tipo_condicion] ?? c.tipo_condicion;
-                const authorityStatus = isAuthorityRole(c.tipo_condicion as TipoCondicionCargo)
-                  ? c.inscripcion_rm_referencia
-                    ? "Inscrito"
-                    : "Pendiente RM"
-                  : null;
                 return (
                   <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
                     <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">
@@ -375,19 +424,12 @@ export default function PersonaDetalle() {
                       >
                         Vigente
                       </span>
-                      {authorityStatus ? (
-                        <span
-                          className={
-                            "ml-2 inline-flex items-center px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)] " +
-                            (authorityStatus === "Inscrito"
-                              ? "bg-[var(--status-success)]"
-                              : "bg-[var(--status-warning)]")
-                          }
-                          style={{ borderRadius: "var(--g-radius-sm)" }}
-                        >
-                          {authorityStatus}
-                        </span>
-                      ) : null}
+                      <span className="ml-2">
+                        <RmStatusChip
+                          tipoCondicion={c.tipo_condicion as TipoCondicionCargo}
+                          referencia={c.inscripcion_rm_referencia}
+                        />
+                      </span>
                     </td>
                     <td className="px-6 py-3 text-right text-sm">
                       <button
