@@ -158,7 +158,8 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
   });
 
   it("adds CSV and Excel import with dry-run plus RPC apply", () => {
-    expect(personasImport).toMatch(/xlsx/);
+    expect(personasImport).toMatch(/await import\("xlsx"\)/);
+    expect(personasImport).not.toMatch(/import \* as XLSX from "xlsx"/);
     expect(personasImport).toMatch(/parseFile/);
     expect(personasImport).toMatch(/existingTaxIds/);
     expect(personasImport).toMatch(/useImportPersonaRow/);

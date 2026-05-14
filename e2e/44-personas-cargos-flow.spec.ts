@@ -29,19 +29,15 @@ const ANTONIO_RIOS_PERSON_ID = '12ab13c3-0a0e-4ab6-a17a-902a3eaeddf8';
 const ARGA_SEGUROS_CANONICAL_TAX_ID = 'A-99999903';
 
 test.describe('Personas y Cargos — Wave 6 readiness', () => {
-  test('PersonasList renderiza Cartera ARGA una sola vez y oculta PRUEBA 1', async ({ page }) => {
+  test('PersonasList busca Cartera ARGA una sola vez y oculta PRUEBA 1', async ({ page }) => {
     await page.goto('/secretaria/personas?scope=grupo');
 
-    // El bootstrap canónico crea una única fila para Cartera ARGA SLU y oculta
-    // entradas marcadas como [ARCHIVED-LEGAL] (filtradas por isProductionPerson).
+    // La lista esta paginada server-side: no asumimos que Cartera este en la
+    // primera pagina alfabetica, la buscamos mediante el searchbox operativo.
     const table = page.getByTestId('personas-desktop-table');
     await expect(table).toBeVisible({ timeout: 15_000 });
 
-    // Esperamos a que la tabla tenga filas reales (no skeleton).
-    await expect(table.locator('tbody tr')).toHaveCount(
-      await table.locator('tbody tr').count(),
-      { timeout: 10_000 },
-    );
+    await page.getByLabel(/Buscar persona/i).fill('Cartera ARGA');
 
     // Cartera ARGA — debe aparecer exactamente UNA vez en la columna Nombre.
     const carteraLinks = table.locator('tbody tr td:first-child a', {
@@ -50,10 +46,14 @@ test.describe('Personas y Cargos — Wave 6 readiness', () => {
     await expect(carteraLinks).toHaveCount(1);
 
     // PRUEBA 1 — filtrada por isProductionPerson (queda como [ARCHIVED-LEGAL]).
+    await page.getByLabel(/Buscar persona/i).fill('PRUEBA 1');
     const pruebaRows = table.locator('tbody tr td:first-child a', {
       hasText: /^PRUEBA 1$/i,
     });
     await expect(pruebaRows).toHaveCount(0);
+
+    await page.getByLabel(/Buscar persona/i).fill('Cartera ARGA');
+    await expect(carteraLinks).toHaveCount(1);
 
     // Botón "Asignar cargo" por fila — al menos uno por persona renderizada.
     const asignarBtns = page.locator('a[aria-label^="Asignar cargo a"]');
@@ -203,19 +203,21 @@ test.describe('Personas y Cargos — Wave 6 readiness', () => {
     await expect(table).toBeVisible({ timeout: 10_000 });
     await expect(table.getByRole('columnheader', { name: /Inscripción RM/i })).toBeVisible();
 
-    // D5.5 / W6 apply: el Presidente y el Secretario del CdA tienen
-    // inscripcion_rm_referencia poblada con RM-DEMO-ARGA-CDA-2026 para
-    // habilitar el pipeline de certificación (EmitirCertificacionButton).
+    // D5.5 / W6 apply: el Presidente y el Secretario del CdA aparecen como
+    // inscritos en RM. El chip visible no imprime la referencia tecnica, solo
+    // el estado de inscripcion.
     const presidenteCdaRow = table
-      .locator('tbody tr', { hasText: /Antonio Ríos Valverde/i })
+      .locator('tbody tr', { hasText: /D\.? Antonio Ríos Valverde/i })
+      .filter({ hasText: /Presidente/i })
       .filter({ hasText: /Consejo de Administración/i })
-      .filter({ hasText: /RM-DEMO-ARGA-CDA-2026/i });
+      .filter({ hasText: /Inscrito/i });
     await expect(presidenteCdaRow.first()).toBeVisible();
 
     const secretarioCdaRow = table
-      .locator('tbody tr', { hasText: /Lucía Paredes Vega/i })
+      .locator('tbody tr', { hasText: /Dña\. Lucía Paredes Vega/i })
+      .filter({ hasText: /Secretario/i })
       .filter({ hasText: /Consejo de Administración/i })
-      .filter({ hasText: /RM-DEMO-ARGA-CDA-2026/i });
+      .filter({ hasText: /Inscrito/i });
     await expect(secretarioCdaRow.first()).toBeVisible();
   });
 });
