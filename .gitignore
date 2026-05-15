@@ -53,6 +53,7 @@ Plantillas_Oleada1_Revision_Legal.docx
 # Playwright report
 playwright-report/
 test-results/
+.playwright-mcp/
 .vercel
 
 # External skill/MCP material (EAD Trust, etc.)
