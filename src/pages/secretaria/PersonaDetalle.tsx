@@ -11,7 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { usePersonaCanonical, useUpdatePersona } from "@/hooks/usePersonasCanonical";
+import { usePersonaCanonical, usePersonaProfile, useUpdatePersona } from "@/hooks/usePersonasCanonical";
 import {
   useCargosPersona,
   CARGO_LABELS,
@@ -39,9 +39,22 @@ function formatVigencia(from: string | null | undefined, to: string | null | und
   return `${formatDate(from)} → ${to ? formatDate(to) : "vigente"}`;
 }
 
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function formatEvidenceSummary(evidence: Record<string, unknown> | null | undefined) {
+  if (!evidence) return "—";
+  const type = readString(evidence.type);
+  const reference = readString(evidence.reference);
+  const date = readString(evidence.date);
+  return [type, reference, date ? formatDate(date) : null].filter(Boolean).join(" · ") || "—";
+}
+
 export default function PersonaDetalle() {
   const { id } = useParams<{ id: string }>();
   const { data: p, isLoading } = usePersonaCanonical(id);
+  const { data: profile } = usePersonaProfile(id);
   const { data: cargos } = useCargosPersona(id);
   const { data: holdings } = useHoldingsPersona(id);
   const secretariaScope = useSecretariaScope();
@@ -322,6 +335,74 @@ export default function PersonaDetalle() {
           ) : null}
         </dl>
       </section>
+
+      {profile ? (
+        <section
+          className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+            Alta integral
+          </h2>
+          <dl className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Field label="Documento" value={`${profile.document_type} · ${profile.document_country}`} />
+            <Field label="Nacionalidad" value={profile.nationality ?? "—"} />
+            <Field label="Fecha nacimiento" value={formatDate(profile.birth_date)} />
+            <Field label="Lugar nacimiento" value={profile.birth_place ?? "—"} />
+            <Field label="Forma jurídica" value={profile.legal_form ?? "—"} />
+            <Field label="Jurisdicción" value={profile.jurisdiction ?? "—"} />
+            <Field label="Registro" value={profile.registry_name ?? "—"} />
+            <Field label="Hoja / número registral" value={profile.registry_number ?? "—"} />
+            <Field label="LEI" value={profile.lei_code ?? "—"} />
+            <Field label="Teléfono" value={profile.phone ?? "—"} />
+            <Field label="Email alternativo" value={profile.secondary_email ?? "—"} />
+            <Field label="Idioma" value={profile.preferred_language ?? "—"} />
+            <Field
+              label="Domicilio"
+              value={[
+                profile.address_line1,
+                profile.address_line2,
+                profile.postal_code,
+                profile.city,
+                profile.province,
+                profile.country,
+              ].filter(Boolean).join(", ") || "—"}
+            />
+            <Field
+              label="Notificaciones"
+              value={
+                profile.notification_address_same
+                  ? "Mismo domicilio"
+                  : [
+                      profile.notification_address_line1,
+                      profile.notification_address_line2,
+                      profile.notification_postal_code,
+                      profile.notification_city,
+                      profile.notification_province,
+                      profile.notification_country,
+                    ].filter(Boolean).join(", ") || "—"
+              }
+            />
+            <Field label="Perfil societario" value={profile.governance_role} />
+            <Field label="KYC" value={profile.kyc_status} />
+            <Field label="Estado alta" value={profile.onboarding_status} />
+            <Field label="Evidencia" value={formatEvidenceSummary(profile.evidence_summary)} />
+            <Field label="Notas" value={profile.notes ?? "—"} />
+          </dl>
+        </section>
+      ) : (
+        <section
+          className="mb-6 border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+            Esta persona no tiene perfil integral registrado.
+          </p>
+          <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            Fue creada antes del alta completa. Para producción debe regularizarse con un flujo de enriquecimiento o consolidación.
+          </p>
+        </section>
+      )}
 
       {representacionesHistoria && representacionesHistoria.length > 0 ? (
         <section
