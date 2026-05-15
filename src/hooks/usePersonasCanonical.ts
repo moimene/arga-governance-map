@@ -32,6 +32,88 @@ export interface PersonaDetailRow extends PersonaRow {
   } | null;
 }
 
+export interface PersonaProfileRow {
+  id: string;
+  tenant_id: string;
+  person_id: string;
+  document_type: string;
+  document_country: string;
+  nationality: string | null;
+  birth_date: string | null;
+  birth_place: string | null;
+  legal_form: string | null;
+  jurisdiction: string | null;
+  registry_name: string | null;
+  registry_number: string | null;
+  lei_code: string | null;
+  phone: string | null;
+  secondary_email: string | null;
+  preferred_language: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  postal_code: string | null;
+  city: string | null;
+  province: string | null;
+  country: string;
+  notification_address_same: boolean;
+  notification_address_line1: string | null;
+  notification_address_line2: string | null;
+  notification_postal_code: string | null;
+  notification_city: string | null;
+  notification_province: string | null;
+  notification_country: string | null;
+  governance_role: string;
+  kyc_status: string;
+  onboarding_status: string;
+  evidence_summary: Record<string, unknown>;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PersonaCompletaProfileInput {
+  document_type: string;
+  document_country: string;
+  nationality?: string | null;
+  birth_date?: string | null;
+  birth_place?: string | null;
+  legal_form?: string | null;
+  jurisdiction?: string | null;
+  registry_name?: string | null;
+  registry_number?: string | null;
+  lei_code?: string | null;
+  phone?: string | null;
+  secondary_email?: string | null;
+  preferred_language: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country: string;
+  notification_address_same: boolean;
+  notification_address_line1?: string | null;
+  notification_address_line2?: string | null;
+  notification_postal_code?: string | null;
+  notification_city?: string | null;
+  notification_province?: string | null;
+  notification_country?: string | null;
+  governance_role: string;
+  kyc_status: string;
+  onboarding_status: string;
+  notes?: string | null;
+}
+
+export interface PersonaCompletaInput {
+  person_type: PersonType;
+  full_name: string;
+  tax_id: string;
+  email?: string | null;
+  denomination?: string | null;
+  profile: PersonaCompletaProfileInput;
+  evidence_summary: Record<string, unknown>;
+}
+
 // G2: agregados que enriquecen la lista de personas con contexto societario.
 export interface PersonaCargoAgregado {
   tipo_condicion: string;
@@ -504,6 +586,24 @@ export function usePersonaCanonical(id: string | undefined) {
   });
 }
 
+export function usePersonaProfile(personId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!personId && !!tenantId,
+    queryKey: ["personas_canonical", tenantId, "profile", personId],
+    queryFn: async (): Promise<PersonaProfileRow | null> => {
+      const { data, error } = await supabase
+        .from("persona_profiles")
+        .select("*")
+        .eq("tenant_id", tenantId!)
+        .eq("person_id", personId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as PersonaProfileRow) ?? null;
+    },
+  });
+}
+
 export interface UpdatePersonaInput {
   id: string;
   full_name: string;
@@ -548,6 +648,59 @@ export function useImportPersonaRow() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId] });
+    },
+  });
+}
+
+export function useCreatePersonaCompleta() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: PersonaCompletaInput): Promise<{ person_id: string; profile_id: string }> => {
+      if (!tenantId) throw new Error("Tenant no inicializado");
+      const fullName = input.full_name.trim();
+      const taxId = input.tax_id.trim();
+      if (!fullName) throw new Error("El nombre es obligatorio");
+      if (!taxId) throw new Error("El NIF/CIF es obligatorio");
+
+      const payload = {
+        person_type: input.person_type,
+        full_name: fullName,
+        tax_id: taxId,
+        email: input.email?.trim() || null,
+        denomination: input.person_type === "PJ" ? input.denomination?.trim() || fullName : null,
+        profile: input.profile,
+        evidence_summary: input.evidence_summary,
+      };
+
+      const { data, error } = await supabase.rpc("fn_create_persona_completa", {
+        p_tenant_id: tenantId,
+        p_payload: payload,
+        p_idempotency_key: [
+          "create-persona-completa",
+          tenantId,
+          input.person_type,
+          taxId,
+          fullName,
+          input.profile.document_type,
+          input.profile.document_country,
+        ].join(":"),
+      });
+      if (error) throw error;
+
+      const result = data as { person_id?: unknown; profile_id?: unknown } | null;
+      const personId = typeof result?.person_id === "string" ? result.person_id : "";
+      const profileId = typeof result?.profile_id === "string" ? result.profile_id : "";
+      if (!personId || !profileId) {
+        throw new Error("La RPC no devolvió identificadores de persona y perfil");
+      }
+      return { person_id: personId, profile_id: profileId };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId] });
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId, "byId", data.person_id] });
+      qc.invalidateQueries({ queryKey: ["personas_canonical", tenantId, "profile", data.person_id] });
     },
   });
 }
