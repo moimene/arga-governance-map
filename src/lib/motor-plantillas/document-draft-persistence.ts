@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { computeContentHash } from "@/lib/doc-gen/docx-generator";
+import { actaLegalStructureFromVariables } from "@/lib/secretaria/acta-legal-structure";
 import { validatePostRenderDocument } from "./post-render-validation";
 import type { PreparedDocumentComposition } from "./types";
 
@@ -234,6 +235,10 @@ export async function buildEditableDocumentDraftPayload(
     capa1Template: input.prepared.template.capa1_inmutable,
     agreementIds: input.prepared.request.agreement_ids,
     unresolvedVariables: input.prepared.unresolvedVariables,
+    actaLegalStructure:
+      input.prepared.request.document_type === "ACTA"
+        ? actaLegalStructureFromVariables(input.prepared.mergedVariables)
+        : null,
   });
   const draftState = input.draftState ?? "EDITABLE_DRAFT";
   const now = new Date().toISOString();

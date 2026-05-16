@@ -68,11 +68,30 @@ export interface ProcessDocumentTemplateCriteria {
   materia?: string | null;
   adoptionMode?: string | null;
   organoTipo?: string | null;
+  requireCriticalMetadata?: boolean;
+}
+
+export interface ProcessTemplateCandidate {
+  templateId: string;
+  tipo: string;
+  version: string;
+  estado: string;
+  selectionReason: string;
+  missingCriticalMetadata: string[];
+}
+
+export interface ProcessTemplateSelectionResult {
+  selected: PlantillaProtegidaRow | null;
+  selectionReason: string | null;
+  candidates: ProcessTemplateCandidate[];
+  blockingIssues: string[];
+  warnings: string[];
 }
 
 export interface ProcessDocumentArchiveResult {
   attempted: boolean;
   archived: boolean;
+  reused?: boolean;
   skippedReason?: string;
   documentUrls: string[];
   evidenceBundleIds: string[];
@@ -87,6 +106,9 @@ export interface ProcessDocumentGenerationResult {
   templateId: string | null;
   templateTipo: string;
   templateVersion: string;
+  templateSelectionReason?: string | null;
+  templateSelectionWarnings?: string[];
+  templateSelectionBlockingIssues?: string[];
   usedFallback: boolean;
   unresolvedVariables: string[];
   archive: ProcessDocumentArchiveResult;
@@ -160,6 +182,26 @@ function templateMetadataMatches(
   return true;
 }
 
+function templateCriticalMetadataMissing(
+  template: PlantillaProtegidaRow,
+  criteria: ProcessDocumentTemplateCriteria,
+) {
+  const missing: string[] = [];
+  if (normalizeCode(criteria.jurisdiction) && !normalizeCode(template.jurisdiccion)) {
+    missing.push("jurisdiccion");
+  }
+  if (normalizeCode(criteria.materia) && !normalizeCode(template.materia_acuerdo ?? template.materia)) {
+    missing.push("materia_acuerdo");
+  }
+  if (normalizeCode(criteria.adoptionMode) && !normalizeCode(template.adoption_mode)) {
+    missing.push("adoption_mode");
+  }
+  if (normalizeCode(criteria.organoTipo) && !normalizeCode(template.organo_tipo)) {
+    missing.push("organo_tipo");
+  }
+  return missing;
+}
+
 function organoFamily(value?: string | null) {
   const code = normalizeCode(value);
   if (!code) return null;
@@ -186,6 +228,26 @@ function templateSpecificityScore(
   const organoTipo = normalizeCode(criteria.organoTipo);
   if (templateOrgano && organoTipo && organoTipoMatches(templateOrgano, organoTipo)) score -= 2;
   return score;
+}
+
+function templateSelectionReason(
+  template: PlantillaProtegidaRow,
+  criteria: ProcessDocumentTemplateCriteria,
+  preferred: boolean,
+) {
+  const parts = [
+    preferred ? "plantilla preferida compatible" : "mejor candidata operativa",
+    `tipo ${template.tipo}`,
+    `estado ${template.estado}`,
+    `version ${template.version}`,
+  ];
+  if (normalizeCode(template.jurisdiccion) === normalizeCode(criteria.jurisdiction)) parts.push("jurisdiccion exacta");
+  if (normalizeCode(template.materia_acuerdo ?? template.materia) === normalizeCode(criteria.materia)) parts.push("materia exacta");
+  if (normalizeCode(template.adoption_mode) === normalizeCode(criteria.adoptionMode)) parts.push("modo de adopcion exacto");
+  const templateOrgano = normalizeCode(template.organo_tipo);
+  const organoTipo = normalizeCode(criteria.organoTipo);
+  if (templateOrgano && organoTipo && organoTipoMatches(templateOrgano, organoTipo)) parts.push("organo compatible");
+  return parts.join("; ");
 }
 
 function readStringVariable(variables: Record<string, unknown> | undefined, keys: string[]) {
@@ -221,25 +283,46 @@ export function selectProcessTemplate(
   criteria: ProcessDocumentTemplateCriteria = {},
   preferredTemplateId?: string | null,
 ): PlantillaProtegidaRow | null {
+  return resolveProcessTemplateSelection(plantillas, templateTypes, criteria, preferredTemplateId).selected;
+}
+
+export function resolveProcessTemplateSelection(
+  plantillas: PlantillaProtegidaRow[],
+  templateTypes: string[],
+  criteria: ProcessDocumentTemplateCriteria = {},
+  preferredTemplateId?: string | null,
+): ProcessTemplateSelectionResult {
   const typePriority = new Map(templateTypes.map((type, index) => [type, index]));
+  const requireCriticalMetadata = criteria.requireCriticalMetadata === true;
+  const usableCandidates = plantillas
+    .filter((template) =>
+      typePriority.has(template.tipo) &&
+      isOperationalTemplate(template) &&
+      templateMetadataMatches(template, criteria)
+    );
+  const candidates = usableCandidates.map((template) => ({
+    templateId: template.id,
+    tipo: template.tipo,
+    version: template.version,
+    estado: template.estado,
+    selectionReason: templateSelectionReason(template, criteria, template.id === preferredTemplateId),
+    missingCriticalMetadata: templateCriticalMetadataMissing(template, criteria),
+  }));
+  const criticalCompatible = (template: PlantillaProtegidaRow) =>
+    !requireCriticalMetadata || templateCriticalMetadataMissing(template, criteria).length === 0;
   const preferredTemplate = preferredTemplateId
     ? plantillas.find((template) =>
       template.id === preferredTemplateId &&
       typePriority.has(template.tipo) &&
       isOperationalTemplate(template) &&
-      templateMetadataMatches(template, criteria)
+      templateMetadataMatches(template, criteria) &&
+      criticalCompatible(template)
     ) ?? null
     : null;
 
-  if (preferredTemplate) return preferredTemplate;
-
-  return (
-    plantillas
-      .filter((template) =>
-        typePriority.has(template.tipo) &&
-        isOperationalTemplate(template) &&
-        templateMetadataMatches(template, criteria)
-      )
+  const selected = preferredTemplate ?? (
+    usableCandidates
+      .filter(criticalCompatible)
       .sort((a, b) => {
         const typeDiff = (typePriority.get(a.tipo) ?? 99) - (typePriority.get(b.tipo) ?? 99);
         if (typeDiff !== 0) return typeDiff;
@@ -248,6 +331,25 @@ export function selectProcessTemplate(
         return compareOperationalTemplateFreshness(a, b);
       })[0] ?? null
   );
+
+  const warnings: string[] = [];
+  const blockingIssues: string[] = [];
+  if (selected) {
+    const missing = templateCriticalMetadataMissing(selected, criteria);
+    if (missing.length > 0) {
+      warnings.push(`Plantilla seleccionada con metadatos criticos incompletos: ${missing.join(", ")}.`);
+    }
+  } else if (requireCriticalMetadata && candidates.some((candidate) => candidate.missingCriticalMetadata.length > 0)) {
+    blockingIssues.push("template_critical_metadata_missing");
+  }
+
+  return {
+    selected,
+    selectionReason: selected ? templateSelectionReason(selected, criteria, selected.id === preferredTemplateId) : null,
+    candidates,
+    blockingIssues,
+    warnings,
+  };
 }
 
 function templateEditableFields(
@@ -467,6 +569,7 @@ export async function archiveProcessDocx(params: {
     return {
       attempted: false,
       archived: false,
+      reused: false,
       skippedReason: "archive_disabled",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -489,6 +592,7 @@ export async function archiveProcessDocx(params: {
     return {
       attempted: false,
       archived: false,
+      reused: false,
       skippedReason: "tenant_context_not_available",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -502,6 +606,7 @@ export async function archiveProcessDocx(params: {
     return {
       attempted: false,
       archived: false,
+      reused: false,
       skippedReason: resolved.skippedReason ?? "agreement_context_not_available",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -517,6 +622,7 @@ export async function archiveProcessDocx(params: {
   const documentUrls: string[] = [];
   const evidenceBundleIds: string[] = [];
   const errors: string[] = [];
+  let reused = false;
 
   for (const agreementId of resolved.agreementIds) {
     const result = await archiveDocxToStorage(
@@ -538,6 +644,7 @@ export async function archiveProcessDocx(params: {
     if (result.ok) {
       if (result.documentUrl) documentUrls.push(result.documentUrl);
       if (result.evidenceBundleId) evidenceBundleIds.push(result.evidenceBundleId);
+      if (result.reused) reused = true;
       if (result.error) errors.push(`${agreementId}: ${result.error}`);
     } else {
       errors.push(`${agreementId}: ${result.error ?? "Error desconocido"}`);
@@ -547,6 +654,7 @@ export async function archiveProcessDocx(params: {
   return {
     attempted: true,
     archived: evidenceBundleIds.length > 0,
+    reused,
     skippedReason: evidenceBundleIds.length > 0 ? undefined : "archive_failed",
     documentUrls,
     evidenceBundleIds,
@@ -569,6 +677,7 @@ async function archiveConvocatoriaDocx(params: {
     return {
       attempted: false,
       archived: false,
+      reused: false,
       skippedReason: "tenant_context_not_available",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -594,6 +703,7 @@ async function archiveConvocatoriaDocx(params: {
     return {
       attempted: true,
       archived: false,
+      reused: false,
       skippedReason: "archive_failed",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -609,6 +719,7 @@ async function archiveConvocatoriaDocx(params: {
     return {
       attempted: true,
       archived: false,
+      reused: false,
       skippedReason: "archive_failed",
       documentUrls: [],
       evidenceBundleIds: [],
@@ -635,6 +746,7 @@ async function archiveConvocatoriaDocx(params: {
     return {
       attempted: true,
       archived: false,
+      reused: false,
       skippedReason: "archive_failed",
       documentUrls: [publicUrl],
       evidenceBundleIds: [],
@@ -647,6 +759,7 @@ async function archiveConvocatoriaDocx(params: {
   return {
     attempted: true,
     archived: true,
+    reused: false,
     documentUrls: [publicUrl],
     evidenceBundleIds: [],
     attachmentIds: [attachment.id],
@@ -689,12 +802,13 @@ export async function generateProcessDocx(
   input: ProcessDocumentGenerationInput,
 ): Promise<ProcessDocumentGenerationResult> {
   const templateCriteria = inferProcessTemplateCriteria(input);
-  const plantilla = selectProcessTemplate(
+  const templateSelection = resolveProcessTemplateSelection(
     input.plantillas,
     input.templateTypes,
     templateCriteria,
     input.preferredTemplateId,
   );
+  const plantilla = templateSelection.selected;
   const capa3Values = input.capa3Values ?? {};
   const variables = expandLegalStructuredVariables(mergeVariables(input.variables ?? {}, capa3Values));
 
@@ -792,6 +906,9 @@ export async function generateProcessDocx(
     templateId: plantilla?.id ?? null,
     templateTipo: plantilla?.tipo ?? input.kind,
     templateVersion: plantilla?.version ?? "system",
+    templateSelectionReason: templateSelection.selectionReason,
+    templateSelectionWarnings: templateSelection.warnings,
+    templateSelectionBlockingIssues: templateSelection.blockingIssues,
     usedFallback,
     unresolvedVariables,
     archive,

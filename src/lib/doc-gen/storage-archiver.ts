@@ -5,6 +5,7 @@ export interface ArchiveResult {
   documentUrl?: string;
   hash512?: string;
   evidenceBundleId?: string;
+  reused?: boolean;
   error?: string;
 }
 
@@ -70,6 +71,28 @@ export async function archiveDocxToStorage(
     const hashBuffer = await globalThis.crypto.subtle.digest("SHA-512", buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    if (metadata.contentHash) {
+      const { data: existing, error: existingError } = await supabase
+        .from("evidence_bundles")
+        .select("id, document_url, hash_sha512")
+        .eq("tenant_id", tenantId)
+        .eq("agreement_id", agreementId)
+        .eq("manifest->metadata->>contentHash", metadata.contentHash)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingError && existing?.id) {
+        return {
+          ok: true,
+          documentUrl: existing.document_url ?? undefined,
+          hash512: existing.hash_sha512 ?? hashHex,
+          evidenceBundleId: existing.id,
+          reused: true,
+        };
+      }
+    }
 
     // Upload to Supabase Storage
     const storagePath = `agreements/${agreementId}/${filename}.docx`;

@@ -19,11 +19,37 @@ export {
   staticDocumentDraftSchemaGate,
 } from "./document-draft-persistence";
 export {
+  formatEditableDraftDiffSummary,
+  summarizeEditableDraftDiff,
+} from "./document-draft-review";
+export {
+  ACTA_DRAFT_POLISH_ALLOWED_TARGETS,
+  ACTA_DRAFT_POLISH_PROMPT_VERSION,
+  applyActaDraftPolishProposals,
+  suggestActaDraftPolish,
+  validateActaDraftPolishResult,
+} from "./document-composer-harness";
+export {
   invokeAnthropicCapa3DraftProvider,
   sanitizeCapa3ProviderInput,
   suggestCapa3DraftWithAnthropicFallback,
 } from "./anthropic-capa3-provider";
-export { generateProcessDocxWithMotor } from "./process-generator";
+export {
+  invokeOpenAiActaComposerProvider,
+  invokeOpenAiActaDraftPolishProvider,
+  invokeOpenAiCapa3DraftProvider,
+  sanitizeOpenAiCapa3CopilotInput,
+  sanitizeOpenAiCapa3DraftInput,
+  sanitizeOpenAiActaComposerInput,
+  suggestActaDraftPolishWithCapa3CopilotFallback,
+  suggestActaDraftPolishWithOpenAIFallback,
+  suggestCapa3DraftWithOpenAIFallback,
+} from "./openai-capa3-copilot-provider";
+export {
+  finalizeProcessDocumentDraftWithMotor,
+  generateProcessDocxWithMotor,
+  prepareProcessDocumentDraftWithMotor,
+} from "./process-generator";
 export { validatePostRenderDocument } from "./post-render-validation";
 export {
   allowedReviewStateTransitions,
@@ -59,6 +85,20 @@ export type {
   SaveEditableDocumentDraftResult,
 } from "./document-draft-persistence";
 export type {
+  EditableDraftDiffSummary,
+} from "./document-draft-review";
+export type {
+  ActaDraftPolishMode,
+  ActaDraftPolishProposal,
+  ActaDraftPolishProvider,
+  ActaDraftPolishProviderInput,
+  ActaDraftPolishProviderOutput,
+  ActaDraftPolishResult,
+  ActaDraftPolishTarget,
+  ActaDraftPolishValidationIssue,
+  SuggestActaDraftPolishInput,
+} from "./document-composer-harness";
+export type {
   Capa3DraftAssistantMode,
   Capa3DraftAssistantProvider,
   Capa3DraftAssistantProviderInput,
@@ -67,6 +107,10 @@ export type {
   SuggestCapa3DraftInput,
   SuggestCapa3DraftResult,
 } from "./capa3-draft-assistant";
+export type {
+  FinalizedProcessDocumentDraftResult,
+  PreparedProcessDocumentDraft,
+} from "./process-generator";
 export type {
   AgreementNormativeSnapshot,
   EntityNormativeProfile,

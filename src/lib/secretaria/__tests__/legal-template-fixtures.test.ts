@@ -53,6 +53,13 @@ describe("legal-template-fixtures", () => {
       miembros_presentes_texto: "Consejera A\nConsejero B",
       orden_dia_texto: "Formulacion de cuentas\nConvocatoria de junta",
       acuerdos_texto: "Se formulan las cuentas\nSe convoca la junta",
+      acta_rrm_texto_completo: [
+        "ACTA DEL CONSEJO DE ADMINISTRACION",
+        "1. Formulacion de cuentas",
+        "2. Se convoca la junta",
+        "Consejera A",
+      ].join("\n"),
+      canonical_minutes_hash: "sha256-acta-canonica-demo",
     });
 
     const rendered = renderTemplate({

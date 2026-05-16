@@ -16,11 +16,13 @@ import {
 import type { Capa2Variable } from "@/lib/doc-gen/variable-resolver";
 import { computeContentHash, generateDocx } from "@/lib/doc-gen/docx-generator";
 import type { EditableField } from "@/lib/doc-gen/docx-generator";
+import { validateGeneratedDocxOpenXml } from "@/lib/doc-gen/openxml-validation";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import {
   compactAgreementNormativeSnapshot,
   type AgreementNormativeSnapshot,
 } from "@/lib/secretaria/normative-framework";
+import { actaLegalStructureFromVariables } from "@/lib/secretaria/acta-legal-structure";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
 import type { ProcessDocumentTemplateCriteria } from "@/lib/doc-gen/process-documents";
 import {
@@ -459,6 +461,7 @@ export async function prepareDocumentComposition(
     capa1Template: template.capa1_inmutable,
     agreementIds: req.agreement_ids,
     unresolvedVariables: rendered.unresolvedVariables,
+    actaLegalStructure: req.document_type === "ACTA" ? actaLegalStructureFromVariables(mergedVariables) : null,
   });
   if (!postRenderValidation.ok) {
     const blocking = postRenderValidation.issues.filter((issue) => issue.severity === "BLOCKING");
@@ -594,6 +597,10 @@ async function buildComposeResultFromPrepared(
   includeEditableFields = true,
 ): Promise<ComposeDocumentResult> {
   const contentHash = await computeContentHash(prepared.renderedText);
+  const actaLegalStructure =
+    prepared.request.document_type === "ACTA"
+      ? actaLegalStructureFromVariables(prepared.mergedVariables)
+      : null;
   const buffer = await generateDocx({
     renderedText: prepared.renderedText,
     title: prepared.title,
@@ -614,6 +621,19 @@ async function buildComposeResultFromPrepared(
         )
       : undefined,
   });
+  const openXmlValidation = await validateGeneratedDocxOpenXml({
+    buffer,
+    renderedText: prepared.renderedText,
+    documentType: prepared.request.document_type,
+    contentHash,
+    actaLegalStructure,
+  });
+  if (!openXmlValidation.ok) {
+    const blocking = openXmlValidation.issues.filter((issue) => issue.severity === "BLOCKING");
+    throw new Error(
+      `OpenXML validation blocked: ${blocking.map((issue) => `${issue.code}@${issue.field_path}`).join(", ")}`,
+    );
+  }
   const document = buildGeneratedDocumentArtifact(prepared, buffer, contentHash, options);
   const archive = await archivePreparedDocument(prepared, buffer, contentHash, options);
 
@@ -623,6 +643,7 @@ async function buildComposeResultFromPrepared(
     docxBuffer: buffer,
     document,
     archive,
+    openXmlValidation,
   };
 }
 
@@ -647,6 +668,10 @@ export async function finalizeEditableDocumentDraft(
     capa1Template: prepared.template.capa1_inmutable,
     agreementIds: prepared.request.agreement_ids,
     unresolvedVariables: prepared.unresolvedVariables,
+    actaLegalStructure:
+      prepared.request.document_type === "ACTA"
+        ? actaLegalStructureFromVariables(prepared.mergedVariables)
+        : null,
   });
   if (!postRenderValidation.ok) {
     const blocking = postRenderValidation.issues.filter((issue) => issue.severity === "BLOCKING");
