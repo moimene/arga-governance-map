@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { supabaseAdmin, hasAdminClient, DEMO_TENANT } from "../helpers/supabase-test-client";
 
 const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/20260514_000067_fn_crear_sociedad_legal_y_capital.sql"),
+  join(process.cwd(), "supabase/migrations/20260515183150_secretaria_d6_crear_sociedad_legal_y_capital.sql"),
   "utf8",
 );
 
@@ -61,14 +61,14 @@ describe("fn_crear_sociedad_legal_y_capital migration contract", () => {
 });
 
 describe.skipIf(!hasAdminClient())("fn_crear_sociedad_legal_y_capital Cloud probe", () => {
-  it("resolves the RPC signature after the human applies migration 000067", async () => {
+  it("resolves the RPC signature after D6 is applied", async () => {
     const { error } = await supabaseAdmin!.rpc("fn_crear_sociedad_legal_y_capital", {
       p_tenant_id: DEMO_TENANT,
       p_payload: {},
     });
 
     if (error?.message?.match(/function .* does not exist|could not find the function|schema cache/i)) {
-      console.warn("[000067] fn_crear_sociedad_legal_y_capital not yet applied to Cloud; skipping live probe.");
+      console.warn("[D6] fn_crear_sociedad_legal_y_capital not yet applied to Cloud; skipping live probe.");
       return;
     }
 

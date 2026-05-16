@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { hasAdminClient, supabaseAdmin } from "../helpers/supabase-test-client";
 
 const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/20260514_000067_fn_crear_sociedad_legal_y_capital.sql"),
+  join(process.cwd(), "supabase/migrations/20260515183150_secretaria_d6_crear_sociedad_legal_y_capital.sql"),
   "utf8",
 );
 
@@ -38,7 +38,7 @@ const LEGAL_FIELDS = [
   "onboarding_status",
 ] as const;
 
-describe("entities legal fields migration 000067", () => {
+describe("entities legal fields migration D6 reissue", () => {
   it("adds every legal field required by the alta-sociedad D6 spec", () => {
     for (const field of LEGAL_FIELDS) {
       expect(migration).toMatch(new RegExp(`ADD COLUMN IF NOT EXISTS ${field}\\b`, "i"));
