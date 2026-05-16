@@ -123,6 +123,7 @@ async function smoke(
   expect(result.renderedText).not.toContain("{{");
   expect(result.unresolvedVariables).toEqual([]);
   expect(result.postRenderValidation.ok).toBe(true);
+  expect(result.openXmlValidation.ok).toBe(true);
   expect(result.archive.skippedReason).toBe("archive_disabled");
   return result;
 }
@@ -231,6 +232,7 @@ describe("motor-plantillas composer smoke", () => {
     expect(reviewed.document.renderedText).not.toContain("TRAZABILIDAD DOCUMENTAL");
     expect(reviewed.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(reviewed.docxBuffer.length).toBeGreaterThan(0);
+    expect(reviewed.openXmlValidation.ok).toBe(true);
     expect(reviewed.archive.skippedReason).toBe("archive_disabled");
   });
 
@@ -357,6 +359,36 @@ describe("motor-plantillas composer smoke", () => {
         miembros_presentes_texto: "Consejera A\nConsejero B",
         orden_dia_texto: "Formulacion de cuentas\nConvocatoria de junta",
         acuerdos_texto: "Se formulan las cuentas\nSe convoca la junta",
+      },
+      {
+        canonical_minutes_hash: "hash-acta-demo",
+        acta_rrm_texto_completo: [
+          "ACTA",
+          "",
+          "ENCABEZADO",
+          "Sociedad: ARGA Seguros, S.A.",
+          "",
+          "CONSTITUCIÓN DE LA REUNIÓN",
+          "Preside Antonio Rios y actúa como secretaria Lucia Paredes.",
+          "",
+          "ORDEN DEL DÍA",
+          "1. Formulacion de cuentas",
+          "2. Convocatoria de junta",
+          "",
+          "DESARROLLO DE LA SESIÓN",
+          "1. Formulacion de cuentas",
+          "2. Convocatoria de junta",
+          "",
+          "ACUERDOS Y VOTACIONES",
+          "1. Se formulan las cuentas",
+          "2. Se convoca la junta",
+          "",
+          "APROBACIÓN DEL ACTA",
+          "Aprobada en el acto.",
+          "",
+          "FIRMAS",
+          "Secretaria y visto bueno del presidente.",
+        ].join("\n"),
       },
     );
 

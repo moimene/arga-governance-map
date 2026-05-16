@@ -3,6 +3,7 @@ import type {
   ValidatePostRenderInput,
 } from "./types";
 import type { SecretariaValidationResult } from "@/lib/secretaria/document-generation-boundary";
+import { validateRenderedActaAgainstLegalStructure } from "@/lib/secretaria/acta-legal-structure";
 
 const REQUIRED_SECTION_MARKERS: Record<string, string[]> = {
   CONVOCATORIA: ["CONVOCATORIA", "ORDEN"],
@@ -102,6 +103,17 @@ export function validatePostRenderDocument(
       field_path: "agreement_ids",
       message: "El texto renderizado no contiene referencias visibles a los agreement_ids del request.",
     });
+  }
+
+  if (input.documentType === "ACTA" && input.actaLegalStructure) {
+    for (const issue of validateRenderedActaAgainstLegalStructure(rendered, input.actaLegalStructure)) {
+      pushIssue(issues, {
+        code: issue.code,
+        severity: issue.severity,
+        field_path: "acta_legal_structure",
+        message: issue.message,
+      });
+    }
   }
 
   return {

@@ -14,8 +14,12 @@ Importar siempre desde `@/lib/motor-plantillas`:
 - `probeDocumentDraftSchema()`
 - `composeDocument(req, capa3Values, options)`
 - `suggestCapa3Draft(input)`
+- `suggestCapa3DraftWithOpenAIFallback(input)`
 - `suggestCapa3DraftWithAnthropicFallback(input)`
 - `buildCapa3AiAllowedFields(fields)`
+- `suggestActaDraftPolish(input)`
+- `suggestActaDraftPolishWithCapa3CopilotFallback(input)`
+- `suggestActaDraftPolishWithOpenAIFallback(input)`
 - `generateProcessDocxWithMotor(input)`
 - `validatePostRenderDocument(input)`
 - `transitionReviewState(input)`
@@ -78,7 +82,7 @@ tambien conserva una proyeccion normativa minima dentro de
 `agreements.compliance_snapshot` y `agreements.compliance_explain` al
 materializar resoluciones de reunion.
 
-## Draft Assistant Capa 3
+## Copiloto Capa 3 documental
 
 `suggestCapa3Draft()` propone valores para campos editables con whitelist
 `capa3.<campo>`. No altera Capa 1, no inventa una plantilla y siempre marca las
@@ -87,12 +91,43 @@ modelo configurado usa `capa3-local-demo-assistant@0.1.0`, un fallback local
 determinista para demo. Un proveedor IA real debe vivir server-side y devolver
 solo los campos permitidos.
 
-`suggestCapa3DraftWithAnthropicFallback()` intenta primero la Edge Function
-`anthropic-capa3-draft-assistant` y vuelve al fallback local si no esta
-desplegada o no tiene secreto. La funcion espera `ANTHROPIC_API_KEY` en el
-entorno server-side y permite sobrescribir modelo con `ANTHROPIC_MODEL`; el
-default local de la funcion es `claude-opus-4-7`. Nunca leer claves
-desde frontend ni desde repos externos.
+El proveedor operativo principal es `suggestCapa3DraftWithOpenAIFallback()`,
+que invoca la Edge Function unica `openai-capa3-document-copilot` con tarea
+`CAPA3_FIELDS`. Requiere `OPENAI_API_KEY_2` o `OPENAI_API_KEY` server-side.
+El default productivo local de la funcion es `gpt-5.5` con temperatura `0`,
+`OPENAI_CAPA3_COPILOT_REASONING_EFFORT=low` y
+`OPENAI_CAPA3_COPILOT_VERBOSITY=low`, para comportamiento casi determinista
+sobre JSON estructurado. Todo es parametrizable con
+`OPENAI_CAPA3_COPILOT_MODEL`, `OPENAI_CAPA3_COPILOT_TEMPERATURE`,
+`OPENAI_CAPA3_COPILOT_REASONING_EFFORT` y
+`OPENAI_CAPA3_COPILOT_VERBOSITY`. Nunca se leen claves desde frontend.
+
+`suggestCapa3DraftWithAnthropicFallback()` queda como adaptador legacy
+compatible para entornos demo que todavia tengan desplegada
+`anthropic-capa3-draft-assistant`, pero no es la ruta principal.
+
+`suggestActaDraftPolish()` es el harness gobernado para asistir el borrador
+editable del acta despues del composer determinista y antes del cierre por
+Secretaria. Forma parte del mismo copiloto Capa 3 documental: no genera un acta
+desde cero, sino que propone reemplazos localizados sobre fragmentos exactos del
+texto actual. Los targets iniciales permitidos son:
+
+- `narrativa.introduccion`
+- `narrativa.deliberaciones`
+- `narrativa.incidencias_no_criticas`
+
+El harness protege hechos juridicos: sociedad, organo, asistentes, quorum,
+capital, derechos de voto, votaciones, texto de acuerdos, pactos, conflictos,
+fechas, lugar, hashes, snapshots, evidencias, orden del dia y numeracion. Cada
+propuesta se aplica solo si conserva la estructura RRM del acta y pasa
+`validateRenderedActaAgainstLegalStructure()`.
+
+`suggestActaDraftPolishWithCapa3CopilotFallback()` invoca la misma Edge
+Function `openai-capa3-document-copilot` con tarea `ACTA_DRAFT_POLISH`.
+La funcion usa OpenAI Responses API con Structured Outputs
+(`text.format`/`json_schema`) para obtener JSON tipado tanto para campos Capa 3
+como para propuestas de formacion del acta. `suggestActaDraftPolishWithOpenAIFallback()`
+se mantiene como alias compatible.
 
 ## Schema posture
 

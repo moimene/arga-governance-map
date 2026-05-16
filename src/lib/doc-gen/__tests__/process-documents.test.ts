@@ -9,6 +9,7 @@ import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fi
 let buildProcessDocumentTraceFooterLines: typeof import("../process-documents").buildProcessDocumentTraceFooterLines;
 let resolveProcessDocumentFinalEvidenceReadiness: typeof import("../process-document-readiness").resolveProcessDocumentFinalEvidenceReadiness;
 let selectProcessTemplate: typeof import("../process-documents").selectProcessTemplate;
+let resolveProcessTemplateSelection: typeof import("../process-documents").resolveProcessTemplateSelection;
 
 beforeAll(async () => {
   const store = new Map<string, string>();
@@ -25,7 +26,7 @@ beforeAll(async () => {
       },
     },
   });
-  ({ buildProcessDocumentTraceFooterLines, selectProcessTemplate } = await import("../process-documents"));
+  ({ buildProcessDocumentTraceFooterLines, resolveProcessTemplateSelection, selectProcessTemplate } = await import("../process-documents"));
   ({ resolveProcessDocumentFinalEvidenceReadiness } = await import("../process-document-readiness"));
 });
 
@@ -172,6 +173,50 @@ describe("process-documents", () => {
     );
 
     expect(selected?.id).toBe("es-cuentas");
+  });
+
+  it("expone razón determinista de selección sobre el catálogo curado existente", () => {
+    const selection = resolveProcessTemplateSelection(
+      [
+        template({
+          id: "es-cuentas",
+          tipo: "MODELO_ACUERDO",
+          estado: "ACTIVA",
+          jurisdiccion: "ES",
+          materia_acuerdo: "APROBACION_CUENTAS",
+        }),
+      ],
+      ["MODELO_ACUERDO"],
+      { jurisdiction: "ES", materia: "APROBACION_CUENTAS" },
+    );
+
+    expect(selection.selected?.id).toBe("es-cuentas");
+    expect(selection.selectionReason).toContain("materia exacta");
+    expect(selection.candidates[0].missingCriticalMetadata).toEqual([]);
+  });
+
+  it("puede bloquear selección estricta cuando faltan metadatos críticos", () => {
+    const selection = resolveProcessTemplateSelection(
+      [
+        template({
+          id: "generica-sin-metadata",
+          tipo: "MODELO_ACUERDO",
+          estado: "ACTIVA",
+          jurisdiccion: null,
+          materia_acuerdo: null,
+        }),
+      ],
+      ["MODELO_ACUERDO"],
+      {
+        jurisdiction: "ES",
+        materia: "AUMENTO_CAPITAL",
+        requireCriticalMetadata: true,
+      },
+    );
+
+    expect(selection.selected).toBeNull();
+    expect(selection.blockingIssues).toContain("template_critical_metadata_missing");
+    expect(selection.candidates[0].missingCriticalMetadata).toEqual(["jurisdiccion", "materia_acuerdo"]);
   });
 
   it("respeta plantilla preferida si es utilizable y compatible", () => {

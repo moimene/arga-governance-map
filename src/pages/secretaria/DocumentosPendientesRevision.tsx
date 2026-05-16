@@ -47,7 +47,7 @@ export default function DocumentosPendientesRevision() {
             Documentos pendientes de revision
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-            Bandeja de revision para documentos generados y archivados como DEMO_OPERATIVA.
+            Bandeja de revisión para documentos generados y archivados como evidencia operativa.
           </p>
         </div>
         <button

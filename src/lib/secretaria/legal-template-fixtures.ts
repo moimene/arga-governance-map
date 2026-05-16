@@ -174,6 +174,12 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     tipo: "ACTA_SESION",
     organo_tipo: "JUNTA",
     capa1_inmutable: [
+      "{{#if acta_rrm_texto_completo}}",
+      "{{acta_rrm_texto_completo}}",
+      "",
+      "HASH CANÓNICO DEL ACTA",
+      "{{canonical_minutes_hash}}",
+      "{{else}}",
       "ACTA DE JUNTA GENERAL",
       "",
       "En {{ciudad_emision}}, a {{fecha_junta}}, siendo las {{hora_inicio}}, se reune la Junta General {{tipo_junta}} de {{denominacion_social}}, en {{lugar}}, bajo la presidencia de {{presidente}} y actuando como secretario {{secretario}}.",
@@ -187,6 +193,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       legalListBlockFor("acuerdos"),
       "",
       "{{#if hora_fin}}Sin mas asuntos que tratar, se levanta la sesion a las {{hora_fin}}.{{/if}}",
+      "{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -206,6 +213,12 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     tipo: "ACTA_SESION",
     organo_tipo: "CONSEJO",
     capa1_inmutable: [
+      "{{#if acta_rrm_texto_completo}}",
+      "{{acta_rrm_texto_completo}}",
+      "",
+      "HASH CANÓNICO DEL ACTA",
+      "{{canonical_minutes_hash}}",
+      "{{else}}",
       "ACTA DEL CONSEJO DE ADMINISTRACION",
       "",
       "En {{ciudad_emision}}, a {{fecha}}, siendo las {{hora_inicio}}, se reune el Consejo de Administracion de {{denominacion_social}}, en {{lugar}}, bajo la presidencia de {{presidente}} y actuando como secretario {{secretario}}.",
@@ -220,6 +233,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       legalListBlockFor("acuerdos"),
       "",
       "{{#if hora_fin}}Sin mas asuntos que tratar, se levanta la sesion a las {{hora_fin}}.{{/if}}",
+      "{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,

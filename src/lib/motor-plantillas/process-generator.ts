@@ -21,7 +21,8 @@ import {
 } from "@/lib/secretaria/document-generation-boundary";
 import { resolveDocumentEvidencePosture } from "@/lib/secretaria/agreement-document-contract";
 import { resolveProcessDocumentFinalEvidenceReadiness } from "@/lib/doc-gen/process-document-readiness";
-import { composeDocument } from "./composer";
+import { composeDocument, finalizeEditableDocumentDraft, prepareDocumentComposition } from "./composer";
+import type { ComposeDocumentResult, PreparedDocumentComposition } from "./types";
 
 const MOTOR_PROCESS_KINDS = new Set<ProcessDocumentKind>([
   "CONVOCATORIA",
@@ -177,6 +178,129 @@ function emptyArchiveResult(reason: string): ProcessDocumentArchiveResult {
 
 async function legacyFallback(input: ProcessDocumentGenerationInput) {
   return generateProcessDocx(input);
+}
+
+export interface PreparedProcessDocumentDraft {
+  input: ProcessDocumentGenerationInput;
+  prepared: PreparedDocumentComposition;
+  variables: Record<string, unknown>;
+  templateId: string;
+  templateTipo: string;
+  templateVersion: string;
+}
+
+export interface FinalizedProcessDocumentDraftResult extends ProcessDocumentGenerationResult {
+  composition: ComposeDocumentResult;
+}
+
+async function prepareMotorDraftContext(
+  input: ProcessDocumentGenerationInput,
+): Promise<PreparedProcessDocumentDraft> {
+  if (!isMotorProcessKind(input.kind)) {
+    throw new Error("Este tipo documental no usa el motor de plantillas editable.");
+  }
+
+  const templateCriteria = inferProcessTemplateCriteria(input);
+  const plantilla = selectProcessTemplate(
+    input.plantillas,
+    input.templateTypes,
+    templateCriteria,
+    input.preferredTemplateId,
+  );
+  if (!plantilla) {
+    throw new Error("No hay plantilla utilizable para preparar el borrador editable.");
+  }
+
+  const capa3Values = input.capa3Values ?? {};
+  const variables = expandLegalStructuredVariables(mergeVariables(input.variables ?? {}, capa3Values));
+  const req = await buildMotorRequestForProcess(input, variables, plantilla.id, plantilla.tipo);
+  const prepared = await prepareDocumentComposition(req, capa3Values, {
+    plantilla,
+    baseVariables: variables,
+    resolveCapa2: false,
+    archiveDraft: false,
+    resolverContext: {
+      tenantId: req.tenant_id,
+      entityId: req.entity_id ?? undefined,
+      agreementId: req.agreement_ids[0],
+      meetingId: req.meeting_id ?? undefined,
+    },
+    title: input.title,
+    subtitle: input.subtitle,
+    entityName: input.entityName,
+    filenamePrefix: input.filenamePrefix ?? input.kind,
+  });
+
+  return {
+    input,
+    prepared,
+    variables,
+    templateId: plantilla.id,
+    templateTipo: plantilla.tipo,
+    templateVersion: plantilla.version,
+  };
+}
+
+export async function prepareProcessDocumentDraftWithMotor(
+  input: ProcessDocumentGenerationInput,
+): Promise<PreparedProcessDocumentDraft> {
+  return prepareMotorDraftContext(input);
+}
+
+export async function finalizeProcessDocumentDraftWithMotor(params: {
+  draft: PreparedProcessDocumentDraft;
+  editedBodyText: string;
+}): Promise<FinalizedProcessDocumentDraftResult> {
+  const { draft, editedBodyText } = params;
+  const composition = await finalizeEditableDocumentDraft(draft.prepared, editedBodyText, {
+    plantilla: draft.prepared.template,
+    baseVariables: draft.variables,
+    resolveCapa2: false,
+    archiveDraft: false,
+    resolverContext: draft.prepared.resolverContext,
+    title: draft.input.title,
+    subtitle: draft.input.subtitle,
+    entityName: draft.input.entityName,
+    filenamePrefix: draft.input.filenamePrefix ?? draft.input.kind,
+  });
+
+  const archive = await archiveProcessDocx({
+    input: draft.input,
+    buffer: composition.docxBuffer,
+    filename: composition.filename,
+    contentHash: composition.contentHash,
+    template: draft.prepared.template,
+  }).catch((error): ProcessDocumentArchiveResult => ({
+    ...emptyArchiveResult("archive_failed"),
+    errors: [error instanceof Error ? error.message : String(error)],
+  }));
+
+  await persistProcessArchiveLink(draft.input, archive).catch(() => undefined);
+  downloadDocx(composition.docxBuffer, composition.filename);
+
+  const agreementTrace = buildProcessAgreementTrace(draft.input, draft.variables);
+  const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
+  const finalEvidenceReadiness = resolveProcessDocumentFinalEvidenceReadiness({
+    agreementTrace,
+    evidencePosture,
+    archive,
+    contentHash: composition.contentHash,
+  });
+
+  return {
+    filename: composition.filename,
+    contentHash: composition.contentHash,
+    templateId: draft.templateId,
+    templateTipo: draft.templateTipo,
+    templateVersion: draft.templateVersion,
+    usedFallback: false,
+    unresolvedVariables: composition.unresolvedVariables,
+    archive,
+    agreementTrace,
+    evidencePosture,
+    finalEvidenceReadiness,
+    composition,
+  };
 }
 
 export async function generateProcessDocxWithMotor(

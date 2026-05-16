@@ -8,6 +8,8 @@ import type {
 import type { ResolverContext, ResolvedVariables } from "@/lib/doc-gen/variable-resolver";
 import type { ArchiveMetadata, ArchiveResult } from "@/lib/doc-gen/storage-archiver";
 import type { AgreementNormativeSnapshot } from "@/lib/secretaria/normative-framework";
+import type { ActaLegalStructureViewModel } from "@/lib/secretaria/acta-legal-structure";
+import type { OpenXmlValidationResult } from "@/lib/doc-gen/openxml-validation";
 
 export type MotorPlantillasIssue = SecretariaValidationIssue;
 
@@ -95,6 +97,7 @@ export interface ComposeDocumentResult extends PreparedDocumentComposition {
   docxBuffer: Uint8Array;
   document: GeneratedDocumentArtifact;
   archive: MotorPlantillasArchiveResult;
+  openXmlValidation: OpenXmlValidationResult;
 }
 
 export interface ValidatePostRenderInput {
@@ -103,6 +106,7 @@ export interface ValidatePostRenderInput {
   capa1Template: string | null | undefined;
   agreementIds: string[];
   unresolvedVariables?: string[];
+  actaLegalStructure?: ActaLegalStructureViewModel | null;
 }
 
 export type ReviewState =
