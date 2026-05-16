@@ -243,16 +243,48 @@ export function buildEntitySettings(draft: SociedadOnboardingDraft, catalogKeys:
 }
 
 export function buildRuleParamOverrides(draft: SociedadOnboardingDraft) {
-  if (!draft.rules.mayoria_reforzada_pct) return [];
-  return [
-    {
+  const out: Array<Record<string, unknown>> = [];
+  if (draft.rules.mayoria_reforzada_pct) {
+    out.push({
       materia: "GOBIERNO_SOCIETARIO",
       clave: "MAYORIA_REFORZADA_PCT",
       valor: Number(draft.rules.mayoria_reforzada_pct),
       fuente: "ESTATUTOS",
       referencia: "Alta sociedad onboarding",
-    },
+    });
+  }
+
+  const materia = draft.rules.override_materia || "MODIFICACION_ESTATUTOS";
+  const fuente = draft.rules.override_fuente || "ESTATUTOS";
+  const referenciaBase = [
+    draft.rules.override_referencia,
+    draft.rules.override_justificacion,
+    draft.rules.override_vigencia_desde ? `vigente desde ${draft.rules.override_vigencia_desde}` : "",
+    draft.rules.override_vigencia_hasta ? `hasta ${draft.rules.override_vigencia_hasta}` : "",
+  ].filter(Boolean).join(" · ");
+
+  const candidates = [
+    { clave: "MAYORIA_REFORZADA_PCT", valor: draft.rules.override_mayoria_reforzada_pct },
+    { clave: "QUORUM_PRIMERA_PCT", valor: draft.rules.override_quorum_primera_pct },
+    { clave: "CONVOCATORIA_DIAS", valor: draft.rules.override_convocatoria_dias },
   ];
+
+  for (const candidate of candidates) {
+    if (!candidate.valor) continue;
+    out.push({
+      materia,
+      clave: candidate.clave,
+      valor: Number(candidate.valor),
+      fuente,
+      referencia: referenciaBase || "Alta sociedad onboarding",
+    });
+  }
+
+  const dedup = new Map<string, Record<string, unknown>>();
+  for (const item of out) {
+    dedup.set(`${item.materia}:${item.clave}`, item);
+  }
+  return Array.from(dedup.values());
 }
 
 export function buildSupportDocsMetadata(docs: SupportDocDraft[]) {

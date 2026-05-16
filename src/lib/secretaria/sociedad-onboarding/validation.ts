@@ -1,4 +1,5 @@
 import { isUnipersonalTipo, TIPO_SOCIAL_VALUES } from "./defaults";
+import { validateNormativeOverrideDraft } from "@/lib/secretaria/mesa-control-societaria";
 import type {
   CapTableEntryDraft,
   CargoInputDraft,
@@ -370,6 +371,25 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   if (draft.rules.mayoria_reforzada_pct && reinforced < simple) {
     issues.push(issue("R-001", "rules.mayoria_reforzada_pct", "La mayoria reforzada no puede ser inferior a la simple."));
   }
+  const normativeValidation = validateNormativeOverrideDraft({
+    tipoSocial: draft.identification.tipo_social,
+    estatutosModelados: draft.rules.estatutos_modelados,
+    reglamentoModelado: draft.rules.reglamento_organo_modelado,
+    pactosModelados: draft.rules.pactos_modelados || draft.rules.pactos_no_modelados_ack,
+    statutoryMajorityPct: draft.rules.override_mayoria_reforzada_pct,
+    statutoryQuorumPct: draft.rules.override_quorum_primera_pct,
+    noticeDays: draft.rules.override_convocatoria_dias,
+    sourceReference: draft.rules.override_referencia,
+    sourceJustification: draft.rules.override_justificacion,
+  });
+  for (const normativeIssue of normativeValidation.issues) {
+    issues.push(issue(
+      normativeIssue.severity === "BLOCK" ? "R-003" : "R-004",
+      normativeIssue.field,
+      normativeIssue.message,
+      normativeIssue.severity === "BLOCK" ? "BLOCK" : "WARN",
+    ));
+  }
   if (!/^\d{2}-\d{2}$/.test(draft.registry.fiscal_year_close)) {
     issues.push(issue("R-002", "registry.fiscal_year_close", "El cierre fiscal debe tener formato DD-MM."));
   } else {
@@ -408,7 +428,7 @@ export function validateStep(draft: SociedadOnboardingDraft, step: number): Vali
     5: ["CT-001", "CT-002", "CT-003", "CT-004", "CT-005", "CT-006", "CT-007", "CT-008", "CT-009", "CT-010", "CT-011", "P-001"],
     6: ["O-001", "O-002"],
     7: ["CA-001", "CA-002", "CA-003", "CA-004", "AU-001", "AU-002", "AU-003", "PJ-001"],
-    8: ["R-001", "R-002"],
+    8: ["R-001", "R-002", "R-003", "R-004"],
     9: [],
     10: [],
   };

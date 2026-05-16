@@ -14,6 +14,7 @@ import { evaluarCoAprobacion } from "@/lib/rules-engine/votacion-engine";
 import type { CoAprobacionConfig } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
+import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -598,7 +599,8 @@ export default function CoAprobacionStepper() {
             ) : (
               <>
                 <div className="text-sm text-[var(--g-text-secondary)]">
-                  Se creará un acuerdo con <strong>adoption_mode = CO_APROBACION</strong> y
+                  Se creará un acuerdo con forma de adopción{" "}
+                  <strong>{adoptionModeBusinessLabel("CO_APROBACION")}</strong> y
                   el snapshot del motor. Estado:{" "}
                   <strong>{statusLabel(motorResult?.ok ? "ADOPTED" : "DRAFT")}</strong>.
                 </div>

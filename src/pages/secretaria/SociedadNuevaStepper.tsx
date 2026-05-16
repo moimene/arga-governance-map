@@ -417,6 +417,8 @@ export default function SociedadNuevaStepper() {
         {step === 8 ? (
           <StepReglas
             draft={draft.rules}
+            tipoSocial={draft.identification.tipo_social}
+            jurisdiction={draft.identification.jurisdiction}
             issues={currentIssues}
             onChange={(patch) => patchSection("rules", patch)}
           />

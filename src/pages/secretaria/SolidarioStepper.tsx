@@ -14,6 +14,7 @@ import { evaluarSolidario } from "@/lib/rules-engine/votacion-engine";
 import type { SolidarioConfig } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
+import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ const STEPS = [
   { n: 1, label: "Tipo de acuerdo", hint: "Materia, clase y texto de la propuesta" },
   { n: 2, label: "Administrador actuante", hint: "Identificar el administrador solidario que adopta el acuerdo" },
   { n: 3, label: "Evaluación motor", hint: "Verificación de validez por el motor LSC" },
-  { n: 4, label: "Registrar", hint: "Crear acuerdo con adoption_mode = SOLIDARIO" },
+  { n: 4, label: "Registrar", hint: "Crear acuerdo de administrador solidario" },
 ];
 
 // ─── Step bodies ─────────────────────────────────────────────────────────────
@@ -537,7 +538,8 @@ export default function SolidarioStepper() {
             ) : (
               <>
                 <div className="text-sm text-[var(--g-text-secondary)]">
-                  Se creará un acuerdo con <strong>adoption_mode = SOLIDARIO</strong> adoptado por{" "}
+                  Se creará un acuerdo con forma de adopción{" "}
+                  <strong>{adoptionModeBusinessLabel("SOLIDARIO")}</strong> adoptado por{" "}
                   <strong>{adminNombre || adminId || "—"}</strong>. Estado:{" "}
                   <strong>{statusLabel(motorResult?.ok ? "ADOPTED" : "DRAFT")}</strong>.
                 </div>

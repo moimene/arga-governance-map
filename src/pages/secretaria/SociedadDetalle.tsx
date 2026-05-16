@@ -17,8 +17,11 @@ import { useEntityBodies } from "@/hooks/useEntities";
 import { useCloseRepresentacionPuntual, useRepresentaciones, SCOPE_LABELS } from "@/hooks/useRepresentacionesCanonical";
 import { useAuthorityEvidence, CARGO_CERT_LABELS } from "@/hooks/useAuthorityEvidence";
 import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
+import { useMateriaCatalogoSocietario } from "@/hooks/useMesaControlSocietaria";
+import { useEffectiveRuleMatrix } from "@/hooks/useNormativeGovernance";
 import { useReglasAplicables } from "@/hooks/useReglasAplicables";
 import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
+import { buildNormativeMatrixRows, displaySocietyLegalForm } from "@/lib/secretaria/mesa-control-societaria";
 import type { TipoCondicionCargo } from "@/lib/secretaria/cargo-validation";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
@@ -43,8 +46,11 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "marco",            label: "Marco normativo",     icon: Scale },
 ];
 
-function tipoSocialLabel(value: string | null | undefined) {
+function tipoSocialLabel(value: string | null | undefined, jurisdiction?: string | null, legalForm?: string | null) {
   if (!value) return "Tipo social pendiente";
+  if (jurisdiction && jurisdiction !== "ES") {
+    return displaySocietyLegalForm({ jurisdiction, tipoSocial: value, legalForm });
+  }
   return (
     {
       SA: "Sociedad Anónima",
@@ -92,12 +98,12 @@ function getSociedadModel(s: NonNullable<ReturnType<typeof useSociedad>["data"]>
 
   return {
     admin,
-    socialLabel: tipoSocialLabel(s.tipo_social ?? s.legal_form),
+    socialLabel: tipoSocialLabel(s.tipo_social ?? s.legal_form, s.jurisdiction, s.legal_form),
     adminFlow,
     juntaFlow,
     evidenceFlow,
     facts: [
-      { label: "Tipo social", value: tipoSocialLabel(s.tipo_social ?? s.legal_form) },
+      { label: "Tipo social", value: tipoSocialLabel(s.tipo_social ?? s.legal_form, s.jurisdiction, s.legal_form) },
       { label: "Administración", value: admin },
       { label: "Unipersonal", value: s.es_unipersonal ? "Sí" : "No" },
       { label: "Cotizada", value: s.es_cotizada ? "Sí" : "No" },
@@ -166,7 +172,7 @@ export default function SociedadDetalle() {
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Reglas aplicables
+          Regla efectiva
         </Link>
       </div>
 
@@ -250,6 +256,14 @@ function NormativeStatusBadge({ status }: { status: NormativeFrameworkStatus | n
   );
 }
 
+function sourceLabel(source: string) {
+  if (source === "LEY") return "Ley";
+  if (source === "ESTATUTOS") return "Estatutos";
+  if (source === "REGLAMENTO") return "Reglamento";
+  if (source === "PACTO") return "Pacto parasocial";
+  return source;
+}
+
 function SociedadNormativeOverview({ entityId, onOpen }: { entityId: string; onOpen: () => void }) {
   const { data: profile, isLoading } = useEntityNormativeProfile(entityId);
   const activeSources = profile?.sources.filter((source) => source.status === "ACTIVE").length ?? 0;
@@ -273,8 +287,8 @@ function SociedadNormativeOverview({ entityId, onOpen }: { entityId: string; onO
               <NormativeStatusBadge status={profile?.status ?? (isLoading ? undefined : "INCOMPLETO")} />
             </div>
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
-              Cada acuerdo queda anclado a fuentes legales, estatutos, pactos, reglamentos,
-              rule packs y requisitos de formalizacion. Fuentes activas: {activeSources}.
+              Cada acuerdo queda anclado a fuentes legales, estatutos, pactos, reglamentos y
+              requisitos de formalización. Fuentes activas: {activeSources}.
             </p>
             <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
               {sourceLayers}
@@ -298,6 +312,7 @@ function SociedadNormativeOverview({ entityId, onOpen }: { entityId: string; onO
 function TabMarcoNormativo({ entityId }: { entityId: string }) {
   const { data: profile, isLoading, error } = useEntityNormativeProfile(entityId);
   const { data: reglas = [], isLoading: reglasLoading } = useReglasAplicables(entityId);
+  const { data: effectiveMatrix = [], isLoading: matrixLoading } = useEffectiveRuleMatrix(entityId);
 
   if (isLoading) return <div className="p-4 text-sm text-[var(--g-text-secondary)]">Cargando marco normativo…</div>;
   if (error) {
@@ -315,19 +330,55 @@ function TabMarcoNormativo({ entityId }: { entityId: string }) {
     );
   }
 
-  return <NormativeFrameworkPanel profile={profile} reglas={reglas} reglasLoading={reglasLoading} />;
+  return (
+    <NormativeFrameworkPanel
+      profile={profile}
+      reglas={reglas}
+      reglasLoading={reglasLoading || matrixLoading}
+      effectiveMatrix={effectiveMatrix}
+    />
+  );
 }
 
 function NormativeFrameworkPanel({
   profile,
   reglas,
   reglasLoading,
+  effectiveMatrix,
 }: {
   profile: EntityNormativeProfile;
   reglas: NonNullable<ReturnType<typeof useReglasAplicables>["data"]>;
   reglasLoading: boolean;
+  effectiveMatrix: NonNullable<ReturnType<typeof useEffectiveRuleMatrix>["data"]>;
 }) {
   const ruleRows = reglas.filter((rule) => rule.source === "LEY" && rule.materia && rule.materia !== "GENERAL");
+  const { data: materias = [], isLoading: materiasLoading } = useMateriaCatalogoSocietario();
+  const sourceByMateria = reglas.reduce<Record<string, Set<string>>>((acc, rule) => {
+    if (!rule.materia || rule.materia === "GENERAL") return acc;
+    acc[rule.materia] = acc[rule.materia] ?? new Set<string>();
+    acc[rule.materia].add(sourceLabel(rule.source));
+    return acc;
+  }, {});
+  const matrixRows = buildNormativeMatrixRows(materias, { tipoSocial: profile.company_form })
+    .map((row) => ({
+      ...row,
+      formalizacion: `${row.notaria} · ${row.registro} · ${row.publicacion} · ${row.plazos}`,
+      fuente: sourceByMateria[row.materia] ? Array.from(sourceByMateria[row.materia]).join(" · ") : row.fuente,
+    }));
+  const persistedRows = effectiveMatrix.map((row) => ({
+    materia: row.matter_code,
+    label: row.matter_code.split("_").map((part) => part.charAt(0) + part.slice(1).toLowerCase()).join(" "),
+    organo: row.organo_tipo,
+    mayoria: row.majority_rule,
+    quorum: row.quorum_rule,
+    documentos: row.documents_required.join(", "),
+    formalizacion: [
+      row.formalization?.notary_required ? "Escritura pública" : "Sin escritura",
+      row.formalization?.registry_required ? "Inscripción requerida" : "No inscribible",
+      row.formalization?.publication_required ? "Publicación requerida" : "Sin publicación",
+    ].join(" · "),
+    fuente: row.source_layers.map((source) => source.reference ?? source.type ?? "Fuente").join(" · "),
+  }));
   return (
     <div
       className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
@@ -340,13 +391,13 @@ function NormativeFrameworkPanel({
             <NormativeStatusBadge status={profile.status} />
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Perfil {profile.profile_hash} · {profile.jurisdiction ?? "sin jurisdiccion"} ·{" "}
-            {profile.company_form ?? "sin tipo social"} · version {profile.profile_version}
+            {profile.jurisdiction ?? "sin jurisdicción"} · {profile.company_form ?? "sin tipo social"} ·
+            versión del perfil {profile.profile_version}
           </p>
         </div>
         <div className="text-right text-xs text-[var(--g-text-secondary)]">
           <div>Fuentes: {profile.sources.length}</div>
-          <div>Rule packs: {profile.rule_trace.rule_pack_version_ids.length}</div>
+          <div>Normativa base: {profile.rule_trace.rule_pack_version_ids.length}</div>
           <div>Pactos: {profile.rule_trace.pacto_ids.length}</div>
         </div>
       </div>
@@ -392,33 +443,43 @@ function NormativeFrameworkPanel({
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Motor de reglas por materia
+              Matriz materia × requisitos
             </h3>
             <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--g-text-secondary)]">
-              Esta es la capa de mantenimiento de rule packs que gobierna acuerdos. Acuerdo 360
-              es el expediente trazable; los documentos son salidas del expediente; el rule pack
-              es la regla que decide quórum, mayoría, competencia, warnings y gates.
+              Proyección práctica de lo que puede tratar la sociedad: órgano competente,
+              mayoría, quórum, documentos obligatorios, formalización, inscripción y fuente aplicable.
             </p>
           </div>
           <span
             className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {ruleRows.length} rule packs activos
+            {matrixRows.length || ruleRows.length} materias configuradas
           </span>
         </div>
         <Table
-          isLoading={reglasLoading}
-          empty="Sin rule packs activos para materias societarias."
-          headers={["Materia", "Órgano", "Pack", "Versión", "Nota"]}
+          isLoading={reglasLoading || materiasLoading}
+          empty="Sin materias societarias configuradas."
+          headers={["Materia", "Órgano", "Mayoría", "Quórum", "Documentos", "Formalización", "Fuente"]}
         >
-          {ruleRows.slice(0, 18).map((rule) => (
-            <tr key={`${rule.source}-${rule.pack_id}-${rule.version ?? "v"}`} className="hover:bg-[var(--g-surface-subtle)]/50">
-              <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">{rule.materia}</td>
-              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.organo_tipo ?? "—"}</td>
-              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.pack_code}</td>
-              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.version ?? "—"}</td>
-              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{rule.note ?? "—"}</td>
+          {(persistedRows.length > 0 ? persistedRows : matrixRows.length > 0 ? matrixRows : ruleRows.map((rule) => ({
+            materia: rule.materia ?? "—",
+            label: rule.materia ?? "—",
+            organo: rule.organo_tipo ?? "—",
+            mayoria: "Según ley y estatutos",
+            quorum: "Según ley y estatutos",
+            documentos: rule.note ?? "—",
+            formalizacion: "Según materia",
+            fuente: sourceLabel(rule.source),
+          }))).slice(0, 18).map((row) => (
+            <tr key={`${row.materia}-${row.fuente}`} className="hover:bg-[var(--g-surface-subtle)]/50">
+              <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">{row.label}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.organo}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.mayoria}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.quorum}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.documentos}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.formalizacion}</td>
+              <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{row.fuente}</td>
             </tr>
           ))}
         </Table>
@@ -680,11 +741,12 @@ function SociedadQuickActions({
     { label: "Nueva reunión", icon: CalendarDays, to: "/secretaria/reuniones/nueva" },
     { label: "Acuerdo sin sesión", icon: ScrollText, to: "/secretaria/acuerdos-sin-sesion/nuevo" },
     { label: "Generar documento", icon: FileText, to: "/secretaria/tramitador/nuevo" },
-    { label: "Reglas aplicables", icon: ClipboardList, to: `/secretaria/sociedades/${entityId}/reglas` },
+    { label: "Regla efectiva", icon: ClipboardList, to: `/secretaria/sociedades/${entityId}/reglas` },
+    { label: "Activar marco", icon: Scale, to: `/secretaria/sociedades/${entityId}/marco-normativo/activar` },
   ];
 
   return (
-    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-5">
+    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {actions.map((action) => {
         const Icon = action.icon;
         return (
@@ -841,7 +903,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
     {
       label: "Sector regulado",
       value: s.regulated_sector ?? "—",
-      help: "Sector regulado declarado para rule packs y reporting.",
+      help: "Sector regulado declarado para obligaciones y reporting.",
     },
     {
       label: "Rol en grupo",
@@ -851,7 +913,7 @@ function TabPerfil({ id, s }: { id: string; s: NonNullable<ReturnType<typeof use
     {
       label: "Jurisdicción",
       value: s.jurisdiction ?? "—",
-      help: "País/ordenamiento usado para resolver rule packs y marco normativo.",
+      help: "País/ordenamiento usado para resolver el marco normativo.",
     },
     {
       label: "Fecha constitución",

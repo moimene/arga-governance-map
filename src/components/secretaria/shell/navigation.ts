@@ -10,6 +10,7 @@ import {
   Gavel,
   Globe,
   Layers,
+  Landmark,
   LayoutDashboard,
   Library,
   Repeat2,
@@ -66,7 +67,9 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Configuración y reglas",
     items: [
-      { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
+      { label: "Catálogo de materias", to: "/secretaria/catalogo-materias", icon: BookOpen },
+      { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
+      { label: "Regla efectiva", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
@@ -219,7 +222,9 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Configuración y reglas",
     items: [
-      { label: "Gestor de Reglas", to: "/secretaria/reglas", icon: Gavel },
+      { label: "Catálogo de materias", to: "/secretaria/catalogo-materias", icon: BookOpen },
+      { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
+      { label: "Regla efectiva", to: "/secretaria/reglas", icon: Gavel },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
@@ -244,8 +249,11 @@ export function getNavGroups(mode: SecretariaMode): SecretariaNavGroup[] {
 }
 
 export function getSecretariaSectionLabel(pathname: string, mode: SecretariaMode) {
-  if (/^\/secretaria\/reglas/.test(pathname)) return "Gestor de Reglas Acuerdo360";
-  if (/^\/secretaria\/sociedades\/[^/]+\/reglas/.test(pathname)) return "Reglas aplicables";
+  if (/^\/secretaria\/catalogo-materias/.test(pathname)) return "Catálogo de materias";
+  if (/^\/secretaria\/catalogo-organos/.test(pathname)) return "Catálogo de órganos";
+  if (/^\/secretaria\/reglas/.test(pathname)) return "Regla efectiva";
+  if (/^\/secretaria\/sociedades\/[^/]+\/marco-normativo\/activar/.test(pathname)) return "Activar marco normativo";
+  if (/^\/secretaria\/sociedades\/[^/]+\/reglas/.test(pathname)) return "Regla efectiva";
   if (/^\/secretaria\/sociedades\/[^/]+/.test(pathname)) return "Ficha societaria";
   if (/^\/secretaria\/personas\/[^/]+/.test(pathname)) return "Personas";
   if (/^\/secretaria\/convocatorias\/nueva/.test(pathname)) return "Convocatorias";

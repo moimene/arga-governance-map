@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   BookMarked,
   CheckCircle2,
   ChevronLeft,
+  FileText,
   Gavel,
+  Landmark,
   PauseCircle,
   Scale,
   Shield,
@@ -13,8 +15,21 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
+import {
+  useEffectiveRuleMatrix,
+  useMaterializeEffectiveRuleMatrix,
+  useNormativeOverrides,
+  useStatuteVersions,
+  useTemplateBindings,
+} from "@/hooks/useNormativeGovernance";
 import { useSociedades } from "@/hooks/useSociedades";
 import { useRulePacks } from "@/hooks/useRulePacks";
+import {
+  useNormativeFrameworkCloudStatus,
+  useRecordNormativeMaintenanceEvent,
+  useRunNormativeFrameworkBackfill,
+} from "@/hooks/useNormativeMaintenanceCloud";
 import {
   useAgreementRulePreview,
   useRuleManagerProfile,
@@ -26,6 +41,18 @@ import type {
   LegalConsequence,
 } from "@/lib/secretaria/rule-manager-contract";
 import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
+import {
+  buildFeatureFlagDecision,
+  buildNormativeAuditEvent,
+  buildNormativeHistoryEntries,
+  buildNormativeTelemetryEvent,
+  canPerformNormativeAction,
+  detectConflictOfLaws,
+  displaySocietyLegalForm,
+  normativeRoleFromAppRole,
+  requirementStateLabel,
+  type RequirementOperationalState,
+} from "@/lib/secretaria/mesa-control-societaria";
 
 // ── Catálogo de materias y modos de adopción para el simulador ─────────────
 
@@ -158,6 +185,10 @@ export default function RuleManagerPage() {
 
   const sociedadesQuery = useSociedades();
   const rulePacksQuery = useRulePacks();
+  const { primaryRole, displayName } = useCurrentUserRole();
+  const normativeRole = normativeRoleFromAppRole(primaryRole);
+  const wizardFlag = buildFeatureFlagDecision("ff_ruleset_wizard");
+  const organsFlag = buildFeatureFlagDecision("ff_organs_catalog");
   const [matter, setMatter] = useState<string>(initialMatter);
   const [adoptionMode, setAdoptionMode] = useState<string>(initialAdoption);
 
@@ -180,6 +211,14 @@ export default function RuleManagerPage() {
 
   const profileQuery = useRuleManagerProfile(entityId ?? undefined);
   const pactosVigentes = profileQuery.pactos;
+  const sociedades = useMemo(
+    () => sociedadesQuery.data ?? [],
+    [sociedadesQuery.data],
+  );
+  const sociedad = useMemo(
+    () => sociedades.find((s) => s.id === entityId) ?? null,
+    [entityId, sociedades],
+  );
 
   // Si el usuario desactiva el modo pre-votación pero todavía no ha introducido
   // cifras válidas, mantener el modo PRE_VOTE en el contrato. Esto evita el
@@ -216,16 +255,64 @@ export default function RuleManagerPage() {
     statutoryEnshrinedPactoIds: Array.from(statutoryPactoIds),
   };
   const previewQuery = useAgreementRulePreview(previewInput);
+  const cloudStatusQuery = useNormativeFrameworkCloudStatus(entityId);
+  const matrixQuery = useEffectiveRuleMatrix(entityId);
+  const statuteVersionsQuery = useStatuteVersions(entityId);
+  const overridesQuery = useNormativeOverrides(entityId);
+  const templateBindingsQuery = useTemplateBindings({
+    materia: matter,
+    jurisdiction: sociedad?.jurisdiction,
+    tipoSocial: sociedad?.tipo_social,
+  });
+  const materializeMatrix = useMaterializeEffectiveRuleMatrix();
+  const recordNormativeEvent = useRecordNormativeMaintenanceEvent();
+  const telemetryKeyRef = useRef<string | null>(null);
 
-  const sociedades = useMemo(
-    () => sociedadesQuery.data ?? [],
-    [sociedadesQuery.data],
+  const conflictOfLaws = useMemo(
+    () =>
+      sociedad
+        ? detectConflictOfLaws({
+            jurisdiction: sociedad.jurisdiction,
+            tipoSocial: sociedad.tipo_social,
+            legalForm: sociedad.legal_form,
+            appliedReferences: profileQuery.data?.sources.map((source) => `${source.label} ${source.reference ?? ""}`),
+          })
+        : null,
+    [profileQuery.data?.sources, sociedad],
   );
-  const sociedad = useMemo(
-    () => sociedades.find((s) => s.id === entityId) ?? null,
-    [entityId, sociedades],
+  const history = useMemo(
+    () =>
+      buildNormativeHistoryEntries({
+        sources: profileQuery.data?.sources,
+        actor: displayName,
+        effectiveAt: profileQuery.data?.effective_at,
+      }),
+    [displayName, profileQuery.data?.effective_at, profileQuery.data?.sources],
   );
   const sociedadMissing = !!entityId && !sociedadesQuery.isLoading && !sociedad;
+
+  useEffect(() => {
+    if (!entityId || !profileQuery.data) return;
+    const key = `${entityId}:${matter}:${profileQuery.data.profile_hash}`;
+    if (telemetryKeyRef.current === key) return;
+    telemetryKeyRef.current = key;
+    recordNormativeEvent.mutate({
+      action: "effective_rule_viewed",
+      societyId: entityId,
+      matter,
+      userRole: normativeRole,
+      eventDedupeKey: key,
+      after: {
+        framework_status: profileQuery.data.status,
+        profile_hash: profileQuery.data.profile_hash,
+      },
+      attributes: {
+        source_count: profileQuery.data.sources.length,
+        blocker_count: profileQuery.data.blockers.length,
+        warning_count: profileQuery.data.warnings.length,
+      },
+    });
+  }, [entityId, matter, normativeRole, profileQuery.data, recordNormativeEvent]);
 
   const handleEntityChange = (next: string) => {
     const params = new URLSearchParams(searchParams);
@@ -277,17 +364,28 @@ export default function RuleManagerPage() {
 
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          <BookMarked className="h-3.5 w-3.5" /> Secretaría · Gestor de Reglas Acuerdo360
+          <BookMarked className="h-3.5 w-3.5" /> Secretaría · Regla efectiva y mantenimiento
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-          Regla efectiva por sociedad y materia
+          Regla efectiva y mantenimiento
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
           Lectura legal del marco normativo aplicable a un acuerdo: ley → estatutos → reglamento →
           pactos parasociales. Separa los tres planos jurídicos relevantes (validez societaria,
-          cumplimiento contractual, hold operativo). Esta vista es <strong>read-only</strong>: no
-          materializa acuerdos ni edita reglas.
+          cumplimiento contractual y retención operativa) y ofrece rutas de resolución cuando falta
+          una fuente, un órgano o una plantilla mínima.
         </p>
+        {entityId ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {wizardFlag.enabled ? (
+              <TopAction to={`/secretaria/sociedades/${entityId}/marco-normativo/activar`} icon={Shield} label="Activar marco normativo" />
+            ) : null}
+            {organsFlag.enabled ? (
+              <TopAction to={`/secretaria/catalogo-organos?entity=${entityId}&matter=${matter}`} icon={Landmark} label="Catálogo de órganos" />
+            ) : null}
+            <TopAction to={`/secretaria/plantillas?materia=${matter}`} icon={FileText} label="Asignar plantillas" />
+          </div>
+        ) : null}
       </div>
 
       {/* ── Selector de sociedad ──────────────────────────────────────────── */}
@@ -315,7 +413,11 @@ export default function RuleManagerPage() {
         {sociedad && (
           <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
             Jurisdicción: {sociedad.jurisdiction ?? "—"} · Forma:{" "}
-            {sociedad.tipo_social ?? sociedad.legal_form ?? "—"}
+            {displaySocietyLegalForm({
+              jurisdiction: sociedad.jurisdiction,
+              tipoSocial: sociedad.tipo_social,
+              legalForm: sociedad.legal_form,
+            })}
             {sociedad.es_cotizada ? " · Cotizada" : ""}
           </p>
         )}
@@ -336,11 +438,22 @@ export default function RuleManagerPage() {
 
       {entityId && !sociedadMissing && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {conflictOfLaws?.conflict_of_laws_flag ? (
+            <div className="lg:col-span-2">
+              <ErrorBanner
+                title="Posible conflicto de ley aplicable"
+                message={`${conflictOfLaws.explanation} Ley esperada: ${conflictOfLaws.expectedLawLabel}. Ley aplicada: ${conflictOfLaws.appliedLawLabel}.`}
+              />
+            </div>
+          ) : null}
           {/* ── Marco normativo ─────────────────────────────────────────── */}
           <NormativeFrameworkCard
             isLoading={profileQuery.isLoading}
             profile={profileQuery.data}
             error={profileQuery.error}
+            conflictOfLaws={conflictOfLaws}
+            entityId={entityId}
+            cloudStatus={cloudStatusQuery.data}
           />
 
           {/* ── Pactos vigentes ─────────────────────────────────────────── */}
@@ -358,6 +471,29 @@ export default function RuleManagerPage() {
 
           {/* ── Simulador (full width) ──────────────────────────────────── */}
           <div className="lg:col-span-2">
+            <CloudPersistenceCard entityId={entityId} statusError={cloudStatusQuery.error} />
+          </div>
+          <div className="lg:col-span-2">
+            <GovernedMaintenanceCard
+              entityId={entityId}
+              matter={matter}
+              matrixRows={matrixQuery.data ?? []}
+              statuteVersions={statuteVersionsQuery.data ?? []}
+              overrides={overridesQuery.data ?? []}
+              templateBindings={templateBindingsQuery.data ?? []}
+              isLoading={
+                matrixQuery.isLoading ||
+                statuteVersionsQuery.isLoading ||
+                overridesQuery.isLoading ||
+                templateBindingsQuery.isLoading
+              }
+              materializePending={materializeMatrix.isPending}
+              materializeRows={materializeMatrix.data?.rows_materialized}
+              materializeError={materializeMatrix.error}
+              onMaterialize={() => materializeMatrix.mutate({ entityId })}
+            />
+          </div>
+          <div className="lg:col-span-2">
             <SimuladorReglaCard
               matter={matter}
               adoptionMode={adoptionMode}
@@ -374,6 +510,15 @@ export default function RuleManagerPage() {
               onVotosFavorChange={setVotosFavorRaw}
               effectiveSkipVotes={effectiveSkipVotes}
               votingFiguresIncomplete={votingFiguresIncomplete}
+              entityId={entityId}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <MaintenanceHistoryCard
+              history={history}
+              role={normativeRole}
+              entityId={entityId}
+              matter={matter}
             />
           </div>
         </div>
@@ -408,10 +553,16 @@ function NormativeFrameworkCard({
   isLoading,
   profile,
   error,
+  conflictOfLaws,
+  entityId,
+  cloudStatus,
 }: {
   isLoading: boolean;
   profile: ReturnType<typeof useRuleManagerProfile>["data"];
   error: unknown;
+  conflictOfLaws: ReturnType<typeof detectConflictOfLaws> | null;
+  entityId: string;
+  cloudStatus: ReturnType<typeof useNormativeFrameworkCloudStatus>["data"];
 }) {
   return (
     <Card title="Marco normativo" icon={Scale}>
@@ -430,7 +581,32 @@ function NormativeFrameworkCard({
             <span className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
               Estado:
             </span>
-            <FrameworkStatusChip status={profile.status} />
+            <FrameworkStatusChip status={conflictOfLaws?.conflict_of_laws_flag ? "CONFLICTO_JURISDICCIONAL" : profile.status} />
+          </div>
+          {cloudStatus ? (
+            <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-primary)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+              <div className="font-semibold">Diagnóstico Cloud persistido</div>
+              <div className="mt-1 text-[var(--g-text-secondary)]">
+                Estado: {cloudStatus.status} · Cobertura: {cloudStatus.source_coverage_pct}% ·
+                Última actualización: {new Date(cloudStatus.updated_at).toLocaleString("es-ES")}
+              </div>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Link
+              to={`/secretaria/sociedades/${entityId}/marco-normativo/activar`}
+              className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Activar marco normativo
+            </Link>
+            <Link
+              to={`/secretaria/catalogo-organos?entity=${entityId}`}
+              className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Revisar órganos
+            </Link>
           </div>
           {profile.warnings.length > 0 && (
             <ul className="list-disc space-y-1 pl-5 text-xs text-[var(--g-text-secondary)]">
@@ -448,9 +624,15 @@ function NormativeFrameworkCard({
                 <li key={source.id} className="flex items-start gap-2">
                   <SourceStatusDot status={source.status} />
                   <div>
-                    <div className="font-medium text-[var(--g-text-primary)]">{source.label}</div>
+                    <div className="font-medium text-[var(--g-text-primary)]">
+                      {source.layer === "POLITICA" && source.label.startsWith("Rule pack ")
+                        ? `Parámetro operativo ${source.materia ?? source.reference ?? ""}`.trim()
+                        : source.label}
+                    </div>
                     {source.reference && (
-                      <div className="text-[var(--g-text-secondary)]">{source.reference}</div>
+                      <div className="text-[var(--g-text-secondary)]">
+                        Fuente: {source.reference} · Versión {source.version ?? "vigente"}
+                      </div>
                     )}
                   </div>
                 </li>
@@ -460,6 +642,182 @@ function NormativeFrameworkCard({
         </div>
       )}
     </Card>
+  );
+}
+
+function CloudPersistenceCard({
+  entityId,
+  statusError,
+}: {
+  entityId: string;
+  statusError: unknown;
+}) {
+  const backfill = useRunNormativeFrameworkBackfill();
+  const result = backfill.data;
+
+  return (
+    <Card title="Persistencia Cloud" icon={Shield}>
+      <div className="space-y-3 text-sm text-[var(--g-text-primary)]">
+        <p className="text-xs text-[var(--g-text-secondary)]">
+          El diagnóstico del marco normativo se puede ejecutar en modo simulación o aplicar sobre las sociedades existentes. La aplicación actualiza el estado materializado y deja traza en auditoría.
+        </p>
+        {statusError ? (
+          <ErrorBanner
+            title="Diagnóstico Cloud no disponible"
+            message={statusError instanceof Error ? statusError.message : "La migración de persistencia todavía no está disponible en Cloud."}
+          />
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => backfill.mutate({ apply: false })}
+            disabled={backfill.isPending}
+            aria-busy={backfill.isPending}
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Simular backfill
+          </button>
+          <button
+            type="button"
+            onClick={() => backfill.mutate({ apply: true })}
+            disabled={backfill.isPending}
+            aria-busy={backfill.isPending}
+            className="bg-[var(--g-brand-3308)] px-3 py-2 text-xs font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Aplicar diagnóstico
+          </button>
+        </div>
+        {backfill.error ? (
+          <ErrorBanner
+            title="No se pudo ejecutar"
+            message={backfill.error instanceof Error ? backfill.error.message : "Error desconocido al ejecutar el backfill."}
+          />
+        ) : null}
+        {result ? (
+          <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-xs" style={{ borderRadius: "var(--g-radius-md)" }}>
+            <div className="font-semibold text-[var(--g-text-primary)]">
+              {result.mode === "APPLY" ? "Backfill aplicado" : "Simulación completada"}
+            </div>
+            <div className="mt-1 text-[var(--g-text-secondary)]">
+              Sociedades revisadas: {result.entities_scanned}. Actualizadas: {result.entities_updated}. Sociedad en pantalla: {entityId}.
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function GovernedMaintenanceCard({
+  entityId,
+  matter,
+  matrixRows,
+  statuteVersions,
+  overrides,
+  templateBindings,
+  isLoading,
+  materializePending,
+  materializeRows,
+  materializeError,
+  onMaterialize,
+}: {
+  entityId: string;
+  matter: string;
+  matrixRows: Array<{
+    matter_code: string;
+    operational_status: string;
+    confidence: string;
+    majority_rule: string;
+    quorum_rule: string;
+    source_layers: Array<{ type?: string; reference?: string }>;
+    generated_at: string;
+  }>;
+  statuteVersions: Array<{ id: string; version_label: string; status: string; mapping_coverage: number; published_at: string | null }>;
+  overrides: Array<{ id: string; matter_code: string; requirement_key: string; source_ref: string; status: string }>;
+  templateBindings: Array<{ id: string; doc_type: string; template_id: string; selection_reason: string; priority: number }>;
+  isLoading: boolean;
+  materializePending: boolean;
+  materializeRows?: number;
+  materializeError: unknown;
+  onMaterialize: () => void;
+}) {
+  const matterMatrix = matrixRows.find((row) => row.matter_code === matter);
+  const publishedStatute = statuteVersions.find((version) => version.status === "PUBLICADA");
+  const matterOverrides = overrides.filter((override) => override.matter_code === matter);
+
+  return (
+    <Card title="Mantenimiento gobernado P2" icon={Landmark}>
+      <div className="space-y-4 text-sm text-[var(--g-text-primary)]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <p className="max-w-3xl text-xs leading-5 text-[var(--g-text-secondary)]">
+            Persistencia real de órganos, estatutos, overrides y plantillas. La matriz materializada
+            es la vista operativa que usa la sociedad antes de iniciar un expediente.
+          </p>
+          <button
+            type="button"
+            disabled={materializePending}
+            aria-busy={materializePending}
+            onClick={onMaterialize}
+            className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Recalcular matriz
+          </button>
+        </div>
+        {isLoading ? (
+          <Loading label="Cargando mantenimiento gobernado…" />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <P2Metric label="Estatutos publicados" value={publishedStatute ? publishedStatute.version_label : "Pendiente"} detail={publishedStatute ? `Cobertura ${publishedStatute.mapping_coverage}%` : "Sin versión publicada"} />
+            <P2Metric label="Overrides vigentes" value={`${matterOverrides.length}`} detail={`Materia ${humanizeMatter(matter)}`} />
+            <P2Metric label="Plantillas vinculadas" value={`${templateBindings.length}`} detail={templateBindings[0]?.selection_reason ?? "Sin binding persistido"} />
+            <P2Metric label="Matriz efectiva" value={matterMatrix?.operational_status ?? "Pendiente"} detail={matterMatrix ? `Confianza ${matterMatrix.confidence}` : "No materializada"} />
+          </div>
+        )}
+        {matterMatrix ? (
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="font-semibold text-[var(--g-text-primary)]">Regla efectiva materializada</div>
+            <div className="mt-1">
+              Mayoría: {matterMatrix.majority_rule} · Quórum: {matterMatrix.quorum_rule}
+            </div>
+            <div className="mt-1">
+              Fuentes: {matterMatrix.source_layers.map((source) => source.reference ?? source.type ?? "fuente").join(" · ")}
+            </div>
+          </div>
+        ) : null}
+        {materializeRows !== undefined ? (
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Matriz actualizada para {entityId}: {materializeRows} filas materializadas.
+          </p>
+        ) : null}
+        {materializeError ? (
+          <ErrorBanner
+            title="No se pudo materializar"
+            message={materializeError instanceof Error ? materializeError.message : "La migración P2 todavía no está disponible en Cloud."}
+          />
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function P2Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold text-[var(--g-text-primary)]">{value}</div>
+      <div className="mt-1 truncate text-xs text-[var(--g-text-secondary)]">{detail}</div>
+    </div>
   );
 }
 
@@ -601,6 +959,7 @@ function SimuladorReglaCard({
   onVotosFavorChange,
   effectiveSkipVotes,
   votingFiguresIncomplete,
+  entityId,
 }: {
   matter: string;
   adoptionMode: string;
@@ -617,10 +976,11 @@ function SimuladorReglaCard({
   onVotosFavorChange: (value: string) => void;
   effectiveSkipVotes: boolean;
   votingFiguresIncomplete: boolean;
+  entityId?: string | null;
 }) {
   const result = previewQuery.data;
   return (
-    <Card title="Simulador de regla efectiva" icon={Gavel}>
+    <Card title="Vista previa de requisitos" icon={Gavel}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -640,17 +1000,24 @@ function SimuladorReglaCard({
             ))}
           </select>
           {matterUnknown && (
-            <p className="mt-1 text-xs text-[var(--status-warning)]">
-              Materia desconocida en el catálogo: usando defaults seguros (estatutaria, inscribible).
-            </p>
+            <div className="mt-2 border border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2 text-xs text-[var(--g-text-secondary)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+              Materia no registrada en el catálogo. Se aplican criterios conservadores hasta darla
+              de alta con fuente documental.
+              <Link
+                to={`/secretaria/catalogo-materias${entityId ? `?entity=${entityId}` : ""}`}
+                className="ml-2 font-semibold text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
+              >
+                Solicitar alta de materia
+              </Link>
+            </div>
           )}
         </div>
         <div>
           <label className="block text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-            Modo de adopción
+            Forma de adopción
           </label>
           <select
-            aria-label="Modo de adopción"
+            aria-label="Forma de adopción"
             value={adoptionMode}
             onChange={(event) => onAdoptionChange(event.target.value)}
             className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
@@ -748,9 +1115,9 @@ function SimuladorReglaCard({
         </p>
       ) : (
         <div className="mt-4 space-y-4">
-          <ResultStatusBanner status={result.status} />
+          <ResultStatusBanner status={result.status} isPreVote={effectiveSkipVotes} />
           <ConsequencesList consequences={result.consequences} />
-          <RequirementsGrid requirements={result.requirements} />
+          <RequirementsGrid requirements={result.requirements} isPreVote={effectiveSkipVotes} />
         </div>
       )}
     </Card>
@@ -766,7 +1133,7 @@ function Card({
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div
@@ -790,10 +1157,18 @@ function Empty({ label }: { label: string }) {
 }
 
 function FrameworkStatusChip({ status }: { status: string }) {
+  const labelMap: Record<string, string> = {
+    COMPLETO: "OK",
+    CONFLICTO: "CONFLICTO",
+    CONFLICTO_JURISDICCIONAL: "CONFLICTO JURISDICCIONAL",
+    DESACTUALIZADO: "REQUIERE REVISIÓN",
+    INCOMPLETO: "INCOMPLETO",
+    REQUIERE_REVISION: "REQUIERE REVISIÓN",
+  };
   const tone =
-    status === "COMPLETO"
+    status === "COMPLETO" || status === "OK"
       ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-      : status === "INCOMPLETO" || status === "DESACTUALIZADO"
+      : status === "INCOMPLETO" || status === "DESACTUALIZADO" || status === "REQUIERE_REVISION"
         ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
         : "bg-[var(--status-error)] text-[var(--g-text-inverse)]";
   return (
@@ -801,7 +1176,7 @@ function FrameworkStatusChip({ status }: { status: string }) {
       className={`px-2 py-0.5 text-[10px] uppercase tracking-wider ${tone}`}
       style={{ borderRadius: "var(--g-radius-sm)" }}
     >
-      {status}
+      {labelMap[status] ?? status.split("_").join(" ")}
     </span>
   );
 }
@@ -817,7 +1192,20 @@ function SourceStatusDot({ status }: { status: string }) {
   return <span className={`mt-1 inline-block h-2 w-2 ${tone} rounded-full shrink-0`} aria-hidden />;
 }
 
-function ResultStatusBanner({ status }: { status: EffectiveAgreementRule["status"] }) {
+function ResultStatusBanner({ status, isPreVote }: { status: EffectiveAgreementRule["status"]; isPreVote: boolean }) {
+  if (isPreVote) {
+    return (
+      <div
+        className="flex items-center gap-2 bg-[var(--status-warning)] px-3 py-2 text-[var(--g-text-inverse)]"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <AlertTriangle className="h-4 w-4" aria-hidden />
+        <span className="text-sm font-medium">
+          Validación preliminar. No ejecutable hasta cierre de votación y proclamación.
+        </span>
+      </div>
+    );
+  }
   const meta = STATUS_TONE[status];
   const Icon =
     status === "PROCLAMABLE_AND_EXECUTABLE"
@@ -875,8 +1263,10 @@ function ConsequencesList({ consequences }: { consequences: EffectiveRuleConsequ
 
 function RequirementsGrid({
   requirements,
+  isPreVote,
 }: {
   requirements: EffectiveAgreementRule["requirements"];
+  isPreVote: boolean;
 }) {
   return (
     <div className="border-t border-[var(--g-border-subtle)] pt-3">
@@ -884,8 +1274,8 @@ function RequirementsGrid({
         Requisitos por categoría
       </div>
       <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-        <RequirementRow label="Convocatoria" required={requirements.convocatoria?.required} notes={requirements.convocatoria?.notes} />
-        <RequirementRow label="Quórum" required={requirements.quorum?.required} notes={requirements.quorum?.notes} />
+        <RequirementRow label="Convocatoria" required={requirements.convocatoria?.required} notes={requirements.convocatoria?.notes} source="Ley / estatutos" isPreVote={isPreVote} />
+        <RequirementRow label="Quórum" required={requirements.quorum?.required} notes={requirements.quorum?.notes} source="Ley / órgano" isPreVote={isPreVote} dependency="Convocatoria" />
         <RequirementRow
           label="Mayoría"
           required={requirements.majority?.code !== null}
@@ -896,33 +1286,48 @@ function RequirementsGrid({
               : (requirements.majority?.code ?? "—")
           }
           notes={requirements.majority?.notes}
+          source="Ley / estatutos / pacto"
+          isPreVote={isPreVote}
+          dependency="Quórum"
         />
         <RequirementRow
           label="Unanimidad"
           required={requirements.unanimity?.required}
           notes={requirements.unanimity?.notes}
+          source="Ley / forma de adopción"
+          isPreVote={isPreVote}
+          dependency="Votación"
         />
         <RequirementRow
           label="Veto pactado"
           required={requirements.veto?.applies}
           extra={requirements.veto?.titulares.join(", ") || undefined}
           notes={requirements.veto?.notes}
+          source="Pacto parasocial"
+          isPreVote={isPreVote}
         />
         <RequirementRow
           label="Consentimiento previo"
           required={requirements.consent?.required}
           extra={requirements.consent?.from.join(", ") || undefined}
           notes={requirements.consent?.notes}
+          source="Pacto parasocial"
+          isPreVote={isPreVote}
         />
         <RequirementRow
           label="Inscripción registral"
           required={requirements.registry?.required}
           notes={requirements.registry?.notes}
+          source="Registro Mercantil"
+          isPreVote={isPreVote}
+          dependency="Elevación a público"
         />
         <RequirementRow
           label="Publicación supervisor"
           required={requirements.publication?.required}
           notes={requirements.publication?.notes}
+          source="Ley / supervisor"
+          isPreVote={isPreVote}
         />
       </div>
       {requirements.documentation.length > 0 && (
@@ -946,17 +1351,105 @@ function RequirementsGrid({
   );
 }
 
+function MaintenanceHistoryCard({
+  history,
+  role,
+  entityId,
+  matter,
+}: {
+  history: ReturnType<typeof buildNormativeHistoryEntries>;
+  role: ReturnType<typeof normativeRoleFromAppRole>;
+  entityId: string;
+  matter: string;
+}) {
+  const resolveDecision = canPerformNormativeAction(role, "resolve_conflict");
+  const auditEvent = buildNormativeAuditEvent({
+    action: "effective_rule_viewed",
+    societyId: entityId,
+    matter,
+    userRole: role,
+  });
+  const telemetryEvent = buildNormativeTelemetryEvent(auditEvent);
+  return (
+    <Card title="Historial y trazabilidad" icon={BookMarked}>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div>
+          {history.length === 0 ? (
+            <p className="text-sm text-[var(--g-text-secondary)]">
+              No hay historial estructurado de fuentes para esta combinación.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {history.slice(0, 6).map((item) => (
+                <li
+                  key={item.id}
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <div className="font-semibold text-[var(--g-text-primary)]">{item.action}</div>
+                  <div>{item.after}</div>
+                  <div className="mt-1">{item.comment}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+            Gobernanza
+          </div>
+          <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+            Evento preparado: {auditEvent.action}. Rol operativo: {auditEvent.userRole}.
+          </p>
+          <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+            Telemetría preparada para la consulta de regla efectiva · sociedad {telemetryEvent.attributes.society_id}.
+          </p>
+          <button
+            type="button"
+            disabled={!resolveDecision.allowed}
+            aria-disabled={!resolveDecision.allowed}
+            className={`mt-3 w-full px-3 py-2 text-xs font-semibold ${
+              resolveDecision.allowed
+                ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+            }`}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {resolveDecision.ctaLabel}
+          </button>
+          {resolveDecision.reason ? (
+            <p className="mt-2 text-xs text-[var(--g-text-secondary)]">{resolveDecision.reason}</p>
+          ) : null}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function RequirementRow({
   label,
   required,
   notes,
   extra,
+  source,
+  dependency,
+  isPreVote,
 }: {
   label: string;
   required?: boolean;
   notes?: string[];
   extra?: string;
+  source: string;
+  dependency?: string;
+  isPreVote: boolean;
 }) {
+  const state: RequirementOperationalState = required ? (isPreVote ? "pendiente" : "cumplido") : "no_aplica";
+  const stateTone =
+    state === "cumplido"
+      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+      : state === "pendiente"
+        ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+        : "bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
   return (
     <div
       className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-2"
@@ -967,16 +1460,16 @@ function RequirementRow({
           {label}
         </span>
         <span
-          className={`px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-            required
-              ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-              : "bg-[var(--g-surface-card)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
-          }`}
+          className={`px-2 py-0.5 text-[10px] uppercase tracking-wider ${stateTone}`}
           style={{ borderRadius: "var(--g-radius-sm)" }}
         >
-          {required ? "Sí" : "No"}
+          {requirementStateLabel(state)}
         </span>
       </div>
+      <div className="mt-1 text-[10px] text-[var(--g-text-secondary)]">Fuente: {source}</div>
+      {dependency ? (
+        <div className="mt-1 text-[10px] text-[var(--g-text-secondary)]">Depende de: {dependency}</div>
+      ) : null}
       {extra && (
         <div className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">{extra}</div>
       )}
@@ -991,5 +1484,26 @@ function RequirementRow({
         </ul>
       )}
     </div>
+  );
+}
+
+function TopAction({
+  to,
+  icon: Icon,
+  label,
+}: {
+  to: string;
+  icon: ElementType;
+  label: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+      style={{ borderRadius: "var(--g-radius-md)" }}
+    >
+      <Icon className="h-3.5 w-3.5 text-[var(--g-brand-3308)]" />
+      {label}
+    </Link>
   );
 }

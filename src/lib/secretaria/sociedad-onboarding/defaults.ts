@@ -53,11 +53,13 @@ export function applyTipoSocialDefaults(
   draft: SociedadOnboardingDraft,
   tipo: TipoSocial,
 ): SociedadOnboardingDraft {
+  const convocatoriaDias = tipo === "SA" || tipo === "SAU" ? "30" : "15";
   return {
     ...draft,
     identification: { ...draft.identification, tipo_social: tipo },
     profile: { ...draft.profile, es_unipersonal: isUnipersonalTipo(tipo) },
     capital: { ...draft.capital, tipo_titulo: tipoTituloFromTipo(tipo) },
+    rules: { ...draft.rules, convocatoria_dias: convocatoriaDias },
   };
 }
 
@@ -136,6 +138,21 @@ export function createEmptySociedadDraft(date = todayIso()): SociedadOnboardingD
       convocatoria_medio: "WEB_EMAIL",
       voto_calidad_presidente: true,
       restricciones_transmision: "",
+      estatutos_modelados: false,
+      reglamento_organo_modelado: false,
+      pactos_modelados: false,
+      pactos_no_modelados_ack: false,
+      override_materia: "MODIFICACION_ESTATUTOS",
+      override_fuente: "ESTATUTOS",
+      override_mayoria_reforzada_pct: "",
+      override_quorum_primera_pct: "",
+      override_convocatoria_dias: "",
+      override_referencia: "",
+      override_justificacion: "",
+      override_vigencia_desde: date,
+      override_vigencia_hasta: "",
+      capa3_area_responsable: "",
+      capa3_firmante_preferente: "",
     },
     supportDocs: [],
   };

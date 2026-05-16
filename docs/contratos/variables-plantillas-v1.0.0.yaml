@@ -3,7 +3,7 @@
 # NO EDITAR MANUALMENTE — regenerar con: bun run scripts/generate-variable-contract.ts
 
 version: "1.0.0"
-fecha_generacion: "2026-04-19T09:12:59.267Z"
+fecha_generacion: "2026-05-15T12:00:39.263Z"
 fecha_congelacion: null  # Se rellena al congelar
 
 bloques:
@@ -21,6 +21,84 @@ bloques:
           referencia:
             tipo: "string"
             requerido: false
+      EffectiveRuleSourceLayer:
+        campos:
+          layer:
+            tipo: "Fuente"
+            requerido: true
+          plane:
+            tipo: "NormativePlane"
+            requerido: true
+          path:
+            tipo: "string"
+            requerido: true
+          label:
+            tipo: "string"
+            requerido: true
+          value:
+            tipo: "unknown"
+            requerido: true
+          reference:
+            tipo: "string | null"
+            requerido: false
+          applied:
+            tipo: "boolean"
+            requerido: true
+          contractual_only:
+            tipo: "boolean"
+            requerido: false
+          reason:
+            tipo: "string"
+            requerido: true
+      EffectiveRuleSummary:
+        campos:
+          path:
+            tipo: "string"
+            requerido: true
+          label:
+            tipo: "string"
+            requerido: true
+          comparator:
+            tipo: "RuleComparator"
+            requerido: true
+          legal_minimum:
+            tipo: "unknown"
+            requerido: false
+          effective_value:
+            tipo: "T"
+            requerido: true
+          effective_source:
+            tipo: "Fuente"
+            requerido: true
+          effective_reference:
+            tipo: "string | null"
+            requerido: false
+      EffectiveRuleResolution:
+        campos:
+          ok:
+            tipo: "boolean"
+            requerido: true
+          severity:
+            tipo: "EvalSeverity"
+            requerido: true
+          effective_rule:
+            tipo: "ReglaParametro<T>"
+            requerido: true
+          summary:
+            tipo: "EffectiveRuleSummary<T>"
+            requerido: true
+          source_layers:
+            tipo: "EffectiveRuleSourceLayer[]"
+            requerido: true
+          explain_nodes:
+            tipo: "ExplainNode[]"
+            requerido: true
+          blocking_issues:
+            tipo: "string[]"
+            requerido: true
+          warnings:
+            tipo: "string[]"
+            requerido: true
       ReglaConvocatoria:
         campos:
           antelacionDias:
@@ -174,6 +252,37 @@ bloques:
           contenido_minimo_propuesta:
             tipo: "string[]"
             requerido: true
+      CoAprobacionConfig:
+        campos:
+          k:
+            tipo: "number"
+            requerido: true
+          n:
+            tipo: "number"
+            requerido: true
+          ventanaConsenso:
+            tipo: "string"
+            requerido: true
+          estatutosPermitenSinSesion:
+            tipo: "boolean"
+            requerido: true
+          firmas:
+            tipo: "Array<{ adminId: string"
+            requerido: true
+      SolidarioConfig:
+        campos:
+          adminActuante:
+            tipo: "string"
+            requerido: true
+          materia:
+            tipo: "string"
+            requerido: true
+          requiereCofirma:
+            tipo: "boolean"
+            requerido: true
+          cofirmantes:
+            tipo: "string[]"
+            requerido: false
       RulePack:
         campos:
           id:
@@ -215,6 +324,9 @@ bloques:
           postAcuerdo:
             tipo: "ReglaPostAcuerdo"
             requerido: true
+          reglaEspecifica:
+            tipo: "Record<string, unknown>"
+            requerido: false
       RuleParamOverride:
         campos:
           id:
@@ -237,6 +349,67 @@ bloques:
             requerido: true
           referencia:
             tipo: "string"
+            requerido: false
+      ComplianceGateResult:
+        campos:
+          kind:
+            tipo: "ComplianceGateKind"
+            requerido: true
+          label:
+            tipo: "string"
+            requerido: true
+          status:
+            tipo: "ComplianceGateStatus"
+            requerido: true
+          ok:
+            tipo: "boolean"
+            requerido: true
+          blocksProgress:
+            tipo: "boolean"
+            requerido: true
+          notApplicable:
+            tipo: "boolean"
+            requerido: false
+          message:
+            tipo: "string"
+            requerido: true
+          source:
+            tipo: "Fuente"
+            requerido: false
+          reference:
+            tipo: "string | null"
+            requerido: false
+          explain:
+            tipo: "ExplainNode[]"
+            requerido: true
+          blocking_issues:
+            tipo: "string[]"
+            requerido: true
+          warnings:
+            tipo: "string[]"
+            requerido: true
+      CompliancePanelResult:
+        campos:
+          ok:
+            tipo: "boolean"
+            requerido: true
+          can_advance:
+            tipo: "boolean"
+            requerido: true
+          gates:
+            tipo: "ComplianceGateResult[]"
+            requerido: true
+          blocking_issues:
+            tipo: "string[]"
+            requerido: true
+          warnings:
+            tipo: "string[]"
+            requerido: true
+          next_actions:
+            tipo: "string[]"
+            requerido: true
+          effective_rule:
+            tipo: "EffectiveRuleResolution"
             requerido: false
       ExplainNode:
         campos:
@@ -283,6 +456,29 @@ bloques:
             requerido: true
           warnings:
             tipo: "string[]"
+            requerido: true
+      AgendaItemEvaluationResult:
+        campos:
+          itemKind:
+            tipo: "AgendaItemKind"
+            requerido: true
+          gateMode:
+            tipo: "AgendaItemGateMode"
+            requerido: true
+          shouldRunAgreementGates:
+            tipo: "boolean"
+            requerido: true
+          agreementAllowed:
+            tipo: "boolean"
+            requerido: true
+          constanciaRequired:
+            tipo: "boolean"
+            requerido: true
+          requiresVote:
+            tipo: "AgendaReportAcceptanceVote"
+            requerido: true
+          resolutionKind:
+            tipo: "AgendaItemResolutionKind | null"
             requerido: true
       ConflictoInteres:
         campos:
@@ -387,6 +583,24 @@ bloques:
           gate_hash:
             tipo: "string"
             requerido: false
+          pactosResult:
+            tipo: "import('./pactos-engine').PactosEvalOutput"
+            requerido: false
+          gates:
+            tipo: "ComplianceGateResult[]"
+            requerido: false
+          can_advance:
+            tipo: "boolean"
+            requerido: false
+          next_actions:
+            tipo: "string[]"
+            requerido: false
+          effective_rule:
+            tipo: "EffectiveRuleResolution"
+            requerido: false
+          source_layers:
+            tipo: "EffectiveRuleSourceLayer[]"
+            requerido: false
       PlantillaGateRule:
         campos:
           tipo:
@@ -463,55 +677,59 @@ bloques:
         campos: {}
       MateriaClase:
         campos: {}
+      AgendaItemKind:
+        campos: {}
+      AgendaDecisionSubtype:
+        campos: {}
+      AgendaReportAcceptanceVote:
+        campos: {}
+      AgendaItemResolutionKind:
+        campos: {}
+      RuleComparator:
+        campos: {}
+      NormativePlane:
+        campos: {}
       TipoProceso:
         campos: {}
       CondicionAdopcion:
         campos: {}
       SentidoRespuesta:
         campos: {}
+      ExecutionMode:
+        campos: {}
       EvalSeverity:
+        campos: {}
+      ComplianceGateStatus:
+        campos: {}
+      ComplianceGateKind:
+        campos: {}
+      AgendaItemGateMode:
         campos: {}
       PlantillaExigencia:
         campos: {}
       BordeStatus:
         campos: {}
-      CoAprobacionConfig:
-        campos:
-          k:
-            tipo: "number"
-            requerido: true
-          n:
-            tipo: "number"
-            requerido: true
-          ventanaConsenso:
-            tipo: "string"
-            requerido: true
-          estatutosPermitenSinSesion:
-            tipo: "boolean"
-            requerido: true
-          firmas:
-            tipo: "Array<{ adminId: string; fechaFirma: string; hashDocumento: string }>"
-            requerido: true
-      SolidarioConfig:
-        campos:
-          adminActuante:
-            tipo: "string"
-            requerido: true
-          restriccionesEstatutarias:
-            tipo: "Array<{ materia: string; requiereCofirma: boolean; cofirmantes?: string[] }>"
-            requerido: true
-          vigenciaDesde:
-            tipo: "string"
-            requerido: true
-          vigenciaHasta:
-            tipo: "string"
-            requerido: false
-      ExecutionMode:
-        campos: {}
 
   USUARIO:
     descripcion: "Tipos de entrada del usuario"
     tipos:
+      AgendaItemEvaluationInput:
+        campos:
+          kind:
+            tipo: "unknown"
+            requerido: false
+          title:
+            tipo: "string | null"
+            requerido: false
+          orderNumber:
+            tipo: "number | null"
+            requerido: false
+          hasAgreement:
+            tipo: "boolean"
+            requerido: false
+          requiresVote:
+            tipo: "AgendaReportAcceptanceVote | null"
+            requerido: false
       VotosInput:
         campos:
           favor:
@@ -622,6 +840,9 @@ bloques:
           materias:
             tipo: "string[]"
             requerido: true
+          jurisdiction:
+            tipo: "string"
+            requerido: false
       ConvocatoriaOutput:
         campos:
           fechaLimitePublicacion:
@@ -668,6 +889,12 @@ bloques:
           capitalPresenteRepresentado:
             tipo: "number"
             requerido: true
+          esJuntaUniversal:
+            tipo: "boolean"
+            requerido: false
+          aceptacionUnanimeCelebracion:
+            tipo: "boolean"
+            requerido: false
           asistentesPresentes:
             tipo: "number"
             requerido: false
@@ -725,6 +952,24 @@ bloques:
             requerido: false
           noSessionInput:
             tipo: "NoSessionInput"
+            requerido: false
+          coAprobacionConfig:
+            tipo: "CoAprobacionConfig"
+            requerido: false
+          solidarioConfig:
+            tipo: "SolidarioConfig"
+            requerido: false
+          adminVigentes:
+            tipo: "string[]"
+            requerido: false
+          fechaAcuerdo:
+            tipo: "string"
+            requerido: false
+          firmasPresentes:
+            tipo: "string[]"
+            requerido: false
+          vetoActivo:
+            tipo: "boolean"
             requerido: false
       VotacionOutput:
         campos:
@@ -800,6 +1045,9 @@ bloques:
           status:
             tipo: "'SEALED' | 'ERROR'"
             requerido: true
+          seal_type:
+            tipo: "'QSEAL' | 'TSQ'"
+            requerido: false
       QTSPSignRequest:
         campos:
           document_hash:

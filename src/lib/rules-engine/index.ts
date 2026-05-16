@@ -3,7 +3,12 @@
 // ============================================================
 
 export * from './types';
-export { resolverReglaEfectiva } from './jerarquia-normativa';
+export {
+  FUENTE_PRIORITY,
+  resolverReglaEfectiva,
+  resolverReglaEfectivaConTrazabilidad,
+  type ResolverReglaEfectivaOptions,
+} from './jerarquia-normativa';
 export { evaluarConvocatoria } from './convocatoria-engine';
 export { evaluarConstitucion, calcularDenominadorAjustado, validarCapitalUniversal } from './constitucion-engine';
 export { evaluarMayoria } from './majority-evaluator';
@@ -37,6 +42,10 @@ export {
   evaluateAgendaItemComplianceGate,
   gateFromEvaluation,
 } from './compliance-gates';
+export {
+  buildEffectiveRuleProjection,
+  type EffectiveRuleProjection,
+} from './effective-rule';
 export { evaluarProcesoSinSesion, evaluarVentana } from './no-session-engine';
 export { evaluarDocumentacion, evaluarActa } from './documentacion-engine';
 export { determinarAdoptionMode, componerPerfilSesion, evaluarAcuerdoCompleto } from './orquestador';
