@@ -1,0 +1,662 @@
+{
+  "summary": {
+    "local_before_20260514_count": 65,
+    "local_by_comparison": {
+      "local_only_legacy": 25,
+      "name_candidate_diff_content": 34,
+      "exact_sha_match": 6
+    }
+  },
+  "local": [
+    {
+      "file": "supabase/migrations/20260419_000001_rule_engine_tables.sql",
+      "filename": "20260419_000001_rule_engine_tables.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "rule_engine_tables",
+      "sha256": "f00ece5ef1d80950a845903304a8b92453e466dbad15f4af85a991f72a6eaee8",
+      "file_len": 13770,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000002_persons_extension.sql",
+      "filename": "20260419_000002_persons_extension.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "persons_extension",
+      "sha256": "241809a9b7d850ff5d8c17b27b5bbf37430828a783703aa793e095b7c8778424",
+      "file_len": 1867,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000003_role_book.sql",
+      "filename": "20260419_000003_role_book.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "role_book",
+      "sha256": "17119433ab59d528280939d7ac562e1f6c1c006d3970ae825083c5ae736eabe3",
+      "file_len": 8481,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000004_plantillas_protegidas.sql",
+      "filename": "20260419_000004_plantillas_protegidas.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "plantillas_protegidas",
+      "sha256": "6d431805d0da164f182c68c2674abf711428f6a74614f74160791cc4880df624",
+      "file_len": 10359,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000005_no_session_expediente.sql",
+      "filename": "20260419_000005_no_session_expediente.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "no_session_expediente",
+      "sha256": "a7122c8884937dbc3f0b5cbe3553e433ec10c55f9f3c66c908173d331c0e85b6",
+      "file_len": 10373,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000006_evidence_bundles.sql",
+      "filename": "20260419_000006_evidence_bundles.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "evidence_bundles",
+      "sha256": "7fd92555afbdff1c1155ed13a7937aff06a7be2f8b5a5898adbd546ac9889f01",
+      "file_len": 6521,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000007_oleada1_contenido_juridico.sql",
+      "filename": "20260419_000007_oleada1_contenido_juridico.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "oleada1_contenido_juridico",
+      "sha256": "6a49ddd376d5037e3f598da4cbf898f4b47b85afcde636773bca858e6da04bd3",
+      "file_len": 39027,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000008_ajustes_revision_legal.sql",
+      "filename": "20260419_000008_ajustes_revision_legal.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "ajustes_revision_legal",
+      "sha256": "13f6195d85c6278e08036b4084d330c9d3c619c04374340296a482591ba24c2e",
+      "file_len": 31411,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000009_cobertura_es_100.sql",
+      "filename": "20260419_000009_cobertura_es_100.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "cobertura_es_100",
+      "sha256": "d45aef7119348a368b205527345fd2e164d23d1abba692bbc8a0385df72ff838",
+      "file_len": 16929,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000010_dl_resolutions_seed.sql",
+      "filename": "20260419_000010_dl_resolutions_seed.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "dl_resolutions_seed",
+      "sha256": "5c0238711476a315c87b39e73143c51fd702e37eba5d3e9577059c236ea8f7d0",
+      "file_len": 11520,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260419_000011_sprint_d_full.sql",
+      "filename": "20260419_000011_sprint_d_full.sql",
+      "version_prefix": "20260419",
+      "normalized_name": "sprint_d_full",
+      "sha256": "c7730f38d15a13b1137aeb76097a8977bbb909334f8cfbe2fe3fcda332520a41",
+      "file_len": 11494,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000012_oleada2_modelos_acuerdo.sql",
+      "filename": "20260420_000012_oleada2_modelos_acuerdo.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "oleada2_modelos_acuerdo",
+      "sha256": "9e657078a1653bc7f6705aad4a0324144ce4b72933729c7ac66874d2f82834f7",
+      "file_len": 81294,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000014_tipo_social_slu.sql",
+      "filename": "20260420_000014_tipo_social_slu.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "tipo_social_slu",
+      "sha256": "41972134c7fda17118b1b2cae59bb995001acffc15710eaf96d9b47b5b4ef787",
+      "file_len": 3096,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000015_pactos_parasociales.sql",
+      "filename": "20260420_000015_pactos_parasociales.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "pactos_parasociales",
+      "sha256": "6bceb951bf320cdd212b1a9dc7bbc421189da074d84ee16bcba3ba225b093155",
+      "file_len": 3350,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000016_extend_adoption_mode.sql",
+      "filename": "20260420_000016_extend_adoption_mode.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "extend_adoption_mode",
+      "sha256": "ccdfe63e360cb36d5db8835ab6ba574190da6e31fab6e06d5f8dacaad521c56a",
+      "file_len": 735,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000017_seed_rule_packs_v2.sql",
+      "filename": "20260420_000017_seed_rule_packs_v2.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "seed_rule_packs_v2",
+      "sha256": "e50431c25524f86966028f7f2e95624764d48cbf633a6d859cd96fbccb35366e",
+      "file_len": 50330,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260420_000018_seed_pacto_arga.sql",
+      "filename": "20260420_000018_seed_pacto_arga.sql",
+      "version_prefix": "20260420",
+      "normalized_name": "seed_pacto_arga",
+      "sha256": "53140dd3ecde86f99581414d34a466f0f19279caa3f18245a1c6d82330bd3694",
+      "file_len": 2895,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000019_modelo_canonico_base.sql",
+      "filename": "20260421_000019_modelo_canonico_base.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "modelo_canonico_base",
+      "sha256": "4f8b1fde17a708062f50ba793047ec6d184326d92fb57cfaf050d5acf44e675f",
+      "file_len": 49947,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000020_bootstrap_identidad.sql",
+      "filename": "20260421_000020_bootstrap_identidad.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "bootstrap_identidad",
+      "sha256": "ef33f18973faea34710dbdf8b157a862905743c5efa73f463284adcc2435fdec",
+      "file_len": 7467,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000021_canonical_model_rbac_and_sod.sql",
+      "filename": "20260421_000021_canonical_model_rbac_and_sod.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "canonical_model_rbac_and_sod",
+      "sha256": "85bd8967de8d7231f5e3aed58534add23c702e4bdf97b1bd8419f65c2a259c86",
+      "file_len": 4372,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000022_revert_role_based_sod.sql",
+      "filename": "20260421_000022_revert_role_based_sod.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "revert_role_based_sod",
+      "sha256": "59d493aa775aec2a17e473c5bc2d760dd03295b0431d82656016433538a00f52",
+      "file_len": 1563,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000023_capability_matrix.sql",
+      "filename": "20260421_000023_capability_matrix.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "capability_matrix",
+      "sha256": "a6e8e54bad89f3e7252cacb0762527ef326f7b0e8e512f493a1a845b2ab10a2c",
+      "file_len": 3462,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000024_authority_evidence_and_extensions.sql",
+      "filename": "20260421_000024_authority_evidence_and_extensions.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "authority_evidence_and_extensions",
+      "sha256": "bd037e52804c0a68f9ead2b762ef31b024ae172ae46251b53501424a09765b11",
+      "file_len": 9099,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000026_mandates_as_view.sql",
+      "filename": "20260421_000026_mandates_as_view.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "mandates_as_view",
+      "sha256": "5d4df6d599e8c27089ad06b00f00441bee1d282caf6f2fe08676ea6f22d96ccc",
+      "file_len": 3608,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000027_rpcs_acta_certificacion.sql",
+      "filename": "20260421_000027_rpcs_acta_certificacion.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "rpcs_acta_certificacion",
+      "sha256": "08b05c3b583fca6de8eafe83d86c21fccfe6e7cc562b915378b9ba0a623ff834",
+      "file_len": 6933,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000028_rpcs_firmar_emitir.sql",
+      "filename": "20260421_000028_rpcs_firmar_emitir.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "rpcs_firmar_emitir",
+      "sha256": "5890b614a2b2e6864d0ee56a372b05318b2b87b8b106d7e7c22c8f4d4304b639",
+      "file_len": 5142,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260421_000029_backfill_minutes_denormalized.sql",
+      "filename": "20260421_000029_backfill_minutes_denormalized.sql",
+      "version_prefix": "20260421",
+      "normalized_name": "backfill_minutes_denormalized",
+      "sha256": "471b669465e33c446603b2fe7620de040e011199fc7e2716efaf155f6c669524",
+      "file_len": 1186,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260423_000030_user_profiles.sql",
+      "filename": "20260423_000030_user_profiles.sql",
+      "version_prefix": "20260423",
+      "normalized_name": "user_profiles",
+      "sha256": "dc70dc14712ff309c2b0c0ca76f9a7890032cc628b1200f588d70dd06d43475a",
+      "file_len": 3004,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260423_000031_fn_cerrar_votaciones_vencidas.sql",
+      "filename": "20260423_000031_fn_cerrar_votaciones_vencidas.sql",
+      "version_prefix": "20260423",
+      "normalized_name": "fn_cerrar_votaciones_vencidas",
+      "sha256": "8bb5a0941f4e927c34300da81c67b916c2b16bde8c8f6f2ab30054d30aa99db7",
+      "file_len": 1116,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000032_capital_movements_worm.sql",
+      "filename": "20260424_000032_capital_movements_worm.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "capital_movements_worm",
+      "sha256": "3183a384e8bcb3b7debbac451fd0413889fb26469b6ec4b1545537b45561068b",
+      "file_len": 4503,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000033_materia_catalog.sql",
+      "filename": "20260424_000033_materia_catalog.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "materia_catalog",
+      "sha256": "c1f7b5e9dac3d1a8fc7767feaadcad3bd6ab252466749f9e8510dc2020e4d5e2",
+      "file_len": 6558,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000034_fn_validar_no_rebaja_ley.sql",
+      "filename": "20260424_000034_fn_validar_no_rebaja_ley.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "fn_validar_no_rebaja_ley",
+      "sha256": "9fd32dc676639b1f1cb8b35e5dd1ae3b0a13913af099c6fea241176f3ee0d2db",
+      "file_len": 2470,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000035_deed_tracking.sql",
+      "filename": "20260424_000035_deed_tracking.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "deed_tracking",
+      "sha256": "7a04bdf1e4ae83a3bcbee60184dd76818c47c64126c55c5b3164940271c2694f",
+      "file_len": 1683,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000036_materia_aliases.sql",
+      "filename": "20260424_000036_materia_aliases.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "materia_aliases",
+      "sha256": "52b177df96855971b58ec52ca2cc91f00ea0b77c2bbddb24ed962f0b4e259e3a",
+      "file_len": 1775,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000037_jurisdiction_rule_sets_seed.sql",
+      "filename": "20260424_000037_jurisdiction_rule_sets_seed.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "jurisdiction_rule_sets_seed",
+      "sha256": "96e791ea721b43fd5112674c76e982617771c62377467807f058d5282a8d40c8",
+      "file_len": 15917,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000038_filial_entities_seed.sql",
+      "filename": "20260424_000038_filial_entities_seed.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "filial_entities_seed",
+      "sha256": "0e6859cb476c1ac4b5cdee662e2f626f3a938832ddbc4128cf6a2fa1c92c69ce",
+      "file_len": 6537,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000039_convocatorias_agenda_columns.sql",
+      "filename": "20260424_000039_convocatorias_agenda_columns.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "convocatorias_agenda_columns",
+      "sha256": "ec63e1dc27f1e3c9c2792da51eb4164282f1ccceb82fa76ba861cf1728b0604c",
+      "file_len": 735,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000040_no_session_resolutions_matter_class.sql",
+      "filename": "20260424_000040_no_session_resolutions_matter_class.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "no_session_resolutions_matter_class",
+      "sha256": "30b3eb844c97f6ef8e8ebea2527d1c7250b6d3d5fa724f43f24d42334dcad475",
+      "file_len": 638,
+      "comparison": "exact_sha_match",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260424_000041_agreements_approval_workflow_document_url.sql",
+      "filename": "20260424_000041_agreements_approval_workflow_document_url.sql",
+      "version_prefix": "20260424",
+      "normalized_name": "agreements_approval_workflow_document_url",
+      "sha256": "ead2b53e47130c86626370f9bb94c3ec0028ccd26dae19f15dce70c356e1b16a",
+      "file_len": 503,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260503115719_create_secretaria_document_drafts.sql",
+      "filename": "20260503115719_create_secretaria_document_drafts.sql",
+      "version_prefix": "20260503115719",
+      "normalized_name": "create_secretaria_document_drafts",
+      "sha256": "36b6c7076c35b015155e70a35e73f291f09e6cb964b2b854c5cb98d0fa27266c",
+      "file_len": 4672,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260504193000_000052_secretaria_p0_rpc_hardening.sql",
+      "filename": "20260504193000_000052_secretaria_p0_rpc_hardening.sql",
+      "version_prefix": "20260504193000",
+      "normalized_name": "secretaria_p0_rpc_hardening",
+      "sha256": "f1d784c9f84d406bd7b48162f04dfa92a40c5b83dc5025a8fc0ce3d18e121b46",
+      "file_len": 39946,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260504201000_000053_secretaria_p0_pgcrypto_search_path.sql",
+      "filename": "20260504201000_000053_secretaria_p0_pgcrypto_search_path.sql",
+      "version_prefix": "20260504201000",
+      "normalized_name": "secretaria_p0_pgcrypto_search_path",
+      "sha256": "ef1b7e527c4aa78c86f9c1918401da7b8ffac70e3f565277ae4093f12dce54a2",
+      "file_len": 40191,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260504203000_000054_secretaria_capital_movement_audit_uuid.sql",
+      "filename": "20260504203000_000054_secretaria_capital_movement_audit_uuid.sql",
+      "version_prefix": "20260504203000",
+      "normalized_name": "secretaria_capital_movement_audit_uuid",
+      "sha256": "28c719c071b59117a4f6ef44650edb8d76ac6cc9a77006ebc65e5a8f15bc50cc",
+      "file_len": 2599,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260504214500_000055_secretaria_http_service_role_detection.sql",
+      "filename": "20260504214500_000055_secretaria_http_service_role_detection.sql",
+      "version_prefix": "20260504214500",
+      "normalized_name": "secretaria_http_service_role_detection",
+      "sha256": "3143d11356c8aa5328511a4883614ae49b9447215389e3268f16a20b716a8440",
+      "file_len": 1584,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260504_000051_secretaria_p0_transactional_rpcs.sql",
+      "filename": "20260504_000051_secretaria_p0_transactional_rpcs.sql",
+      "version_prefix": "20260504",
+      "normalized_name": "secretaria_p0_transactional_rpcs",
+      "sha256": "b712fdf8c0f58737998d91344da7e2be04ac7b4d6c52f6a4e5c1ed244326f301",
+      "file_len": 34305,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260505093000_000056_secretaria_meeting_resolutions_transactional.sql",
+      "filename": "20260505093000_000056_secretaria_meeting_resolutions_transactional.sql",
+      "version_prefix": "20260505093000",
+      "normalized_name": "secretaria_meeting_resolutions_transactional",
+      "sha256": "8c2e3f4ecb1044f6c9da0dbbd1bac95746ba45bc2ced7ea89565c0494e191dc7",
+      "file_len": 15497,
+      "comparison": "local_only_legacy",
+      "cluster": "pre-may09-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260509_000057_extend_agreements_adoption_mode_solidario_co_aprobacion.sql",
+      "filename": "20260509_000057_extend_agreements_adoption_mode_solidario_co_aprobacion.sql",
+      "version_prefix": "20260509",
+      "normalized_name": "extend_agreements_adoption_mode_solidario_co_aprobacion",
+      "sha256": "786750ecca48b81d36ca703182dc64eb35d123f693a19ce3e1d852d8714d2800",
+      "file_len": 1777,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "other-historical-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260511_000058_v2_plantillas_overrides.sql",
+      "filename": "20260511_000058_v2_plantillas_overrides.sql",
+      "version_prefix": "20260511",
+      "normalized_name": "v2_plantillas_overrides",
+      "sha256": "c826f67eda5f668cec7775c050305f3b680bd1fe2ee913df9bbc19d97ae9da99",
+      "file_len": 18459,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "plantillas-overrides-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260511_000059_v2_plantillas_overrides_worm_hardening.sql",
+      "filename": "20260511_000059_v2_plantillas_overrides_worm_hardening.sql",
+      "version_prefix": "20260511",
+      "normalized_name": "v2_plantillas_overrides_worm_hardening",
+      "sha256": "60eda099e2384ff9e2ffb9adcba7df361d0a65cb8803ab75e942f39c2cffa54d",
+      "file_len": 4037,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "plantillas-overrides-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260511_000060_v2_plantillas_overrides_null_capa3.sql",
+      "filename": "20260511_000060_v2_plantillas_overrides_null_capa3.sql",
+      "version_prefix": "20260511",
+      "normalized_name": "v2_plantillas_overrides_null_capa3",
+      "sha256": "162428bc5b8229493826f45e1fff42da7a86ec657c047e2e3f389ae3403d0ec9",
+      "file_len": 5084,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "plantillas-overrides-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260511_000061_plantillas_protegidas_capa3_immutable_with_overrides.sql",
+      "filename": "20260511_000061_plantillas_protegidas_capa3_immutable_with_overrides.sql",
+      "version_prefix": "20260511",
+      "normalized_name": "plantillas_protegidas_capa3_immutable_with_overrides",
+      "sha256": "bb44fbc4a23dc9164c8b7a5b5d85c5b5106b67cb45ca006ccba078f1cc336b16",
+      "file_len": 4053,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "plantillas-overrides-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260511_000062_plantillas_capa3_immutable_null_safe.sql",
+      "filename": "20260511_000062_plantillas_capa3_immutable_null_safe.sql",
+      "version_prefix": "20260511",
+      "normalized_name": "plantillas_capa3_immutable_null_safe",
+      "sha256": "3325787520dcaaf7dbbb0e1466a769246cf5731b6e9f239c6edd3c7a4c04d30b",
+      "file_len": 3626,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "plantillas-overrides-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000059_agenda_item_kind.sql",
+      "filename": "20260512_000059_agenda_item_kind.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_item_kind",
+      "sha256": "aabba2fba0370557b7ee16edc5111f29b4946b8fbf2ac0a05b9cf0f31911703e",
+      "file_len": 23165,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000060_agenda_item_kind_backfill.sql",
+      "filename": "20260512_000060_agenda_item_kind_backfill.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_item_kind_backfill",
+      "sha256": "5fef70baff07c19685c0f7129f38413dee17e0475689633f196f96c9e3f27042",
+      "file_len": 4317,
+      "comparison": "local_only_legacy",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000061_agenda_item_kind_status_espanol.sql",
+      "filename": "20260512_000061_agenda_item_kind_status_espanol.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_item_kind_status_espanol",
+      "sha256": "e8bfa3cc67dc731c73286b7235c4c979e705a577edee375a2dc0a9f646bfe351",
+      "file_len": 4688,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000062_agenda_item_kind_p7_enforcement.sql",
+      "filename": "20260512_000062_agenda_item_kind_p7_enforcement.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_item_kind_p7_enforcement",
+      "sha256": "796299a204159128fe42c04dd8f487fb14dc4282172235ad0a2b81ad11b31bf7",
+      "file_len": 12674,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000064_agenda_item_kind_backfill_draft_resolutions.sql",
+      "filename": "20260512_000064_agenda_item_kind_backfill_draft_resolutions.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_item_kind_backfill_draft_resolutions",
+      "sha256": "670ec79702e31879d9cce0f39cdd50e2aa1f281bb8dc2cddb74b45e0fd917b8d",
+      "file_len": 3122,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260512_000066_agenda_items_unique_meeting_order.sql",
+      "filename": "20260512_000066_agenda_items_unique_meeting_order.sql",
+      "version_prefix": "20260512",
+      "normalized_name": "agenda_items_unique_meeting_order",
+      "sha256": "46414328bc1e0704ce2d4f3cdbca8c325f1e45ba813de594b49ad3755deef603",
+      "file_len": 1531,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "agenda-kind-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000063_persons_tax_id_unique.sql",
+      "filename": "20260513_000063_persons_tax_id_unique.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "persons_tax_id_unique",
+      "sha256": "c7244d3a0a08a8eb2bddfe4be9d6d8f29ea59a24a5b526a52c0f78e1e5125940",
+      "file_len": 942,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000064_authority_evidence_trigger_rm_fields.sql",
+      "filename": "20260513_000064_authority_evidence_trigger_rm_fields.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "authority_evidence_trigger_rm_fields",
+      "sha256": "b4ff61f5e910f1ba8ad36355523641c4801df8e8410469cf9abd40ffe8c14b19",
+      "file_len": 5455,
+      "comparison": "name_candidate_diff_content",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000065_condiciones_persona_vicesecretario.sql",
+      "filename": "20260513_000065_condiciones_persona_vicesecretario.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "condiciones_persona_vicesecretario",
+      "sha256": "0ee230268d81aec932ff04ff11b1dc21bbe5775fe7bc2c829345243f7c1a851a",
+      "file_len": 1091,
+      "comparison": "exact_sha_match",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000066_personas_cargos_sprint2_core.sql",
+      "filename": "20260513_000066_personas_cargos_sprint2_core.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "personas_cargos_sprint2_core",
+      "sha256": "5f06ed8970656ce9c0fe98ed1edb985bbebe36c5ffc6a3932281165af397c742",
+      "file_len": 56288,
+      "comparison": "exact_sha_match",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000067_personas_cargos_vacancia_scan_filters.sql",
+      "filename": "20260513_000067_personas_cargos_vacancia_scan_filters.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "personas_cargos_vacancia_scan_filters",
+      "sha256": "f0d20adbcf769fc61b24f6d147fe916d9593eced271025186ee162d6bbdfa34e",
+      "file_len": 4524,
+      "comparison": "exact_sha_match",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000068_vacancia_notification_tones.sql",
+      "filename": "20260513_000068_vacancia_notification_tones.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "vacancia_notification_tones",
+      "sha256": "89517b050148ba5601411952ded678c351c11a1094b35da8a443ba4880dc48d4",
+      "file_len": 4602,
+      "comparison": "exact_sha_match",
+      "cluster": "personas-cargos-baseline"
+    },
+    {
+      "file": "supabase/migrations/20260513_000069_personas_cargos_security_followups.sql",
+      "filename": "20260513_000069_personas_cargos_security_followups.sql",
+      "version_prefix": "20260513",
+      "normalized_name": "personas_cargos_security_followups",
+      "sha256": "c9f21a7c085cf6ae93fa15bb1ab5ca047b10cc9aa1e9e803399b40f9cc1a6ca3",
+      "file_len": 24415,
+      "comparison": "exact_sha_match",
+      "cluster": "personas-cargos-baseline"
+    }
+  ]
+}
