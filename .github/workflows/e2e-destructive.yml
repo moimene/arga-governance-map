@@ -1,0 +1,81 @@
+name: E2E destructive (staging)
+
+# F4.G12 — Plan: docs/superpowers/plans/2026-05-16-tgms-gaps-coverage-plan-v1.md §6
+#
+# E2E destructivos (B7 sociedad nueva, isolated fixture) NO se ejecutan
+# automáticamente contra demo Cloud (governance_OS). Este workflow los corre
+# semanalmente contra un proyecto staging separado. Hasta que F4.G17 cree
+# el staging real, este workflow espera `SUPABASE_STAGING_REF` en secrets;
+# si no está configurado, el job termina con `staging-not-configured`.
+
+on:
+  schedule:
+    # Lunes a las 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  e2e-destructive:
+    name: E2E destructive against staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SECRETARIA_E2E_PHASE_B1: "1"
+      SECRETARIA_E2E_DESTRUCTIVE: "1"
+      SECRETARIA_E2E_ISOLATED_TENANT: "1"
+      # G17: redirige los E2E al proyecto staging cuando esté provisionado.
+      EXPECTED_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_REF }}
+      VITE_SUPABASE_URL: ${{ secrets.SUPABASE_STAGING_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_STAGING_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard — staging configured
+        run: |
+          if [ -z "${{ secrets.SUPABASE_STAGING_REF }}" ]; then
+            echo "::warning::SUPABASE_STAGING_REF secret missing. Provision staging (G17) before enabling this workflow."
+            echo "STAGING_NOT_CONFIGURED=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+      - name: Setup Bun
+        if: env.STAGING_NOT_CONFIGURED != '1'
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        if: env.STAGING_NOT_CONFIGURED != '1'
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        if: env.STAGING_NOT_CONFIGURED != '1'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Verify target is staging (NOT governance_OS demo)
+        if: env.STAGING_NOT_CONFIGURED != '1'
+        run: |
+          if [ "$EXPECTED_PROJECT_REF" = "hzqwefkwsxopwrmtksbg" ]; then
+            echo "::error::E2E destructive workflow pointed at governance_OS (demo). Abort."
+            exit 1
+          fi
+          echo "Target: $EXPECTED_PROJECT_REF (staging)"
+
+      - name: Run E2E destructive
+        if: env.STAGING_NOT_CONFIGURED != '1'
+        run: |
+          bunx playwright test \
+            e2e/43-secretaria-phase-b7-sociedad-nueva-ui-driving.spec.ts \
+            e2e/45-secretaria-isolated-fixture.spec.ts \
+            --project=chromium --reporter=list
+
+      - name: Upload Playwright artifacts on failure
+        if: failure() && env.STAGING_NOT_CONFIGURED != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
