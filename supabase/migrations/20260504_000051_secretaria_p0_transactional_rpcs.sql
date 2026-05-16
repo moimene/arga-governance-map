@@ -9,7 +9,7 @@
 --   4. Safer expired voting close RPC: tenant is mandatory.
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto
 
 -- ---------------------------------------------------------------------
 -- Tenant authorization helper for SECURITY DEFINER RPCs.
@@ -33,7 +33,7 @@ AS $$
        LIMIT 1
     )
   )
-$$;
+$$
 
 CREATE OR REPLACE FUNCTION fn_secretaria_assert_tenant_access(p_tenant_id uuid)
 RETURNS void
@@ -59,12 +59,13 @@ BEGIN
     RAISE EXCEPTION 'tenant access denied for %', p_tenant_id;
   END IF;
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_secretaria_current_tenant_id()
-  TO authenticated, service_role;
+  TO authenticated, service_role
+
 GRANT EXECUTE ON FUNCTION fn_secretaria_assert_tenant_access(uuid)
-  TO authenticated, service_role;
+  TO authenticated, service_role
 
 -- ---------------------------------------------------------------------
 -- Schema bridge: legacy UI table no_session_resolutions becomes the
@@ -73,31 +74,31 @@ GRANT EXECUTE ON FUNCTION fn_secretaria_assert_tenant_access(uuid)
 -- ---------------------------------------------------------------------
 
 ALTER TABLE no_session_expedientes
-  ALTER COLUMN agreement_id DROP NOT NULL;
+  ALTER COLUMN agreement_id DROP NOT NULL
 
 ALTER TABLE no_session_expedientes
   ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL
 
 ALTER TABLE no_session_resolutions
-  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL
 
 ALTER TABLE agreements
-  ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE SET NULL
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_no_session_expedientes_resolution
   ON no_session_expedientes(tenant_id, no_session_resolution_id)
-  WHERE no_session_resolution_id IS NOT NULL;
+  WHERE no_session_resolution_id IS NOT NULL
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_agreements_no_session_resolution
   ON agreements(tenant_id, no_session_resolution_id)
-  WHERE no_session_resolution_id IS NOT NULL;
+  WHERE no_session_resolution_id IS NOT NULL
 
 CREATE INDEX IF NOT EXISTS idx_no_session_respuestas_expediente
-  ON no_session_respuestas(expediente_id);
+  ON no_session_respuestas(expediente_id)
 
 CREATE INDEX IF NOT EXISTS idx_no_session_resolutions_tenant_status_deadline
-  ON no_session_resolutions(tenant_id, status, voting_deadline);
+  ON no_session_resolutions(tenant_id, status, voting_deadline)
 
 -- ---------------------------------------------------------------------
 -- fn_cerrar_votaciones_vencidas
@@ -105,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_no_session_resolutions_tenant_status_deadline
 -- never support a NULL tenant sweep from the application surface.
 -- ---------------------------------------------------------------------
 
-DROP FUNCTION IF EXISTS fn_cerrar_votaciones_vencidas(uuid);
+DROP FUNCTION IF EXISTS fn_cerrar_votaciones_vencidas(uuid)
 
 CREATE OR REPLACE FUNCTION fn_cerrar_votaciones_vencidas(p_tenant_id uuid)
 RETURNS integer
@@ -149,10 +150,10 @@ BEGIN
 
   RETURN COALESCE(v_closed_count, 0);
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_cerrar_votaciones_vencidas(uuid)
-  TO authenticated, service_role;
+  TO authenticated, service_role
 
 -- ---------------------------------------------------------------------
 -- fn_no_session_cast_response
@@ -426,10 +427,10 @@ BEGIN
     'total_members', v_total_required
   );
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_no_session_cast_response(uuid, uuid, uuid, text, text, text, text)
-  TO authenticated, service_role;
+  TO authenticated, service_role
 
 -- ---------------------------------------------------------------------
 -- fn_no_session_close_and_materialize_agreement
@@ -651,10 +652,10 @@ BEGIN
     'idempotent', false
   );
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_no_session_close_and_materialize_agreement(uuid, uuid, text, uuid)
-  TO authenticated, service_role;
+  TO authenticated, service_role
 
 -- ---------------------------------------------------------------------
 -- fn_generar_certificacion_acuerdo_sin_sesion
@@ -771,10 +772,10 @@ BEGIN
 
   RETURN v_cert_id;
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_generar_certificacion_acuerdo_sin_sesion(uuid, text, text, uuid)
-  TO authenticated, service_role;
+  TO authenticated, service_role
 
 -- ---------------------------------------------------------------------
 -- fn_registrar_transmision_capital
@@ -970,7 +971,7 @@ BEGIN
     'effective_date', p_effective_date
   );
 END;
-$$;
+$$
 
 GRANT EXECUTE ON FUNCTION fn_registrar_transmision_capital(uuid, uuid, uuid, numeric, date, uuid, text, text)
-  TO authenticated, service_role;
+  TO authenticated, service_role

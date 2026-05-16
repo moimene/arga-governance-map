@@ -18,7 +18,7 @@ AS $$
     NULLIF(auth.jwt() ->> 'role', ''),
     NULLIF((NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'), '')
   ) = 'service_role'
-$$
+$$;
 
 CREATE OR REPLACE FUNCTION fn_secretaria_assert_tenant_access(p_tenant_id uuid)
 RETURNS void
@@ -42,10 +42,9 @@ BEGIN
     RAISE EXCEPTION 'tenant access denied for %', p_tenant_id;
   END IF;
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_secretaria_is_service_role()
-  TO authenticated, service_role
-
+  TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION fn_secretaria_assert_tenant_access(uuid)
-  TO authenticated, service_role
+  TO authenticated, service_role;
