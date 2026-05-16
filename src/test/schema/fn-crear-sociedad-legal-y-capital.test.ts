@@ -61,17 +61,13 @@ describe("fn_crear_sociedad_legal_y_capital migration contract", () => {
 });
 
 describe.skipIf(!hasAdminClient())("fn_crear_sociedad_legal_y_capital Cloud probe", () => {
-  it("resolves the RPC signature after D6 is applied", async () => {
+  it("resolves the RPC signature in Cloud", async () => {
     const { error } = await supabaseAdmin!.rpc("fn_crear_sociedad_legal_y_capital", {
       p_tenant_id: DEMO_TENANT,
       p_payload: {},
     });
 
-    if (error?.message?.match(/function .* does not exist|could not find the function|schema cache/i)) {
-      console.warn("[D6] fn_crear_sociedad_legal_y_capital not yet applied to Cloud; skipping live probe.");
-      return;
-    }
-
     expect(error?.message ?? "").toMatch(/payload root missing|payload must be a JSON object|role .* not allowed|tenant access denied/i);
+    expect(error?.message ?? "").not.toMatch(/function .* does not exist|could not find the function|schema cache/i);
   });
 });
