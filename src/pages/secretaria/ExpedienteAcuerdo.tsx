@@ -21,7 +21,7 @@ import {
   ClipboardCheck,
   Lock,
 } from "lucide-react";
-import { useAgreement, useAgreementCompliance } from "@/hooks/useAgreementCompliance";
+import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
@@ -105,6 +105,29 @@ function toAdoptionMode(value: string | null | undefined): AdoptionMode {
 
 function toMateriaClase(value: string | null | undefined): MateriaClase {
   return MATERIA_CLASES.includes(value as MateriaClase) ? (value as MateriaClase) : "ORDINARIA";
+}
+
+function adoptionModeLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    MEETING: "Sesión formal",
+    UNIVERSAL: "Junta universal",
+    NO_SESSION: "Acuerdo sin sesión",
+    UNIPERSONAL_SOCIO: "Decisión de socio único",
+    UNIPERSONAL_ADMIN: "Decisión de administrador único",
+    CO_APROBACION: "Decisión mancomunada",
+    SOLIDARIO: "Decisión de administrador solidario",
+  };
+  return labels[value ?? ""] ?? "Sesión formal";
+}
+
+function matterClassLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    ORDINARIA: "Ordinaria",
+    ESTATUTARIA: "Estatutaria",
+    ESTRUCTURAL: "Estructural",
+    ESPECIAL: "Especial",
+  };
+  return labels[value ?? ""] ?? "Ordinaria";
 }
 
 export default function ExpedienteAcuerdo() {
@@ -266,8 +289,8 @@ export default function ExpedienteAcuerdo() {
 
           <Card icon={<Gavel className="h-4 w-4" />} title="Adopción">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <KV label="Modalidad" value={a.adoption_mode} />
-              <KV label="Materia" value={a.matter_class} />
+              <KV label="Forma de adopción" value={adoptionModeLabel(a.adoption_mode)} />
+              <KV label="Tipo de materia" value={matterClassLabel(a.matter_class)} />
               <KV label="Quórum exigido" value={a.required_quorum_code ?? "—"} />
               <KV label="Mayoría exigida" value={a.required_majority_code ?? "—"} />
               <KV
@@ -500,6 +523,8 @@ export default function ExpedienteAcuerdo() {
             }}
           />
 
+          <LegalControlPanel status={a.status} compliance={compliance} />
+
           <div
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -507,23 +532,23 @@ export default function ExpedienteAcuerdo() {
             <div className="border-b border-[var(--g-border-subtle)] px-5 py-3">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                  Compliance snapshot
+                  Snapshot normativo congelado
                 </h2>
                 {isLegacyMeetingAdoptionSnapshot(a.compliance_snapshot) && (
                   <span
                     className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
                     style={{ borderRadius: "var(--g-radius-sm)" }}
-                    title="Snapshot legacy. Este resultado fue calculado con una versión anterior del motor. La evaluación actual puede diferir."
-                    aria-label="Snapshot legacy: calculado con una versión anterior del motor"
+                    title="Snapshot anterior. Este resultado fue calculado con una versión anterior del sistema. La evaluación actual puede diferir."
+                    aria-label="Snapshot anterior: calculado con una versión anterior del sistema"
                   >
                     <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden="true" />
-                    Snapshot legacy
+                    Snapshot anterior
                   </span>
                 )}
               </div>
               {isLegacyMeetingAdoptionSnapshot(a.compliance_snapshot) && (
                 <p className="mt-2 text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
-                  Este resultado fue calculado con una versión anterior del motor. La evaluación actual puede diferir.
+                  Este resultado fue calculado con una versión anterior del sistema. La evaluación actual puede diferir.
                 </p>
               )}
             </div>
@@ -601,6 +626,89 @@ function Card({
       </div>
       <div className="p-5">{children}</div>
     </section>
+  );
+}
+
+function LegalControlPanel({
+  status,
+  compliance,
+}: {
+  status: string | null | undefined;
+  compliance: ComplianceResult | null | undefined;
+}) {
+  const blocking = compliance?.blocking_issues ?? [];
+  const warnings = compliance?.warnings ?? [];
+  const canDo =
+    status === "DRAFT"
+      ? ["Completar propuesta", "Incluir en orden del día o circular para firma"]
+      : status === "PROPOSED"
+        ? ["Registrar votación", "Proclamar resultado cuando proceda"]
+        : status === "ADOPTED"
+          ? ["Generar acta", "Emitir certificación"]
+          : status === "CERTIFIED"
+            ? ["Preparar elevación a público", "Abrir tramitación registral si procede"]
+            : ["Consultar expediente y evidencias"];
+  const missing = [
+    compliance?.convocation_compliant === false ? "Convocatoria pendiente de subsanar" : null,
+    compliance?.quorum_compliant === false ? "Quórum pendiente de acreditar" : null,
+    compliance?.majority_compliant === false ? "Resultado de votación pendiente de validar" : null,
+    compliance?.registry_required && status !== "REGISTERED" ? "Inscripción registral pendiente" : null,
+    compliance?.publication_required ? "Publicación pendiente cuando proceda" : null,
+    ...warnings,
+  ].filter(Boolean) as string[];
+  const nextActions = compliance?.next_actions?.length
+    ? compliance.next_actions
+    : status === "ADOPTED"
+      ? ["Cerrar acta y congelar evidencia documental"]
+      : status === "CERTIFIED"
+        ? ["Preparar instrumento y presentación registral"]
+        : ["Continuar con la siguiente fase del expediente"];
+
+  return (
+    <section
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <div className="border-b border-[var(--g-border-subtle)] px-5 py-3">
+        <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Mesa de control del acuerdo</h2>
+        <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+          Resumen operativo de requisitos, bloqueos y próximos pasos.
+        </p>
+      </div>
+      <div className="space-y-4 p-5">
+        <ControlList title="Qué puedo hacer" items={canDo} icon={CheckCircle2} />
+        <ControlList title="Qué falta" items={missing.length ? missing : ["Sin pendientes relevantes."]} icon={ClipboardCheck} />
+        <ControlList title="Qué bloquea" items={blocking.length ? blocking : ["Sin bloqueos societarios."]} icon={AlertTriangle} tone={blocking.length ? "error" : "ok"} />
+        <ControlList title="Próximos pasos" items={nextActions} icon={ArrowLeft} />
+      </div>
+    </section>
+  );
+}
+
+function ControlList({
+  title,
+  items,
+  icon: Icon,
+  tone = "default",
+}: {
+  title: string;
+  items: string[];
+  icon: React.ElementType;
+  tone?: "default" | "error" | "ok";
+}) {
+  const iconClass = tone === "error" ? "text-[var(--status-error)]" : tone === "ok" ? "text-[var(--status-success)]" : "text-[var(--g-brand-3308)]";
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">{title}</div>
+      <ul className="space-y-1.5">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2 text-xs leading-5 text-[var(--g-text-secondary)]">
+            <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${iconClass}`} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -736,7 +844,7 @@ function FrozenRuleSnapshotCard({
 }) {
   if (isLoading) {
     return (
-      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
         <p className="text-sm text-[var(--g-text-secondary)]">Cargando snapshot inmutable…</p>
       </Card>
     );
@@ -749,16 +857,16 @@ function FrozenRuleSnapshotCard({
         ? `/secretaria/reglas?entity=${agreementEntityId}&matter=${encodeURIComponent(agreementMatter)}&adoption=${encodeURIComponent(agreementAdoptionMode)}`
         : "/secretaria/reglas";
     return (
-      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Este acuerdo no tiene snapshot WORM. La regla efectiva no se congeló al materializarse.
+            Este acuerdo no tiene snapshot inmutable. La regla efectiva no se congeló al materializarse.
           </p>
           <Link
             to={ruleManagerLink}
             className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
           >
-            Simulador →
+            Ver mantenimiento →
           </Link>
         </div>
       </Card>
@@ -769,7 +877,7 @@ function FrozenRuleSnapshotCard({
   const classification = classifyFrozenSnapshot(snapshot);
   if (!classification) {
     return (
-      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+      <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
         <p className="text-sm text-[var(--g-text-secondary)]">
           Snapshot presente pero no interpretable.
         </p>
@@ -781,7 +889,7 @@ function FrozenRuleSnapshotCard({
   const warnings = Array.isArray(snapshot.warnings) ? snapshot.warnings : [];
 
   return (
-    <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva Acuerdo360 (congelada)">
+    <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
       <div className="mb-3 flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
         <Lock className="h-3 w-3" aria-hidden />
         <span>Snapshot inmutable: estas eran las reglas en el momento de adopción.</span>

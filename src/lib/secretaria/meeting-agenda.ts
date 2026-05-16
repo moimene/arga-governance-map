@@ -228,21 +228,23 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
       normalizePoint({
         punto: title,
         notas: agreement.proposal_text ?? "",
-      materia,
-      tipo: normalizeMateriaClase(agreement.matter_class ?? materiaClaseFromMateria(materia)),
-      origin: "PREPARED_AGREEMENT",
-      source_table: "agreements",
-      source_id: agreement.id,
-      source_index: index + 1,
-      agreement_id: agreement.id,
-      group_campaign_id:
-        typeof agreement.compliance_snapshot?.campaign_id === "string"
-          ? agreement.compliance_snapshot.campaign_id
+        materia,
+        tipo: normalizeMateriaClase(agreement.matter_class ?? materiaClaseFromMateria(materia)),
+        origin: "PREPARED_AGREEMENT",
+        source_table: "agreements",
+        source_id: agreement.id,
+        source_index: index + 1,
+        agreement_id: agreement.id,
+        kind: "DECISORIO",
+        decision_subtype: "CONSTITUTIVE",
+        group_campaign_id:
+          typeof agreement.compliance_snapshot?.campaign_id === "string"
+            ? agreement.compliance_snapshot.campaign_id
           : null,
-      group_campaign_step:
-        typeof agreement.compliance_explain?.campaign_step === "string"
-          ? agreement.compliance_explain.campaign_step
-          : null,
+        group_campaign_step:
+          typeof agreement.compliance_explain?.campaign_step === "string"
+            ? agreement.compliance_explain.campaign_step
+            : null,
       })
     );
   });
@@ -265,6 +267,10 @@ function dedupeAgendaPoints(points: MeetingAgendaPoint[]) {
       if (!existing.notas && normalized.notas) existing.notas = normalized.notas;
       if (!existing.group_campaign_id && normalized.group_campaign_id) existing.group_campaign_id = normalized.group_campaign_id;
       if (!existing.group_campaign_step && normalized.group_campaign_step) existing.group_campaign_step = normalized.group_campaign_step;
+      if (!existing.kind && normalized.kind) existing.kind = normalized.kind;
+      if (!existing.decision_subtype && normalized.decision_subtype) {
+        existing.decision_subtype = normalized.decision_subtype;
+      }
       if (existing.origin !== "PREPARED_AGREEMENT" && normalized.origin === "PREPARED_AGREEMENT") {
         existing.origin = normalized.origin;
         existing.source_table = normalized.source_table;
@@ -330,5 +336,7 @@ export function newSessionAgendaPoint(): MeetingAgendaPoint {
     agreement_id: null,
     group_campaign_id: null,
     group_campaign_step: null,
+    kind: "DELIBERATIVO",
+    decision_subtype: null,
   };
 }

@@ -24,11 +24,13 @@ import {
   useMinuteForMeeting,
   useOpenMeeting,
   useReplaceAttendees,
+  useReplaceAgendaItemConstancias,
   useReunionAttendees,
   useReunionById,
   useReunionResolutions,
   useSaveMeetingResolutions,
   useUpdateQuorumData,
+  type AgendaItemConstanciaInput,
   type BodyMember,
   type MeetingResolution,
 } from "@/hooks/useReunionSecretaria";
@@ -37,6 +39,7 @@ import {
   buildMeetingAdoptionSnapshot,
   evaluateMeetingVoteCompleteness,
   evaluarConstitucion,
+  evaluarPuntoOrdenDia,
   type MeetingAdoptionSnapshot,
   type MeetingAdoptionRuleTrace,
   type MateriaClase,
@@ -50,6 +53,7 @@ import {
   AGENDA_ORIGIN_LABELS,
   newSessionAgendaPoint,
   type AgendaPointOrigin,
+  type MeetingAgendaPoint,
 } from "@/lib/secretaria/meeting-agenda";
 import {
   normalizeAgendaItemKind,
@@ -63,6 +67,11 @@ import {
 import { useReclassifyAgendaItemKind } from "@/hooks/useReclassifyAgendaItemKind";
 import { useMaterializeAgendaItem } from "@/hooks/useMaterializeAgendaItem";
 import { useAgendaItemRealtimeSubscription } from "@/hooks/useAgendaItemRealtimeSubscription";
+import { useActaAgendaContract } from "@/hooks/useActas";
+import {
+  buildAgendaConstanciaSummary,
+  renderActaAgendaItemsText,
+} from "@/lib/secretaria/acta-agenda";
 import {
   buildMeetingAdoptionDoubleEvaluation,
   type DualEvaluationComparison,
@@ -286,22 +295,65 @@ function resolvePointKind(
 }
 
 const KIND_CHIP_STYLES: Record<AgendaItemKind, string> = {
-  INFORMATIVO: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
-  DELIBERATIVO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   DECISORIO: "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
+  INFORMATIVO: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
+  TOMA_DE_RAZON: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
+  DELIBERATIVO: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
+  ACEPTACION_INFORME: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
+  RUEGOS_PREGUNTAS:
+    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]",
 };
 
 const KIND_CHIP_LABELS: Record<AgendaItemKind, string> = {
-  INFORMATIVO: "INFO",
-  DELIBERATIVO: "DELIB",
   DECISORIO: "DECIS",
+  INFORMATIVO: "INFO",
+  TOMA_DE_RAZON: "TOMA",
+  DELIBERATIVO: "DELIB",
+  ACEPTACION_INFORME: "INF",
+  RUEGOS_PREGUNTAS: "R/P",
 };
 
 const KIND_CHIP_LONG_LABELS: Record<AgendaItemKind, string> = {
-  INFORMATIVO: "informativo",
-  DELIBERATIVO: "deliberativo",
   DECISORIO: "decisorio",
+  INFORMATIVO: "informativo",
+  TOMA_DE_RAZON: "toma de razón",
+  DELIBERATIVO: "deliberativo",
+  ACEPTACION_INFORME: "aceptación de informe",
+  RUEGOS_PREGUNTAS: "ruegos y preguntas",
 };
+
+const AGENDA_KIND_OPTIONS: Array<{ value: AgendaItemKind; label: string; helper: string }> = [
+  {
+    value: "DECISORIO",
+    label: "Acuerdo",
+    helper: "Produce negocio jurídico y activa votación, mayoría y Acuerdo 360.",
+  },
+  {
+    value: "INFORMATIVO",
+    label: "Informativo",
+    helper: "Presentación de información sin votación.",
+  },
+  {
+    value: "TOMA_DE_RAZON",
+    label: "Toma de razón",
+    helper: "Constancia de un hecho o acto ya producido.",
+  },
+  {
+    value: "DELIBERATIVO",
+    label: "Deliberativo",
+    helper: "Debate sin decisión formal.",
+  },
+  {
+    value: "ACEPTACION_INFORME",
+    label: "Aceptación de informe",
+    helper: "Recepción de informe con conformidad u observaciones.",
+  },
+  {
+    value: "RUEGOS_PREGUNTAS",
+    label: "Ruegos y preguntas",
+    helper: "Intervenciones, solicitudes y compromisos de respuesta.",
+  },
+];
 
 function KindChip({ kind }: { kind: AgendaItemKind }) {
   return (
@@ -1416,6 +1468,8 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
   );
 
   const updateQuorum = useUpdateQuorumData(meetingId);
+  const saveConstancias = useReplaceAgendaItemConstancias(meetingId);
+  const materializeAgendaItem = useMaterializeAgendaItem();
 
   const [debates, setDebates] = useState<DebatePunto[]>([newSessionAgendaPoint()]);
   const [initialized, setInitialized] = useState(false);
@@ -1465,15 +1519,64 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
   }
 
   async function handleSave() {
-    const debatesForSave = debates
+    const debatesForSave: MeetingAgendaPoint[] = debates
       .filter((debate) => debate.punto.trim())
       .map((debate, index) => ({
         ...debate,
         materia: debate.materia ?? defaultMateriaForTitle(debate.punto),
         tipo: normalizeMateriaClase(debate.tipo),
+        kind: resolvePointKind(debate, kindIndex),
         origin: debate.origin ?? "MEETING_FLOOR",
-        source_index: debate.source_index ?? index + 1,
+        source_index: index + 1,
       }));
+    const constancias: AgendaItemConstanciaInput[] = [];
+
+    try {
+      for (let index = 0; index < debatesForSave.length; index += 1) {
+        const point = debatesForSave[index];
+        const kind = resolvePointKind(point, kindIndex);
+        if (kind === "DECISORIO") continue;
+        if (!meetingId || !tenantId) {
+          throw new Error("No se puede guardar la constancia: falta contexto de reunión.");
+        }
+
+        const agendaItemId =
+          point.source_table === "agenda_items" && point.source_id
+            ? point.source_id
+            : await materializeAgendaItem.mutateAsync({
+                meetingId,
+                tenantId,
+                orderNumber: index + 1,
+                title: point.punto,
+                kind,
+                decisionSubtype: point.decision_subtype ?? null,
+              });
+
+        debatesForSave[index] = {
+          ...point,
+          kind,
+          source_table: "agenda_items",
+          source_id: agendaItemId,
+          source_index: index + 1,
+        };
+        constancias.push({
+          agenda_item_id: agendaItemId,
+          kind,
+          summary: buildAgendaConstanciaSummary({
+            kind,
+            title: point.punto,
+            notes: point.notas,
+          }),
+          participants: [],
+          follow_ups: [],
+          attachments: [],
+        });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al preparar constancias");
+      return;
+    }
+
     let latestQD = existingQD ?? null;
     if (meetingId && tenantId) {
       const { data, error } = await supabase
@@ -1494,11 +1597,17 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     };
     try {
       await updateQuorum.mutateAsync(qd);
-      toast.success("Agenda y debate guardados");
+      await saveConstancias.mutateAsync(constancias);
+      toast.success("Agenda, debate y constancias guardados");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al guardar debates");
+      toast.error(e instanceof Error ? e.message : "Error al guardar agenda y constancias");
     }
   }
+
+  const savingDebates =
+    updateQuorum.isPending ||
+    saveConstancias.isPending ||
+    materializeAgendaItem.isPending;
 
   return (
     <div className="space-y-5">
@@ -1555,10 +1664,31 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
               )}
             </div>
             <div className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
-                    Materia jurídica
+                    Tipo de punto
+                  </label>
+                  <select
+                    value={resolvePointKind(d, kindIndex)}
+                    onChange={(e) => updatePunto(idx, "kind", e.target.value)}
+                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                    title={
+                      AGENDA_KIND_OPTIONS.find((option) => option.value === resolvePointKind(d, kindIndex))
+                        ?.helper ?? "Naturaleza del punto"
+                    }
+                  >
+                    {AGENDA_KIND_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                    Materia o ámbito
                   </label>
                   <select
                     value={d.materia ?? "APROBACION_CUENTAS"}
@@ -1634,12 +1764,12 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       <button
         type="button"
         onClick={handleSave}
-        disabled={updateQuorum.isPending || debates.every((d) => !d.punto.trim())}
-        aria-busy={updateQuorum.isPending}
+        disabled={savingDebates || debates.every((d) => !d.punto.trim())}
+        aria-busy={savingDebates}
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
-        {updateQuorum.isPending ? (
+        {savingDebates ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <Save className="h-4 w-4" />
@@ -1823,20 +1953,32 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     return normalized;
   }, [agendaSources, meetingForDebates]);
 
-  // Task 8: índice original→{punto, kind, agendaItemId}. Solo los DECISORIO
-  // entran al carril de votación. Los no-DECIS se muestran en sección aparte
-  // con CTA "Reclasificar a DECISORIO".
+  // Task 8: índice original→{punto, kind, agendaItemId}. El contrato del motor
+  // `evaluarPuntoOrdenDia` decide qué puntos ejecutan FULL_GATE de acuerdo.
+  // Los demás se muestran en sección aparte con CTA "Reclasificar a DECISORIO".
   const pointKinds = useMemo(
     () => agendaPoints.map((p) => resolvePointKind(p, kindIndex)),
     [agendaPoints, kindIndex],
   );
-  const votablePointIndices = useMemo(
-    () => agendaPoints.map((_, i) => i).filter((i) => pointKinds[i] === "DECISORIO"),
+  const agendaItemEvaluations = useMemo(
+    () =>
+      agendaPoints.map((point, index) =>
+        evaluarPuntoOrdenDia({
+          kind: pointKinds[index],
+          title: point.punto,
+          orderNumber: index + 1,
+          hasAgreement: Boolean(point.agreement_id),
+        }),
+      ),
     [agendaPoints, pointKinds],
   );
+  const votablePointIndices = useMemo(
+    () => agendaPoints.map((_, i) => i).filter((i) => agendaItemEvaluations[i]?.shouldRunAgreementGates),
+    [agendaItemEvaluations, agendaPoints],
+  );
   const nonVotablePointIndices = useMemo(
-    () => agendaPoints.map((_, i) => i).filter((i) => pointKinds[i] !== "DECISORIO"),
-    [agendaPoints, pointKinds],
+    () => agendaPoints.map((_, i) => i).filter((i) => !agendaItemEvaluations[i]?.shouldRunAgreementGates),
+    [agendaItemEvaluations, agendaPoints],
   );
 
   const meetingRaw = meetingForDebates as
@@ -1935,6 +2077,40 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         },
       };
     });
+  }
+
+  function applyUnanimousFastTrack() {
+    if (!hasPersistentVoters || votablePointIndices.length === 0) return;
+    setVotesByPoint((prev) => {
+      const next = { ...prev };
+      for (const pointIndex of votablePointIndices) {
+        const currentPoint = next[pointIndex] ?? {};
+        const votesForPoint: Record<
+          string,
+          Pick<VoterRow, "vote" | "conflict_flag" | "conflict_reason">
+        > = {};
+        for (const voter of voters) {
+          const hasActiveConflict =
+            !activeConflictsLoading && voter.person_id ? activeConflictPersonIds.has(voter.person_id) : false;
+          votesForPoint[voter.id] = hasActiveConflict
+            ? {
+                vote: "",
+                conflict_flag: true,
+                conflict_reason:
+                  currentPoint[voter.id]?.conflict_reason ||
+                  "Conflicto activo registrado en el expediente; excluido del acuerdo por unanimidad.",
+              }
+            : {
+                vote: "FAVOR",
+                conflict_flag: false,
+                conflict_reason: "",
+              };
+        }
+        next[pointIndex] = { ...currentPoint, ...votesForPoint };
+      }
+      return next;
+    });
+    toast.success("Todos los puntos decisorios quedan marcados como aprobados por unanimidad");
   }
 
   const currentVoters = pointRows();
@@ -2072,12 +2248,12 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const abstencion = currentSnapshot.vote_summary.abstenciones;
   const hasPersistentVoters = voters.length > 0;
   // Codex P1 (round 3 fix): VotacionesStep solo renderiza puntos DECISORIO en
-  // la UI de votación; INFORMATIVO/DELIBERATIVO no reciben voters/votes y
+  // la UI de votación; los puntos no decisorios no reciben voters/votes y
   // `evaluateMeetingVoteCompleteness` devolvería complete=false para ellos.
   // `allPointsHaveVotes` debe iterar exclusivamente `votablePointIndices`
   // para no bloquear el botón "Registrar resultado" en agendas mixtas.
   //
-  // Codex P2 round 6: si NO hay puntos DECISORIO (agenda 100% INFO/DELIB),
+  // Codex P2 round 6: si NO hay puntos DECISORIO,
   // el botón "Registrar resolución" no tiene sentido — handleSaveResolutions
   // sometería un rows=[] vacío. allPointsHaveVotes ahora retorna false en
   // ese caso para mantener el botón disabled. Una agenda sin decisorios cierra
@@ -2114,7 +2290,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       };
     });
     // Codex P1 (round 3 fix): solo puntos DECISORIO generan rows en
-    // `meeting_resolutions`. INFORMATIVO/DELIBERATIVO se trazan en el acta vía
+    // `meeting_resolutions`. Los puntos no decisorios se trazan en el acta vía
     // `buildActaPuntosSequencial` (RRM art. 99, orden secuencial). Insertar
     // rows sin votos forzaría a T4 a auto-derivar kind_resolution sobre
     // resoluciones que no son tales (status sin sentido).
@@ -2210,45 +2386,64 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {votablePointIndices.map((index) => {
-            const point = agendaPoints[index];
-            const hasVotes = pointRows(index).some((v) => v.vote !== "");
-            const active = index === selectedPointIndex;
-            const linkedAgreement = existingResolutions.find(
-              (resolution) =>
-                resolution.agenda_item_index === index + 1 && Boolean(resolution.agreement_id),
-            );
-            return (
-              <button
-                key={`${point.punto}-${index}`}
-                type="button"
-                onClick={() => setSelectedPointIndex(index)}
-                className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium transition-colors ${
-                  active
-                    ? "border-[var(--g-brand-3308)] bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                    : "border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
-                }`}
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span>Punto {index + 1}</span>
-                <KindChip kind="DECISORIO" />
-                {hasVotes && <CheckCircle2 className="h-3.5 w-3.5" />}
-                {linkedAgreement && (
-                  <span
-                    className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {votablePointIndices.map((index) => {
+                const point = agendaPoints[index];
+                const hasVotes = pointRows(index).some((v) => v.vote !== "");
+                const active = index === selectedPointIndex;
+                const linkedAgreement = existingResolutions.find(
+                  (resolution) =>
+                    resolution.agenda_item_index === index + 1 && Boolean(resolution.agreement_id),
+                );
+                return (
+                  <button
+                    key={`${point.punto}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedPointIndex(index)}
+                    className={`inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium transition-colors ${
                       active
-                        ? "bg-[var(--g-text-inverse)] text-[var(--g-brand-3308)]"
-                        : "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+                        ? "border-[var(--g-brand-3308)] bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                        : "border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                     }`}
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                    style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    360
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                    <span>Punto {index + 1}</span>
+                    <KindChip kind="DECISORIO" />
+                    {hasVotes && <CheckCircle2 className="h-3.5 w-3.5" />}
+                    {linkedAgreement && (
+                      <span
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                          active
+                            ? "bg-[var(--g-text-inverse)] text-[var(--g-brand-3308)]"
+                            : "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+                        }`}
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        360
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={applyUnanimousFastTrack}
+              disabled={!hasPersistentVoters || activeConflictsLoading}
+              title={
+                activeConflictsLoading
+                  ? "Cargando conflictos activos antes de aplicar unanimidad"
+                  : "Marca voto favorable de todos los votantes elegibles en todos los puntos decisorios"
+              }
+              className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+              Aprobar todo por unanimidad
+            </button>
+          </div>
         </div>
       )}
 
@@ -2264,9 +2459,9 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
                 Puntos no decisorios — fuera del carril de votación
               </p>
               <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                Los puntos informativos y deliberativos no se someten a votación. Si durante la
-                sesión emerge la necesidad de elevar uno a decisorio, reclasifícalo. La matriz P7
-                valida si la elevación es admisible según estado de la reunión y tipo de órgano.
+                Los puntos de constancia, informe, deliberación o ruegos no se someten a votación.
+                Si durante la sesión emerge la necesidad de elevar uno a decisorio, reclasifícalo.
+                La matriz P7 valida si la elevación es admisible según estado de la reunión y tipo de órgano.
               </p>
             </div>
           </div>
@@ -2741,10 +2936,39 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
 
 // ── Paso 6: Cierre ───────────────────────────────────────────────────────────
 
+function actaNarrativeForAgendaPoint(point: DebatePunto, index: number) {
+  const kind = normalizeAgendaItemKind(point.kind ?? "DELIBERATIVO");
+  const origin = AGENDA_ORIGIN_LABELS[point.origin ?? "MEETING_FLOOR"];
+  const lines = [`${index + 1}. ${point.punto} — ${KIND_CHIP_LONG_LABELS[kind]} · origen: ${origin}`];
+  if (point.agreement_id) lines.push(`   Propuesta preparada: ${point.agreement_id}`);
+
+  const note = point.notas?.trim();
+  if (kind === "DECISORIO") {
+    if (note) lines.push(`   Deliberación previa: ${note}`);
+    return lines;
+  }
+
+  if (kind === "INFORMATIVO") {
+    lines.push(`   Se deja constancia de la información presentada al órgano.${note ? ` ${note}` : ""}`);
+  } else if (kind === "TOMA_DE_RAZON") {
+    lines.push(`   El órgano toma razón del hecho comunicado.${note ? ` ${note}` : ""}`);
+  } else if (kind === "ACEPTACION_INFORME") {
+    lines.push(`   El órgano recibe el informe y deja constancia de su conformidad u observaciones.${note ? ` ${note}` : ""}`);
+  } else if (kind === "RUEGOS_PREGUNTAS") {
+    lines.push(`   Se recogen las intervenciones, ruegos, preguntas y compromisos de respuesta.${note ? ` ${note}` : ""}`);
+  } else {
+    lines.push(`   Se deja constancia del debate mantenido, sin adopción de acuerdo.${note ? ` ${note}` : ""}`);
+  }
+
+  return lines;
+}
+
 function buildActaContent(
   meeting: ReturnType<typeof useReunionById>["data"],
   attendees: ReturnType<typeof useReunionAttendees>["data"],
-  resolutions: MeetingResolution[]
+  resolutions: MeetingResolution[],
+  actaPuntos: Parameters<typeof renderActaAgendaItemsText>[0],
+  canonicalMinutesHash?: string | null,
 ): string {
   const m = meeting as {
     meeting_type?: string | null;
@@ -2790,34 +3014,34 @@ function buildActaContent(
     lines.push("");
   }
 
-  const debates = (qd?.debates ?? []) as DebatePunto[];
-  if (debates.length > 0) {
+  if (actaPuntos.length > 0) {
     lines.push("PUNTOS DEL ORDEN DEL DÍA:");
-    debates.forEach((d, i) => {
-      const origin = AGENDA_ORIGIN_LABELS[d.origin ?? "MEETING_FLOOR"];
-      lines.push(`${i + 1}. ${d.punto} — origen: ${origin}`);
-      if (d.agreement_id) lines.push(`   Propuesta preparada: ${d.agreement_id}`);
-      if (d.notas?.trim()) lines.push(`   ${d.notas}`);
-    });
+    lines.push(renderActaAgendaItemsText(actaPuntos));
     lines.push("");
-  }
+  } else {
+    const debates = (qd?.debates ?? []) as DebatePunto[];
+    if (debates.length > 0) {
+      lines.push("PUNTOS DEL ORDEN DEL DÍA:");
+      debates.forEach((d, i) => {
+        lines.push(...actaNarrativeForAgendaPoint(d, i));
+      });
+      lines.push("");
+    }
 
-  if (resolutions.length > 0) {
-    lines.push("RESOLUCIONES Y ACUERDOS 360:");
-    resolutions.forEach((r, i) => {
-      const label =
-      r.status === "ADOPTED" ? "APROBADO" : r.status === "REJECTED" ? "RECHAZADO" : r.status;
-      lines.push(`${i + 1}. ${r.resolution_text} — ${label}`);
-      if (r.agreement_id) {
-        lines.push(`   Acuerdo 360: ${r.agreement_id}`);
-      }
-    });
-    lines.push("");
+    if (resolutions.length > 0) {
+      lines.push("RESOLUCIONES:");
+      resolutions.forEach((r, i) => {
+        const label =
+          r.status === "ADOPTED" ? "APROBADO" : r.status === "REJECTED" ? "RECHAZADO" : r.status;
+        lines.push(`${i + 1}. ${r.resolution_text} — ${label}`);
+      });
+      lines.push("");
+    }
   }
 
   const snapshots = (qd?.point_snapshots ?? []) as MeetingAdoptionSnapshot[];
   if (snapshots.length > 0) {
-    lines.push("SNAPSHOT DE ADOPCIÓN:");
+    lines.push("ANEXO PROBATORIO DE ADOPCIÓN:");
     snapshots.forEach((snapshot) => {
       lines.push(
         `${snapshot.agenda_item_index}. ${snapshot.materia} — validez societaria: ${
@@ -2841,6 +3065,12 @@ function buildActaContent(
         lines.push("   Pactos: incumplimiento contractual advertido; no altera la validez societaria salvo estatutarización.");
       }
     });
+    lines.push("");
+  }
+
+  if (canonicalMinutesHash) {
+    lines.push("HASH CANÓNICO DEL ACTA:");
+    lines.push(canonicalMinutesHash);
     lines.push("");
   }
 
@@ -2871,6 +3101,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const { data: attendees } = useReunionAttendees(meetingId);
   const { data: resolutions = [], isLoading: resLoading } = useReunionResolutions(meetingId);
   const { data: existingMinute } = useMinuteForMeeting(meetingId);
+  const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(meetingId);
   const generarActa = useGenerarActa();
   const [minuteId, setMinuteId] = useState<string | null>(null);
   const materializedAgreementCount = resolutions.filter((resolution) => resolution.agreement_id).length;
@@ -2881,26 +3112,43 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const censoBodyId = meeting?.body_id ?? null;
   const censoSnapshotType = inferCensoSnapshotType(meeting);
   const canCreateCensoSnapshot = Boolean(censoEntityId && censoBodyId);
+  const actaPuntos = actaAgendaContract?.puntos ?? [];
+  const actaValidationIssues = actaAgendaContract?.validation.blockingIssues ?? [];
+  const actaValidationOk = actaAgendaContract?.validation.ok ?? false;
   const canGenerateMinute =
-    resolutions.length > 0 &&
+    actaPuntos.length > 0 &&
     adoptedWithoutAgreement.length === 0 &&
+    actaValidationOk &&
     !existingMinute?.id &&
     canCreateCensoSnapshot;
 
-  function handleConfirmar() {
+  async function handleConfirmar() {
     if (!meetingId || adoptedWithoutAgreement.length > 0) {
       toast.error("No se puede generar el acta: hay acuerdos adoptados sin expediente Acuerdo 360.");
+      return;
+    }
+    if (!actaValidationOk) {
+      toast.error("No se puede generar el acta: la estructura legal no es válida.", {
+        description: actaValidationIssues[0]?.message ?? "Revise el orden del día y las constancias de la reunión.",
+      });
       return;
     }
     if (!censoEntityId || !censoBodyId) {
       toast.error("No se puede generar el acta: falta sociedad u órgano para crear el snapshot WORM de censo.");
       return;
     }
-    const content = buildActaContent(meeting, attendees, resolutions);
+    const content = buildActaContent(
+      meeting,
+      attendees,
+      resolutions,
+      actaPuntos,
+      actaAgendaContract?.canonicalMinutesHash,
+    );
     generarActa.mutate(
       {
         meetingId,
         content,
+        canonicalMinutesHash: actaAgendaContract?.canonicalMinutesHash,
         entityId: censoEntityId,
         bodyId: censoBodyId,
         sessionKind: "MEETING",
@@ -2981,20 +3229,21 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         </div>
       ) : null}
 
-      {resLoading ? (
+      {resLoading || actaAgendaLoading ? (
         <div className="flex items-center gap-2 text-[var(--g-text-secondary)]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Cargando acuerdos…</span>
+          <span className="text-sm">Cargando orden del día y acuerdos…</span>
         </div>
-      ) : resolutions.length === 0 ? (
+      ) : actaPuntos.length === 0 ? (
         <div
-          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          className="flex items-start gap-3 border-l-4 border-[var(--status-info)] bg-[var(--g-surface-muted)] p-4"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-info)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            No hay resoluciones registradas. Vuelve al paso de votaciones y usa «Registrar resolución
-            y crear expediente Acuerdo 360» antes de cerrar la sesión.
+            No hay acuerdos registrados. Si la sesión solo contiene puntos informativos,
+            deliberativos, toma de razón o ruegos y preguntas, el acta se generará como
+            constancia de los asuntos tratados sin Acuerdo 360.
           </p>
         </div>
       ) : (
@@ -3052,6 +3301,33 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         </div>
       ) : null}
 
+      {actaValidationIssues.length > 0 ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+          <div className="text-xs text-[var(--g-text-secondary)]">
+            <p className="font-semibold text-[var(--g-text-primary)]">
+              El acta no está preparada para firma
+            </p>
+            <p className="mt-1">
+              {actaValidationIssues[0].message}
+            </p>
+          </div>
+        </div>
+      ) : actaPuntos.length > 0 ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-success)] bg-[var(--g-sec-100)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-success)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Acta preparada en orden cronológico conforme al orden del día. Los puntos decisorios generan acuerdo; los demás quedan como constancia.
+          </p>
+        </div>
+      ) : null}
+
       <div
         className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
         style={{ borderRadius: "var(--g-radius-md)" }}
@@ -3073,8 +3349,12 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
             ? "La reunión ya tiene un acta operativa vinculada"
             : !canCreateCensoSnapshot
               ? "Falta sociedad u órgano para crear el snapshot WORM de censo"
+            : actaPuntos.length === 0
+              ? "Guarda al menos un punto del orden del día antes de generar el acta"
             : adoptedWithoutAgreement.length > 0
               ? "Recalcula las resoluciones adoptadas sin Acuerdo 360 antes de generar el acta"
+              : !actaValidationOk
+                ? "Corrige la estructura legal del acta antes de generar el documento"
               : undefined
         }
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import {
   buildCertificationPlan,
+  extractPointSnapshots,
   type CertificationPlan,
   type CertificationResolutionRow,
 } from "@/lib/secretaria/certification-snapshot";
@@ -13,10 +14,16 @@ import {
 } from "@/lib/secretaria/agreement-360";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import {
-  normalizeAgendaItemKind,
-  type AgendaItemKind,
-  type ResolutionKind,
-} from "@/lib/secretaria/agenda-kind";
+  buildActaAgendaViewModel,
+  computeCanonicalMinutesHash,
+  validateActaLegalStructure,
+  type ActaAgendaConstanciaRow,
+  type ActaAgendaItemRow,
+  type ActaAgendaItemViewModel,
+  type ActaAgreementRow,
+  type ActaLegalStructureValidationResult,
+  type ActaMeetingResolutionRow,
+} from "@/lib/secretaria/acta-agenda";
 
 export interface ActaRow {
   id: string;
@@ -36,6 +43,7 @@ export interface ActaRow {
   body_name: string | null;
   entity_name: string | null;
   resolutions_count: number;
+  canonical_minutes_hash?: string | null;
 }
 
 export interface CertificationRow {
@@ -235,6 +243,22 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
       }
 
       const agendaItemIndex = input.snapshot.agenda_item_index;
+      const { data: agendaItem, error: agendaItemError } = await supabase
+        .from("agenda_items")
+        .select("id, kind")
+        .eq("tenant_id", tenantId)
+        .eq("meeting_id", input.meetingId)
+        .eq("order_number", agendaItemIndex)
+        .maybeSingle();
+      if (agendaItemError) throw agendaItemError;
+      const agendaItemRow = agendaItem as { id?: string | null; kind?: string | null } | null;
+      if (!agendaItemRow?.id) {
+        throw new Error("No existe el punto del orden del día que debe anclar el acuerdo.");
+      }
+      if (agendaItemRow.kind !== "DECISORIO") {
+        throw new Error("Solo un punto decisorio puede materializarse como Acuerdo 360.");
+      }
+
       const { data: resolutionRows, error: resolutionError } = await supabase
         .from("meeting_resolutions")
         .select("id, agenda_item_index, agreement_id, resolution_text, required_majority_code, status")
@@ -285,6 +309,7 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
         resolutionText: resolution.resolution_text,
         requiredMajorityCode: requiredMajorityCodeForSnapshot(input.snapshot, resolution.required_majority_code),
         origin: input.origin ?? "MEETING_FLOOR",
+        agendaItemId: agendaItemRow.id,
       });
       if (!payload) {
         throw new Error("El punto no es societariamente proclamable y no puede materializarse como Acuerdo 360.");
@@ -338,77 +363,23 @@ export function useMaterializeMeetingPointAgreement(minuteId: string | undefined
 }
 
 // =============================================================================
-// D3 — Construcción de puntos del acta en ORDEN SECUENCIAL (RRM art. 99).
+// P0 — Acta cronológica agenda-driven.
 // =============================================================================
 //
-// CRÍTICO D3: NO reagrupar por kind. RRM art. 99 exige relación cronológica
-// del acta. La plantilla ACTA_SESION canónica usa {{#each meetings.junta.puntos}}
-// como loop secuencial. Reagrupación rompe orden + plantilla + jurisprudencia.
-// Ver docs/superpowers/specs/2026-05-12-agenda-item-kind-spec.md §10 + adversarial round 4.
-//
-// La plantilla v1.3.0 (pendiente de bump por Comité Legal) podrá usar bloques
-// condicionales `{{#if (eq kind "DECISORIO")}}…{{/if}}` para renderizar campos
-// decisorios solo en puntos DECISORIO. Mientras la plantilla actual (legacy
-// v1.2.0) renderice todos los campos genéricamente, los campos decisorios
-// (kind_resolution, status, resolution_text) quedan vacíos en puntos no-DEC
-// — degradación elegante.
+// El acta se construye desde `agenda_items ORDER BY order_number`, no desde
+// `agreements`. Un `agreement` es únicamente el resultado posible de un punto
+// DECISORIO. Puntos informativos, tomas de razón, deliberativos, aceptación de
+// informe y ruegos/preguntas se documentan como constancia.
 
-/**
- * Punto del acta listo para el loop de la plantilla canónica.
- *
- * Incluye:
- *  - `order_number`: posición cronológica en el orden del día (1..N).
- *  - `kind`: naturaleza del punto (INFORMATIVO/DELIBERATIVO/DECISORIO).
- *  - `kind_resolution`: tipo de resolución registrada (sólo si hubo voto).
- *  - `status` + `resolution_text`: resultado de la votación (sólo DECISORIO).
- */
-export interface ActaPuntoSequencial {
-  id: string;
-  meeting_id: string;
-  order_number: number;
-  title: string;
-  description: string | null;
-  kind: AgendaItemKind;
-  kind_resolution: ResolutionKind | null;
-  status: string | null;
-  resolution_text: string | null;
-  agreement_id: string | null;
-}
+export type ActaPuntoSequencial = ActaAgendaItemViewModel;
+export type AgendaItemRow = ActaAgendaItemRow;
+export type MeetingResolutionRow = ActaMeetingResolutionRow;
 
-/** Fila mínima esperada desde `agenda_items` (vía PostgREST). */
-export interface AgendaItemRow {
-  id: string;
-  meeting_id: string;
-  order_number: number;
-  title: string;
-  description: string | null;
-  kind?: string | null;
-  tenant_id: string;
-  created_at?: string | null;
-}
-
-/** Fila mínima esperada desde `meeting_resolutions` (vía PostgREST). */
-export interface MeetingResolutionRow {
-  meeting_id: string;
-  agenda_item_index: number | null;
-  kind_resolution?: string | null;
-  status?: string | null;
-  resolution_text?: string | null;
-  agreement_id?: string | null;
-}
-
-const VALID_RESOLUTION_KINDS = new Set<ResolutionKind>([
-  "DECISION",
-  "DELIBERATION_OUTCOME",
-  "INFORMATION_NOTED",
-]);
-
-function normalizeResolutionKind(value: unknown): ResolutionKind | null {
-  if (typeof value !== "string") return null;
-  const upper = value.toUpperCase().trim();
-  return VALID_RESOLUTION_KINDS.has(upper as ResolutionKind)
-    ? (upper as ResolutionKind)
-    : null;
+export interface ActaAgendaContract {
+  puntos: ActaAgendaItemViewModel[];
+  validation: ActaLegalStructureValidationResult;
+  canonicalMinutesHash: string;
+  agreementRows: ActaAgreementRow[];
 }
 
 /**
@@ -429,32 +400,82 @@ export function buildActaPuntosSequencial(
   agendaItems: AgendaItemRow[],
   resolutions: MeetingResolutionRow[],
 ): ActaPuntoSequencial[] {
-  // CRÍTICO D3: ordenamos por order_number ASC. NO por kind.
-  // Cualquier reagrupación rompería la plantilla {{#each puntos}} + RRM art. 99.
-  const sorted = [...agendaItems].sort((a, b) => a.order_number - b.order_number);
+  return buildActaAgendaViewModel({ agendaItems, resolutions });
+}
 
-  // Indexamos resoluciones por agenda_item_index para lookup O(1).
-  const byIndex = new Map<number, MeetingResolutionRow>();
-  for (const res of resolutions) {
-    if (typeof res.agenda_item_index === "number") {
-      byIndex.set(res.agenda_item_index, res);
-    }
-  }
+async function loadActaAgendaContract(params: {
+  tenantId: string;
+  meetingId: string;
+}): Promise<ActaAgendaContract> {
+  const [itemsRes, resolutionsRes, constanciasRes, meetingRes, agreementsRes] = await Promise.all([
+    supabase
+      .from("agenda_items")
+      .select("id, meeting_id, order_number, title, description, kind, requires_vote, requires_attachments, tenant_id, created_at")
+      .eq("meeting_id", params.meetingId)
+      .eq("tenant_id", params.tenantId)
+      .order("order_number", { ascending: true }),
+    supabase
+      .from("meeting_resolutions")
+      .select("id, meeting_id, agenda_item_index, kind_resolution, status, resolution_text, agreement_id, required_majority_code")
+      .eq("meeting_id", params.meetingId)
+      .eq("tenant_id", params.tenantId),
+    supabase
+      .from("agenda_item_constancias")
+      .select("id, agenda_item_id, meeting_id, kind, summary, participants, follow_ups, attachments")
+      .eq("meeting_id", params.meetingId)
+      .eq("tenant_id", params.tenantId),
+    supabase
+      .from("meetings")
+      .select("quorum_data")
+      .eq("id", params.meetingId)
+      .eq("tenant_id", params.tenantId)
+      .maybeSingle(),
+    supabase
+      .from("agreements")
+      .select("id, parent_meeting_id, agenda_item_id, status")
+      .eq("parent_meeting_id", params.meetingId)
+      .eq("tenant_id", params.tenantId),
+  ]);
+  if (itemsRes.error) throw itemsRes.error;
+  if (resolutionsRes.error) throw resolutionsRes.error;
+  if (constanciasRes.error) throw constanciasRes.error;
+  if (meetingRes.error) throw meetingRes.error;
+  if (agreementsRes.error) throw agreementsRes.error;
 
-  return sorted.map((item) => {
-    const resolution = byIndex.get(item.order_number) ?? null;
-    return {
-      id: item.id,
-      meeting_id: item.meeting_id,
-      order_number: item.order_number,
-      title: item.title,
-      description: item.description,
-      kind: normalizeAgendaItemKind(item.kind ?? "DELIBERATIVO"),
-      kind_resolution: resolution ? normalizeResolutionKind(resolution.kind_resolution) : null,
-      status: resolution?.status ?? null,
-      resolution_text: resolution?.resolution_text ?? null,
-      agreement_id: resolution?.agreement_id ?? null,
-    };
+  const agendaItems = (itemsRes.data ?? []) as ActaAgendaItemRow[];
+  const resolutions = (resolutionsRes.data ?? []) as ActaMeetingResolutionRow[];
+  const constancias = (constanciasRes.data ?? []) as ActaAgendaConstanciaRow[];
+  const agreementRows = (agreementsRes.data ?? []) as ActaAgreementRow[];
+  const snapshots = extractPointSnapshots(
+    (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null,
+  );
+  const puntos = buildActaAgendaViewModel({
+    agendaItems,
+    resolutions,
+    constancias,
+    snapshots,
+  });
+  const validation = validateActaLegalStructure({
+    meetingId: params.meetingId,
+    puntos,
+    agendaItems,
+    agreementRows,
+    renderedOrderNumbers: puntos.map((point) => point.order_number),
+  });
+  const canonicalMinutesHash = await computeCanonicalMinutesHash({
+    meetingId: params.meetingId,
+    puntos,
+  });
+
+  return { puntos, validation, canonicalMinutesHash, agreementRows };
+}
+
+export function useActaAgendaContract(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!meetingId && !!tenantId,
+    queryKey: ["actas", tenantId, "agenda_contract", meetingId],
+    queryFn: () => loadActaAgendaContract({ tenantId: tenantId!, meetingId: meetingId! }),
   });
 }
 
@@ -472,25 +493,8 @@ export function useActaPuntosSequencial(meetingId: string | undefined) {
     enabled: !!meetingId && !!tenantId,
     queryKey: ["actas", tenantId, "puntos_sequencial", meetingId],
     queryFn: async (): Promise<ActaPuntoSequencial[]> => {
-      const [itemsRes, resolutionsRes] = await Promise.all([
-        supabase
-          .from("agenda_items")
-          .select("id, meeting_id, order_number, title, description, kind, tenant_id, created_at")
-          .eq("meeting_id", meetingId!)
-          .eq("tenant_id", tenantId!)
-          .order("order_number", { ascending: true }),
-        supabase
-          .from("meeting_resolutions")
-          .select("meeting_id, agenda_item_index, kind_resolution, status, resolution_text, agreement_id")
-          .eq("meeting_id", meetingId!)
-          .eq("tenant_id", tenantId!),
-      ]);
-      if (itemsRes.error) throw itemsRes.error;
-      if (resolutionsRes.error) throw resolutionsRes.error;
-
-      const items = (itemsRes.data ?? []) as AgendaItemRow[];
-      const resolutions = (resolutionsRes.data ?? []) as MeetingResolutionRow[];
-      return buildActaPuntosSequencial(items, resolutions);
+      const contract = await loadActaAgendaContract({ tenantId: tenantId!, meetingId: meetingId! });
+      return contract.puntos;
     },
   });
 }

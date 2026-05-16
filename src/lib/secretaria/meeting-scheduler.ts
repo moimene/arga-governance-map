@@ -1,4 +1,5 @@
 import { patchQuorumDataSourceLinks } from "./meeting-links";
+import type { AgendaDecisionSubtype, AgendaItemKind } from "./agenda-kind";
 
 export interface ConvocatoriaForMeetingSchedule {
   id: string;
@@ -28,8 +29,8 @@ export interface ConvocatoriaForMeetingSchedule {
     materia?: string;
     tipo?: string;
     inscribible?: boolean;
-    kind?: "INFORMATIVO" | "DELIBERATIVO" | "DECISORIO" | null;
-    decision_subtype?: "CONSTITUTIVE" | "RATIFICATORY" | "ELEVATION" | "ACKNOWLEDGEMENT" | null;
+    kind?: AgendaItemKind | null;
+    decision_subtype?: AgendaDecisionSubtype | null;
   }> | null;
   rule_trace?: Record<string, unknown> | null;
   reminders_trace?: Record<string, unknown> | null;

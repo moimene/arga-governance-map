@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import {
   evaluarAcuerdoCompleto,
+  evaluarPuntoOrdenDia,
   type RulePack,
   type AdoptionMode,
+  type AgendaItemKind,
   type TipoSocial,
   type TipoOrgano,
   type MateriaClase,
@@ -17,6 +19,8 @@ export interface PreviewParams {
   tipoSocial?: TipoSocial;
   organoTipo?: TipoOrgano;
   materiaClase?: MateriaClase;
+  agendaItemKind?: AgendaItemKind;
+  materializeAgreement?: boolean;
   capitalPresentePct?: number;
   votosFavorPct?: number;
 }
@@ -39,11 +43,41 @@ export function usePreviewAcuerdo(params: PreviewParams) {
   const { tenantId } = useTenantContext();
 
   return useQuery<ComplianceResult | null, Error>({
-    queryKey: ["preview_acuerdo", tenantId, params.materia, params.adoptionMode, params.tipoSocial, params.organoTipo, params.materiaClase, params.capitalPresentePct, params.votosFavorPct],
+    queryKey: [
+      "preview_acuerdo",
+      tenantId,
+      params.materia,
+      params.adoptionMode,
+      params.tipoSocial,
+      params.organoTipo,
+      params.materiaClase,
+      params.agendaItemKind,
+      params.materializeAgreement,
+      params.capitalPresentePct,
+      params.votosFavorPct,
+    ],
     enabled: !!params.materia && !!tenantId,
     staleTime: 30_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
       if (!params.materia) return null;
+
+      const agendaBoundary = evaluarPuntoOrdenDia({
+        kind: params.agendaItemKind ?? "DECISORIO",
+        title: params.materia,
+        hasAgreement: params.materializeAgreement ?? true,
+      });
+
+      if (!agendaBoundary.shouldRunAgreementGates) {
+        return {
+          ok: agendaBoundary.ok,
+          adoptionMode: params.adoptionMode ?? "MEETING",
+          path: "A",
+          etapas: [agendaBoundary],
+          explain: agendaBoundary.explain,
+          blocking_issues: agendaBoundary.blocking_issues,
+          warnings: agendaBoundary.warnings,
+        };
+      }
 
       // Query from rule_packs side — is_active is on rule_pack_versions, not status
       const { data: rulePacks, error } = await supabase

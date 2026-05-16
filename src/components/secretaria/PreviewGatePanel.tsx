@@ -4,9 +4,14 @@ import { usePreviewAcuerdo, type PreviewParams } from "@/hooks/usePreviewAcuerdo
 import type { EvalSeverity } from "@/lib/rules-engine";
 
 const GATE_LABELS: Record<string, string> = {
+  agenda_item:       "Tipo de punto",
+  convocatoria:      "Convocatoria",
   CONVOCATORIA:      "Convocatoria",
+  constitucion:      "Constitución / Quórum",
   CONSTITUCION:      "Constitución / Quórum",
+  votacion:          "Votación",
   VOTACION:          "Votación",
+  documentacion:     "Documentación",
   DOCUMENTACION:     "Documentación",
   convocatoria_skip: "Convocatoria (no requerida)",
   constitucion_skip: "Constitución (no requerida)",
@@ -63,7 +68,7 @@ export function PreviewGatePanel({ params, className = "" }: PreviewGatePanelPro
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-[var(--g-brand-3308)]" />
           <span className="text-sm font-medium text-[var(--g-text-primary)]">
-            Simulación del motor LSC
+            Requisitos del acuerdo
           </span>
           {(isLoading || isFetching) && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--g-text-secondary)]" />
@@ -97,11 +102,11 @@ export function PreviewGatePanel({ params, className = "" }: PreviewGatePanelPro
           {isLoading ? (
             <div className="flex items-center gap-2 py-3 text-sm text-[var(--g-text-secondary)]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Ejecutando motor…
+              Calculando requisitos…
             </div>
           ) : !result ? (
             <p className="py-2 text-sm text-[var(--g-text-secondary)]">
-              No se encontró rule pack para esta materia.
+              No hay regla efectiva disponible para esta materia.
             </p>
           ) : (
             <div className="divide-y divide-[var(--g-border-subtle)]">

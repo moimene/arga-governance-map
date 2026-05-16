@@ -24,6 +24,24 @@ resolveRulePackForMatter(input)
 - Incluir overrides aplicables en el `rulesetSnapshotId`.
 - Devolver un contrato único `RuleResolution` para UI, campañas y motor.
 
+#### `agenda-item-engine.ts`
+Frontera canónica entre punto del orden del día y acuerdo.
+
+**Funciones principales:**
+```typescript
+normalizeAgendaItemKind(value)
+evaluarPuntoOrdenDia(input)
+shouldRunAgreementGatesForAgendaItem(input)
+```
+
+**Responsabilidades:**
+- Normalizar la taxonomía v3.1 de puntos: `DECISORIO`, `INFORMATIVO`,
+  `TOMA_DE_RAZON`, `DELIBERATIVO`, `ACEPTACION_INFORME`, `RUEGOS_PREGUNTAS`.
+- Permitir FULL_GATE del motor solo para `DECISORIO`.
+- Bloquear de forma determinista cualquier intento de materializar Acuerdo 360
+  sobre un punto no decisorio.
+- Mapear puntos no decisorios a outcomes de constancia para acta.
+
 #### `bordes-no-computables.ts`
 Evaluación de 7 "bordes no-computables" — edge cases que el motor determinístico no puede resolver sin intervención externa.
 
@@ -126,7 +144,7 @@ calcularRulesetSnapshotId(params: unknown, overrides?: unknown[]): string
 
 ### Shared
 ```typescript
-type EvalSeverity = 'BLOCKING' | 'WARNING' | 'CRITICAL' | 'INFO';
+type EvalSeverity = 'OK' | 'WARNING' | 'BLOCKING';
 ```
 
 ### bordes-no-computables.ts
@@ -220,9 +238,14 @@ interface PlantillaEvalOutput {
 }
 
 interface ExplainNode {
-  step: string;
-  result: boolean;
-  detail: string;
+  regla: string;
+  fuente: Fuente;
+  referencia?: string;
+  umbral?: number | string;
+  valor?: number | string;
+  resultado: EvalSeverity;
+  mensaje: string;
+  hijos?: ExplainNode[];
 }
 ```
 

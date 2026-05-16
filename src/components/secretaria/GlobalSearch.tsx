@@ -446,14 +446,14 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     const existing = new Set(results.map((result) => `${result.kind}:${result.id}`));
     resolutions.value.forEach((resolution) => {
       const agendaJoin = firstJoin(resolution.agenda_items);
-      // Authoritative source: agenda_items.kind (P4 SSOT v1.3). Defensive default DELIBERATIVO.
+      // Authoritative source: agenda_items.kind (P4 SSOT v3.1). Defensive default DELIBERATIVO.
       const effectiveKind: AgendaItemKind = normalizeAgendaItemKind(agendaJoin?.kind ?? "DELIBERATIVO");
       const orderNumber = agendaJoin?.order_number ?? resolution.agenda_item_index;
       const agendaTitle = agendaJoin?.title ?? null;
 
       // DECISORIO con agreement materializado → result tipo agreement (route /acuerdos/:id).
       // DECISORIO sin agreement → agenda_item con badge "pendiente materialización".
-      // DELIBERATIVO / INFORMATIVO → agenda_item (route /reuniones/:id#punto-N).
+      // No decisorios → agenda_item (route /reuniones/:id#punto-N).
       const isDecisorio = effectiveKind === "DECISORIO";
       const hasAgreement = Boolean(resolution.agreement_id);
 

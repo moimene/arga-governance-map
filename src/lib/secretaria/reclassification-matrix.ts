@@ -1,8 +1,7 @@
 /**
- * Matriz P7 — reclasificación de `agenda_items.kind` (v1.4).
+ * Matriz P7 — reclasificación de `agenda_items.kind` (v3.1).
  *
- * Evalúa si una reclasificación de `kind` (INFORMATIVO / DELIBERATIVO /
- * DECISORIO) es admisible según el estado procedimental de la reunión y el
+ * Evalúa si una reclasificación de `kind` es admisible según el estado procedimental de la reunión y el
  * tipo de órgano. Se aplica desde el hook `useReclassifyAgendaItemKind` como
  * defensa en profundidad antes del UPDATE (los triggers T2/T3 son el último
  * backstop).

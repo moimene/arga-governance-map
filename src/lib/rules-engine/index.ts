@@ -22,6 +22,21 @@ export type {
 } from './meeting-adoption-snapshot';
 export { evaluateMeetingVoteCompleteness } from './meeting-vote-completeness';
 export type { MeetingVoteCompleteness, MeetingVoteCompletenessRow, MeetingVoteValue } from './meeting-vote-completeness';
+export {
+  AGENDA_ITEM_KINDS,
+  NON_DECISION_AGENDA_ITEM_KINDS,
+  evaluarPuntoOrdenDia,
+  isDecisionAgendaItem,
+  normalizeAgendaItemKind,
+  normalizeAgendaReportAcceptanceVote,
+  resolutionKindForAgendaItem,
+  shouldRunAgreementGatesForAgendaItem,
+} from './agenda-item-engine';
+export {
+  buildCompliancePanelResult,
+  evaluateAgendaItemComplianceGate,
+  gateFromEvaluation,
+} from './compliance-gates';
 export { evaluarProcesoSinSesion, evaluarVentana } from './no-session-engine';
 export { evaluarDocumentacion, evaluarActa } from './documentacion-engine';
 export { determinarAdoptionMode, componerPerfilSesion, evaluarAcuerdoCompleto } from './orquestador';

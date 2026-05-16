@@ -1,5 +1,5 @@
 /**
- * Hook `useReclassifyAgendaItemKind` (v1.3).
+ * Hook `useReclassifyAgendaItemKind` (v3.1).
  *
  * Spec: docs/superpowers/specs/2026-05-12-agenda-item-kind-spec.md §7.1
  * Plan: docs/superpowers/plans/2026-05-12-agenda-item-kind-implementation.md Task 5

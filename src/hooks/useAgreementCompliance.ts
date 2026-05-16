@@ -5,10 +5,15 @@ import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import {
   evaluarAcuerdoCompleto,
+  evaluarPuntoOrdenDia,
+  buildCompliancePanelResult,
+  gateFromEvaluation,
   type RulePack,
   type RuleParamOverride,
   type Fuente,
   type AdoptionMode,
+  type AgendaItemEvaluationResult,
+  type AgendaReportAcceptanceVote,
   type TipoSocial,
   type TipoOrgano,
   type FormaAdministracion,
@@ -17,6 +22,7 @@ import {
   type CoAprobacionConfig,
   type SolidarioConfig,
   type NoSessionInput,
+  type ComplianceGateResult,
 } from "@/lib/rules-engine";
 
 type RulePackJoinRow = {
@@ -72,6 +78,10 @@ export interface ComplianceResult {
   publication_required: boolean;
   publication_channel: string | null;
   blocking_issues: string[];
+  warnings?: string[];
+  gates?: ComplianceGateResult[];
+  can_advance?: boolean;
+  next_actions?: string[];
   status: string;
 }
 
@@ -93,6 +103,7 @@ export interface AgreementFull {
   effective_date: string | null;
   status: string;
   parent_meeting_id: string | null;
+  agenda_item_id: string | null;
   unipersonal_decision_id: string | null;
   no_session_resolution_id: string | null;
   statutory_basis: string | null;
@@ -137,6 +148,12 @@ type NoSessionRow = {
   proposal_text?: string | null;
 } | null;
 type UnipersonalRow = { status: string } | null;
+type AgendaItemBoundaryRow = {
+  kind: string | null;
+  title: string | null;
+  order_number: number | null;
+  requires_vote: string | null;
+} | null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -145,6 +162,89 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function getExecutionConfig(a: AgreementWithEntity) {
   const execution = isRecord(a.execution_mode) ? a.execution_mode : {};
   return isRecord(execution.config) ? execution.config : {};
+}
+
+function getAgreementAgendaItemIndex(a: AgreementWithEntity) {
+  const execution = isRecord(a.execution_mode) ? a.execution_mode : {};
+  const direct = execution.agenda_item_index;
+  if (typeof direct === "number" && Number.isFinite(direct)) return direct;
+  if (typeof direct === "string" && /^\d+$/.test(direct)) return Number(direct);
+  const agreement360 = isRecord(execution.agreement_360) ? execution.agreement_360 : {};
+  const nested = agreement360.agenda_item_index;
+  if (typeof nested === "number" && Number.isFinite(nested)) return nested;
+  if (typeof nested === "string" && /^\d+$/.test(nested)) return Number(nested);
+  return null;
+}
+
+async function evaluateAgendaBoundaryForAgreement(
+  a: AgreementWithEntity,
+  tenantId: string,
+): Promise<AgendaItemEvaluationResult | null> {
+  if (!a.parent_meeting_id) return null;
+  const agendaItemIndex = getAgreementAgendaItemIndex(a);
+  let query = supabase
+    .from("agenda_items")
+    .select("kind, title, order_number, requires_vote")
+    .eq("tenant_id", tenantId)
+    .eq("meeting_id", a.parent_meeting_id);
+
+  if (a.agenda_item_id) {
+    query = query.eq("id", a.agenda_item_id);
+  } else if (agendaItemIndex !== null) {
+    query = query.eq("order_number", agendaItemIndex);
+  } else {
+    return null;
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  const row = data as AgendaItemBoundaryRow;
+  if (!row) return null;
+
+  return evaluarPuntoOrdenDia({
+    kind: row.kind,
+    title: row.title ?? a.agreement_kind,
+    orderNumber: row.order_number,
+    requiresVote: row.requires_vote as AgendaReportAcceptanceVote | null,
+    hasAgreement: true,
+  });
+}
+
+function complianceFromAgendaBoundary(
+  a: AgreementWithEntity,
+  boundary: AgendaItemEvaluationResult,
+): ComplianceResult {
+  const gate = gateFromEvaluation(boundary, {
+    kind: "routing",
+    label: "Punto del orden del día",
+  });
+  const panel = buildCompliancePanelResult({
+    gates: [gate],
+    blockingIssues: boundary.blocking_issues,
+    warnings: boundary.warnings,
+  });
+
+  return {
+    agreement_id: a.id,
+    agreement_kind: a.agreement_kind,
+    matter_class: a.matter_class,
+    adoption_mode: a.adoption_mode,
+    inscribable: false,
+    convocation_compliant: true,
+    quorum_compliant: true,
+    conflict_handled: true,
+    majority_compliant: true,
+    instrument_required: "NINGUNO",
+    registry_required: false,
+    publication_required: false,
+    publication_channel: null,
+    blocking_issues: panel.blocking_issues,
+    warnings: panel.warnings,
+    gates: panel.gates,
+    can_advance: panel.can_advance,
+    next_actions: panel.next_actions,
+    status: a.status,
+  };
 }
 
 function buildCoAprobacionConfigFromExecution(a: AgreementWithEntity): CoAprobacionConfig | undefined {
@@ -243,6 +343,11 @@ export function resolveAgreementOrganoTipo(
  * Carga rule packs + overrides desde Supabase, ejecuta evaluarAcuerdoCompleto().
  */
 async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<ComplianceResult> {
+  const agendaBoundary = await evaluateAgendaBoundaryForAgreement(a, tenantId);
+  if (agendaBoundary && !agendaBoundary.shouldRunAgreementGates) {
+    return complianceFromAgendaBoundary(a, agendaBoundary);
+  }
+
   const companyForm = normalizeCompanyForm(a.entities?.legal_form);
   const tipoSocial = toTipoSocial(companyForm);
   const organoTipo = resolveAgreementOrganoTipo(a);
@@ -431,6 +536,15 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   const postEtapa = result.etapas.find((e) => e.etapa === "postAcuerdo");
 
   const inscribable = postEtapa?.explain.some((e) => e.regla === "inscribible" && e.valor === "true") ?? a.inscribable;
+  const gates = [
+    ...(agendaBoundary ? [gateFromEvaluation(agendaBoundary, { kind: "routing", label: "Punto del orden del día" })] : []),
+    ...result.etapas.map((etapa) => gateFromEvaluation(etapa)),
+  ];
+  const panel = buildCompliancePanelResult({
+    gates,
+    blockingIssues: result.blocking_issues,
+    warnings: result.warnings,
+  });
 
   return {
     agreement_id: a.id,
@@ -446,7 +560,11 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     registry_required: inscribable,
     publication_required: false,
     publication_channel: null,
-    blocking_issues: result.blocking_issues,
+    blocking_issues: panel.blocking_issues,
+    warnings: panel.warnings,
+    gates: panel.gates,
+    can_advance: panel.can_advance,
+    next_actions: panel.next_actions,
     status: a.status,
   };
 }
