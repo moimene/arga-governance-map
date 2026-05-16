@@ -91,10 +91,12 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(401, { error: "invalid or expired token" });
   }
 
-  // 2) Lectura del bundle (RLS aplica).
+  // 2) Lectura del bundle (RLS aplica — F6 cerró que evidence_bundles tiene
+  // RLS explícita activa). Se selecciona también `status` para que el gate
+  // de §3 sea efectivo (P1 #9 del adversarial review).
   const { data: bundle, error: bundleError } = await userClient
     .from("evidence_bundles")
-    .select("id, tenant_id, agreement_id, storage_path, document_url, legal_hold, source_module")
+    .select("id, tenant_id, agreement_id, storage_path, document_url, legal_hold, source_module, status")
     .eq("id", bundleId)
     .maybeSingle();
 
@@ -105,9 +107,17 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(404, { error: "bundle not found or access denied" });
   }
 
-  // 3) Legal hold gate.
+  // 3) Legal hold + status gate (F6 fix P1 #9 — antes la función decía que
+  // bloqueaba ARCHIVED-PENDIENTE-LEGAL pero solo miraba legal_hold).
   if (bundle.legal_hold === true) {
     return jsonResponse(403, { error: "legal hold active on this bundle" });
+  }
+  const releasableStatuses = new Set(["OPEN", "PROMOTED", "ARCHIVED-RELEASED"]);
+  if (bundle.status && !releasableStatuses.has(bundle.status)) {
+    return jsonResponse(403, {
+      error: "bundle status does not permit download",
+      status: bundle.status,
+    });
   }
 
   // 4) Resolver storage_path: forma nueva primero, legacy extract si no.
@@ -119,9 +129,27 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(404, { error: "bundle has no storage_path or extractable document_url" });
   }
 
-  // 5) Defensa contra path traversal — solo path simple sin .., %2E%2E, %2F leading.
-  if (storagePath.includes("..") || storagePath.startsWith("/") || storagePath.includes("%2E%2E")) {
+  // 5) Defensa contra path traversal — cubre ., %2E, case-insensitive.
+  const lowered = storagePath.toLowerCase();
+  if (
+    storagePath.includes("..") ||
+    storagePath.startsWith("/") ||
+    lowered.includes("%2e%2e") ||
+    lowered.includes("%2f") ||
+    storagePath.includes("\\")
+  ) {
     return jsonResponse(400, { error: "invalid storage_path" });
+  }
+
+  // 6) F6 fix P0 #4 — el storage_path DEBE empezar con el tenant_id del
+  // bundle. Sin esto, un attacker que pueda crear un evidence_bundle con
+  // storage_path apuntando a `<victim>/<...>` obtendría signed URL del
+  // tenant víctima. La RLS bloquea el SELECT cross-tenant, pero el path en
+  // sí no validaba que pertenece a ese tenant — bug independiente de RLS.
+  if (!storagePath.startsWith(`${bundle.tenant_id}/`)) {
+    return jsonResponse(403, {
+      error: "storage_path does not belong to bundle tenant",
+    });
   }
 
   // 6) Firmar via service_role (única ruta con privilegio para signed URLs).
