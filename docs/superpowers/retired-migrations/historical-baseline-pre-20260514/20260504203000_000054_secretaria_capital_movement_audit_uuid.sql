@@ -3,7 +3,7 @@
 -- Fixes fn_registrar_movimiento_capital audit_log.object_id type in Cloud.
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 CREATE OR REPLACE FUNCTION fn_registrar_movimiento_capital(
   p_tenant_id             uuid,
@@ -76,4 +76,4 @@ BEGIN
 
   RETURN v_movement_id;
 END;
-$$
+$$;

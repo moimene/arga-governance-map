@@ -1,16 +1,15 @@
 -- ============================================================
--- Migration 000053: Secretaria P0 pgcrypto search path hotfix
+-- Migration 000051: Secretaria P0 transactional RPCs
 --
--- Hotfix over 000052: pgcrypto is exposed from the extensions schema in Supabase Cloud.
+-- Local contract only until explicitly applied to Cloud.
 -- Covers:
---   1. Capability checks for authenticated RPC callers.
---   2. Actor/person binding for no-session votes.
---   3. Tenant validation for selected templates and transmission recipients.
---   4. Certification authority scoped to the authenticated person unless
---      invoked by service_role/admin support.
+--   1. NO_SESSION WORM responses + idempotent materialization.
+--   2. Certification from an adopted no-session agreement.
+--   3. Atomic capital transmission + append-only capital movements.
+--   4. Safer expired voting close RPC: tenant is mandatory.
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ---------------------------------------------------------------------
 -- Tenant authorization helper for SECURITY DEFINER RPCs.
@@ -23,7 +22,7 @@ RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
   SELECT COALESCE(
     NULLIF(auth.jwt() ->> 'tenant_id', '')::uuid,
@@ -34,13 +33,13 @@ AS $$
        LIMIT 1
     )
   )
-$$
+$$;
 
 CREATE OR REPLACE FUNCTION fn_secretaria_assert_tenant_access(p_tenant_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_claim_role text;
@@ -60,211 +59,12 @@ BEGIN
     RAISE EXCEPTION 'tenant access denied for %', p_tenant_id;
   END IF;
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_secretaria_current_tenant_id()
-  TO authenticated, service_role
-
+  TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION fn_secretaria_assert_tenant_access(uuid)
-  TO authenticated, service_role
-
-CREATE OR REPLACE FUNCTION fn_secretaria_is_service_role()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-  SELECT current_setting('request.jwt.claim.role', true) = 'service_role'
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_current_role_code()
-RETURNS text
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-  SELECT COALESCE(
-    NULLIF(auth.jwt() ->> 'role_code', ''),
-    NULLIF(auth.jwt() ->> 'app_role', ''),
-    (
-      SELECT up.role_code
-        FROM user_profiles up
-       WHERE up.user_id = auth.uid()
-       LIMIT 1
-    )
-  )
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_current_person_id()
-RETURNS uuid
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-  SELECT COALESCE(
-    NULLIF(auth.jwt() ->> 'person_id', '')::uuid,
-    (
-      SELECT up.person_id
-        FROM user_profiles up
-       WHERE up.user_id = auth.uid()
-       LIMIT 1
-    )
-  )
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_assert_capability(
-  p_tenant_id uuid,
-  p_action text
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_role text;
-BEGIN
-  PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  IF fn_secretaria_is_service_role() THEN
-    RETURN;
-  END IF;
-
-  v_role := fn_secretaria_current_role_code();
-  IF v_role IS NULL THEN
-    RAISE EXCEPTION 'role required for action %', p_action;
-  END IF;
-  IF v_role = 'ADMIN_TENANT' THEN
-    RETURN;
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1
-      FROM capability_matrix cm
-     WHERE cm.role = v_role
-       AND cm.action = p_action
-       AND cm.enabled IS TRUE
-  ) THEN
-    RAISE EXCEPTION 'capability % denied for role %', p_action, v_role;
-  END IF;
-END;
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_assert_role_allowed(
-  p_tenant_id uuid,
-  p_allowed_roles text[]
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_role text;
-BEGIN
-  PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  IF fn_secretaria_is_service_role() THEN
-    RETURN;
-  END IF;
-
-  v_role := fn_secretaria_current_role_code();
-  IF v_role IS NULL OR NOT (v_role = ANY(p_allowed_roles)) THEN
-    RAISE EXCEPTION 'role % is not allowed for this Secretaria action', COALESCE(v_role, '<missing>');
-  END IF;
-END;
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_assert_actor_person(
-  p_tenant_id uuid,
-  p_person_id uuid
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  v_current_person_id uuid;
-BEGIN
-  PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  IF fn_secretaria_is_service_role() THEN
-    RETURN;
-  END IF;
-
-  v_current_person_id := fn_secretaria_current_person_id();
-  IF v_current_person_id IS NULL OR v_current_person_id <> p_person_id THEN
-    RAISE EXCEPTION 'person access denied for %', p_person_id;
-  END IF;
-END;
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_assert_person_tenant(
-  p_tenant_id uuid,
-  p_person_id uuid
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-BEGIN
-  IF p_person_id IS NULL THEN
-    RAISE EXCEPTION 'person_id is required';
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1
-      FROM persons p
-     WHERE p.id = p_person_id
-       AND p.tenant_id = p_tenant_id
-  ) THEN
-    RAISE EXCEPTION 'person % does not belong to tenant %', p_person_id, p_tenant_id;
-  END IF;
-END;
-$$
-
-CREATE OR REPLACE FUNCTION fn_secretaria_assert_template_tenant(
-  p_tenant_id uuid,
-  p_template_id uuid
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-BEGIN
-  IF p_template_id IS NULL THEN
-    RETURN;
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1
-      FROM plantillas_protegidas p
-     WHERE p.id = p_template_id
-       AND p.tenant_id = p_tenant_id
-  ) THEN
-    RAISE EXCEPTION 'template % does not belong to tenant %', p_template_id, p_tenant_id;
-  END IF;
-END;
-$$
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_is_service_role()
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_current_role_code()
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_current_person_id()
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_assert_capability(uuid, text)
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_assert_role_allowed(uuid, text[])
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_assert_actor_person(uuid, uuid)
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_assert_person_tenant(uuid, uuid)
-  TO authenticated, service_role
-
-GRANT EXECUTE ON FUNCTION fn_secretaria_assert_template_tenant(uuid, uuid)
-  TO authenticated, service_role
+  TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- Schema bridge: legacy UI table no_session_resolutions becomes the
@@ -273,31 +73,31 @@ GRANT EXECUTE ON FUNCTION fn_secretaria_assert_template_tenant(uuid, uuid)
 -- ---------------------------------------------------------------------
 
 ALTER TABLE no_session_expedientes
-  ALTER COLUMN agreement_id DROP NOT NULL
+  ALTER COLUMN agreement_id DROP NOT NULL;
 
 ALTER TABLE no_session_expedientes
   ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL
+  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL;
 
 ALTER TABLE no_session_resolutions
-  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL
+  ADD COLUMN IF NOT EXISTS selected_template_id uuid REFERENCES plantillas_protegidas(id) ON DELETE SET NULL;
 
 ALTER TABLE agreements
-  ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE SET NULL
+  ADD COLUMN IF NOT EXISTS no_session_resolution_id uuid REFERENCES no_session_resolutions(id) ON DELETE SET NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_no_session_expedientes_resolution
   ON no_session_expedientes(tenant_id, no_session_resolution_id)
-  WHERE no_session_resolution_id IS NOT NULL
+  WHERE no_session_resolution_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_agreements_no_session_resolution
   ON agreements(tenant_id, no_session_resolution_id)
-  WHERE no_session_resolution_id IS NOT NULL
+  WHERE no_session_resolution_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_no_session_respuestas_expediente
-  ON no_session_respuestas(expediente_id)
+  ON no_session_respuestas(expediente_id);
 
 CREATE INDEX IF NOT EXISTS idx_no_session_resolutions_tenant_status_deadline
-  ON no_session_resolutions(tenant_id, status, voting_deadline)
+  ON no_session_resolutions(tenant_id, status, voting_deadline);
 
 -- ---------------------------------------------------------------------
 -- fn_cerrar_votaciones_vencidas
@@ -305,19 +105,18 @@ CREATE INDEX IF NOT EXISTS idx_no_session_resolutions_tenant_status_deadline
 -- never support a NULL tenant sweep from the application surface.
 -- ---------------------------------------------------------------------
 
-DROP FUNCTION IF EXISTS fn_cerrar_votaciones_vencidas(uuid)
+DROP FUNCTION IF EXISTS fn_cerrar_votaciones_vencidas(uuid);
 
 CREATE OR REPLACE FUNCTION fn_cerrar_votaciones_vencidas(p_tenant_id uuid)
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_closed_count integer;
 BEGIN
   PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  PERFORM fn_secretaria_assert_role_allowed(p_tenant_id, ARRAY['SECRETARIO', 'ADMIN_TENANT']);
 
   WITH expired AS (
     SELECT id
@@ -350,10 +149,10 @@ BEGIN
 
   RETURN COALESCE(v_closed_count, 0);
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_cerrar_votaciones_vencidas(uuid)
-  TO authenticated, service_role
+  TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- fn_no_session_cast_response
@@ -373,7 +172,7 @@ CREATE OR REPLACE FUNCTION fn_no_session_cast_response(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_resolution no_session_resolutions%ROWTYPE;
@@ -394,8 +193,6 @@ DECLARE
   v_condicion_adopcion text;
 BEGIN
   PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  PERFORM fn_secretaria_assert_capability(p_tenant_id, 'VOTE_EMISSION');
-  PERFORM fn_secretaria_assert_actor_person(p_tenant_id, p_person_id);
   IF p_resolution_id IS NULL THEN
     RAISE EXCEPTION 'p_resolution_id is required';
   END IF;
@@ -629,10 +426,10 @@ BEGIN
     'total_members', v_total_required
   );
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_no_session_cast_response(uuid, uuid, uuid, text, text, text, text)
-  TO authenticated, service_role
+  TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- fn_no_session_close_and_materialize_agreement
@@ -648,7 +445,7 @@ CREATE OR REPLACE FUNCTION fn_no_session_close_and_materialize_agreement(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_resolution no_session_resolutions%ROWTYPE;
@@ -667,8 +464,6 @@ DECLARE
   v_condicion_adopcion text;
 BEGIN
   PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  PERFORM fn_secretaria_assert_role_allowed(p_tenant_id, ARRAY['SECRETARIO', 'ADMIN_TENANT']);
-  PERFORM fn_secretaria_assert_template_tenant(p_tenant_id, p_selected_template_id);
   IF p_resolution_id IS NULL THEN
     RAISE EXCEPTION 'p_resolution_id is required';
   END IF;
@@ -801,7 +596,6 @@ BEGIN
 
   v_decision_text := COALESCE(NULLIF(trim(v_resolution.proposal_text), ''), v_resolution.title, 'Acuerdo sin sesion');
   v_template_id := COALESCE(p_selected_template_id, v_resolution.selected_template_id, v_expediente.selected_template_id);
-  PERFORM fn_secretaria_assert_template_tenant(p_tenant_id, v_template_id);
 
   INSERT INTO agreements (
     tenant_id, entity_id, body_id,
@@ -857,10 +651,10 @@ BEGIN
     'idempotent', false
   );
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_no_session_close_and_materialize_agreement(uuid, uuid, text, uuid)
-  TO authenticated, service_role
+  TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- fn_generar_certificacion_acuerdo_sin_sesion
@@ -877,7 +671,7 @@ CREATE OR REPLACE FUNCTION fn_generar_certificacion_acuerdo_sin_sesion(
 ) RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_cert_id uuid;
@@ -900,7 +694,6 @@ BEGIN
     RAISE EXCEPTION 'agreement not found: %', p_agreement_id;
   END IF;
   PERFORM fn_secretaria_assert_tenant_access(v_agreement.tenant_id);
-  PERFORM fn_secretaria_assert_capability(v_agreement.tenant_id, 'CERTIFICATION');
 
   IF v_agreement.adoption_mode <> 'NO_SESSION' THEN
     RAISE EXCEPTION 'agreement % is not a NO_SESSION agreement', p_agreement_id;
@@ -937,11 +730,6 @@ BEGIN
    WHERE entity_id = v_agreement.entity_id
      AND cargo = p_certificante_role
      AND estado = 'VIGENTE'
-     AND (
-       fn_secretaria_is_service_role()
-       OR fn_secretaria_current_role_code() = 'ADMIN_TENANT'
-       OR person_id = fn_secretaria_current_person_id()
-     )
    LIMIT 1;
   IF v_auth_ev_id IS NULL THEN
     RAISE EXCEPTION 'No hay autoridad vigente para cargo % en entity %',
@@ -983,10 +771,10 @@ BEGIN
 
   RETURN v_cert_id;
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_generar_certificacion_acuerdo_sin_sesion(uuid, text, text, uuid)
-  TO authenticated, service_role
+  TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- fn_registrar_transmision_capital
@@ -1007,7 +795,7 @@ CREATE OR REPLACE FUNCTION fn_registrar_transmision_capital(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public
 AS $$
 DECLARE
   v_source capital_holdings%ROWTYPE;
@@ -1025,14 +813,12 @@ DECLARE
   v_voting_weight numeric;
 BEGIN
   PERFORM fn_secretaria_assert_tenant_access(p_tenant_id);
-  PERFORM fn_secretaria_assert_role_allowed(p_tenant_id, ARRAY['SECRETARIO', 'ADMIN_TENANT']);
   IF p_source_holding_id IS NULL THEN
     RAISE EXCEPTION 'p_source_holding_id is required';
   END IF;
   IF p_destination_person_id IS NULL THEN
     RAISE EXCEPTION 'p_destination_person_id is required';
   END IF;
-  PERFORM fn_secretaria_assert_person_tenant(p_tenant_id, p_destination_person_id);
   IF p_titles_to_transfer IS NULL OR p_titles_to_transfer <= 0 THEN
     RAISE EXCEPTION 'p_titles_to_transfer must be positive';
   END IF;
@@ -1184,7 +970,7 @@ BEGIN
     'effective_date', p_effective_date
   );
 END;
-$$
+$$;
 
 GRANT EXECUTE ON FUNCTION fn_registrar_transmision_capital(uuid, uuid, uuid, numeric, date, uuid, text, text)
-  TO authenticated, service_role
+  TO authenticated, service_role;

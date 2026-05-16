@@ -1,4 +1,4 @@
--- Migration: 20260503_000051_secretaria_document_drafts.sql
+-- Migration: 20260503115719_create_secretaria_document_drafts.sql
 -- Purpose: Cloud persistence for editable Secretaria document drafts.
 -- Applied target: governance_OS (hzqwefkwsxopwrmtksbg).
 -- Guard: run `bun run db:check-target` before applying to any environment.
