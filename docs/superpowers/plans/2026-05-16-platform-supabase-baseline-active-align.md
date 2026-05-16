@@ -39,42 +39,37 @@ Alinear el directorio activo `supabase/migrations` con el ledger remoto exportad
 
 ## Resultado ledger
 
-El ledger queda alineado en todas las versiones historicas y recientes salvo una particularidad heredada:
+El ledger queda alineado en todas las versiones historicas y recientes.
+
+La particularidad heredada `20260504` fue resuelta posteriormente en el carril `codex/platform-normalize-20260504-ledger`:
 
 ```text
-                 | 20260504       | 20260504
-20260504         |                | 20260504
+20260504000051 | 20260504000051 | 2026-05-04 00:00:51
 ```
 
-La version remota `20260504` existe en `supabase_migrations.schema_migrations` como version de 8 digitos y nombre `000051_secretaria_p0_transactional_rpcs`.
+Acciones ejecutadas:
 
-El fichero local valido que la representa es:
+```bash
+git mv supabase/migrations/20260504_000051_secretaria_p0_transactional_rpcs.sql \
+  supabase/migrations/20260504000051_000051_secretaria_p0_transactional_rpcs.sql
 
-```text
-supabase/migrations/20260504_000051_secretaria_p0_transactional_rpcs.sql
+supabase migration repair 20260504 --status reverted --linked
+supabase migration repair 20260504000051 --status applied --linked
 ```
 
-La CLI ordena los ficheros locales por nombre. Por ese orden, `20260504_...` queda despues de `20260504193000...`, mientras que el remoto `20260504` queda antes de `20260504193000`. La comparacion secuencial de la CLI muestra por tanto un remote-only y un local-only con la misma version.
-
-Se probo `20260504.sql`, pero la CLI lo ignora:
-
-```text
-Skipping migration 20260504.sql... (file name must match pattern "<timestamp>_name.sql")
-```
-
-Conclusion: este caso no puede cerrarse solo con un rename Git-only sin romper el patron aceptado por Supabase CLI. Resolverlo por completo requeriria una decision explicita de ledger, por ejemplo normalizar la version remota a un timestamp de 14 digitos mediante una operacion Cloud controlada. Esa accion queda fuera de este PR.
+No se modifico schema funcional. La intervencion fue solo de representacion local y ledger de migraciones.
 
 ## Acciones no ejecutadas
 
 - No `supabase db push`.
 - No `supabase db pull`.
-- No `supabase migration repair`.
+- No `supabase migration repair` en el PR original de baseline activo. La normalizacion posterior de `20260504` ejecuto repair controlado solo sobre esas dos versiones.
 - No SQL de escritura.
 - No aplicacion de migraciones.
 - No cambios funcionales.
 
 ## Estado recomendado
 
-- Mantener `supabase db push` bloqueado para cambios generales mientras exista la anomalia `20260504`.
-- Permitir trabajo funcional con PRs normales si no requiere operaciones de migracion general.
-- Si se quiere desbloquear por completo `db push`, abrir carril separado y explicitamente autorizado para decidir si se normaliza `20260504` en Cloud.
+- `supabase db push` deja de estar bloqueado por drift historico conocido.
+- Mantener aun la practica de `--dry-run` antes de cualquier push real.
+- Los cambios funcionales con migraciones nuevas deben seguir entrando por PR pequeno y aplicacion controlada.
