@@ -294,6 +294,23 @@ export interface BodySlim {
   config?: Record<string, unknown> | null;
 }
 
+function configString(config: Record<string, unknown> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = config?.[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return null;
+}
+
+function normalizeBodySlim(row: BodySlim): BodySlim {
+  return {
+    ...row,
+    regulation_id: row.regulation_id ?? configString(row.config, ["regulation_id", "reglamento_id", "regulationId"]),
+    quorum: row.quorum ?? configString(row.config, ["quorum", "quorum_constitution", "quorumConstitucion"]),
+    status: row.status ?? configString(row.config, ["status", "estado"]),
+  };
+}
+
 export function useBodiesByEntity(entityId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -302,12 +319,12 @@ export function useBodiesByEntity(entityId: string | undefined) {
     queryFn: async (): Promise<BodySlim[]> => {
       const { data, error } = await supabase
         .from("governing_bodies")
-        .select("id, slug, name, body_type, regulation_id, quorum, status, config")
+        .select("id, slug, name, body_type, config")
         .eq("entity_id", entityId!)
         .eq("tenant_id", tenantId!)
         .order("name");
       if (error) throw error;
-      return ((data ?? []) as BodySlim[]).filter(isOperationalSecretariaBody);
+      return ((data ?? []) as BodySlim[]).map(normalizeBodySlim).filter(isOperationalSecretariaBody);
     },
   });
 }
