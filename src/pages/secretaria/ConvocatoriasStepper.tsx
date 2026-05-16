@@ -117,16 +117,25 @@ const AGENDA_TIPOS = [
   },
 ] as const;
 
-// agenda_item.kind v1.3: naturaleza del punto del orden del día.
+// agenda_item.kind v3.1: naturaleza del punto del orden del día.
 // Solo los puntos DECISORIO (label visible: "Acuerdo") se someten a votación
-// y materializan como acuerdo registrable. INFORMATIVO y DELIBERATIVO no
-// producen acuerdo y por tanto no exigen materia / mayoría / propuesta de
-// acuerdo. El enum DB mantiene "DECISORIO"; solo la etiqueta de UI cambia.
+// y materializan como acuerdo registrable. El resto se documenta en acta como
+// constancia, deliberación, toma de razón, informe o ruegos/preguntas.
 const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] = [
+  {
+    value: "DECISORIO",
+    label: "Acuerdo",
+    helper: "Propuesta concreta sometible a votación y materializable como acuerdo registrable.",
+  },
   {
     value: "INFORMATIVO",
     label: "Informativo",
     helper: "Solo informe, sin decisión ni debate formal.",
+  },
+  {
+    value: "TOMA_DE_RAZON",
+    label: "Toma de razón",
+    helper: "Constancia de un hecho o acto ya producido, sin manifestación de voluntad.",
   },
   {
     value: "DELIBERATIVO",
@@ -134,9 +143,14 @@ const KIND_OPTIONS: { value: AgendaItemKind; label: string; helper: string }[] =
     helper: "Debate y conclusiones, sin votación formal.",
   },
   {
-    value: "DECISORIO",
-    label: "Acuerdo",
-    helper: "Propuesta concreta sometible a votación y materializable como acuerdo registrable.",
+    value: "ACEPTACION_INFORME",
+    label: "Aceptación de informe",
+    helper: "Recepción de informe con conformidad u observaciones, sin activar gates de validez LSC.",
+  },
+  {
+    value: "RUEGOS_PREGUNTAS",
+    label: "Ruegos y preguntas",
+    helper: "Intervenciones, solicitudes o compromisos de respuesta al cierre de la sesión.",
   },
 ];
 
@@ -274,7 +288,7 @@ function newAgendaItem(): AgendaItem {
     materia: "APROBACION_CUENTAS",
     tipo: "ORDINARIA",
     inscribible: false,
-    // agenda_item.kind v1.3: default DELIBERATIVO (coincide con BD default).
+    // agenda_item.kind v3.1: default DELIBERATIVO (coincide con BD default).
     kind: "DELIBERATIVO",
     decision_subtype: null,
     propuesta_acuerdo: null,
@@ -487,12 +501,12 @@ export default function ConvocatoriasStepper() {
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
   const agendaRuleSpecs = agendaItems
-    // agenda_item.kind v1.3: solo DECISORIO produce acuerdo y exige reglas LSC.
-    // INFORMATIVO / DELIBERATIVO no se someten a votación → no aplica motor V2.
+    // agenda_item.kind v3.1: solo DECISORIO produce acuerdo y exige reglas LSC.
+    // Los puntos no decisorios no se someten a votación → no aplica motor V2.
     .filter((item) => (item.kind ?? "DELIBERATIVO") === "DECISORIO")
     // BATCH 8.3 (ronda 2 U-A): filtrar materias libres antes del motor.
     // OTROS_LIBRE indica intencionalmente que el secretario asume el punto
-    // como informativo / sin reglas LSC aplicables — no es bug, es diseño.
+    // como no decisorio / sin reglas LSC aplicables — no es bug, es diseño.
     .filter((item) => !MATERIAS_LIBRES.has(item.materia))
     .map((item) => ({
       materia: item.materia,
@@ -560,14 +574,14 @@ export default function ConvocatoriasStepper() {
     adoptionMode: "MEETING",
     fechaJunta: meetingIso,
     // Lectura canonical desde `entities.es_cotizada` (override en
-     // entity_settings no se aplica aquí — el motor V2 lo recibe ya
-     // resuelto desde variable-resolver en otros flujos. Para el motor
-     // de convocatoria nos basta la columna directa).
+    // entity_settings no se aplica aquí — el motor V2 lo recibe ya
+    // resuelto desde variable-resolver en otros flujos. Para el motor
+    // de convocatoria nos basta la columna directa).
     esCotizada: Boolean(selectedEntity?.es_cotizada),
     webInscrita: true,
     primeraConvocatoria: true,
     esJuntaUniversal: tipoConvocatoria === "UNIVERSAL",
-    // agenda_item.kind v1.3: motor V2 solo recibe materias DECISORIO.
+    // agenda_item.kind v3.1: motor V2 solo recibe materias DECISORIO.
     materias: agendaItems
       .filter((i) => (i.kind ?? "DELIBERATIVO") === "DECISORIO")
       .map((i) => i.materia),
@@ -722,7 +736,7 @@ export default function ConvocatoriasStepper() {
             materia: materiaMeta?.value ?? requestedTemplateMateria ?? first.materia,
             tipo: (materiaMeta?.tipo ?? first.tipo) as AgendaItem["tipo"],
             inscribible: materiaMeta?.inscribible ?? first.inscribible,
-            // agenda_item.kind v1.3: si llega una plantilla MODELO_ACUERDO,
+            // agenda_item.kind v3.1: si llega una plantilla MODELO_ACUERDO,
             // el punto se trata como DECISORIO (se va a votar). Las plantillas
             // de convocatoria sin materia conservan el kind por defecto.
             kind: "DECISORIO",
@@ -1564,14 +1578,14 @@ export default function ConvocatoriasStepper() {
               materia,
               tipo,
               inscribible,
-              // agenda_item.kind v1.3: persistir naturaleza del punto.
-              // Solo DECISORIO admite decision_subtype; INFO / DELIB → null.
+              // agenda_item.kind v3.1: persistir naturaleza del punto.
+              // Solo DECISORIO admite decision_subtype; resto → null.
               kind: effectiveKind,
               decision_subtype:
                 effectiveKind === "DECISORIO" ? (decision_subtype ?? null) : null,
               // BATCH 3: persistir propuesta concreta del acuerdo en JSONB.
               // Backward-compat: convocatorias antiguas leen null.
-              // Para INFO / DELIB no hay propuesta de acuerdo posible.
+              // Para puntos no decisorios no hay propuesta de acuerdo posible.
               propuesta_acuerdo:
                 effectiveKind === "DECISORIO" ? (propuesta_acuerdo ?? null) : null,
             };
@@ -2360,10 +2374,9 @@ export default function ConvocatoriasStepper() {
                       )}
                     </div>
 
-                    {/* agenda_item.kind v1.3: selector de naturaleza del punto.
+                    {/* agenda_item.kind v3.1: selector de naturaleza del punto.
                         Determina si exige materia / mayoría / propuesta de
-                        acuerdo (DECISORIO) o solo es informe / debate
-                        (INFORMATIVO / DELIBERATIVO). */}
+                        acuerdo (DECISORIO) o solo constancia no decisoria. */}
                     <div className="pl-5">
                       <div
                         className="flex flex-wrap gap-2"
@@ -2380,7 +2393,7 @@ export default function ConvocatoriasStepper() {
                               aria-checked={active}
                               aria-label={`${opt.label}: ${opt.helper}`}
                               onClick={() => {
-                                // Al cambiar a INFORMATIVO / DELIBERATIVO,
+                                // Al cambiar a cualquier tipo no decisorio,
                                 // limpiar decision_subtype (solo aplica a DECISORIO).
                                 const patch: Partial<AgendaItem> = { kind: opt.value };
                                 if (opt.value !== "DECISORIO") {
@@ -2447,7 +2460,7 @@ export default function ConvocatoriasStepper() {
                     )}
 
                     {/* Materia / clase / inscribible / propuesta solo aplican a
-                        puntos DECISORIO. Para INFO / DELIB no hay acuerdo. */}
+                        puntos DECISORIO. Para puntos no decisorios no hay acuerdo. */}
                     {isDecisorio && (
                       <>
                         <div className="flex items-center gap-3 pl-5 mt-3">

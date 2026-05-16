@@ -44,15 +44,15 @@ describe("A2 UI Badge — ExpedienteAcuerdo wiring guards", () => {
     );
   });
 
-  it("renderiza un span con el texto 'Snapshot legacy' en el header", () => {
+  it("renderiza un span con el texto 'Snapshot anterior' en el header", () => {
     // El badge debe estar literalmente en el JSX, no oculto detrás de
     // alias o constantes que un refactor accidental podría vaciar.
-    expect(COMPONENT_SOURCE).toMatch(/Snapshot legacy/);
+    expect(COMPONENT_SOURCE).toMatch(/Snapshot anterior/);
   });
 
-  it("incluye el copy UX explicativo de divergencia con el motor actual", () => {
+  it("incluye el copy UX explicativo de divergencia con la evaluación actual", () => {
     expect(COMPONENT_SOURCE).toMatch(
-      /Este resultado fue calculado con una versión anterior del motor\. La evaluación actual puede diferir\./,
+      /Este resultado fue calculado con una versión anterior del sistema\. La evaluación actual puede diferir\./,
     );
   });
 

@@ -31,6 +31,8 @@ describe("meeting agenda source merge", () => {
     ]);
     expect(points[2]).toMatchObject({
       agreement_id: "agreement-1",
+      kind: "DECISORIO",
+      decision_subtype: "CONSTITUTIVE",
       materia: "MODIFICACION_ESTATUTOS",
       tipo: "ESTATUTARIA",
       group_campaign_id: "campaign-1",
@@ -116,6 +118,7 @@ describe("meeting agenda source merge", () => {
     expect(points).toHaveLength(1);
     expect(points[0].agreement_id).toBe("agreement-1");
     expect(points[0].origin).toBe("PREPARED_AGREEMENT");
+    expect(points[0].kind).toBe("DECISORIO");
   });
 
   it("creates blank session-born points for in-meeting additions", () => {
@@ -124,6 +127,7 @@ describe("meeting agenda source merge", () => {
       materia: "APROBACION_CUENTAS",
       tipo: "ORDINARIA",
       origin: "MEETING_FLOOR",
+      kind: "DELIBERATIVO",
     });
   });
 

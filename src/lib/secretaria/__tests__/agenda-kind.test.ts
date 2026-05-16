@@ -12,8 +12,12 @@ describe("normalizeAgendaItemKind", () => {
     ["decisorio", "DECISORIO"],
     ["INFORMATIVO", "INFORMATIVO"],
     ["informativo", "INFORMATIVO"],
+    ["TOMA_DE_RAZON", "TOMA_DE_RAZON"],
+    ["toma_de_razon", "TOMA_DE_RAZON"],
     ["DELIBERATIVO", "DELIBERATIVO"],
     ["  DELIBERATIVO  ", "DELIBERATIVO"],
+    ["ACEPTACION_INFORME", "ACEPTACION_INFORME"],
+    ["RUEGOS_PREGUNTAS", "RUEGOS_PREGUNTAS"],
     ["  DECISIVO ", "DELIBERATIVO"], // típo no reconocido → default conservador
     ["", "DELIBERATIVO"],
     [null, "DELIBERATIVO"],
@@ -30,6 +34,9 @@ describe("isDecisionAgendaItem", () => {
     expect(isDecisionAgendaItem("DECISORIO")).toBe(true);
     expect(isDecisionAgendaItem("DELIBERATIVO")).toBe(false);
     expect(isDecisionAgendaItem("INFORMATIVO")).toBe(false);
+    expect(isDecisionAgendaItem("TOMA_DE_RAZON")).toBe(false);
+    expect(isDecisionAgendaItem("ACEPTACION_INFORME")).toBe(false);
+    expect(isDecisionAgendaItem("RUEGOS_PREGUNTAS")).toBe(false);
   });
 });
 

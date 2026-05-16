@@ -17,6 +17,7 @@ export interface MeetingAgreementMaterializationInput {
   entityId: string;
   bodyId: string;
   meetingId: string;
+  agendaItemId?: string | null;
   scheduledStart?: string | null;
   snapshot: MeetingAdoptionSnapshot;
   resolutionText?: string | null;
@@ -194,6 +195,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
     adoption_mode: "MEETING",
     status: "ADOPTED",
     parent_meeting_id: input.meetingId,
+    agenda_item_id: input.agendaItemId ?? null,
     proposal_text: resolutionText,
     decision_text: resolutionText,
     decision_date: decisionDate,
@@ -248,6 +250,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     agreement_kind: input.snapshot.materia,
     matter_class: input.snapshot.materia_clase,
     status: "DRAFT",
+    agenda_item_id: input.agendaItemId ?? null,
     decision_text: null,
     decision_date: null,
     proposal_text: textForAgreement(input),

@@ -2,7 +2,7 @@
  * Matriz P7 — tests unitarios.
  *
  * Cubre los 5 modos del estado meetings.status × CONSEJO/JUNTA universal/formal
- * × INFO/DELIB/DECIS. Función pura, sin mocks.
+ * × tipos decisorios/no decisorios. Función pura, sin mocks.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -192,6 +192,19 @@ describe("checkReclassificationAllowed — matriz P7", () => {
         isUniversal: false,
         currentKind: "DECISORIO",
         newKind: "INFORMATIVO",
+      }),
+    );
+    expect(r.allowed).toBe(true);
+  });
+
+  it("CONVOCADA + JUNTA formal + DELIB→TOMA_DE_RAZON: permitido (no crea negocio jurídico)", () => {
+    const r = checkReclassificationAllowed(
+      base({
+        meetingStatus: "CONVOCADA",
+        organType: "JUNTA_GENERAL",
+        isUniversal: false,
+        currentKind: "DELIBERATIVO",
+        newKind: "TOMA_DE_RAZON",
       }),
     );
     expect(r.allowed).toBe(true);

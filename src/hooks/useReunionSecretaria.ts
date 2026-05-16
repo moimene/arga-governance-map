@@ -21,6 +21,10 @@ import {
   type ConvocatoriaForMeetingSchedule,
 } from "@/lib/secretaria/meeting-scheduler";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import {
+  normalizeAgendaItemKind,
+  type AgendaItemKind,
+} from "@/lib/secretaria/agenda-kind";
 
 export interface MeetingSecretariaRow {
   id: string;
@@ -95,6 +99,15 @@ export interface SavedMeetingResolutionPoint {
   resolution_id: string;
   agreement_id: string | null;
   adoption_snapshot?: MeetingAdoptionSnapshot;
+}
+
+export interface AgendaItemConstanciaInput {
+  agenda_item_id: string;
+  kind: AgendaItemKind | string;
+  summary?: string | null;
+  participants?: Array<Record<string, unknown>>;
+  follow_ups?: Array<Record<string, unknown>>;
+  attachments?: Array<Record<string, unknown>>;
 }
 
 export interface MeetingForConvocatoria {
@@ -744,6 +757,55 @@ export function useUpdateQuorumData(meetingId: string | undefined) {
   });
 }
 
+export function useReplaceAgendaItemConstancias(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (rows: AgendaItemConstanciaInput[]) => {
+      if (!meetingId || !tenantId) return [];
+
+      const { error: deleteError } = await supabase
+        .from("agenda_item_constancias")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("meeting_id", meetingId);
+      if (deleteError) throw deleteError;
+
+      const payload = rows
+        .map((row) => {
+          const kind = normalizeAgendaItemKind(row.kind);
+          if (kind === "DECISORIO") return null;
+          return {
+            tenant_id: tenantId,
+            meeting_id: meetingId,
+            agenda_item_id: row.agenda_item_id,
+            kind,
+            summary: row.summary ?? null,
+            participants: row.participants ?? [],
+            follow_ups: row.follow_ups ?? [],
+            attachments: row.attachments ?? [],
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => row !== null);
+
+      if (payload.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("agenda_item_constancias")
+        .insert(payload)
+        .select("id, agenda_item_id");
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "byId", meetingId] });
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", meetingId, "agenda-sources"] });
+      qc.invalidateQueries({ queryKey: ["actas", tenantId, "agenda_contract", meetingId] });
+    },
+  });
+}
+
 export function useSaveMeetingResolutions(meetingId: string | undefined) {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
@@ -766,6 +828,17 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
       const meetingForAgreement = meetingData as MeetingForAgreement;
       const bodyId = meetingForAgreement?.body_id ?? null;
       const entityId = meetingForAgreement?.governing_bodies?.entity_id ?? null;
+
+      const { data: agendaRows, error: agendaRowsErr } = await supabase
+        .from("agenda_items")
+        .select("id, order_number, kind")
+        .eq("meeting_id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (agendaRowsErr) throw agendaRowsErr;
+      const agendaByOrder = new Map(
+        ((agendaRows ?? []) as Array<{ id: string; order_number: number; kind: string }>)
+          .map((row) => [row.order_number, row])
+      );
 
       const { data: existingResolutionIds, error: existingErr } = await supabase
         .from("meeting_resolutions")
@@ -805,11 +878,16 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
             if (!entityId || !bodyId) {
               throw new Error("No se puede materializar el acuerdo: falta entidad u órgano de la reunión.");
             }
+            const agendaItem = agendaByOrder.get(row.agenda_item_index);
+            if (!agendaItem?.id || agendaItem.kind !== "DECISORIO") {
+              throw new Error("Solo un punto decisorio puede materializarse como Acuerdo 360.");
+            }
             const payload = buildMeetingAgreementPayload({
               tenantId,
               entityId,
               bodyId,
               meetingId,
+              agendaItemId: agendaItem.id,
               scheduledStart: meetingForAgreement?.scheduled_start,
               snapshot: row.adoption_snapshot,
               resolutionText: row.resolution_text,
@@ -822,11 +900,13 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
               agreementAction = "UPSERT";
             }
           } else if (row.adoption_snapshot && existingAgreementId && entityId && bodyId) {
+            const agendaItem = agendaByOrder.get(row.agenda_item_index);
             agreementPayload = buildMeetingAgreementDraftResetPayload({
               tenantId,
               entityId,
               bodyId,
               meetingId,
+              agendaItemId: agendaItem?.id ?? null,
               scheduledStart: meetingForAgreement?.scheduled_start,
               snapshot: row.adoption_snapshot,
               resolutionText: row.resolution_text,
@@ -873,6 +953,7 @@ export function useGenerarActa() {
     mutationFn: async ({
       meetingId,
       content,
+      canonicalMinutesHash,
       entityId,
       bodyId,
       sessionKind = "MEETING",
@@ -880,6 +961,7 @@ export function useGenerarActa() {
     }: {
       meetingId: string;
       content: string;
+      canonicalMinutesHash?: string | null;
       entityId: string;
       bodyId: string;
       sessionKind?: "MEETING" | "NO_SESSION" | "UNIPERSONAL";
@@ -902,6 +984,7 @@ export function useGenerarActa() {
         p_meeting_id: meetingId,
         p_content: content,
         p_snapshot_id: snapshotId,
+        p_canonical_minutes_hash: canonicalMinutesHash ?? null,
       });
       if (error) throw error;
       return data as string;

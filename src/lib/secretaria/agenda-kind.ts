@@ -1,18 +1,23 @@
-export type AgendaItemKind = "INFORMATIVO" | "DELIBERATIVO" | "DECISORIO";
-export type AgendaDecisionSubtype = "CONSTITUTIVE" | "RATIFICATORY" | "ELEVATION" | "ACKNOWLEDGEMENT";
-export type ResolutionKind = "DECISION" | "DELIBERATION_OUTCOME" | "INFORMATION_NOTED";
+import {
+  normalizeAgendaItemKind,
+  type AgendaItemKind,
+} from "@/lib/rules-engine";
 
-const VALID_KINDS = new Set<AgendaItemKind>(["INFORMATIVO", "DELIBERATIVO", "DECISORIO"]);
-
-export function normalizeAgendaItemKind(value: unknown): AgendaItemKind {
-  if (typeof value !== "string") return "DELIBERATIVO";
-  const upper = value.toUpperCase().trim();
-  return VALID_KINDS.has(upper as AgendaItemKind) ? (upper as AgendaItemKind) : "DELIBERATIVO";
-}
-
-export function isDecisionAgendaItem(kind: AgendaItemKind): boolean {
-  return kind === "DECISORIO";
-}
+export {
+  AGENDA_ITEM_KINDS,
+  NON_DECISION_AGENDA_ITEM_KINDS,
+  isDecisionAgendaItem,
+  normalizeAgendaItemKind,
+  normalizeAgendaReportAcceptanceVote,
+  resolutionKindForAgendaItem,
+  shouldRunAgreementGatesForAgendaItem,
+} from "@/lib/rules-engine";
+export type {
+  AgendaDecisionSubtype,
+  AgendaItemKind,
+  AgendaReportAcceptanceVote,
+  AgendaItemResolutionKind as ResolutionKind,
+} from "@/lib/rules-engine";
 
 export interface AgendaKindMerged {
   effective: AgendaItemKind;       // valor actual autoritative (P4 SSOT)

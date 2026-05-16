@@ -176,9 +176,12 @@ export interface AgendaItem {
   tipo: "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL";
   inscribible: boolean;
   /**
-   * Naturaleza del punto del orden del día (agenda_item.kind v1.3):
+   * Naturaleza del punto del orden del día (agenda_item.kind v3.1):
    * - INFORMATIVO: solo informe, sin decisión.
+   * - TOMA_DE_RAZON: constancia de hecho o acto ya producido.
    * - DELIBERATIVO: debate y conclusiones, sin votación formal (default).
+   * - ACEPTACION_INFORME: recepción de informe con conformidad u observaciones.
+   * - RUEGOS_PREGUNTAS: intervenciones y compromisos de respuesta.
    * - DECISORIO: sometible a votación y materializable como acuerdo.
    *
    * Se persiste en `convocatorias.agenda_items` JSONB y se replica como

@@ -5,7 +5,13 @@
 
 // --- Enums y tipos básicos ---
 
-export type Fuente = 'LEY' | 'ESTATUTOS' | 'PACTO_PARASOCIAL' | 'REGLAMENTO' | 'SISTEMA';
+export type Fuente =
+  | 'LEY'
+  | 'ESTATUTOS'
+  | 'PACTO_PARASOCIAL'
+  | 'REGLAMENTO'
+  | 'OVERRIDE_INTERNO'
+  | 'SISTEMA';
 
 export type TipoSocial = 'SA' | 'SL' | 'SLU' | 'SAU';
 
@@ -37,12 +43,69 @@ export type TipoActa =
 
 export type MateriaClase = 'ORDINARIA' | 'ESTATUTARIA' | 'ESTRUCTURAL' | 'ESPECIAL';
 
+export type AgendaItemKind =
+  | 'DECISORIO'
+  | 'INFORMATIVO'
+  | 'TOMA_DE_RAZON'
+  | 'DELIBERATIVO'
+  | 'ACEPTACION_INFORME'
+  | 'RUEGOS_PREGUNTAS';
+
+export type AgendaDecisionSubtype = 'CONSTITUTIVE' | 'RATIFICATORY' | 'ELEVATION' | 'ACKNOWLEDGEMENT';
+
+export type AgendaReportAcceptanceVote = 'NONE' | 'ASSENT' | 'BINDING';
+
+export type AgendaItemResolutionKind =
+  | 'DECISION'
+  | 'INFORMATION_NOTED'
+  | 'ACKNOWLEDGEMENT_NOTED'
+  | 'DELIBERATION_OUTCOME'
+  | 'REPORT_ACCEPTED'
+  | 'QUESTIONS_ANSWERS';
+
 // --- Parámetros con fuente ---
 
 export interface ReglaParametro<T> {
   valor: T;
   fuente: Fuente;
   referencia?: string; // e.g., "art. 193.1 LSC"
+}
+
+export type RuleComparator = 'mayor' | 'union' | 'override';
+
+export type NormativePlane = 'SOCIETARIO' | 'CONTRACTUAL' | 'OPERATIVO' | 'SISTEMA';
+
+export interface EffectiveRuleSourceLayer {
+  layer: Fuente;
+  plane: NormativePlane;
+  path: string;
+  label: string;
+  value: unknown;
+  reference?: string | null;
+  applied: boolean;
+  contractual_only?: boolean;
+  reason: string;
+}
+
+export interface EffectiveRuleSummary<T = unknown> {
+  path: string;
+  label: string;
+  comparator: RuleComparator;
+  legal_minimum?: unknown;
+  effective_value: T;
+  effective_source: Fuente;
+  effective_reference?: string | null;
+}
+
+export interface EffectiveRuleResolution<T = unknown> {
+  ok: boolean;
+  severity: EvalSeverity;
+  effective_rule: ReglaParametro<T>;
+  summary: EffectiveRuleSummary<T>;
+  source_layers: EffectiveRuleSourceLayer[];
+  explain_nodes: ExplainNode[];
+  blocking_issues: string[];
+  warnings: string[];
 }
 
 // --- Reglas por etapa ---
@@ -236,6 +299,47 @@ export interface RuleParamOverride {
 
 export type EvalSeverity = 'OK' | 'WARNING' | 'BLOCKING';
 
+export type ComplianceGateStatus = 'OK' | 'WARNING' | 'BLOCKING' | 'NOT_APPLICABLE';
+
+export type ComplianceGateKind =
+  | 'routing'
+  | 'convocation'
+  | 'constitution'
+  | 'quorum'
+  | 'conflict'
+  | 'majority'
+  | 'unanimity'
+  | 'documentation'
+  | 'formalization'
+  | 'registry'
+  | 'publication'
+  | 'contractual';
+
+export interface ComplianceGateResult {
+  kind: ComplianceGateKind;
+  label: string;
+  status: ComplianceGateStatus;
+  ok: boolean;
+  blocksProgress: boolean;
+  notApplicable?: boolean;
+  message: string;
+  source?: Fuente;
+  reference?: string | null;
+  explain: ExplainNode[];
+  blocking_issues: string[];
+  warnings: string[];
+}
+
+export interface CompliancePanelResult {
+  ok: boolean;
+  can_advance: boolean;
+  gates: ComplianceGateResult[];
+  blocking_issues: string[];
+  warnings: string[];
+  next_actions: string[];
+  effective_rule?: EffectiveRuleResolution;
+}
+
 export interface ExplainNode {
   regla: string;
   fuente: Fuente;
@@ -254,6 +358,26 @@ export interface EvaluacionResult {
   explain: ExplainNode[];
   blocking_issues: string[];
   warnings: string[];
+}
+
+export type AgendaItemGateMode = 'FULL_GATE' | 'CONSTANCIA' | 'LIGHT_ACCEPTANCE';
+
+export interface AgendaItemEvaluationInput {
+  kind?: unknown;
+  title?: string | null;
+  orderNumber?: number | null;
+  hasAgreement?: boolean;
+  requiresVote?: AgendaReportAcceptanceVote | null;
+}
+
+export interface AgendaItemEvaluationResult extends EvaluacionResult {
+  itemKind: AgendaItemKind;
+  gateMode: AgendaItemGateMode;
+  shouldRunAgreementGates: boolean;
+  agreementAllowed: boolean;
+  constanciaRequired: boolean;
+  requiresVote: AgendaReportAcceptanceVote;
+  resolutionKind: AgendaItemResolutionKind | null;
 }
 
 // --- Denominador ajustado (conflicto de interés) ---
@@ -535,6 +659,11 @@ export interface ComplianceResult {
   snapshot_hash?: string;
   gate_hash?: string;
   pactosResult?: import('./pactos-engine').PactosEvalOutput;
+  gates?: ComplianceGateResult[];
+  can_advance?: boolean;
+  next_actions?: string[];
+  effective_rule?: EffectiveRuleResolution;
+  source_layers?: EffectiveRuleSourceLayer[];
 }
 
 // --- Plantilla types ---

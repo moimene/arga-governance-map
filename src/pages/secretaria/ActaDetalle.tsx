@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, FileSignature, Gavel, Link2, Loader2, Shield, Stamp, Lock, Unlock } from "lucide-react";
 import {
+  useActaAgendaContract,
   useActaById,
   useCertificationsByMinute,
   useCertificationPlanForMinute,
@@ -19,6 +20,14 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import { useReunionAttendees } from "@/hooks/useReunionSecretaria";
 import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
+import { renderActaAgendaItemsText } from "@/lib/secretaria/acta-agenda";
+import {
+  buildActaLegalStructureViewModel,
+  buildActaLegalTemplateVariables,
+  renderActaLegalStructureText,
+  validateActaRrmStructure,
+  type ActaOrganKind,
+} from "@/lib/secretaria/acta-legal-structure";
 
 function buildActaFallback(params: {
   body: string;
@@ -149,6 +158,21 @@ function cityFromLocation(location?: string | null) {
   return first || location.trim();
 }
 
+function inferActaOrganKind(value?: string | null): ActaOrganKind {
+  const raw = String(value ?? "").toUpperCase();
+  if (raw.includes("JUNTA") || raw.includes("ASAMBLEA")) return "JUNTA";
+  if (raw.includes("CONSEJO") || raw.includes("CDA") || raw.includes("COMISION")) return "CONSEJO";
+  return "OTRO";
+}
+
+function stringFromRecord(record: Record<string, unknown> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
 export default function ActaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -157,6 +181,7 @@ export default function ActaDetalle() {
   const { data: acta, isLoading } = useActaById(id);
   const { data: certs } = useCertificationsByMinute(id);
   const { data: certificationPlan, isLoading: certificationPlanLoading } = useCertificationPlanForMinute(id);
+  const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(acta?.meeting_id);
   const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(acta?.meeting_id);
   const materializeAgreement = useMaterializeMeetingPointAgreement(id);
   const { primaryRole } = useCurrentUserRole();
@@ -201,8 +226,22 @@ export default function ActaDetalle() {
       ].sort((a, b) => a.agenda_item_index - b.agenda_item_index)
     : [];
   const meetingDate = meeting?.scheduled_start ?? m.created_at;
-  const ordenDiaTexto = textLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
-  const acuerdosTexto = agreementLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
+  const actaPuntos = actaAgendaContract?.puntos ?? [];
+  const actaValidationIssues = actaAgendaContract?.validation.blockingIssues ?? [];
+  const ordenDiaTexto =
+    actaPuntos.length > 0
+      ? actaPuntos.map((point) => `${point.order_number}. ${point.title}`).join("\n")
+      : textLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
+  const puntosActaTexto = actaPuntos.length > 0
+    ? renderActaAgendaItemsText(actaPuntos)
+    : ordenDiaTexto;
+  const acuerdosTexto =
+    actaPuntos.length > 0
+      ? actaPuntos
+          .filter((point) => point.kind === "DECISORIO")
+          .map((point) => `${point.order_number}. ${point.decisorio?.adoptedText ?? point.resolution_text ?? point.title}`)
+          .join("\n")
+      : agreementLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
   const miembrosPresentesTexto =
     attendeeLines(attendees) || "Según lista de asistentes incorporada al expediente.";
   const presidente = meeting?.president?.full_name ?? "Presidencia del órgano";
@@ -211,6 +250,96 @@ export default function ActaDetalle() {
     quorumPercentage(meeting?.quorum_data, pointSnapshots) || "Según snapshot de quórum incorporado al expediente";
   const isJunta = (meeting?.meeting_type ?? meeting?.governing_bodies?.body_type ?? "").toUpperCase().includes("JUNTA");
   const meetingTypeLabel = bodyTypeLabel(meeting?.meeting_type ?? meeting?.governing_bodies?.body_type);
+  const quorumRecord = asRecord(meeting?.quorum_data);
+  const sourceLinks = asRecord(quorumRecord?.source_links);
+  const actaOrganKind = inferActaOrganKind(meeting?.governing_bodies?.body_type ?? meeting?.meeting_type);
+  const isUniversal = quorumRecord?.is_universal === true || quorumRecord?.junta_universal === true;
+  const convocationText =
+    stringFromRecord(quorumRecord, ["convocation_text", "texto_convocatoria", "modo_convocatoria"]) ||
+    (sourceLinks?.convocatoria_id
+      ? `Convocatoria documentada en el expediente ${String(sourceLinks.convocatoria_id)}.`
+      : "Convocatoria documentada en el expediente de la reunión.");
+  const convocationPublicationText =
+    stringFromRecord(quorumRecord, ["convocation_publication_text", "publicacion_convocatoria", "borme_diario"]) ||
+    (isJunta && entity.toUpperCase().includes("S.A")
+      ? "Publicación o comunicación de convocatoria incorporada al expediente de la sociedad."
+      : "");
+  const approvalMode = m.signed_at
+    ? "aprobación y firma del acta por la Secretaría con el visto bueno de la Presidencia"
+    : "aprobación por el propio órgano al final de la reunión o por el sistema legal o estatutario documentado";
+  const approvalDate = formatDateOnly(m.signed_at ?? m.created_at) || formatDateOnly(meetingDate) || m.created_at;
+  const actaLegalStructure = buildActaLegalStructureViewModel({
+    meetingId: m.meeting_id,
+    minuteId: m.id,
+    entityName: entity,
+    organName: body,
+    organKind: actaOrganKind,
+    meetingCharacter: isUniversal ? "UNIVERSAL" : isJunta ? "NO_UNIVERSAL" : "ORDINARIA",
+    entityType: entity,
+    isUniversal,
+    date: formatDateOnly(meetingDate) || m.created_at,
+    startTime: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    endTime: formatTimeOnly(meeting?.scheduled_end),
+    place: meeting?.location ?? "Domicilio social",
+    convocationText,
+    convocationPublicationText,
+    president: presidente,
+    secretary: secretario,
+    attendees: attendees.map((attendee) => ({
+      name: attendee.full_name ?? attendee.person_id ?? "Asistente sin identificar",
+      attendance:
+        attendee.attendance_type === "REPRESENTADO"
+          ? "REPRESENTADO"
+          : attendee.attendance_type === "AUSENTE"
+            ? "AUSENTE"
+            : "PRESENTE",
+      representedBy: attendee.represented_by_id ?? null,
+      capitalPercentage:
+        typeof attendee.capital_representado === "number"
+          ? `${attendee.capital_representado.toLocaleString("es-ES", { maximumFractionDigits: 2 })}%`
+          : null,
+      signed: isUniversal ? false : null,
+    })),
+    quorumText: porcentajeCapitalPresente,
+    capitalPresentText: porcentajeCapitalPresente,
+    agendaItems: actaPuntos,
+    agreementRows: actaAgendaContract?.agreementRows ?? [],
+    canonicalMinutesHash: actaAgendaContract?.canonicalMinutesHash ?? m.canonical_minutes_hash ?? null,
+    approvalMode,
+    approvalDate,
+    certificationCircumstancesText:
+      certificationAgreementRefs.length > 0
+        ? `Acuerdos certificables: ${certificationAgreementRefs.length}. La certificación deberá recoger sistema y fecha de aprobación del acta y las circunstancias necesarias para calificación registral.`
+        : "No constan acuerdos certificables materializados como Acuerdo 360 en este momento.",
+  });
+  const actaRrmValidation = validateActaRrmStructure({
+    meetingId: m.meeting_id,
+    minuteId: m.id,
+    entityName: entity,
+    organName: body,
+    organKind: actaOrganKind,
+    meetingCharacter: isUniversal ? "UNIVERSAL" : isJunta ? "NO_UNIVERSAL" : "ORDINARIA",
+    entityType: entity,
+    isUniversal,
+    date: formatDateOnly(meetingDate) || m.created_at,
+    startTime: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
+    endTime: formatTimeOnly(meeting?.scheduled_end),
+    place: meeting?.location ?? "Domicilio social",
+    convocationText,
+    convocationPublicationText,
+    president: presidente,
+    secretary: secretario,
+    attendees: actaLegalStructure.attendees,
+    quorumText: porcentajeCapitalPresente,
+    capitalPresentText: porcentajeCapitalPresente,
+    agendaItems: actaPuntos,
+    agreementRows: actaAgendaContract?.agreementRows ?? [],
+    canonicalMinutesHash: actaAgendaContract?.canonicalMinutesHash ?? m.canonical_minutes_hash ?? null,
+    approvalMode,
+    approvalDate,
+  });
+  const actaLegalVariables = buildActaLegalTemplateVariables(actaLegalStructure);
+  const actaRrmIssues = actaRrmValidation.blockingIssues;
   const certificationDisabledReason = certificationPlanLoading
     ? "Cargando snapshot legal de la reunión"
     : !certificationPlan?.hasPointSnapshots
@@ -224,6 +353,7 @@ export default function ActaDetalle() {
     readiness?.status === "reference_only" ? demoReadinessMessage(readiness) : null;
   const certificationGateReason = certificationReadinessReason ?? certificationDisabledReason;
   const actaVariables = {
+    ...actaLegalVariables,
     entity_id: m.entity_id,
     meeting_id: m.meeting_id,
     minute_id: m.id,
@@ -244,18 +374,37 @@ export default function ActaDetalle() {
     secretario,
     porcentaje_capital_presente: porcentajeCapitalPresente,
     orden_dia_texto: ordenDiaTexto,
+    puntos_acta_texto: puntosActaTexto,
+    canonical_minutes_hash: actaAgendaContract?.canonicalMinutesHash ?? m.canonical_minutes_hash ?? "",
     acuerdos_texto: acuerdosTexto,
     miembros_presentes_texto: miembrosPresentesTexto,
     asistentes_texto: miembrosPresentesTexto,
-    orden_dia: pointSnapshots.map((snapshot) => ({
-      ordinal: String(snapshot.agenda_item_index),
-      descripcion_punto: snapshot.resolution_text,
-    })),
-    acuerdos: pointSnapshots.map((snapshot) => ({
-      ordinal: String(snapshot.agenda_item_index),
-      texto: snapshot.resolution_text,
-      estado: snapshot.status_resolucion,
-    })),
+    orden_dia: actaPuntos.length > 0
+      ? actaPuntos.map((point) => ({
+          ordinal: String(point.order_number),
+          descripcion_punto: point.title,
+          tipo_punto: point.kind,
+          constancia: point.constancia?.text ?? "",
+        }))
+      : pointSnapshots.map((snapshot) => ({
+          ordinal: String(snapshot.agenda_item_index),
+          descripcion_punto: snapshot.resolution_text,
+        })),
+    acuerdos: actaPuntos.length > 0
+      ? actaPuntos
+          .filter((point) => point.kind === "DECISORIO")
+          .map((point) => ({
+            ordinal: String(point.order_number),
+            texto: point.decisorio?.adoptedText ?? point.resolution_text ?? point.title,
+            estado: point.status,
+            agreement_id: point.agreement_id,
+          }))
+      : pointSnapshots.map((snapshot) => ({
+          ordinal: String(snapshot.agenda_item_index),
+          texto: snapshot.resolution_text,
+          estado: snapshot.status_resolucion,
+        })),
+    puntos_acta: actaPuntos,
     miembros_presentes: attendees
       .filter((attendee) => attendee.attendance_type !== "AUSENTE")
       .map((attendee, index) => ({
@@ -275,12 +424,14 @@ export default function ActaDetalle() {
     pactos_warnings: certificationPlan?.contractualWarnings ?? [],
     firma_estado: m.signed_at ? "FIRMADA" : "BORRADOR",
   };
-  const actaFallback = buildActaFallback({
-    body,
-    entity,
-    content: m.content,
-    createdAt: m.created_at,
-  });
+  const actaFallback = actaPuntos.length > 0
+    ? renderActaLegalStructureText(actaLegalStructure)
+    : buildActaFallback({
+        body,
+        entity,
+        content: m.content,
+        createdAt: m.created_at,
+      });
 
   async function handleMaterializePoint(snapshot: MeetingAdoptionSnapshot) {
     setMaterializingPoint(snapshot.agenda_item_index);
@@ -356,7 +507,11 @@ export default function ActaDetalle() {
             filenamePrefix: "acta",
           }}
           disabledReason={
-            certificationPlanLoading || attendeesLoading
+            actaValidationIssues.length > 0
+              ? `Corrige la estructura legal del acta: ${actaValidationIssues[0].message}`
+              : actaRrmIssues.length > 0
+                ? `Corrige la estructura RRM del acta: ${actaRrmIssues[0].message}`
+              : certificationPlanLoading || attendeesLoading || actaAgendaLoading
               ? "Cargando datos de reunión, asistentes y acuerdos antes de generar el acta."
               : null
           }
@@ -376,11 +531,35 @@ export default function ActaDetalle() {
               </h2>
             </div>
             <div className="p-6">
+              {actaValidationIssues.length > 0 || actaRrmIssues.length > 0 ? (
+                <div
+                  className="mb-4 flex items-start gap-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-4 text-xs text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+                  <div>
+                    <p className="font-semibold text-[var(--g-text-primary)]">
+                      Acta no preparada para firma
+                    </p>
+                    <p className="mt-1">{(actaValidationIssues[0] ?? actaRrmIssues[0])?.message}</p>
+                  </div>
+                </div>
+              ) : actaPuntos.length > 0 ? (
+                <div
+                  className="mb-4 flex items-start gap-3 border-l-4 border-[var(--status-success)] bg-[var(--g-sec-100)] p-4 text-xs text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-success)]" />
+                  <span>
+                    Acta preparada en el orden del día, con acuerdos solo en puntos decisorios y constancias para el resto.
+                  </span>
+                </div>
+              ) : null}
               {/* Legibility BATCH 2: el contenido legal del acta sube de
                   text-sm (14px) a text-base (16px) con leading-loose y
                   padding generoso para facilitar revisión densa. */}
               <pre className="whitespace-pre-wrap font-sans text-base leading-loose text-[var(--g-text-primary)]">
-                {m.content ?? "— Sin contenido —"}
+                {actaPuntos.length > 0 ? renderActaLegalStructureText(actaLegalStructure) : m.content ?? "— Sin contenido —"}
               </pre>
             </div>
           </div>
