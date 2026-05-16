@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolverReglaEfectiva } from '../jerarquia-normativa';
+import { resolverReglaEfectiva, resolverReglaEfectivaConTrazabilidad } from '../jerarquia-normativa';
 import type { ReglaParametro, RuleParamOverride, Fuente } from '../types';
 
 describe('resolverReglaEfectiva', () => {
@@ -571,5 +571,89 @@ describe('resolverReglaEfectiva', () => {
 
     expect(resultado.valor).toBe('ESPAÑA_MADRID');
     expect(resultado.fuente).toBe('ESTATUTOS');
+  });
+});
+
+describe('resolverReglaEfectivaConTrazabilidad', () => {
+  it('devuelve regla efectiva, capas fuente y explain nodes para estatutos que elevan el suelo legal', () => {
+    const legal: ReglaParametro<number> = {
+      valor: 0.5,
+      fuente: 'LEY',
+      referencia: 'art. 194 LSC',
+    };
+    const overrides: RuleParamOverride[] = [
+      {
+        id: 'ov-estatutos-1',
+        entity_id: 'entity-1',
+        materia: 'MODIFICACION_ESTATUTOS',
+        clave: 'votacion.mayoria',
+        valor: 0.75,
+        fuente: 'ESTATUTOS',
+        referencia: 'art. 18 Estatutos',
+      },
+    ];
+
+    const result = resolverReglaEfectivaConTrazabilidad(legal, overrides, 'mayor', {
+      path: 'votacion.mayoria',
+      label: 'Mayoría requerida',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.effective_rule.valor).toBe(0.75);
+    expect(result.effective_rule.fuente).toBe('ESTATUTOS');
+    expect(result.source_layers.map((layer) => layer.layer)).toEqual(['LEY', 'ESTATUTOS']);
+    expect(result.source_layers[1].applied).toBe(true);
+    expect(result.explain_nodes).toHaveLength(2);
+  });
+
+  it('bloquea una personalización estatutaria que rebaja un mínimo legal', () => {
+    const legal: ReglaParametro<number> = {
+      valor: 0.5,
+      fuente: 'LEY',
+      referencia: 'art. 194 LSC',
+    };
+
+    const result = resolverReglaEfectivaConTrazabilidad(legal, [
+      {
+        id: 'ov-invalid',
+        entity_id: 'entity-1',
+        materia: 'AUMENTO_CAPITAL',
+        clave: 'constitucion.quorum.SA_1a',
+        valor: 0.25,
+        fuente: 'ESTATUTOS',
+        referencia: 'art. 12 Estatutos',
+      },
+    ], 'mayor', { path: 'constitucion.quorum.SA_1a' });
+
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+    expect(result.effective_rule.valor).toBe(0.5);
+    expect(result.blocking_issues[0]).toContain('override_below_legal_minimum');
+    expect(result.source_layers[1].applied).toBe(false);
+  });
+
+  it('muestra pactos como capa contractual sin alterar la validez societaria por defecto', () => {
+    const legal: ReglaParametro<number> = {
+      valor: 0.5,
+      fuente: 'LEY',
+      referencia: 'art. 201 LSC',
+    };
+
+    const result = resolverReglaEfectivaConTrazabilidad(legal, [
+      {
+        id: 'pacto-75',
+        entity_id: 'entity-1',
+        materia: 'OPERACION_VINCULADA',
+        clave: 'votacion.mayoria',
+        valor: 0.75,
+        fuente: 'PACTO_PARASOCIAL',
+        referencia: 'clausula 7 pacto',
+      },
+    ], 'mayor', { path: 'votacion.mayoria' });
+
+    expect(result.ok).toBe(true);
+    expect(result.effective_rule.valor).toBe(0.5);
+    expect(result.source_layers[1].contractual_only).toBe(true);
+    expect(result.warnings[0]).toMatch(/obligación contractual/i);
   });
 });

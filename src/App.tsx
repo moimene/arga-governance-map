@@ -73,9 +73,12 @@ const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
 const RuleManagerPage = lazy(() => import("@/pages/secretaria/RuleManagerPage"));
+const CatalogoMaterias = lazy(() => import("@/pages/secretaria/CatalogoMaterias"));
+const CatalogoOrganos = lazy(() => import("@/pages/secretaria/CatalogoOrganos"));
 const SociedadesList = lazy(() => import("@/pages/secretaria/SociedadesList"));
 const SociedadDetalle = lazy(() => import("@/pages/secretaria/SociedadDetalle"));
 const SociedadNuevaStepper = lazy(() => import("@/pages/secretaria/SociedadNuevaStepper"));
+const ActivarMarcoNormativo = lazy(() => import("@/pages/secretaria/ActivarMarcoNormativo"));
 const PersonasList = lazy(() => import("@/pages/secretaria/PersonasList"));
 const PersonaDetalle = lazy(() => import("@/pages/secretaria/PersonaDetalle"));
 const PersonaNuevaStepper = lazy(() => import("@/pages/secretaria/PersonaNuevaStepper"));
@@ -224,11 +227,14 @@ const App = () => (
                   <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
+                  <Route path="/secretaria/catalogo-materias" element={<Suspense fallback={<ModuleFallback />}><CatalogoMaterias /></Suspense>} />
+                  <Route path="/secretaria/catalogo-organos" element={<Suspense fallback={<ModuleFallback />}><CatalogoOrganos /></Suspense>} />
                   <Route path="/secretaria/reglas" element={<Suspense fallback={<ModuleFallback />}><RuleManagerPage /></Suspense>} />
                   {/* Gestión societaria — sociedades y personas (modelo canónico) */}
                   <Route path="/secretaria/sociedades"                element={<Suspense fallback={<ModuleFallback />}><SociedadesList /></Suspense>} />
                   <Route path="/secretaria/sociedades/nueva"          element={<Suspense fallback={<ModuleFallback />}><SociedadNuevaStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id"            element={<Suspense fallback={<ModuleFallback />}><SociedadDetalle /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/marco-normativo/activar" element={<Suspense fallback={<ModuleFallback />}><ActivarMarcoNormativo /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/socio/nuevo" element={<Suspense fallback={<ModuleFallback />}><AnadirSocioStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/transmision" element={<Suspense fallback={<ModuleFallback />}><TransmisionStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/admin/nuevo" element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />

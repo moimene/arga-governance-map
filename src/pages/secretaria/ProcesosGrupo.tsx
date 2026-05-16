@@ -44,6 +44,7 @@ import {
   type CampaignAdoptionMode,
   type CampaignStatus,
 } from "@/lib/secretaria/group-campaign-engine";
+import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("es-ES", {
@@ -550,7 +551,7 @@ export default function ProcesosGrupo() {
         <InfoPanel
           icon={ShieldCheck}
           title="Motor de enrutamiento"
-          body="Cada expediente lee forma social, forma de administración y unipersonalidad para asignar el AdoptionMode y el rule pack aplicable."
+          body="Cada expediente lee forma social, forma de administración y unipersonalidad para asignar la forma de adopción y la regla legal aplicable."
         />
         <InfoPanel
           icon={Scale}
@@ -718,7 +719,7 @@ function WarRoomExpediente({ expediente }: { expediente: GroupCampaignWarRoomExp
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-[var(--g-text-secondary)]">
           <WarRoomMetric label="Plazo" value={formatOptionalDate(expediente.deadline)} />
-          <WarRoomMetric label="Modo" value={expediente.adoption_mode ?? "N/D"} />
+          <WarRoomMetric label="Forma de adopción" value={adoptionModeBusinessLabel(expediente.adoption_mode)} />
           <WarRoomMetric label="Live" value={expediente.live_links_count} />
         </div>
       </div>
@@ -758,7 +759,7 @@ function WarRoomStepRow({ step }: { step: GroupCampaignWarRoomStep }) {
       <td className="px-4 py-3 text-sm">
         <div className="font-semibold text-[var(--g-text-primary)]">{step.step_order}. {step.label}</div>
         <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
-          {step.materia} · {step.organ} · {step.adoption_mode}
+          {step.materia} · {step.organ} · {adoptionModeBusinessLabel(step.adoption_mode)}
         </div>
         {step.dependency ? (
           <div className="mt-1 text-xs text-[var(--g-text-secondary)]">Depende de {step.dependency}</div>

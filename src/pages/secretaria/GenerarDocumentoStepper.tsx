@@ -53,6 +53,7 @@ import {
   type SecretariaAdoptionMode,
   type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
+import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 import { templateCompatibleWithAgreement } from "@/lib/secretaria/agreement-template-compatibility";
 import {
   finalizeEditableDocumentDraft,
@@ -104,7 +105,7 @@ function unresolvedVariableNames(variables: unknown): string[] {
 }
 
 function evidenceStatusLabel(status: string | null | undefined) {
-  if (status === "DEMO_OPERATIVA") return "Evidencia demo operativa";
+  if (status === "DEMO_OPERATIVA") return "Evidencia operativa";
   if (!status) return "Evidencia no informada";
   return status;
 }
@@ -841,7 +842,7 @@ export default function GenerarDocumentoStepper() {
               Seleccionar plantilla
             </h2>
             <p className="text-xs text-[var(--g-text-secondary)]">
-              Plantillas compatibles con el acuerdo (adopción: {agreement.adoption_mode}, jurisdicción: {agreement.entities?.jurisdiction ?? "ES"})
+              Plantillas compatibles con el acuerdo (forma de adopción: {adoptionModeBusinessLabel(agreement.adoption_mode)}, jurisdicción: {agreement.entities?.jurisdiction ?? "ES"})
             </p>
 
             {requestedPlantillaId ? (

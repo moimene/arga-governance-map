@@ -19,6 +19,7 @@ import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-
 import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { persistRegistryFilingCertificationLink } from "@/lib/secretaria/registry-certification-link";
+import { adoptionModeBusinessLabel, matterClassBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 
 const STEPS: StepDef[] = [
   {
@@ -89,8 +90,8 @@ function buildRegistryVariables({
   ].filter(Boolean).join(" · ");
   const textoDecision = [
     `Materia: ${agreement.agreement_kind}`,
-    `Clase: ${agreement.matter_class}`,
-    `Modo: ${agreement.adoption_mode}`,
+    `Tipo de materia: ${matterClassBusinessLabel(agreement.matter_class)}`,
+    `Forma de adopción: ${adoptionModeBusinessLabel(agreement.adoption_mode)}`,
   ].join("\n");
 
   return {
@@ -151,8 +152,8 @@ function buildRegistryFallback({
     "",
     `Sociedad: ${legalName || entityName}`,
     `Acuerdo: ${agreement.agreement_kind}`,
-    `Clase: ${agreement.matter_class}`,
-    `Modo de adopcion: ${agreement.adoption_mode}`,
+    `Tipo de materia: ${matterClassBusinessLabel(agreement.matter_class)}`,
+    `Forma de adopción: ${adoptionModeBusinessLabel(agreement.adoption_mode)}`,
     `Estado del acuerdo: ${statusLabel(agreement.status)}`,
     "",
     "INSTRUMENTO",
@@ -1121,7 +1122,7 @@ function TramitadorNuevo() {
                     ) : null}
                   </div>
                   <div className="text-xs text-[var(--g-text-secondary)] mt-0.5">
-                    Clase: {agreement.matter_class} • Modo: {agreement.adoption_mode}
+                    Tipo de materia: {matterClassBusinessLabel(agreement.matter_class)} · Forma de adopción: {adoptionModeBusinessLabel(agreement.adoption_mode)}
                   </div>
                 </div>
                 <span
@@ -1151,7 +1152,7 @@ function TramitadorNuevo() {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
           <span>
-            Tramitación con fallback técnico de prototipo. Cloud no aporta rule pack registral activo para esta materia;
+            Tramitación con criterio conservador de prototipo. Cloud no aporta regla registral activa para esta materia;
             no constituye validación legal productiva.
           </span>
         </div>

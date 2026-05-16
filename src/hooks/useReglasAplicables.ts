@@ -42,6 +42,15 @@ interface JurisdictionRuleSetRow {
   legal_reference: string | null;
 }
 
+interface RuleParamOverrideSourceRow {
+  id: string;
+  materia: string;
+  clave: string;
+  valor: unknown;
+  fuente: "ESTATUTOS" | "REGLAMENTO" | "LEY" | "PACTO_PARASOCIAL";
+  referencia: string | null;
+}
+
 /**
  * useReglasAplicables — Devuelve el listado unificado de reglas aplicables para
  * una sociedad: LEY (rule_packs + jurisdiction_rule_sets), ESTATUTOS (placeholder
@@ -121,9 +130,26 @@ export function useReglasAplicables(entityId: string | undefined) {
         }
       }
 
-      // 3) ESTATUTOS — aún no existe tabla específica; stub para cuando se añada.
-      //   Si hay columna `statutes_version` o similar en entities, se puede leer.
-      //   Por ahora, si la sociedad tiene metadata con `estatutos`, lo registramos.
+      // 3) ESTATUTOS / REGLAMENTO — requisitos elevados por sociedad.
+      const { data: overrides, error: overridesErr } = await supabase
+        .from("rule_param_overrides")
+        .select("id, materia, clave, valor, fuente, referencia")
+        .eq("tenant_id", tenantId!)
+        .eq("entity_id", entityId!);
+      if (overridesErr) throw overridesErr;
+      for (const override of (overrides ?? []) as RuleParamOverrideSourceRow[]) {
+        if (override.fuente !== "ESTATUTOS" && override.fuente !== "REGLAMENTO") continue;
+        out.push({
+          source: override.fuente,
+          pack_id: override.id,
+          pack_code: override.clave,
+          version: null,
+          jurisdiction: sociedad?.jurisdiction ?? null,
+          materia: override.materia,
+          organo_tipo: null,
+          note: override.referencia ?? "Requisito añadido por la sociedad",
+        });
+      }
 
       // 4) PACTO — pactos_parasociales vigentes (hook ya cargado arriba)
       for (const p of pactos ?? []) {

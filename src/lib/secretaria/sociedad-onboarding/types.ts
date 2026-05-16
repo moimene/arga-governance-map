@@ -165,6 +165,21 @@ export interface RulesDraft {
   convocatoria_medio: string;
   voto_calidad_presidente: boolean;
   restricciones_transmision: string;
+  estatutos_modelados: boolean;
+  reglamento_organo_modelado: boolean;
+  pactos_modelados: boolean;
+  pactos_no_modelados_ack: boolean;
+  override_materia: string;
+  override_fuente: "ESTATUTOS" | "REGLAMENTO";
+  override_mayoria_reforzada_pct: string;
+  override_quorum_primera_pct: string;
+  override_convocatoria_dias: string;
+  override_referencia: string;
+  override_justificacion: string;
+  override_vigencia_desde: string;
+  override_vigencia_hasta: string;
+  capa3_area_responsable: string;
+  capa3_firmante_preferente: string;
 }
 
 export interface SupportDocDraft {

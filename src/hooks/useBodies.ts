@@ -288,6 +288,9 @@ export interface BodySlim {
   slug: string;
   name: string;
   body_type: string;
+  regulation_id?: string | null;
+  quorum?: string | null;
+  status?: string | null;
   config?: Record<string, unknown> | null;
 }
 
@@ -299,7 +302,7 @@ export function useBodiesByEntity(entityId: string | undefined) {
     queryFn: async (): Promise<BodySlim[]> => {
       const { data, error } = await supabase
         .from("governing_bodies")
-        .select("id, slug, name, body_type, config")
+        .select("id, slug, name, body_type, regulation_id, quorum, status, config")
         .eq("entity_id", entityId!)
         .eq("tenant_id", tenantId!)
         .order("name");
