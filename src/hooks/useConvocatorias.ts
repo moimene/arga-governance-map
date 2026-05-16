@@ -417,7 +417,14 @@ export function useUploadConvocatoriaAttachment() {
         });
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from("matter-documents").getPublicUrl(storagePath);
+      // F3.G3: getPublicUrl removed — el bucket matter-documents es privado.
+      // `file_url` se persiste como sentinel `evidence-bundle://<path>` para
+      // mantener la condición legacy `if (file_url)` en componentes que aún
+      // no consumen la Edge Function sign-evidence-url. El acceso real al
+      // archivo pasa por la Edge Function cuando se materialice un
+      // evidence_bundle (post-archival). Attachments-only refactor (futuro
+      // sprint): adaptar a hook firmado para attachment_id.
+      const sentinelUrl = `evidence-bundle://${storagePath}`;
 
       const { data: inserted, error: insertError } = await supabase
         .from("attachments")
@@ -426,7 +433,7 @@ export function useUploadConvocatoriaAttachment() {
           convocatoria_id: convocatoriaId,
           agenda_item_index: input.agendaItemIndex ?? null,
           file_name: file.name,
-          file_url: urlData.publicUrl,
+          file_url: sentinelUrl,
           file_hash: hash,
         })
         .select("id, file_name, file_url, file_hash")

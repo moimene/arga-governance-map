@@ -22,6 +22,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/hooks/useAgreementCompliance";
+import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
@@ -130,6 +131,67 @@ function matterClassLabel(value: string | null | undefined) {
   return labels[value ?? ""] ?? "Ordinaria";
 }
 
+// F3.G3 — Reemplaza el enlace directo al documento (anteriormente href con
+// agreement document URL) por un enlace firmado vía Edge Function
+// sign-evidence-url. Resuelve agreementId → evidence_bundle.id → signed URL
+// con TTL 5min (no más URLs públicas sobre bucket privado).
+function AgreementArchivedDocLink({ agreementId }: { agreementId: string }) {
+  const { signedUrl, isLoading, isError, hasBundle } = useAgreementSignedDocumentUrl(agreementId);
+
+  if (!hasBundle && !isLoading) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}>
+          <FileText className="h-4 w-4" />
+          Documento archivado (bundle pendiente de migración)
+        </span>
+        <span className="text-xs text-[var(--g-text-secondary)]">
+          Promocion a expediente pendiente de {REVIEW_STATE_VIEW}.
+        </span>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <span className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}>
+        <FileText className="h-4 w-4 animate-pulse" />
+        Generando enlace firmado…
+      </span>
+    );
+  }
+
+  if (isError || !signedUrl) {
+    return (
+      <span className="inline-flex items-center gap-1.5 border border-[var(--status-error)] px-3 py-2 text-sm text-[var(--status-error)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}>
+        <FileText className="h-4 w-4" />
+        Error generando enlace
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <a
+        href={signedUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
+        Ver documento archivado
+      </a>
+      <span className="text-xs text-[var(--g-text-secondary)]">
+        Promocion a expediente pendiente de {REVIEW_STATE_VIEW}.
+      </span>
+    </div>
+  );
+}
+
 export default function ExpedienteAcuerdo() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -220,21 +282,7 @@ export default function ExpedienteAcuerdo() {
               Generar documento
             </button>
             {a.document_url && (
-              <div className="flex flex-col gap-1">
-                <a
-                  href={a.document_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                >
-                  <FileText className="h-4 w-4 text-[var(--g-brand-3308)]" />
-                  Ver documento archivado
-                </a>
-                <span className="text-xs text-[var(--g-text-secondary)]">
-                  Promocion a expediente pendiente de {REVIEW_STATE_VIEW}.
-                </span>
-              </div>
+              <AgreementArchivedDocLink agreementId={a.id} />
             )}
           </div>
         )}

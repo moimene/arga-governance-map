@@ -713,8 +713,11 @@ async function archiveConvocatoriaDocx(params: {
     };
   }
 
-  const { data: urlData } = supabase.storage.from("matter-documents").getPublicUrl(storagePath);
-  const publicUrl = urlData?.publicUrl;
+  // F3.G3: getPublicUrl removed — bucket matter-documents es privado. La URL
+  // legacy publicUrl devolvía 403 al accederla. Sentinel mantiene compat con
+  // UI legacy que comprueba `if (document_url)`. Acceso real vía Edge
+  // Function sign-evidence-url (hook useEvidenceBundleSignedUrl).
+  const publicUrl = `evidence-bundle://${storagePath}`;
   if (!publicUrl) {
     return {
       attempted: true,

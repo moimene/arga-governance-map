@@ -1,6 +1,46 @@
-import { Shield, FileCheck2, Lock, ExternalLink } from "lucide-react";
+import { Shield, FileCheck2, Lock, ExternalLink, Loader2 } from "lucide-react";
 import { useEvidenceBundlesList, useVerifyAuditChain } from "@/hooks/useEvidenceBundles";
+import { useEvidenceBundleSignedUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useState } from "react";
+
+// F3.G3 — Subcomponente que sirve el enlace a la evidencia via signed URL
+// (Edge Function sign-evidence-url) en lugar del antiguo getPublicUrl sobre
+// bucket privado. Acepta bundle_id; el hook decide si dispara o no la firma.
+function EvidenceBundleDownloadLink({ bundleId, hasUrl }: { bundleId: string; hasUrl: boolean }) {
+  const { data: signedUrl, isLoading, isError } = useEvidenceBundleSignedUrl(hasUrl ? bundleId : null);
+  if (!hasUrl) return null;
+  if (isLoading) {
+    return (
+      <span
+        className="text-[var(--g-text-secondary)]"
+        aria-label="Generando enlace firmado"
+      >
+        <Loader2 className="h-4 w-4 animate-spin" />
+      </span>
+    );
+  }
+  if (isError || !signedUrl) {
+    return (
+      <span
+        className="text-[var(--status-error)] text-xs"
+        title="No se pudo generar el enlace firmado"
+        aria-label="Error generando enlace"
+      >
+        Error
+      </span>
+    );
+  }
+  return (
+    <a
+      href={signedUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
+    >
+      <ExternalLink className="h-4 w-4" />
+    </a>
+  );
+}
 
 export function EvidenceForenseSection() {
   const { data: bundles = [], isLoading } = useEvidenceBundlesList();
@@ -96,16 +136,8 @@ export function EvidenceForenseSection() {
                     Firmado por: {b.signed_by || "—"} · {b.created_at ? new Date(b.created_at).toLocaleDateString("es-ES") : "—"}
                   </div>
                 </div>
-                {b.document_url && (
-                  <a
-                    href={b.document_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                )}
+                <EvidenceBundleDownloadLink bundleId={b.id} hasUrl={!!(b.storage_path || b.document_url)} />
+
               </div>
               {b.hash_sha512 && (
                 <div

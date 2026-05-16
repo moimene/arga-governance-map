@@ -13,6 +13,11 @@ export interface EvidenceBundle {
   chain_of_custody: Record<string, unknown> | null;
   legal_hold: boolean;
   created_at: string;
+  // F3.G15 additions:
+  storage_path: string | null;
+  supersedes_id: string | null;
+  manifest: Record<string, unknown> | null;
+  manifest_hash: string | null;
 }
 
 export function useEvidenceBundlesList() {
