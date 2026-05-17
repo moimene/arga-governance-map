@@ -4,6 +4,7 @@ export interface NormalizedCapa3Field {
   campo: string;
   obligatoriedad: string;
   descripcion: string;
+  tipo?: string;
   /**
    * Default value sugerido (Codex P2 round 5): permite que
    * `entity_settings` o `plantilla_capa3_overrides_por_entidad` propaguen un
@@ -11,6 +12,9 @@ export interface NormalizedCapa3Field {
    * lo aplica si el campo está vacío.
    */
   default?: string;
+  min_items?: number;
+  max_items?: number | null;
+  item_schema?: Record<string, NormalizedCapa3ItemField>;
   /**
    * Lista cerrada de opciones permitidas (Codex P2 round 5): si está presente
    * y tiene >=1 elemento, `Capa3Form` renderiza un `<select>` en lugar de
@@ -19,8 +23,23 @@ export interface NormalizedCapa3Field {
   opciones?: string[];
 }
 
+export interface NormalizedCapa3ItemField {
+  key: string;
+  tipo: string;
+  label: string;
+  help_text?: string;
+  placeholder?: string;
+  requerido: boolean;
+  min_length?: number;
+  options?: string[];
+}
+
+export type Capa3ArrayItem = Record<string, string>;
+export type Capa3Value = string | Capa3ArrayItem[];
+export type Capa3Values = Record<string, Capa3Value>;
+
 export interface NormalizedCapa3Draft {
-  values: Record<string, string>;
+  values: Capa3Values;
   emptyKeys: string[];
   ignoredKeys: string[];
   legacyKeyMap: Record<string, string>;
@@ -34,6 +53,10 @@ interface RawCapa3Field {
   label?: unknown;
   default?: unknown;
   opciones?: unknown;
+  min_items?: unknown;
+  max_items?: unknown;
+  item_schema?: unknown;
+  help_text?: unknown;
 }
 
 const SAFE_FIELD_NAME = /^[a-zA-Z_][a-zA-Z0-9_.-]*$/;
@@ -79,6 +102,37 @@ function normalizeDraftValue(value: unknown) {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return "";
+}
+
+export function capa3ValueToText(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (!isRecord(item)) return "";
+        return Object.values(item)
+          .map((entry) => normalizeDraftValue(entry))
+          .filter(Boolean)
+          .join(" · ");
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
+}
+
+export function capa3ValueHasContent(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.some((item) => {
+      if (typeof item === "string") return item.trim().length > 0;
+      if (!isRecord(item)) return false;
+      return Object.values(item).some((entry) => normalizeDraftValue(entry).length > 0);
+    });
+  }
+  return capa3ValueToText(value).length > 0;
 }
 
 function hasText(value: unknown) {
@@ -166,6 +220,13 @@ export function isRequiredCapa3Field(field: Pick<NormalizedCapa3Field, "obligato
   return field.obligatoriedad === "OBLIGATORIO";
 }
 
+export function isArrayCapa3Field(
+  field: Pick<NormalizedCapa3Field, "tipo" | "item_schema">,
+) {
+  const tipo = field.tipo?.toLowerCase();
+  return tipo === "array" || tipo === "array_repeatable" || !!field.item_schema;
+}
+
 function normalizeOpciones(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: string[] = [];
@@ -184,6 +245,98 @@ function normalizeOpciones(value: unknown): string[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
+function normalizeInteger(value: unknown): number | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return undefined;
+  return parsed;
+}
+
+function normalizeMaxItems(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  return normalizeInteger(value);
+}
+
+function normalizeItemSchema(value: unknown): Record<string, NormalizedCapa3ItemField> | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const schema: Record<string, NormalizedCapa3ItemField> = {};
+  for (const [rawKey, rawSpec] of Object.entries(value)) {
+    const key = rawKey.trim().slice(0, 120);
+    if (!key || !SAFE_FIELD_NAME.test(key) || !isRecord(rawSpec)) continue;
+    const spec = rawSpec as {
+      tipo?: unknown;
+      label?: unknown;
+      help_text?: unknown;
+      placeholder?: unknown;
+      requerido?: unknown;
+      min_length?: unknown;
+      options?: unknown;
+      opciones?: unknown;
+    };
+    const tipo = asString(spec.tipo, "text").trim().toLowerCase() || "text";
+    const label = asString(spec.label).trim() || defaultDescription(key);
+    const minLength = normalizeInteger(spec.min_length);
+    const options = normalizeOpciones(spec.options ?? spec.opciones);
+    schema[key] = {
+      key,
+      tipo,
+      label,
+      requerido: spec.requerido === true,
+      ...(asString(spec.help_text).trim() ? { help_text: asString(spec.help_text).trim() } : {}),
+      ...(asString(spec.placeholder).trim() ? { placeholder: asString(spec.placeholder).trim() } : {}),
+      ...(minLength !== undefined ? { min_length: minLength } : {}),
+      ...(options ? { options } : {}),
+    };
+  }
+
+  return Object.keys(schema).length > 0 ? schema : undefined;
+}
+
+function parseArrayDraftValue(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[")) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeArrayDraftValue(
+  field: NormalizedCapa3Field,
+  value: unknown,
+): Capa3ArrayItem[] {
+  const rawItems = parseArrayDraftValue(value);
+  const schema = field.item_schema ?? {};
+  const schemaKeys = Object.keys(schema);
+
+  return rawItems
+    .map((item) => {
+      const row: Capa3ArrayItem = {};
+      if (isRecord(item)) {
+        const keys = schemaKeys.length > 0 ? schemaKeys : Object.keys(item);
+        for (const key of keys) {
+          const normalized = normalizeDraftValue(item[key]);
+          if (normalized) row[key] = normalized;
+        }
+      } else if (typeof item === "string" && schemaKeys.length === 1) {
+        const normalized = normalizeDraftValue(item);
+        if (normalized) row[schemaKeys[0]] = normalized;
+      }
+      return row;
+    })
+    .filter((item) => Object.values(item).some((entry) => entry.trim().length > 0));
+}
+
+function normalizeCapa3Value(field: NormalizedCapa3Field, value: unknown): Capa3Value {
+  if (isArrayCapa3Field(field)) return normalizeArrayDraftValue(field, value);
+  return normalizeDraftValue(value);
+}
+
 export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
   if (!Array.isArray(value)) return [];
 
@@ -198,6 +351,10 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
     seen.add(campo);
 
     const opciones = normalizeOpciones(raw.opciones);
+    const tipo = asString(raw.tipo).trim().toLowerCase();
+    const itemSchema = normalizeItemSchema(raw.item_schema);
+    const minItems = normalizeInteger(raw.min_items);
+    const maxItems = normalizeMaxItems(raw.max_items);
     // Codex P2 round 5+16: preservar `default` y `opciones`. Round 16: el
     // empty string "" es un override explícito válido (SQL contract:
     // NULL = no override, "" = clear el campo). Antes el truthiness check
@@ -223,9 +380,17 @@ export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {
       obligatoriedad: normalizeObligatoriedad(raw.obligatoriedad),
       descripcion:
         (asString(raw.descripcion).trim() ||
+          asString(raw.help_text).trim() ||
           asString(raw.label).trim() ||
           defaultDescription(campo)).slice(0, 240),
     };
+    if (tipo) entry.tipo = tipo;
+    if (itemSchema) {
+      entry.tipo = tipo || "array_repeatable";
+      entry.item_schema = itemSchema;
+    }
+    if (minItems !== undefined) entry.min_items = minItems;
+    if (maxItems !== undefined) entry.max_items = maxItems;
     if (defaultValue !== undefined) entry.default = defaultValue;
     if (opciones !== undefined) entry.opciones = opciones;
     normalized.push(entry);
@@ -238,7 +403,7 @@ export function normalizeCapa3Draft(
   fields: NormalizedCapa3Field[],
   draftValues: Record<string, unknown> | null | undefined,
 ): NormalizedCapa3Draft {
-  const values: Record<string, string> = {};
+  const values: Capa3Values = {};
   const emptyKeys = new Set<string>();
   const ignoredKeys = new Set<string>();
   const legacyKeyMap: Record<string, string> = {};
@@ -263,9 +428,14 @@ export function normalizeCapa3Draft(
 
     const nextPriority = rawKey === target ? "exact" : "legacy";
     const previousPriority = sourcePriority[target];
-    const normalizedValue = normalizeDraftValue(rawValue);
+    const field = fields.find((candidate) => candidate.campo === target);
+    if (!field) {
+      ignoredKeys.add(rawKey);
+      continue;
+    }
+    const normalizedValue = normalizeCapa3Value(field, rawValue);
 
-    if (!normalizedValue) {
+    if (!capa3ValueHasContent(normalizedValue)) {
       emptyKeys.add(target);
       continue;
     }

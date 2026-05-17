@@ -5,7 +5,13 @@ import {
   type SecretariaDocumentGenerationRequest,
   type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
-import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
+import {
+  capa3ValueToText,
+  normalizeCapa3Draft,
+  normalizeCapa3Fields,
+  type Capa3Values,
+} from "@/lib/secretaria/capa3-fields";
+import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { expandLegalStructuredVariables } from "@/lib/secretaria/legal-template-normalizer";
 import { renderTemplate } from "@/lib/doc-gen/template-renderer";
 import {
@@ -192,26 +198,24 @@ function withNormativeSnapshot(context: ResolverContext, snapshot?: AgreementNor
 
 function capa3Issues(
   fields: ReturnType<typeof normalizeCapa3Fields>,
-  values: Record<string, string>,
+  values: Capa3Values,
 ) {
-  return fields
-    .filter((field) => field.obligatoriedad === "OBLIGATORIO" && !values[field.campo]?.trim())
-    .map((field) => ({
+  return Object.entries(validateCapa3(fields, values)).map(([field, message]) => ({
       code: "CAPA3_REQUIRED_MISSING",
       severity: "BLOCKING" as const,
-      field_path: `capa3.${field.campo}`,
-      message: `${field.descripcion || field.campo}: campo obligatorio.`,
+      field_path: `capa3.${field}`,
+      message,
     }));
 }
 
 function buildEditableFields(
   fields: ReturnType<typeof normalizeCapa3Fields>,
-  values: Record<string, string>,
+  values: Capa3Values,
 ): EditableField[] | undefined {
   const editable = fields.map((field) => ({
     key: field.campo,
     label: field.descripcion || field.campo,
-    value: values[field.campo] || undefined,
+    value: capa3ValueToText(values[field.campo]) || undefined,
   }));
   return editable.length > 0 ? editable : undefined;
 }

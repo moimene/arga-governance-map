@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
+import { capa3ValueHasContent, type Capa3Values } from "@/lib/secretaria/capa3-fields";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";
 import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
@@ -448,7 +449,7 @@ function TramitadorNuevo() {
 
   const [selectedModeloId, setSelectedModeloId] = useState<string | null>(null);
   const [modeloCapa3Open, setModeloCapa3Open] = useState(false);
-  const [modeloCapa3Values, setModeloCapa3Values] = useState<Record<string, string>>({});
+  const [modeloCapa3Values, setModeloCapa3Values] = useState<Capa3Values>({});
   const [modeloCapa3Errors, setModeloCapa3Errors] = useState<Record<string, string>>({});
 
   const materia = selectedAgreement?.agreement_kind ?? "";
@@ -624,7 +625,7 @@ function TramitadorNuevo() {
   );
   const selectedModeloCapa3Fields = selectedModeloMatrix?.capa3Fields ?? [];
   const selectedModeloPendingCapa3 = selectedModeloCapa3Fields.filter(
-    (field) => field.obligatoriedad === "OBLIGATORIO" && !modeloCapa3Values[field.campo]?.trim(),
+    (field) => field.obligatoriedad === "OBLIGATORIO" && !capa3ValueHasContent(modeloCapa3Values[field.campo]),
   ).length;
 
   function openModeloCapa3Capture() {

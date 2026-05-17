@@ -7,6 +7,7 @@ import {
   normalizeCapa3Fields,
   type NormalizedCapa3Draft,
   type NormalizedCapa3Field,
+  type Capa3Values,
 } from "./capa3-fields";
 
 export type TemplateProcessId =
@@ -63,7 +64,7 @@ export interface TemplateProcessResolution {
   documentKinds: ProcessDocumentKind[];
   capa3Fields: NormalizedCapa3Field[];
   capa3Draft: NormalizedCapa3Draft;
-  initialCapa3Values: Record<string, string>;
+  initialCapa3Values: Capa3Values;
   variables: Record<string, unknown>;
   sources: Record<string, TemplateVariableSource>;
   missingRequired: string[];
@@ -109,7 +110,7 @@ export interface TemplateTraceEvidence {
     missing_required: string[];
   };
   capa3: {
-    normalized_values: Record<string, string>;
+    normalized_values: Capa3Values;
     empty_keys: string[];
     ignored_keys: string[];
     legacy_key_map: Record<string, string>;

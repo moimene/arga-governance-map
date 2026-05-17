@@ -24,6 +24,7 @@ describe("capa3-fields", () => {
         campo: "observaciones",
         obligatoriedad: "RECOMENDADO",
         descripcion: "Observaciones del secretario",
+        tipo: "textarea",
       },
     ]);
   });
@@ -196,6 +197,60 @@ describe("capa3-fields", () => {
         { campo: "x", obligatoriedad: "OPCIONAL", descripcion: "x", opciones: [] },
       ]);
       expect(fields[0].opciones).toBeUndefined();
+    });
+  });
+
+  describe("array repeatable", () => {
+    it("normaliza item_schema y conserva array JSON como valor estructurado", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "lista_actos",
+          tipo: "array_repeatable",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Lista de actos",
+          min_items: 1,
+          item_schema: {
+            fecha_acto: { tipo: "date", requerido: true, label: "Fecha del acto" },
+            descripcion: { tipo: "textarea", requerido: true, min_length: 20, label: "Descripción" },
+            fundamento_acto: {
+              tipo: "select",
+              requerido: true,
+              label: "Tipo de acto",
+              options: ["GESTION_ORDINARIA", "ACTO_NO_RATIFICADO"],
+            },
+          },
+        },
+      ]);
+
+      expect(fields[0]).toMatchObject({
+        campo: "lista_actos",
+        tipo: "array_repeatable",
+        min_items: 1,
+        item_schema: {
+          fecha_acto: { key: "fecha_acto", tipo: "date", requerido: true },
+          descripcion: { key: "descripcion", tipo: "textarea", min_length: 20 },
+          fundamento_acto: { options: ["GESTION_ORDINARIA", "ACTO_NO_RATIFICADO"] },
+        },
+      });
+
+      const draft = normalizeCapa3Draft(fields, {
+        lista_actos: JSON.stringify([
+          {
+            fecha_acto: "2026-05-17",
+            descripcion: "Contrato de arrendamiento de oficina principal",
+            fundamento_acto: "GESTION_ORDINARIA",
+          },
+          { fecha_acto: "", descripcion: "" },
+        ]),
+      });
+
+      expect(draft.values.lista_actos).toEqual([
+        {
+          fecha_acto: "2026-05-17",
+          descripcion: "Contrato de arrendamiento de oficina principal",
+          fundamento_acto: "GESTION_ORDINARIA",
+        },
+      ]);
     });
   });
 });

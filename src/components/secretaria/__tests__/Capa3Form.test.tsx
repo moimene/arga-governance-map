@@ -93,4 +93,65 @@ describe("validateCapa3", () => {
       expect(validateCapa3(fields, { modalidad: "CUALQUIERA" })).toEqual({});
     });
   });
+
+  describe("array repeatable", () => {
+    const fields = [
+      {
+        campo: "lista_actos",
+        tipo: "array_repeatable",
+        obligatoriedad: "OBLIGATORIO",
+        descripcion: "Lista de actos",
+        min_items: 1,
+        item_schema: {
+          fecha_acto: {
+            key: "fecha_acto",
+            tipo: "date",
+            label: "Fecha del acto",
+            requerido: true,
+          },
+          descripcion: {
+            key: "descripcion",
+            tipo: "textarea",
+            label: "Descripción",
+            requerido: true,
+            min_length: 20,
+          },
+          fundamento_acto: {
+            key: "fundamento_acto",
+            tipo: "select",
+            label: "Tipo de acto",
+            requerido: true,
+            options: ["GESTION_ORDINARIA"],
+          },
+        },
+      },
+    ];
+
+    it("exige min_items en campos array", () => {
+      expect(validateCapa3(fields, { lista_actos: [] })).toEqual({
+        lista_actos: "Lista de actos: añada al menos 1 elemento(s).",
+      });
+    });
+
+    it("valida requeridos, min_length y opciones dentro de cada fila", () => {
+      expect(validateCapa3(fields, {
+        lista_actos: [{ fecha_acto: "2026-05-17", descripcion: "corta", fundamento_acto: "GESTION_ORDINARIA" }],
+      })).toEqual({
+        lista_actos: "Descripción: mínimo 20 caracteres en elemento 1.",
+      });
+
+      expect(validateCapa3(fields, {
+        lista_actos: [
+          {
+            fecha_acto: "2026-05-17",
+            descripcion: "Contrato de arrendamiento de oficina principal",
+            fundamento_acto: "FUERA",
+          },
+        ],
+      })).toEqual({
+        lista_actos:
+          "Tipo de acto: valor fuera de las opciones permitidas (GESTION_ORDINARIA).",
+      });
+    });
+  });
 });

@@ -1,4 +1,9 @@
-import type { NormalizedCapa3Field } from "@/lib/secretaria/capa3-fields";
+import {
+  capa3ValueToText,
+  isArrayCapa3Field,
+  type Capa3Values,
+  type NormalizedCapa3Field,
+} from "@/lib/secretaria/capa3-fields";
 import type { SecretariaDocumentType } from "@/lib/secretaria/document-generation-boundary";
 
 export type Capa3DraftAssistantMode = "LOCAL_DEMO" | "MODEL_ADAPTER";
@@ -13,7 +18,7 @@ export interface Capa3DraftSuggestion {
 
 export interface Capa3DraftAssistantProviderInput {
   fields: NormalizedCapa3Field[];
-  currentValues: Record<string, string>;
+  currentValues: Capa3Values;
   baseVariables: Record<string, unknown>;
   allowedFields: string[];
   documentType?: SecretariaDocumentType | string | null;
@@ -31,7 +36,7 @@ export type Capa3DraftAssistantProvider = (
 
 export interface SuggestCapa3DraftInput {
   fields: NormalizedCapa3Field[];
-  currentValues?: Record<string, string>;
+  currentValues?: Capa3Values;
   baseVariables?: Record<string, unknown>;
   allowedFields?: string[];
   overwrite?: boolean;
@@ -43,7 +48,7 @@ export interface SuggestCapa3DraftInput {
 export interface SuggestCapa3DraftResult {
   mode: Capa3DraftAssistantMode;
   modelName: string;
-  values: Record<string, string>;
+  values: Capa3Values;
   suggestions: Capa3DraftSuggestion[];
   skippedFields: string[];
   allowedFields: string[];
@@ -58,7 +63,10 @@ function fieldPath(field: Pick<NormalizedCapa3Field, "campo">) {
 }
 
 export function buildCapa3AiAllowedFields(fields: NormalizedCapa3Field[]) {
-  return fields.map(fieldPath).filter((value) => CAPA3_AI_FIELD_PATTERN.test(value));
+  return fields
+    .filter((field) => !isArrayCapa3Field(field))
+    .map(fieldPath)
+    .filter((value) => CAPA3_AI_FIELD_PATTERN.test(value));
 }
 
 function stringValue(value: unknown) {
@@ -216,7 +224,7 @@ export async function suggestCapa3Draft(
   );
   const currentValues = input.currentValues ?? {};
   const baseVariables = input.baseVariables ?? {};
-  const values: Record<string, string> = { ...currentValues };
+  const values: Capa3Values = { ...currentValues };
   const suggestions: Capa3DraftSuggestion[] = [];
   const skippedFields: string[] = [];
 
@@ -234,7 +242,7 @@ export async function suggestCapa3Draft(
         skippedFields.push(field.campo);
         continue;
       }
-      if (!input.overwrite && currentValues[field.campo]?.trim()) continue;
+      if (!input.overwrite && capa3ValueToText(currentValues[field.campo])) continue;
       const value = stringValue(providerOutput.values[field.campo]);
       if (!value) continue;
       values[field.campo] = value;
@@ -256,7 +264,7 @@ export async function suggestCapa3Draft(
       skippedFields.push(field.campo);
       continue;
     }
-    if (!input.overwrite && currentValues[field.campo]?.trim()) continue;
+    if (!input.overwrite && capa3ValueToText(currentValues[field.campo])) continue;
     const suggested = localSuggestionForField(field, baseVariables);
     if (!suggested?.value) continue;
     values[field.campo] = suggested.value;

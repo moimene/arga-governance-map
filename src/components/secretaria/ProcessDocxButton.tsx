@@ -21,6 +21,7 @@ import {
 import { actaLegalStructureFromVariables } from "@/lib/secretaria/acta-legal-structure";
 import { useTenantContext } from "@/context/TenantContext";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
+import type { Capa3Values } from "@/lib/secretaria/capa3-fields";
 import { Capa3CaptureDialog } from "./Capa3CaptureDialog";
 import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-fixtures";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";
@@ -73,7 +74,7 @@ export function ProcessDocxButton({
   const { tenantId } = useTenantContext();
   const [generating, setGenerating] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
-  const [capa3Values, setCapa3Values] = useState<Record<string, string>>({});
+  const [capa3Values, setCapa3Values] = useState<Capa3Values>({});
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
   const [draftAssistLoading, setDraftAssistLoading] = useState(false);
   const [draftAssistSummary, setDraftAssistSummary] = useState<string | null>(null);
@@ -206,7 +207,7 @@ export function ProcessDocxButton({
     return false;
   }
 
-  async function prepareActaReviewDraft(nextCapa3Values: Record<string, string> = {}) {
+  async function prepareActaReviewDraft(nextCapa3Values: Capa3Values = {}) {
     setGenerating(true);
     try {
       const mergedCapa3Values = {
@@ -271,7 +272,7 @@ export function ProcessDocxButton({
     }
   }
 
-  async function runGenerate(nextCapa3Values: Record<string, string> = {}) {
+  async function runGenerate(nextCapa3Values: Capa3Values = {}) {
     if (isActaReviewFlow) {
       return prepareActaReviewDraft(nextCapa3Values);
     }

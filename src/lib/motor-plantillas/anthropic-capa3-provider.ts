@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { capa3ValueToText } from "@/lib/secretaria/capa3-fields";
 import type {
   Capa3DraftAssistantProviderInput,
   Capa3DraftAssistantProviderOutput,
@@ -31,7 +32,7 @@ export function sanitizeCapa3ProviderInput(
   return {
     ...input,
     currentValues: Object.fromEntries(
-      Object.entries(input.currentValues).map(([key, value]) => [key, value.slice(0, 4000)]),
+      Object.entries(input.currentValues).map(([key, value]) => [key, capa3ValueToText(value).slice(0, 4000)]),
     ),
     baseVariables: sanitizeValue(input.baseVariables) as Record<string, unknown>,
   };

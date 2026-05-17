@@ -32,7 +32,11 @@ import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
-import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
+import {
+  capa3ValueToText,
+  isRequiredCapa3Field,
+  type Capa3Values,
+} from "@/lib/secretaria/capa3-fields";
 import {
   buildConvocatoriaCapa3Resolution,
   type ConvocatoriaCapa3Field,
@@ -599,7 +603,7 @@ export default function ConvocatoriasStepper() {
   const [emitidoId, setEmitidoId] = useState<string | null>(null);
   const [appliedPlantillaId, setAppliedPlantillaId] = useState<string | null>(null);
   const [templateCapa3Open, setTemplateCapa3Open] = useState(false);
-  const [templateCapa3Values, setTemplateCapa3Values] = useState<Record<string, string>>({});
+  const [templateCapa3Values, setTemplateCapa3Values] = useState<Capa3Values>({});
   const [templateCapa3Errors, setTemplateCapa3Errors] = useState<Record<string, string>>({});
 
   // ── Step 1 ──
@@ -918,7 +922,7 @@ export default function ConvocatoriasStepper() {
     requestedTemplateMatrix?.processId === "informe_pre";
   const requestedTemplateCapa3Fields = requestedTemplateMatrix?.capa3Fields ?? [];
   const requestedTemplatePendingCapa3 = requestedTemplateCapa3Fields.filter(
-    (field) => isRequiredCapa3Field(field) && !templateCapa3Values[field.campo]?.trim(),
+    (field) => isRequiredCapa3Field(field) && !capa3ValueToText(templateCapa3Values[field.campo]),
   ).length;
   const requestedTemplateTraceEvidence = useMemo(
     () => buildTemplateTraceEvidence(requestedPlantilla, requestedTemplateMatrix),
@@ -1113,7 +1117,7 @@ export default function ConvocatoriasStepper() {
         };
       });
   }, [effectiveBorradorTemplate]);
-  const [borradorCapa3Values, setBorradorCapa3Values] = useState<Record<string, string>>({});
+  const [borradorCapa3Values, setBorradorCapa3Values] = useState<Capa3Values>({});
   const channelLabelsForCapa3 = useMemo(
     () => channels.map((channel) => channelLabel(channel, channelOpts)),
     [channels, channelOpts],
@@ -1182,12 +1186,13 @@ export default function ConvocatoriasStepper() {
         const field = borradorCapa3Fields.find((item) => item.campo === campo);
         const currentValue = currentValues[campo] ?? "";
         const previousValue = previousPrefills[campo] ?? "";
+        const currentText = capa3ValueToText(currentValue);
         const shouldWrite =
           field?.readonly === true ||
-          !currentValue.trim() ||
-          currentValue === previousValue;
+          !currentText ||
+          currentText === previousValue;
 
-        if (shouldWrite && currentValue !== value) {
+        if (shouldWrite && currentText !== value) {
           nextValues[campo] = value;
           changed = true;
         }
@@ -1198,7 +1203,7 @@ export default function ConvocatoriasStepper() {
     });
   }, [borradorCapa3Fields, borradorCapa3PrefillValues]);
 
-  function handleBorradorCapa3ValuesChange(nextValues: Record<string, string>) {
+  function handleBorradorCapa3ValuesChange(nextValues: Capa3Values) {
     const nextFecha = firstText(
       nextValues.fecha_sesion,
       nextValues.fecha_reunion,
@@ -1405,7 +1410,7 @@ export default function ConvocatoriasStepper() {
       .map((i) => `${i.titulo}|${i.materia}|${i.tipo}|${i.kind ?? ""}|${i.propuesta_acuerdo ?? ""}`)
       .join("");
     const capa3Signature = Object.entries(borradorCapa3Values)
-      .map(([k, v]) => `${k}=${v}`)
+      .map(([k, v]) => `${k}=${capa3ValueToText(v)}`)
       .join("");
     return [
       selectedEntityId ?? "",

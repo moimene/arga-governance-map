@@ -47,7 +47,13 @@ import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-import { normalizeCapa3Draft, normalizeCapa3Fields } from "@/lib/secretaria/capa3-fields";
+import {
+  capa3ValueHasContent,
+  capa3ValueToText,
+  normalizeCapa3Draft,
+  normalizeCapa3Fields,
+  type Capa3Values,
+} from "@/lib/secretaria/capa3-fields";
 import {
   buildSecretariaDocumentGenerationRequest,
   type SecretariaAdoptionMode,
@@ -114,7 +120,7 @@ function buildDefaultCapa3Values(
   fields: Array<{ campo: string; default?: string; opciones?: string[] }>,
   agreement: AgreementFull,
   resolvedVars: Record<string, unknown>,
-): Record<string, string> {
+): Capa3Values {
   if (fields.length === 0) return {};
 
   const snapshot = agreement.compliance_snapshot ?? {};
@@ -136,7 +142,7 @@ function buildDefaultCapa3Values(
       `Total legitimados/votantes: ${totalMembers}`,
     ].join("\n");
 
-  const defaults: Record<string, string> = {};
+  const defaults: Capa3Values = {};
   // Keys cuyo default proviene de override explícito (incluyendo "") — el
   // filtro final preserva éstas tal cual; las de heurística sí se filtran.
   const overrideExplicitKeys = new Set<string>();
@@ -175,7 +181,7 @@ function buildDefaultCapa3Values(
 
   return Object.fromEntries(
     Object.entries(defaults).filter(
-      ([k, value]) => overrideExplicitKeys.has(k) || value.trim().length > 0,
+      ([k, value]) => overrideExplicitKeys.has(k) || capa3ValueHasContent(value),
     ),
   );
 }
@@ -232,7 +238,7 @@ export default function GenerarDocumentoStepper() {
   const [selectedPlantilla, setSelectedPlantilla] = useState<PlantillaProtegidaRow | null>(null);
   const [resolvedVars, setResolvedVars] = useState<Record<string, unknown>>({});
   const [unresolvedVars, setUnresolvedVars] = useState<string[]>([]);
-  const [capa3Values, setCapa3Values] = useState<Record<string, string>>({});
+  const [capa3Values, setCapa3Values] = useState<Capa3Values>({});
   const [renderError, setRenderError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
@@ -357,7 +363,7 @@ export default function GenerarDocumentoStepper() {
       let changed = false;
       const next = { ...current };
       for (const [key, value] of Object.entries(defaults)) {
-        if (next[key]?.trim()) continue;
+        if (capa3ValueHasContent(next[key])) continue;
         next[key] = value;
         changed = true;
       }
@@ -1128,7 +1134,7 @@ export default function GenerarDocumentoStepper() {
                 agreementId={agreement.id}
                 materia={agreement.agreement_kind ?? ""}
                 capa3Editables={normalizedCapa3Fields as unknown as Array<{ campo: string; [k: string]: unknown }>}
-                campoLibreValue={normalizedCapa3Values["campo_libre_sectorial"] ?? ""}
+                campoLibreValue={capa3ValueToText(normalizedCapa3Values["campo_libre_sectorial"])}
                 onCampoLibreChange={(newValue) => {
                   setCapa3Values((current) => ({ ...current, campo_libre_sectorial: newValue }));
                   setCapa3Errors({});

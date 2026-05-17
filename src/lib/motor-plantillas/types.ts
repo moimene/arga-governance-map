@@ -10,6 +10,7 @@ import type { ArchiveMetadata, ArchiveResult } from "@/lib/doc-gen/storage-archi
 import type { AgreementNormativeSnapshot } from "@/lib/secretaria/normative-framework";
 import type { ActaLegalStructureViewModel } from "@/lib/secretaria/acta-legal-structure";
 import type { OpenXmlValidationResult } from "@/lib/doc-gen/openxml-validation";
+import type { Capa3Values } from "@/lib/secretaria/capa3-fields";
 
 export type MotorPlantillasIssue = SecretariaValidationIssue;
 
@@ -65,7 +66,7 @@ export interface PreparedDocumentComposition {
   templateTypes: string[];
   resolverContext: ResolverContext;
   capa2: ResolvedVariables;
-  capa3Values: Record<string, string>;
+  capa3Values: Capa3Values;
   mergedVariables: Record<string, unknown>;
   renderedBodyText: string;
   systemTraceText: string;

@@ -18,12 +18,17 @@ import {
   Info,
   Minus,
 } from "lucide-react";
-import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
+import { ArrayField } from "./ArrayField";
+import {
+  capa3ValueHasContent,
+  capa3ValueToText,
+  isArrayCapa3Field,
+  isRequiredCapa3Field,
+  type Capa3Values,
+  type NormalizedCapa3Field,
+} from "@/lib/secretaria/capa3-fields";
 
-export interface Capa3Field {
-  campo: string;
-  obligatoriedad: string;
-  descripcion: string;
+export interface Capa3Field extends NormalizedCapa3Field {
   /** Default sugerido (Codex P2 round 5). Aplicado por buildDefaultCapa3Values. */
   default?: string;
   /** Campo derivado de Capa 2 que no debe editarse desde Capa 3. */
@@ -39,8 +44,8 @@ export interface Capa3Field {
 
 interface Capa3FormProps {
   fields: Capa3Field[];
-  values: Record<string, string>;
-  onChange: (values: Record<string, string>) => void;
+  values: Record<string, unknown>;
+  onChange: (values: Capa3Values) => void;
   telematicaEnabled?: boolean;
   readOnly?: boolean;
 }
@@ -100,7 +105,14 @@ export function Capa3Form({
 }: Capa3FormProps) {
   const handleChange = useCallback(
     (campo: string, value: string) => {
-      onChange({ ...values, [campo]: value });
+      onChange({ ...values, [campo]: value } as Capa3Values);
+    },
+    [values, onChange]
+  );
+
+  const handleArrayChange = useCallback(
+    (campo: string, value: Capa3Values[string]) => {
+      onChange({ ...values, [campo]: value } as Capa3Values);
     },
     [values, onChange]
   );
@@ -112,7 +124,7 @@ export function Capa3Form({
   };
 
   const incompleteRequired = fields.filter(
-    (f) => isFieldRequired(f) && !values[f.campo]?.trim()
+    (f) => isFieldRequired(f) && !capa3ValueHasContent(values[f.campo])
   );
 
   if (fields.length === 0) {
@@ -151,8 +163,11 @@ export function Capa3Form({
         const config = OBLIGATORIEDAD_CONFIG[field.obligatoriedad] || OBLIGATORIEDAD_CONFIG.OPCIONAL;
         const Icon = config.icon;
         const required = isFieldRequired(field);
-        const isEmpty = !values[field.campo]?.trim();
+        const rawValue = values[field.campo];
+        const valueText = capa3ValueToText(rawValue);
+        const isEmpty = !capa3ValueHasContent(rawValue);
         const fieldReadOnly = readOnly || field.readonly === true;
+        const isArrayField = isArrayCapa3Field(field);
 
         return (
           <div key={field.campo} className="space-y-1.5">
@@ -193,14 +208,25 @@ export function Capa3Form({
                 className={`px-3 py-2 text-sm text-[var(--g-text-primary)] ${config.bgClass}`}
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {values[field.campo] || (
+                {valueText || (
                   <span className="italic text-[var(--g-text-secondary)]">Sin completar</span>
                 )}
               </div>
+            ) : isArrayField && field.item_schema ? (
+              <ArrayField
+                id={`capa3-${field.campo}`}
+                label={humanizeFieldName(field.campo)}
+                value={rawValue}
+                itemSchema={field.item_schema}
+                minItems={field.min_items ?? (required ? 1 : 0)}
+                maxItems={field.max_items}
+                readOnly={fieldReadOnly}
+                onChange={(items) => handleArrayChange(field.campo, items)}
+              />
             ) : field.opciones && field.opciones.length > 0 ? (
               <select
                 id={`capa3-${field.campo}`}
-                value={values[field.campo] || ""}
+                value={valueText}
                 onChange={(e) => handleChange(field.campo, e.target.value)}
                 aria-required={required}
                 aria-invalid={required && isEmpty}
@@ -222,7 +248,7 @@ export function Capa3Form({
             ) : (
               <textarea
                 id={`capa3-${field.campo}`}
-                value={values[field.campo] || ""}
+                value={valueText}
                 onChange={(e) => handleChange(field.campo, e.target.value)}
                 rows={3}
                 aria-required={required}

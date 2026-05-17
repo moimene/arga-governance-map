@@ -1,13 +1,17 @@
 import { Download, FileText, Loader2, Sparkles, X } from "lucide-react";
 import { Capa3Form } from "./Capa3Form";
-import { normalizeCapa3Draft, type NormalizedCapa3Field } from "@/lib/secretaria/capa3-fields";
+import {
+  normalizeCapa3Draft,
+  type Capa3Values,
+  type NormalizedCapa3Field,
+} from "@/lib/secretaria/capa3-fields";
 
 interface Capa3CaptureDialogProps {
   open: boolean;
   title?: string;
   subtitle?: string;
   fields: NormalizedCapa3Field[];
-  values: Record<string, string>;
+  values: Record<string, unknown>;
   errors?: Record<string, string>;
   loading?: boolean;
   submitLabel?: string;
@@ -15,7 +19,7 @@ interface Capa3CaptureDialogProps {
   draftAssistSummary?: string | null;
   draftAssistLoading?: boolean;
   onDraftAssist?: () => void | Promise<void>;
-  onChange: (values: Record<string, string>) => void;
+  onChange: (values: Capa3Values) => void;
   onClose: () => void;
   onSubmit: () => void;
 }

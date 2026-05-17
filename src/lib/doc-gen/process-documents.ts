@@ -24,6 +24,7 @@ import type {
 } from "@/lib/secretaria/agreement-document-contract";
 import type { FinalEvidenceReadinessResult } from "@/lib/secretaria/final-evidence-readiness-contract";
 import { expandLegalStructuredVariables } from "@/lib/secretaria/legal-template-normalizer";
+import { capa3ValueToText, type Capa3Values } from "@/lib/secretaria/capa3-fields";
 
 export type ProcessDocumentKind =
   | "CONVOCATORIA"
@@ -45,7 +46,7 @@ export interface ProcessDocumentGenerationInput {
   templateTypes: string[];
   plantillas: PlantillaProtegidaRow[];
   variables?: Record<string, unknown>;
-  capa3Values?: Record<string, string>;
+  capa3Values?: Capa3Values;
   fallbackText: string;
   filenamePrefix?: string;
   tenantId?: string | null;
@@ -354,12 +355,12 @@ export function resolveProcessTemplateSelection(
 
 function templateEditableFields(
   plantilla: PlantillaProtegidaRow | null,
-  values: Record<string, string>,
+  values: Capa3Values,
 ): EditableField[] | undefined {
   const fields = (plantilla?.capa3_editables ?? []).map((field) => ({
     key: field.campo,
     label: field.descripcion || field.campo,
-    value: values[field.campo] || undefined,
+    value: capa3ValueToText(values[field.campo]) || undefined,
   }));
   return fields.length > 0 ? fields : undefined;
 }
