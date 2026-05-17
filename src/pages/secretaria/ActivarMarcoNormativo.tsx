@@ -1,5 +1,5 @@
-import { useMemo, useState, type ElementType, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useMemo, useState, type Dispatch, type ElementType, type ReactNode, type SetStateAction } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
@@ -21,6 +21,7 @@ import {
   usePublishStatuteVersion,
 } from "@/hooks/useNormativeGovernance";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
+import { useRecordNormativeMaintenanceEvent } from "@/hooks/useNormativeMaintenanceCloud";
 import { useRuleManagerProfile } from "@/hooks/useRuleManager";
 import { useSociedad } from "@/hooks/useSociedades";
 import {
@@ -57,7 +58,16 @@ const STEPS: Array<{ id: WizardStepId; label: string }> = [
 
 export default function ActivarMarcoNormativo() {
   const { id: entityId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [step, setStep] = useState<WizardStepId>("diagnostico");
+  const [statuteDraft, setStatuteDraft] = useState({
+    versionLabel: `Estatutos ${new Date().getFullYear()}`,
+    documentUri: "",
+    documentHash: "",
+    clauseRef: "Artículo de competencias y mayorías",
+    sourceExcerpt: "Competencia y mayoría aplicable a la materia estatutaria.",
+    mappingCoverage: "85",
+  });
   const { primaryRole, displayName } = useCurrentUserRole();
   const normativeRole = normativeRoleFromAppRole(primaryRole);
   const sociedadQuery = useSociedad(entityId);
@@ -69,6 +79,7 @@ export default function ActivarMarcoNormativo() {
   const publishStatutes = usePublishStatuteVersion();
   const assignTemplate = useAssignTemplateBinding();
   const materializeMatrix = useMaterializeEffectiveRuleMatrix();
+  const recordNormativeEvent = useRecordNormativeMaintenanceEvent();
 
   const materias = useMemo(
     () => buildMateriaCatalogRows(materiasQuery.data ?? []),
@@ -168,6 +179,21 @@ export default function ActivarMarcoNormativo() {
         after: { status: canPublish ? "OK" : "INCOMPLETO" },
       })
     : null;
+  const canPublishStatuteDraft =
+    statuteDraft.versionLabel.trim().length > 0 &&
+    statuteDraft.documentUri.trim().length > 0 &&
+    statuteDraft.documentHash.trim().length > 0 &&
+    !statuteDraft.documentUri.startsWith("secretaria://estatutos/version-demo") &&
+    !statuteDraft.documentHash.startsWith("demo-") &&
+    Number(statuteDraft.mappingCoverage) >= 80;
+
+  function handleDiagnosticAction(id: string) {
+    if (id === "rule-set") setStep("regla");
+    else if (id === "statutes") setStep("estatutos");
+    else if (id === "organs") navigate(`/secretaria/catalogo-organos?entity=${entityId ?? ""}&matter=${criticalMatter?.materia ?? "MODIFICACION_ESTATUTOS"}`);
+    else if (id === "templates") setStep("plantillas");
+    else if (id === "conflict") navigate(`/secretaria/catalogo-materias?entity=${entityId ?? ""}`);
+  }
 
   return (
     <div className="mx-auto max-w-[1280px] p-6">
@@ -232,31 +258,59 @@ export default function ActivarMarcoNormativo() {
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <main>
-            {step === "diagnostico" && <DiagnosticStep diagnostics={diagnostics} />}
-            {step === "regla" && <RuleSetStep sociedadName={sociedad.common_name ?? sociedad.legal_name} conflict={conflict} role={normativeRole} />}
+            {step === "diagnostico" && <DiagnosticStep diagnostics={diagnostics} onAction={handleDiagnosticAction} />}
+            {step === "regla" && (
+              <RuleSetStep
+                sociedadName={sociedad.common_name ?? sociedad.legal_name}
+                conflict={conflict}
+                role={normativeRole}
+                isPending={recordNormativeEvent.isPending || materializeMatrix.isPending}
+                error={recordNormativeEvent.error}
+                onActivate={() => {
+                  if (!entityId) return;
+                  recordNormativeEvent.mutate({
+                    action: "ruleset_activated",
+                    societyId: entityId,
+                    userRole: normativeRole,
+                    after: {
+                      expected_law: conflict?.expectedLawLabel ?? "Regla legal base",
+                      jurisdiction: sociedad.jurisdiction,
+                      tipo_social: sociedad.tipo_social,
+                    },
+                    attributes: {
+                      source: "wizard_activacion_normativa",
+                    },
+                  });
+                  materializeMatrix.mutate({ entityId });
+                }}
+              />
+            )}
             {step === "estatutos" && (
               <StatutesStep
                 hasPublished={diagnostics.find((item) => item.id === "statutes")?.ok === true}
                 role={normativeRole}
                 isPending={publishStatutes.isPending}
                 error={publishStatutes.error}
+                draft={statuteDraft}
+                setDraft={setStatuteDraft}
+                canPublish={canPublishStatuteDraft}
                 onPublish={() => {
                   if (!entityId || !criticalMatter) return;
                   publishStatutes.mutate({
                     entityId,
-                    versionLabel: `Estatutos ${new Date().getFullYear()}`,
-                    documentUri: "secretaria://estatutos/version-demo",
-                    documentHash: `demo-${entityId.slice(0, 8)}-${criticalMatter.materia}`,
-                    mappingCoverage: 85,
+                    versionLabel: statuteDraft.versionLabel,
+                    documentUri: statuteDraft.documentUri,
+                    documentHash: statuteDraft.documentHash,
+                    mappingCoverage: Number(statuteDraft.mappingCoverage),
                     criticalMappingsComplete: true,
                     userRole: normativeRole,
                     mappings: [
                       {
-                        clauseRef: "Estatutos · cláusula de mayoría y competencias",
+                        clauseRef: statuteDraft.clauseRef,
                         matterCode: criticalMatter.materia,
                         requirementKey: "votacion.mayoria",
                         requirementValue: { majority_code: "REFORZADA_2_3" },
-                        sourceExcerpt: "Mayoría reforzada para materias estructurales y estatutarias.",
+                        sourceExcerpt: statuteDraft.sourceExcerpt,
                         confidence: "VALIDADO",
                       },
                     ],
@@ -264,7 +318,7 @@ export default function ActivarMarcoNormativo() {
                 }}
               />
             )}
-            {step === "clausulas" && <ClauseMappingStep matterLabel={criticalMatter?.materia_label_es ?? "materia crítica"} role={normativeRole} />}
+            {step === "clausulas" && <ClauseMappingStep matterLabel={criticalMatter?.materia_label_es ?? "materia crítica"} role={normativeRole} onMap={() => setStep("estatutos")} />}
             {step === "plantillas" && (
               <TemplatesStep
                 readiness={readiness}
@@ -322,8 +376,8 @@ export default function ActivarMarcoNormativo() {
             <Panel>
               <div className="text-sm font-semibold text-[var(--g-text-primary)]">Trazabilidad prevista</div>
               <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
-                Al publicar se registrará usuario, fecha, versión, fuentes modificadas y comentario de
-                validación. En esta fase queda preparado el contrato de auditoría sin escritura Cloud.
+                Al publicar se registra usuario, fecha, versión, fuentes modificadas y comentario de
+                validación en auditoría Cloud mediante evento normativo tenant-scoped.
               </p>
             </Panel>
             <Panel>
@@ -397,8 +451,10 @@ function StatusPanel({ canPublish, blockers }: { canPublish: boolean; blockers: 
 
 function DiagnosticStep({
   diagnostics,
+  onAction,
 }: {
   diagnostics: Array<{ id: string; label: string; ok: boolean; blocking: boolean; cta: string; detail: string }>;
+  onAction: (id: string) => void;
 }) {
   return (
     <Panel>
@@ -416,6 +472,7 @@ function DiagnosticStep({
             {!item.ok ? (
               <button
                 type="button"
+                onClick={() => onAction(item.id)}
                 className="mt-3 inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
@@ -433,10 +490,16 @@ function RuleSetStep({
   sociedadName,
   conflict,
   role,
+  isPending,
+  error,
+  onActivate,
 }: {
   sociedadName: string;
   conflict: ReturnType<typeof detectConflictOfLaws> | null;
   role: ReturnType<typeof normativeRoleFromAppRole>;
+  isPending: boolean;
+  error: unknown;
+  onActivate: () => void;
 }) {
   return (
     <Panel>
@@ -454,7 +517,8 @@ function RuleSetStep({
           {conflict.explanation}
         </div>
       ) : null}
-      <GovernedButton action="activate_rule_set" role={role} className="mt-4" />
+      <GovernedButton action="activate_rule_set" role={role} className="mt-4" onClick={onActivate} isPending={isPending} />
+      {error ? <InlineActionError error={error} /> : null}
     </Panel>
   );
 }
@@ -464,15 +528,36 @@ function StatutesStep({
   role,
   isPending,
   error,
+  draft,
+  setDraft,
+  canPublish,
   onPublish,
 }: {
   hasPublished: boolean;
   role: ReturnType<typeof normativeRoleFromAppRole>;
   isPending: boolean;
   error: unknown;
+  draft: {
+    versionLabel: string;
+    documentUri: string;
+    documentHash: string;
+    clauseRef: string;
+    sourceExcerpt: string;
+    mappingCoverage: string;
+  };
+  setDraft: Dispatch<SetStateAction<{
+    versionLabel: string;
+    documentUri: string;
+    documentHash: string;
+    clauseRef: string;
+    sourceExcerpt: string;
+    mappingCoverage: string;
+  }>>;
+  canPublish: boolean;
   onPublish: () => void;
 }) {
   const decision = canPerformNormativeAction(role, "publish_statutes");
+  const disabled = !decision.allowed || isPending || !canPublish;
   return (
     <Panel>
       <StepHeader icon={FileText} title="Versionar estatutos" />
@@ -483,9 +568,75 @@ function StatutesStep({
       <div className="mt-4">
         <StateChip ok={hasPublished} blocking={false} />
       </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Versión
+          <input
+            value={draft.versionLabel}
+            onChange={(event) => setDraft((current) => ({ ...current, versionLabel: event.target.value }))}
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Cobertura de mapeo
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={draft.mappingCoverage}
+            onChange={(event) => setDraft((current) => ({ ...current, mappingCoverage: event.target.value }))}
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+        <label className="md:col-span-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Referencia documental
+          <input
+            value={draft.documentUri}
+            onChange={(event) => setDraft((current) => ({ ...current, documentUri: event.target.value }))}
+            placeholder="secretaria://fuentes/estatutos-2026.pdf"
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+        <label className="md:col-span-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Hash documental
+          <input
+            value={draft.documentHash}
+            onChange={(event) => setDraft((current) => ({ ...current, documentHash: event.target.value }))}
+            placeholder="sha256:..."
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Cláusula mapeada
+          <input
+            value={draft.clauseRef}
+            onChange={(event) => setDraft((current) => ({ ...current, clauseRef: event.target.value }))}
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+          Extracto
+          <input
+            value={draft.sourceExcerpt}
+            onChange={(event) => setDraft((current) => ({ ...current, sourceExcerpt: event.target.value }))}
+            className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+        </label>
+      </div>
+      {!canPublish ? (
+        <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
+          Publicar estatutos exige documento real, hash y cobertura crítica mínima del 80%.
+        </p>
+      ) : null}
       <button
         type="button"
-        disabled={!decision.allowed || isPending}
+        disabled={disabled}
         aria-disabled={!decision.allowed}
         aria-busy={isPending}
         onClick={onPublish}
@@ -506,9 +657,11 @@ function StatutesStep({
 function ClauseMappingStep({
   matterLabel,
   role,
+  onMap,
 }: {
   matterLabel: string;
   role: ReturnType<typeof normativeRoleFromAppRole>;
+  onMap: () => void;
 }) {
   return (
     <Panel>
@@ -524,7 +677,7 @@ function ClauseMappingStep({
           </div>
         ))}
       </div>
-      <GovernedButton action="map_clause" role={role} className="mt-4" />
+      <GovernedButton action="map_clause" role={role} className="mt-4" onClick={onMap} />
     </Panel>
   );
 }
@@ -637,6 +790,8 @@ function PublicationStep({
         type="button"
         disabled={disabled}
         aria-disabled={disabled}
+        aria-busy={isPending}
+        onClick={onMaterialize}
         className={`mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold ${
           !disabled
             ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
@@ -719,17 +874,23 @@ function GovernedButton({
   action,
   role,
   className = "",
+  onClick,
+  isPending = false,
 }: {
   action: NormativeMaintenanceAction;
   role: ReturnType<typeof normativeRoleFromAppRole>;
   className?: string;
+  onClick?: () => void;
+  isPending?: boolean;
 }) {
   const decision = canPerformNormativeAction(role, action);
   return (
     <button
       type="button"
-      disabled={!decision.allowed}
+      disabled={!decision.allowed || isPending}
       aria-disabled={!decision.allowed}
+      aria-busy={isPending}
+      onClick={onClick}
       className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold ${
         decision.allowed
           ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"

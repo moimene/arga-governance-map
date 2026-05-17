@@ -26,7 +26,19 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(app).toContain("/secretaria/sociedades/:id/marco-normativo/activar");
     expect(navigation).toContain("Catálogo de órganos");
     expect(organos).toContain("Órganos, competencias y reglamentos");
+    expect(organos).toContain("Crear órgano");
+    expect(organos).toContain("Fuente documental obligatoria");
+    expect(organos).toContain("No se permite publicar órgano competente sin fuente documental");
+    expect(organos).toContain("useUpsertOrganProfile");
     expect(wizard).toContain("Wizard de activación normativa");
+    expect(wizard).toContain("useRecordNormativeMaintenanceEvent");
+    expect(wizard).toContain("handleDiagnosticAction");
+    expect(wizard).toContain("Publicar estatutos exige documento real");
+    expect(wizard).toContain('startsWith("secretaria://estatutos/version-demo")');
+    expect(wizard).toContain('startsWith("demo-")');
+    expect(wizard).not.toContain('documentUri: "secretaria://estatutos/version-demo"');
+    expect(wizard).not.toContain("documentHash: `demo-");
+    expect(wizard).not.toContain("sin escritura Cloud");
   });
 
   it("la ficha de materia habla de capas jurídicas y documentos", () => {
@@ -94,6 +106,9 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
 
     expect(ruleManager).toContain("Historial y trazabilidad");
     expect(ruleManager).toContain("Evento preparado");
+    expect(ruleManager).toContain("usePublishNormativeOverride");
+    expect(ruleManager).toContain("Publicar override");
+    expect(ruleManager).toContain("Completa valor, fuente documental y justificación");
     expect(wizard).toContain("Evento de auditoría preparado");
     expect(wizard).toContain("Rollout");
     expect(wizard).toContain("Solicitar edición");
@@ -108,6 +123,15 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(wizard).toContain("Backfill legacy");
     expect(wizard).toContain("Telemetría preparada para la publicación del marco");
     expect(ruleManager).toContain("Telemetría preparada para la consulta de regla efectiva");
+  });
+
+  it("conecta bindings de plantillas a la regla efectiva", () => {
+    const plantillas = read("src/pages/secretaria/Plantillas.tsx");
+
+    expect(plantillas).toContain("useAssignTemplateBinding");
+    expect(plantillas).toContain("Vincular como plantilla activa");
+    expect(plantillas).toContain("templateSelectionReason");
+    expect(plantillas).toContain("Plantilla vinculada a la regla efectiva");
   });
 
   it("no filtra metadatos demo en textos visibles de negocio", () => {

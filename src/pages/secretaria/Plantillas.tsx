@@ -14,8 +14,12 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAssignTemplateBinding } from "@/hooks/useNormativeGovernance";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { normativeRoleFromAppRole } from "@/lib/secretaria/mesa-control-societaria";
+import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import { toast } from "sonner";
 
@@ -120,6 +124,9 @@ export default function Plantillas() {
   const scope = useSecretariaScope();
   const { data, isLoading } = usePlantillasProtegidas();
   const updateEstado = useUpdateEstadoPlantilla();
+  const assignTemplate = useAssignTemplateBinding();
+  const { primaryRole } = useCurrentUserRole();
+  const normativeRole = normativeRoleFromAppRole(primaryRole);
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
   const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>('proceso');
   const [filterMateria, setFilterMateria] = useState<string>('');
@@ -159,6 +166,39 @@ export default function Plantillas() {
           toast.error("Error al actualizar el estado de la plantilla");
         },
       }
+    );
+  };
+
+  const handleAssignBinding = (plantilla: PlantillaProtegidaRow) => {
+    const materia = plantilla.materia_acuerdo ?? plantilla.materia ?? filterMateria;
+    if (!materia) {
+      toast.error("No se puede vincular una plantilla sin materia.");
+      return;
+    }
+    assignTemplate.mutate(
+      {
+        materia,
+        organoTipo: plantilla.organo_tipo ?? "ANY",
+        tipoSocial: selectedEntity?.legalForm ?? "ANY",
+        jurisdiccion: selectedEntity?.jurisdiction ?? plantilla.jurisdiccion ?? "ES",
+        adoptionMode: plantilla.adoption_mode ?? "ANY",
+        docType: plantilla.tipo,
+        templateId: plantilla.id,
+        priority: 100,
+        selectionReason: templateSelectionReason({
+          materia,
+          docType: plantilla.tipo,
+          jurisdiction: selectedEntity?.jurisdiction ?? plantilla.jurisdiccion,
+          tipoSocial: selectedEntity?.legalForm,
+          organoTipo: plantilla.organo_tipo,
+          adoptionMode: plantilla.adoption_mode,
+        }),
+        userRole: normativeRole,
+      },
+      {
+        onSuccess: () => toast.success("Plantilla vinculada a la regla efectiva."),
+        onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo vincular la plantilla."),
+      },
     );
   };
 
@@ -763,6 +803,19 @@ export default function Plantillas() {
                     {getTemplateUsageTarget(selected).label}
                   </button>
                 )}
+                {selected.estado === "ACTIVA" && isSociedadMode && selectedEntity ? (
+                  <button
+                    type="button"
+                    onClick={() => handleAssignBinding(selected)}
+                    disabled={assignTemplate.isPending}
+                    aria-busy={assignTemplate.isPending}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Vincular como plantilla activa
+                  </button>
+                ) : null}
                 {selected.estado === "ACTIVA" ? (
                   <p className="text-xs text-[var(--g-text-secondary)]">
                     {getTemplateUsageTarget(selected).hint}

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assignTemplateBinding,
   buildNormativeOverridePayload,
+  buildOrganProfilePayload,
   buildOrganRulePayload,
   buildStatuteVersionPayload,
   buildTemplateBindingPayload,
@@ -10,12 +11,35 @@ import {
   publishStatuteVersion,
   templateSelectionReason,
   upsertOrganRule,
+  upsertOrganProfile,
 } from "@/lib/secretaria/normative-governance";
 
 const tenantId = "00000000-0000-0000-0000-000000000001";
 const entityId = "11111111-1111-1111-1111-111111111111";
 
 describe("normative governance contracts", () => {
+  it("builds organ profile payloads for governed create/edit", () => {
+    expect(
+      buildOrganProfilePayload({
+        tenantId,
+        entityId,
+        name: "Comité de Estrategia",
+        bodyType: "COMITE",
+        status: "Activo",
+        regulationRef: "Reglamento del Comité art. 3",
+        quorumRule: "Mayoría de miembros",
+        userRole: "editor",
+      }),
+    ).toMatchObject({
+      tenant_id: tenantId,
+      entity_id: entityId,
+      name: "Comité de Estrategia",
+      body_type: "COMITE",
+      regulation_ref: "Reglamento del Comité art. 3",
+      user_role: "editor",
+    });
+  });
+
   it("builds organ rule payloads with documentary source", () => {
     expect(
       buildOrganRulePayload({
@@ -27,6 +51,8 @@ describe("normative governance contracts", () => {
         majorityRule: "Mayoría de dos tercios",
         sourceType: "ESTATUTOS",
         sourceRef: "Estatutos art. 12",
+        documentUri: "secretaria://fuentes/estatutos-2026.pdf",
+        sourceExcerpt: "La Junta es competente para modificar estatutos.",
         userRole: "editor",
       }),
     ).toMatchObject({
@@ -34,6 +60,8 @@ describe("normative governance contracts", () => {
       entity_id: entityId,
       matter_code: "AUMENTO_CAPITAL",
       source_ref: "Estatutos art. 12",
+      document_uri: "secretaria://fuentes/estatutos-2026.pdf",
+      source_excerpt: "La Junta es competente para modificar estatutos.",
       user_role: "editor",
     });
   });
@@ -118,6 +146,14 @@ describe("normative governance contracts", () => {
       sourceRef: "Reglamento art. 4",
       userRole: "editor",
     });
+    await upsertOrganProfile(client, {
+      tenantId,
+      entityId,
+      bodyId: "22222222-2222-2222-2222-222222222222",
+      name: "Consejo de Administración",
+      bodyType: "CDA",
+      userRole: "editor",
+    });
     await publishStatuteVersion(client, {
       tenantId,
       entityId,
@@ -147,6 +183,7 @@ describe("normative governance contracts", () => {
     await materializeEffectiveRuleMatrix(client, { tenantId, entityId });
 
     expect(rpc).toHaveBeenCalledWith("fn_secretaria_upsert_organ_rule", expect.any(Object));
+    expect(rpc).toHaveBeenCalledWith("fn_secretaria_upsert_organ_profile", expect.any(Object));
     expect(rpc).toHaveBeenCalledWith("fn_secretaria_publish_statute_version", expect.any(Object));
     expect(rpc).toHaveBeenCalledWith("fn_secretaria_publish_normative_override", expect.any(Object));
     expect(rpc).toHaveBeenCalledWith("fn_secretaria_assign_template_binding", expect.any(Object));

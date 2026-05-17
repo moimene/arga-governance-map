@@ -119,6 +119,18 @@ export interface EffectiveRuleMatrixRow {
   generated_at: string;
 }
 
+export interface UpsertOrganProfileInput {
+  tenantId: string;
+  entityId: string;
+  bodyId?: string | null;
+  name: string;
+  bodyType: "CDA" | "COMISION" | "COMITE" | "JUNTA";
+  status?: string | null;
+  regulationRef?: string | null;
+  quorumRule?: string | null;
+  userRole: NormativeMaintenanceRole;
+}
+
 export interface UpsertOrganRuleInput {
   tenantId: string;
   entityId: string;
@@ -130,6 +142,8 @@ export interface UpsertOrganRuleInput {
   sourceType: GovernanceSourceType;
   sourceRef: string;
   sourceVersionId?: string | null;
+  documentUri?: string | null;
+  sourceExcerpt?: string | null;
   userRole: NormativeMaintenanceRole;
 }
 
@@ -203,6 +217,22 @@ export function buildOrganRulePayload(input: UpsertOrganRuleInput) {
     source_type: input.sourceType,
     source_ref: input.sourceRef,
     source_version_id: input.sourceVersionId ?? null,
+    document_uri: input.documentUri ?? null,
+    source_excerpt: input.sourceExcerpt ?? null,
+    user_role: input.userRole,
+  };
+}
+
+export function buildOrganProfilePayload(input: UpsertOrganProfileInput) {
+  return {
+    tenant_id: input.tenantId,
+    entity_id: input.entityId,
+    body_id: input.bodyId ?? null,
+    name: input.name,
+    body_type: input.bodyType,
+    status: input.status ?? "Activo",
+    regulation_ref: input.regulationRef ?? null,
+    quorum_rule: input.quorumRule ?? null,
     user_role: input.userRole,
   };
 }
@@ -260,6 +290,14 @@ export function buildTemplateBindingPayload(input: AssignTemplateBindingInput) {
     selection_reason: input.selectionReason,
     user_role: input.userRole,
   };
+}
+
+export async function upsertOrganProfile(client: RpcClient, input: UpsertOrganProfileInput) {
+  const { data, error } = await client.rpc("fn_secretaria_upsert_organ_profile", {
+    p_payload: buildOrganProfilePayload(input),
+  });
+  assertRpc(error, "No se pudo guardar el órgano societario.");
+  return String(data);
 }
 
 export async function upsertOrganRule(client: RpcClient, input: UpsertOrganRuleInput) {

@@ -6,6 +6,7 @@ import {
   materializeEffectiveRuleMatrix,
   publishNormativeOverride,
   publishStatuteVersion,
+  upsertOrganProfile,
   upsertOrganRule,
   type AssignTemplateBindingInput,
   type EffectiveRuleMatrixRow,
@@ -16,6 +17,7 @@ import {
   type StatuteClauseMappingRow,
   type StatuteVersionRow,
   type TemplateBindingRow,
+  type UpsertOrganProfileInput,
   type UpsertOrganRuleInput,
 } from "@/lib/secretaria/normative-governance";
 
@@ -155,6 +157,19 @@ function invalidateNormativeQueries(queryClient: ReturnType<typeof useQueryClien
   queryClient.invalidateQueries({ queryKey: ["materia_template_binding"] });
   queryClient.invalidateQueries({ queryKey: ["secretaria_effective_rule_matrix"] });
   queryClient.invalidateQueries({ queryKey: ["secretaria_normative_framework_status"] });
+  queryClient.invalidateQueries({ queryKey: ["governing_bodies"] });
+}
+
+export function useUpsertOrganProfile() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<UpsertOrganProfileInput, "tenantId">) => {
+      if (!tenantId) throw new Error("tenantId requerido");
+      return upsertOrganProfile(supabase, { ...input, tenantId });
+    },
+    onSuccess: () => invalidateNormativeQueries(queryClient),
+  });
 }
 
 export function useUpsertOrganRule() {

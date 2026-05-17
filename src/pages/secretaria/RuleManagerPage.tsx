@@ -20,6 +20,7 @@ import {
   useEffectiveRuleMatrix,
   useMaterializeEffectiveRuleMatrix,
   useNormativeOverrides,
+  usePublishNormativeOverride,
   useStatuteVersions,
   useTemplateBindings,
 } from "@/hooks/useNormativeGovernance";
@@ -51,6 +52,7 @@ import {
   displaySocietyLegalForm,
   normativeRoleFromAppRole,
   requirementStateLabel,
+  type NormativeMaintenanceRole,
   type RequirementOperationalState,
 } from "@/lib/secretaria/mesa-control-societaria";
 
@@ -491,6 +493,7 @@ export default function RuleManagerPage() {
               materializeRows={materializeMatrix.data?.rows_materialized}
               materializeError={materializeMatrix.error}
               onMaterialize={() => materializeMatrix.mutate({ entityId })}
+              role={normativeRole}
             />
           </div>
           <div className="lg:col-span-2">
@@ -722,6 +725,7 @@ function GovernedMaintenanceCard({
   materializeRows,
   materializeError,
   onMaterialize,
+  role,
 }: {
   entityId: string;
   matter: string;
@@ -742,10 +746,28 @@ function GovernedMaintenanceCard({
   materializeRows?: number;
   materializeError: unknown;
   onMaterialize: () => void;
+  role: NormativeMaintenanceRole;
 }) {
+  const publishOverride = usePublishNormativeOverride();
+  const [overrideDraft, setOverrideDraft] = useState({
+    requirementKey: "votacion.mayoria",
+    requirementValue: "UNANIMIDAD",
+    sourceType: "ESTATUTOS" as "ESTATUTOS" | "REGLAMENTO",
+    sourceRef: "",
+    justification: "Eleva el requisito aplicable respecto del mínimo legal.",
+    effectiveFrom: new Date().toISOString().slice(0, 10),
+    effectiveUntil: "",
+  });
   const matterMatrix = matrixRows.find((row) => row.matter_code === matter);
   const publishedStatute = statuteVersions.find((version) => version.status === "PUBLICADA");
   const matterOverrides = overrides.filter((override) => override.matter_code === matter);
+  const overrideDecision = canPerformNormativeAction(role, "map_clause");
+  const canPublishOverride =
+    overrideDecision.allowed &&
+    overrideDraft.requirementKey.trim().length > 0 &&
+    overrideDraft.requirementValue.trim().length > 0 &&
+    overrideDraft.sourceRef.trim().length > 0 &&
+    overrideDraft.justification.trim().length > 0;
 
   return (
     <Card title="Mantenimiento gobernado P2" icon={Landmark}>
@@ -790,6 +812,128 @@ function GovernedMaintenanceCard({
             </div>
           </div>
         ) : null}
+        <div className="border-t border-[var(--g-border-subtle)] pt-4">
+          <div className="text-sm font-semibold text-[var(--g-text-primary)]">
+            Publicar override estatutario o reglamentario
+          </div>
+          <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            El override exige referencia documental y justificación. Si intenta rebajar un mínimo
+            legal, la publicación queda bloqueada por la validación de ley.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Requisito afectado
+              <select
+                value={overrideDraft.requirementKey}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, requirementKey: event.target.value }))}
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="votacion.mayoria">Mayoría</option>
+                <option value="constitucion.quorum">Quórum</option>
+                <option value="organo.competente">Órgano competente</option>
+                <option value="convocatoria.plazo">Plazo</option>
+                <option value="documento.obligatorio">Documento obligatorio</option>
+                <option value="formalizacion">Formalización</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Fuente
+              <select
+                value={overrideDraft.sourceType}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, sourceType: event.target.value as typeof overrideDraft.sourceType }))}
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="ESTATUTOS">Estatutos</option>
+                <option value="REGLAMENTO">Reglamento</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Valor
+              <input
+                value={overrideDraft.requirementValue}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, requirementValue: event.target.value }))}
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </label>
+            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Referencia documental
+              <input
+                value={overrideDraft.sourceRef}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, sourceRef: event.target.value }))}
+                placeholder="Estatutos art. 15"
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Vigencia desde
+              <input
+                type="date"
+                value={overrideDraft.effectiveFrom}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, effectiveFrom: event.target.value }))}
+                className="mt-1 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </label>
+            <label className="md:col-span-3 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-primary)]">
+              Justificación
+              <textarea
+                value={overrideDraft.justification}
+                onChange={(event) => setOverrideDraft((current) => ({ ...current, justification: event.target.value }))}
+                className="mt-1 min-h-20 w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:border-[var(--g-brand-3308)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!canPublishOverride || publishOverride.isPending}
+              aria-busy={publishOverride.isPending}
+              onClick={() => {
+                if (!canPublishOverride) return;
+                const requirementValue =
+                  overrideDraft.requirementKey === "votacion.mayoria"
+                    ? { majority_code: overrideDraft.requirementValue }
+                    : overrideDraft.requirementKey === "constitucion.quorum"
+                      ? { quorum_code: overrideDraft.requirementValue }
+                      : { value: overrideDraft.requirementValue };
+                publishOverride.mutate({
+                  entityId,
+                  matterCode: matter,
+                  requirementKey: overrideDraft.requirementKey,
+                  requirementValue,
+                  sourceType: overrideDraft.sourceType,
+                  sourceRef: overrideDraft.sourceRef,
+                  justification: overrideDraft.justification,
+                  effectiveFrom: overrideDraft.effectiveFrom,
+                  effectiveUntil: overrideDraft.effectiveUntil || null,
+                  userRole: role,
+                });
+              }}
+              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-xs font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Publicar override
+            </button>
+            {!overrideDecision.allowed ? (
+              <span className="text-xs text-[var(--g-text-secondary)]">Solicitar edición</span>
+            ) : !canPublishOverride ? (
+              <span className="text-xs text-[var(--g-text-secondary)]">
+                Completa valor, fuente documental y justificación.
+              </span>
+            ) : null}
+          </div>
+          {publishOverride.error ? (
+            <ErrorBanner
+              title="Override bloqueado"
+              message={publishOverride.error instanceof Error ? publishOverride.error.message : "No se pudo publicar el override."}
+            />
+          ) : null}
+        </div>
         {materializeRows !== undefined ? (
           <p className="text-xs text-[var(--g-text-secondary)]">
             Matriz actualizada para {entityId}: {materializeRows} filas materializadas.
