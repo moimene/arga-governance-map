@@ -25,6 +25,7 @@ import {
   buildUniversalMeetingDedupHash,
   buildUniversalMeetingQuorumData,
   buildUniversalMeetingSlug,
+  UNIVERSAL_MEETING_INITIAL_STATUS,
   universalMeetingStartIso,
   type UniversalMeetingBasicInput,
 } from "@/lib/secretaria/junta-universal";
@@ -510,7 +511,7 @@ export function useCreateUniversalMeeting() {
           meeting_type: "UNIVERSAL",
           scheduled_start: scheduledStart,
           scheduled_end: scheduledEnd,
-          status: "BORRADOR",
+          status: UNIVERSAL_MEETING_INITIAL_STATUS,
           location: input.lugar.trim(),
           confidentiality_level: "NORMAL",
           quorum_data: buildUniversalMeetingQuorumData(hydrated),

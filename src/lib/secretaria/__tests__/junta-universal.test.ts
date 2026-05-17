@@ -5,6 +5,7 @@ import {
   isUniversalMeetingQuorumData,
   patchUniversalAgendaAcceptance,
   patchUniversalCapitalSummary,
+  UNIVERSAL_MEETING_INITIAL_STATUS,
 } from "../junta-universal";
 
 const baseInput = {
@@ -21,6 +22,10 @@ const baseInput = {
 };
 
 describe("junta-universal helpers", () => {
+  it("uses the canonical meetings.status value accepted by the database", () => {
+    expect(UNIVERSAL_MEETING_INITIAL_STATUS).toBe("DRAFT");
+  });
+
   it("builds a stable dedup hash for the same universal meeting input", () => {
     expect(buildUniversalMeetingDedupHash(baseInput)).toBe(buildUniversalMeetingDedupHash({ ...baseInput }));
   });

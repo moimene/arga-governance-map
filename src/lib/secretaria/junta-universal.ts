@@ -2,6 +2,8 @@ import type { AgendaItemKind } from "./agenda-kind";
 
 export type UniversalMeetingModality = "PRESENCIAL" | "TELEMATICA" | "MIXTA";
 
+export const UNIVERSAL_MEETING_INITIAL_STATUS = "DRAFT";
+
 export interface UniversalMeetingBasicInput {
   tenantId: string;
   entityId: string;
