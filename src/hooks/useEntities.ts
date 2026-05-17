@@ -12,6 +12,13 @@ export interface EntityRow {
   legal_form: string | null;
   tipo_social?: string | null;
   registration_number: string | null;
+  address?: string | null;
+  registered_address?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_floor?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
   parent_entity_id: string | null;
   ownership_percentage: number | null;
   entity_status: string;

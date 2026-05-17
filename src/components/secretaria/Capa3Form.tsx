@@ -26,6 +26,10 @@ export interface Capa3Field {
   descripcion: string;
   /** Default sugerido (Codex P2 round 5). Aplicado por buildDefaultCapa3Values. */
   default?: string;
+  /** Campo derivado de Capa 2 que no debe editarse desde Capa 3. */
+  readonly?: boolean;
+  /** Etiqueta de origen para campos pre-rellenados desde el expediente. */
+  sourceLabel?: string;
   /**
    * Lista cerrada de opciones (Codex P2 round 5). Si está presente y no vacía,
    * Capa3Form renderiza `<select>` en lugar de `<textarea>`.
@@ -148,11 +152,12 @@ export function Capa3Form({
         const Icon = config.icon;
         const required = isFieldRequired(field);
         const isEmpty = !values[field.campo]?.trim();
+        const fieldReadOnly = readOnly || field.readonly === true;
 
         return (
           <div key={field.campo} className="space-y-1.5">
             {/* Label row */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <label
                 htmlFor={`capa3-${field.campo}`}
                 className="text-sm font-medium text-[var(--g-text-primary)]"
@@ -166,6 +171,14 @@ export function Capa3Form({
                 <Icon className="h-3 w-3" />
                 {config.label}
               </span>
+              {field.sourceLabel && (
+                <span
+                  className="inline-flex items-center gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-full)" }}
+                >
+                  {field.readonly ? "Derivado" : "Pre-rellenado"} · {field.sourceLabel}
+                </span>
+              )}
             </div>
 
             {/* Description */}
@@ -175,7 +188,7 @@ export function Capa3Form({
 
             {/* Input — Codex P2 round 5: si el campo declara `opciones`,
                 renderiza un <select> con lista cerrada. Si no, textarea libre. */}
-            {readOnly ? (
+            {fieldReadOnly ? (
               <div
                 className={`px-3 py-2 text-sm text-[var(--g-text-primary)] ${config.bgClass}`}
                 style={{ borderRadius: "var(--g-radius-md)" }}

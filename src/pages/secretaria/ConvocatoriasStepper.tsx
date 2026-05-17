@@ -2,17 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Check, ChevronDown, ChevronRight,
+  ArrowLeft, Check, ChevronDown, ChevronRight, Copy,
   AlertTriangle, FileText, Globe, Plus, Send, ShieldCheck, Trash2, Users,
 } from "lucide-react";
 import { evaluarConvocatoria } from "@/lib/rules-engine";
-import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoSocial } from "@/lib/rules-engine";
+import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
-import { useCreateConvocatoria, useUploadConvocatoriaAttachment, type AgendaItem } from "@/hooks/useConvocatorias";
+import {
+  useConvocatoriasList,
+  useCreateConvocatoria,
+  useUploadConvocatoriaAttachment,
+  type AgendaItem,
+  type ConvocatoriaWithBody,
+} from "@/hooks/useConvocatorias";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
@@ -27,6 +33,10 @@ import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNo
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import { isRequiredCapa3Field } from "@/lib/secretaria/capa3-fields";
+import {
+  buildConvocatoriaCapa3Resolution,
+  type ConvocatoriaCapa3Field,
+} from "@/lib/secretaria/convocatoria-capa3-resolver";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { buildConvocatoriaNoticeDoubleEvaluation } from "@/lib/secretaria/dual-evaluation";
 import {
@@ -178,6 +188,11 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
   },
 ];
 
+const ALL_ORGANOS: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
+const JUNTA_ONLY: TipoOrgano[] = ["JUNTA_GENERAL"];
+const CONSEJO_SCOPE: TipoOrgano[] = ["CONSEJO", "COMISION_DELEGADA"];
+const JUNTA_AND_CONSEJO: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
+
 // `lmvCotizada=true` marca materias con especialidades aplicables a SA
 // cotizadas (LMV / Código de Buen Gobierno CNMV). NO cambia la clase de
 // materia (sigue siendo ORDINARIA/ESTATUTARIA/ESTRUCTURAL para el motor),
@@ -190,6 +205,15 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
 //   - REMUNERACION_CONSEJEROS: art. 529 novodecies LSC → informe anual
 //     vinculante + voto consultivo cotizadas.
 const AGENDA_MATERIAS = [
+  // Consejo / órgano de administración
+  { value: "APROBACION_PLAN_NEGOCIO", label: "Aprobación del plan de negocio", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "COMITES_INTERNOS", label: "Constitución o modificación de comités internos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "DISTRIBUCION_CARGOS", label: "Distribución de cargos del consejo", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  { value: "POLITICAS_CORPORATIVAS", label: "Aprobación de políticas corporativas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "RATIFICACION_ACTOS", label: "Ratificación de actos previos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "SEGUROS_RESPONSABILIDAD", label: "Seguro de responsabilidad de administradores", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+
   // Ordinarias (gestión recurrente del órgano)
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
@@ -240,6 +264,43 @@ const AGENDA_MATERIAS = [
   { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 ] as const;
 
+const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
+  APROBACION_PLAN_NEGOCIO: CONSEJO_SCOPE,
+  FORMULACION_CUENTAS: CONSEJO_SCOPE,
+  COMITES_INTERNOS: CONSEJO_SCOPE,
+  DISTRIBUCION_CARGOS: CONSEJO_SCOPE,
+  POLITICAS_CORPORATIVAS: CONSEJO_SCOPE,
+  RATIFICACION_ACTOS: CONSEJO_SCOPE,
+  SEGUROS_RESPONSABILIDAD: CONSEJO_SCOPE,
+  APROBACION_CUENTAS: JUNTA_ONLY,
+  APLICACION_RESULTADO: JUNTA_ONLY,
+  DISTRIBUCION_DIVIDENDOS: JUNTA_ONLY,
+  DISTRIBUCION_RESERVAS: JUNTA_ONLY,
+  NOMBRAMIENTO_CONSEJERO: JUNTA_AND_CONSEJO,
+  REELECCION_CONSEJERO: JUNTA_ONLY,
+  CESE_CONSEJERO: JUNTA_AND_CONSEJO,
+  NOMBRAMIENTO_AUDITOR: JUNTA_ONLY,
+  REMUNERACION_CONSEJEROS: JUNTA_ONLY,
+  DELEGACION_FACULTADES: CONSEJO_SCOPE,
+  OPERACION_VINCULADA: CONSEJO_SCOPE,
+  PROGRAMA_RECOMPRA: JUNTA_ONLY,
+  AUTORIZACION_GARANTIA: CONSEJO_SCOPE,
+  MODIFICACION_ESTATUTOS: JUNTA_ONLY,
+  MODIFICACION_REGLAMENTO: JUNTA_AND_CONSEJO,
+  AUMENTO_CAPITAL: JUNTA_ONLY,
+  REDUCCION_CAPITAL: JUNTA_ONLY,
+  EMISION_OBLIGACIONES: JUNTA_ONLY,
+  CAMBIO_DENOMINACION_SOCIAL: JUNTA_ONLY,
+  CAMBIO_DOMICILIO_SOCIAL: JUNTA_ONLY,
+  TRANSFORMACION: JUNTA_ONLY,
+  FUSION: JUNTA_ONLY,
+  ESCISION: JUNTA_ONLY,
+  DISOLUCION: JUNTA_ONLY,
+  CESION_GLOBAL: JUNTA_ONLY,
+  AUTORIZACION_OPERACION_ESTRUCTURAL: JUNTA_ONLY,
+  OTROS_LIBRE: ALL_ORGANOS,
+};
+
 // LMV cotizada advertencias específicas por materia. Texto enseña al
 // secretario qué especialidad cotizada aplica y dónde está la referencia.
 const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
@@ -281,13 +342,14 @@ const CHANNEL_LABELS: Record<string, string> = {
   EMAIL_SIMPLE: "Email simple",
 };
 
-function newAgendaItem(): AgendaItem {
+function newAgendaItem(organoTipo: TipoOrgano = "JUNTA_GENERAL"): AgendaItem {
+  const materia = materiaDefaultForOrgano(organoTipo);
   return {
     id: crypto.randomUUID(),
     titulo: "",
-    materia: "APROBACION_CUENTAS",
-    tipo: "ORDINARIA",
-    inscribible: false,
+    materia: materia.value,
+    tipo: materia.tipo,
+    inscribible: materia.inscribible,
     // agenda_item.kind v3.1: default DELIBERATIVO (coincide con BD default).
     kind: "DELIBERATIVO",
     decision_subtype: null,
@@ -325,6 +387,15 @@ function materiaClaseFromTipo(tipo: AgendaItem["tipo"]) {
 
 function labelMateria(materia: string) {
   return AGENDA_MATERIAS.find((m) => m.value === materia)?.label ?? materia;
+}
+
+function isMateriaCompatibleWithOrgano(materia: string, organoTipo: TipoOrgano) {
+  const organos = MATERIA_ORGANOS[materia] ?? ALL_ORGANOS;
+  return organos.includes(organoTipo);
+}
+
+function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
+  return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
 
 function statusLabel(status?: string | null) {
@@ -387,6 +458,71 @@ function channelSatisfiesReminder(selected: string, reminder: string) {
     "DOF",
   ]);
   return officialGazetteChannels.has(selectedValue) && officialGazetteChannels.has(reminderValue);
+}
+
+function firstText(...values: Array<unknown>) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function entityDomicilioSocial(entity: {
+  registered_address?: string | null;
+  address?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_floor?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+} | null | undefined) {
+  if (!entity) return "";
+  const direct = firstText(entity.registered_address, entity.address);
+  if (direct) return direct;
+  return [
+    entity.address_street,
+    entity.address_number,
+    entity.address_floor,
+    entity.postal_code,
+    entity.city,
+  ]
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+}
+
+function isConvocatoriaType(value: string | null | undefined): value is "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL" {
+  return value === "ORDINARIA" || value === "EXTRAORDINARIA" || value === "UNIVERSAL";
+}
+
+function isFormatoReunion(value: string | null | undefined): value is "PRESENCIAL" | "TELEMATICA" | "MIXTA" {
+  return value === "PRESENCIAL" || value === "TELEMATICA" || value === "MIXTA";
+}
+
+function normalizeAgendaDraftItems(items: ConvocatoriaWithBody["agenda_items"], organoTipo: TipoOrgano): AgendaItem[] {
+  if (!Array.isArray(items) || items.length === 0) return [newAgendaItem(organoTipo)];
+  return items.map((item) => {
+    const materia = item.materia ?? materiaDefaultForOrgano(organoTipo).value;
+    const meta = AGENDA_MATERIAS.find((m) => m.value === materia);
+    return {
+      id: crypto.randomUUID(),
+      titulo: item.titulo ?? "",
+      materia,
+      tipo: ((item.tipo ?? meta?.tipo ?? "ORDINARIA") as AgendaItem["tipo"]),
+      inscribible: item.inscribible ?? meta?.inscribible ?? false,
+      kind: item.kind ?? "DELIBERATIVO",
+      decision_subtype: item.kind === "DECISORIO" ? (item.decision_subtype ?? null) : null,
+      propuesta_acuerdo: item.kind === "DECISORIO" ? (item.propuesta_acuerdo ?? null) : null,
+    };
+  });
+}
+
+function excludedRecipientsFromTrace(trace: Record<string, unknown> | null | undefined) {
+  const recipients = trace && typeof trace === "object" ? trace.recipients : null;
+  if (!recipients || typeof recipients !== "object" || Array.isArray(recipients)) return new Set<string>();
+  const ids = (recipients as { excluded_person_ids?: unknown }).excluded_person_ids;
+  if (!Array.isArray(ids)) return new Set<string>();
+  return new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0));
 }
 
 function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
@@ -495,11 +631,17 @@ export default function ConvocatoriasStepper() {
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const tipoSocial = toTipoSocial(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
   const organoTipo = resolveOrganoTipo(selectedBody);
+  const domicilioSocial = entityDomicilioSocial(selectedEntity);
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
+  const { data: previousConvocatorias = [] } = useConvocatoriasList(selectedEntityId);
 
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
+  const availableAgendaMaterias = useMemo(
+    () => AGENDA_MATERIAS.filter((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)),
+    [organoTipo],
+  );
   const agendaRuleSpecs = agendaItems
     // agenda_item.kind v3.1: solo DECISORIO produce acuerdo y exige reglas LSC.
     // Los puntos no decisorios no se someten a votación → no aplica motor V2.
@@ -555,6 +697,19 @@ export default function ConvocatoriasStepper() {
   const [habilitarSegunda, setHabilitarSegunda] = useState(false);
   const [fechaReunion2, setFechaReunion2] = useState("");
   const [horaReunion2, setHoraReunion2] = useState("10:30");
+  const lastAutoLugarRef = useRef("");
+
+  useEffect(() => {
+    if (!domicilioSocial) return;
+    setLugar((currentLugar) => {
+      const shouldAutofill = !currentLugar.trim() || currentLugar === lastAutoLugarRef.current;
+      if (!shouldAutofill) return currentLugar;
+      lastAutoLugarRef.current = domicilioSocial;
+      return domicilioSocial;
+    });
+  }, [domicilioSocial]);
+
+  const lugarRequired = formatoReunion !== "TELEMATICA";
 
   const meetingIso = fechaReunion
     ? new Date(`${fechaReunion}T${horaReunion}:00`).toISOString()
@@ -610,7 +765,7 @@ export default function ConvocatoriasStepper() {
     : noticeDoubleEvaluation.effective_ok;
 
   function addAgendaItem() {
-    setAgendaItems((prev) => [...prev, newAgendaItem()]);
+    setAgendaItems((prev) => [...prev, newAgendaItem(organoTipo)]);
   }
   function removeAgendaItem(id: string) {
     setAgendaItems((prev) => prev.filter((i) => i.id !== id));
@@ -618,6 +773,22 @@ export default function ConvocatoriasStepper() {
   function updateAgendaItem(id: string, patch: Partial<AgendaItem>) {
     setAgendaItems((prev) => prev.map((i) => i.id === id ? { ...i, ...patch } : i));
   }
+
+  useEffect(() => {
+    const defaultMateria = materiaDefaultForOrgano(organoTipo);
+    setAgendaItems((prev) =>
+      prev.map((item) => {
+        const isEmptyDraft = item.titulo.trim().length === 0 && !item.propuesta_acuerdo?.trim();
+        if (!isEmptyDraft || isMateriaCompatibleWithOrgano(item.materia, organoTipo)) return item;
+        return {
+          ...item,
+          materia: defaultMateria.value,
+          tipo: defaultMateria.tipo,
+          inscribible: defaultMateria.inscribible,
+        };
+      }),
+    );
+  }, [organoTipo]);
 
   // ── Step 4 ──
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
@@ -673,6 +844,42 @@ export default function ConvocatoriasStepper() {
     setChannels((prev) =>
       prev.includes(val) ? prev.filter((c) => c !== val) : [...prev, val],
     );
+  }
+  const [cloneSourceId, setCloneSourceId] = useState("");
+  const cloneCandidates = useMemo(
+    () =>
+      previousConvocatorias
+        .filter((convocatoria) => convocatoria.body_id === selectedBodyId)
+        .filter((convocatoria) => convocatoria.tipo_convocatoria !== "UNIVERSAL")
+        .slice(0, 8),
+    [previousConvocatorias, selectedBodyId],
+  );
+
+  useEffect(() => {
+    setCloneSourceId("");
+  }, [selectedBodyId]);
+
+  function applyCloneFromConvocatoria(sourceId: string) {
+    const source = cloneCandidates.find((convocatoria) => convocatoria.id === sourceId);
+    if (!source) return;
+
+    if (isConvocatoriaType(source.tipo_convocatoria) && source.tipo_convocatoria !== "UNIVERSAL") {
+      setTipoConvocatoria(source.tipo_convocatoria);
+    }
+    if (isFormatoReunion(source.modalidad)) {
+      setFormatoReunion(source.modalidad);
+    }
+    setLugar(source.lugar ?? domicilioSocial);
+    lastAutoLugarRef.current = source.lugar ?? domicilioSocial;
+    setChannels(Array.isArray(source.publication_channels) ? source.publication_channels : []);
+    setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
+    setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
+    setDocumentosIncluidos(new Set());
+    setBorradorDirty(false);
+    setCloneSourceId(source.id);
+    toast.success("Convocatoria anterior aplicada como borrador", {
+      description: "Fecha y hora se mantienen como nueva captura; el motor re-evaluará la agenda final.",
+    });
   }
 
   const requestedTemplateMateria =
@@ -882,7 +1089,7 @@ export default function ConvocatoriasStepper() {
   //   - `validateCapa3` no rechaza valores fuera de `opciones` (la guarda
   //     del round 5 en capa3-form-validation depende de que el campo
   //     llegue con `opciones`).
-  const borradorCapa3Fields = useMemo(() => {
+  const borradorCapa3BaseFields = useMemo(() => {
     const raw = (effectiveBorradorTemplate?.capa3_editables ?? []) as Array<{
       campo?: string;
       obligatoriedad?: string;
@@ -907,6 +1114,47 @@ export default function ConvocatoriasStepper() {
       });
   }, [effectiveBorradorTemplate]);
   const [borradorCapa3Values, setBorradorCapa3Values] = useState<Record<string, string>>({});
+  const channelLabelsForCapa3 = useMemo(
+    () => channels.map((channel) => channelLabel(channel, channelOpts)),
+    [channels, channelOpts],
+  );
+  const convocanteMandate = activeMandates.find((mandate) => mandate.role === "PRESIDENTE") ?? activeMandates[0] ?? null;
+  const borradorCapa3Resolution = useMemo(
+    () =>
+      buildConvocatoriaCapa3Resolution(borradorCapa3BaseFields, {
+        fechaReunion,
+        horaReunion,
+        lugar,
+        formatoReunion,
+        domicilioSocial,
+        denominacionSocial: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+        entidadCotizada: Boolean(selectedEntity?.es_cotizada),
+        organoNombre: selectedBody?.name ?? "",
+        convocanteNombre: convocanteMandate?.full_name ?? "",
+        convocanteCargo: convocanteMandate?.role ?? "",
+        agendaItems,
+        channelLabels: channelLabelsForCapa3,
+      }),
+    [
+      agendaItems,
+      borradorCapa3BaseFields,
+      channelLabelsForCapa3,
+      convocanteMandate?.full_name,
+      convocanteMandate?.role,
+      domicilioSocial,
+      fechaReunion,
+      formatoReunion,
+      horaReunion,
+      lugar,
+      selectedBody?.name,
+      selectedEntity?.common_name,
+      selectedEntity?.es_cotizada,
+      selectedEntity?.legal_name,
+    ],
+  );
+  const borradorCapa3Fields: ConvocatoriaCapa3Field[] = borradorCapa3Resolution.fields;
+  const borradorCapa3PrefillValues = borradorCapa3Resolution.values;
+  const lastCapa3PrefillsRef = useRef<Record<string, string>>({});
 
   // Reset capa3 + prefill defaults cuando cambia la plantilla efectiva.
   // Codex P2 round 15: el reset previo solo ponía `{}`; ahora prefilleamos
@@ -921,7 +1169,68 @@ export default function ConvocatoriasStepper() {
       }
     }
     setBorradorCapa3Values(prefills);
-  }, [effectiveBorradorTemplate?.id, borradorCapa3Fields]);
+    lastCapa3PrefillsRef.current = {};
+  }, [effectiveBorradorTemplate?.id, borradorCapa3BaseFields]);
+
+  useEffect(() => {
+    setBorradorCapa3Values((currentValues) => {
+      const nextValues = { ...currentValues };
+      const previousPrefills = lastCapa3PrefillsRef.current;
+      let changed = false;
+
+      for (const [campo, value] of Object.entries(borradorCapa3PrefillValues)) {
+        const field = borradorCapa3Fields.find((item) => item.campo === campo);
+        const currentValue = currentValues[campo] ?? "";
+        const previousValue = previousPrefills[campo] ?? "";
+        const shouldWrite =
+          field?.readonly === true ||
+          !currentValue.trim() ||
+          currentValue === previousValue;
+
+        if (shouldWrite && currentValue !== value) {
+          nextValues[campo] = value;
+          changed = true;
+        }
+      }
+
+      lastCapa3PrefillsRef.current = borradorCapa3PrefillValues;
+      return changed ? nextValues : currentValues;
+    });
+  }, [borradorCapa3Fields, borradorCapa3PrefillValues]);
+
+  function handleBorradorCapa3ValuesChange(nextValues: Record<string, string>) {
+    const nextFecha = firstText(
+      nextValues.fecha_sesion,
+      nextValues.fecha_reunion,
+      nextValues.fecha_junta,
+      nextValues.fecha_primera_convocatoria,
+    );
+    if (/^\d{4}-\d{2}-\d{2}$/.test(nextFecha) && nextFecha !== fechaReunion) {
+      setFechaReunion(nextFecha);
+    }
+
+    const nextHora = firstText(
+      nextValues.hora_sesion,
+      nextValues.hora_reunion,
+      nextValues.hora_junta,
+      nextValues.hora_primera_convocatoria,
+    );
+    if (/^\d{2}:\d{2}$/.test(nextHora) && nextHora !== horaReunion) {
+      setHoraReunion(nextHora);
+    }
+
+    const nextLugar = firstText(
+      nextValues.lugar_sesion,
+      nextValues.lugar_reunion,
+      nextValues.lugar_junta,
+      nextValues.lugar,
+    );
+    if (nextLugar && nextLugar !== lugar) {
+      setLugar(nextLugar);
+    }
+
+    setBorradorCapa3Values(nextValues);
+  }
 
   const borradorVariables = useMemo<Record<string, unknown>>(() => {
     const memberNames = activeMandates
@@ -947,17 +1256,12 @@ export default function ConvocatoriasStepper() {
 
     return {
       denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
-      // Codex P2 PR #3: `registration_number` es el código del Registro
-      // Mercantil (en SA: CIF). NO es domicilio. Mi fix anterior mezclaba
-      // ambos campos rellenando `domicilio_social` con `legal_name` —
-      // semánticamente incorrecto. Ahora:
-      //   - `cif` = registration_number (alias canonical de plantilla)
-      //   - `domicilio_social` queda vacío hasta que se modele como
-      //     columna canonical en `entities` (no hay fuente real hoy).
-      //     El renderTemplate marca `domicilio_social` en
-      //     unresolvedVariables y el usuario lo ve en el callout amarillo.
+      // `cif` = registration_number (alias canonical de plantilla).
+      // `domicilio_social` se resuelve desde entities.address /
+      // registered_address cuando existe. El usuario puede overridearlo
+      // desde Capa 3 si la plantilla lo expone como campo editable.
       cif: selectedEntity?.registration_number ?? "",
-      domicilio_social: "",
+      domicilio_social: domicilioSocial,
       // Codex P2 PR #3 round 6: la plantilla CONVOCATORIA (migration
       // 20260419_000008_ajustes_revision_legal) usa `{{#if forma_social == 'SA'}}`
       // mientras nosotros exponíamos solo `tipo_social`. Sin el alias
@@ -965,6 +1269,8 @@ export default function ConvocatoriasStepper() {
       // vez de "accionistas" + párrafo de derecho-de-información SL.
       tipo_social: tipoSocial,
       forma_social: tipoSocial,
+      entidad_cotizada: Boolean(selectedEntity?.es_cotizada) ? "Sí" : "No",
+      es_cotizada: Boolean(selectedEntity?.es_cotizada) ? "Sí" : "No",
       organo_nombre: selectedBody?.name ?? "",
       organo_tipo: organoTipo,
       jurisdiction,
@@ -977,6 +1283,8 @@ export default function ConvocatoriasStepper() {
       // Aliases lugar
       lugar,
       lugar_junta: lugar,
+      lugar_sesion: lugar,
+      lugar_reunion: lugar,
 
       // Fecha / hora primera convocatoria. Codex P2 round 10 PR #3:
       // la plantilla CONVOCATORIA usa `{{fecha_primera_convocatoria}}` y
@@ -987,11 +1295,17 @@ export default function ConvocatoriasStepper() {
       // rellenado en Paso 2.
       fecha_junta: fechaReunion,
       hora_junta: horaReunion,
+      fecha_sesion: fechaReunion,
+      hora_sesion: horaReunion,
+      fecha_reunion: fechaReunion,
+      hora_reunion: horaReunion,
       fecha_primera_convocatoria: fechaReunion,
       hora_primera_convocatoria: horaReunion,
       fecha_emision: new Date().toISOString().slice(0, 10),
 
       formato_reunion: formatoReunion,
+      modalidad_sesion: formatoReunion,
+      modalidad_reunion: formatoReunion,
 
       // Segunda convocatoria — boolean + aliases canonical + cortos.
       segunda_convocatoria: habilitarSegunda,
@@ -1002,7 +1316,9 @@ export default function ConvocatoriasStepper() {
 
       antelacion_dias_requerida: evaluacionV2.antelacionDiasRequerida,
       fecha_limite_publicacion: evaluacionV2.fechaLimitePublicacion,
-      canales: channels.map((c) => channelLabel(c, channelOpts)).join(", "),
+      canales: channelLabelsForCapa3.join(", "),
+      canal_convocatoria: channelLabelsForCapa3.join(", "),
+      canales_convocatoria: channelLabelsForCapa3.join(", "),
       // Codex P1 PR #3: las plantillas reales (verificado en migration
       // 20260419_000009) hacen `{{#each orden_dia}}{{ordinal}}. {{descripcion_punto}}{{/each}}`.
       // Con un string newline-delimited, Handlebars itera caracter por caracter
@@ -1026,6 +1342,10 @@ export default function ConvocatoriasStepper() {
         .filter((i) => i.titulo.trim())
         .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
         .join("\n"),
+      orden_del_dia_resumen: agendaItems
+        .filter((i) => i.titulo.trim())
+        .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+        .join("\n"),
       destinatarios: memberNames.join(", "),
       // Misma protección para `destinatarios`: si la plantilla espera
       // `{{#each destinatarios_lista}}{{nombre}}{{/each}}`, le damos array;
@@ -1037,12 +1357,15 @@ export default function ConvocatoriasStepper() {
           email: m.email ?? null,
           rol: m.role ?? null,
         })),
+      nombre_convocante: convocanteMandate?.full_name ?? "",
+      cargo_convocante: convocanteMandate?.role ?? "",
     };
   }, [
     activeMandates, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
     jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
     habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
-    evaluacionV2.fechaLimitePublicacion, channels, channelOpts, agendaItems,
+    evaluacionV2.fechaLimitePublicacion, channelLabelsForCapa3, agendaItems, domicilioSocial,
+    convocanteMandate?.full_name, convocanteMandate?.role,
   ]);
 
   const [borradorTexto, setBorradorTexto] = useState<string>("");
@@ -1308,7 +1631,7 @@ export default function ConvocatoriasStepper() {
   function canAdvance(): boolean {
     switch (current) {
       case 1: return !!selectedEntity && !!selectedBody && !readinessBlocked;
-      case 2: return !!fechaReunion && !!lugar;
+      case 2: return !!fechaReunion && (!lugarRequired || !!lugar);
       case 3: return agendaItems.some((i) => i.titulo.trim().length > 0);
       // Codex P2 round 12: bloqueamos avance del Paso 7 si:
       //   - el render del borrador está aún pendiente (import dinámico)
@@ -2033,8 +2356,63 @@ export default function ConvocatoriasStepper() {
                   </div>
                   {tipoConvocatoria === "UNIVERSAL" && (
                     <p className="text-xs text-[var(--g-text-secondary)] mt-1">
-                      Junta universal: todos los socios presentes y de acuerdo en celebrarla. No requiere plazo de convocatoria.
+                      {organoTipo === "JUNTA_GENERAL"
+                        ? "Junta universal: todos los socios presentes y de acuerdo en celebrarla. No requiere plazo de convocatoria."
+                        : "Sesión sin convocatoria formal: requiere aceptación unánime de celebración por los miembros del órgano. El asistente específico de acta queda fuera de este paquete."}
                     </p>
+                  )}
+                </div>
+              )}
+
+              {selectedBodyId && tipoConvocatoria !== "UNIVERSAL" && (
+                <div
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <div className="flex items-start gap-2">
+                    <Copy className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                        Usar convocatoria anterior como modelo
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                        Solo se muestran convocatorias del mismo órgano y sociedad. La agenda clonada queda como borrador editable y se re-evalúa con las reglas actuales.
+                      </p>
+                    </div>
+                  </div>
+                  {cloneCandidates.length === 0 ? (
+                    <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
+                      No hay convocatorias anteriores compatibles para este órgano.
+                    </p>
+                  ) : (
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <select
+                        value={cloneSourceId}
+                        onChange={(e) => setCloneSourceId(e.target.value)}
+                        className="min-w-0 flex-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <option value="">— Seleccionar convocatoria —</option>
+                        {cloneCandidates.map((convocatoria) => (
+                          <option key={convocatoria.id} value={convocatoria.id}>
+                            {convocatoria.fecha_1
+                              ? new Date(convocatoria.fecha_1).toLocaleDateString("es-ES")
+                              : "Sin fecha"}{" "}
+                            · {convocatoria.tipo_convocatoria ?? "Sin tipo"} · {(convocatoria.agenda_items ?? []).length} punto(s)
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!cloneSourceId}
+                        onClick={() => applyCloneFromConvocatoria(cloneSourceId)}
+                        className="inline-flex items-center justify-center gap-1.5 border border-[var(--g-border-subtle)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Aplicar modelo
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -2055,7 +2433,7 @@ export default function ConvocatoriasStepper() {
                         </span>
                       )}
                     </p>
-                    {liveNoticeDays != null && (
+                    {liveNoticeDays != null && tipoConvocatoria !== "UNIVERSAL" && (
                       <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
                         Preaviso mínimo (TGMS):{" "}
                         <span className="font-semibold text-[var(--g-brand-3308)]">
@@ -2125,17 +2503,41 @@ export default function ConvocatoriasStepper() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                  Lugar / enlace de acceso
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                    Lugar / enlace de acceso
+                  </label>
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-semibold ${
+                      lugarRequired
+                        ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                        : "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-secondary)]"
+                    }`}
+                    style={{ borderRadius: "var(--g-radius-full)" }}
+                  >
+                    {lugarRequired ? "Obligatorio" : "Recomendado"}
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={lugar}
                   onChange={(e) => setLugar(e.target.value)}
-                  placeholder="Ej. Sede social C/ Gran Vía 1, Madrid"
+                  placeholder={
+                    domicilioSocial ||
+                    (formatoReunion === "TELEMATICA"
+                      ? "Referencia regulatoria: domicilio social o enlace de acceso"
+                      : "Ej. Sede social C/ Gran Vía 1, Madrid")
+                  }
                   className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
+                <p className="text-xs text-[var(--g-text-secondary)]">
+                  {formatoReunion === "TELEMATICA"
+                    ? "En sesión telemática el domicilio social queda como referencia regulatoria; el enlace o instrucciones de acceso se completan en la convocatoria."
+                    : domicilioSocial
+                    ? "Pre-rellenado con el domicilio social de la entidad. Puedes sustituirlo si la sesión se celebra en otra sede permitida."
+                    : "No hay domicilio social cargado para esta entidad; introdúcelo manualmente."}
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -2170,7 +2572,7 @@ export default function ConvocatoriasStepper() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-[var(--g-text-primary)]">
-                        Evaluación de antelación — Motor LSC v2
+                        Evaluación Reglas — Motor LSC v2
                       </p>
                       {fechaReunion && (
                         <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
@@ -2342,6 +2744,14 @@ export default function ConvocatoriasStepper() {
                   const isDecisorio = itemKind === "DECISORIO";
                   const kindHelper =
                     KIND_OPTIONS.find((k) => k.value === itemKind)?.helper ?? "";
+                  const materiaCompatible = isMateriaCompatibleWithOrgano(item.materia, organoTipo);
+                  const materiaOptions = materiaCompatible
+                    ? availableAgendaMaterias
+                    : [
+                        AGENDA_MATERIAS.find((m) => m.value === item.materia) ??
+                          { value: item.materia, label: item.materia, tipo: item.tipo, inscribible: item.inscribible, lmvCotizada: false },
+                        ...availableAgendaMaterias,
+                      ];
                   return (
                   <div
                     key={item.id}
@@ -2479,8 +2889,10 @@ export default function ConvocatoriasStepper() {
                             className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            {AGENDA_MATERIAS.map((m) => (
-                              <option key={m.value} value={m.value}>{m.label}</option>
+                            {materiaOptions.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}{!isMateriaCompatibleWithOrgano(m.value, organoTipo) ? " — incompatible con el órgano" : ""}
+                              </option>
                             ))}
                           </select>
                           <select
@@ -2511,6 +2923,21 @@ export default function ConvocatoriasStepper() {
                             <span className="text-xs text-[var(--g-text-secondary)]">Inscribible en RM</span>
                           </label>
                         </div>
+
+                        {!materiaCompatible && (
+                          <div
+                            className="mt-3 ml-5 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2"
+                            style={{ borderRadius: "var(--g-radius-sm)" }}
+                            role="alert"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--status-warning)]">
+                              Materia incompatible con el órgano seleccionado
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                              {labelMateria(item.materia)} no corresponde a {organoTipo}. Selecciona una materia compatible para prevenir errores del motor LSC.
+                            </p>
+                          </div>
+                        )}
 
                         {/* M2 — Advertencia LMV cotizada. Aparece sólo si la
                             entidad es cotizada (`entities.es_cotizada=true`)
@@ -3049,7 +3476,7 @@ export default function ConvocatoriasStepper() {
                   <Capa3Form
                     fields={borradorCapa3Fields}
                     values={borradorCapa3Values}
-                    onChange={setBorradorCapa3Values}
+                    onChange={handleBorradorCapa3ValuesChange}
                     telematicaEnabled={formatoReunion !== "PRESENCIAL"}
                   />
                   {/* Codex P2 round 12 PR #3: gate visible cuando faltan
