@@ -54,7 +54,7 @@ export default function ReglasAplicables() {
         <div className="mt-3 flex flex-wrap gap-2">
           <ActionLink to={entityId ? `/secretaria/sociedades/${entityId}/marco-normativo/activar` : "/secretaria/sociedades"} label="Activar marco normativo" />
           <ActionLink to={entityId ? `/secretaria/catalogo-organos?entity=${entityId}` : "/secretaria/catalogo-organos"} label="Catálogo de órganos" />
-          <ActionLink to="/secretaria/reglas" label="Vista previa de requisitos" />
+          <ActionLink to={entityId ? `/secretaria/catalogo-materias?entity=${entityId}` : "/secretaria/catalogo-materias"} label="Materias y reglas" />
         </div>
       </div>
 

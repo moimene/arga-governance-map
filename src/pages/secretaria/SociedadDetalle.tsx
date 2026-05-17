@@ -167,12 +167,12 @@ export default function SociedadDetalle() {
           </div>
         </div>
         <Link
-          to={`/secretaria/sociedades/${s.id}/reglas`}
+          to={`/secretaria/catalogo-materias?entity=${s.id}`}
           className="inline-flex shrink-0 items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          Regla efectiva
+          Materias y reglas
         </Link>
       </div>
 
@@ -741,7 +741,7 @@ function SociedadQuickActions({
     { label: "Nueva reunión", icon: CalendarDays, to: "/secretaria/reuniones/nueva" },
     { label: "Acuerdo sin sesión", icon: ScrollText, to: "/secretaria/acuerdos-sin-sesion/nuevo" },
     { label: "Generar documento", icon: FileText, to: "/secretaria/tramitador/nuevo" },
-    { label: "Regla efectiva", icon: ClipboardList, to: `/secretaria/sociedades/${entityId}/reglas` },
+    { label: "Materias y reglas", icon: ClipboardList, to: `/secretaria/catalogo-materias?entity=${entityId}` },
     { label: "Activar marco", icon: Scale, to: `/secretaria/sociedades/${entityId}/marco-normativo/activar` },
   ];
 

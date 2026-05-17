@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -72,7 +72,6 @@ const DocumentosPendientesRevision = lazy(() => import("@/pages/secretaria/Docum
 const BoardPackPreview = lazy(() => import("@/pages/secretaria/BoardPackPreview"));
 const BoardPack = lazy(() => import("@/pages/secretaria/BoardPack"));
 const MatrizJurisdiccional = lazy(() => import("@/pages/secretaria/MatrizJurisdiccional"));
-const RuleManagerPage = lazy(() => import("@/pages/secretaria/RuleManagerPage"));
 const CatalogoMaterias = lazy(() => import("@/pages/secretaria/CatalogoMaterias"));
 const CatalogoOrganos = lazy(() => import("@/pages/secretaria/CatalogoOrganos"));
 const SociedadesList = lazy(() => import("@/pages/secretaria/SociedadesList"));
@@ -88,7 +87,6 @@ const TransmisionStepper = lazy(() => import("@/pages/secretaria/TransmisionStep
 const DesignarAdminStepper = lazy(() => import("@/pages/secretaria/DesignarAdminStepper"));
 const RepresentanteAdminPJStepper = lazy(() => import("@/pages/secretaria/RepresentanteAdminPJStepper"));
 const RepresentacionPuntualStepper = lazy(() => import("@/pages/secretaria/RepresentacionPuntualStepper"));
-const ReglasAplicables = lazy(() => import("@/pages/secretaria/ReglasAplicables"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
 const GrcLayout = lazy(() =>
@@ -133,6 +131,23 @@ function ModuleFallback() {
       Cargando...
     </div>
   );
+}
+
+function ReglasToCatalogoMateriasRedirect() {
+  const location = useLocation();
+  const { id } = useParams<{ id: string }>();
+  const params = new URLSearchParams(location.search);
+
+  if (id && !params.has("entity")) params.set("entity", id);
+
+  const matter = params.get("matter");
+  if (matter && !params.has("materia")) {
+    params.set("materia", matter);
+  }
+  params.delete("matter");
+
+  const query = params.toString();
+  return <Navigate to={`/secretaria/catalogo-materias${query ? `?${query}` : ""}`} replace />;
 }
 
 const queryClient = new QueryClient();
@@ -229,7 +244,7 @@ const App = () => (
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
                   <Route path="/secretaria/catalogo-materias" element={<Suspense fallback={<ModuleFallback />}><CatalogoMaterias /></Suspense>} />
                   <Route path="/secretaria/catalogo-organos" element={<Suspense fallback={<ModuleFallback />}><CatalogoOrganos /></Suspense>} />
-                  <Route path="/secretaria/reglas" element={<Suspense fallback={<ModuleFallback />}><RuleManagerPage /></Suspense>} />
+                  <Route path="/secretaria/reglas" element={<ReglasToCatalogoMateriasRedirect />} />
                   {/* Gestión societaria — sociedades y personas (modelo canónico) */}
                   <Route path="/secretaria/sociedades"                element={<Suspense fallback={<ModuleFallback />}><SociedadesList /></Suspense>} />
                   <Route path="/secretaria/sociedades/nueva"          element={<Suspense fallback={<ModuleFallback />}><SociedadNuevaStepper /></Suspense>} />
@@ -238,7 +253,7 @@ const App = () => (
                   <Route path="/secretaria/sociedades/:id/socio/nuevo" element={<Suspense fallback={<ModuleFallback />}><AnadirSocioStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/transmision" element={<Suspense fallback={<ModuleFallback />}><TransmisionStepper /></Suspense>} />
                   <Route path="/secretaria/sociedades/:id/admin/nuevo" element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
-                  <Route path="/secretaria/sociedades/:id/reglas"     element={<Suspense fallback={<ModuleFallback />}><ReglasAplicables /></Suspense>} />
+                  <Route path="/secretaria/sociedades/:id/reglas"     element={<ReglasToCatalogoMateriasRedirect />} />
                   {/* D5.2: alta de cargo cross-context (entrada desde PersonasList ?personId=...). */}
                   <Route path="/secretaria/cargos/nuevo"               element={<Suspense fallback={<ModuleFallback />}><DesignarAdminStepper /></Suspense>} />
                   <Route path="/secretaria/personas"                  element={<Suspense fallback={<ModuleFallback />}><PersonasList /></Suspense>} />

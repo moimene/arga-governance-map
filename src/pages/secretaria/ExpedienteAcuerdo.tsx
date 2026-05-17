@@ -902,8 +902,8 @@ function FrozenRuleSnapshotCard({
   if (!snapshot) {
     const ruleManagerLink =
       agreementEntityId && agreementMatter && agreementAdoptionMode
-        ? `/secretaria/reglas?entity=${agreementEntityId}&matter=${encodeURIComponent(agreementMatter)}&adoption=${encodeURIComponent(agreementAdoptionMode)}`
-        : "/secretaria/reglas";
+        ? `/secretaria/catalogo-materias?entity=${agreementEntityId}&materia=${encodeURIComponent(agreementMatter)}&adoption=${encodeURIComponent(agreementAdoptionMode)}`
+        : "/secretaria/catalogo-materias";
     return (
       <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
