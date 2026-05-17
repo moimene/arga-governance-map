@@ -148,6 +148,57 @@ Estas materias no quedan cerradas por el contrato actual y requieren decision le
 - Cotizadas: el perfil conserva `is_listed`, pero no codifica todavia especialidades completas LMV/LSC para sociedades cotizadas.
 - Solvencia II / ARGA: el perfil no modela todavia comunicaciones o condicionantes regulatorios sectoriales para financiacion, operaciones estructurales, gobierno o remuneraciones.
 
+### Mini-dossier pendiente: `DISOLUCION` y `LIQUIDACION`
+
+`DISOLUCION` y `LIQUIDACION` no deben cerrarse con una unica pregunta binaria. Son dos materias conectadas, pero distintas: la disolucion abre el periodo de liquidacion y la liquidacion despliega una cadena documental hasta la extincion registral.
+
+#### `DISOLUCION` - mapa minimo que Legal debe completar
+
+| Causa | Fuente | Organo competente | Adoption mode | Quorum | Mayoria | Documentacion preceptiva |
+|---|---|---|---|---|---|---|
+| Voluntaria por acuerdo de Junta | Art. 368 LSC | `JUNTA_GENERAL` | `MEETING` / `UNIVERSAL` | Pendiente Legal | Pendiente Legal | Acta de Junta |
+| Causa legal por perdidas | Art. 363.1.e LSC | `JUNTA_GENERAL` | `MEETING` / `UNIVERSAL` | Pendiente Legal | Pendiente Legal | Balance actualizado + informe administradores |
+| Judicial a instancia de interesado | Art. 366 LSC | Juzgado | Fuera del perfil ordinario | N/A | N/A | Demanda + resolucion judicial |
+| De pleno derecho por transcurso de plazo | Art. 360 LSC | N/A | Fuera del perfil ordinario | N/A | N/A | Constancia registral / estatutaria |
+| Reduccion bajo minimo sin remedio | Art. 363.1.f LSC | `JUNTA_GENERAL` | `MEETING` / `UNIVERSAL` | Pendiente Legal | Pendiente Legal | Balance + acuerdo de no transformacion/aumento |
+
+Decision tecnica recomendada: `DISOLUCION` deberia exigir `subtipo_materia` obligatorio. Si no se informa la causa, el perfil deberia emitir `SUBTIPO_DISOLUCION_PENDIENTE` con severity a confirmar por Legal.
+
+Prerequisitos candidatos:
+
+| Causa | Prerequisito | Estado minimo | Severity propuesta |
+|---|---|---|---|
+| Perdidas art. 363.1.e | Balance actualizado que acredite patrimonio neto inferior a la mitad del capital | `DOCUMENTADO` | `BLOCKING` |
+| Voluntaria | Sin prerequisito sustantivo especifico | N/A | N/A |
+| Reduccion bajo minimo sin remedio | Evidencia de no transformacion/aumento simultaneo | `DOCUMENTADO` | `WARNING` |
+
+Post-acuerdo candidato:
+
+`CERTIFICACION -> ESCRITURA_PUBLICA -> INSCRIPCION_REGISTRAL -> PUBLICACION_BORME -> NOMBRAMIENTO_LIQUIDADORES si procede -> APERTURA_PERIODO_LIQUIDACION`
+
+Legal debe decidir si el plazo de dos meses del art. 367 LSC se modela como gate temporal de convocatoria o como warning informativo del panel.
+
+#### `LIQUIDACION` - actos formales y decision arquitectonica
+
+| Acto | Fuente | Organo | Documentacion | Inscribible |
+|---|---|---|---|---|
+| Nombramiento de liquidadores si no son administradores | Art. 376 LSC | `JUNTA_GENERAL` | Acta + aceptacion | Si |
+| Inventario y balance inicial | Art. 383 LSC | Liquidadores | Balance inicial | No per se |
+| Operaciones de liquidacion | Arts. 384-387 LSC | Liquidadores | Evidencia de cobros, pagos y realizacion de activo | No |
+| Balance final de liquidacion | Art. 390 LSC | Liquidadores / Junta para aprobacion | Balance final + informe | Base para extincion |
+| Proyecto de division del haber social | Art. 391 LSC | Liquidadores | Proyecto de division | No per se |
+| Aprobacion de balance final y proyecto | Art. 390 LSC | `JUNTA_GENERAL` | Acta aprobatoria | Si, como base de escritura |
+| Escritura de extincion | Art. 395 LSC | Liquidadores | Escritura publica | Si, cancelacion registral |
+
+Grafo candidato de liquidacion:
+
+`DISOLUCION (INSCRITA) -> NOMBRAMIENTO_LIQUIDADORES (INSCRITO, si procede) -> BALANCE_INICIAL_LIQUIDACION (DOCUMENTADO) -> OPERACIONES_LIQUIDACION (DOCUMENTADO) -> BALANCE_FINAL + PROYECTO_DIVISION (DOCUMENTADO) -> APROBACION_BALANCE_FINAL (APROBADO) -> PAGO_CUOTA_LIQUIDACION (EJECUTADO) -> ESCRITURA_EXTINCION (INSCRITA)`
+
+Decision Legal necesaria:
+
+- Opcion A: `DISOLUCION` y `LIQUIDACION` como dos materias con perfil propio. Es mas completa y permite gates para aprobacion del balance final.
+- Opcion B: `DISOLUCION` como materia con perfil y `LIQUIDACION` como workflow extendido post-acuerdo. Es mas simple, pero pierde granularidad formal.
+
 ## 5. Preguntas cerradas para Garrigues / Legal
 
 Responder cada punto con una opcion. La columna "impacto tecnico" indica el campo exacto a parametrizar.
@@ -164,8 +215,92 @@ Responder cada punto con una opcion. La columna "impacto tecnico" indica el camp
 | 8 | Activos esenciales en financiacion/contratacion deben activar prerequisito de Junta? | (a) Siempre si supera 25%; (b) Tambien por relevancia funcional; (c) Solo warning | `votacion.veto_checks` y prerequisitos |
 | 9 | Para ARGA cotizada/aseguradora, que materias requieren comunicacion o revision regulatoria sectorial? | (a) Estructurales; (b) Financiacion/garantias; (c) Remuneraciones/gobierno; (d) Todas las anteriores | `post_acuerdo.comunicacion_regulador` futuro |
 | 10 | Los gaps `BLOCKING` deben exigir doble confirmacion en UX aunque sigan siendo overridable? | (a) Si; (b) No, basta justificacion; (c) Solo para impugnabilidad/calificacion | politica UX de override |
+| 11 | La adquisicion de acciones/participaciones propias requiere perfil formal propio o se subsume en otro gate? | (a) Perfil propio `ADQUISICION_PROPIA`; (b) Subtipo de `OPERACION_VINCULADA`; (c) Warning documental hasta nueva version | Nueva materia o `subtipo_materia` |
+| 12 | Exclusion y separacion de socio deben modelarse como materias independientes? | (a) Dos perfiles independientes; (b) Un perfil comun con subtipo; (c) Workflow derivado de otra materia | Nuevas materias, prerequisitos y gates de votacion |
+| 13 | Deuda convertible debe separarse de emision de obligaciones? | (a) Perfil independiente; (b) Subtipo de `EMISION_OBLIGACIONES`; (c) Diferir hasta segunda ronda | `subtipo_materia` y documentacion preceptiva |
+| 14 | Pactos parasociales con veto deben generar gate de votacion o solo warning informativo? | (a) Gate global en materias afectadas; (b) Warning informativo; (c) Solo si el pacto esta registrado y vigente | `votacion.veto_checks` y `pactosParasociales` |
 
-## 6. Recomendacion de integracion tras validacion
+## 6. Casos de prueba legales solicitados
+
+Legal deberia devolver 10-15 expedientes ejemplo con resultado esperado. Cada fila debe ser atomica y convertible a un `it()` de Vitest sin interpretacion intermedia.
+
+Columnas obligatorias:
+
+| Columna | Uso | Ejemplo |
+|---|---|---|
+| `materia` | Valor exacto del enum del sistema | `APROBACION_CUENTAS` |
+| `organo_tipo` | Valor exacto del enum | `JUNTA_GENERAL` |
+| `tipo_social` | `SA`, `SL`, `SAU` o `SLU` | `SA` |
+| `escenario` | Hechos del expediente: que existe, que falta y que es irregular | Formulacion previa aprobada; convocatoria 30 dias; quorum 40%; unanimidad |
+| `resultado_esperado` | Resultado determinista | `PASSED_LIMPIO`, `PASSED_CON_WARNING`, `OVERRIDE_REQUIRED` o `BLOCKING_GAP` |
+
+Columnas adicionales:
+
+| Columna | Obligatoriedad recomendada | Ejemplo |
+|---|---|---|
+| `adoption_mode` | Obligatoria en materias inscribibles | `MEETING`, `UNIVERSAL`, `NO_SESSION` |
+| `subtipo_materia` | Obligatoria si el subtipo cambia gates | `COOPTACION`, `FUSION_ABSORCION`, `RENUNCIA` |
+| `override_esperado` | Obligatoria si hay gap, warning u override | `DESVIACION_CON_RIESGO`, `risk_flag: IMPUGNABILIDAD` |
+
+Reglas de calidad para Legal:
+
+- No mezclar varios escenarios en una misma fila.
+- No usar resultados ambiguos como "segun proceda" o "si aplica".
+- No inventar materias fuera del catalogo; si es materia nueva, marcarla como propuesta.
+- En materias inscribibles, informar siempre `adoption_mode`.
+- En materias con bifurcacion legal, informar siempre `subtipo_materia`.
+- Si el resultado esperado incluye gap, informar `override_esperado`.
+
+Ejemplos de filas:
+
+| # | materia | organo_tipo | tipo_social | adoption_mode | subtipo_materia | escenario | resultado_esperado | override_esperado |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `APROBACION_CUENTAS` | `JUNTA_GENERAL` | `SA` | `MEETING` | N/A | Formulacion previa aprobada; convocatoria 30 dias; quorum 40%; unanimidad | `PASSED_LIMPIO`, 0 gaps | N/A |
+| 2 | `APROBACION_CUENTAS` | `JUNTA_GENERAL` | `SA` | `MEETING` | N/A | Sin formulacion previa en expediente | `BLOCKING_GAP`: prerequisito `FORMULACION_CUENTAS` no encontrado | `DESVIACION_CON_RIESGO`, `TRAZABILIDAD_PARCIAL` |
+| 3 | `CESE_CONSEJERO` | `JUNTA_GENERAL` | `SA` | `UNIVERSAL` | `AD_NUTUM` | Junta universal art. 178 LSC; todos presentes aceptan orden del dia | `PASSED_CON_WARNING`: via alternativa de convocatoria | `VIA_ALTERNATIVA`, sin risk_flag |
+| 4 | `NOMBRAMIENTO_CONSEJERO` | `CONSEJO_ADMIN` | `SL` | `MEETING` | `COOPTACION` | Cooptacion sin prevision estatutaria expresa | `OVERRIDE_REQUIRED`: gap `COOPTACION_SOLO_SA` | `DESVIACION_CON_RIESGO`, `IMPUGNABILIDAD` |
+| 5 | `NOMBRAMIENTO_AUDITOR` | `JUNTA_GENERAL` | `SA` | `MEETING` | N/A | Duracion propuesta de 2 anos | `BLOCKING_GAP`: `AUDITOR_DURATION_OUT_OF_RANGE` | `DESVIACION_CON_RIESGO`, `CALIFICACION_REGISTRAL` |
+
+## 7. Validacion de rule packs vigentes
+
+El `MatterExecutionProfile` no hardcodea quorum y mayorias ordinarias. Lee del `rulePackPayload`. Por tanto, la validacion legal debe cubrir el dossier y los payloads de los rule packs vigentes.
+
+La revision recomendada no es por materia completa ni por muestreo aleatorio. Debe hacerse por gate x tipo social:
+
+1. Extraer de `rule_pack_versions.payload` los valores vigentes de convocatoria, quorum, mayoria y documentacion.
+2. Cruzarlos con la regla LSC base por tipo social y materia reforzada.
+3. Clasificar divergencias como:
+   - override estatutario legitimo;
+   - error del rule pack;
+   - error de clasificacion del perfil.
+4. Priorizar materias inscribibles o sujetas a calificacion registral.
+
+Materias de prioridad absoluta:
+
+| Materia | Gates criticos | Tipo social | Motivo |
+|---|---|---|---|
+| `MODIFICACION_ESTATUTOS` | Quorum, mayoria, documentacion | SA y SL | Inscribible; regimen reforzado |
+| `AUMENTO_CAPITAL` | Quorum, mayoria, documentacion | SA y SL | Inscribible; regimen reforzado |
+| `REDUCCION_CAPITAL` | Quorum, mayoria, documentacion, acreedores | SA y SL | Inscribible; oposicion de acreedores |
+| `FUSION_ESCISION` / `FUSION` / `ESCISION` | Quorum, mayoria, documentacion | SA y SL | Inscribible; RDL 5/2023 |
+| `NOMBRAMIENTO_CONSEJERO` | Mayoria, documentacion, subtipo | SA y SL | Inscribible; cooptacion solo SA |
+| `DELEGACION_FACULTADES` | Mayoria especial, documentacion | SA y SL | Inscribible; art. 249 LSC |
+| `NOMBRAMIENTO_AUDITOR` | Duracion 3-9, documentacion | SA y SL | Inscribible; calificacion registral |
+
+Fuentes base que deben contrastarse:
+
+| Bloque | Fuente | Regla base |
+|---|---|---|
+| Junta SA ordinaria | Art. 193.1 LSC | Primera convocatoria con 25% capital; segunda sin minimo legal |
+| Junta SA reforzada | Art. 194.1 LSC | Primera 50%; segunda 25% |
+| Junta SL | Arts. 198-200 LSC | Sin quorum legal de constitucion; mayorias sobre participaciones segun materia |
+| Mayoria SA ordinaria | Art. 201.1 LSC | Mas votos a favor que en contra del capital presente o representado |
+| Mayoria SA reforzada | Art. 201.2 LSC | En segunda convocatoria con quorum 25%-50%, dos tercios del capital presente o representado |
+| Consejo | Arts. 245-248 LSC | Constitucion por mayoria de miembros y acuerdos por mayoria absoluta de concurrentes |
+| Delegacion permanente | Art. 249.2 LSC | Voto favorable de dos tercios de componentes del Consejo |
+| Junta universal | Art. 178 LSC | Dispensa convocatoria, no modifica mayoria sustantiva |
+
+## 8. Recomendacion de integracion tras validacion
 
 No conectar todavia a `TramitadorStepper` como checkpoint operativo. La secuencia recomendada es:
 
@@ -178,7 +313,7 @@ No conectar todavia a `TramitadorStepper` como checkpoint operativo. La secuenci
 4. Registrar en `agreement-360` el resultado del perfil y los overrides cuando el secretario avance.
 5. Solo despues, evaluar si algun gate debe convertirse en checkpoint reforzado.
 
-## 7. Checklist de aprobacion legal
+## 9. Checklist de aprobacion legal
 
 - [ ] Matriz de convocatoria por tipo social validada.
 - [ ] Quorum y mayorias reforzadas por materia revisadas contra rule packs.
@@ -186,5 +321,8 @@ No conectar todavia a `TramitadorStepper` como checkpoint operativo. La secuenci
 - [ ] Criterio `VIA_ALTERNATIVA` vs `DESVIACION_CON_RIESGO` aprobado.
 - [ ] Riesgos `IMPUGNABILIDAD`, `CALIFICACION_REGISTRAL`, `NULIDAD`, `TRAZABILIDAD_PARCIAL` validados.
 - [ ] Materias con incertidumbre priorizadas.
-- [ ] Preguntas cerradas respondidas.
+- [ ] Preguntas cerradas P1-P14 respondidas.
+- [ ] Decision sobre mini-dossier `DISOLUCION` / `LIQUIDACION` tomada.
+- [ ] Casos legales de prueba entregados en formato determinista.
+- [ ] Rule packs prioritarios validados por gate x tipo social.
 - [ ] Autorizacion para conectar panel informativo en TramitadorStepper.
