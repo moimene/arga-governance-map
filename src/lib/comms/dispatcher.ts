@@ -79,7 +79,6 @@ async function processRecipient(
   context: DispatcherContext,
 ): Promise<void> {
   if (r.canal_primario === 'PORTAL_PUSH') {
-    // eslint-disable-next-line no-console
     console.warn(`Skipping PORTAL_PUSH recipient ${r.id} (no adapter in P1)`);
     return;
   }

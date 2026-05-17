@@ -13,7 +13,6 @@ async function triggerDispatcher(): Promise<void> {
       body: '{}',
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.warn('Dispatcher trigger failed:', err);
   }
 }
