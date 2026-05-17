@@ -16,7 +16,6 @@ import {
   TrendingUp,
   ShieldAlert,
   HandshakeIcon,
-  FileText,
   Repeat2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -848,9 +847,9 @@ export default function SecretariaDashboard() {
                 path: "/secretaria/acuerdos-sin-sesion",
               },
               {
-                label: "Generar documento",
-                helper: "Usa el motor de plantillas y deja el borrador en revisión.",
-                icon: FileText,
+                label: "Tramitar acuerdo",
+                helper: "Selecciona un acuerdo o certificación inscribible como origen trazable.",
+                icon: Gavel,
                 path: "/secretaria/tramitador/nuevo",
               },
             ].map(({ label, helper, icon, path }) => (

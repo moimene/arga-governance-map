@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { BookOpen, ChevronLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ interface SecretariaSidebarContentProps {
  * Esto produce un skeleton menor o igual que el render final, sin saltos
  * estructurales hacia arriba al hidratar.
  */
-function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?: boolean; requiresUnipersonalAdmin?: boolean; requiresCotizada?: boolean; excludesIfCotizada?: boolean; requiresBodyType?: string[]; requiresCapability?: string; excludesIfReferenceOnly?: boolean } }): boolean {
+function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?: boolean; requiresUnipersonalAdmin?: boolean; requiresCotizada?: boolean; excludesIfCotizada?: boolean; requiresBodyType?: string[]; requiresAdoptionMode?: string[]; requiresCapability?: string; excludesIfReferenceOnly?: boolean } }): boolean {
   const v = item.visibility;
   if (!v) return true;
   if (v.requiresCollegiateBody) return false;
@@ -48,6 +48,7 @@ function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?:
   if (v.requiresCotizada) return false;
   if (v.excludesIfCotizada) return false;
   if (v.requiresBodyType && v.requiresBodyType.length > 0) return false;
+  if (v.requiresAdoptionMode && v.requiresAdoptionMode.length > 0) return false;
   if (v.requiresCapability) return false;
   if (v.excludesIfReferenceOnly) return false;
   return true;
@@ -88,8 +89,31 @@ function SecretariaSidebarSkeleton({ groups }: { groups: ReturnType<typeof getNa
   );
 }
 
+function isSidebarLinkActive(pathname: string, search: string, to: string, end?: boolean): boolean {
+  const [pathAndSearch] = to.split("#");
+  const [targetPathname, targetSearch = ""] = pathAndSearch.split("?");
+  const targetParams = new URLSearchParams(targetSearch);
+  const currentParams = new URLSearchParams(search);
+
+  const pathMatches = end
+    ? pathname === targetPathname
+    : pathname === targetPathname || pathname.startsWith(`${targetPathname}/`);
+  if (!pathMatches) return false;
+
+  for (const key of ["vista", "estado"]) {
+    if (targetParams.has(key)) {
+      if (currentParams.get(key) !== targetParams.get(key)) return false;
+    } else if (currentParams.has(key)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarContentProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const allGroups = getNavGroups(scope.mode);
   const { context: visibilityCtx, isInitialLoading } = useSidebarVisibility(scope);
   const groups = getVisibleSidebarSections(allGroups, visibilityCtx);
@@ -137,6 +161,8 @@ function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarConten
                   item.selectedEntityRoute && scope.selectedEntity
                     ? `/secretaria/sociedades/${scope.selectedEntity.id}`
                     : item.to;
+                const scopedTo = scope.createScopedTo(itemTo);
+                const active = isSidebarLinkActive(location.pathname, location.search, scopedTo, item.end);
 
                 if (disabled) {
                   // Item disabled: usamos role="link" + aria-disabled + tabIndex=-1
@@ -162,14 +188,14 @@ function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarConten
                 return (
                   <NavLink
                     key={`${group.label}-${item.to}-${item.label}`}
-                    to={scope.createScopedTo(itemTo)}
+                    to={scopedTo}
                     end={item.end}
                     onClick={onNavigate}
                     data-sidebar-item={item.label}
-                    className={({ isActive }) =>
+                    className={() =>
                       cn(
                         "mb-0.5 flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]",
-                        isActive
+                        active
                           ? "bg-[hsl(var(--sidebar-accent))] font-semibold text-[hsl(var(--sidebar-foreground))]"
                           : "text-[hsl(var(--sidebar-foreground))]/80 hover:bg-[hsl(var(--sidebar-accent))]/60 hover:text-[hsl(var(--sidebar-foreground))]"
                       )

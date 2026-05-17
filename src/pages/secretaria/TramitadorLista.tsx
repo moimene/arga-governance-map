@@ -1,8 +1,25 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+
+type TramitadorVista = "todas" | "en-tramite" | "subsanaciones" | "presentaciones" | "inscritas";
+
+const VISTA_CONFIG: Record<TramitadorVista, { label: string; estado?: string }> = {
+  todas: { label: "Todas" },
+  "en-tramite": { label: "En trámite", estado: "EN_TRAMITE" },
+  subsanaciones: { label: "Subsanaciones", estado: "SUBSANACION" },
+  presentaciones: { label: "Presentaciones", estado: "PRESENTADA" },
+  inscritas: { label: "Inscritas", estado: "INSCRITA" },
+};
+
+const ESTADO_TO_VISTA: Record<string, TramitadorVista> = {
+  EN_TRAMITE: "en-tramite",
+  SUBSANACION: "subsanaciones",
+  PRESENTADA: "presentaciones",
+  INSCRITA: "inscritas",
+};
 
 const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
@@ -28,9 +45,22 @@ function registryRef(f: FilingRow): string {
 
 export default function TramitadorLista() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useTramitacionesList(scopedEntityId);
+  const requestedEstado = searchParams.get("estado") ?? "";
+  const activeVista: TramitadorVista = ESTADO_TO_VISTA[requestedEstado] ?? "todas";
+  const activeEstado = VISTA_CONFIG[activeVista].estado;
+  const rows = (data ?? []).filter((filing) => !activeEstado || filing.status === activeEstado);
+
+  function setVista(next: TramitadorVista) {
+    const params = new URLSearchParams(searchParams);
+    const estado = VISTA_CONFIG[next].estado;
+    if (estado) params.set("estado", estado);
+    else params.delete("estado");
+    setSearchParams(params, { replace: true });
+  }
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -45,7 +75,8 @@ export default function TramitadorLista() {
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
             Elevación a público, presentación en BORME / PSM / SIGER / JUCERJA / CONSERVATORIA y
-            seguimiento de subsanaciones.
+            seguimiento de subsanaciones. La tramitación se inicia desde un acuerdo o certificación
+            inscribible, nunca como expediente libre.
           </p>
         </div>
         <button
@@ -55,7 +86,7 @@ export default function TramitadorLista() {
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <Plus className="h-4 w-4" />
-          Nueva tramitación
+          Iniciar desde acuerdo
         </button>
       </div>
 
@@ -70,6 +101,28 @@ export default function TramitadorLista() {
           </span>
         </div>
       ) : null}
+
+      <div className="mb-4 flex flex-wrap gap-2" aria-label="Vistas del tramitador registral">
+        {(Object.keys(VISTA_CONFIG) as TramitadorVista[]).map((key) => {
+          const active = activeVista === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setVista(key)}
+              aria-pressed={active}
+              className={`border px-3 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "border-[var(--g-brand-3308)] bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                  : "border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              }`}
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {VISTA_CONFIG[key].label}
+            </button>
+          );
+        })}
+      </div>
 
       <div
         className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -102,22 +155,22 @@ export default function TramitadorLista() {
                   Cargando…
                 </td>
               </tr>
-            ) : !data || data.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5}>
                   <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                     <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
                     <p className="text-sm font-medium text-[var(--g-text-secondary)]">
-                      Sin tramitaciones registradas.
+                      {activeVista === "todas" ? "Sin tramitaciones registradas." : "Sin tramitaciones para esta vista."}
                     </p>
                     <p className="text-xs text-[var(--g-text-secondary)]/70 mt-1">
-                      Registra una nueva tramitación para comenzar.
+                      Inicia el proceso desde un acuerdo o certificación inscribible con origen trazable.
                     </p>
                   </div>
                 </td>
               </tr>
             ) : (
-              data.map((f) => (
+              rows.map((f) => (
                 <tr
                   key={f.id}
                   onClick={() => navigate(scope.createScopedTo(`/secretaria/tramitador/${f.id}`))}

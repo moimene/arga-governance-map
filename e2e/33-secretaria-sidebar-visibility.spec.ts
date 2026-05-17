@@ -1,83 +1,104 @@
 import { test, expect } from "./fixtures/base";
 
 /**
- * Taxonomía sidebar Secretaría — versión 2026-05-12.
- * Verifica que:
- *  - Las secciones del modo sociedad muestren los labels nuevos.
- *  - En SA + CDA (ARGA Seguros) los flujos colegiados están visibles
- *    y Decisiones unipersonales NO aparece (ni en la sección Expedientes).
- *  - El CTA "Sin sesión (unanimidad)" sigue activo en AcuerdosSinSesion.
- *  - Los deep links legacy siguen funcionando tras el rename del item
- *    Calendario → Procesos.
+ * IA Secretaría — contrato canónico.
+ * Verifica que el lateral mantiene la secuencia:
+ *   Acuerdo → Adopción → Documentación → Registro público → Libros
+ * y que los accesos documentales son bandejas/vistas filtradas, no formularios
+ * libres de acta, certificación o tramitación.
  */
 
-test.describe("Secretaría sidebar — nueva taxonomía + visibilidad por contexto", () => {
-  test("modo sociedad muestra CONTEXTO/EXPEDIENTES/REGISTRO/CONFIGURACIÓN Y REGLAS", async ({ page }) => {
-    await page.goto("/secretaria");
+async function selectArgaSociedad(page) {
+  await page.goto("/secretaria");
+  await page.getByRole("button", { name: "Sociedad", exact: true }).click();
 
-    // Forzar modo sociedad seleccionando ARGA Seguros
-    await page.getByRole("button", { name: "Sociedad", exact: true }).click();
-    const sociedadSelect = page.getByLabel("Sociedad seleccionada");
-    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
-    await expect.poll(async () => sociedadSelect.locator("option").count()).toBeGreaterThan(1);
+  const sociedadSelect = page.getByLabel("Sociedad seleccionada");
+  await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => sociedadSelect.locator("option").count()).toBeGreaterThan(1);
 
-    const sociedadValue = await sociedadSelect.evaluate((select) => {
-      const options = Array.from((select as HTMLSelectElement).options);
-      return (
-        options.find((option) => option.textContent?.includes("ARGA Seguros, S.A."))?.value ?? options[1]?.value
-      );
-    });
-    expect(sociedadValue).toBeTruthy();
-    await sociedadSelect.selectOption(sociedadValue!);
+  const sociedadValue = await sociedadSelect.evaluate((select) => {
+    const options = Array.from((select as HTMLSelectElement).options);
+    return (
+      options.find((option) => option.textContent?.includes("ARGA Seguros, S.A."))?.value ?? options[1]?.value
+    );
+  });
 
-    // Esperar a que el sidebar termine de hidratarse
-    await expect(page.locator('[data-sidebar-section="Contexto"]').first()).toBeVisible({ timeout: 10_000 });
+  expect(sociedadValue).toBeTruthy();
+  await sociedadSelect.selectOption(sociedadValue!);
+  await expect(page.locator('[data-sidebar-section="Inicio"]').first()).toBeVisible({ timeout: 10_000 });
+}
 
-    // Las 4 secciones de la nueva taxonomía deben estar presentes
-    await expect(page.locator('[data-sidebar-section="Contexto"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-section="Expedientes"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-section="Registro"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-section="Configuración y reglas"]').first()).toBeVisible();
+test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto", () => {
+  test("modo sociedad muestra las secciones del contrato canónico", async ({ page }) => {
+    await selectArgaSociedad(page);
+
+    for (const section of [
+      "Inicio",
+      "Adopción",
+      "Documentación",
+      "Registro público",
+      "Libros y registros sociales",
+      "Sociedades y personas",
+      "Configuración y reglas",
+    ]) {
+      await expect(page.locator(`[data-sidebar-section="${section}"]`).first()).toBeVisible();
+    }
+
+    await expect(page.locator('[data-sidebar-item="Materias y reglas"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Catálogo de órganos"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Gestor de Reglas"]')).toHaveCount(0);
   });
 
   test("ARGA (SA + CDA) muestra flujos colegiados y oculta Decisiones unipersonales", async ({ page }) => {
-    await page.goto("/secretaria");
-    await page.getByRole("button", { name: "Sociedad", exact: true }).click();
-    const sociedadSelect = page.getByLabel("Sociedad seleccionada");
-    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
-    await expect.poll(async () => sociedadSelect.locator("option").count()).toBeGreaterThan(1);
-    const sociedadValue = await sociedadSelect.evaluate((select) => {
-      const options = Array.from((select as HTMLSelectElement).options);
-      return (
-        options.find((option) => option.textContent?.includes("ARGA Seguros, S.A."))?.value ?? options[1]?.value
-      );
-    });
-    await sociedadSelect.selectOption(sociedadValue!);
+    await selectArgaSociedad(page);
 
-    // CDA: Convocatorias, Reuniones, Actas, Acuerdos sin sesión visibles
-    await expect(page.locator('[data-sidebar-item="Convocatorias"]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-sidebar-item="Convocatorias"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Reuniones"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-item="Actas"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Acuerdos sin sesión"]').first()).toBeVisible();
-    // ARGA Seguros NO tiene admin único → Decisiones unipersonales oculto en sociedad mode
+    await expect(page.locator('[data-sidebar-item="Actas"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Actas pendientes"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Certificaciones vinculadas"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Tramitador registral"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Subsanaciones"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Libro de socios"]').first()).toBeVisible();
+
     await expect(page.locator('[data-sidebar-item="Decisiones unipersonales"]')).toHaveCount(0);
   });
 
-  test("item Procesos navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
-    await page.goto("/secretaria");
-    await page.getByRole("button", { name: "Sociedad", exact: true }).click();
-    const sociedadSelect = page.getByLabel("Sociedad seleccionada");
-    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
-    await expect.poll(async () => sociedadSelect.locator("option").count()).toBeGreaterThan(1);
-    const sociedadValue = await sociedadSelect.evaluate((select) => {
-      const options = Array.from((select as HTMLSelectElement).options);
-      return (
-        options.find((option) => option.textContent?.includes("ARGA Seguros, S.A."))?.value ?? options[1]?.value
-      );
-    });
-    await sociedadSelect.selectOption(sociedadValue!);
+  test("Documentación usa bandejas de origen trazable, no alta libre de acta/certificación", async ({ page }) => {
+    await selectArgaSociedad(page);
 
-    await expect(page.locator('[data-sidebar-item="Procesos"]').first()).toBeVisible({ timeout: 10_000 });
+    await page.locator('[data-sidebar-item="Actas pendientes"]').first().click();
+    await expect(page).toHaveURL(/\/secretaria\/actas\?.*vista=pendientes/);
+    await expect(page.getByText("Actas pendientes de origen trazable")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Esta bandeja no crea actas libres.")).toBeVisible();
+
+    await page.locator('[data-sidebar-item="Certificaciones vinculadas"]').first().click();
+    await expect(page).toHaveURL(/\/secretaria\/actas\?.*vista=certificaciones/);
+    await expect(page.getByRole("heading", { name: "Actas y certificaciones vinculadas" })).toBeVisible();
+
+    await expect(page.locator('a[href*="/secretaria/actas/generar"]')).toHaveCount(0);
+    await expect(page.locator('a[href*="/secretaria/certificaciones/nueva"]')).toHaveCount(0);
+    await expect(page.locator('a[href*="/secretaria/tramitaciones/nueva"]')).toHaveCount(0);
+  });
+
+  test("Registro público navega a vistas filtradas del tramitador", async ({ page }) => {
+    await selectArgaSociedad(page);
+
+    await page.locator('[data-sidebar-item="Subsanaciones"]').first().click();
+    await expect(page).toHaveURL(/\/secretaria\/tramitador\?.*estado=SUBSANACION/);
+    await expect(page.getByRole("button", { name: "Subsanaciones" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Iniciar desde acuerdo" })).toBeVisible();
+
+    await page.locator('[data-sidebar-item="Presentaciones"]').first().click();
+    await expect(page).toHaveURL(/\/secretaria\/tramitador\?.*estado=PRESENTADA/);
+    await expect(page.getByRole("button", { name: "Presentaciones" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("item Procesos navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
+    await selectArgaSociedad(page);
+
+    await expect(page.locator('[data-sidebar-item="Procesos"]').first()).toBeVisible();
     await page.locator('[data-sidebar-item="Procesos"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/calendario/);
     await expect(page.locator("main").getByRole("heading", { name: "Calendario de vencimientos", exact: true })).toBeVisible({
@@ -86,24 +107,11 @@ test.describe("Secretaría sidebar — nueva taxonomía + visibilidad por contex
   });
 
   test("AcuerdosSinSesion: CTA Sin sesión (unanimidad) presente para ARGA (CDA)", async ({ page }) => {
-    await page.goto("/secretaria");
-    await page.getByRole("button", { name: "Sociedad", exact: true }).click();
-    const sociedadSelect = page.getByLabel("Sociedad seleccionada");
-    await expect(sociedadSelect).toBeVisible({ timeout: 10_000 });
-    await expect.poll(async () => sociedadSelect.locator("option").count()).toBeGreaterThan(1);
-    const sociedadValue = await sociedadSelect.evaluate((select) => {
-      const options = Array.from((select as HTMLSelectElement).options);
-      return (
-        options.find((option) => option.textContent?.includes("ARGA Seguros, S.A."))?.value ?? options[1]?.value
-      );
-    });
-    await sociedadSelect.selectOption(sociedadValue!);
+    await selectArgaSociedad(page);
 
     await page.locator('[data-sidebar-item="Acuerdos sin sesión"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/acuerdos-sin-sesion/);
 
-    // Sin sesión SIEMPRE visible para CDA. CO_APROBACION y SOLIDARIO ocultos
-    // (ARGA no es ADMIN_MANCOMUNADO ni ADMIN_SOLIDARIO).
     await expect(page.locator('[data-cta="no-session"]')).toBeVisible();
     await expect(page.locator('[data-cta="co-aprobacion"]')).toHaveCount(0);
     await expect(page.locator('[data-cta="solidario"]')).toHaveCount(0);

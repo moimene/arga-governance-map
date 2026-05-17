@@ -27,19 +27,11 @@ import type { SecretariaMode } from "./types";
 export type SecretariaNavGroup = VisibleSecretariaNavGroup;
 export type SecretariaNavItem = VisibleSecretariaNavItem;
 
-/**
- * Modo "grupo" — vista cross-sociedad del Secretario General de grupo.
- * Se mantienen labels alineados con la taxonomía nueva: PANEL, OPERATIVA,
- * CONFIGURACIÓN Y REGLAS (la "biblioteca legal" se unificó como
- * "Configuración y reglas" para coincidir con el modo sociedad).
- */
 export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
-    label: "Panel de grupo",
+    label: "Inicio",
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
-      { label: "Sociedades", to: "/secretaria/sociedades", icon: Building2 },
-      { label: "Personas", to: "/secretaria/personas", icon: UserCircle },
       {
         label: "Board Pack",
         to: "/secretaria/board-pack",
@@ -47,21 +39,48 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresCapability: "canCertify" },
       },
       { label: "Campañas de grupo", to: "/secretaria/procesos-grupo", icon: Repeat2 },
+    ],
+  },
+  {
+    label: "Adopción",
+    items: [
+      { label: "Convocatorias", to: "/secretaria/convocatorias", icon: Bell },
+      { label: "Reuniones", to: "/secretaria/reuniones", icon: Users },
+      { label: "Acuerdos sin sesión", to: "/secretaria/acuerdos-sin-sesion", icon: ScrollText },
+      { label: "Decisiones unipersonales", to: "/secretaria/decisiones-unipersonales", icon: Building2 },
+    ],
+  },
+  {
+    label: "Documentación",
+    items: [
+      { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
+      { label: "Actas pendientes", to: "/secretaria/actas?vista=pendientes", icon: FileSignature },
+      { label: "Certificaciones vinculadas", to: "/secretaria/actas?vista=certificaciones", icon: FileSignature },
+      { label: "Documentos en revisión", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+    ],
+  },
+  {
+    label: "Registro público",
+    items: [
+      { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel },
+      { label: "Subsanaciones", to: "/secretaria/tramitador?estado=SUBSANACION", icon: Gavel },
+      { label: "Presentaciones", to: "/secretaria/tramitador?estado=PRESENTADA", icon: Gavel },
+    ],
+  },
+  {
+    label: "Libros y registros sociales",
+    items: [
+      { label: "Libro de socios", to: "/secretaria/libro-socios", icon: BookOpen },
+      { label: "Libros obligatorios", to: "/secretaria/libros", icon: Library },
       { label: "Procesos", to: "/secretaria/calendario", icon: Calendar },
       { label: "Multi-jurisdicción", to: "/secretaria/multi-jurisdiccion", icon: Globe },
     ],
   },
   {
-    label: "Operativa multi-sociedad",
+    label: "Sociedades y personas",
     items: [
-      { label: "Convocatorias", to: "/secretaria/convocatorias", icon: Bell },
-      { label: "Reuniones", to: "/secretaria/reuniones", icon: Users },
-      { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
-      { label: "Decisiones unipersonales", to: "/secretaria/decisiones-unipersonales", icon: Building2 },
-      { label: "Acuerdos sin sesión", to: "/secretaria/acuerdos-sin-sesion", icon: ScrollText },
-      { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel },
-      { label: "Libro de socios", to: "/secretaria/libro-socios", icon: BookOpen },
-      { label: "Libros obligatorios", to: "/secretaria/libros", icon: Library },
+      { label: "Sociedades", to: "/secretaria/sociedades", icon: Building2 },
+      { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
     ],
   },
   {
@@ -83,28 +102,19 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
  * readiness). El centralizador `getVisibleSidebarSections` aplica los filtros
  * y poda secciones enteras cuando no queda ningún item visible.
  *
- * Sections (taxonomía 2026-05-12):
- *   CONTEXTO                  — anatomía societaria
- *   EXPEDIENTES               — flujos de adopción de acuerdos
- *   REGISTRO                  — libros, calendario, multi-jurisdicción
- *   CONFIGURACIÓN Y REGLAS    — reglas legales y plantillas
+ * Secuencia canónica:
+ *   Acuerdo → Adopción → Documentación → Registro público si procede
+ *   → Libros y registros sociales siempre.
+ *
+ * La navegación se ordena por ese flujo, pero usa rutas existentes y vistas
+ * filtradas. No crea entradas libres para actas, certificaciones ni
+ * tramitaciones: esas acciones nacen desde reunión, acuerdo o documento fuente.
  */
 export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
   {
-    label: "Contexto",
+    label: "Inicio",
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
-      // Sociedades: un solo item que en modo sociedad navega a la ficha
-      // activa (selectedEntityRoute) y en modo grupo a la lista. El acceso
-      // a "Nueva sociedad" vive en la propia página SociedadesList — no
-      // necesita un segundo item duplicado en el sidebar.
-      {
-        label: "Sociedades",
-        to: "/secretaria/sociedades",
-        icon: Building2,
-        selectedEntityRoute: true,
-      },
-      { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
       {
         label: "Board Pack",
         to: "/secretaria/board-pack",
@@ -120,7 +130,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
     ],
   },
   {
-    label: "Expedientes",
+    label: "Adopción",
     items: [
       {
         label: "Convocatorias",
@@ -145,16 +155,6 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         },
       },
       {
-        label: "Actas",
-        to: "/secretaria/actas",
-        icon: FileSignature,
-        requiresEntity: true,
-        visibility: {
-          requiresEntity: true,
-          requiresCollegiateBody: true,
-        },
-      },
-      {
         label: "Decisiones unipersonales",
         to: "/secretaria/decisiones-unipersonales",
         icon: Building2,
@@ -165,13 +165,8 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         },
       },
       {
-        // La página AcuerdosSinSesion es entry point para 3 flujos:
-        //   - NO_SESSION (unanimidad, requiere colegiado)
-        //   - CO_APROBACION (ADMIN_MANCOMUNADOS — k de n)
-        //   - SOLIDARIO (ADMIN_SOLIDARIOS — administrador único de los solidarios)
-        // No filtramos por colegialidad: si la entidad soporta CUALQUIERA
-        // de esos 3 modos, el item debe aparecer y la página decide qué
-        // CTAs renderizar. Los CTAs internos usan canShowAdoptionModeCta.
+        // Entry point a los modos NO_SESSION / CO_APROBACION / SOLIDARIO.
+        // La página decide qué CTA concreto mostrar según el régimen.
         label: "Acuerdos sin sesión",
         to: "/secretaria/acuerdos-sin-sesion",
         icon: ScrollText,
@@ -182,6 +177,45 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
           excludesIfReferenceOnly: true,
         },
       },
+    ],
+  },
+  {
+    label: "Documentación",
+    items: [
+      {
+        label: "Actas",
+        to: "/secretaria/actas",
+        icon: FileSignature,
+        requiresEntity: true,
+        visibility: {
+          requiresEntity: true,
+          requiresCollegiateBody: true,
+        },
+      },
+      {
+        label: "Actas pendientes",
+        to: "/secretaria/actas?vista=pendientes",
+        icon: FileSignature,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Certificaciones vinculadas",
+        to: "/secretaria/actas?vista=certificaciones",
+        icon: FileSignature,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Documentos en revisión",
+        to: "/secretaria/documentos/pendientes-revision",
+        icon: FileSearch,
+      },
+    ],
+  },
+  {
+    label: "Registro público",
+    items: [
       {
         label: "Tramitador registral",
         to: "/secretaria/tramitador",
@@ -189,10 +223,24 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         requiresEntity: true,
         visibility: { requiresEntity: true },
       },
+      {
+        label: "Subsanaciones",
+        to: "/secretaria/tramitador?estado=SUBSANACION",
+        icon: Gavel,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Presentaciones",
+        to: "/secretaria/tramitador?estado=PRESENTADA",
+        icon: Gavel,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
     ],
   },
   {
-    label: "Registro",
+    label: "Libros y registros sociales",
     items: [
       {
         label: "Libro de socios",
@@ -216,6 +264,18 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresEntity: true },
       },
       { label: "Multi-jurisdicción", to: "/secretaria/multi-jurisdiccion", icon: Globe },
+    ],
+  },
+  {
+    label: "Sociedades y personas",
+    items: [
+      {
+        label: "Sociedades",
+        to: "/secretaria/sociedades",
+        icon: Building2,
+        selectedEntityRoute: true,
+      },
+      { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
     ],
   },
   {
