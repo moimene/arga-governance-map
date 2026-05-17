@@ -62,7 +62,7 @@ describe("legal-template-review", () => {
       template({ id: "acta-ok", tipo: "ACTA_SESION" }),
       template({
         id: "acta-sin-aprobacion",
-        tipo: "ACTA_SESION",
+        tipo: "TIPO_SIN_PLAN",
         aprobada_por: null,
         fecha_aprobacion: null,
       }),
@@ -87,7 +87,7 @@ describe("legal-template-review", () => {
         notas_legal: "Oleada 2 STUB - Pendiente revision legal.",
         adoption_mode: null,
         organo_tipo: null,
-        materia_acuerdo: "AUMENTO_CAPITAL",
+        materia_acuerdo: "MATERIA_SIN_PLAN",
       }),
     ]);
 
@@ -143,11 +143,12 @@ describe("legal-template-review", () => {
 
     expect(pre.approvalDecision).toBe("APROBADA");
     expect(pre.proposedVersion).toBe("1.0.1");
-    expect(pre.canClaimLegalApproval).toBe(false);
+    expect(pre.canClaimLegalApproval).toBe(true);
     expect(matchesLegalTemplateReviewFilter(pre, "LEGAL_REPORT_APPROVED")).toBe(true);
 
     expect(garantia.approvalDecision).toBe("APROBADA");
     expect(garantia.proposedVersion).toBe("1.0.0");
+    expect(garantia.canClaimLegalApproval).toBe(true);
     expect(garantia.reasons.join(" ")).toContain("Version tecnica");
     expect(matchesLegalTemplateReviewFilter(garantia, "LEGAL_REPORT_APPROVED")).toBe(true);
   });
@@ -174,18 +175,18 @@ describe("legal-template-review", () => {
     const rows = buildLegalTemplateReviewRows([
       template({ id: "ok", tipo: "ACTA_SESION" }),
       template({ id: "sin-aprobacion", tipo: "CERTIFICACION", aprobada_por: null, fecha_aprobacion: null }),
-      template({ id: "draft", tipo: "MODELO_ACUERDO", version: "1", materia_acuerdo: "FORMULACION_CUENTAS", adoption_mode: null, organo_tipo: null }),
+      template({ id: "draft", tipo: "MODELO_ACUERDO", version: "1", materia_acuerdo: "MATERIA_SIN_PLAN", adoption_mode: null, organo_tipo: null }),
       template({ id: "fixture", tenant_id: "local-legal-fixture", tipo: "DOCUMENTO_REGISTRAL" }),
     ]);
 
     const summary = summarizeLegalTemplateReview(rows);
     expect(summary.total).toBe(4);
-    expect(summary.legallyApproved).toBe(1);
-    expect(summary.operationalUnapproved).toBe(1);
+    expect(summary.legallyApproved).toBe(2);
+    expect(summary.operationalUnapproved).toBe(0);
     expect(summary.fixtureBridge).toBe(1);
     expect(summary.draftVersion).toBe(1);
     expect(summary.missingOwner).toBe(1);
-    expect(summary.legalReportApproved).toBe(1);
+    expect(summary.legalReportApproved).toBe(0);
     expect(summary.legalReportApprovedWithVariants).toBe(1);
   });
 });

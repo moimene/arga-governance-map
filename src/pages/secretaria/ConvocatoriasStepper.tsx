@@ -3711,6 +3711,68 @@ export default function ConvocatoriasStepper() {
                 )}
               </div>
 
+              <div
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+                style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+                      Documento que se emitirá
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--g-text-primary)]">
+                      Fuente del documento: texto revisado del Paso 7
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-[var(--g-text-secondary)]">
+                    <span
+                      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      {borradorTexto.trim().length} caracteres
+                    </span>
+                    <span
+                      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-2 py-1"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      {borradorDirty ? "Editado por Secretaría" : "Sin edición manual"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-[var(--g-text-secondary)] sm:grid-cols-3">
+                  <MiniFact label="Plantilla" value={effectiveBorradorTemplate ? `${effectiveBorradorTemplate.tipo} v${effectiveBorradorTemplate.version}` : "Sin plantilla"} />
+                  <MiniFact label="Estado" value={effectiveBorradorTemplate?.estado ?? "—"} />
+                  <MiniFact label="Variables sin resolver" value={String(renderUnresolved.length)} />
+                </div>
+
+                {renderUnresolved.length > 0 ? (
+                  <div
+                    className="mt-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--status-warning)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    Variables pendientes: {renderUnresolved.slice(0, 6).join(", ")}
+                    {renderUnresolved.length > 6 ? ` y ${renderUnresolved.length - 6} más` : ""}
+                  </div>
+                ) : null}
+
+                {borradorTexto.trim() ? (
+                  <pre
+                    className="mt-3 max-h-[320px] overflow-auto whitespace-pre-wrap border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 font-mono text-xs leading-relaxed text-[var(--g-text-primary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    {borradorTexto}
+                  </pre>
+                ) : (
+                  <div
+                    className="mt-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--status-warning)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    No hay texto de convocatoria preparado en el Paso 7.
+                  </div>
+                )}
+              </div>
+
               {/* Compliance badge */}
               <div
                 className={`p-3 border-l-4 ${

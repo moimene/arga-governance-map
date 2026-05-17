@@ -47,6 +47,12 @@ export interface ProcessDocumentGenerationInput {
   plantillas: PlantillaProtegidaRow[];
   variables?: Record<string, unknown>;
   capa3Values?: Capa3Values;
+  /**
+   * Body text already reviewed in the originating workflow. When present,
+   * this is the canonical document body; templates remain metadata/context
+   * for traceability but must not recompose the legal text.
+   */
+  reviewedBodyText?: string | null;
   fallbackText: string;
   filenamePrefix?: string;
   tenantId?: string | null;
@@ -111,6 +117,7 @@ export interface ProcessDocumentGenerationResult {
   templateSelectionWarnings?: string[];
   templateSelectionBlockingIssues?: string[];
   usedFallback: boolean;
+  usedReviewedBody?: boolean;
   unresolvedVariables: string[];
   archive: ProcessDocumentArchiveResult;
   agreementTrace: AgreementDocumentTrace;
@@ -389,6 +396,11 @@ function requiredTemplateVariables(plantilla: PlantillaProtegidaRow | null) {
 function variableIsRequired(varName: string, required: Set<string>) {
   const root = varName.split(".")[0];
   return required.has(varName) || required.has(root);
+}
+
+function reviewedBodyText(input: ProcessDocumentGenerationInput) {
+  const value = input.reviewedBodyText;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 function withTraceFooter(
@@ -815,12 +827,14 @@ export async function generateProcessDocx(
   const plantilla = templateSelection.selected;
   const capa3Values = input.capa3Values ?? {};
   const variables = expandLegalStructuredVariables(mergeVariables(input.variables ?? {}, capa3Values));
+  const reviewedBody = reviewedBodyText(input);
 
-  let renderedText = input.fallbackText;
+  let renderedText = reviewedBody ?? input.fallbackText;
   let unresolvedVariables: string[] = [];
-  let usedFallback = true;
+  let usedFallback = !reviewedBody;
+  const usedReviewedBody = !!reviewedBody;
 
-  if (plantilla?.capa1_inmutable) {
+  if (!reviewedBody && plantilla?.capa1_inmutable) {
     const rendered = renderTemplate({
       template: plantilla.capa1_inmutable,
       variables,
@@ -914,6 +928,7 @@ export async function generateProcessDocx(
     templateSelectionWarnings: templateSelection.warnings,
     templateSelectionBlockingIssues: templateSelection.blockingIssues,
     usedFallback,
+    usedReviewedBody,
     unresolvedVariables,
     archive,
     agreementTrace,

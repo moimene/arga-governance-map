@@ -1,12 +1,28 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import {
   resolveAgreementDocumentTrace,
   resolveDocumentEvidencePosture,
 } from "@/lib/secretaria/agreement-document-contract";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
+import { createHash } from "node:crypto";
+
+vi.mock("../docx-generator", () => {
+  return {
+    computeContentHash: async (text: string) => {
+      const data = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
+    },
+    generateDocx: async ({ renderedText }: { renderedText: string }) => new TextEncoder().encode(renderedText),
+    downloadDocx: () => undefined,
+  };
+});
 
 let buildProcessDocumentTraceFooterLines: typeof import("../process-documents").buildProcessDocumentTraceFooterLines;
+let generateProcessDocx: typeof import("../process-documents").generateProcessDocx;
 let resolveProcessDocumentFinalEvidenceReadiness: typeof import("../process-document-readiness").resolveProcessDocumentFinalEvidenceReadiness;
 let selectProcessTemplate: typeof import("../process-documents").selectProcessTemplate;
 let resolveProcessTemplateSelection: typeof import("../process-documents").resolveProcessTemplateSelection;
@@ -26,9 +42,13 @@ beforeAll(async () => {
       },
     },
   });
-  ({ buildProcessDocumentTraceFooterLines, resolveProcessTemplateSelection, selectProcessTemplate } = await import("../process-documents"));
+  ({ buildProcessDocumentTraceFooterLines, generateProcessDocx, resolveProcessTemplateSelection, selectProcessTemplate } = await import("../process-documents"));
   ({ resolveProcessDocumentFinalEvidenceReadiness } = await import("../process-document-readiness"));
 });
+
+function sha256Text(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
 
 function template(
   patch: Partial<PlantillaProtegidaRow> & Pick<PlantillaProtegidaRow, "id" | "tipo" | "estado">,
@@ -64,7 +84,7 @@ function template(
 }
 
 describe("process-documents", () => {
-  it("prioriza ACTIVA sobre APROBADA e ignora REVISADA para documentos finales", () => {
+  it("prioriza ACTIVA sobre APROBADA y revisiones aprobadas por Comite Legal ARGA", () => {
     const selected = selectProcessTemplate(
       [
         template({ id: "revisada", tipo: "CONVOCATORIA", estado: "REVISADA" }),
@@ -75,6 +95,22 @@ describe("process-documents", () => {
     );
 
     expect(selected?.id).toBe("activa");
+  });
+
+  it("acepta REVISADA cuando encaja con el informe aprobado por Comite Legal ARGA", () => {
+    const selected = selectProcessTemplate(
+      [
+        template({
+          id: "convocatoria-revisada",
+          tipo: "CONVOCATORIA",
+          estado: "REVISADA",
+          version: "1.1.0",
+        }),
+      ],
+      ["CONVOCATORIA"],
+    );
+
+    expect(selected?.id).toBe("convocatoria-revisada");
   });
 
   it("acepta BORRADOR con revision legal formal y version mas reciente", () => {
@@ -99,21 +135,21 @@ describe("process-documents", () => {
   it("ignora BORRADOR sin metadatos de aprobacion formal", () => {
     const selected = selectProcessTemplate(
       [
-        template({ id: "borrador-sin-firma", tipo: "CONVOCATORIA", estado: "BORRADOR", version: "1.3.0" }),
-        template({ id: "activa-actual", tipo: "CONVOCATORIA", estado: "ACTIVA", version: "1.1.0" }),
+        template({ id: "borrador-sin-firma", tipo: "TIPO_SIN_PLAN", estado: "BORRADOR", version: "1.3.0" }),
+        template({ id: "activa-actual", tipo: "TIPO_SIN_PLAN", estado: "ACTIVA", version: "1.1.0" }),
       ],
-      ["CONVOCATORIA"],
+      ["TIPO_SIN_PLAN"],
     );
 
     expect(selected?.id).toBe("activa-actual");
   });
 
-  it("no selecciona plantillas solo revisadas para documentos finales", () => {
+  it("no selecciona plantillas REVISADA sin aprobacion del Comite Legal ARGA", () => {
     const selected = selectProcessTemplate(
       [
-        template({ id: "revisada", tipo: "CONVOCATORIA", estado: "REVISADA" }),
+        template({ id: "revisada", tipo: "TIPO_SIN_PLAN", estado: "REVISADA" }),
       ],
-      ["CONVOCATORIA"],
+      ["TIPO_SIN_PLAN"],
     );
 
     expect(selected).toBeNull();
@@ -245,6 +281,34 @@ describe("process-documents", () => {
     );
 
     expect(selected?.id).toBe("certificacion");
+  });
+
+  it("usa el texto revisado como cuerpo canonico aunque exista plantilla activa", async () => {
+    const reviewedBody = "CONVOCATORIA REVISADA\n\nTexto validado en Paso 7 por Secretaria.";
+    const result = await generateProcessDocx({
+      kind: "CONVOCATORIA",
+      recordId: "conv-12345678",
+      title: "Convocatoria",
+      templateTypes: ["CONVOCATORIA"],
+      plantillas: [
+        template({
+          id: "conv-template",
+          tipo: "CONVOCATORIA",
+          estado: "ACTIVA",
+          capa1_inmutable: "CONVOCATORIA RECOMPUESTA {{denominacion_social}}",
+        }),
+      ],
+      variables: { denominacion_social: "ARGA Seguros S.A." },
+      reviewedBodyText: reviewedBody,
+      fallbackText: "Fallback tecnico",
+      archive: false,
+      filenamePrefix: "convocatoria",
+    });
+
+    expect(result.usedReviewedBody).toBe(true);
+    expect(result.usedFallback).toBe(false);
+    expect(result.templateId).toBe("conv-template");
+    expect(result.contentHash).toBe(sha256Text(reviewedBody));
   });
 
   it("selecciona fixture legal de convocatoria segun familia de organo", () => {

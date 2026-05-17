@@ -73,6 +73,7 @@ type ConvocatoriaDocContext = {
   statutory_basis?: string | null;
   publication_channels?: string[] | null;
   agenda_items?: Array<{ titulo?: string; materia?: string; tipo?: string; inscribible?: boolean }> | null;
+  convocatoria_text?: string | null;
   reminders_trace?: Record<string, unknown> | null;
   rule_trace?: Record<string, unknown> | null;
   accepted_warnings?: Record<string, unknown>[] | null;
@@ -227,7 +228,11 @@ function buildInformePreceptivoFallback(conv: ConvocatoriaDocContext) {
 function selectedTemplateFromTrace(trace?: Record<string, unknown> | null) {
   const context = trace?.context;
   if (!context || typeof context !== "object") return null;
-  const selectedTemplate = (context as { selected_template?: unknown }).selected_template;
+  const traceContext = context as { borrador_template?: unknown; selected_template?: unknown };
+  const selectedTemplate =
+    traceContext.borrador_template && typeof traceContext.borrador_template === "object"
+      ? traceContext.borrador_template
+      : traceContext.selected_template;
   if (!selectedTemplate || typeof selectedTemplate !== "object") return null;
   const id = (selectedTemplate as { id?: unknown }).id;
   return typeof id === "string" && id.trim() ? id : null;
@@ -297,6 +302,7 @@ export default function ConvocatoriaDetalle() {
   }
 
   const docVariables = buildConvocatoriaVariables(conv);
+  const reviewedConvocatoriaText = conv.convocatoria_text?.trim() ? conv.convocatoria_text : null;
   const convocatoriaFallback = buildConvocatoriaFallback(conv);
   const informeFallback = buildInformePreceptivoFallback(conv);
   const backToList = scope.createScopedTo("/secretaria/convocatorias");
@@ -360,7 +366,7 @@ export default function ConvocatoriaDetalle() {
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <ProcessDocxButton
-            label={preferredConvocatoriaTemplateId ? "Convocatoria con plantilla" : "Convocatoria DOCX"}
+            label={reviewedConvocatoriaText ? "Convocatoria revisada DOCX" : preferredConvocatoriaTemplateId ? "Convocatoria con plantilla" : "Convocatoria DOCX"}
             variant="primary"
             input={{
               kind: "CONVOCATORIA",
@@ -377,7 +383,8 @@ export default function ConvocatoriaDetalle() {
                 organoTipo: conv.body_type,
               },
               preferredTemplateId: preferredConvocatoriaTemplateId,
-              fallbackText: convocatoriaFallback,
+              reviewedBodyText: reviewedConvocatoriaText,
+              fallbackText: reviewedConvocatoriaText ?? convocatoriaFallback,
               filenamePrefix: "convocatoria",
             }}
           />

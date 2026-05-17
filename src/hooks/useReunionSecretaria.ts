@@ -20,6 +20,14 @@ import {
   buildMeetingScheduleFromConvocatoria,
   type ConvocatoriaForMeetingSchedule,
 } from "@/lib/secretaria/meeting-scheduler";
+import {
+  addUniversalMeetingHoursIso,
+  buildUniversalMeetingDedupHash,
+  buildUniversalMeetingQuorumData,
+  buildUniversalMeetingSlug,
+  universalMeetingStartIso,
+  type UniversalMeetingBasicInput,
+} from "@/lib/secretaria/junta-universal";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import {
   normalizeAgendaItemKind,
@@ -54,6 +62,8 @@ export interface MeetingAttendee {
   attendance_type: string;
   represented_by_id: string | null;
   capital_representado: number | null;
+  shares_represented?: number | null;
+  voting_rights?: number | null;
   via_representante: boolean | null;
   tenant_id: string | null;
   full_name?: string | null;
@@ -452,6 +462,71 @@ export function useCreateMeetingFromConvocatoria() {
   });
 }
 
+export type CreateUniversalMeetingInput = Omit<UniversalMeetingBasicInput, "tenantId">;
+
+export function useCreateUniversalMeeting() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateUniversalMeetingInput): Promise<{ id: string; reused: boolean }> => {
+      if (!tenantId) throw new Error("Tenant no disponible");
+      if (!input.entityId || !input.bodyId) {
+        throw new Error("Selecciona sociedad y Junta General antes de crear la reunión.");
+      }
+      if (!input.fecha || !input.horaInicio || !input.lugar.trim() || !input.modalidad) {
+        throw new Error("Fecha, hora, lugar y modalidad son obligatorios para la Junta Universal.");
+      }
+
+      const hydrated: UniversalMeetingBasicInput = { ...input, tenantId };
+      const scheduledStart = universalMeetingStartIso(input.fecha, input.horaInicio);
+      const scheduledEnd = addUniversalMeetingHoursIso(scheduledStart, 2);
+      const dedupHash = buildUniversalMeetingDedupHash(hydrated);
+
+      const { data: candidates, error: candidatesError } = await supabase
+        .from("meetings")
+        .select("id, quorum_data")
+        .eq("tenant_id", tenantId)
+        .eq("body_id", input.bodyId)
+        .gte("scheduled_start", `${input.fecha}T00:00:00.000Z`)
+        .lt("scheduled_start", nextDateIso(input.fecha))
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (candidatesError) throw candidatesError;
+
+      const existing = ((candidates ?? []) as Array<{ id: string; quorum_data?: Record<string, unknown> | null }>)
+        .find((meeting) => {
+          const universalIntake = meeting.quorum_data?.universal_intake as Record<string, unknown> | undefined;
+          return universalIntake?.dedup_hash === dedupHash;
+        });
+      if (existing) return { id: existing.id, reused: true };
+
+      const { data, error } = await supabase
+        .from("meetings")
+        .insert({
+          tenant_id: tenantId,
+          body_id: input.bodyId,
+          slug: buildUniversalMeetingSlug(hydrated, dedupHash),
+          meeting_type: "UNIVERSAL",
+          scheduled_start: scheduledStart,
+          scheduled_end: scheduledEnd,
+          status: "BORRADOR",
+          location: input.lugar.trim(),
+          confidentiality_level: "NORMAL",
+          quorum_data: buildUniversalMeetingQuorumData(hydrated),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return { id: (data as { id: string }).id, reused: false };
+    },
+    onSuccess: (_result, input) => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "list", input.entityId] });
+    },
+  });
+}
+
 export function useReunionById(id: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -461,7 +536,7 @@ export function useReunionById(id: string | undefined) {
       const { data, error } = await supabase
         .from("meetings")
         .select(
-          "*, governing_bodies(name, body_type, entity_id, quorum_rule, entities(common_name, jurisdiction, legal_form, tipo_social))",
+          "*, governing_bodies(name, body_type, entity_id, quorum_rule, entities(common_name, jurisdiction, legal_form, tipo_social, es_cotizada))",
         )
         .eq("id", id!)
         .eq("tenant_id", tenantId!)
@@ -694,6 +769,8 @@ export function useReplaceAttendees(meetingId: string | undefined) {
         attendance_type: string;
         represented_by_id: string | null;
         capital_representado?: number | null;
+        shares_represented?: number | null;
+        voting_rights?: number | null;
         via_representante?: boolean | null;
       }>
     ) => {

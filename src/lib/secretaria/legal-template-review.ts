@@ -118,7 +118,6 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
   return templates.map((template) => {
     const localFixture = isLocalFixture(template);
     const isOperationalActive = normalizeCode(template.estado) === "ACTIVA";
-    const missingApproval = !localFixture && (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion));
     const draftVersion = !localFixture && isDraftVersion(template.version);
     const notesRequireReview = !localFixture && REVIEW_NOTE_RE.test(template.notas_legal ?? "");
     const missingReference = !localFixture && requiresReference(template) && !hasValue(template.referencia_legal);
@@ -131,6 +130,11 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     const approvalPlan = resolveLegalTemplateApprovalPlan(template);
     const legalReportApproved = approvalPlan?.decision === "APROBADA";
     const legalReportApprovedWithVariants = approvalPlan?.decision === "APROBADA_CON_VARIANTES";
+    const committeeApproved = legalReportApproved || legalReportApprovedWithVariants;
+    const missingApproval =
+      !localFixture &&
+      !committeeApproved &&
+      (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion));
 
     const flags: LegalTemplateReviewFlags = {
       missingApproval,
@@ -147,13 +151,16 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     const reasons: string[] = [];
     if (localFixture) reasons.push("Fixture local no persistido; no sustituye aprobacion legal Cloud.");
     if (missingApproval) reasons.push("Falta aprobada_por o fecha_aprobacion.");
+    if (committeeApproved && (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion))) {
+      reasons.push("Aprobacion por informe del Comite Legal ARGA; metadata Cloud pendiente de reflejar.");
+    }
     if (draftVersion) reasons.push("Version tecnica o no semver final.");
     if (notesRequireReview) reasons.push("Notas legales indican STUB, borrador o revision pendiente.");
     if (missingReference) reasons.push("Falta referencia legal explicita.");
     if (missingOwner) reasons.push("Falta organo competente o AdoptionMode.");
     if (duplicateMatter) reasons.push("Existe mas de una plantilla para la misma materia; Legal debe confirmar variante o consolidacion.");
 
-    const canClaimLegalApproval = !localFixture && isOperationalActive && reasons.length === 0;
+    const canClaimLegalApproval = committeeApproved || (!localFixture && isOperationalActive && reasons.length === 0);
     const requiresLegalReview = !canClaimLegalApproval;
 
     let status: LegalTemplateReviewStatus;

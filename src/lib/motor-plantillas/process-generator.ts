@@ -310,6 +310,10 @@ export async function generateProcessDocxWithMotor(
     return legacyFallback(input);
   }
 
+  if (typeof input.reviewedBodyText === "string" && input.reviewedBodyText.trim().length > 0) {
+    return legacyFallback(input);
+  }
+
   const templateCriteria = inferProcessTemplateCriteria(input);
   const plantilla = selectProcessTemplate(
     input.plantillas,

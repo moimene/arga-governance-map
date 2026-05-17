@@ -1,6 +1,7 @@
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { resolveLegalTemplateApprovalPlan } from "@/lib/secretaria/legal-template-approval-plan";
 
-export const OPERATIONAL_TEMPLATE_QUERY_STATES = ["ACTIVA", "APROBADA", "BORRADOR"] as const;
+export const OPERATIONAL_TEMPLATE_QUERY_STATES = ["ACTIVA", "APROBADA", "REVISADA", "BORRADOR"] as const;
 
 function normalizeTemplateStatus(status?: string | null) {
   return status?.trim().toUpperCase() ?? "";
@@ -18,18 +19,29 @@ export function isLegallyReviewedDraft(template: PlantillaProtegidaRow) {
   );
 }
 
+export function hasArgaLegalCommitteeApproval(template: PlantillaProtegidaRow) {
+  const status = normalizeTemplateStatus(template.estado);
+  if (status === "ACTIVA" || status === "APROBADA") return true;
+  if (isLegallyReviewedDraft(template)) return true;
+  return resolveLegalTemplateApprovalPlan(template) !== null;
+}
+
 export function isOperationalTemplate(template: PlantillaProtegidaRow) {
   const status = normalizeTemplateStatus(template.estado);
   if (!hasCapa1Content(template)) return false;
   if (status === "ACTIVA" || status === "APROBADA") return true;
-  return isLegallyReviewedDraft(template);
+  if (status === "REVISADA" || status === "BORRADOR") {
+    return hasArgaLegalCommitteeApproval(template);
+  }
+  return false;
 }
 
 function operationalStatusRank(template: PlantillaProtegidaRow) {
   const status = normalizeTemplateStatus(template.estado);
   if (status === "ACTIVA") return 0;
   if (status === "APROBADA") return 1;
-  if (isLegallyReviewedDraft(template)) return 2;
+  if (status === "REVISADA" && hasArgaLegalCommitteeApproval(template)) return 2;
+  if (status === "BORRADOR" && hasArgaLegalCommitteeApproval(template)) return 3;
   return 99;
 }
 

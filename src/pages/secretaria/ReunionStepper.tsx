@@ -9,16 +9,21 @@ import {
   Save,
   Trash2,
   Users,
+  Zap,
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
+import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useActiveConflicts } from "@/hooks/useConflicts";
+import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
+import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import {
   useBodyMembers,
+  useCreateUniversalMeeting,
   useGenerarActa,
   useMeetingAgendaSources,
   useMinuteForMeeting,
@@ -34,6 +39,7 @@ import {
   type BodyMember,
   type MeetingResolution,
 } from "@/hooks/useReunionSecretaria";
+import { useSecretariaScope } from "@/components/secretaria/shell";
 import { supabase } from "@/integrations/supabase/client";
 import {
   buildMeetingAdoptionSnapshot,
@@ -81,6 +87,19 @@ import {
   sourceLinksFromAgendaPoints,
 } from "@/lib/secretaria/meeting-links";
 import {
+  buildAgreementNormativeSnapshot,
+  type AgreementNormativeSnapshot,
+} from "@/lib/secretaria/normative-framework";
+import {
+  buildUniversalAgendaPoint,
+  isUniversalMeetingQuorumData,
+  patchUniversalAgendaAcceptance,
+  patchUniversalCapitalSummary,
+  universalAcceptanceText,
+  type UniversalMeetingModality,
+  type UniversalVotePointInput,
+} from "@/lib/secretaria/junta-universal";
+import {
   isMeetingRulePackPayload,
   resolveCloudMeetingRulePacksStrict,
   resolvePrototypeMeetingRulePacks,
@@ -112,6 +131,7 @@ interface VoterRow {
 
 type CensusMember = BodyMember & {
   default_capital_representado?: number | null;
+  default_shares_represented?: number | null;
 };
 
 interface MeetingVoterRow {
@@ -122,6 +142,39 @@ interface MeetingVoterRow {
   shares_represented: number | null;
   voting_rights: number | null;
   person_name: string | null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordAt(value: unknown, key: string): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+  const nested = value[key];
+  return isRecord(nested) ? nested : {};
+}
+
+function stringAt(value: unknown, key: string) {
+  if (!isRecord(value)) return null;
+  const nested = value[key];
+  return typeof nested === "string" ? nested : null;
+}
+
+function entityDomicilioSocial(entity?: EntityWithParent | null) {
+  const parts = [
+    entity?.registered_address,
+    entity?.address,
+    [entity?.address_street, entity?.address_number, entity?.address_floor].filter(Boolean).join(" "),
+    entity?.postal_code,
+    entity?.city,
+  ]
+    .map((part) => part?.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).join(", ");
+}
+
+function formatPercent(value: number) {
+  return value.toLocaleString("es-ES", { maximumFractionDigits: 2 });
 }
 
 function formatMeetingVoterName(voter: MeetingVoterRow) {
@@ -141,6 +194,15 @@ const AGENDA_MATERIAS = [
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA" },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL" },
 ] as const;
+
+const UNIVERSAL_SPECIAL_DOCUMENTATION_MATERIAS = new Set([
+  "MODIFICACION_ESTATUTOS",
+  "AUMENTO_CAPITAL",
+  "FUSION_ESCISION",
+  "ESCISION",
+  "FUSION",
+  "REDUCCION_CAPITAL",
+]);
 
 function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
   const seen = new Set<string>();
@@ -716,6 +778,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   const bodyId = (meeting as { body_id?: string } | null)?.body_id;
   const meetingRaw = meeting as
     | {
+        quorum_data?: Record<string, unknown> | null;
         governing_bodies?: {
           body_type?: string | null;
           entity_id?: string | null;
@@ -726,6 +789,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
   const censusSource = meetingCensusSourceForBodyType(meetingRaw?.governing_bodies?.body_type);
   const isJuntaCensus = censusSource === "capital_holdings";
+  const isUniversalMeeting = isUniversalMeetingQuorumData(meetingRaw?.quorum_data);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
   const tipoSocial = toTipoSocial(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
@@ -747,6 +811,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         tipo_condicion: organoTipo === "JUNTA_GENERAL" ? (tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO") : "MIEMBRO",
         full_name: attendee.full_name?.trim() || "Miembro sin identificar",
         default_capital_representado: attendee.capital_representado ?? null,
+        default_shares_represented: attendee.shares_represented ?? null,
       }));
 
     if (!isJuntaCensus) {
@@ -763,6 +828,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
           holding.holder?.denomination?.trim() ||
           "Socio sin identificar",
         default_capital_representado: holding.porcentaje_capital ?? null,
+        default_shares_represented: holding.numero_titulos ?? null,
       }));
 
     return shareholderMembers.length > 0 ? shareholderMembers : existingAttendeeMembers;
@@ -855,9 +921,17 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         attendance_type: attendanceType,
         represented_by_id: attendanceType === "REPRESENTADO" ? entry?.represented_by_id || null : null,
         capital_representado: Number.isFinite(capitalValue) ? capitalValue : null,
+        shares_represented: attendanceType === "AUSENTE" ? 0 : m.default_shares_represented ?? null,
+        voting_rights: Number.isFinite(capitalValue) ? capitalValue : null,
         via_representante: attendanceType === "REPRESENTADO",
       };
     });
+    if (isUniversalMeeting && universalCapitalPct < 99.999) {
+      toast.error(
+        `La junta universal requiere la presencia o representación de la totalidad del capital social (art. 178 LSC). Capital concurrente actual: ${formatPercent(universalCapitalPct)}%.`
+      );
+      return;
+    }
     replaceAttendees.mutate(rows, {
       onSuccess: () => toast.success(`Asistencia de ${rows.length} miembros guardada`),
       onError: (e) => toast.error(e instanceof Error ? e.message : "Error al guardar asistencia"),
@@ -867,6 +941,15 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
   const presentes = members.filter(
     (m) => (attendance[m.person_id]?.attendance_type ?? "PRESENCIAL") !== "AUSENTE"
   ).length;
+  const universalCapitalPct = members.reduce((sum, member) => {
+    const entry = attendance[member.person_id];
+    if ((entry?.attendance_type ?? "PRESENCIAL") === "AUSENTE") return sum;
+    const raw = entry?.capital_representado === ""
+      ? member.default_capital_representado ?? 0
+      : Number(entry?.capital_representado ?? 0);
+    return Number.isFinite(raw) ? sum + raw : sum;
+  }, 0);
+  const universalCapitalOk = universalCapitalPct >= 99.999;
 
   if (meetingLoading || (!isJuntaCensus && Boolean(bodyId) && membersLoading) || (isJuntaCensus && holdingsLoading)) {
     return (
@@ -951,7 +1034,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
-            {members.map((m: BodyMember) => {
+            {members.map((m: CensusMember) => {
               const entry = attendance[m.person_id] ?? {
                 attendance_type: "PRESENCIAL",
                 represented_by_id: "",
@@ -1053,10 +1136,53 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         </span>
       </div>
 
+      {isUniversalMeeting ? (
+        <div
+          className="space-y-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Capital concurrente exigido por art. 178 LSC
+            </p>
+            <span
+              className={`text-sm font-semibold ${
+                universalCapitalOk ? "text-[var(--status-success)]" : "text-[var(--status-error)]"
+              }`}
+            >
+              {formatPercent(universalCapitalPct)}%
+            </span>
+          </div>
+          <div
+            className="h-2 overflow-hidden bg-[var(--g-surface-muted)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+            aria-label={`Capital concurrente ${formatPercent(universalCapitalPct)}%`}
+          >
+            <div
+              className={universalCapitalOk ? "h-full bg-[var(--status-success)]" : "h-full bg-[var(--status-error)]"}
+              style={{
+                width: `${Math.min(Math.max(universalCapitalPct, 0), 100)}%`,
+                borderRadius: "var(--g-radius-full)",
+              }}
+            />
+          </div>
+          {!universalCapitalOk ? (
+            <p className="text-xs font-medium text-[var(--status-error)]" role="alert">
+              La junta universal requiere la presencia o representación de la totalidad del capital social
+              (art. 178 LSC). Capital concurrente actual: {formatPercent(universalCapitalPct)}%.
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--g-text-secondary)]">
+              La lista queda preparada como Anexo A del acta con el 100% del capital social concurrente.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       <button
         type="button"
         onClick={handleSave}
-        disabled={replaceAttendees.isPending}
+        disabled={replaceAttendees.isPending || (isUniversalMeeting && !universalCapitalOk)}
         aria-busy={replaceAttendees.isPending}
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1080,6 +1206,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   const existingQuorum = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
   const meetingRaw = meeting as
     | {
+        quorum_data?: Record<string, unknown> | null;
         governing_bodies?: {
           body_type?: string | null;
           entity_id?: string | null;
@@ -1118,6 +1245,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       meetingRaw?.governing_bodies?.entities?.legal_form
   );
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
+  const isUniversalMeeting = isUniversalMeetingQuorumData(existingQuorum);
   const entityId = meetingRaw?.governing_bodies?.entity_id ?? null;
   const { data: ruleResolutions = [], isLoading: rulesLoading } = useRuleResolutions({
     materias: ruleSpecs,
@@ -1199,6 +1327,11 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       attendee.attendance_type === "AUSENTE" ? sum : sum + Number(attendee.capital_representado ?? 0),
     0
   );
+  const attendeeCapitalImporte = attendees.reduce(
+    (sum, attendee) =>
+      attendee.attendance_type === "AUSENTE" ? sum : sum + Number(attendee.shares_represented ?? 0),
+    0
+  );
   const hasCapitalData = attendeeCapital > 0;
   const capitalTotal = hasCapitalData ? 100 : Math.max(total, 1);
   const capitalPresente = hasCapitalData ? attendeeCapital : presentes;
@@ -1222,8 +1355,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     packs,
     overrides
   );
-  const pct = constitutionResult.quorumPresente * 100;
-  const quorumReached = constitutionResult.quorumCubierto;
+  const pct = isUniversalMeeting ? capitalPresente : constitutionResult.quorumPresente * 100;
+  const quorumReached = isUniversalMeeting ? capitalPresente >= 99.999 : constitutionResult.quorumCubierto;
 
   const savedQuorum = existingQuorum?.quorum as
     | {
@@ -1238,8 +1371,17 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     | undefined;
 
   function handleConfirm() {
-    const quorumData: Record<string, unknown> = {
+    if (isUniversalMeeting && !quorumReached) {
+      toast.error(
+        `La junta universal requiere la presencia o representación de la totalidad del capital social (art. 178 LSC). Capital concurrente actual: ${formatPercent(pct)}%.`
+      );
+      return;
+    }
+
+    const baseQuorumData: Record<string, unknown> = {
       ...(existingQuorum ?? {}),
+      is_universal: isUniversalMeeting || existingQuorum?.is_universal === true,
+      junta_universal: isUniversalMeeting || existingQuorum?.junta_universal === true,
       quorum: {
         present: presentes,
         total,
@@ -1257,6 +1399,13 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         evaluated_at: new Date().toISOString(),
       },
     };
+    const quorumData = isUniversalMeeting
+      ? patchUniversalCapitalSummary(baseQuorumData, {
+          capitalConcurrentePorcentaje: Number(pct.toFixed(2)),
+          capitalConcurrenteImporte: attendeeCapitalImporte || null,
+          calculoCapitalRef: `capital_holdings:${meetingId}:art178:${new Date().toISOString()}`,
+        })
+      : baseQuorumData;
     updateQuorum.mutate(quorumData, {
       onSuccess: () => toast.success("Quórum registrado en el acta"),
       onError: (e) => toast.error(e instanceof Error ? e.message : "Error al guardar quórum"),
@@ -1266,9 +1415,9 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        El quórum se calcula con el motor de constitución según órgano, tipo social y materias
-        debatidas. En juntas se usa capital/derechos de voto cuando existe dato disponible; en
-        consejo se usa mayoría de miembros.
+        {isUniversalMeeting
+          ? "La Junta Universal exige el 100% del capital social presente o representado y aceptación unánime del orden del día. El sistema bloquea el avance si falta cualquier participación."
+          : "El quórum se calcula con el motor de constitución según órgano, tipo social y materias debatidas. En juntas se usa capital/derechos de voto cuando existe dato disponible; en consejo se usa mayoría de miembros."}
       </p>
 
       <div
@@ -1297,7 +1446,20 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         </div>
       </div>
 
-      {organoTipo === "JUNTA_GENERAL" && !hasCapitalData && (
+      {isUniversalMeeting && !quorumReached ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+          <p className="text-xs font-medium text-[var(--status-error)]">
+            La junta universal requiere la presencia o representación de la totalidad del capital social
+            (art. 178 LSC). Capital concurrente actual: {formatPercent(pct)}%.
+          </p>
+        </div>
+      ) : null}
+
+      {organoTipo === "JUNTA_GENERAL" && !hasCapitalData && !isUniversalMeeting && (
         <div
           className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-4"
           style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1469,12 +1631,17 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     () => (existingQD?.debates ?? []) as DebatePunto[],
     [existingQD?.debates],
   );
+  const isUniversalMeeting = isUniversalMeetingQuorumData(existingQD);
+  const existingAcceptance = recordAt(existingQD, "aceptacion_unanime_orden_dia");
 
   const updateQuorum = useUpdateQuorumData(meetingId);
   const saveConstancias = useReplaceAgendaItemConstancias(meetingId);
   const materializeAgendaItem = useMaterializeAgendaItem();
 
   const [debates, setDebates] = useState<DebatePunto[]>([newSessionAgendaPoint()]);
+  const [universalAcceptanceConfirmed, setUniversalAcceptanceConfirmed] = useState(
+    existingAcceptance.confirmada === true,
+  );
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -1534,13 +1701,21 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       }));
     const constancias: AgendaItemConstanciaInput[] = [];
 
+    if (isUniversalMeeting && debatesForSave.length === 0) {
+      toast.error("Añade al menos un punto del orden del día para la Junta Universal.");
+      return;
+    }
+    if (isUniversalMeeting && !universalAcceptanceConfirmed) {
+      toast.error("Confirma la aceptación unánime de la celebración y del orden del día (art. 178 LSC).");
+      return;
+    }
+
     try {
       for (let index = 0; index < debatesForSave.length; index += 1) {
         const point = debatesForSave[index];
         const kind = resolvePointKind(point, kindIndex);
-        if (kind === "DECISORIO") continue;
         if (!meetingId || !tenantId) {
-          throw new Error("No se puede guardar la constancia: falta contexto de reunión.");
+          throw new Error("No se puede guardar el punto: falta contexto de reunión.");
         }
 
         const agendaItemId =
@@ -1562,6 +1737,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
           source_id: agendaItemId,
           source_index: index + 1,
         };
+        if (kind === "DECISORIO") continue;
         constancias.push({
           agenda_item_id: agendaItemId,
           kind,
@@ -1598,8 +1774,26 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       ...patchQuorumDataSourceLinks(latestQD, sourceLinksFromAgendaPoints(debatesForSave)),
       debates: debatesForSave,
     };
+    const capitalPct =
+      typeof recordAt(latestQD, "rule_pack").junta === "object"
+        ? Number(recordAt(recordAt(latestQD, "rule_pack"), "junta").capital_concurrente_porcentaje ?? 100)
+        : 100;
+    const nextQd = isUniversalMeeting
+      ? patchUniversalAgendaAcceptance(
+          qd,
+          debatesForSave.map((point, index) => ({
+            numero: index + 1,
+            titulo: point.punto,
+            materia: point.materia,
+            texto_acuerdo: point.notas || null,
+            kind: resolvePointKind(point, kindIndex),
+            agreement_id: point.agreement_id ?? null,
+          })),
+          Number.isFinite(capitalPct) ? capitalPct : 100,
+        )
+      : qd;
     try {
-      await updateQuorum.mutateAsync(qd);
+      await updateQuorum.mutateAsync(nextQd);
       await saveConstancias.mutateAsync(constancias);
       toast.success("Agenda, debate y constancias guardados");
     } catch (e) {
@@ -1611,12 +1805,16 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     updateQuorum.isPending ||
     saveConstancias.isPending ||
     materializeAgendaItem.isPending;
+  const hasUniversalSpecialDocumentationMatter = isUniversalMeeting && debates.some((debate) =>
+    UNIVERSAL_SPECIAL_DOCUMENTATION_MATERIAS.has(debate.materia ?? defaultMateriaForTitle(debate.punto))
+  );
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        Revisa la agenda formal, las propuestas preparadas y los puntos que nazcan durante la sesión.
-        El origen queda guardado para explicar si el acuerdo venía preparado, de convocatoria o nació en sala.
+        {isUniversalMeeting
+          ? "Añade el orden del día aceptado por unanimidad en el acto de constitución. No se solicitan datos de convocatoria porque la Junta Universal nace directamente de la reunión."
+          : "Revisa la agenda formal, las propuestas preparadas y los puntos que nazcan durante la sesión. El origen queda guardado para explicar si el acuerdo venía preparado, de convocatoria o nació en sala."}
       </p>
 
       {agendaSourcesLoading && (
@@ -1625,6 +1823,19 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
           Cargando agenda preparada…
         </div>
       )}
+
+      {hasUniversalSpecialDocumentationMatter ? (
+        <div
+          className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <p className="text-xs text-[var(--g-text-secondary)]">
+            Esta materia normalmente exige puesta a disposición previa de documentación. En Junta Universal,
+            verifica que todos los asistentes disponen de la información necesaria antes de aceptar el orden del día.
+          </p>
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         {debates.map((d, idx) => (
@@ -1738,7 +1949,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
-                  Notas del secretario
+                {isUniversalMeeting ? "Descripción / propuesta de acuerdo" : "Notas del secretario"}
                 </label>
                 <textarea
                   value={d.notas}
@@ -1761,13 +1972,34 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
         <Plus className="h-4 w-4" />
-        Añadir punto nacido en sesión
+        {isUniversalMeeting ? "Añadir punto del orden del día" : "Añadir punto nacido en sesión"}
       </button>
+
+      {isUniversalMeeting ? (
+        <label
+          className="flex items-start gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-lg)" }}
+        >
+          <input
+            type="checkbox"
+            checked={universalAcceptanceConfirmed}
+            onChange={(event) => setUniversalAcceptanceConfirmed(event.target.checked)}
+            className="mt-1 h-4 w-4 accent-[var(--g-brand-3308)]"
+          />
+          <span>
+            {universalAcceptanceText()}
+          </span>
+        </label>
+      ) : null}
 
       <button
         type="button"
         onClick={handleSave}
-        disabled={savingDebates || debates.every((d) => !d.punto.trim())}
+        disabled={
+          savingDebates ||
+          debates.every((d) => !d.punto.trim()) ||
+          (isUniversalMeeting && !universalAcceptanceConfirmed)
+        }
         aria-busy={savingDebates}
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1784,6 +2016,91 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
 }
 
 // ── Paso 5: Votaciones ───────────────────────────────────────────────────────
+
+function patchUniversalVotingMetadata(
+  quorumData: Record<string, unknown>,
+  agendaPoints: Array<{
+    punto: string;
+    notas?: string | null;
+    materia?: string | null;
+    agreement_id?: string | null;
+  }>,
+  snapshots: MeetingAdoptionSnapshot[],
+) {
+  const meetings = recordAt(quorumData, "meetings");
+  const junta = recordAt(meetings, "junta");
+  const rulePack = recordAt(quorumData, "rule_pack");
+  const conflictCount = snapshots.reduce(
+    (sum, snapshot) => sum + snapshot.vote_summary.conflict_excluded,
+    0,
+  );
+  const pactosAplicables = snapshots.reduce(
+    (sum, snapshot) => sum + snapshot.pacto_compliance.pactos_aplicables,
+    0,
+  );
+  const pactosIncumplidos = snapshots.reduce(
+    (sum, snapshot) => sum + snapshot.pacto_compliance.pactos_incumplidos,
+    0,
+  );
+  const puntos = agendaPoints.map((point, index) => {
+    const snapshot = snapshots.find((item) => item.agenda_item_index === index + 1);
+    const mayoria =
+      snapshot?.societary_validity.explain[snapshot.societary_validity.explain.length - 1]?.mensaje ??
+      snapshot?.societary_validity.explain[0]?.mensaje ??
+      null;
+    const input: UniversalVotePointInput = {
+      numero: index + 1,
+      titulo: point.punto,
+      materia: point.materia ?? snapshot?.materia ?? null,
+      texto_acuerdo: point.notas?.trim() || snapshot?.resolution_text || null,
+      votos_favor: snapshot?.vote_summary.favor ?? null,
+      votos_contra: snapshot?.vote_summary.contra ?? null,
+      abstenciones: snapshot?.vote_summary.abstenciones ?? null,
+      votos_nulos: snapshot?.vote_summary.en_blanco ?? null,
+      mayoria_descripcion: mayoria,
+      rule_pack_ref:
+        snapshot?.rule_trace?.rule_pack_id ??
+        snapshot?.rule_trace?.ruleset_snapshot_id ??
+        null,
+      agreement_id: snapshot?.agreement_id ?? point.agreement_id ?? null,
+      proclamacion:
+        snapshot?.status_resolucion === "ADOPTED"
+          ? "APROBADO"
+          : snapshot?.status_resolucion === "REJECTED"
+            ? "RECHAZADO"
+            : null,
+    };
+    return buildUniversalAgendaPoint(input);
+  });
+
+  return {
+    ...quorumData,
+    meetings: {
+      ...meetings,
+      junta: {
+        ...junta,
+        puntos,
+      },
+    },
+    rule_pack: {
+      ...rulePack,
+      conflictos: {
+        ...recordAt(rulePack, "conflictos"),
+        estado_resumen:
+          conflictCount > 0
+            ? `${formatVoteWeight(conflictCount)} voto(s)/capital excluido(s) por conflicto en los puntos evaluados`
+            : "Sin conflictos declarados",
+      },
+      pactos: {
+        ...recordAt(rulePack, "pactos"),
+        estado_resumen:
+          pactosAplicables > 0
+            ? `${pactosAplicables} pacto(s) aplicable(s), ${pactosIncumplidos} incumplimiento(s) contractual(es)`
+            : "Sin pactos parasociales relevantes identificados",
+      },
+    },
+  };
+}
 
 const ENGINE_V2 = true;
 
@@ -2334,28 +2651,31 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         );
         return savedPoint?.adoption_snapshot ?? snapshot;
       });
-
-      await updateQuorumData.mutateAsync({
+      const agendaPointsWithAgreements = agendaPoints.map((point, index) => ({
+        punto: point.punto,
+        notas: point.notas ?? "",
+        materia: point.materia ?? defaultMateriaForTitle(point.punto),
+        tipo: normalizeMateriaClase(point.tipo),
+        origin: point.origin ?? "MEETING_FLOOR",
+        source_table: point.source_table ?? null,
+        source_id: point.source_id ?? null,
+        source_index: point.source_index ?? index + 1,
+        agreement_id: agreementIdByAgendaIndex.get(index + 1) ?? point.agreement_id ?? null,
+        group_campaign_id: point.group_campaign_id ?? null,
+        group_campaign_step: point.group_campaign_step ?? null,
+      }));
+      const baseQuorumData = {
         ...patchQuorumDataSourceLinks(
           (quorumData ?? {}) as Record<string, unknown>,
-          sourceLinksFromAgendaPoints(
-            agendaPoints.map((point, index) => ({
-              punto: point.punto,
-              notas: point.notas ?? "",
-              materia: point.materia ?? defaultMateriaForTitle(point.punto),
-              tipo: normalizeMateriaClase(point.tipo),
-              origin: point.origin ?? "MEETING_FLOOR",
-              source_table: point.source_table ?? null,
-              source_id: point.source_id ?? null,
-              source_index: point.source_index ?? index + 1,
-              agreement_id: agreementIdByAgendaIndex.get(index + 1) ?? point.agreement_id ?? null,
-              group_campaign_id: point.group_campaign_id ?? null,
-              group_campaign_step: point.group_campaign_step ?? null,
-            }))
-          )
+          sourceLinksFromAgendaPoints(agendaPointsWithAgreements)
         ),
         point_snapshots: enrichedSnapshots,
-      });
+      };
+      const nextQuorumData = isUniversalMeetingQuorumData(quorumData)
+        ? patchUniversalVotingMetadata(baseQuorumData, agendaPointsWithAgreements, enrichedSnapshots)
+        : baseQuorumData;
+
+      await updateQuorumData.mutateAsync(nextQuorumData);
       const materialized = savedPoints.filter((point) => Boolean(point.agreement_id)).length;
       setSnapshotOnlySaved(false);
       toast.success(
@@ -2984,6 +3304,10 @@ function buildActaContent(
     } | null;
   } | null;
 
+  const qd = m?.quorum_data as Record<string, unknown> | null;
+  const universalMeeting = isUniversalMeetingQuorumData(qd);
+  const juntaMeta = recordAt(recordAt(qd, "meetings"), "junta");
+  const acceptance = recordAt(qd, "aceptacion_unanime_orden_dia");
   const lines: string[] = [];
   lines.push("ACTA DE REUNIÓN");
   lines.push("================");
@@ -2999,6 +3323,19 @@ function buildActaContent(
     );
   }
   if (m?.location) lines.push(`Lugar: ${m.location}`);
+  if (universalMeeting) {
+    lines.push("Modalidad: Junta Universal sin convocatoria previa");
+    lines.push(
+      "Conforme al artículo 178 LSC, concurre la totalidad del capital social presente o representado y se acepta por unanimidad la celebración de la Junta y el orden del día."
+    );
+    if (acceptance.timestamp) {
+      lines.push(`Aceptación unánime registrada: ${acceptance.timestamp}`);
+    }
+    const cierre = stringAt(juntaMeta, "hora_cierre");
+    if (cierre) lines.push(`Hora de cierre: ${cierre}`);
+    const modo = stringAt(juntaMeta, "modo_aprobacion_acta");
+    if (modo) lines.push(`Aprobación del acta: ${modo}`);
+  }
   lines.push("");
 
   const safeAttendees = attendees ?? [];
@@ -3006,7 +3343,6 @@ function buildActaContent(
   lines.push(`ASISTENTES: ${present}/${safeAttendees.length} presentes o representados`);
   lines.push("");
 
-  const qd = m?.quorum_data as Record<string, unknown> | null;
   const quorum = qd?.quorum as
     | { present?: number; total?: number; pct?: string; reached?: boolean }
     | undefined;
@@ -3077,6 +3413,10 @@ function buildActaContent(
     lines.push("");
   }
 
+  lines.push("EVIDENCIA DEMO/OPERATIVA:");
+  lines.push("Documento generado para el prototipo TGMS; la evidencia cualificada queda sujeta al pipeline QTSP configurado.");
+  lines.push("");
+
   lines.push(
     `Generado el ${new Date().toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}`
   );
@@ -3106,7 +3446,41 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const { data: existingMinute } = useMinuteForMeeting(meetingId);
   const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(meetingId);
   const generarActa = useGenerarActa();
+  const updateQuorumData = useUpdateQuorumData(meetingId);
   const [minuteId, setMinuteId] = useState<string | null>(null);
+  const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
+  const isUniversalMeeting = isUniversalMeetingQuorumData(meetingQuorumData);
+  const meetingJuntaMeta = recordAt(recordAt(meetingQuorumData, "meetings"), "junta");
+  const cotizadaMeta = recordAt(meetingJuntaMeta, "cotizada");
+  const [salvedades, setSalvedades] = useState(stringAt(meetingJuntaMeta, "salvedades") ?? "");
+  const [modoAprobacionActa, setModoAprobacionActa] = useState(
+    stringAt(meetingJuntaMeta, "modo_aprobacion_acta") ?? "AL_FINAL_SESION",
+  );
+  const [horaCierre, setHoraCierre] = useState(stringAt(meetingJuntaMeta, "hora_cierre") ?? "");
+  const [referenciaNotarial, setReferenciaNotarial] = useState(
+    stringAt(meetingJuntaMeta, "referencia_notarial_ref") ?? "",
+  );
+  const [cotizadaRecuentoCanales, setCotizadaRecuentoCanales] = useState(
+    stringAt(cotizadaMeta, "recuento_por_canal") ?? "",
+  );
+  const [cotizadaDelegaciones, setCotizadaDelegaciones] = useState(
+    stringAt(cotizadaMeta, "delegaciones_voto_distancia") ?? "",
+  );
+  const [cotizadaIncidencias, setCotizadaIncidencias] = useState(
+    stringAt(cotizadaMeta, "incidencias_tecnicas") ?? "",
+  );
+  useEffect(() => {
+    if (!meetingQuorumData) return;
+    const nextJunta = recordAt(recordAt(meetingQuorumData, "meetings"), "junta");
+    const nextCotizada = recordAt(nextJunta, "cotizada");
+    setSalvedades(stringAt(nextJunta, "salvedades") ?? "");
+    setModoAprobacionActa(stringAt(nextJunta, "modo_aprobacion_acta") ?? "AL_FINAL_SESION");
+    setHoraCierre(stringAt(nextJunta, "hora_cierre") ?? "");
+    setReferenciaNotarial(stringAt(nextJunta, "referencia_notarial_ref") ?? "");
+    setCotizadaRecuentoCanales(stringAt(nextCotizada, "recuento_por_canal") ?? "");
+    setCotizadaDelegaciones(stringAt(nextCotizada, "delegaciones_voto_distancia") ?? "");
+    setCotizadaIncidencias(stringAt(nextCotizada, "incidencias_tecnicas") ?? "");
+  }, [meetingQuorumData]);
   const materializedAgreementCount = resolutions.filter((resolution) => resolution.agreement_id).length;
   const adoptedWithoutAgreement = resolutions.filter(
     (resolution) => resolution.status === "ADOPTED" && !resolution.agreement_id
@@ -3115,15 +3489,22 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const censoBodyId = meeting?.body_id ?? null;
   const censoSnapshotType = inferCensoSnapshotType(meeting);
   const canCreateCensoSnapshot = Boolean(censoEntityId && censoBodyId);
+  const isEntidadCotizada = Boolean(meeting?.governing_bodies?.entities?.es_cotizada);
   const actaPuntos = actaAgendaContract?.puntos ?? [];
   const actaValidationIssues = actaAgendaContract?.validation.blockingIssues ?? [];
   const actaValidationOk = actaAgendaContract?.validation.ok ?? false;
+  const universalCloseReady =
+    !isUniversalMeeting ||
+    (Boolean(horaCierre) &&
+      Boolean(modoAprobacionActa) &&
+      (modoAprobacionActa !== "POR_ACTA_NOTARIAL" || Boolean(referenciaNotarial.trim())));
   const canGenerateMinute =
     actaPuntos.length > 0 &&
     adoptedWithoutAgreement.length === 0 &&
     actaValidationOk &&
     !existingMinute?.id &&
-    canCreateCensoSnapshot;
+    canCreateCensoSnapshot &&
+    universalCloseReady;
 
   async function handleConfirmar() {
     if (!meetingId || adoptedWithoutAgreement.length > 0) {
@@ -3140,15 +3521,44 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
       toast.error("No se puede generar el acta: falta sociedad u órgano para crear el snapshot WORM de censo.");
       return;
     }
+    const baseQuorumData = (meetingQuorumData ?? {}) as Record<string, unknown>;
+    const meetings = recordAt(baseQuorumData, "meetings");
+    const junta = recordAt(meetings, "junta");
+    const qdForMinute = isUniversalMeeting
+      ? {
+          ...baseQuorumData,
+          meetings: {
+            ...meetings,
+            junta: {
+              ...junta,
+              salvedades: salvedades.trim() || null,
+              modo_aprobacion_acta: modoAprobacionActa,
+              hora_cierre: horaCierre || null,
+              referencia_notarial_ref:
+                modoAprobacionActa === "POR_ACTA_NOTARIAL" ? referenciaNotarial.trim() || null : null,
+              cotizada: isEntidadCotizada
+                ? {
+                    recuento_por_canal: cotizadaRecuentoCanales.trim() || null,
+                    delegaciones_voto_distancia: cotizadaDelegaciones.trim() || null,
+                    incidencias_tecnicas: cotizadaIncidencias.trim() || null,
+                  }
+                : null,
+            },
+          },
+        }
+      : baseQuorumData;
     const content = buildActaContent(
-      meeting,
+      meeting ? { ...meeting, quorum_data: qdForMinute } : meeting,
       attendees,
       resolutions,
       actaPuntos,
       actaAgendaContract?.canonicalMinutesHash,
     );
-    generarActa.mutate(
-      {
+    try {
+      if (isUniversalMeeting) {
+        await updateQuorumData.mutateAsync(qdForMinute);
+      }
+      const id = await generarActa.mutateAsync({
         meetingId,
         content,
         canonicalMinutesHash: actaAgendaContract?.canonicalMinutesHash,
@@ -3156,16 +3566,12 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         bodyId: censoBodyId,
         sessionKind: "MEETING",
         snapshotType: censoSnapshotType,
-      },
-      {
-        onSuccess: (id) => {
-          setMinuteId(id);
-          toast.success("Acta generada en borrador");
-        },
-        onError: (e) =>
-          toast.error(e instanceof Error ? e.message : "Error al generar el acta"),
-      }
-    );
+      });
+      setMinuteId(id);
+      toast.success("Acta generada en borrador");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al generar el acta");
+    }
   }
 
   if (minuteId) {
@@ -3205,6 +3611,130 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         Revisa las resoluciones y sus expedientes Acuerdo 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
         acta en borrador mediante el proceso interno de Secretaría.
       </p>
+
+      {isUniversalMeeting ? (
+        <div
+          className="space-y-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div>
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Cierre de Junta Universal
+            </p>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Estos campos completan `meetings.junta.*` antes de renderizar el acta. La convocatoria permanece nula.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Hora de cierre
+              </label>
+              <input
+                type="time"
+                value={horaCierre}
+                onChange={(event) => setHoraCierre(event.target.value)}
+                aria-invalid={!horaCierre}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Modo de aprobación del acta
+              </label>
+              <select
+                value={modoAprobacionActa}
+                onChange={(event) => setModoAprobacionActa(event.target.value)}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="AL_FINAL_SESION">Al final de la sesión</option>
+                <option value="EN_PLAZO_15_DIAS">En plazo de 15 días</option>
+                <option value="POR_ACTA_NOTARIAL">Por acta notarial</option>
+              </select>
+            </div>
+          </div>
+          {modoAprobacionActa === "POR_ACTA_NOTARIAL" ? (
+            <div
+              className="space-y-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <label className="block text-xs font-medium text-[var(--g-text-secondary)]">
+                Referencia notarial
+              </label>
+              <input
+                type="text"
+                value={referenciaNotarial}
+                onChange={(event) => setReferenciaNotarial(event.target.value)}
+                aria-invalid={!referenciaNotarial.trim()}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                placeholder="Protocolo / notario / referencia de requerimiento"
+              />
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                La plantilla operativa no sustituye el acta notarial exigida cuando se active este modo.
+              </p>
+            </div>
+          ) : null}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+              Salvedades
+            </label>
+            <textarea
+              value={salvedades}
+              onChange={(event) => setSalvedades(event.target.value)}
+              rows={3}
+              className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              placeholder="Salvedades o incidencias de cierre, si existen"
+            />
+          </div>
+          {isEntidadCotizada ? (
+            <div
+              className="grid gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 md:grid-cols-3"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                  Recuento por canal
+                </label>
+                <input
+                  type="text"
+                  value={cotizadaRecuentoCanales}
+                  onChange={(event) => setCotizadaRecuentoCanales(event.target.value)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                  Delegaciones / voto a distancia
+                </label>
+                <input
+                  type="text"
+                  value={cotizadaDelegaciones}
+                  onChange={(event) => setCotizadaDelegaciones(event.target.value)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                  Incidencias técnicas
+                </label>
+                <input
+                  type="text"
+                  value={cotizadaIncidencias}
+                  onChange={(event) => setCotizadaIncidencias(event.target.value)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {existingMinute?.id ? (
         <div
@@ -3345,11 +3875,13 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
       <button
         type="button"
         onClick={handleConfirmar}
-        disabled={generarActa.isPending || !canGenerateMinute}
-        aria-busy={generarActa.isPending}
+        disabled={generarActa.isPending || updateQuorumData.isPending || !canGenerateMinute}
+        aria-busy={generarActa.isPending || updateQuorumData.isPending}
         title={
           existingMinute?.id
             ? "La reunión ya tiene un acta operativa vinculada"
+            : isUniversalMeeting && !universalCloseReady
+              ? "Completa hora de cierre, modo de aprobación y referencia notarial cuando aplique"
             : !canCreateCensoSnapshot
               ? "Falta sociedad u órgano para crear el snapshot WORM de censo"
             : actaPuntos.length === 0
@@ -3363,7 +3895,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
-        {generarActa.isPending ? (
+        {generarActa.isPending || updateQuorumData.isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
             Generando acta…
@@ -3386,7 +3918,7 @@ function buildSteps(meetingId?: string): StepDef[] {
     {
       n: 1,
       label: "Constitución",
-      hint: "Verificación de convocatoria previa y declaración de apertura de la sesión",
+      hint: "Verificación del contexto de constitución y declaración de apertura de la sesión",
       body: <ConstitutionStep meetingId={meetingId} />,
     },
     {
@@ -3422,6 +3954,320 @@ function buildSteps(meetingId?: string): StepDef[] {
   ];
 }
 
+const UNIVERSAL_MODALITY_OPTIONS: Array<{ value: UniversalMeetingModality; label: string }> = [
+  { value: "PRESENCIAL", label: "Presencial" },
+  { value: "TELEMATICA", label: "Telemática" },
+  { value: "MIXTA", label: "Mixta" },
+];
+
+function UniversalMeetingIntake() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scope = useSecretariaScope();
+  const isSociedadScoped = searchParams.get("scope") === "sociedad";
+  const scopedEntityId = isSociedadScoped ? searchParams.get("entity") : null;
+  const { data: entities = [], isLoading: entitiesLoading } = useEntitiesList({ sociedadesOnly: true });
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
+    scopedEntityId ?? scope.selectedEntity?.id ?? null,
+  );
+  const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
+  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const juntaBody = bodies.find((body) => resolveOrganoTipo(body) === "JUNTA_GENERAL") ?? null;
+  const normativeProfile = useEntityNormativeProfile(selectedEntityId);
+  const createUniversalMeeting = useCreateUniversalMeeting();
+  const [fecha, setFecha] = useState("");
+  const [horaInicio, setHoraInicio] = useState("10:00");
+  const [lugar, setLugar] = useState("");
+  const [modalidad, setModalidad] = useState<UniversalMeetingModality>("PRESENCIAL");
+  const domicilioSocial = entityDomicilioSocial(selectedEntity);
+
+  useEffect(() => {
+    if (!scopedEntityId) return;
+    setSelectedEntityId(scopedEntityId);
+  }, [scopedEntityId]);
+
+  useEffect(() => {
+    if (!domicilioSocial || lugar.trim()) return;
+    setLugar(domicilioSocial);
+  }, [domicilioSocial, lugar]);
+
+  const normativeSnapshot: AgreementNormativeSnapshot | null = useMemo(() => {
+    if (!selectedEntityId || !normativeProfile.data) return null;
+    return buildAgreementNormativeSnapshot({
+      agreement: {
+        id: `junta-universal:${selectedEntityId}:${fecha || "draft"}:${horaInicio || "draft"}`,
+        entity_id: selectedEntityId,
+        agreement_kind: "ACTA_SESION",
+        matter_class: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        status: "BORRADOR",
+        inscribable: false,
+      },
+      profile: normativeProfile.data,
+    });
+  }, [fecha, horaInicio, normativeProfile.data, selectedEntityId]);
+
+  const normativeReady =
+    Boolean(normativeProfile.data) &&
+    normativeProfile.data?.status !== "INCOMPLETO" &&
+    (normativeProfile.data?.blockers ?? []).length === 0;
+  const canSubmit =
+    Boolean(selectedEntityId) &&
+    Boolean(juntaBody?.id) &&
+    Boolean(fecha) &&
+    Boolean(horaInicio) &&
+    Boolean(lugar.trim()) &&
+    Boolean(modalidad) &&
+    normativeReady;
+
+  async function handleSubmit() {
+    if (!selectedEntityId || !selectedEntity || !juntaBody) {
+      toast.error("Selecciona una sociedad con Junta General operativa.");
+      return;
+    }
+    if (!normativeReady) {
+      toast.error("La sociedad no tiene perfil normativo proyectable para congelar el snapshot.");
+      return;
+    }
+    try {
+      const result = await createUniversalMeeting.mutateAsync({
+        entityId: selectedEntityId,
+        entityName: selectedEntity.legal_name ?? selectedEntity.common_name,
+        bodyId: juntaBody.id,
+        bodyName: juntaBody.name,
+        fecha,
+        horaInicio,
+        lugar,
+        modalidad,
+        normativeSnapshot: normativeSnapshot as unknown as Record<string, unknown> | null,
+      });
+      toast.success(result.reused ? "Junta Universal existente reutilizada" : "Junta Universal creada");
+      navigate(`/secretaria/reuniones/${result.id}?scope=sociedad&entity=${encodeURIComponent(selectedEntityId)}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al crear Junta Universal");
+    }
+  }
+
+  return (
+    <main
+      className="min-h-screen bg-[var(--g-surface-page)] p-6 text-[var(--g-text-primary)]"
+      style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}
+    >
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
+            Secretaría · Junta Universal
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
+            Iniciar reunión sin convocatoria
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
+            Crea directamente el objeto reunión con `meetings.junta.es_universal = "SÍ"`.
+            El flujo omitirá canal, publicación y segunda convocatoria, y continuará con asistentes,
+            quórum del 100%, orden del día aceptado por unanimidad, votaciones y acta.
+          </p>
+        </div>
+
+        <section
+          className="space-y-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+              Paso 1
+            </p>
+            <h2 className="mt-1 text-sm font-semibold text-[var(--g-text-primary)]">
+              Sociedad y órgano
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Sociedad
+              </label>
+              {isSociedadScoped ? (
+                <div
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {selectedEntity?.legal_name ?? scope.selectedEntity?.legalName ?? "Sociedad seleccionada"}
+                </div>
+              ) : (
+                <select
+                  value={selectedEntityId ?? ""}
+                  onChange={(event) => setSelectedEntityId(event.target.value || null)}
+                  disabled={entitiesLoading}
+                  aria-invalid={!selectedEntityId}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-60"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <option value="">Seleccionar sociedad</option>
+                  {entities.map((entity) => (
+                    <option key={entity.id} value={entity.id}>
+                      {entity.legal_name || entity.common_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Órgano
+              </label>
+              <div
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {bodiesLoading ? "Resolviendo Junta General..." : juntaBody?.name ?? "Junta General no encontrada"}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`border-l-4 p-3 ${
+              normativeReady
+                ? "border-[var(--status-success)] bg-[var(--g-sec-100)]"
+                : "border-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+            }`}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <p className="text-xs font-semibold text-[var(--g-text-primary)]">
+              Perfil normativo
+            </p>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              {normativeProfile.isLoading
+                ? "Cargando marco normativo de Acuerdo 360..."
+                : normativeReady
+                  ? `Perfil proyectable: ${normativeProfile.data?.status} · snapshot ${normativeSnapshot?.snapshot_id ?? "pendiente"}`
+                  : "La sociedad debe tener un perfil normativo proyectable antes de crear una Junta Universal."}
+            </p>
+          </div>
+        </section>
+
+        <section
+          className="space-y-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+              Paso 2
+            </p>
+            <h2 className="mt-1 text-sm font-semibold text-[var(--g-text-primary)]">
+              Datos básicos de la reunión
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Fecha de la reunión
+              </label>
+              <input
+                type="date"
+                value={fecha}
+                onChange={(event) => setFecha(event.target.value)}
+                aria-invalid={!fecha}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Hora de inicio
+              </label>
+              <input
+                type="time"
+                value={horaInicio}
+                onChange={(event) => setHoraInicio(event.target.value)}
+                aria-invalid={!horaInicio}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Modalidad
+              </label>
+              <select
+                value={modalidad}
+                onChange={(event) => setModalidad(event.target.value as UniversalMeetingModality)}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {UNIVERSAL_MODALITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                Flag universal
+              </label>
+              <div
+                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                meetings.junta.es_universal = SÍ
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+              Lugar
+            </label>
+            <input
+              type="text"
+              value={lugar}
+              onChange={(event) => setLugar(event.target.value)}
+              aria-invalid={!lugar.trim()}
+              className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              placeholder='Dirección física, "telemática" o "mixta"'
+            />
+          </div>
+
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            No se crearán `agreements.convocatoria.*`, `meetings.junta.canal_convocatoria`,
+            `meetings.junta.publicacion_ref` ni segunda convocatoria.
+          </div>
+        </section>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            to={scope.createScopedTo("/secretaria/reuniones/nueva")}
+            className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Volver al intake
+          </Link>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit || createUniversalMeeting.isPending}
+            aria-busy={createUniversalMeeting.isPending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-5 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {createUniversalMeeting.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            Crear Junta Universal y continuar
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function ReunionIntake() {
   const [searchParams] = useSearchParams();
   const source = searchParams.get("source");
@@ -3435,6 +4281,9 @@ function ReunionIntake() {
   const scopedNuevaConvocatoriaPath = scopedEntityId
     ? `/secretaria/convocatorias/nueva?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/convocatorias/nueva";
+  const scopedJuntaUniversalPath = scopedEntityId
+    ? `/secretaria/reuniones/nueva?flow=junta-universal&scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+    : "/secretaria/reuniones/nueva?flow=junta-universal";
   const isCrossModule = source === "grc" || source === "aims";
   const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
 
@@ -3452,9 +4301,9 @@ function ReunionIntake() {
             Preparar una sesión societaria
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Las reuniones duraderas se crean desde una convocatoria emitida para conservar órgano, sociedad, fecha y
-            trazabilidad legal. Esta entrada recoge el contexto y enruta al flujo propietario sin crear actos ni estados
-            cross-module.
+            Las reuniones ordinarias se crean desde convocatoria emitida para conservar órgano, sociedad, fecha y
+            trazabilidad legal. La Junta Universal se inicia directamente como reunión cuando concurre el 100% del
+            capital social y se acepta por unanimidad el orden del día.
           </p>
         </div>
 
@@ -3486,7 +4335,7 @@ function ReunionIntake() {
         ) : null}
 
         <section
-          className="grid gap-4 md:grid-cols-2"
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
           aria-label="Opciones para crear una reunión"
         >
           <Link
@@ -3513,6 +4362,19 @@ function ReunionIntake() {
               Selecciona una convocatoria emitida para entrar en la sesión asociada sin perder el contexto societario.
             </p>
           </Link>
+
+          <Link
+            to={scopedJuntaUniversalPath}
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)] md:col-span-2 lg:col-span-1"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <Zap className="h-5 w-5 text-[var(--g-brand-3308)]" />
+            <h2 className="mt-3 text-sm font-semibold text-[var(--g-text-primary)]">Junta Universal</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
+              Inicia directamente la reunión sin convocatoria previa. Requiere presencia o representación del 100%
+              del capital social y aceptación unánime del orden del día (art. 178 LSC).
+            </p>
+          </Link>
         </section>
       </div>
     </main>
@@ -3522,11 +4384,13 @@ function ReunionIntake() {
 export default function ReunionStepper() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const flow = searchParams.get("flow");
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const backTo = scopedEntityId
     ? `/secretaria/reuniones?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/reuniones";
+  if (!id && flow === "junta-universal") return <UniversalMeetingIntake />;
   if (!id) return <ReunionIntake />;
 
   return (

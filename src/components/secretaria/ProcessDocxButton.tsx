@@ -327,7 +327,9 @@ export function ProcessDocxButton({
       }
 
       toast.success("Documento Word generado", {
-        description: result.usedFallback
+        description: result.usedReviewedBody
+          ? `Generado desde texto revisado · ${result.templateTipo} v${result.templateVersion} · hash ${result.contentHash.slice(0, 12)}`
+          : result.usedFallback
           ? "Generado con plantilla tecnica del sistema."
           : `${result.templateTipo} v${result.templateVersion} · hash ${result.contentHash.slice(0, 12)}`,
       });
