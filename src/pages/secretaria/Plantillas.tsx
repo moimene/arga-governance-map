@@ -605,20 +605,24 @@ export default function Plantillas() {
 
                 {/* Capa 1 Inmutable */}
                 {selected.capa1_inmutable && (
-                  <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+                  <details open className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
                     <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
-                      Contenido base protegido
+                      Texto literal protegido · Capa 1 completa
                     </summary>
-                    <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                      Detalle técnico · Capa 1
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+                      <span className="font-medium text-[var(--g-text-primary)]">Contenido canónico inmutable</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{selected.capa1_inmutable.length.toLocaleString("es-ES")} caracteres</span>
                     </div>
                     <pre
-                      className="mt-2 max-h-[120px] overflow-y-auto bg-[var(--g-surface-subtle)] p-2 font-mono text-[11px] text-[var(--g-text-secondary)]"
+                      className="mt-2 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words bg-[var(--g-surface-subtle)] p-3 font-mono text-[11px] leading-relaxed text-[var(--g-text-primary)]"
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {selected.capa1_inmutable.substring(0, 300)}
-                      {selected.capa1_inmutable.length > 300 ? "…" : ""}
+                      {selected.capa1_inmutable}
                     </pre>
+                    <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
+                      Este es el texto base que usa el motor de documentos; las variables se resuelven en Capa 2 y los campos editables se capturan en Capa 3.
+                    </p>
                   </details>
                 )}
 
