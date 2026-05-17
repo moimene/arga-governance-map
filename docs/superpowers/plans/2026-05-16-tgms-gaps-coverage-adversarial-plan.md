@@ -312,7 +312,7 @@ Y E2E que descargue un evidence_bundle desde UI con usuario auth normal pasa.
   - Descarga inmediata desde UI → 900s.
   - Compartir enlace con tercero (cliente, auditor) → TTL del lado del flujo de compartir, no del archiver.
   - Long-lived (auditoría a 7 años) → no se firma; se re-firma al abrir.
-  
+
   → arquitectura: **never store signed URLs in DB**. Almacenar `storage_path` + RBAC en la tabla; UI/Edge Function firma en demand.
 - **V−**: "Bucket privado más signed URL doesn't equal access control. Si dos tenants escriben a `matter-documents/`, ambos pueden firmar paths del otro."
 - **V+**: razón. **Storage policy** sobre el bucket necesita filtrar por tenant_id en el path:

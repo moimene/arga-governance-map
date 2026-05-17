@@ -1,12 +1,12 @@
 # Secretaría 360 P2 — Inventario de restauración y plan de merge
 
-**Fecha:** 2026-05-17  
-**Prioridad:** Básica / crítica para crecimiento del sistema  
-**Worktree operativo:** `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map`  
-**Rama observada:** `codex/secretaria-d6-e2e-debt`  
-**Base remota:** `main` y `origin/main` en `7876ba3`  
-**HEAD local observado:** `99b0522 fix(secretaria): route rules entry to materia catalog`  
-**PR relacionado:** `#36` (`codex/secretaria-d6-e2e-debt` → `main`)  
+**Fecha:** 2026-05-17
+**Prioridad:** Básica / crítica para crecimiento del sistema
+**Worktree operativo:** `/Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map`
+**Rama observada:** `codex/secretaria-d6-e2e-debt`
+**Base remota:** `main` y `origin/main` en `7876ba3`
+**HEAD local observado:** `99b0522 fix(secretaria): route rules entry to materia catalog`
+**PR relacionado:** `#36` (`codex/secretaria-d6-e2e-debt` → `main`)
 
 ---
 
