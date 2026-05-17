@@ -15,8 +15,8 @@
 ### 2.1 `meetings.*`
 
 - `meetings.junta.*`: juntas generales, incluidas juntas universales.
-- `meetings.consejo.*`: consejo de administración.
-- `meetings.comision.*`: comisiones delegadas.
+- `meetings.consejo.*`: consejo de administración, incluidas sesiones universales del consejo.
+- `meetings.comision.*`: comisiones delegadas, incluidas sesiones universales de comisión/comité.
 
 ### 2.2 `entities.*`
 
@@ -24,7 +24,7 @@ Datos de sociedad: `entities.name`, `entities.es_cotizada`, `entities.datos_regi
 
 ### 2.3 `agreements.*`
 
-Expedientes Acuerdo 360 y referencias a convocatoria cuando exista. En Junta Universal: `agreements.convocatoria = null`.
+Expedientes Acuerdo 360 y referencias a convocatoria cuando exista. En reuniones universales sin convocatoria: `agreements.convocatoria = null`.
 
 ### 2.4 `governing_bodies.*`
 
@@ -79,30 +79,38 @@ Procedimiento de cambio: PR con label `breaking-naming`, actualización simultá
 
 ## 4. Mapa maestro de campos por módulo
 
-### 4.1 Flujo Junta Universal
+### 4.1 Flujo Reunión Universal
+
+El namespace concreto depende del órgano:
+
+- Junta General: `meetings.junta.*`, `rule_pack.junta.*`, `junta_universal = true`.
+- Consejo de Administración: `meetings.consejo.*`, `rule_pack.consejo.*`, `organo_universal = true`.
+- Comisión o comité: `meetings.comision.*`, `rule_pack.comision.*`, `organo_universal = true`.
+
+La Junta General conserva la denominación legal de Junta Universal. El resto se modela como sesión universal del órgano social sin convocatoria previa.
 
 | Namespace | Campo | Tipo | Paso | Origen |
 |---|---|---|---:|---|
-| `meetings.junta` | `fecha` | date | 2 | input usuario |
-| `meetings.junta` | `hora_inicio` | time | 2 | input usuario |
-| `meetings.junta` | `hora_cierre` | time | 7 | input usuario |
-| `meetings.junta` | `lugar` | text | 2 | input usuario |
-| `meetings.junta` | `modalidad` | select | 2 | input usuario |
-| `meetings.junta` | `es_universal` | boolean/string | 2 | auto `"SÍ"` |
-| `meetings.junta` | `orden_del_dia_resumen` | text | 4 | auto |
-| `meetings.junta` | `salvedades` | textarea | 7 | input usuario |
-| `meetings.junta` | `modo_aprobacion_acta` | select | 7 | input usuario |
-| `meetings.junta` | `puntos[]` | array | 4-6 | input/motor |
-| `rule_pack.junta` | `capital_concurrente_porcentaje` | number | 3 | calculado |
-| `rule_pack.junta` | `capital_concurrente_importe` | currency/number | 3 | calculado |
-| `rule_pack.junta` | `calculo_capital_ref` | ref | 3 | auto |
+| `meetings.{junta|consejo|comision}` | `fecha` | date | 2 | input usuario |
+| `meetings.{junta|consejo|comision}` | `hora_inicio` | time | 2 | input usuario |
+| `meetings.{junta|consejo|comision}` | `hora_cierre` | time | 7 | input usuario |
+| `meetings.{junta|consejo|comision}` | `lugar` | text | 2 | input usuario |
+| `meetings.{junta|consejo|comision}` | `modalidad` | select | 2 | input usuario |
+| `meetings.{junta|consejo|comision}` | `es_universal` | boolean/string | 2 | auto `"SÍ"` |
+| `meetings.{junta|consejo|comision}` | `orden_del_dia_resumen` | text | 4 | auto |
+| `meetings.{junta|consejo|comision}` | `salvedades` | textarea | 7 | input usuario |
+| `meetings.{junta|consejo|comision}` | `modo_aprobacion_acta` | select | 7 | input usuario |
+| `meetings.{junta|consejo|comision}` | `puntos[]` | array | 4-6 | input/motor |
+| `rule_pack.{junta|consejo|comision}` | `capital_concurrente_porcentaje` | number | 3 | calculado |
+| `rule_pack.{junta|consejo|comision}` | `capital_concurrente_importe` | currency/number | 3 | calculado |
+| `rule_pack.{junta|consejo|comision}` | `calculo_capital_ref` | ref | 3 | auto |
 | `rule_pack.conflictos` | `estado_resumen` | text | 5 | motor |
 | `rule_pack.pactos` | `estado_resumen` | text | 5 | motor |
 | `QTSP` | `firma_secretario_ref` | ref | 7 | firma digital |
 | `QTSP` | `firma_presidente_ref` | ref | 7 | firma digital |
 | `QTSP` | `sello_tiempo_ref` | ref | 7 | sellado |
 
-Campos de convocatoria omitidos en Junta Universal: `meetings.junta.canal_convocatoria`, `meetings.junta.fecha_convocatoria`, `meetings.junta.publicacion_ref`, `meetings.junta.convocatoria_ordinal`, `meetings.junta.fecha_segunda_convocatoria`, `meetings.junta.hora_segunda_convocatoria`, `agreements.convocatoria.*`.
+Campos de convocatoria omitidos en reunión universal: `canal_convocatoria`, `fecha_convocatoria`, `publicacion_ref`, `convocatoria_ordinal`, `fecha_segunda_convocatoria`, `hora_segunda_convocatoria`, `agreements.convocatoria.*` en el namespace del órgano.
 
 ### 4.2 Flujo Junta con Convocatoria
 

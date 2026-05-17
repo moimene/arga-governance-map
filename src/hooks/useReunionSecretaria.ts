@@ -473,10 +473,10 @@ export function useCreateUniversalMeeting() {
     mutationFn: async (input: CreateUniversalMeetingInput): Promise<{ id: string; reused: boolean }> => {
       if (!tenantId) throw new Error("Tenant no disponible");
       if (!input.entityId || !input.bodyId) {
-        throw new Error("Selecciona sociedad y Junta General antes de crear la reunión.");
+        throw new Error("Selecciona sociedad y órgano social antes de crear la reunión universal.");
       }
       if (!input.fecha || !input.horaInicio || !input.lugar.trim() || !input.modalidad) {
-        throw new Error("Fecha, hora, lugar y modalidad son obligatorios para la Junta Universal.");
+        throw new Error("Fecha, hora, lugar y modalidad son obligatorios para la reunión universal.");
       }
 
       const hydrated: UniversalMeetingBasicInput = { ...input, tenantId };

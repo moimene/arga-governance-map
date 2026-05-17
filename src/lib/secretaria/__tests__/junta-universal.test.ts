@@ -6,6 +6,8 @@ import {
   patchUniversalAgendaAcceptance,
   patchUniversalCapitalSummary,
   UNIVERSAL_MEETING_INITIAL_STATUS,
+  universalMeetingLabel,
+  universalMeetingNamespace,
 } from "../junta-universal";
 
 const baseInput = {
@@ -39,6 +41,31 @@ describe("junta-universal helpers", () => {
     expect(quorumData.meetings.junta.canal_convocatoria).toBeNull();
     expect(quorumData.meetings.junta.publicacion_ref).toBeNull();
     expect(quorumData.normative_snapshot_id).toBe("snap-arga-2026");
+  });
+
+  it("supports universal sessions for non-junta governing bodies", () => {
+    const quorumData = buildUniversalMeetingQuorumData({
+      ...baseInput,
+      bodyId: "consejo-admin",
+      bodyName: "Consejo de Administración",
+      organoTipo: "CONSEJO",
+    });
+    const withAgenda = patchUniversalAgendaAcceptance(
+      quorumData,
+      [{ numero: 1, titulo: "Formulación de cuentas", materia: "FORMULACION_CUENTAS" }],
+      100,
+      "2026-06-15T10:05:00.000Z",
+    );
+
+    expect(universalMeetingNamespace("CONSEJO")).toBe("consejo");
+    expect(universalMeetingLabel("CONSEJO")).toBe("Sesión universal");
+    expect(isUniversalMeetingQuorumData(quorumData)).toBe(true);
+    expect(quorumData.junta_universal).toBe(false);
+    expect(quorumData.organo_universal).toBe(true);
+    expect(quorumData.meetings.consejo.es_universal).toBe("SÍ");
+    expect(quorumData.meetings.junta).toBeUndefined();
+    expect(withAgenda.meetings.consejo.orden_del_dia_resumen).toBe("1. Formulación de cuentas");
+    expect(withAgenda.aceptacion_unanime_orden_dia.texto_legal).toContain("órgano social");
   });
 
   it("patches capital summary and unanimous agenda acceptance using protected namespaces", () => {

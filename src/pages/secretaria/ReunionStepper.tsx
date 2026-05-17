@@ -96,6 +96,9 @@ import {
   patchUniversalAgendaAcceptance,
   patchUniversalCapitalSummary,
   universalAcceptanceText,
+  universalMeetingLabel,
+  universalMeetingNamespace,
+  universalMeetingRequirementLabel,
   type UniversalMeetingModality,
   type UniversalVotePointInput,
 } from "@/lib/secretaria/junta-universal";
@@ -926,9 +929,9 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         via_representante: attendanceType === "REPRESENTADO",
       };
     });
-    if (isUniversalMeeting && universalCapitalPct < 99.999) {
+    if (isUniversalMeeting && !universalConcurrenceOk) {
       toast.error(
-        `La junta universal requiere la presencia o representación de la totalidad del capital social (art. 178 LSC). Capital concurrente actual: ${formatPercent(universalCapitalPct)}%.`
+        `${universalMeetingLabel(organoTipo)} requiere ${universalMeetingRequirementLabel(organoTipo)}. Concurrencia actual: ${formatPercent(universalConcurrencePct)}%.`
       );
       return;
     }
@@ -949,7 +952,9 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
       : Number(entry?.capital_representado ?? 0);
     return Number.isFinite(raw) ? sum + raw : sum;
   }, 0);
-  const universalCapitalOk = universalCapitalPct >= 99.999;
+  const universalMembersPct = members.length > 0 ? (presentes / members.length) * 100 : 0;
+  const universalConcurrencePct = organoTipo === "JUNTA_GENERAL" ? universalCapitalPct : universalMembersPct;
+  const universalConcurrenceOk = universalConcurrencePct >= 99.999;
 
   if (meetingLoading || (!isJuntaCensus && Boolean(bodyId) && membersLoading) || (isJuntaCensus && holdingsLoading)) {
     return (
@@ -1143,37 +1148,37 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         >
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Capital concurrente exigido por art. 178 LSC
+              {universalMeetingRequirementLabel(organoTipo)}
             </p>
             <span
               className={`text-sm font-semibold ${
-                universalCapitalOk ? "text-[var(--status-success)]" : "text-[var(--status-error)]"
+                universalConcurrenceOk ? "text-[var(--status-success)]" : "text-[var(--status-error)]"
               }`}
             >
-              {formatPercent(universalCapitalPct)}%
+              {formatPercent(universalConcurrencePct)}%
             </span>
           </div>
           <div
             className="h-2 overflow-hidden bg-[var(--g-surface-muted)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
-            aria-label={`Capital concurrente ${formatPercent(universalCapitalPct)}%`}
+            aria-label={`Concurrencia universal ${formatPercent(universalConcurrencePct)}%`}
           >
             <div
-              className={universalCapitalOk ? "h-full bg-[var(--status-success)]" : "h-full bg-[var(--status-error)]"}
+              className={universalConcurrenceOk ? "h-full bg-[var(--status-success)]" : "h-full bg-[var(--status-error)]"}
               style={{
-                width: `${Math.min(Math.max(universalCapitalPct, 0), 100)}%`,
+                width: `${Math.min(Math.max(universalConcurrencePct, 0), 100)}%`,
                 borderRadius: "var(--g-radius-full)",
               }}
             />
           </div>
-          {!universalCapitalOk ? (
+          {!universalConcurrenceOk ? (
             <p className="text-xs font-medium text-[var(--status-error)]" role="alert">
-              La junta universal requiere la presencia o representación de la totalidad del capital social
-              (art. 178 LSC). Capital concurrente actual: {formatPercent(universalCapitalPct)}%.
+              {universalMeetingLabel(organoTipo)} requiere {universalMeetingRequirementLabel(organoTipo)}.
+              Concurrencia actual: {formatPercent(universalConcurrencePct)}%.
             </p>
           ) : (
             <p className="text-xs text-[var(--g-text-secondary)]">
-              La lista queda preparada como Anexo A del acta con el 100% del capital social concurrente.
+              La lista queda preparada como Anexo A del acta con concurrencia universal completa.
             </p>
           )}
         </div>
@@ -1182,7 +1187,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
       <button
         type="button"
         onClick={handleSave}
-        disabled={replaceAttendees.isPending || (isUniversalMeeting && !universalCapitalOk)}
+        disabled={replaceAttendees.isPending || (isUniversalMeeting && !universalConcurrenceOk)}
         aria-busy={replaceAttendees.isPending}
         className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
         style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1355,8 +1360,14 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     packs,
     overrides
   );
-  const pct = isUniversalMeeting ? capitalPresente : constitutionResult.quorumPresente * 100;
-  const quorumReached = isUniversalMeeting ? capitalPresente >= 99.999 : constitutionResult.quorumCubierto;
+  const universalPct =
+    organoTipo === "JUNTA_GENERAL"
+      ? (hasCapitalData ? attendeeCapital : 0)
+      : total > 0
+        ? (presentes / total) * 100
+        : 0;
+  const pct = isUniversalMeeting ? universalPct : constitutionResult.quorumPresente * 100;
+  const quorumReached = isUniversalMeeting ? pct >= 99.999 : constitutionResult.quorumCubierto;
 
   const savedQuorum = existingQuorum?.quorum as
     | {
@@ -1373,7 +1384,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   function handleConfirm() {
     if (isUniversalMeeting && !quorumReached) {
       toast.error(
-        `La junta universal requiere la presencia o representación de la totalidad del capital social (art. 178 LSC). Capital concurrente actual: ${formatPercent(pct)}%.`
+        `${universalMeetingLabel(organoTipo)} requiere ${universalMeetingRequirementLabel(organoTipo)}. Concurrencia actual: ${formatPercent(pct)}%.`
       );
       return;
     }
@@ -1397,13 +1408,14 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         warnings: constitutionResult.warnings,
         blocking_issues: constitutionResult.blocking_issues,
         evaluated_at: new Date().toISOString(),
+        universal_requirement: isUniversalMeeting ? universalMeetingRequirementLabel(organoTipo) : null,
       },
     };
     const quorumData = isUniversalMeeting
       ? patchUniversalCapitalSummary(baseQuorumData, {
           capitalConcurrentePorcentaje: Number(pct.toFixed(2)),
           capitalConcurrenteImporte: attendeeCapitalImporte || null,
-          calculoCapitalRef: `capital_holdings:${meetingId}:art178:${new Date().toISOString()}`,
+          calculoCapitalRef: `${organoTipo === "JUNTA_GENERAL" ? "capital_holdings" : "body_members"}:${meetingId}:universal:${new Date().toISOString()}`,
         })
       : baseQuorumData;
     updateQuorum.mutate(quorumData, {
@@ -1416,7 +1428,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
         {isUniversalMeeting
-          ? "La Junta Universal exige el 100% del capital social presente o representado y aceptación unánime del orden del día. El sistema bloquea el avance si falta cualquier participación."
+          ? `${universalMeetingLabel(organoTipo)} exige ${universalMeetingRequirementLabel(organoTipo)} y aceptación unánime del orden del día. El sistema bloquea el avance si falta cualquier participación.`
           : "El quórum se calcula con el motor de constitución según órgano, tipo social y materias debatidas. En juntas se usa capital/derechos de voto cuando existe dato disponible; en consejo se usa mayoría de miembros."}
       </p>
 
@@ -1453,8 +1465,8 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
           <p className="text-xs font-medium text-[var(--status-error)]">
-            La junta universal requiere la presencia o representación de la totalidad del capital social
-            (art. 178 LSC). Capital concurrente actual: {formatPercent(pct)}%.
+            {universalMeetingLabel(organoTipo)} requiere {universalMeetingRequirementLabel(organoTipo)}.
+            Concurrencia actual: {formatPercent(pct)}%.
           </p>
         </div>
       ) : null}
@@ -1631,6 +1643,13 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     () => (existingQD?.debates ?? []) as DebatePunto[],
     [existingQD?.debates],
   );
+  const meetingRaw = meeting as
+    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | null
+    | undefined;
+  const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
+  const universalLabel = universalMeetingLabel(organoTipo);
+  const universalNamespace = universalMeetingNamespace(organoTipo);
   const isUniversalMeeting = isUniversalMeetingQuorumData(existingQD);
   const existingAcceptance = recordAt(existingQD, "aceptacion_unanime_orden_dia");
 
@@ -1702,11 +1721,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     const constancias: AgendaItemConstanciaInput[] = [];
 
     if (isUniversalMeeting && debatesForSave.length === 0) {
-      toast.error("Añade al menos un punto del orden del día para la Junta Universal.");
+      toast.error(`Añade al menos un punto del orden del día para la ${universalLabel}.`);
       return;
     }
     if (isUniversalMeeting && !universalAcceptanceConfirmed) {
-      toast.error("Confirma la aceptación unánime de la celebración y del orden del día (art. 178 LSC).");
+      toast.error("Confirma la aceptación unánime de la celebración y del orden del día.");
       return;
     }
 
@@ -1774,9 +1793,10 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
       ...patchQuorumDataSourceLinks(latestQD, sourceLinksFromAgendaPoints(debatesForSave)),
       debates: debatesForSave,
     };
+    const universalRulePack = recordAt(recordAt(latestQD, "rule_pack"), universalNamespace);
     const capitalPct =
-      typeof recordAt(latestQD, "rule_pack").junta === "object"
-        ? Number(recordAt(recordAt(latestQD, "rule_pack"), "junta").capital_concurrente_porcentaje ?? 100)
+      typeof universalRulePack === "object"
+        ? Number(universalRulePack.capital_concurrente_porcentaje ?? 100)
         : 100;
     const nextQd = isUniversalMeeting
       ? patchUniversalAgendaAcceptance(
@@ -1813,7 +1833,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
         {isUniversalMeeting
-          ? "Añade el orden del día aceptado por unanimidad en el acto de constitución. No se solicitan datos de convocatoria porque la Junta Universal nace directamente de la reunión."
+          ? `Añade el orden del día aceptado por unanimidad en el acto de constitución. No se solicitan datos de convocatoria porque la ${universalLabel} nace directamente de la reunión.`
           : "Revisa la agenda formal, las propuestas preparadas y los puntos que nazcan durante la sesión. El origen queda guardado para explicar si el acuerdo venía preparado, de convocatoria o nació en sala."}
       </p>
 
@@ -1831,7 +1851,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Esta materia normalmente exige puesta a disposición previa de documentación. En Junta Universal,
+            Esta materia normalmente exige puesta a disposición previa de documentación. En una reunión universal,
             verifica que todos los asistentes disponen de la información necesaria antes de aceptar el orden del día.
           </p>
         </div>
@@ -1987,7 +2007,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
             className="mt-1 h-4 w-4 accent-[var(--g-brand-3308)]"
           />
           <span>
-            {universalAcceptanceText()}
+            {universalAcceptanceText(organoTipo)}
           </span>
         </label>
       ) : null}
@@ -3306,7 +3326,13 @@ function buildActaContent(
 
   const qd = m?.quorum_data as Record<string, unknown> | null;
   const universalMeeting = isUniversalMeetingQuorumData(qd);
-  const juntaMeta = recordAt(recordAt(qd, "meetings"), "junta");
+  const universalIntake = recordAt(qd, "universal_intake");
+  const universalOrganoTipo = stringAt(universalIntake, "organo_tipo");
+  const universalNamespace = universalMeetingNamespace(
+    stringAt(universalIntake, "meeting_namespace") || universalOrganoTipo,
+  );
+  const universalMeta = recordAt(recordAt(qd, "meetings"), universalNamespace);
+  const isUniversalJunta = universalNamespace === "junta";
   const acceptance = recordAt(qd, "aceptacion_unanime_orden_dia");
   const lines: string[] = [];
   lines.push("ACTA DE REUNIÓN");
@@ -3324,16 +3350,17 @@ function buildActaContent(
   }
   if (m?.location) lines.push(`Lugar: ${m.location}`);
   if (universalMeeting) {
-    lines.push("Modalidad: Junta Universal sin convocatoria previa");
-    lines.push(
-      "Conforme al artículo 178 LSC, concurre la totalidad del capital social presente o representado y se acepta por unanimidad la celebración de la Junta y el orden del día."
+    lines.push(`Modalidad: ${isUniversalJunta ? "Junta Universal" : "Sesión universal"} sin convocatoria previa`);
+    lines.push(isUniversalJunta
+      ? "Conforme al artículo 178 LSC, concurre la totalidad del capital social presente o representado y se acepta por unanimidad la celebración de la Junta y el orden del día."
+      : "Concurre la totalidad de los miembros del órgano social, presentes o representados, y se acepta por unanimidad la celebración de la sesión y el orden del día."
     );
     if (acceptance.timestamp) {
       lines.push(`Aceptación unánime registrada: ${acceptance.timestamp}`);
     }
-    const cierre = stringAt(juntaMeta, "hora_cierre");
+    const cierre = stringAt(universalMeta, "hora_cierre");
     if (cierre) lines.push(`Hora de cierre: ${cierre}`);
-    const modo = stringAt(juntaMeta, "modo_aprobacion_acta");
+    const modo = stringAt(universalMeta, "modo_aprobacion_acta");
     if (modo) lines.push(`Aprobación del acta: ${modo}`);
   }
   lines.push("");
@@ -3450,15 +3477,23 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const [minuteId, setMinuteId] = useState<string | null>(null);
   const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
   const isUniversalMeeting = isUniversalMeetingQuorumData(meetingQuorumData);
-  const meetingJuntaMeta = recordAt(recordAt(meetingQuorumData, "meetings"), "junta");
-  const cotizadaMeta = recordAt(meetingJuntaMeta, "cotizada");
-  const [salvedades, setSalvedades] = useState(stringAt(meetingJuntaMeta, "salvedades") ?? "");
+  const meetingBodyForUniversal = (meeting as
+    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | null
+    | undefined
+  )?.governing_bodies;
+  const meetingOrganoTipo = resolveOrganoTipo(meetingBodyForUniversal);
+  const meetingUniversalNamespace = universalMeetingNamespace(meetingOrganoTipo);
+  const meetingUniversalLabel = universalMeetingLabel(meetingOrganoTipo);
+  const meetingUniversalMeta = recordAt(recordAt(meetingQuorumData, "meetings"), meetingUniversalNamespace);
+  const cotizadaMeta = recordAt(meetingUniversalMeta, "cotizada");
+  const [salvedades, setSalvedades] = useState(stringAt(meetingUniversalMeta, "salvedades") ?? "");
   const [modoAprobacionActa, setModoAprobacionActa] = useState(
-    stringAt(meetingJuntaMeta, "modo_aprobacion_acta") ?? "AL_FINAL_SESION",
+    stringAt(meetingUniversalMeta, "modo_aprobacion_acta") ?? "AL_FINAL_SESION",
   );
-  const [horaCierre, setHoraCierre] = useState(stringAt(meetingJuntaMeta, "hora_cierre") ?? "");
+  const [horaCierre, setHoraCierre] = useState(stringAt(meetingUniversalMeta, "hora_cierre") ?? "");
   const [referenciaNotarial, setReferenciaNotarial] = useState(
-    stringAt(meetingJuntaMeta, "referencia_notarial_ref") ?? "",
+    stringAt(meetingUniversalMeta, "referencia_notarial_ref") ?? "",
   );
   const [cotizadaRecuentoCanales, setCotizadaRecuentoCanales] = useState(
     stringAt(cotizadaMeta, "recuento_por_canal") ?? "",
@@ -3471,16 +3506,16 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   );
   useEffect(() => {
     if (!meetingQuorumData) return;
-    const nextJunta = recordAt(recordAt(meetingQuorumData, "meetings"), "junta");
-    const nextCotizada = recordAt(nextJunta, "cotizada");
-    setSalvedades(stringAt(nextJunta, "salvedades") ?? "");
-    setModoAprobacionActa(stringAt(nextJunta, "modo_aprobacion_acta") ?? "AL_FINAL_SESION");
-    setHoraCierre(stringAt(nextJunta, "hora_cierre") ?? "");
-    setReferenciaNotarial(stringAt(nextJunta, "referencia_notarial_ref") ?? "");
+    const nextUniversal = recordAt(recordAt(meetingQuorumData, "meetings"), meetingUniversalNamespace);
+    const nextCotizada = recordAt(nextUniversal, "cotizada");
+    setSalvedades(stringAt(nextUniversal, "salvedades") ?? "");
+    setModoAprobacionActa(stringAt(nextUniversal, "modo_aprobacion_acta") ?? "AL_FINAL_SESION");
+    setHoraCierre(stringAt(nextUniversal, "hora_cierre") ?? "");
+    setReferenciaNotarial(stringAt(nextUniversal, "referencia_notarial_ref") ?? "");
     setCotizadaRecuentoCanales(stringAt(nextCotizada, "recuento_por_canal") ?? "");
     setCotizadaDelegaciones(stringAt(nextCotizada, "delegaciones_voto_distancia") ?? "");
     setCotizadaIncidencias(stringAt(nextCotizada, "incidencias_tecnicas") ?? "");
-  }, [meetingQuorumData]);
+  }, [meetingQuorumData, meetingUniversalNamespace]);
   const materializedAgreementCount = resolutions.filter((resolution) => resolution.agreement_id).length;
   const adoptedWithoutAgreement = resolutions.filter(
     (resolution) => resolution.status === "ADOPTED" && !resolution.agreement_id
@@ -3523,14 +3558,14 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
     }
     const baseQuorumData = (meetingQuorumData ?? {}) as Record<string, unknown>;
     const meetings = recordAt(baseQuorumData, "meetings");
-    const junta = recordAt(meetings, "junta");
+    const universalMeetingMeta = recordAt(meetings, meetingUniversalNamespace);
     const qdForMinute = isUniversalMeeting
       ? {
           ...baseQuorumData,
           meetings: {
             ...meetings,
-            junta: {
-              ...junta,
+            [meetingUniversalNamespace]: {
+              ...universalMeetingMeta,
               salvedades: salvedades.trim() || null,
               modo_aprobacion_acta: modoAprobacionActa,
               hora_cierre: horaCierre || null,
@@ -3619,10 +3654,11 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         >
           <div>
             <p className="text-sm font-semibold text-[var(--g-text-primary)]">
-              Cierre de Junta Universal
+              Cierre de {meetingUniversalLabel}
             </p>
             <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-              Estos campos completan `meetings.junta.*` antes de renderizar el acta. La convocatoria permanece nula.
+              Estos campos completan `meetings.{meetingUniversalNamespace}.*` antes de renderizar el acta.
+              La convocatoria permanece nula.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -3970,9 +4006,13 @@ function UniversalMeetingIntake() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
     scopedEntityId ?? scope.selectedEntity?.id ?? null,
   );
+  const [selectedBodyId, setSelectedBodyId] = useState<string | null>(searchParams.get("body"));
   const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
   const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined);
-  const juntaBody = bodies.find((body) => resolveOrganoTipo(body) === "JUNTA_GENERAL") ?? null;
+  const selectedBody = bodies.find((body) => body.id === selectedBodyId) ?? null;
+  const selectedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
+  const selectedNamespace = universalMeetingNamespace(selectedOrganoTipo);
+  const selectedUniversalLabel = universalMeetingLabel(selectedOrganoTipo);
   const normativeProfile = useEntityNormativeProfile(selectedEntityId);
   const createUniversalMeeting = useCreateUniversalMeeting();
   const [fecha, setFecha] = useState("");
@@ -3987,25 +4027,40 @@ function UniversalMeetingIntake() {
   }, [scopedEntityId]);
 
   useEffect(() => {
+    if (bodies.length === 0) {
+      setSelectedBodyId(null);
+      return;
+    }
+    if (selectedBodyId && bodies.some((body) => body.id === selectedBodyId)) return;
+    const defaultBody = bodies.find((body) => resolveOrganoTipo(body) === "JUNTA_GENERAL") ?? bodies[0];
+    setSelectedBodyId(defaultBody.id);
+  }, [bodies, selectedBodyId]);
+
+  function handleEntityChange(entityId: string | null) {
+    setSelectedEntityId(entityId);
+    setSelectedBodyId(null);
+  }
+
+  useEffect(() => {
     if (!domicilioSocial || lugar.trim()) return;
     setLugar(domicilioSocial);
   }, [domicilioSocial, lugar]);
 
   const normativeSnapshot: AgreementNormativeSnapshot | null = useMemo(() => {
-    if (!selectedEntityId || !normativeProfile.data) return null;
+    if (!selectedEntityId || !normativeProfile.data || !selectedOrganoTipo) return null;
     return buildAgreementNormativeSnapshot({
       agreement: {
-        id: `junta-universal:${selectedEntityId}:${fecha || "draft"}:${horaInicio || "draft"}`,
+        id: `reunion-universal:${selectedEntityId}:${selectedBodyId || "body"}:${fecha || "draft"}:${horaInicio || "draft"}`,
         entity_id: selectedEntityId,
         agreement_kind: "ACTA_SESION",
-        matter_class: "JUNTA_GENERAL",
+        matter_class: selectedOrganoTipo,
         adoption_mode: "MEETING",
         status: "BORRADOR",
         inscribable: false,
       },
       profile: normativeProfile.data,
     });
-  }, [fecha, horaInicio, normativeProfile.data, selectedEntityId]);
+  }, [fecha, horaInicio, normativeProfile.data, selectedBodyId, selectedEntityId, selectedOrganoTipo]);
 
   const normativeReady =
     Boolean(normativeProfile.data) &&
@@ -4013,7 +4068,7 @@ function UniversalMeetingIntake() {
     (normativeProfile.data?.blockers ?? []).length === 0;
   const canSubmit =
     Boolean(selectedEntityId) &&
-    Boolean(juntaBody?.id) &&
+    Boolean(selectedBody?.id) &&
     Boolean(fecha) &&
     Boolean(horaInicio) &&
     Boolean(lugar.trim()) &&
@@ -4021,8 +4076,8 @@ function UniversalMeetingIntake() {
     normativeReady;
 
   async function handleSubmit() {
-    if (!selectedEntityId || !selectedEntity || !juntaBody) {
-      toast.error("Selecciona una sociedad con Junta General operativa.");
+    if (!selectedEntityId || !selectedEntity || !selectedBody || !selectedOrganoTipo) {
+      toast.error("Selecciona una sociedad y un órgano social operativo.");
       return;
     }
     if (!normativeReady) {
@@ -4033,18 +4088,19 @@ function UniversalMeetingIntake() {
       const result = await createUniversalMeeting.mutateAsync({
         entityId: selectedEntityId,
         entityName: selectedEntity.legal_name ?? selectedEntity.common_name,
-        bodyId: juntaBody.id,
-        bodyName: juntaBody.name,
+        bodyId: selectedBody.id,
+        bodyName: selectedBody.name,
+        organoTipo: selectedOrganoTipo,
         fecha,
         horaInicio,
         lugar,
         modalidad,
         normativeSnapshot: normativeSnapshot as unknown as Record<string, unknown> | null,
       });
-      toast.success(result.reused ? "Junta Universal existente reutilizada" : "Junta Universal creada");
+      toast.success(result.reused ? `${selectedUniversalLabel} existente reutilizada` : `${selectedUniversalLabel} creada`);
       navigate(`/secretaria/reuniones/${result.id}?scope=sociedad&entity=${encodeURIComponent(selectedEntityId)}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al crear Junta Universal");
+      toast.error(e instanceof Error ? e.message : "Error al crear reunión universal");
     }
   }
 
@@ -4056,15 +4112,15 @@ function UniversalMeetingIntake() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-            Secretaría · Junta Universal
+            Secretaría · Reunión universal
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
             Iniciar reunión sin convocatoria
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Crea directamente el objeto reunión con `meetings.junta.es_universal = "SÍ"`.
-            El flujo omitirá canal, publicación y segunda convocatoria, y continuará con asistentes,
-            quórum del 100%, orden del día aceptado por unanimidad, votaciones y acta.
+            Crea directamente el objeto reunión con marca universal en el namespace del órgano.
+            Para Junta General se documenta como Junta Universal; para Consejo, comisiones y comités se
+            tramita como sesión universal del órgano social. No se crea convocatoria.
           </p>
         </div>
 
@@ -4096,7 +4152,7 @@ function UniversalMeetingIntake() {
               ) : (
                 <select
                   value={selectedEntityId ?? ""}
-                  onChange={(event) => setSelectedEntityId(event.target.value || null)}
+                  onChange={(event) => handleEntityChange(event.target.value || null)}
                   disabled={entitiesLoading}
                   aria-invalid={!selectedEntityId}
                   className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-60"
@@ -4115,12 +4171,23 @@ function UniversalMeetingIntake() {
               <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
                 Órgano
               </label>
-              <div
-                className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+              <select
+                value={selectedBodyId ?? ""}
+                onChange={(event) => setSelectedBodyId(event.target.value || null)}
+                disabled={bodiesLoading || bodies.length === 0}
+                aria-invalid={!selectedBodyId}
+                className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-60"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                {bodiesLoading ? "Resolviendo Junta General..." : juntaBody?.name ?? "Junta General no encontrada"}
-              </div>
+                <option value="">
+                  {bodiesLoading ? "Cargando órganos..." : "Seleccionar órgano social"}
+                </option>
+                {bodies.map((body) => (
+                  <option key={body.id} value={body.id}>
+                    {body.name} · {resolveOrganoTipo(body)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -4140,7 +4207,7 @@ function UniversalMeetingIntake() {
                 ? "Cargando marco normativo de Acuerdo 360..."
                 : normativeReady
                   ? `Perfil proyectable: ${normativeProfile.data?.status} · snapshot ${normativeSnapshot?.snapshot_id ?? "pendiente"}`
-                  : "La sociedad debe tener un perfil normativo proyectable antes de crear una Junta Universal."}
+                  : "La sociedad debe tener un perfil normativo proyectable antes de crear una reunión universal."}
             </p>
           </div>
         </section>
@@ -4210,7 +4277,7 @@ function UniversalMeetingIntake() {
                 className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)]"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                meetings.junta.es_universal = SÍ
+                meetings.{selectedNamespace}.es_universal = SÍ
               </div>
             </div>
           </div>
@@ -4234,8 +4301,8 @@ function UniversalMeetingIntake() {
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-secondary)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            No se crearán `agreements.convocatoria.*`, `meetings.junta.canal_convocatoria`,
-            `meetings.junta.publicacion_ref` ni segunda convocatoria.
+            No se crearán `agreements.convocatoria.*`, canal de convocatoria, referencia de
+            publicación ni segunda convocatoria. La exigencia será: {universalMeetingRequirementLabel(selectedOrganoTipo)}.
           </div>
         </section>
 
@@ -4260,7 +4327,7 @@ function UniversalMeetingIntake() {
             ) : (
               <Zap className="h-4 w-4" />
             )}
-            Crear Junta Universal y continuar
+            Crear {selectedUniversalLabel} y continuar
           </button>
         </div>
       </div>
@@ -4302,8 +4369,9 @@ function ReunionIntake() {
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
             Las reuniones ordinarias se crean desde convocatoria emitida para conservar órgano, sociedad, fecha y
-            trazabilidad legal. La Junta Universal se inicia directamente como reunión cuando concurre el 100% del
-            capital social y se acepta por unanimidad el orden del día.
+            trazabilidad legal. La vía universal se inicia directamente como reunión cuando concurre el 100% del
+            capital social en Junta General o el 100% de los miembros en otros órganos, con aceptación unánime del
+            orden del día.
           </p>
         </div>
 
@@ -4369,10 +4437,10 @@ function ReunionIntake() {
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
             <Zap className="h-5 w-5 text-[var(--g-brand-3308)]" />
-            <h2 className="mt-3 text-sm font-semibold text-[var(--g-text-primary)]">Junta Universal</h2>
+            <h2 className="mt-3 text-sm font-semibold text-[var(--g-text-primary)]">Reunión universal</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
-              Inicia directamente la reunión sin convocatoria previa. Requiere presencia o representación del 100%
-              del capital social y aceptación unánime del orden del día (art. 178 LSC).
+              Inicia directamente una Junta Universal o una sesión universal de cualquier órgano social. Requiere
+              concurrencia del 100% y aceptación unánime del orden del día.
             </p>
           </Link>
         </section>
