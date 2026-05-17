@@ -130,6 +130,9 @@ function formatMeetingVoterName(voter: MeetingVoterRow) {
 
 const AGENDA_MATERIAS = [
   { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA" },
+  { value: "APROBACION_PRESUPUESTOS", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA" },
+  { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA" },
+  { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA" },
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA" },
   { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA" },
   { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA" },

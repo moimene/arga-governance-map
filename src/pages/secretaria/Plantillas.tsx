@@ -18,7 +18,11 @@ import { useAssignTemplateBinding } from "@/hooks/useNormativeGovernance";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
-import { normativeRoleFromAppRole } from "@/lib/secretaria/mesa-control-societaria";
+import {
+  FUNCTIONAL_MATTER_GROUPS,
+  MATTER_GROUP_BY_MATERIA,
+  normativeRoleFromAppRole,
+} from "@/lib/secretaria/mesa-control-societaria";
 import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import { toast } from "sonner";
@@ -48,10 +52,14 @@ const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; i
 
 const MATERIAS_ACUERDO = [
   'APROBACION_CUENTAS',
+  'APROBACION_PRESUPUESTOS',
   'DISTRIBUCION_DIVIDENDOS',
   'NOMBRAMIENTO_CONSEJERO',
   'CESE_CONSEJERO',
   'DELEGACION_FACULTADES',
+  'FORMULACION_CUENTAS',
+  'FINANCIACION',
+  'CONTRATACION_RELEVANTE',
   'MODIFICACION_ESTATUTOS',
   'AUMENTO_CAPITAL',
   'REDUCCION_CAPITAL',
@@ -61,6 +69,14 @@ const MATERIAS_ACUERDO = [
   'AUTORIZACION_GARANTIA',
   'RATIFICACION_ACTOS',
 ];
+
+const FALLBACK_MATTER_GROUP = FUNCTIONAL_MATTER_GROUPS.find((g) => g.id === "INFORMACION_SEGUIMIENTO_CONTROL")
+  ?? FUNCTIONAL_MATTER_GROUPS[0];
+
+function matterGroup(value: string) {
+  const groupId = MATTER_GROUP_BY_MATERIA[value] ?? FALLBACK_MATTER_GROUP.id;
+  return FUNCTIONAL_MATTER_GROUPS.find((g) => g.id === groupId) ?? FALLBACK_MATTER_GROUP;
+}
 
 const JURISDICTION_LABEL: Record<string, string> = {
   ES: "España",
@@ -204,6 +220,22 @@ export default function Plantillas() {
 
   const procesoDatos = scopedData.filter((p) => p.tipo !== 'MODELO_ACUERDO');
   const modelosDatos = scopedData.filter((p) => p.tipo === 'MODELO_ACUERDO');
+  const materiaOptionsByGroup = useMemo(() => {
+    const materias = new Set<string>(MATERIAS_ACUERDO);
+    for (const plantilla of modelosDatos) {
+      const materia = plantilla.materia_acuerdo ?? plantilla.materia;
+      if (materia) materias.add(materia);
+    }
+
+    return FUNCTIONAL_MATTER_GROUPS.map((group) => {
+      const options = [...materias]
+        .filter((materia) => matterGroup(materia).id === group.id)
+        .sort((a, b) => materiaLabel(a).localeCompare(materiaLabel(b), "es"))
+        .map((materia) => ({ value: materia, label: materiaLabel(materia) }));
+
+      return { group, options };
+    }).filter((entry) => entry.options.length > 0);
+  }, [modelosDatos]);
   const displayData = activeTab === 'proceso' ? procesoDatos : modelosDatos;
   const procesoCoverage = [...new Set(procesoDatos.map((p) => p.tipo))].map((tipo) => {
     const rows = procesoDatos.filter((p) => p.tipo === tipo);
@@ -342,8 +374,12 @@ export default function Plantillas() {
             style={{ borderRadius: 'var(--g-radius-md)' }}
           >
             <option value="">Todas</option>
-            {MATERIAS_ACUERDO.map((m) => (
-              <option key={m} value={m}>{materiaLabel(m)}</option>
+            {materiaOptionsByGroup.map(({ group, options }) => (
+              <optgroup key={group.id} label={group.title}>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

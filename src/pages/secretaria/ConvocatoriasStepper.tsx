@@ -211,7 +211,10 @@ const JUNTA_AND_CONSEJO: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_D
 const AGENDA_MATERIAS = [
   // Consejo / órgano de administración
   { value: "APROBACION_PLAN_NEGOCIO", label: "Aprobación del plan de negocio", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "APROBACION_PRESUPUESTOS", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "COMITES_INTERNOS", label: "Constitución o modificación de comités internos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "DISTRIBUCION_CARGOS", label: "Distribución de cargos del consejo", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
   { value: "POLITICAS_CORPORATIVAS", label: "Aprobación de políticas corporativas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
@@ -270,7 +273,10 @@ const AGENDA_MATERIAS = [
 
 const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   APROBACION_PLAN_NEGOCIO: CONSEJO_SCOPE,
+  APROBACION_PRESUPUESTOS: CONSEJO_SCOPE,
   FORMULACION_CUENTAS: CONSEJO_SCOPE,
+  FINANCIACION: CONSEJO_SCOPE,
+  CONTRATACION_RELEVANTE: CONSEJO_SCOPE,
   COMITES_INTERNOS: CONSEJO_SCOPE,
   DISTRIBUCION_CARGOS: CONSEJO_SCOPE,
   POLITICAS_CORPORATIVAS: CONSEJO_SCOPE,
@@ -310,6 +316,8 @@ const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
 const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
   OPERACION_VINCULADA:
     "SA cotizada: requiere informe de la Comisión de Auditoría (art. 529 ter.h LSC) + aprobación del Consejo. Si la operación supera el 5% del balance debe comunicarse a CNMV (art. 530 LSC).",
+  CONTRATACION_RELEVANTE:
+    "SA cotizada: revisar si el contrato es operación vinculada significativa, afecta a activos esenciales o exige comunicación al mercado por su impacto.",
   PROGRAMA_RECOMPRA:
     "SA cotizada: autorización JGA (art. 277 LSC) + notificación CNMV + cumplimiento de ventanas de trading (Reglamento UE 596/2014 sobre abuso de mercado).",
   REMUNERACION_CONSEJEROS:
