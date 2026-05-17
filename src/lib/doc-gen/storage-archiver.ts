@@ -14,6 +14,7 @@ export interface ArchiveMetadata {
   evidenceStatus?: "DEMO_OPERATIVA";
   recordId?: string;
   templateId?: string | null;
+  templateBindingId?: string | null;
   templateTipo?: string;
   templateVersion?: string;
   contentHash?: string;
@@ -30,6 +31,12 @@ export interface ArchiveMetadata {
   normativeFrameworkStatus?: string | null;
   normativeSourceLayers?: string[];
   formalizationRequirements?: string[];
+  registryStatus?: string | null;
+  rulePackId?: string | null;
+  rulePackName?: string | null;
+  rulePackVersionId?: string | null;
+  rulePackVersionLabel?: string | null;
+  rulePackOrgano?: string | null;
 }
 
 function canonicalJson(value: unknown): string {

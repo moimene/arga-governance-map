@@ -43,6 +43,21 @@ export type ComposeDocumentArchiveAdapter = (
   params: ComposeDocumentArchiveParams,
 ) => Promise<ArchiveResult>;
 
+export interface ComposeDocumentRulePackContext {
+  rulePackId?: string | null;
+  rulePackName?: string | null;
+  rulePackVersionId?: string | null;
+  rulePackVersionLabel?: string | null;
+  rulePackOrgano?: string | null;
+}
+
+export interface ComposeDocumentTemplateContext {
+  bindingId?: string | null;
+  templateId?: string | null;
+  templateVersion?: string | null;
+  registryStatus?: string | null;
+}
+
 export interface ComposeDocumentOptions {
   plantilla?: PlantillaProtegidaRow | null;
   plantillas?: PlantillaProtegidaRow[];
@@ -58,6 +73,8 @@ export interface ComposeDocumentOptions {
   entityName?: string | null;
   filenamePrefix?: string;
   normativeSnapshot?: AgreementNormativeSnapshot | null;
+  rulePackContext?: ComposeDocumentRulePackContext | null;
+  templateContext?: ComposeDocumentTemplateContext | null;
 }
 
 export interface PreparedDocumentComposition {

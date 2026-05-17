@@ -543,9 +543,10 @@ async function archivePreparedDocument(
       processKind: prepared.request.document_type,
       evidenceStatus: "DEMO_OPERATIVA",
       recordId: agreementId,
-      templateId: prepared.template.id,
+      templateId: options.templateContext?.templateId ?? prepared.template.id,
+      templateBindingId: options.templateContext?.bindingId ?? null,
       templateTipo: prepared.template.tipo,
-      templateVersion: prepared.template.version,
+      templateVersion: options.templateContext?.templateVersion ?? prepared.template.version,
       contentHash,
       signedBy: "SISTEMA",
       archivedBufferKind: "ORIGINAL_DOCX",
@@ -559,6 +560,12 @@ async function archivePreparedDocument(
       formalizationRequirements: prepared.normativeSnapshot
         ? prepared.normativeSnapshot.formalization_requirements.map((item) => item.kind)
         : [],
+      registryStatus: options.templateContext?.registryStatus ?? null,
+      rulePackId: options.rulePackContext?.rulePackId ?? null,
+      rulePackName: options.rulePackContext?.rulePackName ?? null,
+      rulePackVersionId: options.rulePackContext?.rulePackVersionId ?? null,
+      rulePackVersionLabel: options.rulePackContext?.rulePackVersionLabel ?? null,
+      rulePackOrgano: options.rulePackContext?.rulePackOrgano ?? null,
     },
   });
 

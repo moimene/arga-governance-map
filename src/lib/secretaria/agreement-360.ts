@@ -12,6 +12,18 @@ export type AgreementOrigin =
   | "UNIPERSONAL"
   | "GROUP_CAMPAIGN";
 
+export interface Agreement360TraceContext {
+  templateBindingId?: string | null;
+  templateId?: string | null;
+  templateVersion?: string | null;
+  rulePackId?: string | null;
+  rulePackName?: string | null;
+  rulePackVersionId?: string | null;
+  rulePackVersionLabel?: string | null;
+  rulePackOrgano?: string | null;
+  registryStatus?: string | null;
+}
+
 export interface MeetingAgreementMaterializationInput {
   tenantId: string;
   entityId: string;
@@ -25,6 +37,7 @@ export interface MeetingAgreementMaterializationInput {
   origin?: AgreementOrigin;
   materializedAt?: string;
   normativeSnapshot?: AgreementNormativeSnapshot | null;
+  traceContext?: Agreement360TraceContext | null;
 }
 
 export interface MeetingAgreementResetInput extends MeetingAgreementMaterializationInput {
@@ -79,6 +92,21 @@ function normalizeRequiredMajorityCode(input: MeetingAgreementMaterializationInp
   if (input.snapshot.materia_clase === "ORDINARIA") return "SIMPLE";
   if (input.snapshot.materia_clase === "ESTRUCTURAL") return "ESTRUCTURAL";
   return "REFORZADA";
+}
+
+function compactTraceContext(trace?: Agreement360TraceContext | null) {
+  if (!trace) return {};
+  const compacted: Record<string, string> = {};
+  if (trace.templateBindingId) compacted.template_binding_id = trace.templateBindingId;
+  if (trace.templateId) compacted.template_id = trace.templateId;
+  if (trace.templateVersion) compacted.template_version = trace.templateVersion;
+  if (trace.rulePackId) compacted.rule_pack_id = trace.rulePackId;
+  if (trace.rulePackName) compacted.rule_pack_name = trace.rulePackName;
+  if (trace.rulePackVersionId) compacted.rule_pack_version_id = trace.rulePackVersionId;
+  if (trace.rulePackVersionLabel) compacted.rule_pack_version_label = trace.rulePackVersionLabel;
+  if (trace.rulePackOrgano) compacted.rule_pack_organo = trace.rulePackOrgano;
+  if (trace.registryStatus) compacted.registry_status = trace.registryStatus;
+  return compacted;
 }
 
 export function isInscribableAgreementMatter(materia: string, matterClass: string) {
@@ -183,6 +211,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
     materialized_at: now,
     materialized: true,
     normative_snapshot_id: normativeSnapshot?.snapshot_id ?? null,
+    ...compactTraceContext(input.traceContext),
   };
 
   return {
@@ -234,6 +263,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
     materialized: false,
     reason,
     normative_snapshot_id: normativeSnapshot?.snapshot_id ?? null,
+    ...compactTraceContext(input.traceContext),
   };
   const complianceSnapshot = normativeSnapshot
     ? {

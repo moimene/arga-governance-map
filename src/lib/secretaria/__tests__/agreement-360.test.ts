@@ -159,6 +159,40 @@ describe("agreement 360 meeting materialization", () => {
     });
   });
 
+  it("conserva traza de plantilla, binding y rule pack en agreement_360", () => {
+    const payload = buildMeetingAgreementPayload({
+      ...baseInput,
+      snapshot: snapshot(),
+      origin: "MEETING_FLOOR",
+      materializedAt: "2026-04-27T11:00:00.000Z",
+      traceContext: {
+        templateBindingId: "binding-1",
+        templateId: "template-1",
+        templateVersion: "1.1.0",
+        rulePackId: "rule-pack-1",
+        rulePackName: "NOMBRAMIENTO_AUDITOR",
+        rulePackVersionId: "rule-pack-version-1",
+        rulePackVersionLabel: "1.1.0",
+        rulePackOrgano: "JUNTA_GENERAL",
+        registryStatus: "RESUELTA",
+      },
+    });
+
+    expect(payload?.execution_mode).toMatchObject({
+      agreement_360: {
+        template_binding_id: "binding-1",
+        template_id: "template-1",
+        template_version: "1.1.0",
+        rule_pack_id: "rule-pack-1",
+        rule_pack_name: "NOMBRAMIENTO_AUDITOR",
+        rule_pack_version_id: "rule-pack-version-1",
+        rule_pack_version_label: "1.1.0",
+        rule_pack_organo: "JUNTA_GENERAL",
+        registry_status: "RESUELTA",
+      },
+    });
+  });
+
   it("no materializa resoluciones rechazadas o no proclamables", () => {
     const rejected = snapshot({
       status_resolucion: "REJECTED",
