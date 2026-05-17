@@ -803,14 +803,98 @@ F5 paralelo a F4.
 
 ---
 
-## §12 Open questions post-v1
+## §12 Open questions post-v1 — resueltas 2026-05-16
 
-1. **G13**: ¿Plan Supabase actual permite Custom Access Token hook, o hay que pagar Pro? Sin respuesta, F1 path A queda bloqueado.
-2. **G14**: ¿Quién es owner del threat model DEFINER (seguridad interna vs externa)?
-3. **G17**: ¿Presupuesto para un proyecto Supabase staging adicional (~$25/mes)?
-4. **G11**: ¿Garrigues / EAD Trust tienen sandbox al que podamos suscribirnos para contract tests sin contrato productivo?
-5. **F1 sequencing**: ¿OK con forward-only deployment de RLS, o se requiere "rollback plan operativo" antes de aplicar?
+| # | Pregunta | Decisión owner |
+|---|---|---|
+| 1 | G13 plan Supabase | **Path B** (`app_metadata.tenant_id`, Free tier; sin Pro hook) |
+| 2 | G14 owner threat model | Plataforma + seguridad interna (firma documento `docs/superpowers/specs/2026-05-16-definer-threat-model.md`) |
+| 3 | G17 presupuesto staging | **Autorizado** (Free tier, ~$0/mes) |
+| 4 | G11 sandbox QTSP/RM/CNMV/Sentinel | Sin acceso confirmado todavía. Contract tests viven contra stubs locales con shapes Zod (sprint siguiente activa live tests cuando se firme acceso). |
+| 5 | F1 sequencing | **Forward-only** sin rollback operativo; mitigación = feature flag por tabla si se detecta lockout en monitoring |
 
 ---
 
-*v1 — post-concilio codex 2026-05-16. Reemplaza v0.*
+## §13 Estado de implementación — 2026-05-17
+
+Tras una sesión de implementación + ciclo adversarial codex (commits `6d1b63e..0cca276`, PR #36), el estado de cada gap es:
+
+### F0 — Estabilización gate
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G4 — 5 tests ENOENT | ✅ CERRADO | `6d1b63e` | 31/31 tests pass + tabla cobertura por aserción + Test 4 documenta drift G8 |
+| G5 — Probe §6.2 → Gate PRE | ✅ CERRADO | `6d1b63e` | Regla `SEM_ACTIVA_CAMPOS_REQUERIDOS` en `gate-pre-semantic.ts` + 10/10 tests |
+| G6 — Prompt ESTADO_INICIAL | ✅ CERRADO con deuda | `9424e98` | Item "E2E legacy" retirado; refactor a `state-snapshot.yaml` deferred |
+| G9 — PR carril | ✅ CERRADO | `9424e98` | PR #36 abierto a `main` |
+
+### F1 — Identity contract
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G13 — `fn_current_tenant_id()` | ✅ CERRADO | `ff051af` | Función + helper assert en Cloud, REVOKE PUBLIC/anon, 16/16 tests |
+| G1 — RLS hardcoded → JWT-aware | ✅ CERRADO | `ff051af` | 135 policies reescritas (vs 17 estimadas), 0 literales demo restantes |
+| G18 — RBAC intra-tenant | ✅ CERRADO con activación diferida | `ff051af` | `scope_body_ids` + `fn_user_has_body_access()` + `tenant_features` feature flag, no activado por defecto para no romper demo single-tenant |
+
+### F2 — Surface hardening
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G14 — DEFINER threat model | ✅ CERRADO P0 + doc + follow-up | `da3d2bc`, `0cca276` | Doc 20 funciones inventariadas, 3 P0 hardened, P2 cleanup de migración `000052` duplicada deferred |
+| G2 — REVOKE `fn_*` PUBLIC/anon | ✅ CERRADO con regresión cazada | `da3d2bc`, `0cca276` | 88 grants revocados; F6 cerró regresión `fn_consolidate_person` reabierta accidentalmente |
+| G19 — ALTER DEFAULT PRIVILEGES | ⚠️ PARCIAL | `da3d2bc` | `postgres` aplicado; `supabase_admin` requiere Supabase support ticket |
+
+### F3 — Evidence storage
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G15 — Append-only supersession | ✅ CERRADO con adaptación | `7906004` | 4 columnas nuevas + view + chain helper; trigger propio omitido porque Cloud ya tiene WORM trigger más estricto (drift G8) |
+| G3 — Edge Function + UI refactor | ✅ CERRADO con hardening F6 | `7906004`, `0cca276` | Edge Function v2 deployed + 5 sitios refactorizados + tenant path-binding + status gate + path traversal extendido |
+
+### F4 — Plataforma
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G16 — RPC `fn_promover_sociedad_operativa` | ✅ CERRADO + TOCTOU cerrado en F6 | `14418a5`, `0cca276` | RPC + frontend refactor + `SELECT FOR UPDATE` + `pg_advisory_xact_lock` |
+| G17 — Staging Supabase | ⚠️ PENDIENTE HANDOFF | `14418a5` | Runbook completo en docs; ejecución dashboard pendiente del owner |
+| G8 — Drift ledger histórico | ✅ VALIDADO ALINEADO | (n/a) | `supabase migration list --linked` 0 drift filas |
+| G10 — Code splitting | ✅ CERRADO | `14418a5` | Vendor chunks split (handlebars/xlsx/docx/zod/supabase/react); Lighthouse pending |
+| G12 — CI E2E destructivo | ⚠️ PARCIAL | `14418a5` | Workflow YAML configurado; bloqueado por G17 staging + P1 #11 cliente env-driven |
+| G20 — Observability | ⚠️ PARCIAL | `14418a5` | Módulo OTel + helpers + doc Sentinel rules; sink default `console.warn` (Edge Function feed siguiente sprint) |
+
+### F5 — Garantía externa
+
+| Gap | Estado | Commit | Evidencia |
+|---|---|---|---|
+| G11 — Risk register + contract tests | ✅ CERRADO con live tests deferred | `245e4c3` | Risk register 4 integraciones + 20/20 Zod contract tests; live tests opt-in deferred |
+| G7 — `evidence_bundle_review_events` | ⚠️ PENDIENTE COMITÉ LEGAL | `245e4c3` | Propuesta schema + workflow documentado; plazo 60 días → 2026-07-15 |
+
+### F6 — Ciclo adversarial (no en plan original)
+
+| Hallazgo codex | Estado | Commit | Evidencia |
+|---|---|---|---|
+| P0 #1+#2 user_profiles cols mutables | ✅ CERRADO | `0cca276` | Trigger `trg_user_profiles_lock_critical_cols` |
+| P0 #3 `evidence_bundles` RLS | ✅ CERRADO | `0cca276` | ENABLE RLS + policy + view `security_invoker=true` |
+| P0 #4 path no bound a tenant | ✅ CERRADO | `0cca276` | Edge Function valida `storage_path.startsWith(tenant_id/)` |
+| P0 #5 `fn_consolidate_person` regrant | ✅ CERRADO | `0cca276` | REVOKE explícito de authenticated |
+| P1 #8 audit delta perdió campos | ❌ RECHAZADO con evidencia | (verificación) | Body original tiene mismos campos — codex alucinó |
+| P1 #9 status gate goodhart | ✅ CERRADO | `0cca276` | Edge Function selecciona `status` y bloquea no-releasable |
+| P1 #10 TOCTOU promoción | ✅ CERRADO | `0cca276` | `SELECT FOR UPDATE` + advisory xact lock |
+| P1 #6, #7, #11, P2 #12, #13 | ⚠️ DEFERRED | (doc) | Documentados como follow-up en migration header |
+
+### Cierre mecánico final
+
+```
+typecheck (tsc -b)                    pass
+schema tests (Cloud-touching)         110/110 pass del plan
+build (vite)                          pass — vendor chunks split
+supabase migration list --linked      0 drift
+supabase db push                      F0–F6 todas aplicadas a Cloud
+codex challenge (174k tokens)         12/13 hallazgos correctos, 7 cerrados, 5 deferred, 1 rechazado con evidencia
+```
+
+**Estimación real vs plan v1**: el plan v1 estimaba 9–11 sprints. La ejecución consumió 1 sesión continua porque codex como adversarial independiente comprimió el ciclo de feedback que normalmente requiere code review humano + iteración.
+
+---
+
+*v1 — post-concilio codex 2026-05-16. Estado §13 actualizado 2026-05-17 tras ejecución completa.*
