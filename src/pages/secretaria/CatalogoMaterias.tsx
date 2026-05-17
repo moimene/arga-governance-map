@@ -523,7 +523,7 @@ function MateriaDetail({
           </span>
         )}
         <Link
-          to={`/secretaria/reglas?matter=${materia.materia}${entityId ? `&entity=${entityId}` : ""}`}
+          to={`/secretaria/catalogo-materias?materia=${materia.materia}${entityId ? `&entity=${entityId}` : ""}`}
           className="inline-flex flex-1 items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >

@@ -252,15 +252,24 @@ export default function SociedadNuevaStepper() {
       const hasTx2Failures = failedCargos > 0 || failedRepresentaciones > 0;
       const hasOperationalBlocks = validation.blockingOperational.length > 0;
       if (!hasTx2Failures && !hasOperationalBlocks) {
-        const { error: statusError } = await supabase
-          .from("entities")
-          .update({ onboarding_status: "OPERATIVA" })
-          .eq("tenant_id", tenantId)
-          .eq("id", tx1.entityId);
-        if (statusError) {
+        // F4.G16 — promoción via RPC server-side con guards de invariantes
+        // (tenant, role, cargos mínimos). Reemplaza el UPDATE client-side
+        // que era no-atómico con TX2. Si TX2 quedó parcial, el RPC valida y
+        // emite check_violation; ya no quedan sociedades medio-promovidas
+        // por race condition de red.
+        const { data: promResult, error: promError } = await supabase.rpc(
+          "fn_promover_sociedad_operativa",
+          {
+            p_tenant_id: tenantId,
+            p_entity_id: tx1.entityId,
+          },
+        );
+        if (promError) {
           toast.warning("Sociedad creada; no se pudo promover a operativa", {
-            description: statusError.message,
+            description: promError.message,
           });
+        } else if (promResult && typeof promResult === "object" && "already_operativa" in promResult && promResult.already_operativa === true) {
+          toast.success("Sociedad ya estaba en estado operativa");
         } else {
           toast.success("Sociedad creada y operativa");
         }

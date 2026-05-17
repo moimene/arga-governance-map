@@ -6,12 +6,14 @@ const root = process.cwd();
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
 describe("mesa de control jurídico-societaria — UI contract", () => {
-  it("expone el catálogo de materias en ruta y navegación", () => {
+  it("expone materias y reglas como entrada principal de mantenimiento", () => {
     const app = read("src/App.tsx");
     const navigation = read("src/components/secretaria/shell/navigation.ts");
 
     expect(app).toContain("/secretaria/catalogo-materias");
-    expect(navigation).toContain("Catálogo de materias");
+    expect(app).toContain("ReglasToCatalogoMateriasRedirect");
+    expect(navigation).toContain("Materias y reglas");
+    expect(navigation).not.toContain("to: \"/secretaria/reglas\"");
   });
 
   it("expone catálogo de órganos y wizard de activación normativa", () => {
@@ -75,7 +77,8 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     const model = read("src/lib/secretaria/mesa-control-societaria.ts");
     const navigation = read("src/components/secretaria/shell/navigation.ts");
 
-    expect(navigation).toContain("Regla efectiva");
+    expect(navigation).toContain("Materias y reglas");
+    expect(navigation).not.toContain("Regla efectiva");
     expect(ruleManager).toContain("Validación preliminar. No ejecutable");
     expect(ruleManager).toContain("Posible conflicto de ley aplicable");
     expect(ruleManager).toContain("Solicitar alta de materia");

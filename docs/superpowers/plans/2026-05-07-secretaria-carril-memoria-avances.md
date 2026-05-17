@@ -167,6 +167,22 @@ No se ha identificado relacion entre esos mensajes y la ausencia visual de admin
 6. Acuerdo360 no es el motor de reglas: es expediente/snapshot. La regla efectiva vive en rule packs, overrides, pactos y marco normativo.
 7. Si la UI online no refleja cambios locales verificados, comprobar primero bundle/despliegue/cache antes de reabrir datos.
 
+### Update 2026-05-17 - entorno Supabase activo
+
+Requisito fundamental vigente: mientras TGMS/ARGA no alcance estabilidad pre-release,
+Supabase Cloud `governance_OS` (`hzqwefkwsxopwrmtksbg`) sigue siendo el entorno activo
+de desarrollo-test-demo y la fuente de verdad funcional. Staging queda diferido y no
+bloquea la evolucion del prototipo, salvo decision explicita para aislar E2E destructivos
+o preparar una release preproductiva.
+
+Reglas operativas:
+
+- Ejecutar `bun run db:check-target` antes de cualquier cambio Supabase.
+- Reflejar cambios Cloud en migraciones del repo o en documento de excepcion aprobado.
+- Verificar con `supabase migration list --linked`, MCP `supabase_migrations.schema_migrations`
+  o `supabase db push --linked --dry-run` cuando el rol temporal del CLI este disponible.
+- No tratar `governance_OS` como produccion congelada durante esta fase.
+
 ## No secretos
 
 Este documento no contiene credenciales, tokens, claves de Supabase ni secretos. La ruta `docs/superpowers/plans/.env` existe en el repo local, pero no se ha copiado ningun valor en esta memoria.

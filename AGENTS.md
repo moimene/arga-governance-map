@@ -73,7 +73,7 @@ En código, ambos modos están en este repo. La segregación a repos independien
 - ✅ Código y datos demo pulidos
 - ✅ Flujos UX completos y navegables
 - ❌ No segregar módulos a repos separados todavía
-- ❌ No construir infraestructura enterprise (RLS real, BYOK, WORM) — eso es fase posterior
+- ❌ No abrir infraestructura enterprise net-new (BYOK, WORM productiva, segregación multi-entorno) sin paquete aprobado. Sí se puede evolucionar el schema demo de `governance_OS` para estabilizar el prototipo.
 
 ---
 
@@ -87,6 +87,19 @@ En código, ambos modos están en este repo. La segregación a repos independien
 **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
 **Tenant demo:** `tenant_id = "00000000-0000-0000-0000-000000000001"`
 **Entidad canónica Cloud:** `entity_id = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (ARGA Seguros S.A.). El UUID `00000000-0000-0000-0000-000000000010` aparece en seeds/planes legacy y no debe tratarse como fuente canónica sin verificar.
+
+### Requisito fundamental Supabase — fase desarrollo-test-demo (2026-05-17)
+
+Hasta que el prototipo alcance estabilidad pre-release, **`governance_OS` (`hzqwefkwsxopwrmtksbg`) sigue siendo el entorno activo y fuente de verdad para desarrollo, demo y validación funcional**. Se debe seguir evolucionando este Supabase original con migraciones, seeds y fixes necesarios para el prototipo.
+
+Reglas:
+- Staging queda preparado pero **no bloquea** el desarrollo actual.
+- G17 staging es una capacidad futura/pre-release o para E2E destructivos cuando el prototipo requiera aislamiento sistemático.
+- Antes de tocar Supabase, ejecutar `bun run db:check-target` y confirmar `governance_OS`.
+- Todo cambio Cloud debe quedar reflejado en migraciones del repo y verificarse con `supabase migration list --linked`, MCP `supabase_migrations.schema_migrations` o `supabase db push --linked --dry-run` cuando el rol temporal del CLI esté disponible.
+- No tratar `governance_OS` como producción congelada todavía.
+
+Detalle canónico: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-environment-policy.md`.
 
 ---
 
@@ -963,8 +976,10 @@ npx vite build --outDir /tmp/tgms-dist
 - **Proyecto:** `hzqwefkwsxopwrmtksbg` (governance_OS, eu-central-1)
 - **Auth demo:** `demo@arga-seguros.com` / `TGMSdemo2026!`
 - **Tenant:** `00000000-0000-0000-0000-000000000001`
-- **Entidad ARGA Seguros:** `00000000-0000-0000-0000-000000000010`
-- **Migraciones aplicadas:** 000001–000010 + seeds (rule packs, demo data, ETD stubs)
+- **Entidad ARGA Seguros canónica Cloud:** `6d7ed736-f263-4531-a59d-c6ca0cd41602`
+- **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)
+- **Migraciones aplicadas verificadas:** local/remoto alineados hasta `20260516120008` (2026-05-17)
+- **Verificación target vigente:** `bun run db:check-target` pass contra `governance_OS`; MCP `get_project_url` apunta a `https://hzqwefkwsxopwrmtksbg.supabase.co`; MCP `schema_migrations` confirma última versión remota `20260516120008`
 - **RLS:** Habilitado en todas las tablas de dominio con tenant scoping
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 

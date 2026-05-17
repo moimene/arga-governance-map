@@ -2,8 +2,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// DEUDA G8 (drift ledger). La RPC `fn_save_meeting_resolutions` está aplicada
+// en Cloud (governance_OS) y la invoca `useReunionSecretaria.useSaveMeetingResolutions`,
+// pero su DDL fuente quedó en una migración retirada al consolidar el ledger
+// pre-20260514. La consolidada `20260514181001_secretaria_production_sprint_closeout`
+// no la reabsorbió. Hasta cerrar G8 leemos el contrato desde el archivo retirado.
 const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/20260505093000_000056_secretaria_meeting_resolutions_transactional.sql"),
+  join(
+    process.cwd(),
+    "docs/superpowers/retired-migrations/historical-baseline-pre-20260514/20260505093000_000056_secretaria_meeting_resolutions_transactional.sql",
+  ),
   "utf8",
 );
 

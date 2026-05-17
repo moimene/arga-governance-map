@@ -251,7 +251,7 @@ export default function CatalogoOrganos() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <ActionLink to={`/secretaria/sociedades/${selectedEntityId}/admin/nuevo`} label="Gestionar miembros" />
-                  <ActionLink to={`/secretaria/reglas?entity=${selectedEntityId}`} label="Asignar competencia" />
+                  <ActionLink to={`/secretaria/catalogo-materias?entity=${selectedEntityId}`} label="Asignar competencia" />
                   <ActionLink to={`/secretaria/sociedades/${selectedEntityId}/marco-normativo/activar`} label="Vincular reglamento" />
                 </div>
               </div>

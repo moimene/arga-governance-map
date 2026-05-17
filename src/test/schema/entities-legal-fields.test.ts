@@ -66,14 +66,9 @@ describe("entities legal fields migration D6 reissue", () => {
     expect(migration).toMatch(/ELSE ARRAY\[\]::text\[\]/i);
   });
 
-  it.skipIf(!hasAdminClient())("can probe the new columns after the human applies the migration", async () => {
+  it.skipIf(!hasAdminClient())("probes the D6 legal columns in Cloud", async () => {
     const select = LEGAL_FIELDS.map((field) => field).join(",");
     const { error } = await supabaseAdmin!.from("entities").select(`id,${select}`).limit(1);
-
-    if (error?.message?.match(/column .* does not exist|Could not find|schema cache/i)) {
-      console.warn("[000067] entities legal fields not yet applied to Cloud; skipping live probe.");
-      return;
-    }
 
     expect(error).toBeNull();
   });

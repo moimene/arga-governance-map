@@ -1,39 +1,30 @@
 /**
- * Phase B7 — UI driving destructive de SociedadNuevaStepper.
+ * Phase B7 — UI driving destructive de SociedadNuevaStepper D6.
  *
- * Cubre el alta de una sociedad SA desde cero vía UI. Drives los 4 pasos
- * (Identidad / Administración / Capital / Confirmar) y verifica Cloud
- * que se crearon correctamente:
- *   - persons (PJ) — denominación legal
- *   - entities — con FK person_id + jurisdicción + tipo_social + tipo_organo_admin
- *   - entity_capital_profile — VIGENTE con capital escriturado/desembolsado
- *   - share_classes — clase ORD ordinaria
- *   - governing_bodies (2) — Junta General + CdA seed
- *
- * Diferencias clave vs e2e/35-secretaria-alta-rollback.spec.ts:
- *   - e2e/35 valida ROLLBACK ante fallo intermedio (test pesimista)
- *   - e2e/43 valida HAPPY PATH end-to-end (test optimista) con verificación
- *     Cloud completa de las 5 tablas escritas + cleanup destructive
+ * Cubre el alta de una sociedad SA desde cero vía UI con el modelo vigente:
+ * asistente de 11 pasos, RPC atómica TX1 `fn_crear_sociedad_legal_y_capital`
+ * y TX2 post-commit para cargos/representaciones. El test verifica Cloud en
+ * las tablas D6 relevantes y no presupone rollback compensatorio cliente.
  *
  * Marker scheme:
- *   - persons.tax_id = `Z-NS-<6hex>`  (PJ sociedad sintética)
+ *   - persons.tax_id = `Z-NS-<marker>-...`
  *   - entities.legal_name LIKE `PHASE-B7-NS-<runId>%`
- *   - runId = `NS-YYYYMMDD-HHMMSS-<6hex>-B7`
+ *   - runId = `NS-YYYYMMDD-HHMMSS-<4hex>-B7`
  *
  * Opt-in vía SECRETARIA_E2E_PHASE_B1=1 (mismo flag que B1/B3/B4).
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/base';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-const EXPECTED_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const DEFAULT_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const EXPECTED_PROJECT_REF = cleanEnvValue(process.env.EXPECTED_PROJECT_REF) ?? DEFAULT_PROJECT_REF;
 const DEFAULT_SECRET_ENV_FILE = 'docs/superpowers/plans/.env';
 
 type ServiceClient = SupabaseClient;
-
-// ── Env / client / marker helpers ───────────────────────────────────
 
 function cleanEnvValue(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -93,42 +84,43 @@ function generateRunId(): string {
   return `NS-${stamp}-${randomBytes(2).toString('hex')}-B7`;
 }
 
-// ── Pre-cleanup defensivo idempotente ────────────────────────────────
-//
-// Si runs anteriores de B7 fallaron antes de que SociedadNuevaStepper.guardar()
-// completara los 5 inserts, dejan residuos en Cloud. Este helper purga
-// cualquier residuo NS-marker antes de empezar el run actual.
+async function fill(page: Page, label: string | RegExp, value: string) {
+  const input = page.getByLabel(label);
+  await expect(input).toBeVisible({ timeout: 10_000 });
+  await input.fill(value);
+}
+
+async function next(page: Page) {
+  const button = page.getByRole('button', { name: 'Siguiente' });
+  await expect(button).toBeEnabled({ timeout: 10_000 });
+  await button.click();
+}
+
+async function selectStepperStep(page: Page, name: string) {
+  const button = page.getByRole('button', { name: new RegExp(`^\\d+\\s+${name}$|^${name}$`) });
+  await expect(button).toBeVisible({ timeout: 10_000 });
+  await button.click();
+}
 
 async function cleanLeftoverPhaseB7Residue(client: ServiceClient): Promise<void> {
-  // 1. Find PJ persons (Z-NS-) - owners of synthetic societies
   const { data: pjPersons } = await client.from('persons').select('id').like('tax_id', 'Z-NS-%');
   const pjIds = (pjPersons ?? []).map((p) => p.id);
 
   let purged = 0;
-
   if (pjIds.length > 0) {
-    // 2. Find entities owned by these PJs OR with PHASE-B7- legal_name
-    const orFilters: string[] = ['legal_name.like.PHASE-B7-NS-*', `person_id.in.(${pjIds.join(',')})`];
-    const { data: entities } = await client.from('entities').select('id').or(orFilters.join(','));
+    const { data: entities } = await client
+      .from('entities')
+      .select('id')
+      .or(`legal_name.like.PHASE-B7-NS-*,person_id.in.(${pjIds.join(',')})`);
     const entityIds = (entities ?? []).map((e) => e.id);
 
-    for (const eId of entityIds) {
-      // condiciones / capital / shares / bodies first
-      await client.from('condiciones_persona').delete().eq('entity_id', eId);
-      await client.from('capital_holdings').delete().eq('entity_id', eId);
-      await client.from('share_classes').delete().eq('entity_id', eId);
-      await client.from('entity_capital_profile').delete().eq('entity_id', eId);
-      await client.from('governing_bodies').delete().eq('entity_id', eId);
-      await client.from('entities').delete().eq('id', eId);
+    for (const entityId of entityIds) {
+      await cleanupEntity(client, entityId, pjIds);
       purged += 1;
     }
   }
 
-  const { data: deletedPjs } = await client
-    .from('persons')
-    .delete()
-    .like('tax_id', 'Z-NS-%')
-    .select('id');
+  const { data: deletedPjs } = await client.from('persons').delete().like('tax_id', 'Z-NS-%').select('id');
   purged += deletedPjs?.length ?? 0;
 
   if (purged > 0) {
@@ -136,24 +128,52 @@ async function cleanLeftoverPhaseB7Residue(client: ServiceClient): Promise<void>
   }
 }
 
-// ── Test ────────────────────────────────────────────────────────────
+async function cleanupEntity(client: ServiceClient, entityId: string, knownPersonIds: string[] = []) {
+  const { data: conditionPersons } = await client
+    .from('condiciones_persona')
+    .select('person_id, representative_person_id')
+    .eq('entity_id', entityId);
+  const personIds = new Set<string>(knownPersonIds);
+  for (const row of conditionPersons ?? []) {
+    if (row.person_id) personIds.add(row.person_id);
+    if (row.representative_person_id) personIds.add(row.representative_person_id);
+  }
 
-test.describe.configure({ timeout: 120_000 });
-test.skip(
-  process.env.SECRETARIA_E2E_PHASE_B1 !== '1',
-  'Opt-in: Phase B7 destructive UI driving — synthetic sociedad alta SociedadNuevaStepper',
-);
+  await client.from('authority_evidence').delete().eq('entity_id', entityId);
+  await client.from('representaciones').delete().eq('entity_id', entityId);
+  await client.from('condiciones_persona').delete().eq('entity_id', entityId);
+  await client.from('capital_holdings').delete().eq('entity_id', entityId);
+  await client.from('share_classes').delete().eq('entity_id', entityId);
+  await client.from('entity_capital_profile').delete().eq('entity_id', entityId);
+  await client.from('entity_settings').delete().eq('entity_id', entityId);
+  await client.from('rule_param_overrides').delete().eq('entity_id', entityId);
+  await client.from('governing_bodies').delete().eq('entity_id', entityId);
+  await client.from('entities').delete().eq('id', entityId);
+
+  if (personIds.size > 0) {
+    await client.from('persons').delete().in('id', [...personIds]);
+  }
+}
 
 interface CreatedEntity {
   runId: string;
+  marker: string;
   taxId: string;
   legalName: string;
-  // populated post-stepper run via Cloud query
+  holderTaxId: string;
+  presidentTaxId: string;
+  secretaryTaxId: string;
   pjPersonId: string | null;
   entityId: string | null;
 }
 
-test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => {
+test.describe.configure({ timeout: 180_000 });
+test.skip(
+  process.env.SECRETARIA_E2E_PHASE_B1 !== '1',
+  'Opt-in: Phase B7 destructive UI driving — synthetic sociedad alta SociedadNuevaStepper D6',
+);
+
+test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper D6', () => {
   let client: ServiceClient;
   let trace: CreatedEntity;
 
@@ -162,11 +182,15 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
     await cleanLeftoverPhaseB7Residue(client);
 
     const runId = generateRunId();
-    const hex = runId.split('-').slice(-2)[0];
+    const marker = runId.split('-').slice(-2)[0].toUpperCase();
     trace = {
       runId,
-      taxId: `Z-NS-${hex}`,
+      marker,
+      taxId: `Z-NS-${marker}-SOC`,
       legalName: `PHASE-B7-NS-${runId} S.A.`,
+      holderTaxId: `Z-NS-${marker}-HLD`,
+      presidentTaxId: `Z-NS-${marker}-PRS`,
+      secretaryTaxId: `Z-NS-${marker}-SEC`,
       pjPersonId: null,
       entityId: null,
     };
@@ -174,33 +198,17 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
   });
 
   test.afterAll(async () => {
-    if (!client || !trace.entityId) {
-      // Si no llegó a crearse la entity, sólo borramos PJ residual
-      if (trace?.pjPersonId) {
-        await client.from('persons').delete().eq('id', trace.pjPersonId);
-      }
-      return;
+    if (!client || !trace) return;
+    if (trace.entityId) {
+      await cleanupEntity(client, trace.entityId, trace.pjPersonId ? [trace.pjPersonId] : []);
     }
-    // Cascade cleanup: bodies → share_classes → capital_profile → entity → PJ
-    const eId = trace.entityId;
-    await client.from('condiciones_persona').delete().eq('entity_id', eId);
-    await client.from('capital_holdings').delete().eq('entity_id', eId);
-    await client.from('share_classes').delete().eq('entity_id', eId);
-    await client.from('entity_capital_profile').delete().eq('entity_id', eId);
-    await client.from('governing_bodies').delete().eq('entity_id', eId);
-    const { error: eErr } = await client.from('entities').delete().eq('id', eId);
-    if (eErr) console.error('[phase-b7] cleanup entity FAIL:', eErr.message);
-    else console.log(`[phase-b7] cleanup OK: entity/${eId}`);
-
-    if (trace.pjPersonId) {
-      const { error: pErr } = await client.from('persons').delete().eq('id', trace.pjPersonId);
-      if (pErr) console.error('[phase-b7] cleanup PJ FAIL:', pErr.message);
-      else console.log(`[phase-b7] cleanup OK: persons/${trace.pjPersonId}`);
-    }
+    await client
+      .from('persons')
+      .delete()
+      .in('tax_id', [trace.taxId, trace.holderTaxId, trace.presidentTaxId, trace.secretaryTaxId]);
   });
 
-  test('UI SociedadNuevaStepper drive 4 pasos + verify Cloud writes', async ({ page }) => {
-    // Capturar errores de browser + network 4xx para debug profundo
+  test('UI SociedadNuevaStepper D6: 11 pasos + TX1/TX2 + Cloud verification', async ({ page }) => {
     const browserErrors: string[] = [];
     const networkFails: string[] = [];
     page.on('pageerror', (err) => browserErrors.push(`[pageerror] ${err.message}`));
@@ -212,80 +220,113 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
     page.on('response', async (resp) => {
       const url = resp.url();
       const status = resp.status();
-      if (status >= 400 && /supabase\.co\/rest\/|supabase\.co\/rpc\//.test(url)) {
+      if (status >= 400 && /supabase\.co\/(rest\/v1|rpc)\//.test(url)) {
         let body = '';
         try { body = await resp.text(); } catch { /* noop */ }
-        networkFails.push(`[${status}] ${resp.request().method()} ${url} → ${body.slice(0, 400)}`);
+        networkFails.push(`[${status}] ${resp.request().method()} ${url} -> ${body.slice(0, 400)}`);
       }
     });
 
     await page.goto('/secretaria/sociedades/nueva');
-    await expect(page.getByRole('heading', { name: 'Alta de sociedad' })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(page.getByRole('heading', { name: 'Alta de sociedad' })).toBeVisible({ timeout: 20_000 });
 
-    // ── PASO 1: Identidad ────────────────────────────────────────
-    // Campos por <label> con span: usamos getByLabel (Playwright matchea aunque
-    // el span vaya antes del input, gracias al asociado HTML).
-    await page.getByLabel(/Denominación legal/i).fill(trace.legalName);
-    await page.getByLabel(/Nombre común/i).fill(`PHASE B7 NS ${trace.runId}`);
-    await page.getByLabel(/NIF\/CIF/i).fill(trace.taxId);
+    await expect(page.getByRole('button', { name: /1\s+Identificacion/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /11\s+Revision/ })).toBeVisible();
+
+    // 1. Identificacion
+    await fill(page, /Denominacion legal/i, trace.legalName);
+    await fill(page, /Nombre comun/i, `PHASE B7 NS ${trace.runId}`);
+    await fill(page, /NIF\/CIF/i, trace.taxId);
     await page.getByLabel(/Tipo social/i).selectOption('SA');
-    // Jurisdicción ya viene 'ES' por default en EMPTY draft, pero forzamos
-    await page.getByLabel(/Jurisdicción/i).fill('ES');
+    await fill(page, /Jurisdiccion/i, 'ES');
+    await next(page);
 
-    // canNext en step 0: legal_name + tax_id + jurisdiction → "Siguiente" enabled
-    const next1 = page.getByRole('button', { name: 'Siguiente' });
-    await expect(next1).toBeEnabled({ timeout: 10_000 });
-    await next1.click();
+    // 2. Domicilio
+    await fill(page, /Calle/i, 'Calle D6 QA');
+    await fill(page, /Numero/i, '1');
+    await fill(page, /Codigo postal/i, '28001');
+    await fill(page, /Ciudad/i, 'Madrid');
+    await fill(page, /Pais/i, 'ES');
+    await fill(page, /CNAE principal/i, '6511');
+    await fill(page, /Objeto social/i, 'Actividad aseguradora de prueba D6');
+    await next(page);
 
-    // ── PASO 2: Administración ───────────────────────────────────
-    await expect(page.getByLabel(/Órgano de administración/i)).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel(/Órgano de administración/i).selectOption('CDA');
-    // unipersonal y cotizada quedan en false default
-    const next2 = page.getByRole('button', { name: 'Siguiente' });
-    await expect(next2).toBeEnabled({ timeout: 10_000 });
-    await next2.click();
+    // 3. Perfil
+    await page.getByLabel(/Organo de administracion/i).selectOption('CDA');
+    await next(page);
 
-    // ── PASO 3: Capital ───────────────────────────────────────────
-    await expect(page.getByLabel(/Capital escriturado/i)).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel(/Capital escriturado/i).fill('60000');
-    await page.getByLabel(/Número de títulos/i).fill('60000');
-    // valor_nominal es auto, no editable
+    // 4. Capital
+    await fill(page, /Capital escriturado/i, '60000');
+    await fill(page, /Capital desembolsado/i, '60000');
+    await fill(page, /Numero total de titulos/i, '60000');
+    await next(page);
 
-    const next3 = page.getByRole('button', { name: 'Siguiente' });
-    await expect(next3).toBeEnabled({ timeout: 10_000 });
-    await next3.click();
+    // 5. Clases
+    await page.getByRole('button', { name: /Anadir clase/i }).click();
+    await fill(page, /Codigo/i, 'ORD');
+    await fill(page, /^Nombre$/i, 'Acciones ordinarias');
+    await fill(page, /Titulos emitidos/i, '60000');
+    await next(page);
 
-    // ── PASO 4: Confirmar + crear ────────────────────────────────
-    await expect(page.getByText(/Revisa los datos/i).first()).toBeVisible({ timeout: 10_000 });
-    // BATCH 4 (ronda 2): el botón muestra "Cargando contexto…" mientras
-    // TenantContext hidrata desde user_profiles. Esperar al texto exacto
-    // "Crear sociedad" garantiza que tenantId !== null cuando hagamos click.
+    // 6. Cap table
+    await page.getByRole('button', { name: /Anadir socio/i }).click();
+    await page.getByRole('button', { name: 'Nueva' }).click();
+    await fill(page, /^Nombre$/i, `Socio ${trace.runId}`);
+    await fill(page, /NIF\/CIF/i, trace.holderTaxId);
+    await fill(page, /Titulos/i, '60000');
+    await next(page);
+
+    // 7. Organos
+    await fill(page, /Consejeros minimo/i, '1');
+    await next(page);
+
+    // 8. Cargos
+    await page.getByRole('button', { name: /Anadir cargo/i }).click();
+    await page.getByRole('button', { name: /Anadir cargo/i }).click();
+    await page.locator('select#cargo').nth(0).selectOption('PRESIDENTE');
+    await page.locator('select#cargo').nth(1).selectOption('SECRETARIO');
+    await page.getByRole('button', { name: 'Nueva' }).nth(0).click();
+    await page.locator('input#nombre').nth(0).fill(`Presidenta ${trace.runId}`);
+    await page.locator('input#nif-cif').nth(0).fill(trace.presidentTaxId);
+    await page.getByRole('button', { name: 'Nueva' }).nth(1).click();
+    await page.locator('input#nombre').nth(1).fill(`Secretario ${trace.runId}`);
+    await page.locator('input#nif-cif').nth(1).fill(trace.secretaryTaxId);
+    await next(page);
+
+    // 9. Reglas
+    const pactosAck = page.getByLabel(/Confirmo que los pactos no quedan modelados/i);
+    if (await pactosAck.isVisible().catch(() => false)) {
+      await pactosAck.check();
+    }
+    await next(page);
+
+    // 10. Soporte
+    await next(page);
+
+    // 11. Revision + create
+    await selectStepperStep(page, 'Revision');
+    await expect(page.getByText(/Marco normativo inicial/i)).toBeVisible({ timeout: 10_000 });
     const crear = page.getByRole('button', { name: 'Crear sociedad' });
     await crear.scrollIntoViewIfNeeded();
-    await expect(crear).toBeVisible({ timeout: 15_000 });
     await expect(crear).toBeEnabled({ timeout: 15_000 });
     await crear.click();
 
-    // Esperar toast success o redirect a /secretaria/sociedades/:id
     try {
-      await page.waitForURL(/\/secretaria\/sociedades\/[a-f0-9-]{36}/, { timeout: 30_000 });
-    } catch (e) {
+      await page.waitForURL(/\/secretaria\/sociedades\/[a-f0-9-]{36}/, { timeout: 45_000 });
+    } catch (error) {
       const toastErrors = await page.locator('[data-sonner-toast]').allTextContents().catch(() => []);
       console.error('[B7 debug] browserErrors:', JSON.stringify(browserErrors, null, 2));
       console.error('[B7 debug] networkFails:', JSON.stringify(networkFails, null, 2));
       console.error('[B7 debug] toastErrors:', JSON.stringify(toastErrors, null, 2));
       console.error('[B7 debug] current URL:', page.url());
-      throw e;
+      throw error;
     }
-    const url = page.url();
-    const idMatch = url.match(/\/secretaria\/sociedades\/([a-f0-9-]{36})/);
+
+    const idMatch = page.url().match(/\/secretaria\/sociedades\/([a-f0-9-]{36})/);
     expect(idMatch, 'redirect a detalle de sociedad creada').not.toBeNull();
     const createdEntityId = idMatch![1];
+    trace.entityId = createdEntityId;
 
-    // ── Verificación Cloud ──────────────────────────────────────
-    // 1. PJ con tax_id marker
     const { data: pj, error: pjErr } = await client
       .from('persons')
       .select('id, full_name, tax_id, person_type, denomination')
@@ -297,24 +338,24 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
     expect(pj!.denomination).toBe(trace.legalName);
     trace.pjPersonId = pj!.id;
 
-    // 2. Entity con FK person_id, tipo_social SA, tipo_organo_admin CDA
     const { data: entity, error: eErr } = await client
       .from('entities')
-      .select('id, person_id, legal_name, tipo_social, tipo_organo_admin, jurisdiction, entity_status, materiality, forma_administracion')
+      .select('id, person_id, legal_name, tipo_social, tipo_organo_admin, jurisdiction, entity_status, onboarding_status, materiality, forma_administracion, address, cnae_primary')
       .eq('id', createdEntityId)
       .maybeSingle();
     expect(eErr, 'read entity').toBeNull();
     expect(entity, 'entity creada').not.toBeNull();
-    expect(entity!.person_id, 'entity.person_id FK al PJ').toBe(pj!.id);
+    expect(entity!.person_id).toBe(pj!.id);
     expect(entity!.legal_name).toBe(trace.legalName);
     expect(entity!.tipo_social).toBe('SA');
     expect(entity!.tipo_organo_admin).toBe('CDA');
     expect(entity!.jurisdiction).toBe('ES');
     expect(entity!.entity_status).toBe('Active');
+    expect(entity!.onboarding_status).toBe('OPERATIVA');
     expect(entity!.forma_administracion).toBe('CONSEJO');
-    trace.entityId = entity!.id;
+    expect(entity!.address).toContain('Madrid');
+    expect(entity!.cnae_primary).toBe('6511');
 
-    // 3. entity_capital_profile VIGENTE
     const { data: profile, error: pfErr } = await client
       .from('entity_capital_profile')
       .select('entity_id, capital_escriturado, capital_desembolsado, numero_titulos, valor_nominal, estado, currency')
@@ -328,21 +369,29 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
     expect(profile!.numero_titulos).toBe(60000);
     expect(profile!.currency).toBe('EUR');
 
-    // 4. share_classes — al menos 1 clase ORD
     const { data: shares, error: shErr } = await client
       .from('share_classes')
-      .select('class_code, name, votes_per_title, voting_rights')
+      .select('id, class_code, name, votes_per_title, voting_rights')
       .eq('entity_id', createdEntityId);
     expect(shErr, 'read share_classes').toBeNull();
-    expect(shares?.length ?? 0, 'al menos 1 share_class').toBeGreaterThanOrEqual(1);
-    const ord = shares!.find((s) => s.class_code === 'ORD');
+    const ord = shares?.find((s) => s.class_code === 'ORD');
     expect(ord, 'clase ORD ordinaria creada').toBeDefined();
     expect(ord!.voting_rights).toBe(true);
 
-    // 5. governing_bodies — 2 órganos seed (Junta + CdA)
+    const { data: holdings, error: hErr } = await client
+      .from('capital_holdings')
+      .select('holder_person_id, share_class_id, numero_titulos, voting_rights, is_treasury')
+      .eq('entity_id', createdEntityId);
+    expect(hErr, 'read capital_holdings').toBeNull();
+    expect(holdings?.length ?? 0, 'holding inicial').toBe(1);
+    expect(holdings![0].share_class_id).toBe(ord!.id);
+    expect(holdings![0].numero_titulos).toBe(60000);
+    expect(holdings![0].voting_rights).toBe(true);
+    expect(holdings![0].is_treasury).toBe(false);
+
     const { data: bodies, error: bErr } = await client
       .from('governing_bodies')
-      .select('name, body_type, slug')
+      .select('id, name, body_type, slug, config')
       .eq('entity_id', createdEntityId);
     expect(bErr, 'read bodies').toBeNull();
     expect(bodies?.length ?? 0, '2 órganos seed creados').toBeGreaterThanOrEqual(2);
@@ -351,13 +400,33 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper', () => 
     expect(junta, 'Junta General creada').toBeDefined();
     expect(cda, 'CdA creado').toBeDefined();
     expect(junta!.name).toMatch(/Junta General/i);
+    expect(cda!.config).toMatchObject({ organo_tipo: 'CONSEJO_ADMIN', min_consejeros: 1 });
 
-    // Sin errores fatales en browser
+    const { data: cargos, error: cErr } = await client
+      .from('condiciones_persona')
+      .select('tipo_condicion, estado, person_id, body_id')
+      .eq('entity_id', createdEntityId)
+      .in('tipo_condicion', ['PRESIDENTE', 'SECRETARIO']);
+    expect(cErr, 'read condiciones_persona').toBeNull();
+    expect(cargos?.map((cargo) => cargo.tipo_condicion).sort()).toEqual(['PRESIDENTE', 'SECRETARIO']);
+    expect(cargos?.every((cargo) => cargo.estado === 'VIGENTE' && cargo.body_id === cda!.id)).toBe(true);
+
+    const { data: settings, error: setErr } = await client
+      .from('entity_settings')
+      .select('key')
+      .eq('entity_id', createdEntityId);
+    expect(setErr, 'read entity_settings').toBeNull();
+    expect(settings?.length ?? 0, 'entity_settings D6').toBeGreaterThan(0);
+
     expect(
-      browserErrors.filter((e) =>
-        /relation .* does not exist|column .* does not exist|permission denied|RLS/i.test(e),
+      browserErrors.filter((err) =>
+        /relation .* does not exist|column .* does not exist|permission denied|RLS/i.test(err),
       ),
-      'no fatal errors during sociedad alta UI flow',
+      'no fatal browser errors during sociedad alta UI flow',
+    ).toEqual([]);
+    expect(
+      networkFails.filter((err) => !/permission denied for table migrations/i.test(err)),
+      'no Supabase REST/RPC failures during sociedad alta UI flow',
     ).toEqual([]);
   });
 });

@@ -94,8 +94,9 @@ export async function archiveDocxToStorage(
       }
     }
 
-    // Upload to Supabase Storage
-    const storagePath = `agreements/${agreementId}/${filename}.docx`;
+    // F3.G3: path schema con tenant prefix (era `agreements/${id}/...`).
+    // Forma nueva: `<tenant_id>/<agreement_id>/<filename>.docx`.
+    const storagePath = `${tenantId}/${agreementId}/${filename}.docx`;
     const archivedAt = new Date().toISOString();
     const { error: uploadError, data } = await supabase.storage
       .from("matter-documents")
@@ -111,19 +112,14 @@ export async function archiveDocxToStorage(
       };
     }
 
-    // Get signed URL (7 days validity)
-    const { data: urlData } = supabase.storage
-      .from("matter-documents")
-      .getPublicUrl(storagePath);
-
-    const publicUrl = urlData?.publicUrl;
-
-    if (!publicUrl) {
-      return {
-        ok: false,
-        error: "No se pudo obtener la URL pública del documento",
-      };
-    }
+    // F3.G3: ya NO se llama supabase.storage public URL helper — el bucket es
+    // privado y la URL pública devuelve 403. El acceso pasa por la Edge
+    // Function `sign-evidence-url` invocada vía `useEvidenceBundleSignedUrl`.
+    // Para mantener la condición legacy `if (document_url)` en componentes que
+    // aún no se han refactorizado, poblamos `document_url` con un sentinel
+    // `evidence-bundle://<path>` que no es navegable pero permite distinguir
+    // "archivado" de "no archivado".
+    const sentinelUrl = `evidence-bundle://${storagePath}`;
 
     const manifest = {
       version: "docgen-process-v2",
@@ -145,14 +141,18 @@ export async function archiveDocxToStorage(
     };
     const manifestHash = await computeSha256(canonicalJson(manifest));
 
-    // Insert into evidence_bundles table
+    // Insert into evidence_bundles table.
+    // F3.G15: populamos `storage_path` (forma nueva, source of truth para
+    // la Edge Function sign-evidence-url) y `document_url` con sentinel
+    // (compat con legacy callers).
     const { data: bundle, error: insertError } = await supabase.from("evidence_bundles").insert({
       tenant_id: tenantId,
       agreement_id: agreementId,
       manifest,
       manifest_hash: manifestHash,
       hash_sha512: hashHex,
-      document_url: publicUrl,
+      storage_path: storagePath,
+      document_url: sentinelUrl,
       signed_by: metadata.signedBy ?? "SISTEMA",
       status: "OPEN",
     }).select("id").maybeSingle();
@@ -160,7 +160,7 @@ export async function archiveDocxToStorage(
     if (insertError) {
       return {
         ok: false,
-        documentUrl: publicUrl,
+        documentUrl: sentinelUrl,
         hash512: hashHex,
         error: `Evidence bundle no creado: ${insertError.message}`,
       };
@@ -169,7 +169,7 @@ export async function archiveDocxToStorage(
     if (!bundle?.id) {
       return {
         ok: false,
-        documentUrl: publicUrl,
+        documentUrl: sentinelUrl,
         hash512: hashHex,
         error: "Evidence bundle no creado: la inserción no devolvió identificador",
       };
@@ -177,7 +177,7 @@ export async function archiveDocxToStorage(
 
     return {
       ok: true,
-      documentUrl: publicUrl,
+      documentUrl: sentinelUrl,
       hash512: hashHex,
       evidenceBundleId: bundle.id,
     };

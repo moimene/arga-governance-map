@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync(
   join(
     process.cwd(),
-    "supabase/migrations/20260513_000067_personas_cargos_vacancia_scan_filters.sql",
+    "supabase/migrations/20260512183903_personas_cargos_vacancia_scan_filters.sql",
   ),
   "utf8",
 );
@@ -13,7 +13,7 @@ const migration = readFileSync(
 const toneMigration = readFileSync(
   join(
     process.cwd(),
-    "supabase/migrations/20260513_000068_vacancia_notification_tones.sql",
+    "supabase/migrations/20260512185033_personas_cargos_vacancia_notification_tones.sql",
   ),
   "utf8",
 );

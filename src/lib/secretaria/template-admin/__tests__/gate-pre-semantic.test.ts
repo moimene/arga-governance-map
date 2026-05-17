@@ -63,4 +63,79 @@ describe("gate-pre-semantic", () => {
     );
     expect(r.some((i) => i.code === "SEM_RATIFICACION_IDENTIFICACION")).toBe(false);
   });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: MODELO_ACUERDO ACTIVA con organo_tipo NULL → BLOCKING", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "MODELO_ACUERDO",
+        estado: "ACTIVA",
+        organo_tipo: null as never,
+        materia: "NOMBRAMIENTO_CONSEJERO",
+        capa1_inmutable: "ok",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(true);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: ACTA ACTIVA con adoption_mode vacío → BLOCKING", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "ACTA",
+        estado: "ACTIVA",
+        adoption_mode: "" as never,
+        materia: "NOMBRAMIENTO_CONSEJERO",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(true);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: DECISION ACTIVA con referencia_legal NULL → BLOCKING", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "DECISION",
+        estado: "ACTIVA",
+        referencia_legal: null as never,
+        materia: "NOMBRAMIENTO_CONSEJERO",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(true);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: MODELO_ACUERDO ACTIVA con todos los campos OK → no fires", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "MODELO_ACUERDO",
+        estado: "ACTIVA",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        referencia_legal: "Art. 160 LSC",
+        materia: "NOMBRAMIENTO_CONSEJERO",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: tipo no en (MODELO_ACUERDO|ACTA|DECISION) → regla no aplica", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "CONVOCATORIA" as never,
+        estado: "ACTIVA",
+        organo_tipo: null as never,
+        adoption_mode: null as never,
+        referencia_legal: null as never,
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: estado BORRADOR no dispara la regla aunque falten campos", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "MODELO_ACUERDO",
+        estado: "BORRADOR",
+        organo_tipo: null as never,
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
 });
