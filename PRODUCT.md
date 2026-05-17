@@ -14,6 +14,10 @@ TGMS Platform is an advanced governance prototype for Grupo ARGA Seguros. It com
 
 Success means the product is credible for executive review, honest about demo versus productive posture, and navigable as a working prototype without hidden schema assumptions.
 
+## Operational Environment
+
+Until the prototype reaches pre-release stability, `governance_OS` (`hzqwefkwsxopwrmtksbg`) remains the active development-demo Supabase project and the source of truth for connected product behavior. Staging is a future/pre-release isolation capability and must not block prototype evolution.
+
 ## Brand Personality
 
 Expert, restrained, institutional. The interface should project legal rigor, operational confidence and calm command of complex governance workflows.

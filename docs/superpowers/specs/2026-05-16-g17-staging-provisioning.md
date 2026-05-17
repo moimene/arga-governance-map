@@ -3,8 +3,15 @@
 **Fecha:** 2026-05-16
 **Plan:** docs/superpowers/plans/2026-05-16-tgms-gaps-coverage-plan-v1.md §6
 **Owner decision (2026-05-16):** autorizado a provisionar.
+**Política superior (2026-05-17):** `governance_OS` sigue siendo el entorno activo de desarrollo-test-demo hasta estabilidad pre-release. Staging queda diferido y no bloquea la evolución del prototipo. Ver `2026-05-17-governance-os-active-dev-environment-policy.md`.
 
 > Este documento describe los pasos para crear el proyecto Supabase staging que aísla los E2E destructivos del proyecto demo `governance_OS`. La creación del proyecto requiere ejecutar comandos en el dashboard de Supabase (no es scriptable sin un PAT con privilegio elevado), por lo que aquí se documentan los pasos a seguir manualmente y los secrets GitHub que deben configurarse al finalizar.
+
+## §0 Requisito fundamental vigente
+
+No crear ni exigir staging como precondición para continuar el desarrollo. Mientras el prototipo no esté estable, las migraciones, seeds y fixes siguen aplicándose sobre `governance_OS` con `bun run db:check-target` previo.
+
+Este runbook debe ejecutarse solo cuando se active una fase pre-release, se congele la demo para presentaciones o los E2E destructivos requieran aislamiento sistemático.
 
 ## §1 Decisión owner
 
@@ -68,11 +75,13 @@ Repository → Settings → Secrets and variables → Actions → New repository
 | `SUPABASE_STAGING_REF` | el project ref de §2.1 (e.g. `abcdefgh1234567`) |
 | `SUPABASE_STAGING_URL` | `https://<staging-ref>.supabase.co` |
 | `SUPABASE_STAGING_ANON_KEY` | anon key de §2.1 |
+| `SUPABASE_STAGING_SERVICE_ROLE_KEY` | service_role key de §2.1, solo para fixtures/cleanup E2E |
 
 Una vez configurados, el workflow `.github/workflows/e2e-destructive.yml`:
-- Detecta `SUPABASE_STAGING_REF` no vacío → ejecuta el job.
+- Detecta `SUPABASE_STAGING_REF`, `SUPABASE_STAGING_URL`, `SUPABASE_STAGING_ANON_KEY` y `SUPABASE_STAGING_SERVICE_ROLE_KEY` no vacíos → ejecuta el job.
 - Verifica que el ref **no** sea `hzqwefkwsxopwrmtksbg` (demo) y aborta si lo es.
 - Corre `e2e/43-*` y `e2e/45-*` con `SECRETARIA_E2E_DESTRUCTIVE=1`.
+- La autenticación/login de desarrollo-test-demo queda deliberadamente flexible: este runbook no impone todavía si staging debe usar usuario demo clonado, usuario `staging-e2e@example.invalid` o credenciales inyectadas por workflow.
 
 ### 2.5 Validación post-provisioning
 
@@ -102,13 +111,13 @@ gh workflow run e2e-destructive.yml
 
 Si el staging causa más fricción que valor:
 
-1. Revoke los 3 secrets de GitHub (`SUPABASE_STAGING_*`).
+1. Revoke los 4 secrets de GitHub (`SUPABASE_STAGING_*`).
 2. Pause/delete el proyecto Supabase desde el dashboard.
 3. El workflow `e2e-destructive.yml` detecta `SUPABASE_STAGING_REF` vacío → emite warning `staging-not-configured` y termina sin ejecutar tests.
 
-## §5 Pendiente — handoff humano
+## §5 Pendiente — handoff humano diferido
 
-Este documento es la fase 1 de G17: documentar el procedimiento. La fase 2 (ejecutar §2.1–§2.4) requiere acceso al dashboard de Supabase de la organización, que está fuera del alcance del agente. Estado actual:
+Este documento es la fase 1 de G17: documentar el procedimiento. La fase 2 (ejecutar §2.1–§2.4) requiere acceso al dashboard de Supabase de la organización y queda diferida hasta pre-release o decisión explícita. Estado actual:
 
 - ✅ Documento provisioning runbook
 - ✅ GitHub workflow `.github/workflows/e2e-destructive.yml` configurado con guards
@@ -116,6 +125,8 @@ Este documento es la fase 1 de G17: documentar el procedimiento. La fase 2 (ejec
 - ⏳ Configurar secrets en GitHub → owner
 - ⏳ Ejecutar primer workflow manual → owner
 - ⏳ Crear `scripts/seed-staging-synthetic.ts` (sprint posterior)
+- ⏳ Resolver estrategia de login de staging → owner/dev, deliberadamente flexible durante desarrollo-test-demo
+- ✅ Desarrollo actual continúa sobre `governance_OS` original
 
 ---
 

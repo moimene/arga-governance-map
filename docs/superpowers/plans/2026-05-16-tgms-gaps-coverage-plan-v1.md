@@ -819,6 +819,10 @@ F5 paralelo a F4.
 
 Tras una sesión de implementación + ciclo adversarial codex (commits `6d1b63e..0cca276`, PR #36), el estado de cada gap es:
 
+### Requisito fundamental operativo — 2026-05-17
+
+Mientras TGMS/ARGA siga en fase desarrollo-test-demo y el prototipo no esté estable para pre-release, `governance_OS` (`hzqwefkwsxopwrmtksbg`) sigue siendo la fuente de verdad y el entorno activo para migraciones, seeds, fixes y validación funcional. G17 staging queda diferido: no bloquea el desarrollo actual, solo pre-release/productiva o E2E destructivos con aislamiento sistemático. Política canónica: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-environment-policy.md`.
+
 ### F0 — Estabilización gate
 
 | Gap | Estado | Commit | Evidencia |
@@ -856,10 +860,10 @@ Tras una sesión de implementación + ciclo adversarial codex (commits `6d1b63e.
 | Gap | Estado | Commit | Evidencia |
 |---|---|---|---|
 | G16 — RPC `fn_promover_sociedad_operativa` | ✅ CERRADO + TOCTOU cerrado en F6 | `14418a5`, `0cca276` | RPC + frontend refactor + `SELECT FOR UPDATE` + `pg_advisory_xact_lock` |
-| G17 — Staging Supabase | ⚠️ PENDIENTE HANDOFF | `14418a5` | Runbook completo en docs; ejecución dashboard pendiente del owner |
+| G17 — Staging Supabase | ⚠️ DIFERIDO PRE-RELEASE | `14418a5` | Runbook completo en docs; no bloquea desarrollo-test-demo porque `governance_OS` sigue siendo entorno activo |
 | G8 — Drift ledger histórico | ✅ VALIDADO ALINEADO | (n/a) | `supabase migration list --linked` 0 drift filas |
 | G10 — Code splitting | ✅ CERRADO | `14418a5` | Vendor chunks split (handlebars/xlsx/docx/zod/supabase/react); Lighthouse pending |
-| G12 — CI E2E destructivo | ⚠️ PARCIAL | `14418a5` | Workflow YAML configurado; bloqueado por G17 staging + P1 #11 cliente env-driven |
+| G12 — CI E2E destructivo | ⚠️ PARCIAL / DIFERIDO | `14418a5` + post-review | Workflow YAML configurado; P1 #11 cliente/env/E2E guards cerrado; ejecución real diferida hasta staging/pre-release |
 | G20 — Observability | ⚠️ PARCIAL | `14418a5` | Módulo OTel + helpers + doc Sentinel rules; sink default `console.warn` (Edge Function feed siguiente sprint) |
 
 ### F5 — Garantía externa
@@ -880,7 +884,8 @@ Tras una sesión de implementación + ciclo adversarial codex (commits `6d1b63e.
 | P1 #8 audit delta perdió campos | ❌ RECHAZADO con evidencia | (verificación) | Body original tiene mismos campos — codex alucinó |
 | P1 #9 status gate goodhart | ✅ CERRADO | `0cca276` | Edge Function selecciona `status` y bloquea no-releasable |
 | P1 #10 TOCTOU promoción | ✅ CERRADO | `0cca276` | `SELECT FOR UPDATE` + advisory xact lock |
-| P1 #6, #7, #11, P2 #12, #13 | ⚠️ DEFERRED | (doc) | Documentados como follow-up en migration header |
+| P1 #6, #7, P2 #12, #13 | ⚠️ DEFERRED | (doc) | Documentados como follow-up en migration header |
+| P1 #11 staging env-driven | ✅ CERRADO post-review | post-review | Cliente Supabase, workflow y guards Playwright leen env vars con fallback demo |
 
 ### Cierre mecánico final
 
@@ -890,7 +895,7 @@ schema tests (Cloud-touching)         110/110 pass del plan
 build (vite)                          pass — vendor chunks split
 supabase migration list --linked      0 drift
 supabase db push                      F0–F6 todas aplicadas a Cloud
-codex challenge (174k tokens)         12/13 hallazgos correctos, 7 cerrados, 5 deferred, 1 rechazado con evidencia
+codex challenge (174k tokens)         12/13 hallazgos correctos, 8 cerrados post-review, 4 deferred, 1 rechazado con evidencia
 ```
 
 **Estimación real vs plan v1**: el plan v1 estimaba 9–11 sprints. La ejecución consumió 1 sesión continua porque codex como adversarial independiente comprimió el ciclo de feedback que normalmente requiere code review humano + iteración.

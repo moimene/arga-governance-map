@@ -3,8 +3,9 @@
 **Fecha:** 2026-05-17
 **Origen:** Plan v1 [`2026-05-16-tgms-gaps-coverage-plan-v1.md`](./2026-05-16-tgms-gaps-coverage-plan-v1.md) §13
 **PR del carril:** [`#36`](https://github.com/moimene/arga-governance-map/pull/36) en `codex/secretaria-d6-e2e-debt` → `main`
+**Política superior 2026-05-17:** `governance_OS` sigue siendo el entorno activo de desarrollo-test-demo. Staging queda diferido y no bloquea la evolución del prototipo.
 
-> Inventario completo de lo que NO está cerrado tras la implementación de F0–F6.
+> Inventario completo de lo que queda pendiente tras la implementación de F0–F6 y la corrección técnica posterior de P1 #11.
 > Cada item incluye categoría, qué bloquea, quién es owner, plazo y referencias.
 
 ---
@@ -13,18 +14,18 @@
 
 | Categoría | Items | Bloquea productiva | Bloquea demo |
 |---|---:|---|---|
-| Handoffs humanos (acción externa requerida) | 4 | Sí (G17, G19) | No |
+| Handoffs humanos/técnicos pendientes | 3 | Sí (G17, G19) | No |
 | Decisiones colegiadas pendientes | 1 | Parcial (G7) | No |
 | Deuda intencional documentada | 7 | No (todos deferred con razón) | No |
 | Drift histórico identificado | 2 | No | No |
-| **Total pendientes** | **14** | **2** | **0** |
+| **Total pendientes** | **13** | **2** | **0** |
 
-**Veredicto demo:** GO sin pendientes bloqueantes.
-**Veredicto productiva:** NO-GO hasta cerrar G17 + G19 (supabase_admin) + P1 #11 (client env-driven).
+**Veredicto desarrollo-test-demo:** GO. `governance_OS` continúa como fuente de verdad y se puede seguir evolucionando.
+**Veredicto productiva/pre-release:** NO-GO hasta cerrar G17 + G19 (supabase_admin). P1 #11 queda corregido a nivel código/workflow; la estrategia de login de staging queda deliberadamente flexible durante desarrollo-test-demo.
 
 ---
 
-## §2 Handoffs humanos — acción externa requerida
+## §2 Handoffs y cierres técnicos
 
 ### H1 — G17 Staging Supabase provisioning
 
@@ -33,20 +34,21 @@
 | **Categoría** | Handoff humano (dashboard Supabase) |
 | **Bloquea** | Productiva + workflow `e2e-destructive.yml` (no puede correr sin staging real) |
 | **Owner** | Operaciones / DevOps del proyecto (acceso al dashboard Supabase organizacional) |
-| **Plazo sugerido** | Antes del primer release a producción real |
+| **Plazo sugerido** | Diferido hasta pre-release o antes del primer release a producción real |
 | **Coste** | $0/mes (Free tier alcanza para E2E semanales) |
 | **Runbook** | `docs/superpowers/specs/2026-05-16-g17-staging-provisioning.md` |
 
-**Tareas concretas que necesita ejecutar el owner**:
+**Tareas concretas que necesita ejecutar el owner cuando se active pre-release**:
 
 1. Crear proyecto Supabase `governance-os-staging` (eu-central-1, Free tier).
 2. Anotar `project_ref`, URL, anon key, service_role key.
 3. Ejecutar `supabase link --project-ref <staging-ref>` + `supabase db push --linked` para clonar el schema.
 4. Crear script `scripts/seed-staging-synthetic.ts` con un tenant sintético (UUID aleatorio, NO el demo `00000000-…-0001`).
-5. Configurar 3 secrets en GitHub Actions:
+5. Configurar 4 secrets en GitHub Actions:
    - `SUPABASE_STAGING_REF`
    - `SUPABASE_STAGING_URL`
    - `SUPABASE_STAGING_ANON_KEY`
+   - `SUPABASE_STAGING_SERVICE_ROLE_KEY`
 6. Disparo manual del workflow `e2e-destructive.yml` para validar.
 
 **Validación de cierre**: workflow ejecutado verde con `EXPECTED_PROJECT_REF != hzqwefkwsxopwrmtksbg`.
@@ -62,7 +64,7 @@
 | **Owner** | Account owner del proyecto Supabase con acceso a soporte |
 | **Plazo sugerido** | Antes del primer release a producción real |
 | **Razón del handoff** | El rol `postgres` que ejecuta nuestras migraciones no tiene privilegio para alterar defaults de `supabase_admin`. Solo el equipo de Supabase puede hacerlo. |
-| **Migración que documenta el estado** | `20260516120004_f2_g2_g19_revoke_public_execute.sql` líneas 122-130 |
+| **Migración que documenta el estado** | `20260516120004_f2_g2_g19_revoke_public_execute.sql` líneas 140-145 |
 
 **Tareas**:
 
@@ -80,38 +82,28 @@
 
 ---
 
-### H3 — P1 #11 Cliente Supabase env-driven
+### H3 — P1 #11 Cliente Supabase env-driven — ✅ cerrado post-review
 
 | Campo | Valor |
 |---|---|
-| **Categoría** | Handoff técnico (refactor en código) |
-| **Bloquea** | Workflow `e2e-destructive.yml` real contra staging (depende de H1) |
-| **Owner** | Cualquier dev con acceso al repo (refactor pequeño ~30 min) |
-| **Plazo sugerido** | Inmediatamente después de cerrar H1 |
-| **Archivo** | `src/integrations/supabase/client.ts` |
+| **Categoría** | Cierre técnico |
+| **Bloquea** | Nada pendiente tras corrección; se validará end-to-end cuando H1 exista |
+| **Owner** | Dev |
+| **Archivo principal** | `src/integrations/supabase/client.ts` |
+| **Archivos de guard** | `.github/workflows/e2e-destructive.yml`, `e2e/43-secretaria-phase-b7-sociedad-nueva-ui-driving.spec.ts`, `e2e/fixtures/secretaria-isolated-tenant.ts` |
 
-**Estado actual**:
-
-```typescript
-// src/integrations/supabase/client.ts:4-6
-const SUPABASE_URL = "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = "<hardcoded>";
-```
-
-El cliente está cableado al demo. Si el workflow E2E destructive intenta apuntar a staging vía env vars, los tests siguen tocando demo porque el cliente ignora las env vars.
-
-**Fix requerido**:
+**Estado corregido**:
 
 ```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-  ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-  ?? "<hardcoded-demo-fallback>";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEMO_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEMO_SUPABASE_ANON_KEY;
 ```
 
-Con el fallback al demo si las env vars no están seteadas (no rompe build local), pero el workflow CI puede inyectar `VITE_SUPABASE_URL=<staging>` y los tests E2E se redirigen.
+Además, los guards de Playwright leen `process.env.EXPECTED_PROJECT_REF` con fallback al demo, y el workflow mapea `SUPABASE_STAGING_SERVICE_ROLE_KEY` a `SUPABASE_SERVICE_ROLE_KEY` porque los fixtures destructivos usan service role para preparar/limpiar datos.
 
-**Validación de cierre**: `grep "hzqwefkwsxopwrmtksbg" src/` solo aparece en el fallback default; CI con env vars apunta a staging.
+**Queda fuera por decisión owner**: estrategia de login/autenticación staging. Durante desarrollo-test-demo se mantiene flexible y no bloquea este cierre técnico.
+
+**Validación de cierre**: tests F4 comprueban cliente env-driven, guards `EXPECTED_PROJECT_REF` y service role secret de staging. El workflow real se validará cuando H1 esté provisionado.
 
 ---
 
@@ -267,7 +259,9 @@ Estos 5 hallazgos del adversarial review codex se aceptaron como deuda con razó
 
 | Prioridad | Items | Plazo sugerido | Bloquea |
 |---|---|---|---|
-| **P0 productiva** | H1 (G17 staging), H2 (G19 supabase_admin), H3 (P1 #11 client env-driven) | Antes del 1er release real | Sí |
+| **P0 productiva/pre-release** | H1 (G17 staging), H2 (G19 supabase_admin) | Antes del 1er release real | Sí |
+| **P0 desarrollo-test-demo** | Mantener `governance_OS` como entorno activo, con `db:check-target` antes de tocar Cloud | Vigente hasta estabilidad pre-release | Sí |
+| **Cierre técnico validado** | H3 (P1 #11 client/env/E2E guards env-driven) | Cerrado post-review; revalidar cuando H1 exista | No |
 | **P1 producto** | D1 (G7 decisión legal) | 2026-07-15 | Workflow revisión legal |
 | **P2 hardening** | DI1 (G1 polpermissive), DI2 (G2 scope), DI3 (live contract tests) | 2do release | Robustez productiva |
 | **P3 cleanup** | DI4 (000052 retire), DI5 (state-snapshot.yaml), DR1+DR2 (drift restore) | Sprints cleanup | Higiene operativa |
@@ -281,7 +275,7 @@ Estos 5 hallazgos del adversarial review codex se aceptaron como deuda con razó
 | Owner | Responsabilidades |
 |---|---|
 | **Operaciones / DevOps** | H1 (G17 dashboard), H2 (G19 supabase support ticket), H4 (Sentinel workspace) |
-| **Desarrollador** | H3 (P1 #11 refactor cliente), DI1, DI2, DI3, DI4, DI5, DR1, DR2 |
+| **Desarrollador** | DI1, DI2, DI3, DI4, DI5, DR1, DR2; H3 solo revalidación cuando H1 exista |
 | **SECRETARIO / COMPLIANCE / Comité Legal Garrigues** | D1 (G7 decisión) |
 | **Product / Comercial** | Activación DI6 (G18 intra-tenant scope) cuando un cliente lo requiera contractualmente |
 
@@ -289,12 +283,12 @@ Estos 5 hallazgos del adversarial review codex se aceptaron como deuda con razó
 
 ## §8 Estado final del plan v1
 
-- **20 gaps del plan v1**: 16 cerrados, 4 con dependencia externa (G7, G17, G19 supabase_admin, G12 staging).
-- **8 hallazgos adversariales codex aceptados**: 7 cerrados (5 P0 + 2 P1), 5 deferred con razón documentada.
+- **20 gaps del plan v1**: 16 cerrados, 4 con dependencia externa/owner (G7, G17, G19 supabase_admin, G12 staging). P1 #11 se cerró como corrección técnica posterior.
+- **13 hallazgos adversariales codex**: 12 correctos (7 cerrados + 5 deferred originalmente), 1 rechazado con evidencia; P1 #11 ya no queda deferred.
 - **1 hallazgo codex rechazado con evidencia** (P1 #8 audit delta).
 - **2 drift históricos identificados** (DR1, DR2): no bloqueantes, restauración en sprint cleanup.
 
-**Demo: GO. Productiva: NO-GO hasta cerrar §6 P0 productiva (H1+H2+H3).**
+**Desarrollo-test-demo: GO sobre `governance_OS`. Productiva/pre-release: NO-GO hasta cerrar §6 P0 productiva (H1+H2).**
 
 ---
 

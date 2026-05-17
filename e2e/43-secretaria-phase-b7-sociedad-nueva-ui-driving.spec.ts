@@ -20,7 +20,8 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-const EXPECTED_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const DEFAULT_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const EXPECTED_PROJECT_REF = cleanEnvValue(process.env.EXPECTED_PROJECT_REF) ?? DEFAULT_PROJECT_REF;
 const DEFAULT_SECRET_ENV_FILE = 'docs/superpowers/plans/.env';
 
 type ServiceClient = SupabaseClient;

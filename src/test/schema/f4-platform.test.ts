@@ -18,12 +18,35 @@ const e2eDestructiveYml = readFileSync(
   join(process.cwd(), ".github/workflows/e2e-destructive.yml"),
   "utf8",
 );
+const supabaseClient = readFileSync(
+  join(process.cwd(), "src/integrations/supabase/client.ts"),
+  "utf8",
+);
+const phaseB7E2e = readFileSync(
+  join(process.cwd(), "e2e/43-secretaria-phase-b7-sociedad-nueva-ui-driving.spec.ts"),
+  "utf8",
+);
+const isolatedTenantFixture = readFileSync(
+  join(process.cwd(), "e2e/fixtures/secretaria-isolated-tenant.ts"),
+  "utf8",
+);
 const observability = readFileSync(
   join(process.cwd(), "src/lib/telemetry/observability.ts"),
   "utf8",
 );
 const stagingDoc = readFileSync(
   join(process.cwd(), "docs/superpowers/specs/2026-05-16-g17-staging-provisioning.md"),
+  "utf8",
+);
+const governanceOsPolicyDoc = readFileSync(
+  join(process.cwd(), "docs/superpowers/specs/2026-05-17-governance-os-active-dev-environment-policy.md"),
+  "utf8",
+);
+const agentsDoc = readFileSync(join(process.cwd(), "AGENTS.md"), "utf8");
+const claudeDoc = readFileSync(join(process.cwd(), "CLAUDE.md"), "utf8");
+const readmeDoc = readFileSync(join(process.cwd(), "README.md"), "utf8");
+const secretariaMemoryDoc = readFileSync(
+  join(process.cwd(), "docs/superpowers/plans/2026-05-07-secretaria-carril-memoria-avances.md"),
   "utf8",
 );
 
@@ -79,23 +102,39 @@ describe("F4.G10 — bundle code-splitting (vendor chunks)", () => {
 });
 
 describe("F4.G12 — E2E destructive CI workflow", () => {
+  it("app Supabase client is env-driven with demo fallback", () => {
+    expect(supabaseClient).toMatch(/import\.meta\.env\.VITE_SUPABASE_URL\s*\|\|\s*DEMO_SUPABASE_URL/);
+    expect(supabaseClient).toMatch(/import\.meta\.env\.VITE_SUPABASE_ANON_KEY\s*\|\|\s*DEMO_SUPABASE_ANON_KEY/);
+    expect(supabaseClient).toMatch(/https:\/\/hzqwefkwsxopwrmtksbg\.supabase\.co/);
+  });
+
   it("runs weekly on Monday 06:00 UTC", () => {
     expect(e2eDestructiveYml).toMatch(/cron:\s*"0 6 \* \* 1"/);
   });
 
-  it("sets SECRETARIA_E2E_DESTRUCTIVE=1 + ISOLATED_TENANT=1 + PHASE_B1=1", () => {
+  it("sets SECRETARIA_E2E_DESTRUCTIVE=1 + ISOLATED_TENANT=1 + PHASE_B1=1 + staging service role", () => {
     expect(e2eDestructiveYml).toMatch(/SECRETARIA_E2E_DESTRUCTIVE:\s*"1"/);
     expect(e2eDestructiveYml).toMatch(/SECRETARIA_E2E_ISOLATED_TENANT:\s*"1"/);
     expect(e2eDestructiveYml).toMatch(/SECRETARIA_E2E_PHASE_B1:\s*"1"/);
+    expect(e2eDestructiveYml).toMatch(/SUPABASE_SERVICE_ROLE_KEY:\s*\$\{\{\s*secrets\.SUPABASE_STAGING_SERVICE_ROLE_KEY\s*\}\}/);
   });
 
   it("aborts if target ref is governance_OS demo (hzqwefkwsxopwrmtksbg)", () => {
     expect(e2eDestructiveYml).toMatch(/EXPECTED_PROJECT_REF.*=\s*"hzqwefkwsxopwrmtksbg"/);
     expect(e2eDestructiveYml).toMatch(/E2E destructive workflow pointed at governance_OS/);
+    expect(e2eDestructiveYml).toMatch(/SUPABASE_STAGING_URL ref .* does not match SUPABASE_STAGING_REF/);
   });
 
-  it("emits staging-not-configured warning when secret missing", () => {
-    expect(e2eDestructiveYml).toMatch(/SUPABASE_STAGING_REF secret missing/);
+  it("emits staging-not-configured warning when any required staging env is missing", () => {
+    expect(e2eDestructiveYml).toMatch(/for name in EXPECTED_PROJECT_REF VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY/);
+    expect(e2eDestructiveYml).toMatch(/STAGING_NOT_CONFIGURED=1/);
+  });
+
+  it("E2E service clients accept EXPECTED_PROJECT_REF from staging env", () => {
+    expect(phaseB7E2e).toMatch(/process\.env\.EXPECTED_PROJECT_REF/);
+    expect(isolatedTenantFixture).toMatch(/process\.env\.EXPECTED_PROJECT_REF/);
+    expect(phaseB7E2e).toMatch(/DEFAULT_PROJECT_REF = 'hzqwefkwsxopwrmtksbg'/);
+    expect(isolatedTenantFixture).toMatch(/DEFAULT_PROJECT_REF = 'hzqwefkwsxopwrmtksbg'/);
   });
 });
 
@@ -132,14 +171,32 @@ describe("F4.G17 — staging provisioning runbook", () => {
     expect(stagingDoc).toMatch(/eu-central-1/);
   });
 
-  it("includes the 3 GitHub secrets the workflow expects", () => {
+  it("includes the 4 GitHub secrets the workflow expects", () => {
     expect(stagingDoc).toMatch(/SUPABASE_STAGING_REF/);
     expect(stagingDoc).toMatch(/SUPABASE_STAGING_URL/);
     expect(stagingDoc).toMatch(/SUPABASE_STAGING_ANON_KEY/);
+    expect(stagingDoc).toMatch(/SUPABASE_STAGING_SERVICE_ROLE_KEY/);
   });
 
   it("flags the manual provisioning steps as pending owner action", () => {
     expect(stagingDoc).toMatch(/owner/i);
     expect(stagingDoc).toMatch(/handoff humano/i);
+  });
+});
+
+describe("F4.G17 — governance_OS active development policy", () => {
+  it("marks governance_OS as the source of truth until pre-release stability", () => {
+    expect(governanceOsPolicyDoc).toMatch(/governance_OS/);
+    expect(governanceOsPolicyDoc).toMatch(/fuente de verdad operativa/);
+    expect(governanceOsPolicyDoc).toMatch(/Staging no bloquea el desarrollo actual/);
+    expect(governanceOsPolicyDoc).toMatch(/20260516120008/);
+  });
+
+  it("keeps the root agent docs and project README aligned with the policy", () => {
+    for (const doc of [agentsDoc, claudeDoc, readmeDoc, secretariaMemoryDoc]) {
+      expect(doc).toMatch(/governance_OS/);
+      expect(doc).toMatch(/pre-release/);
+      expect(doc).toMatch(/db:check-target/);
+    }
   });
 });

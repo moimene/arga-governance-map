@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 
 export const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 export const DEMO_ENTITY_ID = '6d7ed736-f263-4531-a59d-c6ca0cd41602';
-const EXPECTED_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const DEFAULT_PROJECT_REF = 'hzqwefkwsxopwrmtksbg';
+const EXPECTED_PROJECT_REF = cleanEnvValue(process.env.EXPECTED_PROJECT_REF) ?? DEFAULT_PROJECT_REF;
 const DEFAULT_SECRET_ENV_FILE = 'docs/superpowers/plans/.env';
 const SUPABASE_REST_OR_RPC = /\/rest\/v1\/|\/rpc\//;
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);

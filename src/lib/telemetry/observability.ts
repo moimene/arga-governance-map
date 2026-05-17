@@ -40,7 +40,6 @@ export type ObservabilityEvent = {
 type ObservabilitySink = (event: ObservabilityEvent) => void;
 
 let activeSink: ObservabilitySink = (event) => {
-  // eslint-disable-next-line no-console
   console.warn(
     "[observability]",
     JSON.stringify({
@@ -64,7 +63,6 @@ export function emitObservabilityEvent(event: ObservabilityEvent): void {
     });
   } catch (e) {
     // Telemetry must never crash the caller — log fallback only.
-    // eslint-disable-next-line no-console
     console.error("[observability] sink threw:", e);
   }
 }

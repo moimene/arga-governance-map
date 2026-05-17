@@ -27,14 +27,21 @@ jobs:
       EXPECTED_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_REF }}
       VITE_SUPABASE_URL: ${{ secrets.SUPABASE_STAGING_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_STAGING_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_STAGING_SERVICE_ROLE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Guard — staging configured
         run: |
-          if [ -z "${{ secrets.SUPABASE_STAGING_REF }}" ]; then
-            echo "::warning::SUPABASE_STAGING_REF secret missing. Provision staging (G17) before enabling this workflow."
+          missing=0
+          for name in EXPECTED_PROJECT_REF VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::warning::${name} is missing. Provision staging (G17) before enabling this workflow."
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
             echo "STAGING_NOT_CONFIGURED=1" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -58,6 +65,12 @@ jobs:
         run: |
           if [ "$EXPECTED_PROJECT_REF" = "hzqwefkwsxopwrmtksbg" ]; then
             echo "::error::E2E destructive workflow pointed at governance_OS (demo). Abort."
+            exit 1
+          fi
+          actual_ref="${VITE_SUPABASE_URL#https://}"
+          actual_ref="${actual_ref%%.*}"
+          if [ "$actual_ref" != "$EXPECTED_PROJECT_REF" ]; then
+            echo "::error::SUPABASE_STAGING_URL ref ($actual_ref) does not match SUPABASE_STAGING_REF ($EXPECTED_PROJECT_REF). Abort."
             exit 1
           fi
           echo "Target: $EXPECTED_PROJECT_REF (staging)"

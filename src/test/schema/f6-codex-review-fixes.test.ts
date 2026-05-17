@@ -89,7 +89,7 @@ describe("F6 — Edge Function sign-evidence-url hardening (P0 #4 + P1 #9)", () 
 describe("F6 — adversarial review findings disposition", () => {
   it("documents the rejection of P1 #8 (audit delta) with reason", () => {
     expect(migrationF6).toMatch(/P1 RECHAZADO:[\s\S]*?#8 fn_registrar_movimiento_capital.*audit delta perdió campos.*verificado/);
-    expect(migrationF6).toMatch(/los campos son IDÉNTICOS\.\s+--      Codex se equivocó/);
+    expect(migrationF6).toMatch(/los campos son IDÉNTICOS\.\s+-- {6}Codex se equivocó/);
   });
 
   it("documents the deferred follow-ups (P1 #6 #7 #11, P2 #12 #13)", () => {

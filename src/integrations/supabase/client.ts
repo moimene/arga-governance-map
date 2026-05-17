@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
 // External Supabase project (publishable values, safe in client)
-const SUPABASE_URL = "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY =
+const DEMO_SUPABASE_URL = "https://hzqwefkwsxopwrmtksbg.supabase.co";
+const DEMO_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEMO_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEMO_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

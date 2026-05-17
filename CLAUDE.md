@@ -101,19 +101,31 @@ En código, ambos modos están en este repo. La segregación a repos independien
 **Tenant demo:** `tenant_id = "00000000-0000-0000-0000-000000000001"`
 **Entidad canónica Cloud:** `entity_id = "6d7ed736-f263-4531-a59d-c6ca0cd41602"` (ARGA Seguros S.A.). El UUID `00000000-0000-0000-0000-000000000010` aparece en seeds/planes legacy y no debe tratarse como fuente canónica sin verificar.
 
+### Requisito fundamental Supabase — fase desarrollo-test-demo (2026-05-17)
+
+Hasta que el prototipo alcance estabilidad pre-release, **`governance_OS` (`hzqwefkwsxopwrmtksbg`) sigue siendo el entorno activo y fuente de verdad para desarrollo, demo y validación funcional**. Se debe seguir evolucionando este Supabase original con migraciones, seeds y fixes necesarios para el prototipo.
+
+Reglas:
+- Staging queda preparado pero **no bloquea** el desarrollo actual.
+- G17 staging es una capacidad futura/pre-release o para E2E destructivos cuando el prototipo requiera aislamiento sistemático.
+- Antes de tocar Supabase, ejecutar `bun run db:check-target` y confirmar `governance_OS`.
+- Todo cambio Cloud debe quedar reflejado en migraciones del repo y verificarse con `supabase migration list --linked`, MCP `supabase_migrations.schema_migrations` o `supabase db push --linked --dry-run` cuando el rol temporal del CLI esté disponible.
+- No tratar `governance_OS` como producción congelada todavía.
+
+Detalle canónico: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-environment-policy.md`.
+
 ---
 
-## Sincronización operativa — 2026-05-02
+## Sincronización operativa — actualizada 2026-05-17
 
 ### Guardrails activos
 
 - Antes de cualquier trabajo Supabase: `bun run db:check-target`.
-- No aplicar migraciones, no ejecutar `db push`, no regenerar tipos Supabase.
-- No crear tablas/columnas ni tocar RLS, RPC, storage o policies.
+- Se pueden aplicar migraciones, ejecutar `db push`, regenerar tipos Supabase y tocar RLS/RPC/storage/policies cuando sea necesario para evolucionar el prototipo, siempre con cambios forward-only, mirror en `supabase/migrations/` y verificación.
 - No promover evidence/legal hold como final: `000049_grc_evidence_legal_hold` permanece en HOLD.
 - No escribir en `governance_module_events` ni `governance_module_links`.
 - No mezclar `ai_*` legacy con `aims_*` backbone, ni `grc_*` futuro con tablas legacy, sin decisión explícita.
-- Si una tarea necesita schema, parar y documentar tabla/RPC/policy/storage exacto.
+- Si una tarea necesita schema, documentar tabla/RPC/policy/storage exacto, aplicar sobre `governance_OS` si procede y verificar target antes/después.
 
 ### Ownership actual
 
@@ -1111,9 +1123,9 @@ src/
 
 ## No hacer
 
-- No aplicar migraciones, no `db push`, no regenerar tipos Supabase.
-- No crear columnas/tablas ni tocar RLS/RPC/storage/policies.
-- No tocar Supabase sin ejecutar antes `bun run db:check-target`.
+- No tocar Supabase sin ejecutar antes `bun run db:check-target` y confirmar `governance_OS`.
+- No aplicar cambios Cloud sin espejo en `supabase/migrations/` o documento de excepción aprobado.
+- No usar staging como bloqueo del desarrollo-test-demo: hasta estabilidad pre-release, `governance_OS` sigue siendo el entorno activo.
 - No escribir en `governance_module_events` ni `governance_module_links`.
 - No declarar evidence/legal hold como final productivo; `000049` sigue HOLD.
 - No mezclar `ai_*` con `aims_*` ni tablas legacy GRC con `grc_*` sin contrato aprobado.
@@ -1153,7 +1165,9 @@ bun run build
 PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
-**Última verificación conocida (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/10-grc.spec.ts` + `e2e/16-sanitization-smoke.spec.ts` 16/16 incluyendo AIMS incidentes, GRC riesgos y Penal/Anticorrupción.
+**Verificación histórica (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/10-grc.spec.ts` + `e2e/16-sanitization-smoke.spec.ts` 16/16 incluyendo AIMS incidentes, GRC riesgos y Penal/Anticorrupción.
+
+**Verificación Supabase vigente (2026-05-17):** `db:check-target` pass contra `governance_OS`, `supabase migration list --linked` alineado local/remoto hasta `20260516120008`, MCP `get_project_url` apunta a `https://hzqwefkwsxopwrmtksbg.supabase.co`, MCP `schema_migrations` confirma última versión remota `20260516120008`.
 
 ## Supabase Cloud
 
