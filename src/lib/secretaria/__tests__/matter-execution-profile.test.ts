@@ -592,6 +592,55 @@ describe("MatterExecutionProfile", () => {
     }));
   });
 
+  it("bloquea APLICACION_RESULTADO si no hay cuentas aprobadas", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "APLICACION_RESULTADO",
+      rulePackPayload: rulePack({ id: "rp-aplicacion", materia: "APLICACION_RESULTADO" }),
+    }));
+
+    expect(profile.prerequisitos).toContainEqual(expect.objectContaining({
+      materia_requerida: "APROBACION_CUENTAS",
+      estado_minimo: "APROBADO",
+      severity: "BLOCKING",
+    }));
+  });
+
+  it("exige subtipo para DISOLUCION y documentacion condicional para EMISION_OBLIGACIONES", () => {
+    const disolucion = buildMatterExecutionProfile(profileInput({
+      materia: "DISOLUCION",
+      rulePackPayload: rulePack({ id: "rp-disolucion", materia: "DISOLUCION" }),
+    }));
+    const emision = buildMatterExecutionProfile(profileInput({
+      materia: "EMISION_OBLIGACIONES",
+      rulePackPayload: rulePack({ id: "rp-emision", materia: "EMISION_OBLIGACIONES" }),
+    }));
+
+    expect(disolucion.gaps).toContainEqual(expect.objectContaining({
+      code: "SUBTIPO_DISOLUCION_PENDIENTE",
+      severity: "BLOCKING",
+    }));
+    expect(emision.gaps).toContainEqual(expect.objectContaining({
+      code: "SUBTIPO_EMISION_OBLIGACIONES_PENDIENTE",
+      severity: "WARNING",
+    }));
+    expect(emision.documentacion.informes_preceptivos).toContain("Informe de administradores si convertible/canjeable");
+  });
+
+  it("escala AUTORIZACION_GARANTIA de Consejo a Junta si se activa un trigger legal", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "AUTORIZACION_GARANTIA",
+      organo_tipo: "CONSEJO_ADMIN",
+      paramOverrides: [overrideParam("porcentaje_activo", 25)],
+      rulePackPayload: rulePack({ id: "rp-garantia", materia: "AUTORIZACION_GARANTIA" }),
+    }));
+
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "GARANTIA_CONSEJO_ESCALA_JUNTA",
+      severity: "BLOCKING",
+      risk_flag: "IMPUGNABILIDAD",
+    }));
+  });
+
   it("calcula campos_a_actualizar cruzando la materia con capa3Schema", () => {
     const capa3Schema: NormalizedCapa3Field[] = [
       { campo: "ejercicio", obligatoriedad: "OBLIGATORIO", descripcion: "Ejercicio" },

@@ -218,4 +218,79 @@ describe("Matter Registry", () => {
     expect(entry.rule_pack_name).toBe("CESE_CONSEJERO Consejo");
     expect(entry.rule_pack_version_label).toBe("1.1.0");
   });
+
+  it("normaliza CONSEJO y CDA contra bindings y rule packs CONSEJO_ADMIN", () => {
+    const entry = resolveMatterRegistryFromRows(
+      {
+        tenantId,
+        materia: "AUTORIZACION_GARANTIA",
+        organoTipo: "CDA",
+        adoptionMode: "MEETING",
+      },
+      {
+        bindings: [
+          binding({
+            id: "binding-garantia-consejo",
+            materia: "AUTORIZACION_GARANTIA",
+            template_id: "tpl-garantia-consejo",
+            organo_tipo: "CONSEJO",
+          }),
+        ],
+        templates: [
+          template({
+            id: "tpl-garantia-consejo",
+            materia_acuerdo: "AUTORIZACION_GARANTIA",
+            organo_tipo: "CONSEJO_ADMIN",
+          }),
+        ],
+        rulePacks: [
+          rulePack({
+            id: "rp-garantia-consejo",
+            materia: "AUTORIZACION_GARANTIA",
+            organo_tipo: "CONSEJO",
+            descripcion: "Garantia Consejo",
+          }),
+        ],
+        effectiveRule: { matter_code: "AUTORIZACION_GARANTIA", operational_status: "OK" },
+      },
+    );
+
+    expect(entry.registry_status).toBe("RESUELTA");
+    expect(entry.binding_id).toBe("binding-garantia-consejo");
+    expect(entry.rule_pack_id).toBe("rp-garantia-consejo");
+  });
+
+  it("resuelve aliases cuando el binding apunta a una plantilla de otra materia canonica", () => {
+    const entry = resolveMatterRegistryFromRows(
+      {
+        tenantId,
+        materia: "FUSION",
+        organoTipo: "JUNTA_GENERAL",
+        adoptionMode: "MEETING",
+      },
+      {
+        bindings: [
+          binding({
+            id: "binding-fusion",
+            materia: "FUSION",
+            template_id: "tpl-fusion-escision",
+            organo_tipo: "JUNTA_GENERAL",
+          }),
+        ],
+        templates: [
+          template({
+            id: "tpl-fusion-escision",
+            materia_acuerdo: "FUSION_ESCISION",
+            organo_tipo: "JUNTA_GENERAL",
+          }),
+        ],
+        rulePacks: [rulePack({ id: "rp-fusion", materia: "FUSION", organo_tipo: "JUNTA_GENERAL" })],
+        effectiveRule: { matter_code: "FUSION", operational_status: "OK" },
+      },
+    );
+
+    expect(entry.registry_status).toBe("RESUELTA");
+    expect(entry.template_id).toBe("tpl-fusion-escision");
+    expect(entry.gaps.some((gap) => gap.campo === "template")).toBe(false);
+  });
 });

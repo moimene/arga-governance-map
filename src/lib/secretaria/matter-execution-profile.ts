@@ -219,6 +219,8 @@ const SL_HALF_MAJORITY_MATTERS = new Set([
   "CAMBIO_DENOMINACION",
   "TRASLADO_DOMICILIO_NACIONAL",
   "PRESTACIONES_ACCESORIAS",
+  "TRANSMISION_PARTICIPACIONES",
+  "EXCLUSION_SOCIO",
 ]);
 
 const SL_TWO_THIRDS_MAJORITY_MATTERS = new Set([
@@ -228,8 +230,9 @@ const SL_TWO_THIRDS_MAJORITY_MATTERS = new Set([
   "FUSION_ESCISION",
   "CESION_GLOBAL_ACTIVO",
   "EXCLUSION_DERECHO_SUSCRIPCION",
+  "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+  "SUPRESION_PREFERENTE",
   "AUTORIZACION_COMPETENCIA",
-  "EXCLUSION_SOCIO",
   "TRASLADO_DOMICILIO_EXTRANJERO",
 ]);
 
@@ -244,10 +247,12 @@ const ARTICLE_249_BIS_INDELEGABLE_MATTERS = new Set([
   "POLITICAS_CORPORATIVAS",
   "APROBACION_PLAN_NEGOCIO",
   "APROBACION_PRESUPUESTO",
+  "APROBACION_REGLAMENTO_CONSEJO",
   "DISTRIBUCION_CARGOS",
   "COMITES_INTERNOS",
   "DELEGACION_FACULTADES",
   "OPERACION_VINCULADA",
+  "PODER_REPRESENTACION",
 ]);
 
 const REFRESHABLE_FIELDS_BY_MATTER: Record<string, string[]> = {
@@ -291,6 +296,19 @@ const REFRESHABLE_FIELDS_BY_MATTER: Record<string, string[]> = {
   DIVIDENDO_A_CUENTA: ["importe_dividendo", "fecha_pago", "estado_contable_ref"],
   EJECUCION_AUMENTO_DELEGADO: ["importe_aumento", "modalidad_aumento", "acuerdo_junta_delegacion_ref"],
   TRASLADO_DOMICILIO_NACIONAL: ["nuevo_domicilio", "fecha_efectos", "certificacion_domicilio_ref"],
+  APLICACION_RESULTADO: ["ejercicio", "dotacion_reserva_legal", "importe_dividendo"],
+  CUENTAS_CONSOLIDADAS: ["ejercicio", "perimetro_consolidacion", "auditor_grupo"],
+  DISOLUCION: ["subtipo_disolucion", "causa_disolucion", "soporte_causa_disolucion"],
+  EMISION_OBLIGACIONES: ["subtipo_emision", "importe_maximo_emision", "condiciones_financieras"],
+  SUPRESION_PREFERENTE: ["aumento_capital_ref", "justificacion_interes_social", "informe_admin_ref"],
+  TRANSMISION_PARTICIPACIONES: ["socio_transmitente", "adquirente", "numero_participaciones", "restricciones_estatutarias"],
+  PRESTACIONES_ACCESORIAS: ["tipo_actuacion", "redaccion_prestacion_accesoria", "consentimientos_ref"],
+  CONTRATOS_SOCIO_UNICO_SOCIEDAD: ["contrato_ref", "objeto_contrato", "valor_contrato"],
+  ACUERDO_CONVOCATORIA_JUNTA: ["fecha_junta_convocada", "hora_junta_convocada", "lugar_junta_convocada", "orden_dia"],
+  EXCLUSION_SOCIO: ["socio_afectado_nombre", "causa_exclusion", "procedimiento_valoracion"],
+  SEPARACION_SOCIO: ["socio_afectado_nombre", "causa_separacion", "metodo_valoracion"],
+  APROBACION_REGLAMENTO_CONSEJO: ["tipo_actuacion_reglamento", "resumen_cambios", "texto_reglamento_ref"],
+  PODER_REPRESENTACION: ["apoderado_nombre", "facultades_poder", "limitaciones_poder"],
 };
 
 function nowIso(value?: Date | string) {
@@ -701,6 +719,18 @@ function requiredReportsForMatter(materia: string) {
   if (materia === "EJECUCION_AUMENTO_DELEGADO") {
     return ["Certificacion del acuerdo de Junta que delega la ejecucion del aumento (art. 297 LSC)"];
   }
+  if (materia === "CUENTAS_CONSOLIDADAS") {
+    return ["Cuentas consolidadas", "Informe de gestion consolidado", "Informe del auditor de grupo cuando proceda"];
+  }
+  if (materia === "DISOLUCION") {
+    return ["Soporte de la causa de disolucion", "Balance actualizado si la causa es patrimonial"];
+  }
+  if (materia === "EMISION_OBLIGACIONES") {
+    return ["Condiciones de emision", "Informe de administradores si convertible/canjeable"];
+  }
+  if (materia === "SUPRESION_PREFERENTE") {
+    return ["Informe de administradores justificativo de la supresion (art. 308 LSC)"];
+  }
   return [];
 }
 
@@ -718,6 +748,7 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
         },
       ];
     case "DISTRIBUCION_DIVIDENDOS":
+    case "APLICACION_RESULTADO":
       return [
         {
           materia_requerida: "APROBACION_CUENTAS",
@@ -726,6 +757,18 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
           fuente: "Art. 273 LSC",
           verificable_automaticamente: true,
           severity: "BLOCKING",
+        },
+      ];
+    case "SUPRESION_PREFERENTE":
+      return [
+        {
+          materia_requerida: "AUMENTO_CAPITAL",
+          organo_tipo_requerido: "JUNTA_GENERAL",
+          estado_minimo: "APROBADO",
+          fuente: "Art. 308 LSC",
+          verificable_automaticamente: true,
+          severity: "BLOCKING",
+          risk_flag: "IMPUGNABILIDAD",
         },
       ];
     case "FUSION":
@@ -873,6 +916,48 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "TRAZABILIDAD_PARCIAL",
     }));
+  }
+
+  if (materia === "DISOLUCION" && !context.subtipo_materia) {
+    gaps.push(profileGap({
+      gate: "DOCUMENTACION",
+      code: "SUBTIPO_DISOLUCION_PENDIENTE",
+      severity: "BLOCKING",
+      message: "La disolucion requiere subtipo: VOLUNTARIA, CAUSA_LEGAL_PERDIDAS o REDUCCION_SIN_REMEDIO.",
+      fuente: "Arts. 360-368 LSC",
+      override_tipo: "DESVIACION_CON_RIESGO",
+      risk_flag: "TRAZABILIDAD_PARCIAL",
+    }));
+  }
+
+  if (materia === "EMISION_OBLIGACIONES" && !context.subtipo_materia) {
+    gaps.push(profileGap({
+      gate: "DOCUMENTACION",
+      code: "SUBTIPO_EMISION_OBLIGACIONES_PENDIENTE",
+      severity: "WARNING",
+      message: "La emision debe identificar subtipo SIMPLE, CONVERTIBLE o CANJEABLE para cerrar informes condicionales.",
+      fuente: "Arts. 401, 414 y 415 LSC",
+      override_tipo: "DESVIACION_CON_RIESGO",
+      risk_flag: "TRAZABILIDAD_PARCIAL",
+    }));
+  }
+
+  if (materia === "AUTORIZACION_GARANTIA" && (organo === "CONSEJO_ADMIN" || organo === "CONSEJO")) {
+    const porcentajeActivo = numericOverride(context, "porcentaje_activo");
+    const esAdministrador = booleanOverride(context, "beneficiario_es_administrador");
+    const esVinculada = booleanOverride(context, "beneficiario_es_parte_vinculada");
+    const afectaActivosEsenciales = booleanOverride(context, "afecta_activos_esenciales");
+    if ((porcentajeActivo !== null && porcentajeActivo >= 25) || esAdministrador || esVinculada || afectaActivosEsenciales) {
+      gaps.push(profileGap({
+        gate: "VOTACION",
+        code: "GARANTIA_CONSEJO_ESCALA_JUNTA",
+        severity: "BLOCKING",
+        message: "La garantia supera el umbral de Consejo o afecta a administrador/parte vinculada. Debe tramitarse por Junta General.",
+        fuente: "Arts. 160.f y 162 LSC",
+        override_tipo: "DESVIACION_CON_RIESGO",
+        risk_flag: "IMPUGNABILIDAD",
+      }));
+    }
   }
 
   if (materia === "TRASLADO_DOMICILIO_NACIONAL" && (organo === "CONSEJO_ADMIN" || organo === "CONSEJO") && booleanOverride(context, "traslado_domicilio_reservado_junta")) {

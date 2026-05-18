@@ -150,6 +150,13 @@ const DEFAULT_DOC_TYPE = "MODELO_ACUERDO";
 const GENERIC_VALUES = new Set(["ANY", "GLOBAL", "MULTI", "DERIVADO_DEL_ACTO", "SOPORTE_INTERNO", "ORGANO_ADMIN"]);
 const META_ORGANS = new Set(["ANY", "DERIVADO_DEL_ACTO", "SOPORTE_INTERNO", "ORGANO_ADMIN"]);
 const OPERATIONAL_TEMPLATE_STATES = new Set(["ACTIVA", "APROBADA"]);
+const ORGANO_ALIASES: Record<string, string> = {
+  CONSEJO: "CONSEJO_ADMIN",
+  CDA: "CONSEJO_ADMIN",
+  CONSEJO_ADMINISTRACION: "CONSEJO_ADMIN",
+  ADMIN_CONJUNTA: "ADMIN_CONJUNTA_O_COAPROBADORES",
+  ADMIN_SOLIDARIO: "ADMIN_SOLIDARIOS",
+};
 
 export const COMPOSITE_ORGANS: Record<string, string[]> = {
   JUNTA_GENERAL_O_CONSEJO: ["JUNTA_GENERAL", "CONSEJO_ADMIN"],
@@ -163,24 +170,29 @@ interface ScoredBinding {
 }
 
 function normalizeValue(value: string | null | undefined) {
-  const trimmed = value?.trim();
+  const trimmed = value?.trim().toUpperCase();
   return trimmed ? trimmed : null;
 }
 
+function normalizeOrgano(value: string | null | undefined) {
+  const normalized = normalizeValue(value);
+  return normalized ? (ORGANO_ALIASES[normalized] ?? normalized) : null;
+}
+
 export function isCompositeOrganMatch(bindingOrgano: string | null | undefined, requestedOrgano: string | null | undefined) {
-  const binding = normalizeValue(bindingOrgano);
-  const requested = normalizeValue(requestedOrgano);
+  const binding = normalizeOrgano(bindingOrgano);
+  const requested = normalizeOrgano(requestedOrgano);
   if (!binding || !requested) return false;
   return COMPOSITE_ORGANS[binding]?.includes(requested) ?? false;
 }
 
 export function isMetaOrgan(organo: string | null | undefined) {
-  const normalized = normalizeValue(organo);
+  const normalized = normalizeOrgano(organo);
   return normalized ? META_ORGANS.has(normalized) : true;
 }
 
 function isConcreteOrgan(organo: string | null | undefined) {
-  const normalized = normalizeValue(organo);
+  const normalized = normalizeOrgano(organo);
   return Boolean(normalized && !isMetaOrgan(normalized) && !COMPOSITE_ORGANS[normalized]);
 }
 
@@ -232,8 +244,8 @@ export function computeBindingScore(
   weights = DEFAULT_MATTER_REGISTRY_WEIGHTS,
 ) {
   let score = 0;
-  const requestedOrgano = normalizeValue(query.organoTipo);
-  const bindingOrgano = normalizeValue(binding.organo_tipo);
+  const requestedOrgano = normalizeOrgano(query.organoTipo);
+  const bindingOrgano = normalizeOrgano(binding.organo_tipo);
   const requestedAdoption = normalizeValue(query.adoptionMode);
   const bindingAdoption = normalizeValue(binding.adoption_mode);
   const requestedSubtipo = normalizeValue(query.subtipo);
@@ -309,6 +321,14 @@ function filterTemplates(query: MatterRegistryResolveQuery, templates: MatterReg
   });
 }
 
+function filterTemplatesForBinding(query: MatterRegistryResolveQuery, templates: MatterRegistryTemplateRow[]) {
+  const docType = query.docType ?? DEFAULT_DOC_TYPE;
+  return templates.filter((template) => {
+    if (template.tenant_id && template.tenant_id !== query.tenantId) return false;
+    return template.tipo === docType;
+  });
+}
+
 function compareScoredBinding(a: ScoredBinding, b: ScoredBinding) {
   if (b.score !== a.score) return b.score - a.score;
   const priorityDiff = (a.binding.priority ?? 100) - (b.binding.priority ?? 100);
@@ -327,7 +347,7 @@ function isIrreduciblyAmbiguous(query: MatterRegistryResolveQuery, candidates: S
   if (!normalizeValue(query.organoTipo) && query.allowAdministrativeDefault !== true) {
     const concreteOrgans = new Set(
       topCandidates
-        .map((candidate) => normalizeValue(candidate.binding.organo_tipo))
+        .map((candidate) => normalizeOrgano(candidate.binding.organo_tipo))
         .filter((organo): organo is string => isConcreteOrgan(organo)),
     );
     if (concreteOrgans.size > 1) return true;
@@ -338,7 +358,7 @@ function isIrreduciblyAmbiguous(query: MatterRegistryResolveQuery, candidates: S
 }
 
 function selectRulePackContext(rulePacks: MatterRegistryRulePackRow[], materia: string, organoTipo?: string | null) {
-  const requestedOrgano = normalizeValue(organoTipo);
+  const requestedOrgano = normalizeOrgano(organoTipo);
   const candidates = rulePacks
     .filter((pack) => pack.materia === materia)
     .map((pack) => ({
@@ -498,7 +518,7 @@ export function resolveMatterRegistryFromRows(
   rows: MatterRegistryRows,
 ): MatterRegistryEntry {
   const templates = filterTemplates(query, rows.templates);
-  const templatesById = new Map(templates.map((template) => [template.id, template]));
+  const templatesById = new Map(filterTemplatesForBinding(query, rows.templates).map((template) => [template.id, template]));
   const scored = filterBindings(query, rows.bindings)
     .map((binding) => ({
       binding,
@@ -562,8 +582,7 @@ export async function resolveMatterEntry(
       .select(TEMPLATE_SELECT)
       .eq("tenant_id", query.tenantId)
       .eq("tipo", docType)
-      .in("estado", ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"])
-      .or(`materia_acuerdo.eq.${query.materia},materia.eq.${query.materia}`),
+      .in("estado", ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"]),
     client
       .from("rule_packs")
       .select(
