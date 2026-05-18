@@ -4,7 +4,7 @@ Fecha: 2026-05-17
 De: Equipo de ingenieria TGMS Secretaria Societaria
 Para: Comite Legal Garrigues - Secretaria Societaria
 Cliente: Demo ARGA (pseudonimo)
-Referencia tecnica: commits `4b4c866` (Matter Registry), `08eb9b6` (MatterExecutionProfile), `ac15b77` (dossier legal expandido)
+Referencia tecnica: commits `4b4c866` (Matter Registry), `08eb9b6` (MatterExecutionProfile), `ac15b77` (dossier legal expandido), `8fd94a6` (extraccion de rule packs)
 
 ## 1. Proposito
 
@@ -30,6 +30,29 @@ El modulo no selecciona plantillas. Esa funcion corresponde al `Matter Registry`
 | Nota de envio | `docs/superpowers/specs/2026-05-17-nota-envio-legal-matter-execution-profile.md` | Priorizacion, instrucciones de respuesta y decision esperada |
 | SQL de extraccion de rule packs | `docs/superpowers/specs/2026-05-17-rule-packs-review-extraction.sql` | Query read-only para obtener payloads vigentes de materias prioritarias |
 | Instrucciones de extraccion | `docs/superpowers/specs/2026-05-17-rule-packs-review-instructions.md` | Como ejecutar el SQL de forma segura y como formatear el resultado para Legal |
+| Extraccion de rule packs prioritarios | `docs/superpowers/specs/2026-05-17-rule-packs-review-prioritarios.md` | Valores reales extraidos de Cloud y contextos con multiples versiones activas |
+| Addendum duplicados rule packs | `docs/superpowers/specs/2026-05-18-addendum-rule-pack-versions-duplicadas.md` | Hallazgo destacado: 8 contextos materia + organo con mas de una version activa |
+
+## 2.1. Hallazgo previo a la validacion: versiones activas duplicadas
+
+La extraccion read-only de Cloud detecto `8` contextos `materia + organo_tipo` con mas de una `rule_pack_version` marcada como `is_active = true`.
+
+Esto no impide enviar el paquete a Legal, pero si impide tratar los rule packs como fuente determinista hasta que se decida version canonica. Cualquier selector que use `.limit(1)` o equivalente podria aplicar una version distinta segun orden de query.
+
+Contextos afectados:
+
+| Materia | Organo | Versiones activas | Decision requerida |
+|---|---|---|---|
+| `APROBACION_CUENTAS` | `JUNTA_GENERAL` | `v1.0.0`, `1.0.0` | Determinar plazo de convocatoria canonico y archivar version obsoleta |
+| `AUMENTO_CAPITAL` | `JUNTA_GENERAL` | `v1.0.0`, `1.0.0` | Determinar version canonica; una version no informa convocatoria |
+| `REDUCCION_CAPITAL` | `JUNTA_GENERAL` | `v1.0.0`, `1.0.0` | Determinar version canonica; una version no informa convocatoria |
+| `DELEGACION_FACULTADES` | `CONSEJO` | `1.1.0`, `1.0.0` | Confirmar mayoria y documentacion art. 249 bis |
+| `NOMBRAMIENTO_AUDITOR` | `JUNTA_GENERAL` | `1.1.0`, `1.0.0` | Confirmar documentacion reforzada de independencia/comision auditoria |
+| `OPERACION_VINCULADA` | `CONSEJO` | `1.1.0`, `1.0.0` | Confirmar formula de mayoria y computo de abstenciones |
+| `AUTORIZACION_GARANTIA` | `JUNTA_GENERAL` | `1.1.0`, `1.0.0` | Confirmar competencia Consejo/Junta y umbral art. 160.f LSC |
+| `RATIFICACION_ACTOS` | `CONSEJO` | `1.1.0`, `1.0.0` | Revisar version canonica antes de uso determinista |
+
+La decision solicitada a Legal es identificar cual de las versiones es juridicamente correcta. Despues, Ingenieria debe preparar un SQL puntual y auditado para desactivar las versiones no canonicas, sin tocar contenido historico.
 
 ## 3. Que es bloqueante para fase 1
 
