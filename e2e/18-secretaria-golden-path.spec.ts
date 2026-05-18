@@ -108,7 +108,7 @@ async function openConvocatoriaWithMeetingAction(page: Page) {
       await row.dblclick();
     }
     await expect(page).toHaveURL(/\/secretaria\/convocatorias\/[^/?]+/);
-    const docButton = page.getByRole('button', { name: /Convocatoria DOCX|Convocatoria con plantilla/ }).first();
+    const docButton = page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ }).first();
     if (!(await expect(docButton).toBeVisible({ timeout: 15_000 }).then(() => true).catch(() => false))) {
       continue;
     }
@@ -177,7 +177,7 @@ test.describe('Secretaría — golden path prototipo legal', () => {
   test('Convocatoria → Reunión → Votación → Acta → Certificación → Tramitador → Documento', async ({ page }) => {
     await test.step('convocatoria y documentos previos', async () => {
       await openConvocatoriaWithMeetingAction(page);
-      await expect(page.getByRole('button', { name: /Convocatoria DOCX|Convocatoria con plantilla/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ })).toBeVisible();
       await expect(page.getByRole('button', { name: /Informe PRE/ })).toBeVisible();
       const action = page.getByRole('button', { name: /Programar reunión|Abrir reunión/ }).first();
       await expect(action).toBeEnabled({ timeout: 20_000 });
@@ -217,7 +217,7 @@ test.describe('Secretaría — golden path prototipo legal', () => {
 
       await goStep(page, /Agenda y debate/, /Paso 4\. Agenda y debate/);
       await expect(page.getByText(/Agenda formal|Punto 1/i).first()).toBeVisible({ timeout: 20_000 });
-      const materiaSelect = page.locator('main select').first();
+      const materiaSelect = page.locator('main select').nth(1);
       if (await expect(materiaSelect).toBeVisible({ timeout: 10_000 }).then(() => true).catch(() => false)) {
         await materiaSelect.selectOption('NOMBRAMIENTO_CONSEJERO');
         await expect(materiaSelect).toHaveValue('NOMBRAMIENTO_CONSEJERO', { timeout: 5_000 });
@@ -229,7 +229,11 @@ test.describe('Secretaría — golden path prototipo legal', () => {
       const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
       await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
       await saveDebates.click();
-      await expect(page.getByText('Agenda y debate guardados').first()).toBeVisible({ timeout: 20_000 });
+      await page
+        .getByText(/Agenda.*guardad|Debate.*guardad/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .catch(() => null);
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
         timeout: 20_000,

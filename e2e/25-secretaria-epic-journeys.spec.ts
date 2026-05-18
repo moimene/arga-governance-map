@@ -79,7 +79,7 @@ test.describe('Secretaría — epic user journeys', () => {
 
     await openFirstConvocatoriaDetalle(page);
 
-    await expect(page.getByRole('button', { name: /Convocatoria DOCX|Convocatoria con plantilla/ })).toBeVisible({
+    await expect(page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ })).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByRole('button', { name: /Informe PRE/ })).toBeVisible();

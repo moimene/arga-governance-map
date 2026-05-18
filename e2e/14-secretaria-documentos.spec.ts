@@ -2,7 +2,9 @@ import { test, expect } from './fixtures/base';
 
 test.describe.configure({ timeout: 40_000 });
 
-async function expectDocxDownload(page, buttonName: string, filenamePattern: RegExp) {
+const convocatoriaDocxButton = /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/;
+
+async function expectDocxDownload(page, buttonName: string | RegExp, filenamePattern: RegExp) {
   const button = page.getByRole('button', { name: buttonName }).first();
   await expect(button).toBeVisible({ timeout: 10_000 });
   await expect(button).toBeEnabled({ timeout: 20_000 });
@@ -80,14 +82,14 @@ test.describe('Secretaría — documentos DOCX', () => {
   test('convocatoria expone botones documentales', async ({ page }) => {
     await openFirstConvocatoriaDetalle(page);
 
-    await expect(page.getByRole('button', { name: 'Convocatoria DOCX' })).toBeVisible();
+    await expect(page.getByRole('button', { name: convocatoriaDocxButton })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
   });
 
   test('convocatoria dispara descarga DOCX', async ({ page }) => {
     await openFirstConvocatoriaDetalle(page);
 
-    await expectDocxDownload(page, 'Convocatoria DOCX', /^convocatoria_[a-zA-Z0-9-]{8}_\d{4}-\d{2}-\d{2}\.docx$/);
+    await expectDocxDownload(page, convocatoriaDocxButton, /^convocatoria_[a-zA-Z0-9-]{8}_\d{4}-\d{2}-\d{2}\.docx$/);
   });
 
   test('informe PRE de convocatoria descarga DOCX', async ({ page }) => {
@@ -109,7 +111,7 @@ test.describe('Secretaría — documentos DOCX', () => {
     if (await emitirCertificacion.isVisible().catch(() => false)) {
       if (!(await emitirCertificacion.isEnabled())) {
         await expect(
-          page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal/i).first()
+          page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal|No se puede emitir certificación/i).first()
         ).toBeVisible();
       }
     }
@@ -121,7 +123,7 @@ test.describe('Secretaría — documentos DOCX', () => {
     await expect(page.getByRole('heading', { name: 'Revisión legal para certificación' })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText('Certificables')).toBeVisible();
+    await expect(page.getByText('Certificables', { exact: true })).toBeVisible();
     await expect(page.getByText('Acuerdo 360').first()).toBeVisible();
     await expect(page.getByText('Refs. por punto')).toBeVisible();
     await expect(page.getByText(/Estado Acuerdo 360|Falta snapshot legal por punto/i).first()).toBeVisible();
@@ -141,9 +143,11 @@ test.describe('Secretaría — documentos DOCX', () => {
   test('gestor permite usar fixture registral local sin cargarlo en Supabase', async ({ page }) => {
     await page.goto('/secretaria/gestor-plantillas');
 
-    await expect(page.getByRole('heading', { name: 'Plantillas con contenido jurídico' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Gestor de Plantillas' })).toBeVisible({
       timeout: 10_000,
     });
+    await page.getByRole('tab', { name: 'Catálogo' }).click();
+    await expect(page.getByText('Catálogo de plantillas protegidas')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('Documento registral');
 
     await page.getByRole('button', { name: /Documento registral/ }).first().click();

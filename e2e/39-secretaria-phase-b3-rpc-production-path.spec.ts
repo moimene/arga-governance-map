@@ -120,9 +120,14 @@ interface MinimalFixture {
   entityId: string;
   bodyId: string;
   meetingId: string;
+  agendaItemId: string;
 }
 
-async function createMinimalFixture(client: ServiceClient, created: CleanupEntry[]): Promise<MinimalFixture> {
+async function createMinimalFixture(
+  client: ServiceClient,
+  created: CleanupEntry[],
+  agendaKind: 'DECISORIO' | 'INFORMATIVO' = 'DECISORIO',
+): Promise<MinimalFixture> {
   const runId = generateRunId('B3');
   const hex = runId.split('-').slice(-2)[0];
   const taxIdPj = `Z-PB-${hex}`;
@@ -202,6 +207,21 @@ async function createMinimalFixture(client: ServiceClient, created: CleanupEntry
   if (mErr || !meeting) throw new Error(`meeting insert failed: ${mErr?.message}`);
   created.push({ table: 'meetings', id: meeting.id, marker: runId });
 
+  const { data: agendaItem, error: aiErr } = await client
+    .from('agenda_items')
+    .insert({
+      tenant_id: DEMO_TENANT_ID,
+      meeting_id: meeting.id,
+      order_number: 0,
+      title: `${agendaKind === 'DECISORIO' ? 'Acuerdo' : 'Información'} ${runId}`,
+      description: `Punto ${agendaKind.toLowerCase()} sintético para B3.`,
+      kind: agendaKind,
+      decision_subtype: agendaKind === 'DECISORIO' ? 'CONSTITUTIVE' : null,
+    })
+    .select('id')
+    .single();
+  if (aiErr || !agendaItem) throw new Error(`agenda_item insert failed: ${aiErr?.message}`);
+
   return {
     runId,
     taxIdPj,
@@ -209,6 +229,7 @@ async function createMinimalFixture(client: ServiceClient, created: CleanupEntry
     entityId: entity.id,
     bodyId: body.id,
     meetingId: meeting.id,
+    agendaItemId: agendaItem.id,
   };
 }
 
@@ -267,6 +288,8 @@ test.describe('Phase B3 — fn_save_meeting_resolutions production path', () => 
         await client.from('meeting_resolutions').delete().eq('meeting_id', entry.id);
         // agreements creados por el RPC con parent_meeting_id
         await client.from('agreements').delete().eq('parent_meeting_id', entry.id);
+        // agenda_items sintéticos que anclan las resoluciones
+        await client.from('agenda_items').delete().eq('meeting_id', entry.id);
         // rule_evaluation_results referenciando el meeting (si los hay)
       }
       try {
@@ -318,6 +341,7 @@ test.describe('Phase B3 — fn_save_meeting_resolutions production path', () => 
       entityId: fixture.entityId,
       bodyId: fixture.bodyId,
       meetingId: fixture.meetingId,
+      agendaItemId: fixture.agendaItemId,
       scheduledStart: new Date().toISOString(),
       snapshot,
     });
@@ -390,7 +414,7 @@ test.describe('Phase B3 — fn_save_meeting_resolutions production path', () => 
   });
 
   test('fn_save_meeting_resolutions con agreement_action=NONE solo crea meeting_resolutions sin agreement', async () => {
-    const fixture = await createMinimalFixture(client, created);
+    const fixture = await createMinimalFixture(client, created, 'INFORMATIVO');
 
     // Path simplificado: action=NONE, sin payload de agreement.
     const rpcRows = [

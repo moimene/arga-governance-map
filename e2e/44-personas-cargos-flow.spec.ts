@@ -166,21 +166,21 @@ test.describe('Personas y Cargos — Wave 6 readiness', () => {
     await page.goto('/secretaria/personas/nueva');
 
     // Paso 1 — seleccionar PJ (tax_id A-99999903 corresponde a una persona PJ).
-    await page.getByLabel(/Tipo de persona/i).selectOption('PJ');
+    await page.getByRole('button', { name: /Persona jurídica/i }).click();
     await page.getByRole('button', { name: 'Siguiente' }).click();
 
     // Paso 2 — Datos. Rellenar denominación + tax_id duplicado.
     await page.getByLabel(/Denominación legal/i).fill('PRUEBA DUP NIF');
-    await page.getByLabel(/CIF/i).fill(ARGA_SEGUROS_CANONICAL_TAX_ID);
+    await page.getByLabel(/CIF\/NIF/i).fill(ARGA_SEGUROS_CANONICAL_TAX_ID);
 
     // El precheck es debounced (500ms). Esperamos al alert.
     const alert = page.getByRole('alert').filter({
-      hasText: /Ya existe una persona con este NIF/i,
-    });
+      hasText: /Ya existe una persona con este NIF(?:\/CIF)?/i,
+    }).last();
     await expect(alert).toBeVisible({ timeout: 5_000 });
 
     // CTA "Abrir ficha existente" presente con link a la persona ya creada.
-    const abrirFicha = page.getByRole('link', { name: /Abrir ficha existente/i });
+    const abrirFicha = page.getByRole('link', { name: /Abrir ficha/i });
     await expect(abrirFicha).toBeVisible();
     await expect(abrirFicha).toHaveAttribute('href', /\/secretaria\/personas\/[a-f0-9-]+/);
 

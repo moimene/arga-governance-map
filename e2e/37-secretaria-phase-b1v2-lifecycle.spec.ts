@@ -206,6 +206,22 @@ test.describe('Phase B1 v2 — lifecycle societario completo destructive', () =>
     expect(meeting?.id).toBeDefined();
     created.push({ table: 'meetings', id: meeting!.id, marker: fixture.runId });
 
+    const { data: agendaItem, error: aiErr } = await client
+      .from('agenda_items')
+      .insert({
+        tenant_id: DEMO_TENANT_ID,
+        meeting_id: meeting!.id,
+        order_number: 0,
+        title: `B1v2 meeting agenda ${fixture.runId}`,
+        description: 'Punto decisorio sintético para anclar Acuerdo 360.',
+        kind: 'DECISORIO',
+        decision_subtype: 'CONSTITUTIVE',
+      })
+      .select('id')
+      .single();
+    expect(aiErr, 'insert agenda item').toBeNull();
+    created.push({ table: 'agenda_items', id: agendaItem!.id, marker: fixture.runId });
+
     // Build snapshot via builder real (post-fix CDA→CONSEJO).
     const snapshot = buildMeetingAdoptionSnapshot({
       agendaItemIndex: 0,
@@ -276,6 +292,8 @@ test.describe('Phase B1 v2 — lifecycle societario completo destructive', () =>
         decision_text: `Aprobado vía meeting CdA ${fixture.runId}`,
         decision_date: new Date().toISOString().slice(0, 10),
         parent_meeting_id: meeting!.id,
+        agenda_item_id: agendaItem!.id,
+        execution_mode: { mode: 'MEETING', agenda_item_index: 0 },
         compliance_snapshot: snapshot,
       })
       .select('id')

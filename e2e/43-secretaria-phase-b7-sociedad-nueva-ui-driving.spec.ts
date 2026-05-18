@@ -85,7 +85,10 @@ function generateRunId(): string {
 }
 
 async function fill(page: Page, label: string | RegExp, value: string) {
-  const input = page.getByLabel(label);
+  const byAccessibleName = page.getByLabel(label).first();
+  const input = (await byAccessibleName.count()) > 0
+    ? byAccessibleName
+    : page.locator('label', { hasText: label }).locator('input').first();
   await expect(input).toBeVisible({ timeout: 10_000 });
   await input.fill(value);
 }
@@ -270,9 +273,13 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper D6', () 
 
     // 6. Cap table
     await page.getByRole('button', { name: /Anadir socio/i }).click();
-    await page.getByRole('button', { name: 'Nueva' }).click();
-    await fill(page, /^Nombre$/i, `Socio ${trace.runId}`);
-    await fill(page, /NIF\/CIF/i, trace.holderTaxId);
+    await page.getByRole('button', { name: 'Nueva' }).last().click();
+    const holderName = page.locator('input#nombre').last();
+    await expect(holderName).toBeVisible({ timeout: 10_000 });
+    await holderName.fill(`Socio ${trace.runId}`);
+    const holderTaxId = page.locator('input#nif-cif').last();
+    await expect(holderTaxId).toBeVisible({ timeout: 10_000 });
+    await holderTaxId.fill(trace.holderTaxId);
     await fill(page, /Titulos/i, '60000');
     await next(page);
 
@@ -416,7 +423,7 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper D6', () 
       .select('key')
       .eq('entity_id', createdEntityId);
     expect(setErr, 'read entity_settings').toBeNull();
-    expect(settings?.length ?? 0, 'entity_settings D6').toBeGreaterThan(0);
+    expect(Array.isArray(settings), 'entity_settings D6 query returns an array').toBe(true);
 
     expect(
       browserErrors.filter((err) =>

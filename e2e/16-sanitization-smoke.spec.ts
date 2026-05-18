@@ -134,7 +134,7 @@ test.describe('Sanitization smoke — Secretaria', () => {
         /\/secretaria\/convocatorias\/[^/?]+/,
         'convocatorias',
       );
-      await expect(page.getByRole('button', { name: 'Convocatoria DOCX' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Convocatoria(?: revisada)? DOCX|Convocatoria con plantilla/ })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
     });
 
@@ -170,7 +170,7 @@ test.describe('Sanitization smoke — Secretaria', () => {
     });
 
     await test.step('gestor documental', async () => {
-      await visitRoute(page, '/secretaria/gestor-plantillas', [/Plantillas con contenido jur[ií]dico/i]);
+      await visitRoute(page, '/secretaria/gestor-plantillas', [/Gestor de Plantillas/i]);
     });
   });
 });
