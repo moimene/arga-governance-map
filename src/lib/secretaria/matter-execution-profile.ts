@@ -1,5 +1,10 @@
 import type { NormalizedCapa3Field } from "@/lib/secretaria/capa3-fields";
 import type { EntityNormativeProfile } from "@/lib/secretaria/normative-framework";
+import {
+  isAtOrBeyondStep,
+  WORKFLOW_STEPS_VERSION,
+  type AdoptionWorkflowStep,
+} from "@/lib/secretaria/workflow-steps";
 import type { PactoParasocial, RulePack, RuleParamOverride } from "@/lib/rules-engine";
 
 export type FormalGate =
@@ -17,11 +22,11 @@ export type RiskFlag =
   | "NULIDAD"
   | "TRAZABILIDAD_PARCIAL";
 
-export type ProfileSeverity = "WARNING" | "BLOCKING";
+export type ProfileSeverity = "INFO" | "WARNING" | "BLOCKING";
 
 export type MinimumPrerequisiteStatus = "DOCUMENTADO" | "APROBADO" | "INSCRITO";
 
-export type FormalGateEvaluationStatus = "PASSED" | "WARNING" | "OVERRIDE_REQUIRED";
+export type FormalGateEvaluationStatus = "PASSED" | "WARNING" | "OVERRIDE_REQUIRED" | "BLOCKED";
 
 export interface FormalGateOverride {
   gate: FormalGate;
@@ -41,6 +46,9 @@ export interface MatterPrerequisite {
   fuente: string;
   verificable_automaticamente: boolean;
   severity: ProfileSeverity;
+  blocking_from_step?: AdoptionWorkflowStep;
+  non_overridable?: boolean;
+  risk_flag?: RiskFlag;
 }
 
 export interface ProfileGap {
@@ -49,9 +57,10 @@ export interface ProfileGap {
   severity: ProfileSeverity;
   message: string;
   fuente?: string;
-  overridable: true;
+  overridable: boolean;
   override_tipo?: OverrideTipo;
   risk_flag?: RiskFlag;
+  risk_flags_adicionales?: RiskFlag[];
 }
 
 export interface ExpedientePrerequisiteRecord {
@@ -67,6 +76,7 @@ export interface ExpedienteState {
 
 export interface MatterExecutionProfile {
   schema_version: "matter-execution-profile.v1";
+  workflow_steps_version: typeof WORKFLOW_STEPS_VERSION;
   materia: string;
   organo_tipo: string;
   tipo_social: string;
@@ -178,6 +188,13 @@ const STATUS_RANK: Record<MinimumPrerequisiteStatus, number> = {
   INSCRITO: 3,
 };
 
+export const RISK_FLAG_PRIORITY: Record<RiskFlag, number> = {
+  NULIDAD: 1,
+  IMPUGNABILIDAD: 2,
+  CALIFICACION_REGISTRAL: 3,
+  TRAZABILIDAD_PARCIAL: 4,
+};
+
 const DEFAULT_SOURCE = "Regla legal base";
 
 const REFRESHABLE_FIELDS_BY_MATTER: Record<string, string[]> = {
@@ -238,6 +255,16 @@ function numericValue(value: unknown) {
   return null;
 }
 
+export function resolveRiskFlag(candidates: RiskFlag[]) {
+  const ordered = [...new Set(candidates)].sort(
+    (a, b) => RISK_FLAG_PRIORITY[a] - RISK_FLAG_PRIORITY[b],
+  );
+  return {
+    primary: ordered[0],
+    additional: ordered.slice(1),
+  };
+}
+
 function ruleParamValue<T>(value: unknown): T | undefined {
   if (value && typeof value === "object" && "valor" in value) {
     return (value as { valor?: T }).valor;
@@ -253,10 +280,105 @@ function ruleParamReference(value: unknown, fallback = DEFAULT_SOURCE) {
   return fallback;
 }
 
+function overrideFor(context: BuildMatterExecutionProfileContext, key: string) {
+  return (context.paramOverrides ?? []).find((override) => normalizeCode(override.clave) === normalizeCode(key));
+}
+
+function overrideValue(context: BuildMatterExecutionProfileContext, key: string) {
+  return overrideFor(context, key)?.valor;
+}
+
+function booleanOverride(context: BuildMatterExecutionProfileContext, key: string) {
+  return overrideValue(context, key) === true;
+}
+
+function numericOverride(context: BuildMatterExecutionProfileContext, key: string) {
+  return numericValue(overrideValue(context, key));
+}
+
+function overrideReference(context: BuildMatterExecutionProfileContext, key: string, fallback = DEFAULT_SOURCE) {
+  const override = overrideFor(context, key);
+  return override?.referencia || fallback;
+}
+
+function legalNoticeMinimumDays(tipoSocial: string) {
+  const normalized = normalizeCode(tipoSocial);
+  if (normalized === "SA" || normalized === "SAU") return 30;
+  if (normalized === "SL" || normalized === "SLU") return 15;
+  return undefined;
+}
+
 function convocatoriaRuleFor(context: BuildMatterExecutionProfileContext) {
   const tipoSocial = normalizeCode(context.tipo_social);
   const rules = context.rulePackPayload.convocatoria?.antelacionDias as Record<string, unknown> | undefined;
   return rules?.[tipoSocial] ?? rules?.SA ?? rules?.SL;
+}
+
+function resolveNoticeDays(
+  context: BuildMatterExecutionProfileContext,
+  convocatoriaRule: unknown,
+): { days?: number; fuente: string; gap?: ProfileGap } {
+  const legalMinimum = legalNoticeMinimumDays(context.tipo_social);
+  const rulePackDays = numericValue(ruleParamValue<number>(convocatoriaRule));
+  const statutoryDays = numericOverride(context, "plazo_convocatoria_dias");
+
+  if (statutoryDays !== null && typeof legalMinimum === "number") {
+    if (statutoryDays >= legalMinimum) {
+      return {
+        days: statutoryDays,
+        fuente: overrideReference(context, "plazo_convocatoria_dias", "Estatutos sociales"),
+      };
+    }
+
+    return {
+      days: legalMinimum,
+      fuente: "Art. 176 LSC",
+      gap: profileGap({
+        gate: "CONVOCATORIA",
+        code: "STATUTORY_NOTICE_BELOW_LEGAL_MINIMUM",
+        severity: "INFO",
+        message: `Override estatutario de ${statutoryDays} dias inferior al minimo legal de ${legalMinimum} dias. Se aplica el minimo legal.`,
+        fuente: "Art. 176 LSC",
+        overridable: false,
+      }),
+    };
+  }
+
+  if (rulePackDays !== null) {
+    if (typeof legalMinimum === "number" && rulePackDays < legalMinimum) {
+      return {
+        days: legalMinimum,
+        fuente: "Art. 176 LSC",
+        gap: profileGap({
+          gate: "CONVOCATORIA",
+          code: "RULE_PACK_NOTICE_BELOW_LEGAL_MINIMUM",
+          severity: "INFO",
+          message: `Rule pack indica ${rulePackDays} dias, inferior al minimo legal de ${legalMinimum} dias. Se aplica el minimo legal.`,
+          fuente: "Art. 176 LSC",
+          overridable: false,
+        }),
+      };
+    }
+
+    return {
+      days: rulePackDays,
+      fuente: ruleParamReference(convocatoriaRule),
+    };
+  }
+
+  return {
+    days: legalMinimum,
+    fuente: typeof legalMinimum === "number" ? "Art. 176 LSC" : ruleParamReference(convocatoriaRule),
+  };
+}
+
+function hasSecondCall(context: BuildMatterExecutionProfileContext) {
+  const tipoSocial = normalizeCode(context.tipo_social);
+  if (tipoSocial === "SA" || tipoSocial === "SAU") return true;
+  if (tipoSocial === "SL" || tipoSocial === "SLU") {
+    return booleanOverride(context, "segunda_convocatoria_sl");
+  }
+  return false;
 }
 
 function quorumRuleFor(context: BuildMatterExecutionProfileContext) {
@@ -343,14 +465,6 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
           verificable_automaticamente: true,
           severity: "BLOCKING",
         },
-        {
-          materia_requerida: "FORMULACION_CUENTAS",
-          organo_tipo_requerido: "ORGANO_ADMIN",
-          estado_minimo: "APROBADO",
-          fuente: "Art. 253 LSC por cadena APROBACION_CUENTAS",
-          verificable_automaticamente: true,
-          severity: "WARNING",
-        },
       ];
     case "FUSION":
     case "ESCISION":
@@ -362,6 +476,8 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
           fuente: "Arts. 11-25 RDL 5/2023",
           verificable_automaticamente: false,
           severity: "WARNING",
+          blocking_from_step: "CONVOCATORIA",
+          risk_flag: "IMPUGNABILIDAD",
         },
       ];
     case "DELEGACION_FACULTADES":
@@ -382,6 +498,8 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
           fuente: "RRM arts. 108-109",
           verificable_automaticamente: true,
           severity: "BLOCKING",
+          non_overridable: true,
+          risk_flag: "CALIFICACION_REGISTRAL",
         },
       ];
     default:
@@ -398,37 +516,65 @@ function postAgreementWorkflow(profile: Pick<MatterExecutionProfile, "post_acuer
   return workflow;
 }
 
-function profileGap(input: Omit<ProfileGap, "overridable">): ProfileGap {
-  return { ...input, overridable: true };
+function profileGap(input: Omit<ProfileGap, "overridable"> & { overridable?: boolean }): ProfileGap {
+  return { ...input, overridable: input.overridable ?? true };
 }
 
 function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
   const gaps: ProfileGap[] = [];
   const materia = normalizeCode(context.materia);
+  const organo = normalizeCode(context.organo_tipo);
   const tipoSocial = normalizeCode(context.tipo_social);
   const subtipo = normalizeCode(context.subtipo_materia);
 
   if (materia === "NOMBRAMIENTO_CONSEJERO" && subtipo === "COOPTACION" && tipoSocial !== "SA" && tipoSocial !== "SAU") {
+    const hasStatutorySupport = booleanOverride(context, "cooptacion_sl_estatutaria");
     gaps.push(profileGap({
       gate: "VOTACION",
       code: "COOPTACION_SOLO_SA",
-      severity: "WARNING",
-      message: "La cooptacion del art. 244 LSC esta configurada como cauce propio de SA/SAU; en SL exige revision estatutaria expresa.",
+      severity: hasStatutorySupport ? "WARNING" : "BLOCKING",
+      message: hasStatutorySupport
+        ? "Cooptacion en SL con prevision estatutaria: revisar texto estatutario y criterio registral aplicable."
+        : "La cooptacion del art. 244 LSC esta configurada como cauce propio de SA/SAU; en SL exige prevision estatutaria expresa.",
       fuente: "Art. 244 LSC",
       override_tipo: "DESVIACION_CON_RIESGO",
-      risk_flag: "IMPUGNABILIDAD",
+      risk_flag: hasStatutorySupport ? "CALIFICACION_REGISTRAL" : "IMPUGNABILIDAD",
     }));
+  }
+
+  if (materia === "CESE_CONSEJERO" && (organo === "CONSEJO_ADMIN" || organo === "CONSEJO")) {
+    if (!subtipo) {
+      gaps.push(profileGap({
+        gate: "VOTACION",
+        code: "CESE_CONSEJO_SUBTIPO_REQUIRED",
+        severity: "BLOCKING",
+        message: "El cese por Consejo requiere subtipo: RENUNCIA, CESE_AUTOMATICO o PROPUESTA_CESE_A_JUNTA.",
+        fuente: "Art. 223.1 LSC",
+        override_tipo: "DESVIACION_CON_RIESGO",
+        risk_flag: "IMPUGNABILIDAD",
+      }));
+    } else if (subtipo === "AD_NUTUM") {
+      gaps.push(profileGap({
+        gate: "VOTACION",
+        code: "CESE_AD_NUTUM_COMPETENCIA_JUNTA",
+        severity: "BLOCKING",
+        message: "El Consejo no puede cesar ad nutum a un consejero; la separacion libre corresponde a la Junta General.",
+        fuente: "Art. 223.1 LSC",
+        override_tipo: "DESVIACION_CON_RIESGO",
+        risk_flag: "IMPUGNABILIDAD",
+      }));
+    }
   }
 
   if ((materia === "FUSION" || materia === "ESCISION" || materia === "FUSION_ESCISION") && !context.subtipo_materia) {
     gaps.push(profileGap({
       gate: "DOCUMENTACION",
       code: "SUBTIPO_MODIFICACION_ESTRUCTURAL_PENDIENTE",
-      severity: "WARNING",
+      severity: "BLOCKING",
       message: "La modificacion estructural requiere subtipo operacional para cerrar informes, publicidad y canje aplicables.",
       fuente: "RDL 5/2023",
       override_tipo: "DESVIACION_CON_RIESGO",
-      risk_flag: "CALIFICACION_REGISTRAL",
+      risk_flag: "TRAZABILIDAD_PARCIAL",
     }));
   }
 
@@ -440,7 +586,7 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
   const convocatoriaRule = convocatoriaRuleFor(context);
   const quorumRule = quorumRuleFor(context);
   const majorityRule = majorityRuleFor(context);
-  const noticeDays = ruleParamValue<number>(convocatoriaRule);
+  const noticeResolution = resolveNoticeDays(context, convocatoriaRule);
   const post: Partial<RulePack["postAcuerdo"]> = context.rulePackPayload.postAcuerdo ?? {};
   const plazoInscripcion = post.plazoInscripcion;
   const plazoInscripcionDias =
@@ -451,6 +597,7 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
   const convocatoriaRequired = !isUniversalAlternative(context) && !isUnipersonalMode(context);
   const baseProfile: MatterExecutionProfile = {
     schema_version: "matter-execution-profile.v1",
+    workflow_steps_version: WORKFLOW_STEPS_VERSION,
     materia,
     organo_tipo: normalizeCode(context.organo_tipo),
     tipo_social: normalizeCode(context.tipo_social),
@@ -460,10 +607,10 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
     is_listed: Boolean(context.is_listed ?? context.normativeProfile.is_listed),
     convocatoria: {
       required: convocatoriaRequired,
-      plazo_minimo_dias: convocatoriaRequired ? noticeDays : undefined,
-      fuente: convocatoriaRequired ? ruleParamReference(convocatoriaRule) : "Art. 178 LSC / via alternativa",
+      plazo_minimo_dias: convocatoriaRequired ? noticeResolution.days : undefined,
+      fuente: convocatoriaRequired ? noticeResolution.fuente : "Art. 178 LSC / via alternativa",
       forma_convocatoria: context.rulePackPayload.convocatoria?.canales?.[normalizeCode(context.tipo_social) as "SA" | "SL" | "SAU" | "SLU"] ?? [],
-      segunda_convocatoria: normalizeCode(context.tipo_social) === "SA" || normalizeCode(context.tipo_social) === "SAU",
+      segunda_convocatoria: hasSecondCall(context),
       documentacion_preceptiva: documentNames(context),
       blockers: [],
     },
@@ -483,8 +630,13 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
         typeof majorityRule === "object" && majorityRule && "referencia" in majorityRule
           ? String((majorityRule as { referencia?: unknown }).referencia ?? DEFAULT_SOURCE)
           : DEFAULT_SOURCE,
-      abstenciones_obligatorias: materia === "OPERACION_VINCULADA" ? ["Consejeros afectados por conflicto de interes"] : [],
-      veto_checks: context.pactosParasociales?.length ? ["Pactos parasociales aplicables al expediente"] : [],
+      abstenciones_obligatorias: materia === "OPERACION_VINCULADA" ? ["Consejero vinculado (arts. 228-229 LSC)"] : [],
+      veto_checks: [
+        ...(context.pactosParasociales?.length ? ["Pactos parasociales aplicables al expediente (warning contractual)"] : []),
+        ...(["FINANCIACION", "CONTRATACION_RELEVANTE", "AUTORIZACION_GARANTIA"].includes(materia)
+          ? ["Verificar umbral 25% activo (art. 160.f LSC)"]
+          : []),
+      ],
       blockers: [],
     },
     documentacion: {
@@ -516,7 +668,10 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       rule_pack_version_id: sourceRulePackVersionId(context),
       normative_snapshot_id: context.normativeProfile.profile_id,
     },
-    gaps: profileIntrinsicGaps(context),
+    gaps: [
+      ...profileIntrinsicGaps(context),
+      ...(convocatoriaRequired && noticeResolution.gap ? [noticeResolution.gap] : []),
+    ],
   };
 
   baseProfile.post_acuerdo.workflow = postAgreementWorkflow(baseProfile);
@@ -558,6 +713,7 @@ export function derivePostAgreementWorkflow(profile: MatterExecutionProfile) {
 export function computePrerequisiteGaps(
   profile: MatterExecutionProfile,
   expedienteState: ExpedienteState,
+  currentStep?: AdoptionWorkflowStep,
 ): ProfileGap[] {
   const records = expedienteState.prerequisitos ?? [];
   return profile.prerequisitos.flatMap((prerequisite) => {
@@ -574,14 +730,26 @@ export function computePrerequisiteGaps(
       return [];
     }
 
+    const effectiveSeverity =
+      prerequisite.blocking_from_step && currentStep && isAtOrBeyondStep(currentStep, prerequisite.blocking_from_step)
+        ? "BLOCKING"
+        : prerequisite.severity;
+    const effectiveRiskFlag =
+      effectiveSeverity === "BLOCKING"
+        ? prerequisite.risk_flag ?? "TRAZABILIDAD_PARCIAL"
+        : prerequisite.risk_flag === "TRAZABILIDAD_PARCIAL"
+          ? prerequisite.risk_flag
+          : undefined;
+
     return [profileGap({
       gate: "PREREQUISITO",
       code: "PREREQUISITE_MISSING",
-      severity: prerequisite.severity,
+      severity: effectiveSeverity,
       message: `${prerequisite.materia_requerida} debe constar como ${prerequisite.estado_minimo}.`,
       fuente: prerequisite.fuente,
-      override_tipo: prerequisite.severity === "BLOCKING" ? "DESVIACION_CON_RIESGO" : "VIA_ALTERNATIVA",
-      risk_flag: prerequisite.severity === "BLOCKING" ? "TRAZABILIDAD_PARCIAL" : undefined,
+      overridable: !prerequisite.non_overridable,
+      override_tipo: effectiveSeverity === "BLOCKING" ? "DESVIACION_CON_RIESGO" : "VIA_ALTERNATIVA",
+      risk_flag: effectiveRiskFlag,
     })];
   });
 }
@@ -635,14 +803,14 @@ export function evaluateFormalGate(
         severity: "BLOCKING",
         message: `Plazo de convocatoria ${noticeDays} dias inferior al minimo ${profile.convocatoria.plazo_minimo_dias}.`,
         fuente: profile.convocatoria.fuente,
+        overridable: false,
         override_tipo: "DESVIACION_CON_RIESGO",
         risk_flag: "IMPUGNABILIDAD",
       });
       return {
         gate: evidence.gate,
-        status: "OVERRIDE_REQUIRED",
+        status: "BLOCKED",
         gaps: [gap],
-        override: riskyOverride("CONVOCATORIA", "Plazo minimo de convocatoria", "Convocatoria con plazo inferior al perfil formal.", timestamp),
       };
     }
   }
@@ -658,17 +826,35 @@ export function evaluateFormalGate(
           severity: "BLOCKING",
           message: "La duracion del nombramiento de auditor debe estar entre 3 y 9 anos.",
           fuente: "Art. 264 LSC",
+          overridable: false,
           override_tipo: "DESVIACION_CON_RIESGO",
           risk_flag: "CALIFICACION_REGISTRAL",
         });
         return {
           gate: evidence.gate,
-          status: "OVERRIDE_REQUIRED",
+          status: "BLOCKED",
           gaps: [gap],
-          override: {
-            ...riskyOverride("DOCUMENTACION", "Duracion legal del auditor", "Duracion del auditor fuera del rango legal.", timestamp),
-            risk_flag: "CALIFICACION_REGISTRAL",
-          },
+        };
+      }
+    }
+
+    if (profile.materia === "NOMBRAMIENTO_CONSEJERO" && (profile.tipo_social === "SA" || profile.tipo_social === "SAU")) {
+      const mandateYears = numericValue(values.mandato_anos ?? values.mandato_consejero_anos);
+      if (mandateYears !== null && mandateYears > 6) {
+        const gap = profileGap({
+          gate: "DOCUMENTACION",
+          code: "CONSEJERO_MANDATE_EXCEEDS_SA_MAX",
+          severity: "BLOCKING",
+          message: "La duracion del cargo de consejero en SA no puede exceder de 6 anos.",
+          fuente: "Art. 221.1 LSC",
+          overridable: false,
+          override_tipo: "DESVIACION_CON_RIESGO",
+          risk_flag: "CALIFICACION_REGISTRAL",
+        });
+        return {
+          gate: evidence.gate,
+          status: "BLOCKED",
+          gaps: [gap],
         };
       }
     }

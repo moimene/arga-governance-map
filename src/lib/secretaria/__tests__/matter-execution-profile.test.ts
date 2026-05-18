@@ -8,7 +8,9 @@ import {
   computeRefreshableCapa3Fields,
   derivePostAgreementWorkflow,
   evaluateFormalGate,
+  resolveRiskFlag,
 } from "../matter-execution-profile";
+import { ADOPTION_WORKFLOW_STEPS, WORKFLOW_STEPS_VERSION } from "../workflow-steps";
 
 const normativeProfile: EntityNormativeProfile = {
   schema_version: "entity-normative-profile.v1",
@@ -99,6 +101,18 @@ function profileInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function overrideParam(clave: string, valor: unknown) {
+  return {
+    id: `override-${clave}`,
+    entity_id: "entity-1",
+    materia: "APROBACION_CUENTAS",
+    clave,
+    valor,
+    fuente: "ESTATUTOS",
+    referencia: "Estatutos demo",
+  };
+}
+
 describe("MatterExecutionProfile", () => {
   it("trata la junta universal como via alternativa, sin risk_flag ni consecuencia", () => {
     const profile = buildMatterExecutionProfile(profileInput({ adoption_mode: "MEETING" }));
@@ -117,7 +131,7 @@ describe("MatterExecutionProfile", () => {
     expect(result.override?.consecuencia).toBeUndefined();
   });
 
-  it("marca convocatoria defectuosa como desviacion con riesgo de impugnabilidad", () => {
+  it("bloquea convocatoria defectuosa cuando existe convocatoria formal con plazo inferior al minimo legal", () => {
     const profile = buildMatterExecutionProfile(profileInput());
     const result = evaluateFormalGate(profile, {
       gate: "CONVOCATORIA",
@@ -125,13 +139,46 @@ describe("MatterExecutionProfile", () => {
       convocatoria: { noticeDays: 10 },
     });
 
-    expect(result.status).toBe("OVERRIDE_REQUIRED");
-    expect(result.override).toMatchObject({
-      override_tipo: "DESVIACION_CON_RIESGO",
+    expect(result.status).toBe("BLOCKED");
+    expect(result.override).toBeUndefined();
+    expect(result.gaps[0]).toMatchObject({
+      code: "NOTICE_PERIOD_SHORT",
+      overridable: false,
       risk_flag: "IMPUGNABILIDAD",
     });
-    expect(result.override?.consecuencia).toContain("riesgo formal");
-    expect(result.gaps[0]).toMatchObject({ code: "NOTICE_PERIOD_SHORT", overridable: true });
+  });
+
+  it("corrige rule packs con plazo SA inferior al minimo legal art. 176 LSC", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      rulePackPayload: rulePack({
+        convocatoria: {
+          antelacionDias: {
+            SA: { valor: 15, fuente: "LEY", referencia: "Rule pack legacy" },
+          },
+          canales: { SA: ["BORME"] },
+        },
+      }),
+    }));
+
+    expect(profile.convocatoria.plazo_minimo_dias).toBe(30);
+    expect(profile.gaps).toEqual([
+      expect.objectContaining({
+        code: "RULE_PACK_NOTICE_BELOW_LEGAL_MINIMUM",
+        severity: "INFO",
+        overridable: false,
+      }),
+    ]);
+  });
+
+  it("permite segunda convocatoria en SL solo con override estatutario", () => {
+    const base = buildMatterExecutionProfile(profileInput({ tipo_social: "SL" }));
+    const withOverride = buildMatterExecutionProfile(profileInput({
+      tipo_social: "SL",
+      paramOverrides: [overrideParam("segunda_convocatoria_sl", true)],
+    }));
+
+    expect(base.convocatoria.segunda_convocatoria).toBe(false);
+    expect(withOverride.convocatoria.segunda_convocatoria).toBe(true);
   });
 
   it("modela APROBACION_CUENTAS -> FORMULACION_CUENTAS como prerequisito blocking", () => {
@@ -156,7 +203,7 @@ describe("MatterExecutionProfile", () => {
     ]);
   });
 
-  it("modela DISTRIBUCION_DIVIDENDOS con cadena de prerequisitos de cuentas", () => {
+  it("modela DISTRIBUCION_DIVIDENDOS con prerequisito directo de cuentas aprobadas", () => {
     const profile = buildMatterExecutionProfile(profileInput({
       materia: "DISTRIBUCION_DIVIDENDOS",
       rulePackPayload: rulePack({ id: "rp-dividendos", materia: "DISTRIBUCION_DIVIDENDOS" }),
@@ -167,14 +214,8 @@ describe("MatterExecutionProfile", () => {
 
     expect(profile.prerequisitos.map((item) => item.materia_requerida)).toEqual([
       "APROBACION_CUENTAS",
-      "FORMULACION_CUENTAS",
     ]);
-    expect(gaps).toEqual([
-      expect.objectContaining({
-        message: "FORMULACION_CUENTAS debe constar como APROBADO.",
-        severity: "WARNING",
-      }),
-    ]);
+    expect(gaps).toEqual([]);
   });
 
   it("exige acta aprobada para CERTIFICACION_ACUERDOS", () => {
@@ -191,12 +232,15 @@ describe("MatterExecutionProfile", () => {
       fuente: "RRM arts. 108-109",
     });
     expect(gaps[0].override_tipo).toBe("DESVIACION_CON_RIESGO");
+    expect(gaps[0].overridable).toBe(false);
+    expect(gaps[0].risk_flag).toBe("CALIFICACION_REGISTRAL");
   });
 
   it("bifurca CESE_CONSEJERO entre Consejo y Junta por quorum y mayoria", () => {
     const consejo = buildMatterExecutionProfile(profileInput({
       materia: "CESE_CONSEJERO",
       organo_tipo: "CONSEJO_ADMIN",
+      subtipo_materia: "RENUNCIA",
       rulePackPayload: rulePack({ id: "rp-cese-consejo", materia: "CESE_CONSEJERO" }),
     }));
     const junta = buildMatterExecutionProfile(profileInput({
@@ -211,7 +255,23 @@ describe("MatterExecutionProfile", () => {
     expect(junta.votacion.majority_rule).toBe("favor > contra");
   });
 
-  it("advierte si NOMBRAMIENTO_CONSEJERO por cooptacion se intenta en SL", () => {
+  it("exige subtipo para CESE_CONSEJERO por Consejo", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "CESE_CONSEJERO",
+      organo_tipo: "CONSEJO_ADMIN",
+      rulePackPayload: rulePack({ id: "rp-cese-consejo", materia: "CESE_CONSEJERO" }),
+    }));
+
+    expect(profile.gaps).toEqual([
+      expect.objectContaining({
+        code: "CESE_CONSEJO_SUBTIPO_REQUIRED",
+        severity: "BLOCKING",
+        risk_flag: "IMPUGNABILIDAD",
+      }),
+    ]);
+  });
+
+  it("bloquea NOMBRAMIENTO_CONSEJERO por cooptacion en SL sin prevision estatutaria", () => {
     const profile = buildMatterExecutionProfile(profileInput({
       materia: "NOMBRAMIENTO_CONSEJERO",
       organo_tipo: "CONSEJO_ADMIN",
@@ -223,10 +283,28 @@ describe("MatterExecutionProfile", () => {
     expect(profile.gaps).toEqual([
       expect.objectContaining({
         code: "COOPTACION_SOLO_SA",
-        severity: "WARNING",
+        severity: "BLOCKING",
         overridable: true,
+        risk_flag: "IMPUGNABILIDAD",
       }),
     ]);
+  });
+
+  it("degrada cooptacion en SL a warning registral si hay prevision estatutaria", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "NOMBRAMIENTO_CONSEJERO",
+      organo_tipo: "CONSEJO_ADMIN",
+      tipo_social: "SL",
+      subtipo_materia: "COOPTACION",
+      paramOverrides: [overrideParam("cooptacion_sl_estatutaria", true)],
+      rulePackPayload: rulePack({ id: "rp-cooptacion", materia: "NOMBRAMIENTO_CONSEJERO" }),
+    }));
+
+    expect(profile.gaps[0]).toMatchObject({
+      code: "COOPTACION_SOLO_SA",
+      severity: "WARNING",
+      risk_flag: "CALIFICACION_REGISTRAL",
+    });
   });
 
   it("modela FUSION/ESCISION con proyecto comun, RDL 5/2023 e inscripcion", () => {
@@ -247,6 +325,8 @@ describe("MatterExecutionProfile", () => {
     expect(profile.prerequisitos[0]).toMatchObject({
       materia_requerida: "PROYECTO_COMUN_MODIFICACION_ESTRUCTURAL",
       fuente: "Arts. 11-25 RDL 5/2023",
+      severity: "WARNING",
+      blocking_from_step: "CONVOCATORIA",
     });
     expect(profile.documentacion.informes_preceptivos).toContain("Proyecto comun de modificacion estructural");
     expect(profile.post_acuerdo).toMatchObject({
@@ -263,7 +343,27 @@ describe("MatterExecutionProfile", () => {
     ]);
   });
 
-  it("marca NOMBRAMIENTO_AUDITOR fuera de 3-9 anos como gap bloqueante y overridable", () => {
+  it("eleva proyecto comun de WARNING a BLOCKING desde convocatoria", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FUSION",
+      subtipo_materia: "FUSION_ABSORCION",
+      rulePackPayload: rulePack({ id: "rp-fusion", materia: "FUSION" }),
+    }));
+
+    expect(computePrerequisiteGaps(profile, { prerequisitos: [] }, "INICIO")[0]).toMatchObject({
+      severity: "WARNING",
+      risk_flag: undefined,
+    });
+    expect(computePrerequisiteGaps(profile, { prerequisitos: [] }, "CONVOCATORIA")[0]).toMatchObject({
+      severity: "BLOCKING",
+      risk_flag: "IMPUGNABILIDAD",
+    });
+    expect(computePrerequisiteGaps(profile, { prerequisitos: [] }, "VOTACION")[0]).toMatchObject({
+      severity: "BLOCKING",
+    });
+  });
+
+  it("marca NOMBRAMIENTO_AUDITOR fuera de 3-9 anos como minimo imperativo no overridable", () => {
     const profile = buildMatterExecutionProfile(profileInput({
       materia: "NOMBRAMIENTO_AUDITOR",
       rulePackPayload: rulePack({ id: "rp-auditor", materia: "NOMBRAMIENTO_AUDITOR" }),
@@ -273,11 +373,30 @@ describe("MatterExecutionProfile", () => {
       values: { duracion_anos: 10 },
     });
 
-    expect(result.status).toBe("OVERRIDE_REQUIRED");
+    expect(result.status).toBe("BLOCKED");
     expect(result.gaps[0]).toMatchObject({
       code: "AUDITOR_DURATION_OUT_OF_RANGE",
       severity: "BLOCKING",
-      overridable: true,
+      overridable: false,
+      risk_flag: "CALIFICACION_REGISTRAL",
+    });
+  });
+
+  it("marca mandato de consejero SA superior a 6 anos como minimo imperativo no overridable", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "NOMBRAMIENTO_CONSEJERO",
+      tipo_social: "SA",
+      rulePackPayload: rulePack({ id: "rp-consejero", materia: "NOMBRAMIENTO_CONSEJERO" }),
+    }));
+    const result = evaluateFormalGate(profile, {
+      gate: "DOCUMENTACION",
+      values: { mandato_anos: 7 },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.gaps[0]).toMatchObject({
+      code: "CONSEJERO_MANDATE_EXCEEDS_SA_MAX",
+      overridable: false,
       risk_flag: "CALIFICACION_REGISTRAL",
     });
   });
@@ -297,7 +416,7 @@ describe("MatterExecutionProfile", () => {
     expect(computeRefreshableCapa3Fields(profile, capa3Schema)).toEqual(profile.eficiencia.campos_a_actualizar);
   });
 
-  it("mantiene todos los gaps como overridable para preservar control del secretario", () => {
+  it("mantiene gaps ordinarios como overridable y reserva false para minimos imperativos", () => {
     const profile = buildMatterExecutionProfile(profileInput({
       materia: "NOMBRAMIENTO_CONSEJERO",
       organo_tipo: "CONSEJO_ADMIN",
@@ -316,7 +435,34 @@ describe("MatterExecutionProfile", () => {
     const allGaps = [...profile.gaps, ...prereqGaps, ...gateResult.gaps];
 
     expect(allGaps.length).toBeGreaterThan(0);
-    expect(allGaps.every((gap) => gap.overridable === true)).toBe(true);
-    expect(gateResult.status).toBe("OVERRIDE_REQUIRED");
+    expect(profile.gaps.every((gap) => gap.overridable === true)).toBe(true);
+    expect(prereqGaps.every((gap) => gap.overridable === true)).toBe(true);
+    expect(gateResult.gaps[0].overridable).toBe(false);
+    expect(gateResult.status).toBe("BLOCKED");
+  });
+
+  it("prioriza risk_flags por consecuencia juridica", () => {
+    expect(resolveRiskFlag(["CALIFICACION_REGISTRAL", "IMPUGNABILIDAD"])).toEqual({
+      primary: "IMPUGNABILIDAD",
+      additional: ["CALIFICACION_REGISTRAL"],
+    });
+    expect(resolveRiskFlag(["TRAZABILIDAD_PARCIAL", "NULIDAD", "IMPUGNABILIDAD"])).toEqual({
+      primary: "NULIDAD",
+      additional: ["IMPUGNABILIDAD", "TRAZABILIDAD_PARCIAL"],
+    });
+  });
+
+  it("expone steps formales versionados para blocking_from_step", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FUSION",
+      rulePackPayload: rulePack({ id: "rp-fusion", materia: "FUSION" }),
+    }));
+
+    expect(profile.workflow_steps_version).toBe(WORKFLOW_STEPS_VERSION);
+    for (const prerequisite of profile.prerequisitos) {
+      if (prerequisite.blocking_from_step) {
+        expect(ADOPTION_WORKFLOW_STEPS).toContain(prerequisite.blocking_from_step);
+      }
+    }
   });
 });
