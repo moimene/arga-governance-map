@@ -191,6 +191,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
   const decisionDate = dateOnly(input.scheduledStart) ?? dateOnly(input.snapshot.evaluated_at) ?? dateOnly(now);
   const requiredMajorityCode = normalizeRequiredMajorityCode(input);
   const normativeSnapshot = compactNormativeSnapshotForMeeting(input);
+  const adoptionMode = input.snapshot.voting_context.adoption_mode ?? "MEETING";
   const complianceSnapshot = normativeSnapshot
     ? {
         ...input.snapshot,
@@ -221,7 +222,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
     agreement_kind: input.snapshot.materia,
     matter_class: input.snapshot.materia_clase,
     inscribable: isInscribableAgreementMatter(input.snapshot.materia, input.snapshot.materia_clase),
-    adoption_mode: "MEETING",
+    adoption_mode: adoptionMode,
     status: "ADOPTED",
     parent_meeting_id: input.meetingId,
     agenda_item_id: input.agendaItemId ?? null,
@@ -237,7 +238,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
       normative_snapshot: normativeSnapshot,
     },
     execution_mode: {
-      mode: "MEETING",
+      mode: adoptionMode,
       ...agreement360,
       agreement_360: agreement360,
     },
@@ -253,6 +254,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
       ? "resolution_not_adopted"
       : "societary_validity_not_proclaimable");
   const normativeSnapshot = compactNormativeSnapshotForMeeting(input);
+  const adoptionMode = input.snapshot.voting_context.adoption_mode ?? "MEETING";
   const agreement360 = {
     version: AGREEMENT_360_VERSION,
     origin: input.origin ?? "MEETING_FLOOR",
@@ -293,7 +295,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
       normative_snapshot: normativeSnapshot,
     },
     execution_mode: {
-      mode: "MEETING",
+      mode: adoptionMode,
       ...agreement360,
       agreement_360: agreement360,
     },

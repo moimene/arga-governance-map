@@ -762,6 +762,22 @@ test.describe('Phase B1 v3 — adoption modes no-meeting/no-no-session', () => {
     expect(mErr, 'insert meeting universal').toBeNull();
     created.push({ table: 'meetings', id: meeting!.id, marker: runId });
 
+    const { data: agendaItem, error: aiErr } = await client
+      .from('agenda_items')
+      .insert({
+        tenant_id: DEMO_TENANT_ID,
+        meeting_id: meeting!.id,
+        order_number: 1,
+        title: `Punto universal ${runId}`,
+        description: 'Punto sintético para anclar el acuerdo de junta universal',
+        kind: 'DECISORIO',
+        decision_subtype: 'CONSTITUTIVE',
+      })
+      .select('id')
+      .single();
+    expect(aiErr, 'insert agenda item UNIVERSAL').toBeNull();
+    created.push({ table: 'agenda_items', id: agendaItem!.id, marker: runId });
+
     // Snapshot de junta universal: adoption_mode=UNIVERSAL.
     const snapshot = {
       adoption_mode: 'UNIVERSAL',
@@ -796,6 +812,8 @@ test.describe('Phase B1 v3 — adoption modes no-meeting/no-no-session', () => {
         decision_text: `Aprobado en junta universal ${runId}`,
         decision_date: new Date().toISOString().slice(0, 10),
         parent_meeting_id: meeting!.id,
+        agenda_item_id: agendaItem!.id,
+        execution_mode: { mode: 'UNIVERSAL', agenda_item_index: 1 },
         compliance_snapshot: snapshot,
       })
       .select('id')

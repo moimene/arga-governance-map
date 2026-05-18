@@ -428,6 +428,7 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     // Fecha 30 días en el futuro (suficiente antelación para SA art. 176 LSC)
     const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     await page.locator('input[type="date"]').first().fill(futureDate);
+    await page.locator('input[type="time"]').first().fill('10:00');
     await page.locator('input[type="text"]').first().fill('Sede social C/ Gran Vía 1, Madrid');
 
     const next2 = page.getByRole('button', { name: /^Siguiente$/i });
@@ -438,6 +439,17 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await expect(
       page.getByRole('heading', { name: /Paso 3\. Orden del día/i }),
     ).toBeVisible({ timeout: 10_000 });
+    const acuerdoKind = page.getByRole('radio', { name: /Acuerdo:/i }).first();
+    await expect(acuerdoKind).toBeVisible({ timeout: 5_000 });
+    await acuerdoKind.click();
+    await expect(acuerdoKind).toHaveAttribute('aria-checked', 'true');
+    const materiaAcuerdo = page.getByLabel('Materia del acuerdo').first();
+    await expect(materiaAcuerdo).toBeVisible({ timeout: 5_000 });
+    const firstMateriaValue = await materiaAcuerdo.locator('option').evaluateAll((options) => {
+      return (options as HTMLOptionElement[]).find((option) => option.value)?.value ?? '';
+    });
+    if (firstMateriaValue) await materiaAcuerdo.selectOption(firstMateriaValue);
+
     // El default tiene 1 agenda item vacío. Llenamos su titulo.
     const tituloPunto = page.getByPlaceholder(/Descripción del punto del orden del día/i).first();
     await expect(tituloPunto).toBeVisible({ timeout: 5_000 });
@@ -471,6 +483,10 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await expect(
       page.getByRole('heading', { name: /Paso 5\. Canales de publicación/i }),
     ).toBeVisible({ timeout: 10_000 });
+    const firstChannel = page.locator('main input[type="checkbox"]').first();
+    if (await firstChannel.isVisible().catch(() => false)) {
+      await firstChannel.check();
+    }
     const next5 = page.getByRole('button', { name: /^Siguiente$/i });
     await expect(next5).toBeEnabled({ timeout: 10_000 });
     await next5.click();
@@ -490,8 +506,33 @@ test.describe('Phase B5 — UI driving destructive ConvocatoriaStepper synthetic
     await expect(
       page.getByRole('heading', { name: /Paso 7\. Borrador documento/i }),
     ).toBeVisible({ timeout: 10_000 });
+    const nombreConvocante = page.getByLabel(/Nombre Convocante/i);
+    if (await nombreConvocante.isVisible().catch(() => false)) {
+      await nombreConvocante.fill(`Secretaría E2E ${fixture.runId}`);
+    }
+    const requiredInvalidTextareas = page.locator('main textarea[aria-required="true"][aria-invalid="true"]');
+    const invalidTextAreaCount = await requiredInvalidTextareas.count();
+    for (let index = 0; index < invalidTextAreaCount; index += 1) {
+      await requiredInvalidTextareas.nth(index).fill(`Valor Capa 3 E2E ${fixture.runId}`);
+    }
+    const requiredInvalidSelects = page.locator('main select[aria-required="true"][aria-invalid="true"]');
+    const invalidSelectCount = await requiredInvalidSelects.count();
+    for (let index = 0; index < invalidSelectCount; index += 1) {
+      const select = requiredInvalidSelects.nth(index);
+      const firstValue = await select.locator('option').evaluateAll((options) => {
+        return (options as HTMLOptionElement[]).find((option) => option.value)?.value ?? '';
+      });
+      if (firstValue) await select.selectOption(firstValue);
+    }
+    const borradorTextarea = page
+      .getByPlaceholder(/Borrador generado desde plantilla|Sin plantilla aplicada/i)
+      .first();
+    await expect(borradorTextarea).toBeVisible({ timeout: 10_000 });
+    await borradorTextarea.fill(
+      `Borrador de convocatoria E2E ${fixture.runId}. Se convoca sesión ordinaria con orden del día y emisión certificada.`,
+    );
     const next7 = page.getByRole('button', { name: /^Siguiente$/i });
-    await expect(next7).toBeEnabled({ timeout: 10_000 });
+    await expect(next7).toBeEnabled({ timeout: 60_000 });
     await next7.click();
 
     // ── PASO 8: Revisión y emisión ─────────────────────────────────

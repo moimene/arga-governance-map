@@ -15,7 +15,7 @@ test.describe('Secretaría — Convocatorias', () => {
     await expect(dataRow).toBeVisible({ timeout: 10_000 });
     await dataRow.click();
     await expect(page).toHaveURL(/\/secretaria\/convocatorias\/[^/?]+/);
-    await expect(page.getByRole('button', { name: 'Convocatoria DOCX' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Convocatoria.*DOCX/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Informe PRE' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Reunión operativa' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Programar reunión|Abrir reunión/ }).first()).toBeVisible();

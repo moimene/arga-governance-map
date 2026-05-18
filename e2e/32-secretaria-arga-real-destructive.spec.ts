@@ -222,8 +222,8 @@ async function prepareFixture(client: ServiceClient): Promise<FixtureContext> {
   );
 
   const bodyId = randomUUID();
-  const bodyName = `[E2E REAL] Consejo QA ${runId}`;
-  const slug = `e2e-real-${runId}`;
+  const bodyName = `Consejo QA ${runId}`;
+  const slug = `qa-no-session-${runId}`;
 
   await requireSingle<IdRow>(
     client
@@ -236,7 +236,7 @@ async function prepareFixture(client: ServiceClient): Promise<FixtureContext> {
         name: bodyName,
         body_type: 'CDA',
         quorum_rule: { mode: 'E2E_REAL_SINGLE_VOTER', required: 1 },
-        config: { e2e_real_run_id: runId, purpose: 'no-session-destructive-ui' },
+        config: { qa_run_id: runId, purpose: 'no-session-destructive-ui' },
       })
       .select('id')
       .single(),
@@ -281,8 +281,8 @@ async function prepareFixture(client: ServiceClient): Promise<FixtureContext> {
     'insert QA president authority',
   );
 
-  const sellerName = `[E2E REAL] Transmitente ${runId}`;
-  const buyerName = `[E2E REAL] Adquirente ${runId}`;
+  const sellerName = `QA Transmitente ${runId}`;
+  const buyerName = `QA Adquirente ${runId}`;
   const [seller, buyer] = await Promise.all([
     requireSingle<PersonRow>(
       client
@@ -290,7 +290,7 @@ async function prepareFixture(client: ServiceClient): Promise<FixtureContext> {
         .insert({
           tenant_id: DEMO_TENANT_ID,
           full_name: sellerName,
-          tax_id: `E2E-S-${runId.slice(-10)}`,
+          tax_id: `QA-S-${runId.slice(-10)}`,
           person_type: 'PF',
           email: `seller-${runId}@arga.example`,
         })
@@ -304,7 +304,7 @@ async function prepareFixture(client: ServiceClient): Promise<FixtureContext> {
         .insert({
           tenant_id: DEMO_TENANT_ID,
           full_name: buyerName,
-          tax_id: `E2E-B-${runId.slice(-10)}`,
+          tax_id: `QA-B-${runId.slice(-10)}`,
           person_type: 'PF',
           email: `buyer-${runId}@arga.example`,
         })
@@ -399,6 +399,51 @@ async function closeActiveTestHoldings(client: ServiceClient, runId: string) {
     .is('effective_to', null);
 }
 
+async function deleteByIds(client: ServiceClient, table: string, ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await client.from(table).delete().in('id', ids);
+  if (error) console.warn(`[e2e-real-cleanup] ${table}: ${error.message}`);
+}
+
+async function cleanupFixture(client: ServiceClient, fixture: FixtureContext) {
+  const { data: resolutions } = await client
+    .from('no_session_resolutions')
+    .select('id')
+    .eq('tenant_id', fixture.tenantId)
+    .eq('title', `[E2E REAL] Acuerdo sin sesión ${fixture.runId}`);
+  const resolutionIds = (resolutions ?? []).map((row) => row.id);
+
+  const agreementIds = new Set<string>();
+  if (resolutionIds.length > 0) {
+    const { data: agreementsByResolution } = await client
+      .from('agreements')
+      .select('id')
+      .in('no_session_resolution_id', resolutionIds);
+    (agreementsByResolution ?? []).forEach((row) => agreementIds.add(row.id));
+  }
+  const { data: agreementsByBody } = await client
+    .from('agreements')
+    .select('id')
+    .eq('body_id', fixture.bodyId);
+  (agreementsByBody ?? []).forEach((row) => agreementIds.add(row.id));
+
+  const ids = [...agreementIds];
+  if (ids.length > 0) {
+    await client.from('certifications').delete().in('agreement_id', ids);
+    await client.from('secretaria_document_drafts').delete().in('agreement_id', ids);
+    await deleteByIds(client, 'agreements', ids);
+  }
+
+  await deleteByIds(client, 'no_session_resolutions', resolutionIds);
+  await client.from('authority_evidence').delete().eq('body_id', fixture.bodyId);
+  await client.from('authority_evidence').delete().contains('metadata', { e2e_real_run_id: fixture.runId });
+  await client.from('condiciones_persona').delete().eq('body_id', fixture.bodyId);
+  await client.from('condiciones_persona').delete().contains('metadata', { e2e_real_run_id: fixture.runId });
+  await client.from('capital_holdings').delete().contains('metadata', { e2e_real_run_id: fixture.runId });
+  await client.from('governing_bodies').delete().eq('id', fixture.bodyId);
+  await deleteByIds(client, 'persons', [fixture.sellerPersonId, fixture.buyerPersonId]);
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Secretaría ARGA real destructive E2E', () => {
@@ -413,6 +458,7 @@ test.describe('Secretaría ARGA real destructive E2E', () => {
   test.afterAll(async () => {
     if (client && fixture?.runId) {
       await closeActiveTestHoldings(client, fixture.runId);
+      await cleanupFixture(client, fixture);
     }
   });
 
@@ -434,7 +480,7 @@ test.describe('Secretaría ARGA real destructive E2E', () => {
     await expect(page.getByText('Plantilla seleccionada:')).toBeVisible();
 
     const stepOneSelects = page.locator('main select');
-    await selectOptionByText(stepOneSelects.nth(1), /\[E2E REAL\] Consejo QA/);
+    await stepOneSelects.nth(1).selectOption(fixture.bodyId);
     await selectOptionByText(stepOneSelects.nth(2), /Aprobaci[oó]n de cuentas anuales/);
     await page.getByRole('button', { name: /Siguiente/ }).click();
 
@@ -527,6 +573,10 @@ test.describe('Secretaría ARGA real destructive E2E', () => {
 
     await selectOptionByText(page.locator('main select').first(), new RegExp(fixture.buyerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     await page.getByRole('button', { name: /Siguiente/ }).click();
+
+    await page.getByLabel('Documento soporte *').fill(`evidence://qa/transmision-${fixture.runId}`);
+    await page.getByRole('button', { name: /Siguiente/ }).click();
+
     await expect(page.getByText(fixture.sellerName)).toBeVisible();
     await expect(page.getByText(fixture.buyerName)).toBeVisible();
     await page.getByRole('button', { name: /Registrar transmisión/ }).click();

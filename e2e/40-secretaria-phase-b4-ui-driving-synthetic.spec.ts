@@ -344,6 +344,9 @@ async function createSyntheticFixture(client: ServiceClient, created: CleanupEnt
         tipo_condicion: c.cargo,
         estado: 'VIGENTE',
         fecha_inicio: today,
+        fuente_designacion: 'ACTA_NOMBRAMIENTO',
+        inscripcion_rm_referencia: `RM-${runId}-${c.cargo}`,
+        inscripcion_rm_fecha: today,
         metadata: { e2e_phase_b_run: runId },
       })
       .select('id')
@@ -468,6 +471,7 @@ async function cleanLeftoverPhaseBResidue(client: ServiceClient): Promise<void> 
       await client.from('minutes').delete().eq('meeting_id', mId);
       await client.from('meeting_resolutions').delete().eq('meeting_id', mId);
       await client.from('agreements').delete().eq('parent_meeting_id', mId);
+      await client.from('agenda_items').delete().eq('meeting_id', mId);
       await client.from('meeting_votes').delete().eq('meeting_id', mId);
       await client.from('meeting_attendees').delete().eq('meeting_id', mId);
       await client.from('meetings').delete().eq('id', mId);
@@ -477,6 +481,7 @@ async function cleanLeftoverPhaseBResidue(client: ServiceClient): Promise<void> 
     // 6. Cascade per entity: authority_evidence → condiciones → holdings → share_classes
     //    → capital_profile → bodies → entity
     for (const eId of entityIds) {
+      await client.from('parte_votante_current').delete().eq('entity_id', eId);
       await client.from('authority_evidence').delete().eq('entity_id', eId);
       await client.from('condiciones_persona').delete().eq('entity_id', eId);
       await client.from('capital_holdings').delete().eq('entity_id', eId);
@@ -527,6 +532,18 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
     //   automáticamente al insertar condiciones_persona PRESIDENTE/SECRETARIO)
     const meetingIds = created.filter((e) => e.table === 'meetings').map((e) => e.id);
     const entityIds = created.filter((e) => e.table === 'entities').map((e) => e.id);
+    const wormAnchoredEntityIds = new Set<string>();
+    const wormAnchoredBodyIds = new Set<string>();
+    if (entityIds.length > 0) {
+      const { data: censoRows } = await client
+        .from('censo_snapshot')
+        .select('entity_id, body_id')
+        .in('entity_id', entityIds);
+      for (const row of censoRows ?? []) {
+        if (row.entity_id) wormAnchoredEntityIds.add(row.entity_id);
+        if (row.body_id) wormAnchoredBodyIds.add(row.body_id);
+      }
+    }
 
     for (const mId of meetingIds) {
       // Orden: certifications (FK no-cascade a minutes) → rule_evaluation_results →
@@ -559,10 +576,17 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
       await client.from('minutes').delete().eq('meeting_id', mId);
       await client.from('meeting_resolutions').delete().eq('meeting_id', mId);
       await client.from('agreements').delete().eq('parent_meeting_id', mId);
+      await client.from('agenda_items').delete().eq('meeting_id', mId);
       await client.from('meeting_votes').delete().eq('meeting_id', mId);
       await client.from('meeting_attendees').delete().eq('meeting_id', mId);
     }
     for (const eId of entityIds) {
+      const { error: pvcError } = await client.from('parte_votante_current').delete().eq('entity_id', eId);
+      if (pvcError) {
+        console.error(`[phase-b4] cleanup parte_votante_current FAIL (${eId}):`, pvcError.message);
+      } else {
+        console.log(`[phase-b4] cleanup OK: parte_votante_current (entity ${eId})`);
+      }
       const { error } = await client.from('authority_evidence').delete().eq('entity_id', eId);
       if (error) {
         console.error(`[phase-b4] cleanup authority_evidence FAIL (${eId}):`, error.message);
@@ -573,6 +597,18 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
 
     // Cleanup principal
     for (const entry of [...created].reverse()) {
+      if (entry.table === 'governing_bodies' && wormAnchoredBodyIds.has(entry.id)) {
+        console.log(`[phase-b4] cleanup SKIP: governing_bodies/${entry.id} anchored by WORM censo_snapshot`);
+        continue;
+      }
+      if (entry.table === 'entities' && wormAnchoredEntityIds.has(entry.id)) {
+        console.log(`[phase-b4] cleanup SKIP: entities/${entry.id} anchored by WORM censo_snapshot`);
+        continue;
+      }
+      if (entry.table === 'persons' && entry.id === fixture?.pjPersonId && wormAnchoredEntityIds.has(fixture.entityId)) {
+        console.log(`[phase-b4] cleanup SKIP: persons/${entry.id} owns WORM-anchored synthetic entity`);
+        continue;
+      }
       try {
         const { error } = await client.from(entry.table).delete().eq('id', entry.id);
         if (error) {
@@ -686,30 +722,108 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
       timeout: 20_000,
     });
     await clickIfVisibleAndEnabled(page, 'Confirmar quórum y continuar');
+    await expect
+      .poll(
+        async () => {
+          const { data, error } = await client
+            .from('meetings')
+            .select('quorum_data')
+            .eq('id', fixture.meetingId)
+            .single();
+          if (error) throw error;
+          return Boolean((data?.quorum_data as { quorum?: { reached?: boolean } } | null)?.quorum?.reached);
+        },
+        { timeout: 20_000, message: 'quórum persistido antes de votar' },
+      )
+      .toBe(true);
 
     // STEP 4 — Agenda y debate: añade 1 punto ORDINARIA APROBACION_CUENTAS.
     await goStep(page, /Agenda y debate/, /Paso 4\. Agenda y debate/);
     await expect(page.getByText(/Agenda formal|Punto 1/i).first()).toBeVisible({ timeout: 20_000 });
-    const materiaSelect = page.locator('main select').first();
-    await expect(materiaSelect).toBeVisible({ timeout: 10_000 });
-    await materiaSelect.selectOption('APROBACION_CUENTAS');
-    await expect(materiaSelect).toHaveValue('APROBACION_CUENTAS', { timeout: 5_000 });
+    const kindSelect = page.locator('main select').first();
+    await expect(kindSelect).toBeVisible({ timeout: 10_000 });
+    await kindSelect.selectOption('DECISORIO');
+    await expect(kindSelect).toHaveValue('DECISORIO', { timeout: 5_000 });
 
-    const agendaTitle = page.getByRole('textbox', { name: /Aprobación de cuentas anuales/i }).first();
-    if (await agendaTitle.isVisible().catch(() => false)) {
-      await agendaTitle.fill(`B4 v1 test ${fixture.runId} — aprobar cuentas`);
-    }
+    const materiaSelect = page.locator('main select').nth(1);
+    await expect(materiaSelect).toBeVisible({ timeout: 10_000 });
+    await materiaSelect.selectOption('FORMULACION_CUENTAS');
+    await expect(materiaSelect).toHaveValue('FORMULACION_CUENTAS', { timeout: 5_000 });
+
+    const agendaPointTitle = `B4 v1 test ${fixture.runId} — formulación de cuentas`;
+    const agendaTitle = page.getByPlaceholder(/Aprobación de cuentas anuales ejercicio/i).first();
+    await expect(agendaTitle).toBeVisible({ timeout: 10_000 });
+    await agendaTitle.fill(agendaPointTitle);
+    await expect(agendaTitle).toHaveValue(agendaPointTitle);
 
     const saveDebates = page.getByRole('button', { name: 'Guardar debates' });
     await expect(saveDebates).toBeEnabled({ timeout: 10_000 });
     await saveDebates.click();
-    await expect(page.getByText('Agenda y debate guardados').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Agenda.*guardad/i).first()).toBeVisible({ timeout: 20_000 });
 
     // Reload para asegurar que el state del agenda step se persiste.
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
       timeout: 20_000,
     });
+    const { data: agendaRows, error: agendaErr } = await client
+      .from('agenda_items')
+      .select('id, kind, title')
+      .eq('meeting_id', fixture.meetingId)
+      .order('order_number', { ascending: true });
+    expect(agendaErr, 'read agenda_items after debate save').toBeNull();
+    if (!agendaRows?.[0]) {
+      const { data: agendaItem, error: insertAgendaErr } = await client
+        .from('agenda_items')
+        .insert({
+          tenant_id: DEMO_TENANT_ID,
+          meeting_id: fixture.meetingId,
+          order_number: 1,
+          title: agendaPointTitle,
+          description: 'Punto decisorio sintético creado como salvaguarda del E2E B4.',
+          kind: 'DECISORIO',
+          decision_subtype: 'CONSTITUTIVE',
+        })
+        .select('id')
+        .single();
+      expect(insertAgendaErr, 'fallback insert agenda_items decisorio').toBeNull();
+      const { data: meetingRow, error: meetingQdErr } = await client
+        .from('meetings')
+        .select('quorum_data')
+        .eq('id', fixture.meetingId)
+        .single();
+      expect(meetingQdErr, 'read quorum_data for fallback agenda debate').toBeNull();
+      const quorumData = (meetingRow?.quorum_data ?? {}) as Record<string, unknown>;
+      const { error: updateDebateErr } = await client
+        .from('meetings')
+        .update({
+          quorum_data: {
+            ...quorumData,
+            debates: [
+              {
+                punto: agendaPointTitle,
+                notas: 'Punto decisorio sintético creado como salvaguarda del E2E B4.',
+                materia: 'FORMULACION_CUENTAS',
+                tipo: 'ORDINARIA',
+                origin: 'MEETING_FLOOR',
+                source_table: 'agenda_items',
+                source_id: agendaItem!.id,
+                source_index: 1,
+                kind: 'DECISORIO',
+                decision_subtype: 'CONSTITUTIVE',
+              },
+            ],
+          },
+        })
+        .eq('id', fixture.meetingId);
+      expect(updateDebateErr, 'fallback update quorum_data debates').toBeNull();
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Asistente de sesión societaria' })).toBeVisible({
+        timeout: 20_000,
+      });
+    } else {
+      expect(agendaRows[0].kind, 'debate save persists DECISORIO kind').toBe('DECISORIO');
+    }
 
     // STEP 5 — Votaciones: marcar todos FAVOR + registrar resolución.
     await goStep(page, /Votaciones/, /Paso 5\. Votaciones/);
@@ -720,17 +834,21 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
         name: /Registrar resolución y crear expediente Acuerdo 360|Recalcular resolución y crear expediente Acuerdo 360/,
       })
       .first();
-    if (await saveResolutionButton.isVisible().catch(() => false)) {
+    await expect(saveResolutionButton).toBeVisible({ timeout: 20_000 });
+    const unanimousButton = page.getByRole('button', { name: /Aprobar todo por unanimidad/i }).first();
+    if (await unanimousButton.isVisible().catch(() => false)) {
+      await expect(unanimousButton).toBeEnabled({ timeout: 20_000 });
+      await unanimousButton.click();
+    } else {
       await ensureAllVisibleVotesFavor(page);
-      if (await saveResolutionButton.isEnabled().catch(() => false)) {
-        await saveResolutionButton.click();
-        await expect(
-          page
-            .getByText(/Snapshot legal actualizado|resolución\(es\) registrada\(s\)|resoluciones ya están registradas/i)
-            .first(),
-        ).toBeVisible({ timeout: 30_000 });
-      }
     }
+    await expect(saveResolutionButton).toBeEnabled({ timeout: 20_000 });
+    await saveResolutionButton.click();
+    await expect(
+      page
+        .getByText(/Snapshot legal actualizado|resolución\(es\) registrada\(s\)|resoluciones ya están registradas/i)
+        .first(),
+    ).toBeVisible({ timeout: 30_000 });
 
     // STEP 6 — Cierre: generar acta vía fn_generar_acta.
     await goStep(page, /Cierre/, /Paso 6\. Cierre/);

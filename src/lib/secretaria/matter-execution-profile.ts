@@ -679,6 +679,10 @@ function isUniversalAlternative(context: BuildMatterExecutionProfileContext) {
   return normalizeCode(context.adoption_mode) === "UNIVERSAL";
 }
 
+function isNoSessionMode(context: BuildMatterExecutionProfileContext) {
+  return normalizeCode(context.adoption_mode) === "NO_SESSION";
+}
+
 function isUnipersonalMode(context: BuildMatterExecutionProfileContext) {
   return ["UNIPERSONAL_SOCIO", "UNIPERSONAL_ADMIN", "SOLIDARIO", "CO_APROBACION"].includes(
     normalizeCode(context.adoption_mode),
@@ -990,7 +994,8 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       ? Number((plazoInscripcion as { dias?: unknown }).dias)
       : undefined;
 
-  const convocatoriaRequired = !isUniversalAlternative(context) && !isUnipersonalMode(context);
+  const convocatoriaRequired =
+    !isUniversalAlternative(context) && !isNoSessionMode(context) && !isUnipersonalMode(context);
   const secondCallGap = convocatoriaRequired ? secondCallInfoGap(context) : undefined;
   const regulatoryGap = regulatoryCommunicationGap(context);
   const baseProfile: MatterExecutionProfile = {

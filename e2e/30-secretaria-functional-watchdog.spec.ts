@@ -927,12 +927,17 @@ test.describe('Secretaría functional watchdog', () => {
     await selectOptionByText(main.locator('select').first(), /Cartera ARGA/);
     await main.getByRole('button', { name: 'Siguiente' }).click();
 
+    await main.getByLabel(/Documento soporte/).fill('evidence://qa/transmision-no-destructiva');
+    await main.getByRole('button', { name: 'Siguiente' }).click();
+
     await expect(main.getByText('Origen', { exact: true })).toBeVisible();
     await expect(main.getByText('Fundación ARGA', { exact: true })).toBeVisible();
     await expect(main.getByText('Destino', { exact: true })).toBeVisible();
     await expect(main.getByText('Cartera ARGA S.L.U.', { exact: true })).toBeVisible();
     await expect(main.getByText('Remanente en origen', { exact: true })).toBeVisible();
     await expect(main.getByText('75', { exact: true })).toBeVisible();
+    await expect(main.getByText('Documento soporte', { exact: true })).toBeVisible();
+    await expect(main.getByText('evidence://qa/transmision-no-destructiva', { exact: true })).toBeVisible();
     await expect(main.getByRole('button', { name: 'Registrar transmisión' })).toBeVisible();
   });
 });

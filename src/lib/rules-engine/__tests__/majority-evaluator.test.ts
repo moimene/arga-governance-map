@@ -184,6 +184,46 @@ describe('majority-evaluator', () => {
     expect(result.alcanzada).toBe(false);
   });
 
+  it('normalizes legacy Consejo formulas from active rule packs', () => {
+    const votos = createVotos(3, 0, 0, 0, 3, 3, 3, 3);
+
+    expect(evaluarMayoria(createMajoritySpec('Mayoría'), votos).alcanzada).toBe(true);
+    expect(evaluarMayoria(createMajoritySpec('favor > presentes_mitad'), votos).alcanzada).toBe(true);
+    expect(evaluarMayoria(createMajoritySpec('favor > total_miembros / 2'), votos).alcanzada).toBe(true);
+  });
+
+  it('normalizes legacy SL capital threshold formulas from active rule packs', () => {
+    expect(
+      evaluarMayoria(
+        createMajoritySpec('favor > 1/3_capital_total_con_voto'),
+        createVotos(34, 0, 0, 0, 34, 100),
+      ).alcanzada,
+    ).toBe(true);
+
+    expect(
+      evaluarMayoria(
+        createMajoritySpec('favor > mitad_capital_con_voto'),
+        createVotos(51, 0, 0, 0, 51, 100),
+      ).alcanzada,
+    ).toBe(true);
+  });
+
+  it('normalizes legacy reinforced SA formulas from active rule packs', () => {
+    expect(
+      evaluarMayoria(
+        createMajoritySpec('> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a'),
+        createVotos(31, 29, 0, 0, 60, 100),
+      ).alcanzada,
+    ).toBe(true);
+
+    expect(
+      evaluarMayoria(
+        createMajoritySpec('reforzada art. 201.2 LSC'),
+        createVotos(20, 10, 0, 0, 40, 100),
+      ).alcanzada,
+    ).toBe(true);
+  });
+
   // ===== Test: Abstenciones handling =====
 
   it('abstenciones no_cuentan: should exclude abstenciones from denominator', () => {

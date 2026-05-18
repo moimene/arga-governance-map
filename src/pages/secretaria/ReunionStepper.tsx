@@ -1737,17 +1737,36 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
           throw new Error("No se puede guardar el punto: falta contexto de reunión.");
         }
 
+        const existingAgendaItemId =
+          point.source_table === "agenda_items" && point.source_id ? point.source_id : null;
         const agendaItemId =
-          point.source_table === "agenda_items" && point.source_id
-            ? point.source_id
-            : await materializeAgendaItem.mutateAsync({
-                meetingId,
-                tenantId,
-                orderNumber: index + 1,
-                title: point.punto,
-                kind,
-                decisionSubtype: point.decision_subtype ?? null,
-              });
+          existingAgendaItemId ??
+          await materializeAgendaItem.mutateAsync({
+            meetingId,
+            tenantId,
+            orderNumber: index + 1,
+            title: point.punto,
+            kind,
+            decisionSubtype: point.decision_subtype ?? null,
+          });
+
+        if (existingAgendaItemId) {
+          const persistedKind = kindIndex.get(existingAgendaItemId);
+          const updatePayload: Record<string, unknown> = {
+            title: point.punto,
+            description: point.notas || null,
+            decision_subtype: kind === "DECISORIO" ? point.decision_subtype ?? null : null,
+          };
+          if (persistedKind !== kind) {
+            updatePayload.kind = kind;
+          }
+          const { error: agendaUpdateError } = await supabase
+            .from("agenda_items")
+            .update(updatePayload)
+            .eq("tenant_id", tenantId)
+            .eq("id", existingAgendaItemId);
+          if (agendaUpdateError) throw agendaUpdateError;
+        }
 
         debatesForSave[index] = {
           ...point,
@@ -1806,7 +1825,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
             titulo: point.punto,
             materia: point.materia,
             texto_acuerdo: point.notas || null,
-            kind: resolvePointKind(point, kindIndex),
+            kind: point.kind ?? resolvePointKind(point, kindIndex),
             agreement_id: point.agreement_id ?? null,
           })),
           Number.isFinite(capitalPct) ? capitalPct : 100,
@@ -2522,6 +2541,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           : Math.max(totalWeight, 1)
         : Math.max(rowsForPoint.length, 1);
 
+    const adoptionMode = isUniversalMeetingQuorumData(quorumData) ? "UNIVERSAL" : "MEETING";
     const snapshot = buildMeetingAdoptionSnapshot({
       agendaItemIndex: pointIndex + 1,
       resolutionText: point.punto || "Acuerdo de la sesión",
@@ -2529,7 +2549,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       materiaClase: normalizeMateriaClase(point.tipo),
       tipoSocial,
       organoTipo,
-      adoptionMode: "MEETING",
+      adoptionMode,
       primeraConvocatoria: true,
       quorumReached: quorumReachedForVote,
       voters: rowsForPoint.map((voter) => ({
@@ -4054,7 +4074,7 @@ function UniversalMeetingIntake() {
         entity_id: selectedEntityId,
         agreement_kind: "ACTA_SESION",
         matter_class: selectedOrganoTipo,
-        adoption_mode: "MEETING",
+        adoption_mode: "UNIVERSAL",
         status: "BORRADOR",
         inscribable: false,
       },
