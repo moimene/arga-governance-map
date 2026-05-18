@@ -1,12 +1,18 @@
-// webhook-resend: receives Resend webhooks, verifies HMAC, updates recipient state, inserts WORM event.
+// webhook-resend
+// Receives Resend webhooks with proper Svix verification.
+// Resend uses Svix as their webhook delivery infrastructure. Verification requires:
+//   - svix-id, svix-timestamp, svix-signature headers
+//   - HMAC-SHA256 of `${id}.${timestamp}.${body}` with base64-decoded whsec_xxx secret
+//   - timestamp within ±5 minutes for replay protection
+// Docs: https://resend.com/docs/dashboard/webhooks/verify-webhooks-requests
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHmac } from 'node:crypto';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const RESEND_WEBHOOK_SECRET = Deno.env.get('RESEND_WEBHOOK_SECRET') ?? '';
+const TOLERANCE_SECONDS = 300;
 
 const EVENT_MAP: Record<string, string> = {
   'email.sent': 'SENT',
@@ -17,13 +23,6 @@ const EVENT_MAP: Record<string, string> = {
   'email.clicked': 'CLICKED',
 };
 
-function verifyHmac(rawBody: string, signature: string | null): boolean {
-  if (!RESEND_WEBHOOK_SECRET) return true; // dev mode: skip if secret not configured
-  if (!signature) return false;
-  const expected = createHmac('sha256', RESEND_WEBHOOK_SECRET).update(rawBody).digest('hex');
-  return expected === signature;
-}
-
 interface ResendWebhookPayload {
   type: string;
   created_at?: string;
@@ -33,11 +32,74 @@ interface ResendWebhookPayload {
   };
 }
 
+async function verifySvix(rawBody: string, headers: Headers): Promise<{ ok: true } | { ok: false; reason: string; status: number }> {
+  if (!RESEND_WEBHOOK_SECRET) {
+    return { ok: false, reason: 'Webhook secret not configured', status: 503 };
+  }
+  if (!RESEND_WEBHOOK_SECRET.startsWith('whsec_')) {
+    return { ok: false, reason: 'Webhook secret must start with whsec_', status: 503 };
+  }
+
+  const svixId = headers.get('svix-id');
+  const svixTimestamp = headers.get('svix-timestamp');
+  const svixSignature = headers.get('svix-signature');
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return { ok: false, reason: 'Missing Svix headers', status: 401 };
+  }
+
+  const tsNum = parseInt(svixTimestamp, 10);
+  if (Number.isNaN(tsNum)) return { ok: false, reason: 'Invalid timestamp', status: 401 };
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - tsNum) > TOLERANCE_SECONDS) {
+    return { ok: false, reason: 'Timestamp outside ±5min tolerance', status: 401 };
+  }
+
+  // Decode secret: strip `whsec_` then base64-decode
+  const secretBase64 = RESEND_WEBHOOK_SECRET.replace(/^whsec_/, '');
+  let secretBytes: Uint8Array;
+  try {
+    const binaryString = atob(secretBase64);
+    secretBytes = Uint8Array.from(binaryString, (c) => c.charCodeAt(0));
+  } catch {
+    return { ok: false, reason: 'Failed to base64-decode webhook secret', status: 503 };
+  }
+
+  const toSign = `${svixId}.${svixTimestamp}.${rawBody}`;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    secretBytes as BufferSource,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(toSign));
+  const expectedBase64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+
+  // svix-signature format: "v1,base64sig v1,base64sig2 …" (space-separated, multiple keys possible during rotation)
+  const provided = svixSignature.split(' ').map((s) => s.replace(/^v1,/, '').trim()).filter(Boolean);
+  if (!provided.some((s) => timingSafeEqual(s, expectedBase64))) {
+    return { ok: false, reason: 'Signature mismatch', status: 401 };
+  }
+  return { ok: true };
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 serve(async (req) => {
   const rawBody = await req.text();
-  const signature = req.headers.get('resend-signature');
-  if (!verifyHmac(rawBody, signature)) {
-    return new Response('Invalid signature', { status: 401 });
+  const verify = await verifySvix(rawBody, req.headers);
+  if (!verify.ok) {
+    return new Response(JSON.stringify({ error: verify.reason }), {
+      status: verify.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   let payload: ResendWebhookPayload;
@@ -95,7 +157,7 @@ serve(async (req) => {
     proveedor: 'RESEND',
     proveedor_evento_id: payload.data?.email_id ?? null,
     payload: payload as unknown as Record<string, unknown>,
-    hash_self: '', // populated by tg_delivery_events_hash_chain
+    hash_self: '',
   });
 
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });

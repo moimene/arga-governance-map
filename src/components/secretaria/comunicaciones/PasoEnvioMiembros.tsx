@@ -19,6 +19,9 @@ export interface PasoEnvioMiembrosProps {
   documentHash?: string;
   documentLabel?: string;
   documentMimeType?: string;
+  documentTipo?: 'DOCUMENTO_GENERADO' | 'INFORME_PRECEPTIVO' | 'EXPEDIENTE_REF' | 'TEXTO_INTEGRO' | 'ORDEN_DIA' | 'OTRO';
+  documentSizeBytes?: number;
+  documentModoEntrega?: 'ADJUNTO' | 'LINK_FIRMADO';
   templateId?: string | null;
   tipoComunicacion?: TipoComunicacion;
   asunto: string;
@@ -46,7 +49,7 @@ async function sha512Hex(text: string): Promise<string> {
 }
 
 export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
-  const { user } = useAuth();
+  useAuth();
   useTenantContext();
   const programar = useProgramCommunication();
   const { data: mandates, isLoading: loadingMembers } = useBodyMandates(props.bodyId);
@@ -96,22 +99,57 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
       setError(plazo.reason);
       return;
     }
+
+    const recipientsWithEmail = activeMembers.filter((m) => m.email && m.email.trim().length > 0);
+    if (recipientsWithEmail.length === 0) {
+      setError('Ningún miembro vigente tiene email. Verifica el directorio de personas.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const cuerpoHash = props.documentHash ?? (await sha512Hex(props.cuerpoHtml));
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error('Sesión expirada');
+      // CRITICAL fix: cuerpo_hash and document_hash are DISTINCT.
+      // cuerpo_hash_sha512 = SHA-512 of the email body HTML (sealed by Resend+QTSP / EAD ERDS)
+      // attachment.hash_sha512 = SHA-512 of the attached document (separate evidence)
+      const cuerpoHash = await sha512Hex(props.cuerpoHtml);
+      const docHash = props.documentHash ?? (await sha512Hex(props.documentUri));
 
-      // 1. INSERT communications
-      const { data: comm, error: commErr } = await supabase
-        .from('communications')
-        .insert({
-          tenant_id: ((currentUser as { app_metadata?: { tenant_id?: string } }).app_metadata?.tenant_id) ?? null,
+      const attachments = [
+        {
+          tipo: props.documentTipo ?? 'DOCUMENTO_GENERADO',
+          label: props.documentLabel ?? 'Documento',
+          storage_uri: props.documentUri,
+          hash_sha512: docHash,
+          size_bytes: props.documentSizeBytes ?? null,
+          mime_type: props.documentMimeType ?? 'application/pdf',
+          orden: 0,
+          modo_entrega: props.documentModoEntrega ?? 'ADJUNTO',
+          signed_url_expiry_hours: 168,
+        },
+      ];
+
+      const recipientsPayload = recipientsWithEmail.map((m) => {
+        const canal = channelFor(m.person_id);
+        const fb = fallbackFor(m.person_id);
+        return {
+          person_id: m.person_id,
+          cargo_en_organo: m.role,
+          canal_primario: canal,
+          canal_fallback: fb,
+          destino_primario: m.email,
+          destino_fallback: null,
+        };
+      });
+
+      // ATOMIC RPC: communications + attachments + recipients in one transaction.
+      // If any insert fails (e.g. tg_communications_validate_plazo blocks), all rollback.
+      const { data: commId, error: rpcErr } = await supabase.rpc('fn_create_communication_atomic', {
+        p_comm: {
           entity_id: props.entityId,
           body_id: props.bodyId,
           organo_tipo: props.organoTipo,
-          meeting_id: props.meetingId ?? null,
           agreement_id: props.agreementId ?? null,
+          meeting_id: props.meetingId ?? null,
           template_id: props.templateId ?? null,
           tipo_comunicacion: props.tipoComunicacion ?? 'CONVOCATORIA',
           tipo_respuesta_esperada: 'ACUSE',
@@ -121,51 +159,19 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
           cuerpo_hash_sha512: cuerpoHash,
           estado: 'BORRADOR',
           fecha_programada: fechaProgramada.toISOString(),
-          created_by: currentUser.id,
           metadata: { source: 'PasoEnvioMiembros' },
-        })
-        .select('id')
-        .single();
-      if (commErr || !comm) throw new Error(commErr?.message ?? 'Failed to create communication');
-
-      // 2. INSERT attachment (documento generado)
-      const docHash = props.documentHash ?? cuerpoHash;
-      await supabase.from('communication_attachments').insert({
-        communication_id: comm.id,
-        tipo: 'DOCUMENTO_GENERADO',
-        label: props.documentLabel ?? 'Documento',
-        storage_uri: props.documentUri,
-        hash_sha512: docHash,
-        mime_type: props.documentMimeType ?? 'application/pdf',
-        modo_entrega: 'ADJUNTO',
+        },
+        p_attachments: attachments,
+        p_recipients: recipientsPayload,
       });
 
-      // 3. INSERT recipients (one per active member)
-      const recipientsPayload = activeMembers
-        .filter((m) => m.email)
-        .map((m) => {
-          const canal = channelFor(m.person_id);
-          const fallback = fallbackFor(m.person_id);
-          return {
-            communication_id: comm.id,
-            person_id: m.person_id,
-            cargo_en_organo: m.role,
-            canal_original: canal,
-            canal_primario: canal,
-            canal_fallback: fallback,
-            destino_primario: m.email ?? '',
-            destino_fallback: null,
-          };
-        });
-      if (recipientsPayload.length === 0) {
-        throw new Error('Ningún miembro vigente tiene email. Verifica el directorio de personas.');
+      if (rpcErr || !commId) {
+        throw new Error(rpcErr?.message ?? 'Failed to create communication');
       }
-      const { error: rErr } = await supabase.from('communication_recipients').insert(recipientsPayload);
-      if (rErr) throw new Error(rErr.message);
 
-      // 4. Promover a PROGRAMADA + trigger dispatch
-      await programar.mutateAsync(comm.id);
-      props.onProgramado?.(comm.id);
+      // Promote to PROGRAMADA + trigger dispatcher
+      await programar.mutateAsync(commId as string);
+      props.onProgramado?.(commId as string);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -202,7 +208,6 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
         </p>
       </header>
 
-      {/* Nivel certificación */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-[var(--g-text-primary)]">
           Nivel mínimo de certificación
@@ -219,7 +224,6 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
         </select>
       </div>
 
-      {/* Fecha programada */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-[var(--g-text-primary)]">
           Fecha y hora programadas
@@ -247,7 +251,6 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
         )}
       </div>
 
-      {/* Tabla destinatarios */}
       <div
         className="border border-[var(--g-border-subtle)] overflow-hidden"
         style={{ borderRadius: 'var(--g-radius-md)' }}
@@ -353,5 +356,3 @@ export function PasoEnvioMiembros(props: PasoEnvioMiembrosProps) {
     </div>
   );
 }
-
-void useAuth; // ensure not tree-shaken from lint POV

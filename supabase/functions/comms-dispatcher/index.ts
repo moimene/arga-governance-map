@@ -1,12 +1,23 @@
-// comms-dispatcher: invoked by pg_cron every minute (and ad-hoc by composer after INSERT).
-// Reclaims PENDIENTE recipients with FOR UPDATE SKIP LOCKED via fn_claim_recipients_for_dispatch RPC.
-// Calls adapter per recipient based on canal_primario, records SENT event via fn_recipient_mark_sent.
+// comms-dispatcher
+// Invoked by pg_cron every minute (service_role JWT) and ad-hoc by SECRETARIO/
+// ADMIN_TENANT staff after programming a communication.
+//
+// AUTH: this function must be deployed WITHOUT --no-verify-jwt. Supabase gateway
+// rejects calls without a valid JWT. Inside, we additionally require:
+//   - service_role JWT (pg_cron) → allowed
+//   - authenticated user JWT with SECRETARIO or ADMIN_TENANT role → allowed
+//   - anything else → 403
+//
+// TRANSACTIONAL SAFETY: if the adapter call succeeds but the post-send DB write
+// fails, we DO NOT increment `processed`. Instead we insert a best-effort
+// orphan-mark event and alert via notifications table so the operator can reconcile.
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const EAD_TRUST_BASE = Deno.env.get('EAD_TRUST_API_URL') ?? '';
 const EAD_TRUST_KEY = Deno.env.get('EAD_TRUST_API_KEY') ?? '';
@@ -25,6 +36,51 @@ interface Adjunto {
 
 interface ResendResponse { id?: string; error?: string }
 interface EADEvidence { id: string; hash: string; status?: { status: string } }
+
+interface AuthCheckResult {
+  allowed: boolean;
+  reason?: string;
+  status?: number;
+}
+
+async function authorizeCaller(req: Request): Promise<AuthCheckResult> {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader) {
+    return { allowed: false, reason: 'Missing Authorization header', status: 401 };
+  }
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+
+  // Service role JWT (pg_cron uses this via app.service_role_key GUC)
+  if (token === SERVICE_ROLE_KEY) {
+    return { allowed: true };
+  }
+
+  // Otherwise verify as user JWT
+  const verify = createClient(SUPABASE_URL, ANON_KEY);
+  const { data: { user }, error } = await verify.auth.getUser(token);
+  if (error || !user) {
+    return { allowed: false, reason: `Invalid JWT: ${error?.message ?? 'no user'}`, status: 401 };
+  }
+
+  // Check user has SECRETARIO or ADMIN_TENANT role
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data: roles, error: rolesErr } = await admin
+    .from('rbac_user_roles')
+    .select('rbac_roles(role_code), is_active')
+    .eq('user_id', user.id);
+  if (rolesErr) {
+    return { allowed: false, reason: `Role check failed: ${rolesErr.message}`, status: 500 };
+  }
+  type RoleRow = { rbac_roles: { role_code: string } | null; is_active: boolean | null };
+  const allowedCodes = new Set(['SECRETARIO', 'ADMIN_TENANT']);
+  const hasRole = ((roles ?? []) as RoleRow[]).some(
+    (r) => r.rbac_roles?.role_code && allowedCodes.has(r.rbac_roles.role_code) && (r.is_active ?? true),
+  );
+  if (!hasRole) {
+    return { allowed: false, reason: 'User lacks SECRETARIO or ADMIN_TENANT role', status: 403 };
+  }
+  return { allowed: true };
+}
 
 async function resendSend(opts: {
   destino: string; asunto: string; cuerpoHtml: string; idempotencyKey: string;
@@ -106,7 +162,16 @@ async function eadTrustErdsSend(opts: {
   }
 }
 
-serve(async (_req) => {
+serve(async (req) => {
+  // 1. Auth gate
+  const auth = await authorizeCaller(req);
+  if (!auth.allowed) {
+    return new Response(JSON.stringify({ error: auth.reason }), {
+      status: auth.status ?? 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { data: claimed, error: claimErr } = await sb.rpc('fn_claim_recipients_for_dispatch', { p_limit: BATCH_LIMIT });
   if (claimErr) {
@@ -118,6 +183,8 @@ serve(async (_req) => {
   }>) ?? [];
 
   let processed = 0;
+  const orphaned: Array<{ recipientId: string; reason: string }> = [];
+
   for (const r of recipients) {
     if (r.canal_primario === 'PORTAL_PUSH') {
       console.warn(`Skipping PORTAL_PUSH recipient ${r.id} (no adapter in P1)`);
@@ -158,8 +225,9 @@ serve(async (_req) => {
       result = send.ok ? { ok: true, proveedor: 'RESEND', eventId: send.eventId } : send;
     } else if (r.canal_primario === 'EMAIL_CERTIFICADO') {
       const seal = await eadTrustTimestamp(comm.cuerpo_hash_sha512);
-      if (!seal.ok) { result = seal; }
-      else {
+      if (!seal.ok) {
+        result = seal;
+      } else {
         const enrichedHtml = `${comm.cuerpo_render}<hr/><p style="font-size:11px;color:#666">Sello QTSP EAD Trust: ${seal.evidenceId}<br/>Emitido: ${seal.timestampedAt}</p>`;
         const adjuntosCert = [...adjuntos, { filename: 'timestamp.tsr', path: `data:application/timestamp-reply;base64,${seal.tsqTokenBase64}` }];
         const send = await resendSend({
@@ -183,22 +251,67 @@ serve(async (_req) => {
     }
 
     if (result.ok) {
-      await sb.rpc('fn_recipient_mark_sent', {
+      // CRITICAL: don't increment processed until the DB write succeeds.
+      // If the DB write fails after the email/ERDS was sent, log an alert and
+      // continue so the operator can reconcile (the recipient stays in ENVIANDO
+      // with the proveedor_evento_id discoverable via Resend/EAD logs).
+      const { error: markErr } = await sb.rpc('fn_recipient_mark_sent', {
         p_recipient_id: r.id,
         p_canal_usado: r.canal_primario,
         p_proveedor: result.proveedor,
         p_proveedor_evento_id: result.eventId,
         p_evidence_hash: result.evidenceHashSha512 ?? null,
       });
-      processed++;
+      if (markErr) {
+        orphaned.push({ recipientId: r.id, reason: `Sent but DB mark failed: ${markErr.message}` });
+        // Best-effort orphan event (WORM)
+        try {
+          await sb.from('communication_delivery_events').insert({
+            recipient_id: r.id,
+            evento: 'ERROR',
+            proveedor: 'INTERNAL',
+            proveedor_evento_id: result.eventId,
+            payload: { orphan_after_send: true, db_error: markErr.message, proveedor_real: result.proveedor },
+            hash_self: '',
+          });
+        } catch (logErr) {
+          console.error(`Failed to log orphan event for recipient ${r.id}:`, logErr);
+        }
+        // Insert internal alert
+        try {
+          const { data: t } = await sb.from('communications').select('tenant_id').eq('id', r.communication_id).single();
+          if (t?.tenant_id) {
+            await sb.from('notifications').insert({
+              tenant_id: t.tenant_id,
+              title: `Recipient ${r.id} email enviado pero DB no actualizado`,
+              body: markErr.message,
+              route: `/secretaria/comunicaciones/${r.communication_id}`,
+              type: 'error',
+            });
+          }
+        } catch (notifErr) {
+          console.error(`Failed to insert internal alert:`, notifErr);
+        }
+        // DO NOT increment processed.
+      } else {
+        processed++;
+      }
     } else {
-      await sb.rpc('fn_recipient_handle_error', {
+      const { error: handleErr } = await sb.rpc('fn_recipient_handle_error', {
         p_recipient_id: r.id,
         p_error_message: result.error,
         p_retriable: result.retriable,
       });
+      if (handleErr) {
+        console.error(`fn_recipient_handle_error failed for ${r.id}:`, handleErr.message);
+      }
     }
   }
 
-  return new Response(JSON.stringify({ processed, claimed: recipients.length }), { headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({
+    processed,
+    claimed: recipients.length,
+    orphaned: orphaned.length,
+    orphaned_recipients: orphaned,
+  }), { headers: { 'Content-Type': 'application/json' } });
 });

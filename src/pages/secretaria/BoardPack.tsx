@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { DistribuirPackButton } from "@/components/secretaria/comunicaciones/DistribuirPackButton";
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 
@@ -555,6 +556,17 @@ export default function BoardPackPage() {
               <Printer className="h-4 w-4" />
               Imprimir / PDF
             </button>
+            {boardPackData.meeting?.body?.id && boardPackData.meeting?.body?.entity_id && (
+              <div className="print:hidden">
+                <DistribuirPackButton
+                  bodyId={boardPackData.meeting.body.id}
+                  entityId={boardPackData.meeting.body.entity_id}
+                  meetingId={boardPackData.meeting.id}
+                  meetingDate={boardPackData.meeting.scheduled_start ? new Date(boardPackData.meeting.scheduled_start) : null}
+                  packStorageUri={`evidence_bundle:board-pack:${boardPackData.meeting.id}@${boardPackData.generatedAt}`}
+                />
+              </div>
+            )}
           </div>
         </div>
 
