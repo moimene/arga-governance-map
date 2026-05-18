@@ -179,6 +179,14 @@ describe("MatterExecutionProfile", () => {
 
     expect(base.convocatoria.segunda_convocatoria).toBe(false);
     expect(withOverride.convocatoria.segunda_convocatoria).toBe(true);
+    expect(base.gaps).toContainEqual(expect.objectContaining({
+      code: "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE",
+      severity: "INFO",
+    }));
+    expect(base.gaps.find((gap) => gap.code === "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE")?.risk_flag).toBeUndefined();
+    expect(withOverride.gaps).not.toContainEqual(expect.objectContaining({
+      code: "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE",
+    }));
   });
 
   it("modela APROBACION_CUENTAS -> FORMULACION_CUENTAS como prerequisito blocking", () => {
@@ -280,14 +288,12 @@ describe("MatterExecutionProfile", () => {
       rulePackPayload: rulePack({ id: "rp-cooptacion", materia: "NOMBRAMIENTO_CONSEJERO" }),
     }));
 
-    expect(profile.gaps).toEqual([
-      expect.objectContaining({
-        code: "COOPTACION_SOLO_SA",
-        severity: "BLOCKING",
-        overridable: true,
-        risk_flag: "IMPUGNABILIDAD",
-      }),
-    ]);
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "COOPTACION_SOLO_SA",
+      severity: "BLOCKING",
+      overridable: true,
+      risk_flag: "IMPUGNABILIDAD",
+    }));
   });
 
   it("degrada cooptacion en SL a warning registral si hay prevision estatutaria", () => {
@@ -399,6 +405,23 @@ describe("MatterExecutionProfile", () => {
       overridable: false,
       risk_flag: "CALIFICACION_REGISTRAL",
     });
+  });
+
+  it("anade gap INFO regulatorio cuando el contexto declara entidad supervisada", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FINANCIACION",
+      is_supervised_entity: true,
+      rulePackPayload: rulePack({ id: "rp-financiacion", materia: "FINANCIACION" }),
+    }));
+
+    expect(profile.post_acuerdo.comunicacion_regulador).toEqual([
+      "Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV.",
+    ]);
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "SUPERVISED_ENTITY_REGULATORY_CHECK",
+      severity: "INFO",
+    }));
+    expect(profile.gaps.find((gap) => gap.code === "SUPERVISED_ENTITY_REGULATORY_CHECK")?.risk_flag).toBeUndefined();
   });
 
   it("calcula campos_a_actualizar cruzando la materia con capa3Schema", () => {

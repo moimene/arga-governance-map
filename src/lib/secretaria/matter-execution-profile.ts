@@ -119,6 +119,7 @@ export interface MatterExecutionProfile {
     publicacion_borme: boolean;
     plazo_inscripcion_dias?: number;
     documentos_registrales: string[];
+    comunicacion_regulador: string[];
     workflow: string[];
   };
   prerequisitos: MatterPrerequisite[];
@@ -151,6 +152,7 @@ export interface BuildMatterExecutionProfileContext {
   jurisdiccion?: string;
   subtipo_materia?: string;
   is_listed?: boolean;
+  is_supervised_entity?: boolean;
   rulePackPayload: Partial<RulePack> & Record<string, unknown>;
   normativeProfile: EntityNormativeProfile;
   paramOverrides?: RuleParamOverride[];
@@ -381,6 +383,36 @@ function hasSecondCall(context: BuildMatterExecutionProfileContext) {
   return false;
 }
 
+function secondCallInfoGap(context: BuildMatterExecutionProfileContext) {
+  const tipoSocial = normalizeCode(context.tipo_social);
+  if ((tipoSocial === "SL" || tipoSocial === "SLU") && !booleanOverride(context, "segunda_convocatoria_sl")) {
+    return profileGap({
+      gate: "CONVOCATORIA",
+      code: "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE",
+      severity: "INFO",
+      message: "La SL/SLU no tiene segunda convocatoria salvo prevision estatutaria. Se aplica false por defecto.",
+      fuente: "Art. 195 LSC y autonomia estatutaria",
+    });
+  }
+  return undefined;
+}
+
+function regulatoryCommunicationInfo(context: BuildMatterExecutionProfileContext) {
+  if (!context.is_supervised_entity) return [];
+  return ["Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV."];
+}
+
+function regulatoryCommunicationGap(context: BuildMatterExecutionProfileContext) {
+  if (!context.is_supervised_entity) return undefined;
+  return profileGap({
+    gate: "POST_ACUERDO",
+    code: "SUPERVISED_ENTITY_REGULATORY_CHECK",
+    severity: "INFO",
+    message: "Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV.",
+    fuente: "Solvencia II / LOSSEAR / normativa CNMV segun materia",
+  });
+}
+
 function quorumRuleFor(context: BuildMatterExecutionProfileContext) {
   const organo = normalizeCode(context.organo_tipo);
   const tipoSocial = normalizeCode(context.tipo_social);
@@ -595,6 +627,8 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       : undefined;
 
   const convocatoriaRequired = !isUniversalAlternative(context) && !isUnipersonalMode(context);
+  const secondCallGap = convocatoriaRequired ? secondCallInfoGap(context) : undefined;
+  const regulatoryGap = regulatoryCommunicationGap(context);
   const baseProfile: MatterExecutionProfile = {
     schema_version: "matter-execution-profile.v1",
     workflow_steps_version: WORKFLOW_STEPS_VERSION,
@@ -651,6 +685,7 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       publicacion_borme: Boolean(post.publicacionRequerida),
       plazo_inscripcion_dias: Number.isFinite(plazoInscripcionDias) ? plazoInscripcionDias : undefined,
       documentos_registrales: [],
+      comunicacion_regulador: regulatoryCommunicationInfo(context),
       workflow: [],
     },
     prerequisitos: prerequisitesForMatter(materia),
@@ -671,6 +706,8 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
     gaps: [
       ...profileIntrinsicGaps(context),
       ...(convocatoriaRequired && noticeResolution.gap ? [noticeResolution.gap] : []),
+      ...(secondCallGap ? [secondCallGap] : []),
+      ...(regulatoryGap ? [regulatoryGap] : []),
     ],
   };
 

@@ -1,24 +1,24 @@
 # Criterio Garrigues-Legal — MatterExecutionProfile
 
-**Fecha:** 2026-05-18  
-**Estado:** borrador técnico para revisión/firma del Comité Legal.  
+**Fecha:** 2026-05-18
+**Estado:** criterio legal recibido para parametrización técnica.
 **Alcance:** criterios P1-P14, prerequisitos, overrides, `risk_flag`, severidad dinámica y versiones duplicadas de rule packs.
 
-Este documento traslada al contrato computable de Secretaría 360 el criterio de trabajo basado en LSC vigente, RRM y RDL 5/2023. No sustituye la aprobación formal del Comité Legal.
+Este documento traslada al contrato computable de Secretaría 360 el criterio legal recibido basado en LSC vigente, RRM y RDL 5/2023.
 
 ## 1. Respuestas P1-P14
 
 | Pregunta | Criterio propuesto | Impacto computable |
 |---|---|---|
 | P1. Plazo base SA | SA/SAU 30 días; SL/SLU 15 días; estatutos solo pueden ampliar. | `convocatoria.plazo_minimo_dias`; rule packs por debajo del mínimo se corrigen al mínimo legal y generan gap `INFO` no overridable. |
-| P2. Segunda convocatoria SL | Permitida solo con previsión estatutaria. | `segunda_convocatoria = true` en SL/SLU solo si `rule_param_overrides.segunda_convocatoria_sl = true`. |
+| P2. Segunda convocatoria SL | Permitida solo con previsión estatutaria. Si no existe override, `false` por defecto con gap `INFO`. | `segunda_convocatoria = true` en SL/SLU solo si `rule_param_overrides.segunda_convocatoria_sl = true`. |
 | P3. Proyecto común fusión/escisión | `WARNING` al abrir expediente; `BLOCKING` desde convocatoria. | `MatterPrerequisite.blocking_from_step = CONVOCATORIA`. |
 | P4. Delegación facultades y consejero inscrito | `WARNING`, no `BLOCKING`. | Riesgo `CALIFICACION_REGISTRAL`; la inscripción del consejero es declarativa. |
 | P5. Cooptación en SL | `BLOCKING` salvo previsión estatutaria; con estatutos baja a `WARNING`. | Sin estatutos: `IMPUGNABILIDAD`; con estatutos: `CALIFICACION_REGISTRAL`. |
 | P6. Cese por Consejo | Requiere subtipo obligatorio. | `RENUNCIA`, `CESE_AUTOMATICO` o `PROPUESTA_CESE_A_JUNTA`; `AD_NUTUM` compete a Junta. |
 | P7. Operaciones vinculadas no cotizadas | Abstención siempre. | `votacion.abstenciones_obligatorias` aplica a todas las sociedades de capital. |
 | P8. Activos esenciales | Verificar umbral 25% y relevancia funcional. | `votacion.veto_checks` para financiación, contratación relevante y garantías. |
-| P9. Comunicación regulatoria | Gap informativo en entidades supervisadas; detalle v0.2.0. | `post_acuerdo.comunicacion_regulador` futuro; por ahora warning informativo. |
+| P9. Comunicación regulatoria | Gap informativo en entidades supervisadas; detalle v0.2.0. | `post_acuerdo.comunicacion_regulador` y gap `INFO` cuando el contexto declare entidad supervisada. |
 | P10. Doble confirmación UX | Solo para `IMPUGNABILIDAD`, `CALIFICACION_REGISTRAL` y `NULIDAD`. | `TRAZABILIDAD_PARCIAL` queda como warning inline. |
 | P11. Autocartera | Materia propia. | Nueva materia futura `ADQUISICION_PROPIA`. |
 | P12. Separación/exclusión socio | Dos perfiles independientes. | `SEPARACION_SOCIO` y `EXCLUSION_SOCIO`, diferidos a v0.2.0. |
@@ -84,18 +84,18 @@ Los diez escenarios mínimos quedan como baseline automatizable:
 
 ## 6. Rule Packs Duplicados
 
-El criterio técnico pendiente de confirmación legal:
+El criterio legal recibido queda así:
 
 | Materia | Mantener | Archivar | Nota |
 |---|---|---|---|
 | `AUMENTO_CAPITAL` | 1.0.0 completa | `v1.0.0` corta | Mantener versión con convocatoria. |
 | `REDUCCION_CAPITAL` | 1.0.0 completa | `v1.0.0` corta | Mantener versión con convocatoria. |
-| `APROBACION_CUENTAS` | `v1.0.0` con SA=30 | 1.0.0 con SA=15 | SA=15 contradice art. 176 LSC. |
+| `APROBACION_CUENTAS` | `v1.0.0` con SA=30 | 1.0.0 con SA=15 | SA=15 contradice art. 176 LSC; antes de archivar, migrar campos de documentación útiles desde la versión completa. |
 | `DELEGACION_FACULTADES` | 1.1.0 | 1.0.0 | Añade verificación art. 249 bis. |
 | `NOMBRAMIENTO_AUDITOR` | 1.1.0 | 1.0.0 | Añade independencia/propuesta. |
-| `OPERACION_VINCULADA` | 1.0.0 | 1.1.0 | Legal debe confirmar denominador sin consejero vinculado. |
-| `AUTORIZACION_GARANTIA` | pendiente | pendiente | Depende de activo esencial / competencia. |
-| `RATIFICACION_ACTOS` | 1.1.0 | 1.0.0 | Pendiente de inspección detallada. |
+| `OPERACION_VINCULADA` | 1.0.0 | 1.1.0 | Mantener fórmula `presentes_mitad_no_vinculados`. |
+| `AUTORIZACION_GARANTIA` | split | no archivar por ahora | Mantener ambas semánticas y separar por `organo_tipo` / `es_activo_esencial`. |
+| `RATIFICACION_ACTOS` | 1.1.0 | 1.0.0 | Decisión preliminar: inspección detallada antes de ejecutar archivo. |
 
 ## 7. Implementación Adoptada
 
@@ -105,5 +105,7 @@ El contrato v1 incorpora:
 - `overridable: false` para mínimos imperativos mecánicos.
 - `resolveRiskFlag()` con prioridad de flags.
 - Corrección defensiva del plazo legal mínimo frente a rule packs o overrides inferiores.
+- Gap `INFO` para segunda convocatoria SL sin override estatutario.
+- Campo `post_acuerdo.comunicacion_regulador` para entidades supervisadas.
 
 Quedan diferidos a v0.2.0: autocartera, exclusión/separación de socio, deuda convertible detallada, comunicación regulatoria sectorial por materia y perfiles de disolución/liquidación.
