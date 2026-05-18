@@ -113,6 +113,19 @@ function overrideParam(clave: string, valor: unknown) {
   };
 }
 
+function rulePackWithSlMajority(formula: string) {
+  return rulePack({
+    votacion: {
+      mayoria: {
+        SA: { formula: "favor > contra", fuente: "LEY", referencia: "Art. 201 LSC" },
+        SL: { formula, fuente: "LEY", referencia: "Rule pack test" },
+        CONSEJO: { formula: "mayoria_consejeros", fuente: "LEY", referencia: "Art. 248 LSC" },
+      },
+      abstenciones: "no_cuentan",
+    },
+  });
+}
+
 describe("MatterExecutionProfile", () => {
   it("trata la junta universal como via alternativa, sin risk_flag ni consecuencia", () => {
     const profile = buildMatterExecutionProfile(profileInput({ adoption_mode: "MEETING" }));
@@ -186,6 +199,102 @@ describe("MatterExecutionProfile", () => {
     expect(base.gaps.find((gap) => gap.code === "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE")?.risk_flag).toBeUndefined();
     expect(withOverride.gaps).not.toContainEqual(expect.objectContaining({
       code: "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE",
+    }));
+  });
+
+  it("normaliza mayoria ordinaria SL a mas de un tercio aunque el rule pack use mitad", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      tipo_social: "SL",
+      rulePackPayload: rulePackWithSlMajority("favor > mitad_capital_con_voto"),
+    }));
+
+    expect(profile.votacion).toMatchObject({
+      majority_rule: "favor > 1/3 capital social total con derecho de voto",
+      majority_threshold: 1 / 3,
+      fuente: "Art. 198 LSC",
+    });
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "SL_MAJORITY_RULE_PACK_MISMATCH",
+      severity: "INFO",
+    }));
+  });
+
+  it("exige mayoria SL superior a mitad para aumento de capital", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "AUMENTO_CAPITAL",
+      tipo_social: "SL",
+      rulePackPayload: rulePackWithSlMajority("favor > 1/3 capital"),
+    }));
+    const result = evaluateFormalGate(profile, {
+      gate: "VOTACION",
+      values: { favor_capital_pct: 0.4 },
+    });
+
+    expect(profile.votacion.majority_rule).toBe("favor > 1/2 capital social total con derecho de voto");
+    expect(profile.votacion.majority_threshold).toBe(0.5);
+    expect(result.status).toBe("OVERRIDE_REQUIRED");
+    expect(result.gaps[0]).toMatchObject({
+      code: "MAJORITY_THRESHOLD_NOT_REACHED",
+      risk_flag: "IMPUGNABILIDAD",
+    });
+  });
+
+  it("exige mayoria SL de dos tercios para modificaciones estructurales", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FUSION",
+      tipo_social: "SL",
+      subtipo_materia: "FUSION_ABSORCION",
+      rulePackPayload: rulePackWithSlMajority("favor > 1/2 capital"),
+    }));
+    const result = evaluateFormalGate(profile, {
+      gate: "VOTACION",
+      values: { favor_capital_pct: 0.6 },
+    });
+
+    expect(profile.votacion.majority_rule).toBe("favor >= 2/3 capital social total con derecho de voto");
+    expect(profile.votacion.majority_threshold).toBe(2 / 3);
+    expect(result.status).toBe("OVERRIDE_REQUIRED");
+  });
+
+  it("acepta exactamente dos tercios para materias SL del art. 199.b", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FUSION",
+      tipo_social: "SL",
+      subtipo_materia: "FUSION_ABSORCION",
+      rulePackPayload: rulePackWithSlMajority("favor >= 2/3 capital"),
+    }));
+    const result = evaluateFormalGate(profile, {
+      gate: "VOTACION",
+      values: { favor_capital_pct: 2 / 3 },
+    });
+
+    expect(profile.votacion.majority_comparator).toBe(">=");
+    expect(result.status).toBe("PASSED");
+  });
+
+  it("permite mayoria estatutaria SL superior a la legal sin superar dos tercios", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      tipo_social: "SL",
+      paramOverrides: [overrideParam("mayoria_estatutaria_sl", 0.6)],
+      rulePackPayload: rulePackWithSlMajority("favor > 1/3 capital"),
+    }));
+
+    expect(profile.votacion.majority_rule).toBe("favor > 60% capital social total con derecho de voto");
+    expect(profile.votacion.majority_threshold).toBe(0.6);
+    expect(profile.votacion.fuente).toBe("Estatutos demo");
+  });
+
+  it("no asume mayoria ordinaria SL para materias no clasificadas", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "MATERIA_SL_NUEVA",
+      tipo_social: "SL",
+      rulePackPayload: rulePackWithSlMajority("favor segun estatutos"),
+    }));
+
+    expect(profile.votacion.majority_threshold).toBeUndefined();
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "SL_MAJORITY_CLASSIFICATION_PENDING",
+      severity: "WARNING",
     }));
   });
 
@@ -306,11 +415,11 @@ describe("MatterExecutionProfile", () => {
       rulePackPayload: rulePack({ id: "rp-cooptacion", materia: "NOMBRAMIENTO_CONSEJERO" }),
     }));
 
-    expect(profile.gaps[0]).toMatchObject({
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
       code: "COOPTACION_SOLO_SA",
       severity: "WARNING",
       risk_flag: "CALIFICACION_REGISTRAL",
-    });
+    }));
   });
 
   it("modela FUSION/ESCISION con proyecto comun, RDL 5/2023 e inscripcion", () => {
@@ -422,6 +531,65 @@ describe("MatterExecutionProfile", () => {
       severity: "INFO",
     }));
     expect(profile.gaps.find((gap) => gap.code === "SUPERVISED_ENTITY_REGULATORY_CHECK")?.risk_flag).toBeUndefined();
+  });
+
+  it("modela DIVIDENDO_A_CUENTA de Consejo con prerequisito de estado contable", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "DIVIDENDO_A_CUENTA",
+      organo_tipo: "CONSEJO_ADMIN",
+      rulePackPayload: rulePack({ id: "rp-dividendo-cuenta", materia: "DIVIDENDO_A_CUENTA" }),
+    }));
+
+    expect(profile.prerequisitos).toContainEqual(expect.objectContaining({
+      materia_requerida: "ESTADO_CONTABLE_LIQUIDEZ",
+      severity: "BLOCKING",
+      fuente: "Art. 277 LSC",
+    }));
+    expect(profile.documentacion.informes_preceptivos).toContain("Estado contable de liquidez formulado por administradores (art. 277 LSC)");
+  });
+
+  it("modela EJECUCION_AUMENTO_DELEGADO con prerequisito de acuerdo de Junta", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "EJECUCION_AUMENTO_DELEGADO",
+      organo_tipo: "CONSEJO_ADMIN",
+      rulePackPayload: rulePack({ id: "rp-ejecucion-aumento", materia: "EJECUCION_AUMENTO_DELEGADO" }),
+    }));
+
+    expect(profile.prerequisitos).toContainEqual(expect.objectContaining({
+      materia_requerida: "ACUERDO_JUNTA_DELEGACION_AUMENTO",
+      organo_tipo_requerido: "JUNTA_GENERAL",
+      severity: "BLOCKING",
+      fuente: "Art. 297 LSC",
+    }));
+  });
+
+  it("advierte si una materia indelegable del art. 249 bis se tramita por comision delegada", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "FORMULACION_CUENTAS",
+      organo_tipo: "COMISION_DELEGADA",
+      rulePackPayload: rulePack({ id: "rp-formulacion", materia: "FORMULACION_CUENTAS" }),
+    }));
+
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "ARTICLE_249_BIS_INDELEGABLE_MATTER",
+      severity: "WARNING",
+      risk_flag: "IMPUGNABILIDAD",
+    }));
+  });
+
+  it("bloquea traslado de domicilio nacional por Consejo si estatutos reservan competencia a Junta", () => {
+    const profile = buildMatterExecutionProfile(profileInput({
+      materia: "TRASLADO_DOMICILIO_NACIONAL",
+      organo_tipo: "CONSEJO_ADMIN",
+      paramOverrides: [overrideParam("traslado_domicilio_reservado_junta", true)],
+      rulePackPayload: rulePack({ id: "rp-traslado", materia: "TRASLADO_DOMICILIO_NACIONAL" }),
+    }));
+
+    expect(profile.gaps).toContainEqual(expect.objectContaining({
+      code: "TRASLADO_DOMICILIO_RESERVA_ESTATUTARIA",
+      severity: "BLOCKING",
+      risk_flag: "IMPUGNABILIDAD",
+    }));
   });
 
   it("calcula campos_a_actualizar cruzando la materia con capa3Schema", () => {

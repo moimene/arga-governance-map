@@ -102,6 +102,7 @@ export interface MatterExecutionProfile {
   votacion: {
     majority_rule: string;
     majority_threshold?: number;
+    majority_comparator?: ">" | ">=";
     fuente: string;
     abstenciones_obligatorias: string[];
     veto_checks: string[];
@@ -199,6 +200,56 @@ export const RISK_FLAG_PRIORITY: Record<RiskFlag, number> = {
 
 const DEFAULT_SOURCE = "Regla legal base";
 
+const SL_SIMPLE_MAJORITY_MATTERS = new Set([
+  "APROBACION_CUENTAS",
+  "APLICACION_RESULTADO",
+  "DISTRIBUCION_DIVIDENDOS",
+  "NOMBRAMIENTO_CONSEJERO",
+  "CESE_CONSEJERO",
+  "NOMBRAMIENTO_AUDITOR",
+  "RATIFICACION_ACTOS",
+  "APROBACION_PLAN_NEGOCIO",
+]);
+
+const SL_HALF_MAJORITY_MATTERS = new Set([
+  "AUMENTO_CAPITAL",
+  "REDUCCION_CAPITAL",
+  "MODIFICACION_ESTATUTOS",
+  "MOD_ESTATUTOS",
+  "CAMBIO_DENOMINACION",
+  "TRASLADO_DOMICILIO_NACIONAL",
+  "PRESTACIONES_ACCESORIAS",
+]);
+
+const SL_TWO_THIRDS_MAJORITY_MATTERS = new Set([
+  "TRANSFORMACION",
+  "FUSION",
+  "ESCISION",
+  "FUSION_ESCISION",
+  "CESION_GLOBAL_ACTIVO",
+  "EXCLUSION_DERECHO_SUSCRIPCION",
+  "AUTORIZACION_COMPETENCIA",
+  "EXCLUSION_SOCIO",
+  "TRASLADO_DOMICILIO_EXTRANJERO",
+]);
+
+const ARTICLE_249_BIS_INDELEGABLE_MATTERS = new Set([
+  "FORMULACION_CUENTAS",
+  "CUENTAS_CONSOLIDADAS",
+  "MODIFICACION_ESTATUTOS",
+  "MOD_ESTATUTOS",
+  "CONVOCATORIA_JUNTA",
+  "ACUERDO_CONVOCATORIA_JUNTA",
+  "POLITICA_REMUNERACION",
+  "POLITICAS_CORPORATIVAS",
+  "APROBACION_PLAN_NEGOCIO",
+  "APROBACION_PRESUPUESTO",
+  "DISTRIBUCION_CARGOS",
+  "COMITES_INTERNOS",
+  "DELEGACION_FACULTADES",
+  "OPERACION_VINCULADA",
+]);
+
 const REFRESHABLE_FIELDS_BY_MATTER: Record<string, string[]> = {
   APROBACION_CUENTAS: [
     "ejercicio",
@@ -237,6 +288,9 @@ const REFRESHABLE_FIELDS_BY_MATTER: Record<string, string[]> = {
   FUSION: ["tipo_fusion", "relacion_canje", "proyecto_comun_ref"],
   ESCISION: ["tipo_escision", "relacion_canje", "proyecto_comun_ref"],
   FUSION_ESCISION: ["tipo_operacion", "relacion_canje", "proyecto_comun_ref"],
+  DIVIDENDO_A_CUENTA: ["importe_dividendo", "fecha_pago", "estado_contable_ref"],
+  EJECUCION_AUMENTO_DELEGADO: ["importe_aumento", "modalidad_aumento", "acuerdo_junta_delegacion_ref"],
+  TRASLADO_DOMICILIO_NACIONAL: ["nuevo_domicilio", "fecha_efectos", "certificacion_domicilio_ref"],
 };
 
 function nowIso(value?: Date | string) {
@@ -255,6 +309,13 @@ function numericValue(value: unknown) {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function ratioValue(value: unknown) {
+  const numeric = numericValue(value);
+  if (numeric === null) return null;
+  if (numeric > 1) return numeric / 100;
+  return numeric;
 }
 
 export function resolveRiskFlag(candidates: RiskFlag[]) {
@@ -282,6 +343,14 @@ function ruleParamReference(value: unknown, fallback = DEFAULT_SOURCE) {
   return fallback;
 }
 
+function ruleParamFormula(value: unknown) {
+  if (value && typeof value === "object" && "formula" in value) {
+    const formula = (value as { formula?: unknown }).formula;
+    if (typeof formula === "string" && formula.trim()) return formula;
+  }
+  return undefined;
+}
+
 function overrideFor(context: BuildMatterExecutionProfileContext, key: string) {
   return (context.paramOverrides ?? []).find((override) => normalizeCode(override.clave) === normalizeCode(key));
 }
@@ -296,6 +365,17 @@ function booleanOverride(context: BuildMatterExecutionProfileContext, key: strin
 
 function numericOverride(context: BuildMatterExecutionProfileContext, key: string) {
   return numericValue(overrideValue(context, key));
+}
+
+function ratioOverride(context: BuildMatterExecutionProfileContext, key: string) {
+  return ratioValue(overrideValue(context, key));
+}
+
+function arrayOverride(context: BuildMatterExecutionProfileContext, key: string) {
+  const value = overrideValue(context, key);
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return undefined;
 }
 
 function overrideReference(context: BuildMatterExecutionProfileContext, key: string, fallback = DEFAULT_SOURCE) {
@@ -383,6 +463,33 @@ function hasSecondCall(context: BuildMatterExecutionProfileContext) {
   return false;
 }
 
+function resolveConvocationChannels(context: BuildMatterExecutionProfileContext) {
+  const tipoSocial = normalizeCode(context.tipo_social);
+  const statutoryChannels = arrayOverride(context, "convocatoria_forma_sl");
+  if ((tipoSocial === "SL" || tipoSocial === "SLU") && statutoryChannels?.length) {
+    return {
+      channels: statutoryChannels,
+      gap: undefined,
+    };
+  }
+
+  const channels = context.rulePackPayload.convocatoria?.canales?.[tipoSocial as "SA" | "SL" | "SAU" | "SLU"] ?? [];
+  if ((tipoSocial === "SL" || tipoSocial === "SLU") && !statutoryChannels?.length) {
+    return {
+      channels,
+      gap: profileGap({
+        gate: "CONVOCATORIA",
+        code: "SL_CONVOCATION_FORM_STATUTORY_SOURCE_NOT_MODELED",
+        severity: "INFO",
+        message: "La forma de convocatoria de SL/SLU depende de estatutos. Se usa el canal del rule pack hasta parametrizar el override estatutario.",
+        fuente: "Art. 173 LSC",
+      }),
+    };
+  }
+
+  return { channels, gap: undefined };
+}
+
 function secondCallInfoGap(context: BuildMatterExecutionProfileContext) {
   const tipoSocial = normalizeCode(context.tipo_social);
   if ((tipoSocial === "SL" || tipoSocial === "SLU") && !booleanOverride(context, "segunda_convocatoria_sl")) {
@@ -433,6 +540,123 @@ function majorityRuleFor(context: BuildMatterExecutionProfileContext) {
   return majority.SL;
 }
 
+function slMajorityBaseline(materia: string) {
+  if (SL_TWO_THIRDS_MAJORITY_MATTERS.has(materia)) {
+    return {
+      rule: "favor >= 2/3 capital social total con derecho de voto",
+      threshold: 2 / 3,
+      comparator: ">=" as const,
+      fuente: "Art. 199.b LSC",
+      level: "SL_TWO_THIRDS",
+    };
+  }
+
+  if (SL_HALF_MAJORITY_MATTERS.has(materia)) {
+    return {
+      rule: "favor > 1/2 capital social total con derecho de voto",
+      threshold: 0.5,
+      comparator: ">" as const,
+      fuente: "Art. 199.a LSC",
+      level: "SL_HALF",
+    };
+  }
+
+  if (SL_SIMPLE_MAJORITY_MATTERS.has(materia)) {
+    return {
+      rule: "favor > 1/3 capital social total con derecho de voto",
+      threshold: 1 / 3,
+      comparator: ">" as const,
+      fuente: "Art. 198 LSC",
+      level: "SL_SIMPLE",
+    };
+  }
+
+  return null;
+}
+
+function formulaMatchesSlBaseline(formula: string | undefined, level: string) {
+  const raw = normalizeCode(formula);
+  if (!raw) return false;
+  if (level === "SL_SIMPLE") return raw.includes("1/3") || raw.includes("TERCIO");
+  if (level === "SL_HALF") return raw.includes("1/2") || raw.includes("MITAD") || raw.includes("> 0.5");
+  if (level === "SL_TWO_THIRDS") return raw.includes("2/3") || raw.includes("DOS_TERCIOS") || raw.includes("0.666");
+  return false;
+}
+
+function resolveMajorityRule(
+  context: BuildMatterExecutionProfileContext,
+  majorityRule: unknown,
+): { rule: string; threshold?: number; comparator?: ">" | ">="; fuente: string; gap?: ProfileGap } {
+  const organo = normalizeCode(context.organo_tipo);
+  const tipoSocial = normalizeCode(context.tipo_social);
+  const materia = normalizeCode(context.materia);
+  const rulePackFormula = ruleParamFormula(majorityRule);
+
+  if ((tipoSocial === "SL" || tipoSocial === "SLU") && organo === "JUNTA_GENERAL") {
+    const baseline = slMajorityBaseline(materia);
+    if (!baseline) {
+      return {
+        rule: rulePackFormula ?? "Mayoria SL pendiente de clasificacion legal por materia",
+        threshold: undefined,
+        fuente: rulePackFormula ? "rule_pack_versions.payload.votacion.mayoria.SL" : DEFAULT_SOURCE,
+        gap: profileGap({
+          gate: "VOTACION",
+          code: "SL_MAJORITY_CLASSIFICATION_PENDING",
+          severity: "WARNING",
+          message: "La materia SL no esta clasificada en el baseline art. 198/199/200 LSC. Requiere validacion legal antes de usarla como gate automatico.",
+          fuente: "Arts. 198-200 LSC",
+        }),
+      };
+    }
+
+    const statutoryMajority = ratioOverride(context, "mayoria_estatutaria_sl");
+    const statutorySource = overrideReference(context, "mayoria_estatutaria_sl", "Art. 200 LSC / Estatutos");
+    const effectiveRule = statutoryMajority !== null && statutoryMajority > baseline.threshold
+      ? {
+        rule: `favor > ${Math.round(statutoryMajority * 10000) / 100}% capital social total con derecho de voto`,
+        threshold: statutoryMajority,
+        comparator: ">" as const,
+        fuente: statutorySource,
+      }
+      : {
+        rule: baseline.rule,
+        threshold: baseline.threshold,
+        comparator: baseline.comparator,
+        fuente: baseline.fuente,
+      };
+
+    const mismatch = rulePackFormula && !formulaMatchesSlBaseline(rulePackFormula, baseline.level);
+    const statutoryTooHigh = statutoryMajority !== null && statutoryMajority > (2 / 3);
+
+    return {
+      ...effectiveRule,
+      gap: mismatch || statutoryTooHigh
+        ? profileGap({
+          gate: "VOTACION",
+          code: statutoryTooHigh ? "SL_STATUTORY_MAJORITY_REVIEW_REQUIRED" : "SL_MAJORITY_RULE_PACK_MISMATCH",
+          severity: statutoryTooHigh ? "WARNING" : "INFO",
+          message: statutoryTooHigh
+            ? "La mayoria estatutaria SL supera 2/3. Revisar art. 200 LSC y redaccion estatutaria antes de aplicar."
+            : `Rule pack SL informa "${rulePackFormula}", pero el perfil aplica ${baseline.rule}.`,
+          fuente: statutoryTooHigh ? "Art. 200 LSC" : baseline.fuente,
+        })
+        : undefined,
+    };
+  }
+
+  return {
+    rule:
+      typeof majorityRule === "object" && majorityRule && "formula" in majorityRule
+        ? String((majorityRule as { formula?: unknown }).formula ?? "Segun ley y estatutos")
+        : "Segun ley y estatutos",
+    threshold: undefined,
+    fuente:
+      typeof majorityRule === "object" && majorityRule && "referencia" in majorityRule
+        ? String((majorityRule as { referencia?: unknown }).referencia ?? DEFAULT_SOURCE)
+        : DEFAULT_SOURCE,
+  };
+}
+
 function isUniversalAlternative(context: BuildMatterExecutionProfileContext) {
   return normalizeCode(context.adoption_mode) === "UNIVERSAL";
 }
@@ -470,6 +694,12 @@ function requiredReportsForMatter(materia: string) {
   }
   if (materia === "NOMBRAMIENTO_AUDITOR") {
     return ["Propuesta de nombramiento y duracion del encargo"];
+  }
+  if (materia === "DIVIDENDO_A_CUENTA") {
+    return ["Estado contable de liquidez formulado por administradores (art. 277 LSC)"];
+  }
+  if (materia === "EJECUCION_AUMENTO_DELEGADO") {
+    return ["Certificacion del acuerdo de Junta que delega la ejecucion del aumento (art. 297 LSC)"];
   }
   return [];
 }
@@ -522,6 +752,29 @@ function prerequisitesForMatter(materia: string): MatterPrerequisite[] {
           severity: "WARNING",
         },
       ];
+    case "DIVIDENDO_A_CUENTA":
+      return [
+        {
+          materia_requerida: "ESTADO_CONTABLE_LIQUIDEZ",
+          estado_minimo: "DOCUMENTADO",
+          fuente: "Art. 277 LSC",
+          verificable_automaticamente: false,
+          severity: "BLOCKING",
+          risk_flag: "IMPUGNABILIDAD",
+        },
+      ];
+    case "EJECUCION_AUMENTO_DELEGADO":
+      return [
+        {
+          materia_requerida: "ACUERDO_JUNTA_DELEGACION_AUMENTO",
+          organo_tipo_requerido: "JUNTA_GENERAL",
+          estado_minimo: "APROBADO",
+          fuente: "Art. 297 LSC",
+          verificable_automaticamente: true,
+          severity: "BLOCKING",
+          risk_flag: "IMPUGNABILIDAD",
+        },
+      ];
     case "CERTIFICACION_ACUERDOS":
       return [
         {
@@ -558,6 +811,18 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
   const organo = normalizeCode(context.organo_tipo);
   const tipoSocial = normalizeCode(context.tipo_social);
   const subtipo = normalizeCode(context.subtipo_materia);
+
+  if (ARTICLE_249_BIS_INDELEGABLE_MATTERS.has(materia) && (organo === "COMISION_DELEGADA" || organo === "CONSEJERO_DELEGADO")) {
+    gaps.push(profileGap({
+      gate: "VOTACION",
+      code: "ARTICLE_249_BIS_INDELEGABLE_MATTER",
+      severity: "WARNING",
+      message: "Materia potencialmente indelegable del art. 249 bis LSC. Revisar competencia del Consejo pleno antes de tramitar por organo delegado.",
+      fuente: "Art. 249 bis LSC",
+      override_tipo: "DESVIACION_CON_RIESGO",
+      risk_flag: "IMPUGNABILIDAD",
+    }));
+  }
 
   if (materia === "NOMBRAMIENTO_CONSEJERO" && subtipo === "COOPTACION" && tipoSocial !== "SA" && tipoSocial !== "SAU") {
     const hasStatutorySupport = booleanOverride(context, "cooptacion_sl_estatutaria");
@@ -610,6 +875,18 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
     }));
   }
 
+  if (materia === "TRASLADO_DOMICILIO_NACIONAL" && (organo === "CONSEJO_ADMIN" || organo === "CONSEJO") && booleanOverride(context, "traslado_domicilio_reservado_junta")) {
+    gaps.push(profileGap({
+      gate: "VOTACION",
+      code: "TRASLADO_DOMICILIO_RESERVA_ESTATUTARIA",
+      severity: "BLOCKING",
+      message: "Los estatutos reservan a la Junta el traslado de domicilio; no procede tramitarlo por Consejo.",
+      fuente: "Art. 285.2 LSC / Estatutos",
+      override_tipo: "DESVIACION_CON_RIESGO",
+      risk_flag: "IMPUGNABILIDAD",
+    }));
+  }
+
   return gaps;
 }
 
@@ -619,6 +896,8 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
   const quorumRule = quorumRuleFor(context);
   const majorityRule = majorityRuleFor(context);
   const noticeResolution = resolveNoticeDays(context, convocatoriaRule);
+  const majorityResolution = resolveMajorityRule(context, majorityRule);
+  const convocationChannels = resolveConvocationChannels(context);
   const post: Partial<RulePack["postAcuerdo"]> = context.rulePackPayload.postAcuerdo ?? {};
   const plazoInscripcion = post.plazoInscripcion;
   const plazoInscripcionDias =
@@ -643,7 +922,7 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       required: convocatoriaRequired,
       plazo_minimo_dias: convocatoriaRequired ? noticeResolution.days : undefined,
       fuente: convocatoriaRequired ? noticeResolution.fuente : "Art. 178 LSC / via alternativa",
-      forma_convocatoria: context.rulePackPayload.convocatoria?.canales?.[normalizeCode(context.tipo_social) as "SA" | "SL" | "SAU" | "SLU"] ?? [],
+      forma_convocatoria: convocationChannels.channels,
       segunda_convocatoria: hasSecondCall(context),
       documentacion_preceptiva: documentNames(context),
       blockers: [],
@@ -655,15 +934,10 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       blockers: [],
     },
     votacion: {
-      majority_rule:
-        typeof majorityRule === "object" && majorityRule && "formula" in majorityRule
-          ? String((majorityRule as { formula?: unknown }).formula ?? "Segun ley y estatutos")
-          : "Segun ley y estatutos",
-      majority_threshold: undefined,
-      fuente:
-        typeof majorityRule === "object" && majorityRule && "referencia" in majorityRule
-          ? String((majorityRule as { referencia?: unknown }).referencia ?? DEFAULT_SOURCE)
-          : DEFAULT_SOURCE,
+      majority_rule: majorityResolution.rule,
+      majority_threshold: majorityResolution.threshold,
+      majority_comparator: majorityResolution.comparator,
+      fuente: majorityResolution.fuente,
       abstenciones_obligatorias: materia === "OPERACION_VINCULADA" ? ["Consejero vinculado (arts. 228-229 LSC)"] : [],
       veto_checks: [
         ...(context.pactosParasociales?.length ? ["Pactos parasociales aplicables al expediente (warning contractual)"] : []),
@@ -706,6 +980,8 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
     gaps: [
       ...profileIntrinsicGaps(context),
       ...(convocatoriaRequired && noticeResolution.gap ? [noticeResolution.gap] : []),
+      ...(convocationChannels.gap ? [convocationChannels.gap] : []),
+      ...(majorityResolution.gap ? [majorityResolution.gap] : []),
       ...(secondCallGap ? [secondCallGap] : []),
       ...(regulatoryGap ? [regulatoryGap] : []),
     ],
@@ -801,6 +1077,16 @@ function riskyOverride(gate: FormalGate, requisito: string, justificacion: strin
     risk_flag: gate === "POST_ACUERDO" ? "CALIFICACION_REGISTRAL" : "IMPUGNABILIDAD",
     timestamp,
   };
+}
+
+function evidenceRatio(values: Record<string, unknown>) {
+  return (
+    ratioValue(values.favor_capital_pct) ??
+    ratioValue(values.capital_favorable_pct) ??
+    ratioValue(values.favorableCapitalPct) ??
+    ratioValue(values.favorableCapitalRatio) ??
+    ratioValue(values.votos_favorables_capital)
+  );
 }
 
 export function evaluateFormalGate(
@@ -911,6 +1197,38 @@ export function evaluateFormalGate(
           override_tipo: "DESVIACION_CON_RIESGO",
           risk_flag: "TRAZABILIDAD_PARCIAL",
         })),
+      };
+    }
+  }
+
+  if (evidence.gate === "VOTACION") {
+    const values = evidence.values ?? {};
+    const favorCapital = evidenceRatio(values);
+    if (favorCapital !== null && typeof profile.votacion.majority_threshold === "number") {
+      const comparator = profile.votacion.majority_comparator ?? ">";
+      const passed =
+        comparator === ">="
+          ? favorCapital >= profile.votacion.majority_threshold
+          : favorCapital > profile.votacion.majority_threshold;
+
+      if (passed) {
+        return { gate: evidence.gate, status: "PASSED", gaps: [] };
+      }
+
+      const gap = profileGap({
+        gate: "VOTACION",
+        code: "MAJORITY_THRESHOLD_NOT_REACHED",
+        severity: "BLOCKING",
+        message: `Voto favorable ${Math.round(favorCapital * 10000) / 100}% inferior o igual al umbral requerido ${Math.round(profile.votacion.majority_threshold * 10000) / 100}%.`,
+        fuente: profile.votacion.fuente,
+        override_tipo: "DESVIACION_CON_RIESGO",
+        risk_flag: "IMPUGNABILIDAD",
+      });
+      return {
+        gate: evidence.gate,
+        status: "OVERRIDE_REQUIRED",
+        gaps: [gap],
+        override: riskyOverride("VOTACION", "Mayoria legal de adopcion", "No consta mayoria suficiente segun el perfil formal.", timestamp),
       };
     }
   }
