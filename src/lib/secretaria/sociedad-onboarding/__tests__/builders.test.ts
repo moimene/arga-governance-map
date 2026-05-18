@@ -182,4 +182,27 @@ describe("sociedad onboarding builders", () => {
     });
     expect(payload.entity_settings).toEqual([{ key: "quorum_primera_pct", value: 50 }]);
   });
+
+  it("emits all operational entity settings when catalog keys are active", () => {
+    const payload = buildRpcPayload(
+      draftBase(),
+      new Set([
+        "quorum_primera_pct",
+        "quorum_segunda_pct",
+        "mayoria_simple_pct",
+        "convocatoria_dias",
+        "convocatoria_medio",
+        "voto_calidad_presidente",
+      ]),
+    );
+
+    expect(payload.entity_settings).toEqual([
+      { key: "quorum_primera_pct", value: 50 },
+      { key: "quorum_segunda_pct", value: 0 },
+      { key: "mayoria_simple_pct", value: 50 },
+      { key: "convocatoria_dias", value: 15 },
+      { key: "convocatoria_medio", value: "WEB_EMAIL" },
+      { key: "voto_calidad_presidente", value: true },
+    ]);
+  });
 });

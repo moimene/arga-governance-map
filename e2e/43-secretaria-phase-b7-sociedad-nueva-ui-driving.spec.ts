@@ -423,7 +423,14 @@ test.describe('Phase B7 — UI driving destructive SociedadNuevaStepper D6', () 
       .select('key')
       .eq('entity_id', createdEntityId);
     expect(setErr, 'read entity_settings').toBeNull();
-    expect(Array.isArray(settings), 'entity_settings D6 query returns an array').toBe(true);
+    expect(settings?.map((setting) => setting.key).sort(), 'entity_settings D6').toEqual([
+      'convocatoria_dias',
+      'convocatoria_medio',
+      'mayoria_simple_pct',
+      'quorum_primera_pct',
+      'quorum_segunda_pct',
+      'voto_calidad_presidente',
+    ]);
 
     expect(
       browserErrors.filter((err) =>
