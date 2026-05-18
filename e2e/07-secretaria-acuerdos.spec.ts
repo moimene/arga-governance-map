@@ -7,18 +7,21 @@ test.describe('Acuerdos Sin Sesión', () => {
     await expect(page).not.toHaveURL('/login');
   });
 
-  test('detalle ASOC-001 abre sin crash', async ({ page }) => {
+  test('detalle de acuerdo sin sesión abre desde lista', async ({ page }) => {
     await page.goto('/secretaria/acuerdos-sin-sesion');
-    const asoc = page.getByText('ASOC-001').first();
-    if (await asoc.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await asoc.click();
-      await expect(page.url()).toMatch(/\/secretaria\/acuerdos-sin-sesion\/.+/);
-    }
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow, 'la lista debe exponer al menos un acuerdo sin sesión').toBeVisible({ timeout: 10_000 });
+    const detailLink = firstRow.getByRole('link').first();
+    await expect(detailLink, 'cada acuerdo sin sesión debe tener enlace accesible a detalle').toBeVisible();
+    await detailLink.click();
+    await expect(page).toHaveURL(/\/secretaria\/acuerdos-sin-sesion\/[^/?]+/);
   });
 
   test('nuevo acuerdo sin sesión — stepper renderiza', async ({ page }) => {
     await page.goto('/secretaria/acuerdos-sin-sesion/nuevo');
     await expect(page).not.toHaveURL('/login');
+    await expect(page.getByRole('heading', { name: /Asistente de acuerdo escrito sin sesión/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: /Paso 1\. Tipo y órgano/i })).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -31,10 +34,11 @@ test.describe('Decisiones Unipersonales', () => {
 
   test('detalle de decisión abre sin crash', async ({ page }) => {
     await page.goto('/secretaria/decisiones-unipersonales');
-    const dec = page.getByText('DEC-').first();
-    if (await dec.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await dec.click();
-      await expect(page.url()).toMatch(/\/secretaria\/decisiones-unipersonales\/.+/);
-    }
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow, 'la lista debe exponer al menos una decisión unipersonal').toBeVisible({ timeout: 10_000 });
+    const detailLink = firstRow.getByRole('link').first();
+    await expect(detailLink, 'cada decisión debe tener enlace accesible a detalle').toBeVisible();
+    await detailLink.click();
+    await expect(page).toHaveURL(/\/secretaria\/decisiones-unipersonales\/[^/?]+/);
   });
 });

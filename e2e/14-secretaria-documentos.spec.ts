@@ -108,12 +108,13 @@ test.describe('Secretaría — documentos DOCX', () => {
     await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible({ timeout: 10_000 });
 
     const emitirCertificacion = page.getByRole('button', { name: 'Emitir certificación' }).first();
-    if (await emitirCertificacion.isVisible().catch(() => false)) {
-      if (!(await emitirCertificacion.isEnabled())) {
-        await expect(
-          page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal|No se puede emitir certificación/i).first()
-        ).toBeVisible();
-      }
+    await expect(emitirCertificacion, 'el detalle de acta debe montar el pipeline de certificación').toBeVisible({
+      timeout: 10_000,
+    });
+    if (!(await emitirCertificacion.isEnabled())) {
+      await expect(
+        page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal|No se puede emitir certificación/i).first()
+      ).toBeVisible();
     }
   });
 
@@ -137,6 +138,9 @@ test.describe('Secretaría — documentos DOCX', () => {
       await expect(
         page.getByText(/Firmada|Pendiente de firma|Evidencia operativa pendiente|Evidencia demo\/operativa vinculada/i).first()
       ).toBeVisible();
+    } else {
+      await expect(page.getByText('Sin certificaciones emitidas.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Emitir certificación' })).toBeVisible();
     }
   });
 

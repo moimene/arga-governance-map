@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Building2, Plus, FolderOpen, Loader2, AlertTriangle } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -140,13 +140,23 @@ export default function DecisionesUnipersonales() {
                 </td>
               </tr>
             ) : (
-              filtered.map((d) => (
+              filtered.map((d) => {
+                const detailPath = scope.createScopedTo(`/secretaria/decisiones-unipersonales/${d.id}`);
+                return (
                 <tr
                   key={d.id}
-                  onClick={() => navigate(scope.createScopedTo(`/secretaria/decisiones-unipersonales/${d.id}`))}
+                  onClick={() => navigate(detailPath)}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">{d.title}</td>
+                  <td className="px-6 py-4 text-sm font-medium">
+                    <Link
+                      to={detailPath}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                    >
+                      {d.title}
+                    </Link>
+                  </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium ${
@@ -183,7 +193,8 @@ export default function DecisionesUnipersonales() {
                     </span>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

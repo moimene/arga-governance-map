@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -170,14 +170,22 @@ export default function TramitadorLista() {
                 </td>
               </tr>
             ) : (
-              rows.map((f) => (
+              rows.map((f) => {
+                const detailPath = scope.createScopedTo(`/secretaria/tramitador/${f.id}`);
+                return (
                 <tr
                   key={f.id}
-                  onClick={() => navigate(scope.createScopedTo(`/secretaria/tramitador/${f.id}`))}
+                  onClick={() => navigate(detailPath)}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-[var(--g-text-primary)]">
-                    {f.filing_number ?? "s/n"}
+                  <td className="px-6 py-4 text-sm font-medium">
+                    <Link
+                      to={detailPath}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                    >
+                      {f.filing_number ?? "s/n"}
+                    </Link>
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {f.filing_via ?? "—"}
@@ -199,7 +207,8 @@ export default function TramitadorLista() {
                     </span>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

@@ -26,11 +26,12 @@ test.describe('Secretaría — Actas', () => {
 
   test('detalle de acta abre desde lista', async ({ page }) => {
     await page.goto('/secretaria/actas');
-    const acta = page.getByText('ACTA-').first();
-    if (await acta.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await acta.click();
-      await expect(page.url()).toMatch(/\/secretaria\/actas\/.+/);
-      await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
-    }
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow, 'la lista debe exponer al menos un acta operativa').toBeVisible({ timeout: 10_000 });
+    const detailLink = firstRow.getByRole('link').first();
+    await expect(detailLink, 'cada acta debe tener enlace accesible a detalle').toBeVisible();
+    await detailLink.click();
+    await expect(page).toHaveURL(/\/secretaria\/actas\/[^/?]+/);
+    await expect(page.getByRole('button', { name: 'Acta DOCX' })).toBeVisible();
   });
 });

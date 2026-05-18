@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ScrollText, Plus, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAcuerdosSinSesionList, useCloseExpiredVotaciones } from "@/hooks/useAcuerdosSinSesion";
@@ -212,17 +212,25 @@ export default function AcuerdosSinSesion() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">Sin acuerdos para los filtros seleccionados.</td></tr>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r) => {
+                const detailPath = scope.createScopedTo(`/secretaria/acuerdos-sin-sesion/${r.id}`);
+                return (
                 <tr
                   key={r.id}
-                  onClick={() => navigate(scope.createScopedTo(`/secretaria/acuerdos-sin-sesion/${r.id}`))}
+                  onClick={() => navigate(detailPath)}
                   className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
                 >
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-[var(--g-text-primary)]">{r.title}</div>
+                    <Link
+                      to={detailPath}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                    >
+                      {r.title}
+                    </Link>
                     {r.requires_unanimity ? (
                       <span
-                        className="mt-1 inline-block bg-[var(--g-sec-100)] px-2 py-0.5 text-[10px] font-medium text-[var(--g-brand-3308)]"
+                        className="mt-1 block w-fit bg-[var(--g-sec-100)] px-2 py-0.5 text-[10px] font-medium text-[var(--g-brand-3308)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
                         Unanimidad
@@ -259,7 +267,8 @@ export default function AcuerdosSinSesion() {
                     </span>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
