@@ -296,11 +296,26 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
   const merged = saved.map((point) => {
     const source = bySource.get(sourceKey(point)) ?? byTitle.get(titleKey(point.punto));
     if (!source) return normalizePoint(point);
+    // `agenda_items` no guarda materia: `sourcePoints` la infiere con
+    // `defaultMateriaForTitle` para puntos con origen MEETING_AGENDA, lo que
+    // pisa silenciosamente la materia editada por el secretario en el paso
+    // de Agenda y debate (ej. NOMBRAMIENTO_CONSEJERO termina volviendo a
+    // APROBACION_CUENTAS). Solo dejamos prevalecer el source cuando guarda
+    // la materia de forma explícita (CONVOCATORIA o PREPARED_AGREEMENT).
+    // Bug detectado por e2e/51 (Junta universal Admin Único).
+    const sourceHasExplicitMateria =
+      source.origin === "CONVOCATORIA" || source.origin === "PREPARED_AGREEMENT";
+    const mergedMateria = sourceHasExplicitMateria
+      ? (source.materia ?? point.materia)
+      : (point.materia ?? source.materia);
+    const mergedTipo = sourceHasExplicitMateria
+      ? (source.tipo ?? point.tipo)
+      : (point.tipo ?? source.tipo);
     return normalizePoint({
       ...point,
       punto: source.punto || point.punto,
-      materia: source.materia ?? point.materia,
-      tipo: source.tipo ?? point.tipo,
+      materia: mergedMateria,
+      tipo: mergedTipo,
       agreement_id: source.agreement_id ?? point.agreement_id ?? null,
       source_table: source.source_table ?? point.source_table ?? null,
       source_id: source.source_id ?? point.source_id ?? null,

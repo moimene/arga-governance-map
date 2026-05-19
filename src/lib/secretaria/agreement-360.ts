@@ -89,9 +89,14 @@ function textForAgreement(input: MeetingAgreementMaterializationInput) {
 function normalizeRequiredMajorityCode(input: MeetingAgreementMaterializationInput) {
   const stored = input.requiredMajorityCode?.trim();
   if (stored && !stored.includes(":")) return stored;
+  // El trigger SQL `fn_agreements_majority_check` valida contra
+  // `materia_catalog.min_majority_code` usando `fn_majority_level`, que sólo
+  // mapea SIMPLE / REFORZADA_2_3 / UNANIMIDAD. Emitir "REFORZADA" o
+  // "ESTRUCTURAL" colapsaba a level 0 y bloqueaba MODIFICACION_ESTATUTOS,
+  // AUMENTO_CAPITAL, etc. al guardar la materialización de un acuerdo.
+  // Bug detectado por e2e/51 (Junta universal Admin Único).
   if (input.snapshot.materia_clase === "ORDINARIA") return "SIMPLE";
-  if (input.snapshot.materia_clase === "ESTRUCTURAL") return "ESTRUCTURAL";
-  return "REFORZADA";
+  return "REFORZADA_2_3";
 }
 
 function compactTraceContext(trace?: Agreement360TraceContext | null) {

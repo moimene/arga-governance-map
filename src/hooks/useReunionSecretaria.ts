@@ -812,6 +812,15 @@ export function useReplaceAttendees(meetingId: string | undefined) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["meeting_attendees", tenantId, meetingId] });
+      // VotacionesStep cachea meeting_attendees bajo otra key
+      // (["secretaria", tenantId, "meetings", meetingId, "votaciones"]) y
+      // necesita refetch con los IDs nuevos tras delete+insert. Sin esto,
+      // los votos viajan con `attendee_id` obsoletos y el RPC
+      // fn_save_meeting_resolutions revienta con FK violation 23503 sobre
+      // meeting_votes_attendee_id_fkey. Bug detectado en e2e/49.
+      qc.invalidateQueries({
+        queryKey: ["secretaria", tenantId, "meetings", meetingId, "votaciones"],
+      });
     },
   });
 }

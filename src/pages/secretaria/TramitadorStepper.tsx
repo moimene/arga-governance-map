@@ -822,6 +822,14 @@ function TramitadorNuevo() {
       return;
     }
 
+    // `registry_filings` no expone columna `filing_type` en el schema Cloud
+    // (sólo `filing_via`, `filing_number`, etc.). El motor calculaba un
+    // `filingType` derivado del rule pack y lo escribía aquí, lo que hacía
+    // que el INSERT reventara con `PGRST204 - schema cache miss`. Mantenemos
+    // el cálculo (lo usan `buildRegistryVariables` y la UI/plantillas) pero
+    // NO lo enviamos a la BD hasta que el modelo registral exponga el
+    // campo. Bug detectado por e2e/54.
+    void filingType;
     const filingPayload = {
       tenant_id: tenantId,
       agreement_id: selectedAgreement.id,
@@ -832,7 +840,6 @@ function TramitadorNuevo() {
       protocol_number: instrumentData.protocolNumber.trim(),
       elevated_at: new Date().toISOString(),
       status: "ELEVATED",
-      filing_type: filingType,
       filing_via: filingChannel || null,
     };
 

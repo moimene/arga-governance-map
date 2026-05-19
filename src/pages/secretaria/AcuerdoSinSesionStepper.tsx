@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -209,7 +209,20 @@ export default function AcuerdoSinSesionStepper() {
   // proposal_text como bloque legible "Dirección de notificación: <texto>".
   const [direccionNotificacion, setDireccionNotificacion] = useState("");
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
-  const activeMembers = mandates.filter((m) => m.status === "Activo");
+  // Dedupe por `person_id`: `useBodyMandates` puede devolver dos filas para
+  // la misma persona (ej. Mateo CONSEJERO+SECRETARIO en `condiciones_persona`).
+  // Cada persona vota una vez bajo WORM, así que `total_members` debe contar
+  // personas únicas. Sin dedup, `fn_no_session_close_and_materialize_agreement`
+  // rechaza el cierre porque `votes_for + against + abstain` queda siempre
+  // por debajo de `total_required`. Bug detectado por e2e/50.
+  const activeMembers = useMemo(() => {
+    const filtered = mandates.filter((m) => m.status === "Activo");
+    const byPersonId = new Map<string, (typeof filtered)[number]>();
+    for (const m of filtered) {
+      if (!byPersonId.has(m.person_id)) byPersonId.set(m.person_id, m);
+    }
+    return Array.from(byPersonId.values());
+  }, [mandates]);
   const [deadlineDays, setDeadlineDays] = useState(5);
   const [excludedPersonIds, setExcludedPersonIds] = useState<Set<string>>(new Set());
   const includedMembers = activeMembers.filter((m) => !excludedPersonIds.has(m.person_id));
