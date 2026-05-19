@@ -547,6 +547,37 @@ function TramitadorNuevo() {
     setModeloCapa3Errors({});
   }, [selectedModeloId]);
 
+  // Hidrata `registryFilingId` y `filingStatus` cuando el acuerdo
+  // seleccionado ya tiene un registry_filing en Cloud. Antes el stepper
+  // arrancaba siempre en DRAFT, ocultando subsanaciones pendientes y
+  // forzando al usuario a re-elevar la escritura. Se re-ejecuta cuando
+  // `filingStatus` vuelve a DRAFT (p.ej. tras `handleSelectAgreement`)
+  // y el id del filing aún no está cargado para el agreement actual,
+  // para no perder la hidratación tras el click del usuario en el
+  // botón del agreement. Bug detectado por e2e/58.
+  useEffect(() => {
+    if (!effectiveSelectedAgreementId || !tenantId) return;
+    if (filingStatus !== "DRAFT" && registryFilingId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("registry_filings")
+        .select("id, status")
+        .eq("tenant_id", tenantId)
+        .eq("agreement_id", effectiveSelectedAgreementId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      if (error) return;
+      const row = (data ?? [])[0];
+      if (!row) return;
+      setRegistryFilingId(row.id as string);
+      setFilingStatus(String(row.status ?? "DRAFT"));
+      setDeedSaved(["ELEVATED", "SUBMITTED", "INSCRIBED"].includes(String(row.status ?? "")));
+    })();
+    return () => { cancelled = true; };
+  }, [effectiveSelectedAgreementId, filingStatus, registryFilingId, tenantId]);
+
   const isDeedRequired = registryRulePackData?.payload.instrumentoRequerido === "ESCRITURA";
   const filingType = (() => {
     if (!registryRulePackData) return null;

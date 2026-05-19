@@ -54,7 +54,13 @@ type ConflictRaw = {
   meeting?: { governing_bodies?: { entity_id?: string | null } | null } | null;
 };
 
-const ACTIVE_CONFLICT_STATUS = "ABIERTO";
+// La tabla `conflicts_of_interest` declara
+// `CHECK status IN ('Declarado', 'Pendiente', 'Resuelto')`. El hook usaba un
+// valor ("ABIERTO") que nunca pasaba la constraint, por lo que la query no
+// devolvía conflictos reales y la UI no marcaba el `conflict_flag` en la
+// tabla de votantes. Filtramos por los estados canónicos no-resueltos.
+// Bug detectado por e2e/57.
+const ACTIVE_CONFLICT_STATUSES = ["Declarado", "Pendiente"] as const;
 
 const formatDateTime = (s: string | null) => {
   if (!s) return null;
@@ -144,7 +150,7 @@ export function useActiveConflicts(entityId?: string | null) {
           "*, person:person_id(full_name), finding:related_finding_id(code, entity_id), meeting:related_meeting_id(governing_bodies(entity_id))",
         )
         .eq("tenant_id", tenantId!)
-        .eq("status", ACTIVE_CONFLICT_STATUS)
+        .in("status", ACTIVE_CONFLICT_STATUSES as unknown as string[])
         .order("declared_at", { ascending: false });
       if (error) throw error;
 
