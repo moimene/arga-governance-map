@@ -80,8 +80,7 @@ export async function persistInitialCargos(
       const personId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, cargo.persona);
       let representativePersonId: string | null = null;
 
-      if (cargo.tipo_condicion === "ADMIN_PJ") {
-        if (!cargo.persona.representante) throw new Error("Administrador PJ sin representante permanente");
+      if (cargo.persona.representante) {
         representativePersonId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, cargo.persona.representante);
       }
 

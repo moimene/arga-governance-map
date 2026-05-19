@@ -11,16 +11,19 @@ export function PersonaPicker({
   onChange,
   personType,
   issue,
+  idPrefix,
 }: {
   label: string;
   value: PersonaDraft | null;
   onChange: (value: PersonaDraft | null) => void;
   personType?: PersonType;
   issue?: ValidationIssue;
+  idPrefix?: string;
 }) {
   const [mode, setMode] = useState<"existing" | "new">(value?.key?.startsWith("new-") ? "new" : "existing");
   const [search, setSearch] = useState("");
   const { data = [], isLoading } = usePersonasCanonical({ person_type: personType, search });
+  const baseId = idPrefix ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
   const options = useMemo(
     () => [
@@ -101,17 +104,17 @@ export function PersonaPicker({
 
       {mode === "existing" ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-          <Field label="Buscar" value={search} onChange={setSearch} />
-          <SelectField label="Persona" value={selectedId} options={options} onChange={selectExisting} issue={issue} />
+          <Field id={`${baseId}-buscar`} label="Buscar" value={search} onChange={setSearch} />
+          <SelectField id={`${baseId}-persona`} label="Persona" value={selectedId} options={options} onChange={selectExisting} issue={issue} />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="Nombre" value={value?.full_name ?? ""} onChange={(full_name) => updateNew({ full_name })} issue={issue} />
-          <Field label="NIF/CIF" value={value?.tax_id ?? ""} onChange={(tax_id) => updateNew({ tax_id })} />
+          <Field id={`${baseId}-nombre`} label="Nombre" value={value?.full_name ?? ""} onChange={(full_name) => updateNew({ full_name })} issue={issue} />
+          <Field id={`${baseId}-nif-cif`} label="NIF/CIF" value={value?.tax_id ?? ""} onChange={(tax_id) => updateNew({ tax_id })} />
           {personType === "PJ" ? (
-            <Field label="Denominacion" value={value?.denomination ?? ""} onChange={(denomination) => updateNew({ denomination })} />
+            <Field id={`${baseId}-denominacion`} label="Denominacion" value={value?.denomination ?? ""} onChange={(denomination) => updateNew({ denomination })} />
           ) : null}
-          <Field label="Email" type="email" value={value?.email ?? ""} onChange={(email) => updateNew({ email })} />
+          <Field id={`${baseId}-email`} label="Email" type="email" value={value?.email ?? ""} onChange={(email) => updateNew({ email })} />
         </div>
       )}
     </div>

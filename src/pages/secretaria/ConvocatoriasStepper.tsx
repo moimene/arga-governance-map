@@ -19,6 +19,7 @@ import {
   type AgendaItem,
   type ConvocatoriaWithBody,
 } from "@/hooks/useConvocatorias";
+import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
@@ -352,6 +353,14 @@ const CHANNEL_LABELS: Record<string, string> = {
   BUROFAX: "Burofax",
   EMAIL_CON_ACUSE: "Email con acuse",
   EMAIL_SIMPLE: "Email simple",
+};
+
+const MANDATE_ROLE_PRIORITY: Record<string, number> = {
+  PRESIDENTE: 1,
+  SECRETARIO: 2,
+  VICEPRESIDENTE: 3,
+  CONSEJERO_COORDINADOR: 4,
+  CONSEJERO: 5,
 };
 
 function newAgendaItem(organoTipo: TipoOrgano = "JUNTA_GENERAL"): AgendaItem {
@@ -804,27 +813,57 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 4 ──
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
+  const { data: capitalHoldings = [] } = useCapitalHoldings(selectedEntityId ?? undefined);
   // BATCH 8.4 (ronda 2 U-B): los destinatarios ahora se ordenan con
   // PRESIDENTE primero, SECRETARIO segundo, después órdenes de prioridad
   // estándar y resto alfabético. Antes aparecían en orden de inserción
   // (alfabético por tipo_condicion) lo cual ponía CONSEJERO antes que
   // PRESIDENTE — inverso al uso operativo.
-  const ROLE_PRIORITY: Record<string, number> = {
-    PRESIDENTE: 1,
-    SECRETARIO: 2,
-    VICEPRESIDENTE: 3,
-    CONSEJERO_COORDINADOR: 4,
-    CONSEJERO: 5,
-  };
-  const activeMandates = mandates
-    .filter((m) => m.status === "Activo")
-    .sort((a, b) => {
-      const pa = ROLE_PRIORITY[a.role ?? ""] ?? 99;
-      const pb = ROLE_PRIORITY[b.role ?? ""] ?? 99;
-      if (pa !== pb) return pa - pb;
-      // Mismo rol: orden alfabético por nombre
-      return (a.full_name ?? "").localeCompare(b.full_name ?? "", "es");
-    });
+  const activeMandates = useMemo(
+    () =>
+      mandates
+        .filter((m) => m.status === "Activo")
+        .sort((a, b) => {
+          const pa = MANDATE_ROLE_PRIORITY[a.role ?? ""] ?? 99;
+          const pb = MANDATE_ROLE_PRIORITY[b.role ?? ""] ?? 99;
+          if (pa !== pb) return pa - pb;
+          // Mismo rol: orden alfabético por nombre
+          return (a.full_name ?? "").localeCompare(b.full_name ?? "", "es");
+        }),
+    [mandates],
+  );
+  const activeRecipients = useMemo(() => {
+    if (organoTipo !== "JUNTA_GENERAL") return activeMandates;
+
+    const byPersonId = new Map<string, (typeof activeMandates)[number]>();
+    for (const holding of capitalHoldings) {
+      if (!holding.holder_person_id || holding.is_treasury || holding.voting_rights === false) continue;
+      const existing = byPersonId.get(holding.holder_person_id);
+      const fullName =
+        holding.holder?.full_name ??
+        holding.holder?.denomination ??
+        existing?.full_name ??
+        "Socio";
+      byPersonId.set(holding.holder_person_id, {
+        id: existing?.id ?? `holding:${holding.id}`,
+        body_id: selectedBodyId ?? "",
+        person_id: holding.holder_person_id,
+        role: tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO",
+        type: "CAPITAL_HOLDER",
+        start_date: holding.effective_from ?? null,
+        end_date: holding.effective_to ?? null,
+        status: "Activo",
+        full_name: fullName,
+        email: existing?.email ?? null,
+        porcentaje_capital: holding.porcentaje_capital,
+        share_class: holding.share_class?.class_code ?? null,
+      });
+    }
+
+    return Array.from(byPersonId.values()).sort((a, b) =>
+      (a.full_name ?? "").localeCompare(b.full_name ?? "", "es"),
+    );
+  }, [activeMandates, capitalHoldings, organoTipo, selectedBodyId, tipoSocial]);
   const [excludedPersonIds, setExcludedPersonIds] = useState<Set<string>>(new Set());
   function toggleExclude(personId: string) {
     setExcludedPersonIds((prev) => {
@@ -847,10 +886,13 @@ export default function ConvocatoriasStepper() {
   const channelOptsBase = CHANNEL_OPTIONS[jurisdiction] ?? CHANNEL_OPTIONS["ES"];
   const bodyTypeForChannels = selectedBody?.body_type?.toUpperCase() ?? "JUNTA";
   const relevantChannelSet = CHANNELS_RELEVANT_BY_BODY_TYPE[bodyTypeForChannels];
-  const channelOpts =
-    relevantChannelSet && relevantChannelSet.size > 0
-      ? channelOptsBase.filter((ch) => relevantChannelSet.has(ch.value))
-      : channelOptsBase;
+  const channelOpts = useMemo(
+    () =>
+      relevantChannelSet && relevantChannelSet.size > 0
+        ? channelOptsBase.filter((ch) => relevantChannelSet.has(ch.value))
+        : channelOptsBase,
+    [channelOptsBase, relevantChannelSet],
+  );
   const [channels, setChannels] = useState<string[]>([]);
   function toggleChannel(val: string) {
     setChannels((prev) =>
@@ -1246,7 +1288,7 @@ export default function ConvocatoriasStepper() {
   }
 
   const borradorVariables = useMemo<Record<string, unknown>>(() => {
-    const memberNames = activeMandates
+    const memberNames = activeRecipients
       .filter((m) => !excludedPersonIds.has(m.person_id))
       .map((m) => m.full_name)
       .filter(Boolean);
@@ -1315,6 +1357,29 @@ export default function ConvocatoriasStepper() {
       fecha_primera_convocatoria: fechaReunion,
       hora_primera_convocatoria: horaReunion,
       fecha_emision: new Date().toISOString().slice(0, 10),
+      SISTEMA: {
+        lugar_emision: lugar || domicilioSocial || "Madrid",
+        fecha_emision: new Date().toISOString().slice(0, 10),
+      },
+      QTSP: {
+        firma_convocante_ref: "EAD Trust QSeal demo/operativo pendiente de emisión",
+      },
+      entities: {
+        name: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+      },
+      persons: {
+        socio_destinatario: {
+          nombre_completo: memberNames.join(", "),
+          nif: "según libro registro",
+        },
+      },
+      agreements: {
+        convocatoria: {
+          id: "pendiente de emisión",
+          fecha_adopcion: new Date().toISOString().slice(0, 10),
+          indice_documentacion_ref: "expediente de convocatoria",
+        },
+      },
 
       formato_reunion: formatoReunion,
       modalidad_sesion: formatoReunion,
@@ -1332,6 +1397,24 @@ export default function ConvocatoriasStepper() {
       canales: channelLabelsForCapa3.join(", "),
       canal_convocatoria: channelLabelsForCapa3.join(", "),
       canales_convocatoria: channelLabelsForCapa3.join(", "),
+      meetings: {
+        junta_sl: {
+          canal_notificacion: channelLabelsForCapa3.join(", "),
+          canal_documentacion: "repositorio documental TGMS",
+          tipo_junta: tipoJuntaTexto,
+          fecha: fechaReunion,
+          hora: horaReunion,
+          lugar,
+          modalidad: formatoReunion,
+          orden_del_dia_resumen: agendaItems
+            .filter((i) => i.titulo.trim())
+            .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+            .join("\n"),
+          fecha_envio: new Date().toISOString().slice(0, 10),
+          envio_ref: "TGMS-demo-pending",
+          acuse_ref: firstText(borradorCapa3Values["meetings.junta_sl.acuse_ref"], "pendiente de acuse"),
+        },
+      },
       // Codex P1 PR #3: las plantillas reales (verificado en migration
       // 20260419_000009) hacen `{{#each orden_dia}}{{ordinal}}. {{descripcion_punto}}{{/each}}`.
       // Con un string newline-delimited, Handlebars itera caracter por caracter
@@ -1363,7 +1446,7 @@ export default function ConvocatoriasStepper() {
       // Misma protección para `destinatarios`: si la plantilla espera
       // `{{#each destinatarios_lista}}{{nombre}}{{/each}}`, le damos array;
       // si espera string concatenado, usa `destinatarios`.
-      destinatarios_lista: activeMandates
+      destinatarios_lista: activeRecipients
         .filter((m) => !excludedPersonIds.has(m.person_id) && m.full_name)
         .map((m) => ({
           nombre: m.full_name,
@@ -1374,11 +1457,11 @@ export default function ConvocatoriasStepper() {
       cargo_convocante: convocanteMandate?.role ?? "",
     };
   }, [
-    activeMandates, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
+    activeMandates, activeRecipients, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
     jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
     habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
     evaluacionV2.fechaLimitePublicacion, channelLabelsForCapa3, agendaItems, domicilioSocial,
-    convocanteMandate?.full_name, convocanteMandate?.role,
+    borradorCapa3Values, convocanteMandate?.full_name, convocanteMandate?.role,
   ]);
 
   const [borradorTexto, setBorradorTexto] = useState<string>("");
@@ -1875,9 +1958,10 @@ export default function ConvocatoriasStepper() {
           })),
         },
         recipients: {
-          total_active: activeMandates.length,
+          source: organoTipo === "JUNTA_GENERAL" ? "capital_holdings" : "condiciones_persona",
+          total_active: activeRecipients.length,
           excluded_person_ids: Array.from(excludedPersonIds),
-          selected_count: Math.max(activeMandates.length - excludedPersonIds.size, 0),
+          selected_count: Math.max(activeRecipients.length - excludedPersonIds.size, 0),
         },
       },
       accepted_warnings: acceptedWarnings.map((warning) => ({
@@ -3035,23 +3119,25 @@ export default function ConvocatoriasStepper() {
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-[var(--g-brand-3308)]" />
                 <p className="text-sm font-medium text-[var(--g-text-primary)]">
-                  Miembros del órgano convocante
+                  {organoTipo === "JUNTA_GENERAL" ? "Socios destinatarios" : "Miembros del órgano convocante"}
                 </p>
               </div>
 
-              {activeMandates.length === 0 ? (
+              {activeRecipients.length === 0 ? (
                 <div
                   className="bg-[var(--g-sec-100)] border border-[var(--g-sec-300)] p-4"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
                   <p className="text-sm text-[var(--g-text-secondary)]">
-                    No hay miembros vigentes registrados para este órgano.
+                    {organoTipo === "JUNTA_GENERAL"
+                      ? "No hay socios vigentes registrados para esta sociedad."
+                      : "No hay miembros vigentes registrados para este órgano."}
                     La convocatoria se enviará sin destinatarios predefinidos.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {activeMandates.map((m) => {
+                  {activeRecipients.map((m) => {
                     const excluded = excludedPersonIds.has(m.person_id);
                     return (
                       <div
@@ -3090,7 +3176,7 @@ export default function ConvocatoriasStepper() {
               )}
 
               <p className="text-xs text-[var(--g-text-secondary)]">
-                {activeMandates.length - excludedPersonIds.size} destinatario(s) seleccionado(s).
+                {activeRecipients.length - excludedPersonIds.size} destinatario(s) seleccionado(s).
                 Las notificaciones se enviarán por los canales que configures en el paso siguiente.
               </p>
             </div>

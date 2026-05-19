@@ -36,6 +36,13 @@ function hasCargo(cargos: CargoInputDraft[], tipo: TipoCondicionOnboarding) {
   return cargos.some((cargo) => cargo.tipo_condicion === tipo && cargo.persona);
 }
 
+function requiresPermanentRepresentative(cargo: CargoInputDraft) {
+  return (
+    cargo.persona?.person_type === "PJ" &&
+    ["ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "ADMIN_PJ", "CONSEJERO"].includes(cargo.tipo_condicion)
+  );
+}
+
 function adminCargoTiposForForma(draft: SociedadOnboardingDraft): TipoCondicionOnboarding[] {
   if (draft.profile.tipo_organo_admin === "ADMIN_UNICO") return ["ADMIN_UNICO", "ADMIN_PJ"];
   if (draft.profile.tipo_organo_admin === "ADMIN_SOLIDARIOS") return ["ADMIN_SOLIDARIO", "ADMIN_PJ"];
@@ -361,8 +368,9 @@ export function validateSociedadOperability(draft: SociedadOnboardingDraft): Val
   }
 
   for (const cargo of draft.cargos) {
-    if (cargo.tipo_condicion === "ADMIN_PJ" && !cargo.persona?.representante) {
-      issues.push(issue("PJ-001", `cargos.${cargo.key}.persona.representante`, "Administrador PJ requiere representante permanente PF."));
+    if (requiresPermanentRepresentative(cargo) && !cargo.persona?.representante) {
+      const label = cargo.tipo_condicion === "CONSEJERO" ? "Consejero PJ" : "Administrador PJ";
+      issues.push(issue("PJ-001", `cargos.${cargo.key}.persona.representante`, `${label} requiere representante permanente PF.`));
     }
   }
 

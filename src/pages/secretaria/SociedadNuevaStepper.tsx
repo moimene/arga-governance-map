@@ -113,10 +113,9 @@ function adapterContextFromTx1(tenantId: string, tx1: Tx1Result): AdapterContext
   };
 }
 
-function adminPJRepresentaciones(cargos: CargoInputDraft[]): RepresentacionAdminPJInput[] {
+function permanentRepresentativeInputs(cargos: CargoInputDraft[]): RepresentacionAdminPJInput[] {
   const reps: RepresentacionAdminPJInput[] = [];
   for (const cargo of cargos) {
-    if (cargo.tipo_condicion !== "ADMIN_PJ") continue;
     if (!cargo.persona?.representante) continue;
     reps.push({
       represented: cargo.persona,
@@ -236,7 +235,7 @@ export default function SociedadNuevaStepper() {
         const failedCargoKeys = new Set(cargosResult.failedCargos.map((failure) => failure.cargo.key));
         const repsResult = await persistInitialRepresentaciones(
           adapterContext,
-          adminPJRepresentaciones(draft.cargos.filter((cargo) => !failedCargoKeys.has(cargo.key))),
+          permanentRepresentativeInputs(draft.cargos.filter((cargo) => !failedCargoKeys.has(cargo.key))),
         );
         failedCargos = cargosResult.failedCargos.length;
         failedRepresentaciones = repsResult.failedReps.length;

@@ -29,6 +29,13 @@ function defaultBodyKey(tipo: TipoCondicionOnboarding): BodyKey | null {
   return ["ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "ADMIN_PJ", "SOCIO"].includes(tipo) ? null : "CDA";
 }
 
+function requiresPermanentRepresentative(cargo: CargoInputDraft) {
+  return (
+    cargo.persona?.person_type === "PJ" &&
+    ["ADMIN_UNICO", "ADMIN_SOLIDARIO", "ADMIN_MANCOMUNADO", "ADMIN_PJ", "CONSEJERO"].includes(cargo.tipo_condicion)
+  );
+}
+
 function emptyCargo(index: number): CargoInputDraft {
   return {
     key: `cargo-${Date.now()}-${index}`,
@@ -71,6 +78,7 @@ export function StepCargos({
       {cargos.map((cargo, index) => (
         <div
           key={cargo.key}
+          data-testid={`cargo-card-${index}`}
           className="space-y-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
@@ -89,6 +97,7 @@ export function StepCargos({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <SelectField
+              id={`cargo-${index}-tipo`}
               label="Cargo"
               value={cargo.tipo_condicion}
               options={CARGO_OPTIONS}
@@ -98,12 +107,14 @@ export function StepCargos({
               }}
             />
             <SelectField
+              id={`cargo-${index}-fuente`}
               label="Fuente"
               value={cargo.fuente_designacion}
               options={FUENTE_OPTIONS}
               onChange={(value) => updateCargo(index, { fuente_designacion: value as FuenteDesignacion })}
             />
             <Field
+              id={`cargo-${index}-fecha-inicio`}
               label="Fecha inicio"
               type="date"
               value={cargo.fecha_inicio}
@@ -113,14 +124,16 @@ export function StepCargos({
 
           <PersonaPicker
             label="Persona"
+            idPrefix={`cargo-${index}-persona`}
             personType={cargo.tipo_condicion === "ADMIN_PJ" ? "PJ" : undefined}
             value={cargo.persona}
             onChange={(persona) => updateCargo(index, { persona })}
           />
 
-          {cargo.tipo_condicion === "ADMIN_PJ" ? (
+          {requiresPermanentRepresentative(cargo) ? (
             <PersonaPicker
               label="Representante permanente PF"
+              idPrefix={`cargo-${index}-representante-permanente`}
               personType="PF"
               value={cargo.persona?.representante ?? null}
               onChange={(representante) => {

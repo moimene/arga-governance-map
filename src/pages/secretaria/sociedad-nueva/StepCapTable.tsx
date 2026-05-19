@@ -59,6 +59,7 @@ export function StepCapTable({
       {entries.map((entry, index) => (
         <div
           key={entry.key}
+          data-testid={`cap-table-card-${index}`}
           className="space-y-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
@@ -78,6 +79,7 @@ export function StepCapTable({
           </div>
 
           <CheckboxField
+            id={`cap-table-${index}-autocartera`}
             label="Autocartera"
             checked={entry.is_treasury}
             onChange={(is_treasury) => updateEntry(index, { is_treasury, holder: is_treasury ? null : entry.holder, voting_rights: is_treasury ? false : entry.voting_rights })}
@@ -86,6 +88,7 @@ export function StepCapTable({
           {!entry.is_treasury ? (
             <PersonaPicker
               label="Socio"
+              idPrefix={`cap-table-${index}-socio`}
               value={entry.holder}
               onChange={(holder) => updateEntry(index, { holder })}
               issue={issueForField(issues, `capTable.${entry.key}.holder`)}
@@ -94,12 +97,14 @@ export function StepCapTable({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <SelectField
+              id={`cap-table-${index}-clase`}
               label="Clase"
               value={entry.share_class_code}
               options={classOptions}
               onChange={(share_class_code) => updateEntry(index, { share_class_code })}
             />
             <NumberField
+              id={`cap-table-${index}-titulos`}
               label="Titulos"
               value={entry.numero_titulos}
               onChange={(numero_titulos) => updateEntry(index, { numero_titulos })}
@@ -111,6 +116,7 @@ export function StepCapTable({
               </div>
             </div>
             <CheckboxField
+              id={`cap-table-${index}-derechos-voto`}
               label="Derechos de voto"
               checked={entry.voting_rights}
               disabled={entry.is_treasury}
@@ -121,6 +127,7 @@ export function StepCapTable({
           {!entry.is_treasury && entry.holder?.person_type === "PJ" && entry.voting_rights ? (
             <PersonaPicker
               label="Representante de junta"
+              idPrefix={`cap-table-${index}-representante-junta`}
               personType="PF"
               value={(entry.representante_junta as PersonaDraft | null) ?? null}
               onChange={(representante_junta) => updateEntry(index, { representante_junta })}

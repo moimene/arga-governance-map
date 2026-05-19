@@ -163,6 +163,31 @@ describe("sociedad-onboarding adapters", () => {
     });
   });
 
+  it("persiste representative_person_id cuando el consejero es PJ", async () => {
+    const { persistInitialCargos } = await import("../adapters");
+    const consejeroPJ = persona("consejero-pj", "B999", "PJ");
+    consejeroPJ.representante = persona("rep-consejero", "87654321A");
+
+    const result = await persistInitialCargos(ctx, [
+      {
+        key: "cargo-pj-cda",
+        tipo_condicion: "CONSEJERO",
+        bodyKey: "CDA",
+        persona: consejeroPJ,
+        fecha_inicio: "2026-05-12",
+        fuente_designacion: "ESCRITURA",
+      },
+    ]);
+
+    expect(result.failedCargos).toEqual([]);
+    const condicion = mockState.inserts.find((insert) => insert.table === "condiciones_persona");
+    expect(condicion?.payload).toMatchObject({
+      body_id: "body-cda",
+      tipo_condicion: "CONSEJERO",
+      representative_person_id: "person-2",
+    });
+  });
+
   it("persiste representaciones ADMIN_PJ_REPRESENTANTE sin meeting_id", async () => {
     const { persistInitialRepresentaciones } = await import("../adapters");
     const represented = persona("admin-pj", "B123", "PJ");

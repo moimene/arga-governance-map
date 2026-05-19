@@ -351,7 +351,11 @@ export default function ActaDetalle() {
         : null;
   const certificationReadinessReason =
     readiness?.status === "reference_only" ? demoReadinessMessage(readiness) : null;
-  const certificationGateReason = certificationReadinessReason ?? certificationDisabledReason;
+  const actaApprovalGateReason = !m.signed_at
+    ? "No se puede emitir certificación: el acta debe estar aprobada o firmada antes de certificar acuerdos (RRM arts. 108-109)."
+    : null;
+  const certificationGateReason =
+    actaApprovalGateReason ?? certificationReadinessReason ?? certificationDisabledReason;
   const actaVariables = {
     ...actaLegalVariables,
     entity_id: m.entity_id,

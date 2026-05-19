@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
-import { useActiveConflicts } from "@/hooks/useConflicts";
+import { useActiveConflicts, type ConflictFull } from "@/hooks/useConflicts";
 import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
 import { useEntityNormativeProfile } from "@/hooks/useNormativeFramework";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
@@ -192,11 +192,14 @@ const AGENDA_MATERIAS = [
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA" },
   { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA" },
   { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA" },
+  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA" },
   { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento de auditor", tipo: "ORDINARIA" },
   { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA" },
   { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA" },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL" },
 ] as const;
+
+const EMPTY_ACTIVE_CONFLICTS: ConflictFull[] = [];
 
 const UNIVERSAL_SPECIAL_DOCUMENTATION_MATERIAS = new Set([
   "MODIFICACION_ESTATUTOS",
@@ -2229,7 +2232,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   });
 
   const activeConflictScope = meetingId ? (meetingContext?.entityId ?? null) : undefined;
-  const { data: activeConflicts = [], isLoading: activeConflictsLoading } = useActiveConflicts(activeConflictScope);
+  const { data: activeConflicts = EMPTY_ACTIVE_CONFLICTS, isLoading: activeConflictsLoading } =
+    useActiveConflicts(activeConflictScope);
   const [voters, setVoters] = useState<VoterRow[]>([]);
   const activeConflictPersonIds = useMemo(
     () =>

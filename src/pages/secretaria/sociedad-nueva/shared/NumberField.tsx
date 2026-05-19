@@ -3,6 +3,7 @@ import { Field } from "./Field";
 import type { ValidationIssue } from "@/lib/secretaria/sociedad-onboarding/types";
 
 interface NumberFieldProps {
+  id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;

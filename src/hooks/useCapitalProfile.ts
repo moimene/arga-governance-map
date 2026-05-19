@@ -27,6 +27,7 @@ export interface ShareClassRow {
   economic_rights_coeff: number;
   voting_rights: boolean;
   veto_rights: boolean;
+  restrictions: Record<string, unknown> | null;
   created_at: string;
 }
 

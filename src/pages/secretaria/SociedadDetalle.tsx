@@ -1094,14 +1094,21 @@ function ShareClassesInlineTable({
   data: NonNullable<ReturnType<typeof useShareClasses>["data"]>;
   isLoading: boolean;
 }) {
+  const preferenceLabel = (restrictions: Record<string, unknown> | null) => {
+    if (restrictions?.preferred_dividend !== true) return "—";
+    const description = restrictions.preferred_dividend_description;
+    return typeof description === "string" && description.trim() ? description : "Dividendo preferente";
+  };
+
   return (
-    <Table isLoading={isLoading} empty="Sin clases definidas." headers={["Código", "Nombre", "Votos/título", "Coef. económico", "Derechos voto", "Veto"]}>
+    <Table isLoading={isLoading} empty="Sin clases definidas." headers={["Código", "Nombre", "Votos/título", "Coef. económico", "Preferencia", "Derechos voto", "Veto"]}>
       {(data ?? []).map((c) => (
         <tr key={c.id} className="hover:bg-[var(--g-surface-subtle)]/50">
           <td className="px-6 py-3 text-sm font-semibold text-[var(--g-text-primary)]">{c.class_code}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.name}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.votes_per_title}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.economic_rights_coeff}</td>
+          <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{preferenceLabel(c.restrictions)}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.voting_rights ? "Sí" : "No"}</td>
           <td className="px-6 py-3 text-sm text-[var(--g-text-secondary)]">{c.veto_rights ? "Sí" : "No"}</td>
         </tr>

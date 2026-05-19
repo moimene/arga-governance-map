@@ -119,6 +119,21 @@ describe("sociedad onboarding builders", () => {
     expect(capital.share_classes.some((item) => item.class_code === "ORD")).toBe(false);
   });
 
+  it("preserves preferred dividend restrictions in share classes", () => {
+    const draft = draftBase();
+    draft.shareClasses[0].restrictions = {
+      preferred_dividend: true,
+      preferred_dividend_description: "Dividendo preferente para ARGA Seguros",
+    };
+
+    const capital = buildInitialCapitalStructure(draft);
+
+    expect(capital.share_classes[0].restrictions).toMatchObject({
+      preferred_dividend: true,
+      preferred_dividend_description: "Dividendo preferente para ARGA Seguros",
+    });
+  });
+
   it("derives capital percentage from titles", () => {
     expect(deriveCapitalPct("30", "120")).toBe(25);
     expect(deriveCapitalPct("30", "0")).toBeNull();

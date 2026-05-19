@@ -168,6 +168,25 @@ describe("sociedad onboarding validation", () => {
     expect(result.blocking.some((item) => item.code === "PJ-001")).toBe(true);
   });
 
+  it("blocks a PJ consejero without permanent PF representative", () => {
+    const draft = completeDraft();
+    draft.cargos = [
+      ...draft.cargos,
+      {
+        key: "consejero-pj",
+        tipo_condicion: "CONSEJERO",
+        bodyKey: "CDA",
+        persona: pj("CONSPJ", "B33333333"),
+        fecha_inicio: "2026-05-12",
+        fuente_designacion: "ESCRITURA",
+      },
+    ];
+
+    const result = validateSociedadOperability(draft);
+
+    expect(result.blocking.some((item) => item.code === "PJ-001")).toBe(true);
+  });
+
   it("blocks reinforced majority below simple majority", () => {
     const draft = completeDraft();
     draft.rules.mayoria_simple_pct = "60";
