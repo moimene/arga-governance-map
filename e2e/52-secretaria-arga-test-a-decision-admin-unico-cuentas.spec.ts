@@ -12,13 +12,12 @@
  *   - `agreements.unipersonal_decision_id` enlaza el expediente
  *   - status ADOPTED, sin meeting/convocatoria asociados
  *
- * Nota sobre la materia: el catálogo del repo expone `FORMULACION_CUENTAS`
- * en `AGENDA_MATERIAS` para reuniones, pero `materia_catalog` en Cloud sólo
- * tiene `APROBACION_CUENTAS` (clase ORDINARIA) y `CUENTAS_CONSOLIDADAS`. Como
- * el stepper de decisión unipersonal sólo permite materias presentes en
- * `materia_catalog`, usamos `APROBACION_CUENTAS` como materia más cercana
- * (representa el acto de formulación que precede a la aprobación de cuentas
- * por la Junta). La trazabilidad queda en el texto del acuerdo.
+ * Materia: tras la migración 20260519080500 `materia_catalog` expone
+ * `FORMULACION_CUENTAS` (matter_class ORDINARIA, art. 253 LSC). La
+ * decisión unipersonal queda con `agreement_kind='FORMULACION_CUENTAS'`,
+ * que refleja literalmente el acto del órgano de administración antes
+ * de la Junta de aprobación. Documentos asociados (cuentas, informe,
+ * propuesta de aplicación) se referencian en el texto del acuerdo.
  *
  * Run:
  *   SECRETARIA_E2E_ARGA_TEST_A_DECISION_ADMIN_UNICO=1 bun run e2e -- e2e/52-secretaria-arga-test-a-decision-admin-unico-cuentas.spec.ts --project=chromium
@@ -40,7 +39,7 @@ const SOCIEDAD = {
 
 const DECISION = {
   type: 'ADMINISTRADOR_UNICO' as const,
-  materia: 'APROBACION_CUENTAS',
+  materia: 'FORMULACION_CUENTAS',
   ejercicio: 2026,
   title: 'Formulación de cuentas anuales del ejercicio 2026 (Admin Único)',
   fundamento: 'Arts. 210, 253 y 254 LSC; art. 173 LSC para convocatoria posterior de Junta',
@@ -148,7 +147,7 @@ async function findExistingDecision(client: ServiceClient): Promise<string | nul
     .eq('tenant_id', DEMO_TENANT_ID)
     .eq('entity_id', SOCIEDAD.entityId)
     .eq('decision_type', DECISION.type)
-    .ilike('title', `%${DECISION.materia === 'APROBACION_CUENTAS' ? 'cuentas' : DECISION.materia}%`)
+    .ilike('title', `%cuentas%`)
     .order('created_at', { ascending: false })
     .limit(5);
   expect(error).toBeNull();
@@ -175,7 +174,7 @@ async function runStepperViaUi(page: Page): Promise<{ decisionId: string; agreem
   });
 
   // Paso 1 — Tipo y materia. La sociedad viene preseleccionada (scope).
-  // Seleccionamos ADMINISTRADOR_UNICO (el segundo botón) y materia APROBACION_CUENTAS.
+  // Seleccionamos ADMINISTRADOR_UNICO (el segundo botón) y materia FORMULACION_CUENTAS.
   await page.getByRole('button', { name: /Administrador único/i }).click();
   await selectOptionInAnySelect(page, DECISION.materia);
 

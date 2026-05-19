@@ -145,6 +145,27 @@ test('Secretaría muestra libro de socios con clases A/B y registro de actas', a
   expect(actaConsejo!.signed_at).toBeNull();
   expect(actaJunta!.signed_at).toBeNull();
 
+  // Libros obligatorios — la migración 20260519081000 auto-siembra los
+  // libros LSC al crear una sociedad. Para una SL esperamos al menos
+  // LIBRO_ACTAS + LIBRO_REGISTRO_SOCIOS, OPEN, con deadline 30/04 del año
+  // siguiente.
+  const currentYear = new Date().getFullYear();
+  const { data: mandatoryBooks, error: booksErr } = await client
+    .from('mandatory_books')
+    .select('book_kind, period, status, legalization_status, legalization_deadline')
+    .eq('tenant_id', DEMO_TENANT_ID)
+    .eq('entity_id', SOCIEDAD.entityId)
+    .eq('period', currentYear);
+  expect(booksErr).toBeNull();
+  const kinds = new Set((mandatoryBooks ?? []).map((b) => b.book_kind));
+  expect(kinds).toContain('LIBRO_ACTAS');
+  expect(kinds).toContain('LIBRO_REGISTRO_SOCIOS');
+  for (const book of mandatoryBooks ?? []) {
+    expect(book.status).toBe('OPEN');
+    expect(book.legalization_status).toBe('PENDIENTE');
+    expect(String(book.legalization_deadline ?? '')).toMatch(/^\d{4}-04-30$/);
+  }
+
   // ── UI: libro de socios.
   await page.goto(`/secretaria/libro-socios?scope=sociedad&entity=${SOCIEDAD.entityId}`);
   await expect(page.getByRole('heading', { name: /Libro de socios de Arga test A/i })).toBeVisible({

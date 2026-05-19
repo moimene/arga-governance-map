@@ -161,7 +161,7 @@ async function runTramitadorViaUi(page: Page, agreementId: string) {
 async function verifyRegistryFiling(client: ServiceClient, agreementId: string) {
   const { data, error } = await client
     .from('registry_filings')
-    .select('id, agreement_id, status, filing_via, notary_name, protocol_number, elevated_at, tenant_id')
+    .select('id, agreement_id, status, filing_type, filing_via, notary_name, protocol_number, elevated_at, tenant_id')
     .eq('tenant_id', DEMO_TENANT_ID)
     .eq('agreement_id', agreementId)
     .order('created_at', { ascending: false })
@@ -172,6 +172,12 @@ async function verifyRegistryFiling(client: ServiceClient, agreementId: string) 
   expect(row!.agreement_id).toBe(agreementId);
   expect(row!.status).toBe('ELEVATED');
   expect(row!.filing_via).toBe(FILING.channel);
+  // Tras la migración 20260519080000 la columna `filing_type` queda viva.
+  // El backfill puso 'ESCRITURA' en filas previas y nuevas tramitaciones
+  // por motor escriben el filing_type derivado del rule pack
+  // (ESCRITURA/INSTANCIA/NINGUNO o código de plantilla). Para MODIFICACION
+  // ESTATUTOS aceptamos cualquier non-null porque depende del rule pack.
+  expect(row!.filing_type).toBeTruthy();
   expect(String(row!.notary_name ?? '')).toContain('Notaría');
   expect(String(row!.protocol_number ?? '')).toContain('2026/5432');
   expect(row!.elevated_at).toBeTruthy();
