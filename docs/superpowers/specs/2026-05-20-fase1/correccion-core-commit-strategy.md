@@ -74,6 +74,15 @@ Agrupar por naturaleza:
 
 Cada commit debe indicar si el valor es minimo legal o `NA` permitido por politica.
 
+El paquete preparado para Lote 2 es:
+
+```text
+supabase/migrations/20260521102000_secretaria_rulepacks_lote2_schema_fix.sql
+docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/
+```
+
+Este lote debe ejecutarse despues de Lote 1. El preflight exige que las 6 filas solapadas con Lote 1 esten en el hash post-Lote-1 previsto; si no, aborta. El alcance cubre las 22 versiones que seguiran incompletas tras Lote 1 y las versiones adicionales que solo tienen errores `schema_contract_errors`, hasta dejar el modo `lint-gates:strict` en verde.
+
 ## Delta tracker
 
 Flujo local por bloque:

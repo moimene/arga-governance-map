@@ -1,0 +1,6 @@
+e172d5e274f5b9f60fad34101f1421d98e790738322e0cdd451e9a83b4c3a238  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/01_preflight.sql
+c02098754691f2eebcd0eaddf0637177beeb6e3ebfc0028cbb335598f40ee2cf  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/02_patch.sql
+19d1c7f23228503534091bf33e7c1e8b5d956441e1148ff952b27b5e40b68e24  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/03_postflight.sql
+1fb3697c5eb7d1ce1b0c884b915c1b8666982cccb051b2629458bf3b938be871  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/04_rollback.sql
+c83d6941913740066e5da13e75a4549ae5dec581951f5f41b2674ff0dd99cd3e  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/README_runbook.md
+6528c1d9c1478fc5eed8e3ea48a37cc35c753a06b77f562005aeae6458e495b4  docs/superpowers/specs/2026-05-20-fase1/offline-release-lote2/delta_tracker_expected.md

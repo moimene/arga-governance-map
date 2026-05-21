@@ -82,3 +82,16 @@ Si faltan credenciales, el job debe quedar marcado como bloqueado por entorno, n
 - `delta_tracker.md`.
 
 Para Lote 1, el gate post-push es `rulepacks:fase1:lint-gates` con `PROBABLE_ERROR_RULE_PACK=0`. El modo estricto completo se reserva para despues de Lote 2, salvo que se ejecute una variante que falle solo por probables y no por incompletos.
+
+## Gate Lote 2
+
+Despues de aplicar Lote 1 y Lote 2, la rama debe activar el linter completo:
+
+```bash
+node scripts/lint-fase1-gates.mjs \
+  --dir /tmp/arga-fase1-current \
+  --fail-on-probable-errors \
+  --fail-on-incomplete
+```
+
+Ese modo falla si queda cualquier `PROBABLE_ERROR_RULE_PACK`, `payloads_incompletos` o `schema_contract_errors`. El paquete offline de Lote 2 (`offline-release-lote2`) esta disenado para que el contador de incompletos y contrato schema/NA baje a cero sin introducir duplicados ni equivalencias a la baja.
