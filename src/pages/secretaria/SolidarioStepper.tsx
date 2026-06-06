@@ -10,6 +10,7 @@ import { useBodiesByEntity } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
+import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { evaluarSolidario } from "@/lib/rules-engine/votacion-engine";
 import type { SolidarioConfig } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -48,6 +49,8 @@ function StepTipoAcuerdo({
   materia: string; setMateria: (v: string) => void;
   texto: string; setTexto: (v: string) => void;
 }) {
+  const selectedBody = bodies.find((body) => body.id === selectedBodyId) ?? null;
+
   return (
     <div className="space-y-4">
       {requestedPlantillaId ? (
@@ -104,6 +107,13 @@ function StepTipoAcuerdo({
           ))}
         </select>
       </div>
+
+      {selectedBody ? (
+        <BookDestinationNotice
+          body={selectedBody}
+          adoptionLabel="acta de administrador solidario"
+        />
+      ) : null}
 
       <div>
         <label htmlFor="solidario-materia" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">

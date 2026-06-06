@@ -131,6 +131,23 @@ test('Secretaría muestra libro de socios con clases A/B y registro de actas', a
 
   // El registro de actas (libro de actas operativo) tras T2/T4 debe incluir al menos
   // un acta del Consejo y otra de la Junta universal (ambas en BORRADOR).
+  // Idempotent reset: A1 (e2e/55) firma la acta del Consejo. En runs
+  // subsiguientes T6 ve acta firmada del run previo y falla. Reset a
+  // BORRADOR antes de las assertions.
+  const { error: resetActasErr } = await client
+    .from('minutes')
+    .update({
+      signed_at: null,
+      signed_by_secretary_id: null,
+      signed_by_president_id: null,
+      is_locked: false,
+    })
+    .eq('tenant_id', DEMO_TENANT_ID)
+    .eq('entity_id', SOCIEDAD.entityId)
+    .in('body_id', [SOCIEDAD.consejoBodyId, SOCIEDAD.juntaBodyId])
+    .not('signed_at', 'is', null);
+  expect(resetActasErr, 'reset actas to BORRADOR for T6 idempotency').toBeNull();
+
   const { data: actas, error: actaErr } = await client
     .from('minutes')
     .select('id, meeting_id, body_id, entity_id, signed_at')

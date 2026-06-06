@@ -202,7 +202,34 @@ async function ensureMeetingWorkflow(page: Page, client: ServiceClient, meetingI
   });
 
   const initial = await getMeetingProgress(client, meetingId);
-  if (initial.minute?.id) return initial.minute.id as string;
+  if (initial.minute?.id) {
+    // Idempotent reset: si la acta quedó firmada por un run posterior
+    // (e.g. e2e/55 A1) las assertions de T2 que exigen acta en BORRADOR
+    // fallarían en runs subsiguientes. Reset a estado borrador.
+    if ((initial.minute as { signed_at?: string | null }).signed_at) {
+      // Borrar certificaciones que A1 (e2e/55) emitió en runs previos.
+      // T2 asserta que el minuteId no tiene certifications cuando el acta
+      // está en BORRADOR; sin este DELETE la assertion final falla aunque
+      // resetear signed_at sí desbloquea el bloqueo de UI.
+      const { error: delCertsError } = await client
+        .from('certifications')
+        .delete()
+        .eq('minute_id', initial.minute.id as string);
+      expect(delCertsError, 'delete previous certifications for T2 idempotency').toBeNull();
+
+      const { error: resetError } = await client
+        .from('minutes')
+        .update({
+          signed_at: null,
+          signed_by_secretary_id: null,
+          signed_by_president_id: null,
+          is_locked: false,
+        })
+        .eq('id', initial.minute.id as string);
+      expect(resetError, 'reset acta to BORRADOR for T2 idempotency').toBeNull();
+    }
+    return initial.minute.id as string;
+  }
 
   await clickIfVisibleAndEnabled(page, /Declarar apertura de la sesión/i);
   await expect

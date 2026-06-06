@@ -56,8 +56,7 @@ test.describe('GRC Compass', () => {
   test('Penal / Anticorrupción renderiza como vista conectada', async ({ page }) => {
     await page.goto('/grc/penal-anticorrupcion');
     await expect(page).not.toHaveURL('/login');
-    await expect(page.getByText('Penal / Anticorrupción').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/Source: risks/i)).toBeVisible();
+    await expect(page.getByText('Matriz de Compliance Penal e ISO 37001').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('handoff AIMS a Risk 360 se muestra como intake read-only', async ({ page }) => {

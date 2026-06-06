@@ -256,7 +256,7 @@ export function SecretariaMobileSidebar({ scope, open, onOpenChange }: Secretari
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="left"
-        className="garrigues-module w-[min(320px,calc(100vw-2rem))] border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] p-0 text-[hsl(var(--sidebar-foreground))]"
+        className="garrigues-module flex h-full w-[min(320px,calc(100vw-2rem))] flex-col overflow-hidden border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] p-0 text-[hsl(var(--sidebar-foreground))]"
       >
         <SheetTitle className="sr-only">Navegación de Secretaría Societaria</SheetTitle>
         <SecretariaSidebarContent scope={scope} onNavigate={() => onOpenChange(false)} />

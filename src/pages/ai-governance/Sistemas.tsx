@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Cpu, PlusCircle, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { cn } from "@/lib/utils";
+import { useScope } from "@/context/ScopeContext";
+import { filterSystemsByScope } from "@/lib/aims/readiness";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -98,13 +100,16 @@ function FilterGroup({
 
 export default function Sistemas() {
   const navigate = useNavigate();
+  const { scope } = useScope();
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState("Todos");
   const [statusFilter, setStatusFilter] = useState("Todos");
 
-  const { data: systems = [], isLoading } = useAiSystemsList(
+  const { data: rawSystems = [], isLoading } = useAiSystemsList(
     riskFilter !== "Todos" ? riskFilter : undefined
   );
+
+  const systems = filterSystemsByScope(rawSystems, scope);
 
   const filtered = systems.filter((s) => {
     const q = search.toLowerCase();

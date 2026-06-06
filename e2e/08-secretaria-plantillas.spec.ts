@@ -30,6 +30,31 @@ test.describe('Plantillas', () => {
   });
 });
 
+test.describe('Motor de reglas societarias', () => {
+  test('materia recorre plantillas, simulación y apertura de expediente', async ({ page }) => {
+    await page.goto('/secretaria/catalogo-materias?scope=sociedad&entity=6d7ed736-f263-4531-a59d-c6ca0cd41602&materia=CESE_CONSEJERO');
+
+    await expect(page.getByRole('heading', { name: 'Materias, requisitos y documentos' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole('button', { name: /Cese de consejero art\. 223 LSC/i }).click();
+    await expect(page.getByRole('tab', { name: 'Resumen Cadena completa de decisión' })).toBeVisible();
+    await expect(page.getByText('Cadena de decisión del motor')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Plantillas Gate PRE documental' }).click();
+    await expect(page.getByText('Plantillas vinculadas al motor')).toBeVisible();
+    await expect(page.getByText('Usada por el motor').first()).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Simular Resultado antes de iniciar' }).click();
+    await expect(page.getByText('Resultado del motor').first()).toBeVisible();
+    await expect(page.getByText('Plantillas mínimas', { exact: true })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Iniciar expediente' }).click();
+    await expect(page).toHaveURL(/\/secretaria\/tramitador\/nuevo.*materia=CESE_CONSEJERO/);
+    await expect(page).not.toHaveURL('/login');
+  });
+});
+
 test.describe('Libros Obligatorios', () => {
   test('lista de libros muestra alertas de legalización', async ({ page }) => {
     await page.goto('/secretaria/libros');

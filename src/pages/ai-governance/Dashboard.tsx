@@ -25,10 +25,12 @@ import {
   aimsReadOnlyHandoffs,
   aimsScreenPostures,
   buildAimsReadiness,
+  filterSystemsByScope,
   type AimsComplianceMonitorDomain,
   type AimsReadinessDomain,
   type AimsReadinessStatus,
 } from "@/lib/aims/readiness";
+import { useScope } from "@/context/ScopeContext";
 
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
@@ -437,10 +439,18 @@ function HandoffAffordances() {
 }
 
 export default function AiDashboard() {
-  const { data: systems = [], isLoading: loadingSystems } = useAiSystemsList();
-  const { data: incidents = [], isLoading: loadingIncidents } = useAiIncidentsList();
-  const { data: assessments = [], isLoading: loadingAssessments } = useAllAssessments();
-  const { data: complianceChecks = [], isLoading: loadingComplianceChecks } = useAllComplianceChecks();
+  const { scope } = useScope();
+  const { data: rawSystems = [], isLoading: loadingSystems } = useAiSystemsList();
+  const { data: rawIncidents = [], isLoading: loadingIncidents } = useAiIncidentsList();
+  const { data: rawAssessments = [], isLoading: loadingAssessments } = useAllAssessments();
+  const { data: rawComplianceChecks = [], isLoading: loadingComplianceChecks } = useAllComplianceChecks();
+
+  const systems = filterSystemsByScope(rawSystems, scope);
+  const systemIds = new Set(systems.map((s) => s.id));
+
+  const incidents = rawIncidents.filter((i) => i.system_id && systemIds.has(i.system_id));
+  const assessments = rawAssessments.filter((a) => a.system_id && systemIds.has(a.system_id));
+  const complianceChecks = rawComplianceChecks.filter((c) => c.system_id && systemIds.has(c.system_id));
 
   const activos = systems.filter((s) => s.status === "ACTIVO").length;
   const alto    = systems.filter((s) => s.risk_level === "Alto").length;

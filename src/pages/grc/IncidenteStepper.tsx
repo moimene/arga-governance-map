@@ -100,6 +100,14 @@ export default function IncidenteStepper() {
     status: "Abierto",
   });
 
+  const [doraRts, setDoraRts] = useState({
+    q1_clients: false,
+    q2_geographic: false,
+    q3_downtime: false,
+    q4_dataloss: false,
+    q5_ecosystem: false,
+  });
+
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
 
@@ -112,7 +120,12 @@ export default function IncidenteStepper() {
   const authority = AUTHORITY_BY_TYPE[form.incident_type];
   const isDora = form.incident_type === "DORA";
   const isGdpr = form.incident_type === "GDPR";
-  const needsNotif = (isDora || isGdpr) && form.is_major_incident;
+  
+  const calculatedIsMajor = isDora
+    ? (doraRts.q1_clients || doraRts.q2_geographic || doraRts.q3_downtime || doraRts.q4_dataloss || doraRts.q5_ecosystem)
+    : form.is_major_incident;
+
+  const needsNotif = (isDora || isGdpr) && calculatedIsMajor;
 
   const handleSubmit = async () => {
     if (!form.title.trim()) {
@@ -121,17 +134,28 @@ export default function IncidenteStepper() {
       return;
     }
     try {
+      const payload = isDora ? {
+        dora_rts: {
+          q1_clients: doraRts.q1_clients,
+          q2_geographic: doraRts.q2_geographic,
+          q3_downtime: doraRts.q3_downtime,
+          q4_dataloss: doraRts.q4_dataloss,
+          q5_ecosystem: doraRts.q5_ecosystem,
+        }
+      } : null;
+
       const created = await createIncident.mutateAsync({
         title: form.title,
         description: form.description || undefined,
         severity: form.severity,
         incident_type: form.incident_type,
-        is_major_incident: form.is_major_incident,
+        is_major_incident: calculatedIsMajor,
         status: form.status,
         country_code: form.country_code,
         detection_date: new Date(form.detection_date).toISOString(),
         regulatory_notification_required: needsNotif,
         entity_id: scopedEntityId,
+        payload,
       });
       toast.success(
         needsNotif
@@ -293,24 +317,120 @@ export default function IncidenteStepper() {
                 Evaluación de umbral de incidente mayor
               </div>
               <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                Según {form.incident_type}, un incidente es <strong>mayor</strong> si
-                cumple criterios como: impacto en servicio crítico, afectación a más de 1.000
-                clientes, pérdida de datos personales masiva, o indisponibilidad superior al
-                RTO de función crítica.
+                {isDora ? (
+                  <>
+                    Bajo el estándar técnico RTS de <strong>DORA</strong>, evalúa los siguientes criterios críticos para clasificar si este incidente ICT califica como <strong>Incidente Mayor</strong>.
+                  </>
+                ) : (
+                  <>
+                    Según {form.incident_type}, un incidente es <strong>mayor</strong> si cumple criterios como: impacto en servicio crítico, afectación a más de 1.000 clientes, pérdida de datos personales masiva, o indisponibilidad superior al RTO de función crítica.
+                  </>
+                )}
               </p>
             </div>
 
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_major_incident}
-                onChange={(e) => set("is_major_incident", e.target.checked)}
-                className="h-4 w-4 accent-[var(--g-brand-3308)]"
-              />
-              <span className="text-sm font-medium text-[var(--g-text-primary)]">
-                Marcar como <strong>incidente mayor</strong>
-              </span>
-            </label>
+            {isDora ? (
+              <div className="space-y-3">
+                <span className="text-xs font-semibold text-[var(--g-text-secondary)] uppercase tracking-wider block mb-1">
+                  Cuestionario RTS DORA
+                </span>
+                
+                {[
+                  {
+                    key: "q1_clients" as const,
+                    label: "1. Impacto en clientes y transacciones",
+                    desc: "¿Afecta a más del 10% de clientes activos o a más de 100.000 clientes/transacciones financieras?",
+                  },
+                  {
+                    key: "q2_geographic" as const,
+                    label: "2. Impacto geográfico transfronterizo",
+                    desc: "¿Tiene impacto en más de un Estado miembro de la UE o afecta a nodos internacionales del grupo?",
+                  },
+                  {
+                    key: "q3_downtime" as const,
+                    label: "3. Indisponibilidad de funciones críticas",
+                    desc: "¿La interrupción del servicio supera las 2 horas para una función crítica o importante de la aseguradora?",
+                  },
+                  {
+                    key: "q4_dataloss" as const,
+                    label: "4. Gravedad de pérdida de datos",
+                    desc: "¿Se ha producido una alteración, pérdida de confidencialidad o indisponibilidad de datos transaccionales o de clientes?",
+                  },
+                  {
+                    key: "q5_ecosystem" as const,
+                    label: "5. Impacto sistémico o en terceros",
+                    desc: "¿Afecta a otros proveedores de servicios críticos de terceros o compromete la estabilidad operativa del ecosistema?",
+                  },
+                ].map((q) => (
+                  <div
+                    key={q.key}
+                    className="p-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] transition-colors hover:border-[var(--g-border-default)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-[var(--g-text-primary)] block">
+                          {q.label}
+                        </span>
+                        <span className="text-xs text-[var(--g-text-secondary)] leading-relaxed block">
+                          {q.desc}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setDoraRts((prev) => ({ ...prev, [q.key]: true }))}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-semibold border transition-all",
+                            doraRts[q.key]
+                              ? "bg-[var(--status-error)] text-[var(--g-text-inverse)] border-[var(--status-error)]"
+                              : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border-[var(--g-border-subtle)] hover:bg-[var(--g-surface-subtle)]"
+                          )}
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          Sí
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDoraRts((prev) => ({ ...prev, [q.key]: false }))}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-semibold border transition-all",
+                            !doraRts[q.key]
+                              ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] border-[var(--g-brand-3308)]"
+                              : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border-[var(--g-border-subtle)] hover:bg-[var(--g-surface-subtle)]"
+                          )}
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_major_incident}
+                  onChange={(e) => set("is_major_incident", e.target.checked)}
+                  className="h-4 w-4 accent-[var(--g-brand-3308)]"
+                />
+                <span className="text-sm font-medium text-[var(--g-text-primary)]">
+                  Marcar como <strong>incidente mayor</strong>
+                </span>
+              </label>
+            )}
+
+            {calculatedIsMajor && isDora && (
+              <div
+                className="p-3 bg-[var(--status-error)]/10 border border-[var(--status-error)] text-[var(--status-error)] font-semibold text-xs flex items-center gap-2"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>Clasificación DORA: INCIDENTE MAYOR IDENTIFICADO (Criterios RTS activos).</span>
+              </div>
+            )}
 
             {needsNotif && (
               <div
@@ -325,21 +445,11 @@ export default function IncidenteStepper() {
                   <div className="text-[var(--g-text-secondary)]">
                     Deadline:{" "}
                     <strong className="text-[var(--status-error)]">
-                      72 horas desde la detección
+                      24 horas para Notificación Inicial bajo DORA
                     </strong>
-                    . La creación del registro regulatorio depende del flujo GRC aprobado, no de un write cross-module.
+                    .
                   </div>
                 </div>
-              </div>
-            )}
-
-            {form.is_major_incident && !authority && (
-              <div
-                className="p-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] border border-[var(--g-border-subtle)]"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                Para el tipo <strong>{form.incident_type}</strong>, no se marca notificación
-                a regulador.
               </div>
             )}
           </div>
@@ -363,7 +473,7 @@ export default function IncidenteStepper() {
                 { label: "Detección", value: form.detection_date },
                 {
                   label: "Incidente mayor",
-                  value: form.is_major_incident ? "Sí" : "No",
+                  value: calculatedIsMajor ? "Sí" : "No",
                 },
               ].map((row) => (
                 <div key={row.label} className="flex gap-4 px-4 py-2.5 text-sm">
@@ -385,7 +495,7 @@ export default function IncidenteStepper() {
                   </div>
                   <div className="text-[var(--g-text-secondary)]">
                     Al confirmar, el incidente quedará marcado con deadline de{" "}
-                    <strong className="text-[var(--status-error)]">72 horas</strong> para el flujo owner de GRC.
+                    <strong className="text-[var(--status-error)]">24 horas (Notificación Inicial)</strong> para el flujo owner de GRC.
                   </div>
                 </div>
               </div>

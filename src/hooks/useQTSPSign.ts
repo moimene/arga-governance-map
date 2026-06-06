@@ -19,6 +19,10 @@ import type { QTSPSignRequest } from '@/lib/rules-engine/types';
 
 export interface QESSignResult {
   ok: boolean;
+  /** true cuando el resultado proviene del adaptador sandbox de demo, NO de una
+   *  transacción QES real de EAD Trust. Los callers NO deben persistir resultados
+   *  con sandbox=true como evidencia SEALED/QES/WORM final. */
+  sandbox?: boolean;
   srId: string;
   documentId: string;
   documentHash: string;
@@ -30,6 +34,9 @@ export interface QESSignResult {
 
 export interface CertifiedNotificationResult {
   ok: boolean;
+  /** true cuando el resultado proviene del adaptador sandbox de demo, NO de una
+   *  notificación ERDS real. No persistir como evidencia de entrega final. */
+  sandbox?: boolean;
   evidenceId: string;
   deliveryRef: string;
   evidenceHash: string;
@@ -107,6 +114,7 @@ export function useQTSPSign() {
 
         return {
           ok: true,
+          sandbox: false,
           srId: result.srId,
           documentId: result.documentId,
           documentHash: result.documentHash,
@@ -117,6 +125,45 @@ export function useQTSPSign() {
         };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
+
+        // --- SANDBOX ADAPTER FALLBACK FOR BROWSER DEMO FLOWS ---
+        if (msg.includes('QTSP_SERVER_PROXY_REQUIRED') || msg.includes('client_credentials')) {
+          // Hardening (Codex review #2): fail-closed en producción. El adaptador sandbox
+          // solo se activa en dev o con VITE_QTSP_ALLOW_SANDBOX=true explícito. Un fallo de
+          // proxy/credenciales NO debe convertirse en una firma "exitosa" en producción.
+          const allowSandbox =
+            import.meta.env.VITE_QTSP_ALLOW_SANDBOX === 'true' || import.meta.env.DEV === true;
+          if (!allowSandbox) {
+            throw new Error(`Firma QES no disponible (proxy/credenciales QTSP) y sandbox deshabilitado: ${msg}`);
+          }
+          console.warn("QTSP Proxy not configured or running in browser. Falling back to high-fidelity QES sandbox adapter.");
+
+          request.onProgress?.('Iniciando simulador de firma sandbox cualificada...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          request.onProgress?.('Calculando hash criptográfico SHA-512 local...');
+          
+          const hashBuffer = await globalThis.crypto.subtle.digest('SHA-512', request.documentData);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const docHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          request.onProgress?.('Generando sellado de tiempo y certificado QES (EAD Trust Sandbox)...');
+          await new Promise(resolve => setTimeout(resolve, 600));
+          
+          request.onProgress?.('Firma QES completada exitosamente (Sandbox).');
+          
+          return {
+            ok: true,
+            sandbox: true,
+            srId: `SR-SANDBOX-${Math.floor(100000 + Math.random() * 900000)}`,
+            documentId: `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
+            documentHash: docHash,
+            signatoryIds: request.signatories.map((_, i) => `SIGN-SANDBOX-${i + 1}`),
+            signed_at: new Date().toISOString(),
+            signedDocumentData: request.documentData,
+            errors: [],
+          };
+        }
+
         throw new Error(`Firma QES fallida: ${msg}`);
       }
     },
@@ -128,11 +175,11 @@ export function useQTSPSign() {
     ERDSNotificationRequest
   >({
     mutationFn: async (request: ERDSNotificationRequest) => {
-      try {
-        // For ERDS notification, we generate evidence of the notification message
-        const messageBody = request.body;
-        const messageData = new TextEncoder().encode(messageBody).buffer;
+      // For ERDS notification, we generate evidence of the notification message
+      const messageBody = request.body;
+      const messageData = new TextEncoder().encode(messageBody).buffer;
 
+      try {
         const evidenceId = `ERDS-${Date.now()}-${Math.random()
           .toString(36)
           .substring(7)}`;
@@ -161,6 +208,7 @@ export function useQTSPSign() {
 
         return {
           ok: true,
+          sandbox: false,
           evidenceId: result.id || evidenceId,
           deliveryRef: `DEL-${Date.now()}`,
           evidenceHash,
@@ -170,6 +218,34 @@ export function useQTSPSign() {
         };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
+
+        // --- SANDBOX ADAPTER FALLBACK FOR BROWSER DEMO FLOWS ---
+        if (msg.includes('QTSP_SERVER_PROXY_REQUIRED') || msg.includes('client_credentials')) {
+          // Hardening (Codex review #2): fail-closed en producción (ver firma QES arriba).
+          const allowSandbox =
+            import.meta.env.VITE_QTSP_ALLOW_SANDBOX === 'true' || import.meta.env.DEV === true;
+          if (!allowSandbox) {
+            throw new Error(`Notificación ERDS no disponible (proxy/credenciales QTSP) y sandbox deshabilitado: ${msg}`);
+          }
+          console.warn("QTSP Proxy not configured or running in browser. Falling back to ERDS notification sandbox adapter.");
+
+          const evidenceId = `ERDS-SANDBOX-${Date.now()}`;
+          const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', messageData);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const evidenceHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          return {
+            ok: true,
+            sandbox: true,
+            evidenceId,
+            deliveryRef: `DEL-SANDBOX-${Date.now()}`,
+            evidenceHash,
+            deliveredAt: new Date().toISOString(),
+            status: 'COMPLETED',
+            errors: [],
+          };
+        }
+
         throw new Error(`Notificación ERDS fallida: ${msg}`);
       }
     },

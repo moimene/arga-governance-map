@@ -1324,8 +1324,8 @@ export default function ConvocatoriasStepper() {
       // vez de "accionistas" + párrafo de derecho-de-información SL.
       tipo_social: tipoSocial,
       forma_social: tipoSocial,
-      entidad_cotizada: Boolean(selectedEntity?.es_cotizada) ? "Sí" : "No",
-      es_cotizada: Boolean(selectedEntity?.es_cotizada) ? "Sí" : "No",
+      entidad_cotizada: selectedEntity?.es_cotizada ? "Sí" : "No",
+      es_cotizada: selectedEntity?.es_cotizada ? "Sí" : "No",
       organo_nombre: selectedBody?.name ?? "",
       organo_tipo: organoTipo,
       jurisdiction,
@@ -2439,7 +2439,24 @@ export default function ConvocatoriasStepper() {
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setTipoConvocatoria(t)}
+                        onClick={() => {
+                          if (t === "UNIVERSAL") {
+                            // Una junta/sesión universal NO tiene convocatoria por
+                            // definición legal (art. 178 LSC). El flujo correcto
+                            // es el intake dedicado, que crea la reunión con
+                            // marca universal directamente.
+                            const params = new URLSearchParams();
+                            params.set("flow", "junta-universal");
+                            if (selectedEntityId) {
+                              params.set("scope", "sociedad");
+                              params.set("entity", selectedEntityId);
+                            }
+                            if (selectedBodyId) params.set("body", selectedBodyId);
+                            navigate(`/secretaria/reuniones/nueva?${params.toString()}`);
+                            return;
+                          }
+                          setTipoConvocatoria(t);
+                        }}
                         className={`px-3 py-1.5 text-xs font-medium border transition-colors ${
                           tipoConvocatoria === t
                             ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] border-[var(--g-brand-3308)]"
@@ -2447,17 +2464,15 @@ export default function ConvocatoriasStepper() {
                         }`}
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       >
-                        {t}
+                        {t === "UNIVERSAL" ? "UNIVERSAL →" : t}
                       </button>
                     ))}
                   </div>
-                  {tipoConvocatoria === "UNIVERSAL" && (
-                    <p className="text-xs text-[var(--g-text-secondary)] mt-1">
-                      {organoTipo === "JUNTA_GENERAL"
-                        ? "Junta universal: todos los socios presentes y de acuerdo en celebrarla. No requiere plazo de convocatoria."
-                        : "Sesión sin convocatoria formal: requiere aceptación unánime de celebración por los miembros del órgano. El asistente específico de acta queda fuera de este paquete."}
-                    </p>
-                  )}
+                  <p className="text-xs text-[var(--g-text-secondary)] mt-1">
+                    {tipoConvocatoria === "UNIVERSAL"
+                      ? "Una reunión universal no se convoca: se inicia directamente con todos los asistentes presentes y la aceptación unánime del orden del día. Pulsa UNIVERSAL → para abrir el asistente específico."
+                      : "Si la sesión va a celebrarse como universal (sin convocatoria previa), pulsa UNIVERSAL → y te llevamos al asistente que crea la reunión directamente."}
+                  </p>
                 </div>
               )}
 

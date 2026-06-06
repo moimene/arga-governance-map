@@ -1,9 +1,17 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, FileWarning, Plus } from "lucide-react";
+import { 
+  ArrowRight, FileWarning, Plus, Route, AlertCircle, 
+  Send, Loader2 
+} from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
 import { exceptionStatusChip } from "@/lib/grc/status-labels";
+import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
+import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type ExceptionRow = {
   id: string;
@@ -104,11 +112,25 @@ function SelectField({
   );
 }
 
-function ExceptionCard({ exception }: { exception: ExceptionRow }) {
+function ExceptionCard({ 
+  exception, 
+  isSelected, 
+  onSelect 
+}: { 
+  exception: ExceptionRow; 
+  isSelected: boolean; 
+  onSelect: () => void;
+}) {
   return (
     <article
-      className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4"
-      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      onClick={onSelect}
+      className={cn(
+        "border bg-[var(--g-surface-card)] p-4 cursor-pointer transition-all duration-150",
+        isSelected 
+          ? "border-[var(--g-brand-3308)] shadow-[var(--g-shadow-brand)] ring-1 ring-[var(--g-brand-3308)]" 
+          : "border-[var(--g-border-default)] hover:border-[var(--g-border-subtle)] shadow-[var(--g-shadow-card)]"
+      )}
+      style={{ borderRadius: "var(--g-radius-lg)" }}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
@@ -128,7 +150,10 @@ function ExceptionCard({ exception }: { exception: ExceptionRow }) {
           </h2>
         </div>
         <span
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]"
+          className={cn(
+            "inline-flex h-9 w-9 shrink-0 items-center justify-center border text-[var(--g-text-secondary)]",
+            isSelected ? "border-[var(--g-brand-3308)] text-[var(--g-brand-3308)]" : "border-[var(--g-border-subtle)]"
+          )}
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-hidden="true"
         >
@@ -162,6 +187,15 @@ export default function Excepciones() {
   const { data: exceptions = [], isLoading } = useExceptions();
   const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
   const [dateFilter, setDateFilter] = useState("todas");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // V2 Integration States
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [escalateMatter, setEscalateMatter] = useState("");
+  const [escalateCommittee, setEscalateCommittee] = useState("CDA");
+  const [escalateRationale, setEscalateRationale] = useState("");
+
+  const navigate = useNavigate();
 
   const filteredExceptions = useMemo(
     () =>
@@ -177,14 +211,55 @@ export default function Excepciones() {
     [exceptions, statusFilter, dateFilter],
   );
 
+  const selectedException = useMemo(() => {
+    if (selectedId) {
+      const found = exceptions.find(e => e.id === selectedId);
+      if (found) return found;
+    }
+    return filteredExceptions[0] ?? exceptions[0] ?? null;
+  }, [exceptions, filteredExceptions, selectedId]);
+
+  const { data: crossLinks = [], refetch: refetchCrossLinks } = useCrossModuleLinks(
+    "GRC",
+    "EXCEPTION",
+    selectedException?.id ?? ""
+  );
+
   const pendingCount = exceptions.filter((exception) => exception.status === "Pendiente").length;
   const expiringCount = exceptions.filter((exception) => isExpired(exception.expires_at) || isDueSoon(exception.expires_at)).length;
   const approvedCount = exceptions.filter((exception) => exception.status === "Aprobada").length;
   const hasFilters = statusFilter !== FILTER_ALL || dateFilter !== "todas";
-  const selectedException = filteredExceptions[0] ?? exceptions[0] ?? null;
+
+  const activeEscalation = crossLinks.find(link => link.status === "PROPOSED");
+
+  const handleOpenEscalation = () => {
+    if (!selectedException) return;
+    setEscalateMatter(`Revisión y aprobación de la excepción de cumplimiento: ${selectedException.code}`);
+    setEscalateRationale(`Se solicita evaluar la materialidad de la excepción ${selectedException.code} vinculada a la obligación ${selectedException.obligations?.code || 'general'} y validar los controles compensatorios propuestos.`);
+    setEscalateCommittee("CDA");
+    setShowEscalationModal(true);
+  };
+
+  const handleEscalateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedException) return;
+    // Handoff READ-ONLY a Secretaría (guardrail CLAUDE.md: no se escribe en
+    // governance_module_*). Navega al intake de Secretaría con la propuesta como
+    // query params; Secretaría decide la materialización desde su owner.
+    setShowEscalationModal(false);
+    toast.success("Abriendo intake de Secretaría con la propuesta (handoff read-only)…");
+    navigate(buildMeetingHandoffPath({
+      source: "grc",
+      event: "GRC_EXCEPTION_MATERIAL",
+      sourceId: selectedException.id,
+      organ: escalateCommittee,
+      matter: escalateMatter,
+      rationale: escalateRationale,
+    }));
+  };
 
   return (
-    <div className="min-w-0 space-y-5 p-4 sm:p-6">
+    <div className="min-w-0 space-y-5 p-4 sm:p-6 animate-fade-in">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-2">
           <FileWarning className="mt-1 h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
@@ -218,8 +293,8 @@ export default function Excepciones() {
         ].map((item) => (
           <div
             key={item.label}
-            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4 shadow-[var(--g-shadow-card)]"
+            style={{ borderRadius: "var(--g-radius-lg)" }}
           >
             <div className="text-2xl font-bold text-[var(--g-text-primary)]">{item.value}</div>
             <div className="text-sm font-semibold text-[var(--g-text-primary)]">{item.label}</div>
@@ -229,8 +304,8 @@ export default function Excepciones() {
       </section>
 
       <section
-        className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4 shadow-[var(--g-shadow-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)" }}
         aria-labelledby="grc-exception-filters"
       >
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -291,13 +366,18 @@ export default function Excepciones() {
           Lista operativa
         </div>
         {filteredExceptions.map((exception) => (
-          <ExceptionCard key={exception.id} exception={exception} />
+          <ExceptionCard 
+            key={exception.id} 
+            exception={exception} 
+            isSelected={selectedException?.id === exception.id}
+            onSelect={() => setSelectedId(exception.id)}
+          />
         ))}
       </section>
 
       <div
-        className="hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)] lg:block"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        className="hidden border border-[var(--g-border-default)] bg-[var(--g-surface-card)] lg:block shadow-[var(--g-shadow-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)" }}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px]">
@@ -314,69 +394,221 @@ export default function Excepciones() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
-              {filteredExceptions.map((exception) => (
-                <tr
-                  key={exception.id}
-                  className="transition-colors hover:bg-[var(--g-surface-subtle)]/50"
-                >
-                  <td className="px-5 py-3 font-mono text-xs text-[var(--g-text-secondary)]">
-                    {exception.code}
-                  </td>
-                  <td className="px-5 py-3 text-sm">
-                    {exception.obligations ? (
-                      <div className="max-w-[360px]">
-                        <div className="font-medium text-[var(--g-text-primary)]">
-                          {exception.obligations.code}
-                        </div>
-                        <div className="truncate text-xs text-[var(--g-text-secondary)]">
-                          {exception.obligations.title}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-[var(--g-text-secondary)]">Sin obligación vinculada</span>
+              {filteredExceptions.map((exception) => {
+                const isSelected = selectedException?.id === exception.id;
+                return (
+                  <tr
+                    key={exception.id}
+                    onClick={() => setSelectedId(exception.id)}
+                    className={cn(
+                      "cursor-pointer transition-colors duration-150",
+                      isSelected 
+                        ? "bg-[var(--g-surface-subtle)]/70 font-semibold" 
+                        : "hover:bg-[var(--g-surface-subtle)]/30"
                     )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${exceptionStatusChip(exception.status)}`}
-                      style={{ borderRadius: "var(--g-radius-full)" }}
-                    >
-                      {exception.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
-                    {formatDate(exception.requested_at)}
-                  </td>
-                  <td className={`px-5 py-3 text-sm font-medium ${expiryTone(exception.expires_at)}`}>
-                    {formatDate(exception.expires_at)}
-                  </td>
-                </tr>
-              ))}
+                  >
+                    <td className="px-5 py-3 font-mono text-xs text-[var(--g-text-secondary)]">
+                      {exception.code}
+                    </td>
+                    <td className="px-5 py-3 text-sm">
+                      {exception.obligations ? (
+                        <div className="max-w-[360px]">
+                          <div className="font-medium text-[var(--g-text-primary)]">
+                            {exception.obligations.code}
+                          </div>
+                          <div className="truncate text-xs text-[var(--g-text-secondary)]">
+                            {exception.obligations.title}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[var(--g-text-secondary)]">Sin obligación vinculada</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${exceptionStatusChip(exception.status)}`}
+                        style={{ borderRadius: "var(--g-radius-full)" }}
+                      >
+                        {exception.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
+                      {formatDate(exception.requested_at)}
+                    </td>
+                    <td className={`px-5 py-3 text-sm font-medium ${expiryTone(exception.expires_at)}`}>
+                      {formatDate(exception.expires_at)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {selectedException && (
-          <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-page)] px-5 py-4">
-            <div className="mb-2 text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
-              Detalle operativo · {selectedException.code}
-            </div>
-            <p className="mb-2 text-sm leading-relaxed text-[var(--g-text-secondary)]">
-              {selectedException.justification ?? "Sin justificación informada."}
-            </p>
-            {selectedException.compensatory_controls && (
-              <>
-                <div className="mb-1 text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
-                  Controles compensatorios
+          <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-page)] px-5 py-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Operational Detail (col-span-2) */}
+              <div className="lg:col-span-2 space-y-4">
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                    Detalle operativo · {selectedException.code}
+                  </div>
+                  <p className="text-sm leading-relaxed text-[var(--g-text-primary)]">
+                    {selectedException.justification ?? "Sin justificación informada."}
+                  </p>
                 </div>
-                <p className="text-sm leading-relaxed text-[var(--g-text-secondary)]">
-                  {selectedException.compensatory_controls}
-                </p>
-              </>
-            )}
+                
+                {selectedException.compensatory_controls && (
+                  <div>
+                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Controles compensatorios
+                    </div>
+                    <p className="text-sm leading-relaxed text-[var(--g-text-primary)]">
+                      {selectedException.compensatory_controls}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Escalation Control (col-span-1) */}
+              <div className="col-span-1 border-t lg:border-t-0 lg:border-l border-[var(--g-border-subtle)] pt-4 lg:pt-0 lg:pl-6 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+                    Escalado Societario
+                  </div>
+                  <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
+                    Si esta excepción tiene carácter material o representa un riesgo de cumplimiento grave, propóngala para el Orden del Día de Secretaría Societaria.
+                  </p>
+                </div>
+
+                {activeEscalation ? (
+                  <div className="p-3 border border-[var(--status-warning)]/30 bg-[var(--g-surface-subtle)] rounded-md space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--g-text-primary)]">
+                      <AlertCircle className="h-4 w-4 text-[var(--status-warning)]" />
+                      Propuesta en Trámite
+                    </div>
+                    <div className="text-[10px] text-[var(--g-text-secondary)] leading-relaxed">
+                      <div><strong>Destinatario:</strong> {activeEscalation.payload?.organ || "CdA"}</div>
+                      <div><strong>Asunto:</strong> {activeEscalation.payload?.matter}</div>
+                    </div>
+                    <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold bg-[var(--status-warning)]/20 text-[var(--status-warning)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                      PROPOSED
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleOpenEscalation}
+                    className="w-full flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] py-2 px-3 text-xs font-semibold hover:bg-[var(--g-sec-700)] transition-colors duration-150"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <Route className="h-3.5 w-3.5" />
+                    Proponer a Secretaría
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* ============================================================ */}
+      {/* Drawer / Modal: Escalado de Excepción                        */}
+      {/* ============================================================ */}
+      {showEscalationModal && selectedException && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div 
+            className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg overflow-hidden"
+            style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
+          >
+            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between bg-[var(--g-surface-subtle)]">
+              <div className="flex items-center gap-2">
+                <Route className="h-5 w-5 text-[var(--g-brand-3308)]" />
+                <h3 className="text-base font-bold text-[var(--g-text-primary)]">
+                  Proponer a Secretaría Societaria
+                </h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowEscalationModal(false)}
+                className="text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)] text-lg"
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={handleEscalateSubmit} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label htmlFor="escalate-organ" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
+                  Órgano de Destino
+                </label>
+                <select
+                  id="escalate-organ"
+                  value={escalateCommittee}
+                  onChange={(e) => setEscalateCommittee(e.target.value)}
+                  className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <option value="CDA">Consejo de Administración (ARGA Seguros S.A.)</option>
+                  <option value="COMITE_EJECUTIVO">Comité Ejecutivo Delegado</option>
+                  <option value="AUDITORIA">Comisión de Auditoría y Cumplimiento</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="escalate-matter" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
+                  Asunto Propuesto
+                </label>
+                <input
+                  id="escalate-matter"
+                  type="text"
+                  required
+                  value={escalateMatter}
+                  onChange={(e) => setEscalateMatter(e.target.value)}
+                  className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="escalate-rationale" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
+                  Justificación de la Desviación y Controles
+                </label>
+                <textarea
+                  id="escalate-rationale"
+                  required
+                  rows={4}
+                  value={escalateRationale}
+                  onChange={(e) => setEscalateRationale(e.target.value)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] resize-none"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEscalationModal(false)}
+                  className="flex-1 h-10 border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-semibold transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Proponer Punto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

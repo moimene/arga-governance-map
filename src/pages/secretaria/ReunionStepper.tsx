@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -113,6 +114,7 @@ import {
   meetingCensusSourceForBodyType,
   selectVotingCapitalHoldings,
 } from "@/lib/secretaria/meeting-census";
+import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
@@ -3502,7 +3504,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
   const isUniversalMeeting = isUniversalMeetingQuorumData(meetingQuorumData);
   const meetingBodyForUniversal = (meeting as
-    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | { governing_bodies?: { name?: string | null; body_type?: string | null; config?: Record<string, unknown> | null } | null }
     | null
     | undefined
   )?.governing_bodies;
@@ -3670,6 +3672,11 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         Revisa las resoluciones y sus expedientes Acuerdo 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
         acta en borrador mediante el proceso interno de Secretaría.
       </p>
+
+      <BookDestinationNotice
+        body={meetingBodyForUniversal}
+        adoptionLabel={isUniversalMeeting ? meetingUniversalLabel.toLowerCase() : "acta de sesion"}
+      />
 
       {isUniversalMeeting ? (
         <div
@@ -4361,9 +4368,11 @@ function UniversalMeetingIntake() {
 
 function ReunionIntake() {
   const [searchParams] = useSearchParams();
-  const source = searchParams.get("source");
-  const event = searchParams.get("event") ?? searchParams.get("handoff");
-  const sourceId = searchParams.get("source_id") ?? searchParams.get("ai_incident");
+  // Contrato de handoff compartido (ver cross-module-handoff.ts): preserva el contexto
+  // completo de la propuesta (órgano/asunto/justificación) emitido por GRC/AIMS.
+  const { source, event, sourceId, organ, matter, rationale, isCrossModule } = readMeetingHandoff(
+    (key) => searchParams.get(key),
+  );
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const scopedConvocatoriasPath = scopedEntityId
@@ -4375,7 +4384,6 @@ function ReunionIntake() {
   const scopedJuntaUniversalPath = scopedEntityId
     ? `/secretaria/reuniones/nueva?flow=junta-universal&scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
     : "/secretaria/reuniones/nueva?flow=junta-universal";
-  const isCrossModule = source === "grc" || source === "aims";
   const sourceLabel = source === "grc" ? "GRC Compass" : source === "aims" ? "AIMS 360" : "Secretaría";
 
   return (
@@ -4421,6 +4429,28 @@ function ReunionIntake() {
                   . Secretaría decide si lo incorpora a una convocatoria, orden del día o expediente. No se escriben
                   `governance_module_events`, `governance_module_links`, reuniones, acuerdos ni actas desde este intake.
                 </p>
+                {(organ || matter || rationale) ? (
+                  <dl className="mt-3 space-y-1.5 border-t border-[var(--g-border-subtle)] pt-3 text-sm">
+                    {organ ? (
+                      <div className="flex gap-2">
+                        <dt className="shrink-0 font-medium text-[var(--g-text-secondary)]">Órgano propuesto:</dt>
+                        <dd className="text-[var(--g-text-primary)]">{organ}</dd>
+                      </div>
+                    ) : null}
+                    {matter ? (
+                      <div className="flex gap-2">
+                        <dt className="shrink-0 font-medium text-[var(--g-text-secondary)]">Asunto propuesto:</dt>
+                        <dd className="text-[var(--g-text-primary)]">{matter}</dd>
+                      </div>
+                    ) : null}
+                    {rationale ? (
+                      <div className="flex gap-2">
+                        <dt className="shrink-0 font-medium text-[var(--g-text-secondary)]">Justificación:</dt>
+                        <dd className="text-[var(--g-text-primary)]">{rationale}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
               </div>
             </div>
           </section>

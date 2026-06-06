@@ -119,3 +119,25 @@ export function useCreateAssessment() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] }),
   });
 }
+
+export function useCreateComplianceChecks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<AiComplianceCheck>[]) => {
+      const { data, error } = await supabase
+        .from("ai_compliance_checks")
+        .insert(payload)
+        .select();
+      if (error) throw error;
+      return data as AiComplianceCheck[];
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["ai_compliance_checks"] });
+      const systemId = variables[0]?.system_id;
+      if (systemId) {
+        qc.invalidateQueries({ queryKey: ["ai_compliance_checks", systemId] });
+      }
+    },
+  });
+}
+

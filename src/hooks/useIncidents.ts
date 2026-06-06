@@ -30,6 +30,7 @@ export type IncidentWithJoins = {
   root_cause: string | null;
   lessons_learned: string | null;
   regulatory_notification_required: boolean | null;
+  payload: any | null;
   obligations?: { code?: string | null; title?: string | null } | null;
   regulatory_notifications?: RegulatoryNotificationLite[] | null;
 };
@@ -43,7 +44,7 @@ export function useIncidents(incidentType?: string, filters?: { entityId?: strin
       let q = supabase
         .from("incidents")
         .select(
-          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
+          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, payload, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
         )
         .eq("tenant_id", tenantId!)
         .order("detection_date", { ascending: false });
@@ -70,7 +71,7 @@ export function useIncident(id?: string) {
       const { data, error } = await supabase
         .from("incidents")
         .select(
-          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
+          "id, code, title, description, severity, incident_type, is_major_incident, status, country_code, detection_date, containment_date, resolution_date, entity_id, obligation_id, root_cause, lessons_learned, regulatory_notification_required, payload, obligations:obligation_id(code, title), regulatory_notifications(id, authority, status, notification_deadline, notification_type, submitted_at, reference_number)"
         )
         .eq("id", id!)
         .maybeSingle();
@@ -95,6 +96,7 @@ export function useCreateIncident() {
       detection_date: string;
       regulatory_notification_required: boolean;
       entity_id?: string | null;
+      payload?: any | null;
     }) => {
       const { data, error } = await supabase
         .from("incidents")
