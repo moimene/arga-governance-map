@@ -113,6 +113,7 @@ import {
   meetingCensusSourceForBodyType,
   selectVotingCapitalHoldings,
 } from "@/lib/secretaria/meeting-census";
+import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
 // ── Tipos locales ────────────────────────────────────────────────────────────
@@ -3502,7 +3503,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
   const isUniversalMeeting = isUniversalMeetingQuorumData(meetingQuorumData);
   const meetingBodyForUniversal = (meeting as
-    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | { governing_bodies?: { name?: string | null; body_type?: string | null; config?: Record<string, unknown> | null } | null }
     | null
     | undefined
   )?.governing_bodies;
@@ -3670,6 +3671,11 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         Revisa las resoluciones y sus expedientes Acuerdo 360 vinculados antes de confirmar el cierre. Al confirmar, se generará el
         acta en borrador mediante el proceso interno de Secretaría.
       </p>
+
+      <BookDestinationNotice
+        body={meetingBodyForUniversal}
+        adoptionLabel={isUniversalMeeting ? meetingUniversalLabel.toLowerCase() : "acta de sesion"}
+      />
 
       {isUniversalMeeting ? (
         <div

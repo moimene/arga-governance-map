@@ -11,6 +11,7 @@ import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
 import { useCreateUnipersonalDecision } from "@/hooks/useDecisionesUnipers";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
+import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 
 type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
 
@@ -107,6 +108,11 @@ function TipoMateriaStep({
           ))}
         </div>
       </div>
+
+      <BookDestinationNotice
+        bookKind={tipo === "SOCIO_UNICO" ? "LIBRO_CONTRATOS_SOCIO_UNICO" : "LIBRO_ACTAS"}
+        adoptionLabel={tipo === "SOCIO_UNICO" ? "decision del socio unico" : "decision del administrador unico"}
+      />
 
       <div className="space-y-1">
         <label className="text-xs font-medium text-[var(--g-text-primary)]">

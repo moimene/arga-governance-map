@@ -679,3 +679,46 @@ export function buildAimsReadiness({
     ],
   };
 }
+
+export function filterSystemsByScope<T extends { name: string; description?: string | null }>(
+  systems: T[],
+  scope: string
+): T[] {
+  if (scope === "Grupo ARGA (Global)") {
+    return systems;
+  }
+  if (scope === "España" || scope === "Europa") {
+    return systems.filter((s) => {
+      const nameLower = s.name.toLowerCase();
+      const descLower = (s.description ?? "").toLowerCase();
+      return (
+        nameLower.includes("auto") ||
+        nameLower.includes("siniestros") ||
+        nameLower.includes("salud") ||
+        nameLower.includes("fraude") ||
+        nameLower.includes("motor") ||
+        descLower.includes("auto") ||
+        descLower.includes("siniestros") ||
+        descLower.includes("salud") ||
+        descLower.includes("fraude") ||
+        descLower.includes("motor")
+      );
+    });
+  }
+  if (scope === "LATAM" || scope === "Brasil" || scope === "México") {
+    return systems.filter((s) => {
+      const nameLower = s.name.toLowerCase();
+      const descLower = (s.description ?? "").toLowerCase();
+      return (
+        nameLower.includes("suscripción") ||
+        nameLower.includes("suscripcion") ||
+        nameLower.includes("patrimonial") ||
+        descLower.includes("suscripción") ||
+        descLower.includes("suscripcion") ||
+        descLower.includes("patrimonial")
+      );
+    });
+  }
+  return [];
+}
+

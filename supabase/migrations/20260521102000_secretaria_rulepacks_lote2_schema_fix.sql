@@ -168,6 +168,11 @@ RETURNS jsonb
 LANGUAGE sql
 IMMUTABLE
 AS $$
+  -- Push-fix 2026-06-06: COERCIÓN A OBJETO. El payload real de algún pack puede tener
+  -- estos contenedores como array u otro tipo (p.ej. SOCIEDAD_UNIPERSONAL.convocatoria.canales
+  -- era un array), y `COALESCE(..., '{}')` conservaba ese array; el `jsonb_set` posterior con
+  -- clave string ('SA'/'SL') sobre un array lanzaba 22P02 ("path element ... is not an integer").
+  -- Si el contenedor no es un objeto, se normaliza a '{}' antes de fijar las claves SA/SL.
   SELECT jsonb_set(
     jsonb_set(
       jsonb_set(
@@ -179,39 +184,39 @@ AS $$
                   jsonb_set(
                     p_payload,
                     '{convocatoria}',
-                    COALESCE(p_payload -> 'convocatoria', '{}'::jsonb),
+                    CASE WHEN jsonb_typeof(p_payload -> 'convocatoria') = 'object' THEN p_payload -> 'convocatoria' ELSE '{}'::jsonb END,
                     true
                   ),
                   '{convocatoria,antelacionDias}',
-                  COALESCE(p_payload #> '{convocatoria,antelacionDias}', '{}'::jsonb),
+                  CASE WHEN jsonb_typeof(p_payload #> '{convocatoria,antelacionDias}') = 'object' THEN p_payload #> '{convocatoria,antelacionDias}' ELSE '{}'::jsonb END,
                   true
                 ),
                 '{convocatoria,canales}',
-                COALESCE(p_payload #> '{convocatoria,canales}', '{}'::jsonb),
+                CASE WHEN jsonb_typeof(p_payload #> '{convocatoria,canales}') = 'object' THEN p_payload #> '{convocatoria,canales}' ELSE '{}'::jsonb END,
                 true
               ),
               '{constitucion}',
-              COALESCE(p_payload -> 'constitucion', '{}'::jsonb),
+              CASE WHEN jsonb_typeof(p_payload -> 'constitucion') = 'object' THEN p_payload -> 'constitucion' ELSE '{}'::jsonb END,
               true
             ),
             '{constitucion,quorum}',
-            COALESCE(p_payload #> '{constitucion,quorum}', '{}'::jsonb),
+            CASE WHEN jsonb_typeof(p_payload #> '{constitucion,quorum}') = 'object' THEN p_payload #> '{constitucion,quorum}' ELSE '{}'::jsonb END,
             true
           ),
           '{votacion}',
-          COALESCE(p_payload -> 'votacion', '{}'::jsonb),
+          CASE WHEN jsonb_typeof(p_payload -> 'votacion') = 'object' THEN p_payload -> 'votacion' ELSE '{}'::jsonb END,
           true
         ),
         '{votacion,mayoria}',
-        COALESCE(p_payload #> '{votacion,mayoria}', '{}'::jsonb),
+        CASE WHEN jsonb_typeof(p_payload #> '{votacion,mayoria}') = 'object' THEN p_payload #> '{votacion,mayoria}' ELSE '{}'::jsonb END,
         true
       ),
       '{documentacion}',
-      COALESCE(p_payload -> 'documentacion', '{}'::jsonb),
+      CASE WHEN jsonb_typeof(p_payload -> 'documentacion') = 'object' THEN p_payload -> 'documentacion' ELSE '{}'::jsonb END,
       true
     ),
     '{postAcuerdo}',
-    COALESCE(p_payload -> 'postAcuerdo', '{}'::jsonb),
+    CASE WHEN jsonb_typeof(p_payload -> 'postAcuerdo') = 'object' THEN p_payload -> 'postAcuerdo' ELSE '{}'::jsonb END,
     true
   );
 $$;

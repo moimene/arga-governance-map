@@ -12,8 +12,8 @@ import {
   Filter,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAssignTemplateBinding } from "@/hooks/useNormativeGovernance";
 import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
@@ -41,6 +41,14 @@ const ESTADO_LABEL = {
   APROBADA: "Aprobada",
   ACTIVA: "Activa",
   ARCHIVADA: "Archivada",
+};
+
+const ESTADO_SORT_RANK: Record<string, number> = {
+  ACTIVA: 0,
+  APROBADA: 1,
+  REVISADA: 2,
+  BORRADOR: 3,
+  ARCHIVADA: 4,
 };
 
 const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; icon: LucideIcon }> = {
@@ -137,8 +145,43 @@ function estadoLabel(value?: string | null) {
   return ESTADO_LABEL[value as keyof typeof ESTADO_LABEL] ?? value.replace(/_/g, " ");
 }
 
+function templateEngineSort(a: PlantillaProtegidaRow, b: PlantillaProtegidaRow) {
+  const rankA = ESTADO_SORT_RANK[a.estado] ?? 99;
+  const rankB = ESTADO_SORT_RANK[b.estado] ?? 99;
+  return (
+    rankA - rankB ||
+    String(b.version).localeCompare(String(a.version), "es", { numeric: true }) ||
+    tipoLabel(a.tipo).localeCompare(tipoLabel(b.tipo), "es")
+  );
+}
+
 function materiaLabel(value?: string | null) {
   return value ? value.replace(/_/g, " ") : "—";
+}
+
+function adoptionModeLabel(value?: string | null) {
+  if (!value) return "Cualquier forma de adopción";
+  const labels: Record<string, string> = {
+    MEETING: "Sesión formal",
+    UNIVERSAL: "Junta universal",
+    NO_SESSION: "Acuerdo sin sesión",
+    UNIPERSONAL_SOCIO: "Decisión de socio único",
+    UNIPERSONAL_ADMIN: "Decisión de administrador único",
+    CO_APROBACION: "Decisión mancomunada",
+    SOLIDARIO: "Administrador solidario",
+    ANY: "Cualquier forma de adopción",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
+}
+
+function organoTipoLabel(value?: string | null) {
+  if (!value) return "Cualquier órgano";
+  const labels: Record<string, string> = {
+    JUNTA_GENERAL: "Junta General",
+    CONSEJO: "Consejo de Administración",
+    ANY: "Cualquier órgano",
+  };
+  return labels[value] ?? value.replace(/_/g, " ");
 }
 
 function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdiction?: string | null) {
@@ -153,6 +196,7 @@ function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdi
 
 export default function Plantillas() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
   const { data, isLoading } = usePlantillasProtegidas();
   const updateEstado = useUpdateEstadoPlantilla();
@@ -160,8 +204,13 @@ export default function Plantillas() {
   const { primaryRole } = useCurrentUserRole();
   const normativeRole = normativeRoleFromAppRole(primaryRole);
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
-  const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>('proceso');
-  const [filterMateria, setFilterMateria] = useState<string>('');
+  const initialMateriaFilter = searchParams.get("materia") ?? "";
+  const initialTipoFilter = searchParams.get("tipo") ?? "";
+  const materiaFilterParam = searchParams.get("materia") ?? "";
+  const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>(() =>
+    initialMateriaFilter || initialTipoFilter.toUpperCase().includes("MODELO") ? "modelos" : "proceso",
+  );
+  const [filterMateria, setFilterMateria] = useState<string>(initialMateriaFilter);
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
@@ -234,8 +283,14 @@ export default function Plantillas() {
     );
   };
 
-  const procesoDatos = scopedData.filter((p) => p.tipo !== 'MODELO_ACUERDO');
-  const modelosDatos = scopedData.filter((p) => p.tipo === 'MODELO_ACUERDO');
+  const procesoDatos = useMemo(
+    () => scopedData.filter((p) => p.tipo !== 'MODELO_ACUERDO'),
+    [scopedData],
+  );
+  const modelosDatos = useMemo(
+    () => scopedData.filter((p) => p.tipo === 'MODELO_ACUERDO'),
+    [scopedData],
+  );
   const materiaOptionsByGroup = useMemo(() => {
     const materias = new Set<string>(MATERIAS_ACUERDO);
     for (const plantilla of modelosDatos) {
@@ -263,9 +318,30 @@ export default function Plantillas() {
     };
   });
 
-  const filteredData = activeTab === 'modelos' && filterMateria
-    ? displayData.filter((p) => p.materia_acuerdo === filterMateria)
-    : displayData;
+  const filteredData = useMemo(
+    () => {
+      const rows = activeTab === 'modelos' && filterMateria
+        ? displayData.filter((p) => (p.materia_acuerdo ?? p.materia) === filterMateria)
+        : displayData;
+      return [...rows].sort(templateEngineSort);
+    },
+    [activeTab, displayData, filterMateria],
+  );
+
+  useEffect(() => {
+    const materia = materiaFilterParam;
+    if (!materia) return;
+    setActiveTab("modelos");
+    setFilterMateria(materia);
+    setSelected(null);
+  }, [materiaFilterParam]);
+
+  useEffect(() => {
+    setSelected((current) => {
+      if (current && filteredData.some((plantilla) => plantilla.id === current.id)) return current;
+      return filteredData[0] ?? null;
+    });
+  }, [filteredData]);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -283,6 +359,16 @@ export default function Plantillas() {
             ? `Biblioteca documental filtrada por jurisdicción ${jurisdictionLabel(selectedJurisdiction)}. Las plantillas alimentan documentos demo/operativos o sirven de referencia del proceso; no crean expedientes por sí solas.`
             : "Ciclo de vida: Borrador → Revisada → Aprobada → Activa → Archivada"}
         </p>
+        <div
+          className="mt-3 inline-flex max-w-4xl items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--g-brand-3308)]" aria-hidden="true" />
+          <span>
+            Configuración del motor: cada plantilla activa alimenta Gate PRE, variables automáticas,
+            campos editables y bindings materia × órgano × tipo social × forma de adopción.
+          </span>
+        </div>
       </div>
 
       {isSociedadMode && selectedEntity ? (
@@ -681,6 +767,42 @@ export default function Plantillas() {
                       {estadoLabel(selected.estado)}
                     </span>
                   </div>
+                </div>
+
+                <div
+                  className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
+                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    Configuración del motor
+                  </div>
+                  <dl className="mt-2 grid grid-cols-1 gap-2 text-xs text-[var(--g-text-secondary)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="font-medium text-[var(--g-text-primary)]">Binding</dt>
+                      <dd className="text-right">
+                        {materiaLabel(selected.materia_acuerdo ?? selected.materia)} · {organoTipoLabel(selected.organo_tipo)}
+                      </dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="font-medium text-[var(--g-text-primary)]">Adopción</dt>
+                      <dd className="text-right">{adoptionModeLabel(selected.adoption_mode)}</dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="font-medium text-[var(--g-text-primary)]">Gate PRE</dt>
+                      <dd className="text-right">
+                        {selected.snapshot_rule_pack_required
+                          ? "Exige snapshot de rule pack"
+                          : "Sin snapshot obligatorio configurado"}
+                      </dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="font-medium text-[var(--g-text-primary)]">Contrato variables</dt>
+                      <dd className="text-right">
+                        {selected.contrato_variables_version ?? "No informado"}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
 
                 {/* Referencia Legal */}

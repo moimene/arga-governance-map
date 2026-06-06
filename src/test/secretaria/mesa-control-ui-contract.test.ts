@@ -41,16 +41,25 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(wizard).not.toContain("sin escritura Cloud");
   });
 
-  it("la ficha de materia habla de capas jurídicas y documentos", () => {
+  it("la ficha de materia funciona como workspace del motor de reglas", () => {
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
 
+    expect(catalogo).toContain("Workspace de configuración del motor");
+    expect(catalogo).toContain("Cadena de decisión del motor");
+    expect(catalogo).toContain("Materia");
+    expect(catalogo).toContain("Regla efectiva");
+    expect(catalogo).toContain("Plantillas vinculadas");
+    expect(catalogo).toContain("Preflight");
+    expect(catalogo).toContain("Resultado del motor");
     expect(catalogo).toContain("Qué exige la ley");
     expect(catalogo).toContain("Qué añaden los estatutos");
     expect(catalogo).toContain("Pactos aplicables");
     expect(catalogo).toContain("Regla efectiva para esta sociedad");
-    expect(catalogo).toContain("Documentos asociados");
-    expect(catalogo).toContain("Formalización posterior");
-    expect(catalogo).toContain("No se puede iniciar expediente porque falta plantilla");
+    expect(catalogo).toContain("Configuración del motor de reglas");
+    expect(catalogo).toContain("Ver plantillas vinculadas");
+    expect(catalogo).toContain("Plantillas vinculadas al motor");
+    expect(catalogo).toContain("Simular preflight del motor");
+    expect(catalogo).toContain("Iniciar expediente bloqueado");
     expect(catalogo).toContain("Asignar plantilla");
   });
 
@@ -129,6 +138,10 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     const plantillas = read("src/pages/secretaria/Plantillas.tsx");
 
     expect(plantillas).toContain("useAssignTemplateBinding");
+    expect(plantillas).toContain("useSearchParams");
+    expect(plantillas).toContain("(p.materia_acuerdo ?? p.materia) === filterMateria");
+    expect(plantillas).toContain("templateEngineSort");
+    expect(plantillas).toContain("Configuración del motor");
     expect(plantillas).toContain("Vincular como plantilla activa");
     expect(plantillas).toContain("templateSelectionReason");
     expect(plantillas).toContain("Plantilla vinculada a la regla efectiva");

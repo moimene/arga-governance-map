@@ -37,6 +37,9 @@ dist-ssr
 .claude-flow/logs/
 .claude-flow/sessions/
 
+# Serena (codebase indexing tool — local cache, no committable)
+.serena/
+
 # Environment variables
 .env
 

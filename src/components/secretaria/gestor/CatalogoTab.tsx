@@ -527,8 +527,12 @@ function PlantillaDetailPanel({
           readOnlyReason={editorReadOnlyReason}
         />
 
-        <SectionToggle title="Gate PRE — Configuración" icon={Shield}>
+        <SectionToggle title="Gate PRE — Configuración" icon={Shield} defaultOpen>
           <div className="space-y-2 text-xs text-[var(--g-text-secondary)]">
+            <p>
+              Esta configuración determina si el motor puede usar la plantilla en el
+              preflight documental de una materia.
+            </p>
             <div className="flex items-center gap-2">
               <span className="font-medium text-[var(--g-text-primary)]">Snapshot requerido:</span>
               {plantilla.snapshot_rule_pack_required ? (
@@ -766,8 +770,8 @@ export function CatalogoTab() {
                     aria-pressed={isSelected}
                     className={`w-full px-5 py-3.5 text-left transition-colors ${
                       isSelected
-                        ? "bg-[var(--g-sec-100)] border-l-[3px] border-l-[var(--g-brand-3308)]"
-                        : "hover:bg-[var(--g-surface-subtle)]/50 border-l-[3px] border-l-transparent"
+                        ? "bg-[var(--g-sec-100)] ring-2 ring-inset ring-[var(--g-brand-3308)]"
+                        : "hover:bg-[var(--g-surface-subtle)]/50"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">

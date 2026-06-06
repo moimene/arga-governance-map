@@ -1,0 +1,55 @@
+name: Validate Fase 1 rule packs
+
+on:
+  pull_request:
+    paths:
+      - "docs/superpowers/specs/2026-05-20-fase1/**"
+      - "scripts/extract-fase1-rulepacks.mjs"
+      - "scripts/validate-fase1-manifest.mjs"
+      - "scripts/lint-fase1-gates.mjs"
+      - "package.json"
+      - ".github/workflows/validate-fase1-rulepacks.yml"
+  workflow_dispatch: {}
+
+jobs:
+  validate-fase1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Guard environment only
+        run: node scripts/extract-fase1-rulepacks.mjs --check-env-only
+
+      - name: Rebuild Fase 1 artefacts read-only
+        run: node scripts/extract-fase1-rulepacks.mjs --read-only --out tmp/fase1-current
+
+      - name: Verify manifest counts and hashes
+        run: |
+          node scripts/validate-fase1-manifest.mjs \
+            --manifest docs/superpowers/specs/2026-05-20-fase1/fase1_manifest.json \
+            --actual-dir tmp/fase1-current
+
+      - name: Lint gate classifications
+        run: node scripts/lint-fase1-gates.mjs --dir tmp/fase1-current
+
+      - name: Upload rule packs monitor snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: rulepacks-monitor-${{ github.run_id }}
+          path: tmp/fase1-current/rulepacks_monitor.csv
+          retention-days: 30
+
+      - name: Upload rebuilt artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase1-current-${{ github.run_id }}
+          path: tmp/fase1-current
+          retention-days: 7

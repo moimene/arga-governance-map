@@ -103,8 +103,8 @@ describe("F4.G10 — bundle code-splitting (vendor chunks)", () => {
 
 describe("F4.G12 — E2E destructive CI workflow", () => {
   it("app Supabase client is env-driven with demo fallback", () => {
-    expect(supabaseClient).toMatch(/import\.meta\.env\.VITE_SUPABASE_URL\s*\|\|\s*DEMO_SUPABASE_URL/);
-    expect(supabaseClient).toMatch(/import\.meta\.env\.VITE_SUPABASE_ANON_KEY\s*\|\|\s*DEMO_SUPABASE_ANON_KEY/);
+    expect(supabaseClient).toMatch(/(import\.meta\.env\.VITE_SUPABASE_URL|viteEnv\.VITE_SUPABASE_URL)\s*\|\|\s*DEMO_SUPABASE_URL/);
+    expect(supabaseClient).toMatch(/(import\.meta\.env\.VITE_SUPABASE_ANON_KEY|viteEnv\.VITE_SUPABASE_ANON_KEY)\s*\|\|\s*DEMO_SUPABASE_ANON_KEY/);
     expect(supabaseClient).toMatch(/https:\/\/hzqwefkwsxopwrmtksbg\.supabase\.co/);
   });
 

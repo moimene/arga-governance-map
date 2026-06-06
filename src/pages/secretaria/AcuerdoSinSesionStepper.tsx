@@ -19,6 +19,7 @@ import {
 import { evaluarMayoria } from "@/lib/rules-engine/majority-evaluator";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
+import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
@@ -579,6 +580,11 @@ export default function AcuerdoSinSesionStepper() {
               {/* Tipo de acuerdo */}
               {selectedBodyId && (
                 <>
+                  <BookDestinationNotice
+                    body={selectedBody}
+                    adoptionLabel="acuerdo sin sesion"
+                  />
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-[var(--g-text-primary)]">Clase de materia</label>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">

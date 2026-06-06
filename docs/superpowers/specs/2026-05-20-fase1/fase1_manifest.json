@@ -1,0 +1,104 @@
+{
+  "generated_at": "2026-05-21T05:48:07.243Z",
+  "target_project_ref": "hzqwefkwsxopwrmtksbg",
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "mode": "read-only",
+  "source": "PostgREST authenticated demo session",
+  "content_range": "0-43/44",
+  "environment": {
+    "supabase_url": "https://hzqwefkwsxopwrmtksbg.supabase.co",
+    "expected_project_ref": "hzqwefkwsxopwrmtksbg",
+    "anon_key_ref": "hzqwefkwsxopwrmtksbg",
+    "rest_header_project_ref": "hzqwefkwsxopwrmtksbg"
+  },
+  "counts": {
+    "active_rule_pack_versions": 44,
+    "rulepacks_activos": 44,
+    "materias": 43,
+    "organos": 4,
+    "payloads_incompletos": 23,
+    "lsc_base_rows": 203,
+    "lsc_rows": 203,
+    "divergencias": 74,
+    "divergencias_total": 74,
+    "probable_error_rule_pack": 20,
+    "patch_plan_equivalencias_a_la_baja": 0,
+    "payloads_incompletos_checklist_items": 47,
+    "duplicados": 0
+  },
+  "artefacts": [
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/rulepacks_vigentes_extraccion.jsonl",
+      "sha256": "fd1edae295660ca1ac27ec4afa85bfc2b5409374109f02265e1f0d88198f648e",
+      "bytes": 86600
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/rulepacks_vigentes_normalizado.csv",
+      "sha256": "6b4f48b249d1931c41a9ecd3d74413e9aa182c36e555deda832dc198e4c6951b",
+      "bytes": 17134
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/lsc_base_gate_tipo_social.csv",
+      "sha256": "66897c9bdf4daf5506a838644563da13489b879e07d4f92b25ab939956475134",
+      "bytes": 22417
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/divergencias_gate_tipo_social.csv",
+      "sha256": "02eed867cd3218bbfc629a143af803f132c5ae3ceff464a93959f82064804e53",
+      "bytes": 17468
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/patch_plan_probable_error_rule_pack.csv",
+      "sha256": "09293687cab586902ad1328d4dfeb85fe8e709810867515b430dfd69088e58ae",
+      "bytes": 12739
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/patch_plan_equivalencias_a_la_baja.csv",
+      "sha256": "54bed9b9c6aea4d3741b64861ab0125cda4ff9f924e0a4e445f1ca3b73e09825",
+      "bytes": 151
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/payloads_incompletos_checklist.csv",
+      "sha256": "10e917c14490712426bb6aaf72dc8703695454c8a719b60d31c06691975f4e12",
+      "bytes": 16774
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/equivalence_review.csv",
+      "sha256": "2acb8e171936796d9b50c88d025272887fa2a504dc991b07add26611dfb4b355",
+      "bytes": 4408
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/duplicados_materia_organo.csv",
+      "sha256": "4740f184482800283426355ac1b5ea041019512ac3600882308ff06c31038d7e",
+      "bytes": 135
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/rulepacks_monitor.csv",
+      "sha256": "560a8ec829ba515c37d2e34c2b0985679ded814162dccf4a068ed3811aa3afe3",
+      "bytes": 6475
+    },
+    {
+      "path": "docs/superpowers/specs/2026-05-20-fase1/dossier_legal_fase1.md",
+      "sha256": "af611b46b7326532e8a917fa2ba5070a23e1b7b15d6daa5acc5b9cb1c0f3c799",
+      "bytes": 3030
+    }
+  ],
+  "guardrails": {
+    "no_writes": true,
+    "abort_unless_environment_match": true,
+    "fail_on_active_duplicates": true
+  },
+  "files": [
+    "rulepacks_vigentes_extraccion.jsonl",
+    "rulepacks_vigentes_normalizado.csv",
+    "lsc_base_gate_tipo_social.csv",
+    "divergencias_gate_tipo_social.csv",
+    "patch_plan_probable_error_rule_pack.csv",
+    "patch_plan_equivalencias_a_la_baja.csv",
+    "payloads_incompletos_checklist.csv",
+    "equivalence_review.csv",
+    "duplicados_materia_organo.csv",
+    "rulepacks_monitor.csv",
+    "dossier_legal_fase1.md"
+  ]
+}

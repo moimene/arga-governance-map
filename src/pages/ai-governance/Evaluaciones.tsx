@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FileWarning, Route, Search, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { useAllAssessments } from "@/hooks/useAiAssessments";
 import { isAimsTechnicalFileGapCandidate } from "@/lib/aims/readiness";
 import { cn } from "@/lib/utils";
@@ -146,14 +146,25 @@ export default function Evaluaciones() {
   return (
     <div className="mx-auto max-w-[1200px] space-y-5 p-4 sm:p-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <ClipboardCheck className="h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
-          <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Evaluaciones de riesgo IA</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <ClipboardCheck className="h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
+            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">Evaluaciones de riesgo IA</h1>
+          </div>
+          <p className="max-w-[72ch] text-sm text-[var(--g-text-secondary)]">
+            Cobertura AI Act e ISO 42001 por sistema, con señal explícita cuando el expediente técnico debe derivarse a GRC.
+          </p>
         </div>
-        <p className="max-w-[72ch] text-sm text-[var(--g-text-secondary)]">
-          Cobertura AI Act e ISO 42001 por sistema, con señal explícita cuando el expediente técnico debe derivarse a GRC.
-        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/ai-governance/evaluaciones/nuevo")}
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-page)] sm:w-auto"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Nueva evaluación
+        </button>
       </div>
 
       {!isLoading && assessments.length > 0 && (

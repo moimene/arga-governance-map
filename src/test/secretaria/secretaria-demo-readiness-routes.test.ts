@@ -17,6 +17,9 @@ describe("Secretaria demo readiness routes", () => {
 
     expect(libros).toContain("function getBookContentRoute");
     expect(libros).toContain("SOCIO_UNICO");
+    expect(libros).toContain("LIBRO_ACTAS_JUNTA_GENERAL");
+    expect(libros).toContain("LIBRO_REGISTRO_SOCIOS");
+    expect(libros).toContain("REGISTRO_COMUNICACIONES_REGULATORIAS");
     expect(libros).not.toContain("Vista no disponible");
   });
 });

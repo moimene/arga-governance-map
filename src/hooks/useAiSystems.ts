@@ -14,6 +14,8 @@ export type AiSystem = {
   status: string;
   description: string | null;
   use_case: string | null;
+  /** Código de referencia AIMS opcional (legacy `ai_systems`). Surfaced by `EvaluacionNueva.tsx`. */
+  aims_reference_code?: string | null;
   created_at: string;
 };
 

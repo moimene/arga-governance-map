@@ -113,6 +113,7 @@ const MyWork = lazy(() => import("@/pages/grc/MyWork"));
 const Alertas = lazy(() => import("@/pages/grc/Alertas"));
 const Excepciones = lazy(() => import("@/pages/grc/Excepciones"));
 const ModuleDashboard = lazy(() => import("@/pages/grc/ModuleDashboard"));
+const TPRM = lazy(() => import("@/pages/grc/TPRM"));
 
 // ── Módulo Garrigues: AI Governance (lazy) ──────────────────────────────────
 const AiLayout = lazy(() =>
@@ -123,6 +124,7 @@ const Sistemas = lazy(() => import("@/pages/ai-governance/Sistemas"));
 const SistemaNuevo = lazy(() => import("@/pages/ai-governance/SistemaNuevo"));
 const SistemaDetalle = lazy(() => import("@/pages/ai-governance/SistemaDetalle"));
 const Evaluaciones = lazy(() => import("@/pages/ai-governance/Evaluaciones"));
+const EvaluacionNueva = lazy(() => import("@/pages/ai-governance/EvaluacionNueva"));
 const AiIncidentes = lazy(() => import("@/pages/ai-governance/Incidentes"));
 const AiIncidenteNuevo = lazy(() => import("@/pages/ai-governance/IncidenteNuevo"));
 
@@ -291,6 +293,7 @@ const App = () => (
                   <Route path="/grc/mywork"               element={<Suspense fallback={<ModuleFallback />}><MyWork /></Suspense>} />
                   <Route path="/grc/alertas"              element={<Suspense fallback={<ModuleFallback />}><Alertas /></Suspense>} />
                   <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
+                  <Route path="/grc/tprm"                 element={<Suspense fallback={<ModuleFallback />}><TPRM /></Suspense>} />
                   <Route path="/grc/m/:moduleId" element={<Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense>}>
                     <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
@@ -312,6 +315,7 @@ const App = () => (
                   <Route path="/ai-governance/sistemas/nuevo" element={<Suspense fallback={<ModuleFallback />}><SistemaNuevo /></Suspense>} />
                   <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
                   <Route path="/ai-governance/evaluaciones" element={<Suspense fallback={<ModuleFallback />}><Evaluaciones /></Suspense>} />
+                  <Route path="/ai-governance/evaluaciones/nuevo" element={<Suspense fallback={<ModuleFallback />}><EvaluacionNueva /></Suspense>} />
                   <Route path="/ai-governance/incidentes"   element={<Suspense fallback={<ModuleFallback />}><AiIncidentes /></Suspense>} />
                   <Route path="/ai-governance/incidentes/nuevo" element={<Suspense fallback={<ModuleFallback />}><AiIncidenteNuevo /></Suspense>} />
                 </Route>
