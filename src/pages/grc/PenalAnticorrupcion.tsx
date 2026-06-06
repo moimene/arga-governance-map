@@ -674,17 +674,23 @@ export default function PenalAnticorrupcion() {
                                   <div className="line-clamp-1"><strong>Audit ID:</strong> {evidence.id}</div>
                                 </div>
                                 <div className="pt-2 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[10px]">
-                                  <span className="text-[var(--g-text-secondary)]">Prueba forense inmutable</span>
-                                  <a
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      toast.info(`EAD Trust Custody ID: ${evidence.id}\nHash: ${evidence.hash_sha512}`);
-                                    }}
-                                    className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
-                                  >
-                                    Verificar QSeal <ExternalLink className="h-3 w-3" />
-                                  </a>
+                                  {isFinalSeal ? (
+                                    <>
+                                      <span className="text-[var(--g-text-secondary)]">Prueba forense inmutable</span>
+                                      <a
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          toast.info(`EAD Trust Custody ID: ${evidence.id}\nHash: ${evidence.hash_sha512}`);
+                                        }}
+                                        className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
+                                      >
+                                        Verificar QSeal <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    </>
+                                  ) : (
+                                    <span className="text-[var(--status-warning)]">Evidencia sandbox de demo — sin custodia QSeal verificable (no es una transacción EAD Trust real).</span>
+                                  )}
                                 </div>
                               </div>
                               );

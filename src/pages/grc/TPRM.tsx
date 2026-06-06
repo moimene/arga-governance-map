@@ -6,7 +6,8 @@ import {
   type ThirdParty 
 } from "@/hooks/useThirdParties";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
-import { useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { useCreateEvidenceBundle, useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
+import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { toast } from "sonner";
 import { 
   Search, ShieldAlert, FileText, CheckCircle2, User, Mail, 
@@ -31,6 +32,9 @@ export default function TPRM() {
   const updateMutation = useUpdateThirdParty();
   const { signMutation } = useQTSPSign();
   const createEvidence = useCreateEvidenceBundle();
+  // Codex final round: el estado "sellado" se deriva de un evidence bundle FINAL real,
+  // no del flag mutable selected.payload.exit_plan_signed (que puede ser stale).
+  const { data: allEvidenceBundles = [] } = useEvidenceBundlesList();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -597,7 +601,7 @@ export default function TPRM() {
                       <span className="text-[10px] text-[var(--g-text-secondary)]">Se guarda automáticamente al modificar el texto.</span>
                     </div>
 
-                    {selected.payload?.exit_plan_signed ? (
+                    {(selected.payload?.exit_plan_signed && allEvidenceBundles.some((b) => b.source_object_id === selected.id && isFinalSealedEvidence(b.status))) ? (
                       <div 
                         className="p-4 border border-[var(--status-success)]/40 bg-[var(--status-success)]/10 space-y-3"
                         style={{ borderRadius: "var(--g-radius-md)" }}

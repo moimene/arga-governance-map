@@ -375,9 +375,17 @@ El bucle adversarial Codex destapó capas sucesivas que se cerraron:
   - `ReunionIntake` usa `readMeetingHandoff` y **surfacea** Órgano/Asunto/Justificación propuestos en el banner read-only.
   - Test de round-trip `src/test/secretaria/cross-module-handoff.test.ts` (6 casos): prueba que `source_id/organ/matter/rationale` sobreviven y bloquea el contrato de claves.
 
-**Gates finales:** `typecheck` verde · `test` **1849 pass / 0 fail** (incluye 6 handoff + 9 gate) · `lint` 15 `any` GRC/AIMS pre-existentes (0 en código nuevo).
+- **Ronda D (sweep de etiquetas residuales):** Codex detectó más superficies que presentaban sandbox/inexistente como final, todas cerradas:
+  - `PenalAnticorrupcion` KPI "Evidencias WORM Selladas" contaba toda evidencia con fallback `|| 4` (mostraba 4 con cero) → ahora cuenta solo `isFinalSealedEvidence` sin fallback; badge accordion "WORM Sealed" gateado (o "SANDBOX" si solo hay OPEN); footer de la tarjeta gateado por `isFinalSeal` (sandbox no ofrece "Verificar QSeal").
+  - `TPRM` panel "PLAN DE SALIDA SELLADO" ahora se deriva de un evidence bundle FINAL real (`useEvidenceBundlesList` + `isFinalSealedEvidence`), no del flag mutable `selected.payload.exit_plan_signed` (que podía ser stale).
 
-**Confirmado por Codex:** `#1` sin escrituras `governance_module_*` y `#2-UI` gating sandbox cerrado.
+**Gates finales:** `typecheck` verde · `test` **1850 pass / 0 fail** (incluye 6 handoff + 10 gate) · `lint` 15 `any` GRC/AIMS pre-existentes (0 en código nuevo).
+
+**Confirmado por Codex:** `#1` sin escrituras `governance_module_*` (en todas las rondas) y `#2-UI` gating sandbox cerrado en todas las superficies UI.
+
+### Hallazgo [critical] derivado → nuevo chip (server-side, fuera del scope de los 2 chips)
+
+La revisión Codex destapó un riesgo **pre-existente** (no introducido por este saneamiento): la RPC `fn_create_governance_evidence_bundle` (SECURITY DEFINER, migración `000045`) confía en `tenant_id`/`source`/`status` del cliente y salta RLS → permite forjar evidencia `SEALED` cross-tenant. Requiere **migración Cloud nueva** (aserción de tenant + verificación de ownership) y decisión de producto sobre estados finales sin verificación QTSP server-side. **Spawneado como chip** `task_8c3b6c65` para tratarlo con su propia migración + push controlado (no se aplica en este cierre por ser server-side, consecuente en Cloud y fuera del scope de los chips de UI).
 
 **Enhancement futuro (no chip, beyond scope):** auto-rellenar el formulario de convocatoria/orden del día materializado desde el contexto del handoff (hoy se surfacea en el intake y la Secretaría lo incorpora manualmente). El guardrail y la trazabilidad ya están resueltos.
 
