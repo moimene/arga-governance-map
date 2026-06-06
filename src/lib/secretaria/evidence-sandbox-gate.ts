@@ -39,6 +39,16 @@ export const SANDBOX_EVIDENCE_REASON =
  * Si el origen es sandbox, degrada a `OPEN` y marca el manifest; en caso contrario
  * respeta el status solicitado (SEALED por defecto).
  */
+/**
+ * Predicado de "evidencia final" (Codex review #2-UI): un evidence bundle solo cuenta
+ * como evidencia sellada/WORM definitiva si su status es SEALED o VERIFIED. Los bundles
+ * sandbox se persisten como OPEN (ver resolveSandboxSafeEvidencePersistence) y NO deben
+ * presentarse como finales en la UI (badges SEALED/QSeal, contadores de certificados).
+ */
+export function isFinalSealedEvidence(status?: string | null): boolean {
+  return status === "SEALED" || status === "VERIFIED";
+}
+
 export function resolveSandboxSafeEvidencePersistence(
   input: EvidencePersistenceInput,
 ): EvidencePersistenceResolution {

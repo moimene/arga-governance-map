@@ -12,6 +12,7 @@ import {
   useObligationsList,
 } from "@/hooks/usePoliciesObligations";
 import { useEvidenceBundlesList, useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -305,7 +306,11 @@ export default function PenalAnticorrupcion() {
         signedBy: `${auditorName} (${auditorEmail})`
       });
 
-      toast.success("Certificación Forense QSeal y bundle WORM generados correctamente.");
+      toast.success(
+        signRes.sandbox
+          ? "Certificación generada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
+          : "Certificación Forense QSeal y bundle WORM generados correctamente."
+      );
       setSealingObject(null);
       setEvidenceDocName("");
       refetchEvidences();
@@ -555,6 +560,10 @@ export default function PenalAnticorrupcion() {
                               
                               // Check if there is already a QSeal evidence bundle
                               const controlEvidence = delitoEvidences.filter(e => e.source_object_id === control.id);
+                              // Codex #2-UI: solo cuenta como "Firmado" la evidencia final (SEALED/VERIFIED);
+                              // los bundles sandbox quedan en OPEN y no deben presentarse como firmados.
+                              const controlFinalEvidence = controlEvidence.filter(e => isFinalSealedEvidence(e.status));
+                              const controlHasSandbox = controlEvidence.some(e => !isFinalSealedEvidence(e.status));
 
                               return (
                                 <tr key={control.id} className="hover:bg-[var(--g-surface-subtle)]/20 transition-colors">
@@ -581,25 +590,30 @@ export default function PenalAnticorrupcion() {
                                     {control.last_test_date ? new Date(control.last_test_date).toLocaleDateString("es-ES") : "Pendiente"}
                                   </td>
                                   <td className="px-4 py-3.5 text-right">
-                                    {controlEvidence.length > 0 ? (
+                                    {controlFinalEvidence.length > 0 ? (
                                       <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-semibold">
                                         <CheckCircle2 className="h-3.5 w-3.5" /> Firmado
                                       </span>
                                     ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => setSealingObject({
-                                          type: "CONTROL",
-                                          id: control.id,
-                                          code: control.code,
-                                          title: control.name,
-                                          delitoId: delito.id
-                                        })}
-                                        className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] px-2.5 py-1 font-semibold transition-colors"
-                                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                                      >
-                                        <PenTool className="h-3 w-3" /> Sellar QSeal
-                                      </button>
+                                      <div className="inline-flex items-center gap-1.5 justify-end">
+                                        {controlHasSandbox && (
+                                          <span className="text-[9px] text-[var(--status-warning)] font-semibold" title="Existe evidencia sandbox de demo (no sellada como final)">sandbox</span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => setSealingObject({
+                                            type: "CONTROL",
+                                            id: control.id,
+                                            code: control.code,
+                                            title: control.name,
+                                            delitoId: delito.id
+                                          })}
+                                          className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] px-2.5 py-1 font-semibold transition-colors"
+                                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                                        >
+                                          <PenTool className="h-3 w-3" /> Sellar QSeal
+                                        </button>
+                                      </div>
                                     )}
                                   </td>
                                 </tr>
@@ -621,19 +635,33 @@ export default function PenalAnticorrupcion() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {delitoEvidences.map((evidence) => (
+                            {delitoEvidences.map((evidence) => {
+                              // Codex #2-UI: distingue evidencia final (SEALED/VERIFIED) de sandbox (OPEN).
+                              const isFinalSeal = isFinalSealedEvidence(evidence.status);
+                              return (
                               <div
                                 key={evidence.id}
-                                className="border border-[var(--status-success)]/40 bg-[var(--status-success)]/5 p-4 space-y-3"
+                                className={cn(
+                                  "border p-4 space-y-3",
+                                  isFinalSeal
+                                    ? "border-[var(--status-success)]/40 bg-[var(--status-success)]/5"
+                                    : "border-[var(--status-warning)]/40 bg-[var(--status-warning)]/5"
+                                )}
                                 style={{ borderRadius: "var(--g-radius-md)" }}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-mono text-[9px] font-bold text-[var(--status-success)]">
+                                  <span className={cn("font-mono text-[9px] font-bold", isFinalSeal ? "text-[var(--status-success)]" : "text-[var(--status-warning)]")}>
                                     {evidence.reference_code || `WORM-${evidence.id.slice(0, 8).toUpperCase()}`}
                                   </span>
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-bold">
-                                    <CheckCircle2 className="h-3 w-3" /> QSeal Custodia
-                                  </span>
+                                  {isFinalSeal ? (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-bold">
+                                      <CheckCircle2 className="h-3 w-3" /> QSeal Custodia
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-warning)] font-bold" title="Evidencia sandbox de demo: NO sellada como final (no es una transacción EAD Trust real)">
+                                      SANDBOX
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-[var(--g-text-secondary)] font-mono space-y-1">
                                   <div><strong>Firmante:</strong> {evidence.signed_by || "Apoderado de Cumplimiento"}</div>
@@ -655,7 +683,8 @@ export default function PenalAnticorrupcion() {
                                   </a>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>

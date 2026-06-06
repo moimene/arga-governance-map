@@ -339,6 +339,48 @@ La 3ª revisión Codex (`b39vmz2p4`) confirmó la capa de datos (sandbox→OPEN 
 
 **Gates:** `typecheck` verde · `test` 1839 pass / 0 fail · `lint` 16 errores `no-explicit-any` (cluster GRC/AIMS pre-existente) + 2 warnings · `build` verde (último conocido).
 
+## 12. Cierre de backlog (#1 + #2-UI) — 2026-06-06 (modo /goal autónomo)
+
+A petición del usuario (`/goal`), se completaron autónomamente los 2 chips de backlog.
+
+### #1 — Eliminadas las escrituras `governance_module_*` (handoffs read-only)
+- `src/hooks/useCrossModuleLinks.ts`: **eliminadas** `useCreateModuleLink`/`useCreateModuleEvent` (las que insertaban en `governance_module_links/events`). El hook queda **solo-lectura** (leer no viola el guardrail).
+- 3 escalados convertidos a **handoff read-only por navegación** (alineado con la arquitectura CLAUDE.md):
+  - `IncidenteDetalle.tsx` → `/secretaria/reuniones/nueva?source=grc&event=GRC_INCIDENT_MATERIAL&...`
+  - `Excepciones.tsx` → `/secretaria/reuniones/nueva?source=grc&event=GRC_EXCEPTION_MATERIAL&...`
+  - `SistemaDetalle.tsx` → `/secretaria/reuniones/nueva?source=aims&handoff=AIMS_SYSTEM_CONFORMITY&...`
+- Verificado: `rg useCreateModuleLink|useCreateModuleEvent src` → 0; ningún INSERT a `governance_module_*` en código (solo menciones en texto/tests guardrail).
+
+### #2-UI — Trust boundary: la evidencia sandbox no se presenta como final
+- `EvidenceBundle` (hook `useEvidenceBundles`): añadido campo `status`.
+- Nuevo helper puro `isFinalSealedEvidence(status)` en `evidence-sandbox-gate.ts` (final solo si `SEALED`/`VERIFIED`).
+- `TPRM.tsx`: `exit_plan_signed` + transacción se persisten **solo si `!signRes.sandbox`**; en sandbox se guarda metadata no-final + toast honesto.
+- Badges condicionados a `isFinalSealedEvidence(status)` en `SistemaDetalle`, `IncidenteDetalle`, `PenalAnticorrupcion` (sandbox/OPEN → badge "SANDBOX", no "SEALED"/"QSeal Custodia"); el badge "Firmado" de controles cuenta solo evidencia final.
+- Test de regresión ampliado (`evidence-sandbox-gate.test.ts`, 9 casos): prueba que un resultado sandbox nunca se considera evidencia final.
+
+### Gates tras cierre de backlog
+- `typecheck` verde · `test` **1843 pass / 134 skip / 0 fail** · `lint` 15 errores `no-explicit-any` (cluster GRC/AIMS pre-existente, −1 respecto al inicio; 0 en código nuevo) + 2 warnings.
+
+### Deuda residual (no chips; fuera de scope)
+- Cluster de 15 `@typescript-eslint/no-explicit-any` en hooks/páginas GRC/AIMS (`useEvidenceBundles`, `useIncidents`, `useThirdParties`, `SistemaDetalle`, `IncidenteDetalle`, `PenalAnticorrupcion`, `TPRM`). typecheck pasa; es lint hygiene de tipado Supabase (patrón Ola 3). No bloqueante.
+
+### 12.1 Refinamientos dirigidos por Codex (3 rondas adversariales sobre los chips)
+
+El bucle adversarial Codex destapó capas sucesivas que se cerraron:
+- **Ronda A:** `#2` era metadato, no enforcement → gate centralizado en `useCreateEvidenceBundle` + 4 callers.
+- **Ronda B:** Codex detectó que los callers/UI seguían presentando sandbox como final → badges condicionados, `TPRM` payload gateado, toasts branchados, status-cards (`Conformidad Certificada`/`Cierre Certificado`) gateados por `finalDeclarations` (no `declarations.length`), TPRM limpia flags finales stale en sandbox.
+- **Ronda C (handoff traceability):** Codex detectó (1) el handoff usaba la clave `sourceId` pero el intake lee `source_id` → se perdía la referencia; (2) el intake no surfaceaba `organ/matter/rationale` → se perdía la propuesta. Cierre:
+  - Nuevo contrato compartido `src/lib/secretaria/cross-module-handoff.ts` (`buildMeetingHandoffPath` / `readMeetingHandoff`) que centraliza las claves y evita drift `sourceId`↔`source_id`.
+  - Los 3 emisores (IncidenteDetalle, Excepciones, SistemaDetalle) usan `buildMeetingHandoffPath`.
+  - `ReunionIntake` usa `readMeetingHandoff` y **surfacea** Órgano/Asunto/Justificación propuestos en el banner read-only.
+  - Test de round-trip `src/test/secretaria/cross-module-handoff.test.ts` (6 casos): prueba que `source_id/organ/matter/rationale` sobreviven y bloquea el contrato de claves.
+
+**Gates finales:** `typecheck` verde · `test` **1849 pass / 0 fail** (incluye 6 handoff + 9 gate) · `lint` 15 `any` GRC/AIMS pre-existentes (0 en código nuevo).
+
+**Confirmado por Codex:** `#1` sin escrituras `governance_module_*` y `#2-UI` gating sandbox cerrado.
+
+**Enhancement futuro (no chip, beyond scope):** auto-rellenar el formulario de convocatoria/orden del día materializado desde el contexto del handoff (hoy se surfacea en el intake y la Secretaría lo incorpora manualmente). El guardrail y la trazabilidad ya están resueltos.
+
 ---
 
 _Fin del informe — 2026-06-06._

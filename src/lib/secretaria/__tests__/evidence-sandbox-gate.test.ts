@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveSandboxSafeEvidencePersistence,
+  isFinalSealedEvidence,
   SANDBOX_EVIDENCE_STATUS,
   SANDBOX_EVIDENCE_REASON,
 } from "@/lib/secretaria/evidence-sandbox-gate";
@@ -65,5 +66,28 @@ describe("evidence sandbox gate (Codex #2)", () => {
 
   it("el status sandbox forzado es válido según el CHECK de evidence_bundles (OPEN|SEALED|VERIFIED)", () => {
     expect(["OPEN", "SEALED", "VERIFIED"]).toContain(SANDBOX_EVIDENCE_STATUS);
+  });
+});
+
+describe("isFinalSealedEvidence — gate UI (Codex #2-UI)", () => {
+  it("SEALED y VERIFIED son evidencia final", () => {
+    expect(isFinalSealedEvidence("SEALED")).toBe(true);
+    expect(isFinalSealedEvidence("VERIFIED")).toBe(true);
+  });
+
+  it("OPEN (status de sandbox) NO es final → la UI no debe rotularlo SEALED/QSeal", () => {
+    expect(isFinalSealedEvidence("OPEN")).toBe(false);
+  });
+
+  it("status nulo/indefinido/desconocido no es final", () => {
+    expect(isFinalSealedEvidence(null)).toBe(false);
+    expect(isFinalSealedEvidence(undefined)).toBe(false);
+    expect(isFinalSealedEvidence("DRAFT")).toBe(false);
+  });
+
+  it("un bundle resultante de una firma sandbox no se considera evidencia final", () => {
+    // Cadena completa: firma sandbox → gate degrada a OPEN → UI lo trata como NO final.
+    const resolved = resolveSandboxSafeEvidencePersistence({ sandbox: true, status: "SEALED", manifest: {} });
+    expect(isFinalSealedEvidence(resolved.status)).toBe(false);
   });
 });

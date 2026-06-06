@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -7,7 +8,8 @@ import {
 } from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
 import { exceptionStatusChip } from "@/lib/grc/status-labels";
-import { useCrossModuleLinks, useCreateModuleLink, useCreateModuleEvent } from "@/hooks/useCrossModuleLinks";
+import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
+import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -193,8 +195,7 @@ export default function Excepciones() {
   const [escalateCommittee, setEscalateCommittee] = useState("CDA");
   const [escalateRationale, setEscalateRationale] = useState("");
 
-  const createLink = useCreateModuleLink();
-  const createEvent = useCreateModuleEvent();
+  const navigate = useNavigate();
 
   const filteredExceptions = useMemo(
     () =>
@@ -239,48 +240,22 @@ export default function Excepciones() {
     setShowEscalationModal(true);
   };
 
-  const handleEscalateSubmit = async (e: React.FormEvent) => {
+  const handleEscalateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedException) return;
-    try {
-      await createLink.mutateAsync({
-        source_module: "GRC",
-        source_object_type: "EXCEPTION",
-        source_object_id: selectedException.id,
-        target_module: "SECRETARIA",
-        target_object_type: "MEETING",
-        target_object_id: null,
-        relation_type: "AGENDA_PROPOSAL",
-        status: "PROPOSED",
-        payload: {
-          organ: escalateCommittee,
-          matter: escalateMatter,
-          rationale: escalateRationale,
-          proposed_by: "Compliance GRC Compass Module"
-        }
-      });
-
-      await createEvent.mutateAsync({
-        source_module: "GRC",
-        event_type: "GRC_EXCEPTION_MATERIAL_ESCALATION",
-        event_status: "PROPOSED",
-        target_module: "SECRETARIA",
-        source_object_type: "EXCEPTION",
-        source_object_id: selectedException.id,
-        payload: {
-          organ: escalateCommittee,
-          matter: escalateMatter,
-          rationale: escalateRationale
-        }
-      });
-
-      toast.success("Propuesta de excepción enviada a Secretaría con éxito");
-      setShowEscalationModal(false);
-      refetchCrossLinks();
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al registrar propuesta de escalado");
-    }
+    // Handoff READ-ONLY a Secretaría (guardrail CLAUDE.md: no se escribe en
+    // governance_module_*). Navega al intake de Secretaría con la propuesta como
+    // query params; Secretaría decide la materialización desde su owner.
+    setShowEscalationModal(false);
+    toast.success("Abriendo intake de Secretaría con la propuesta (handoff read-only)…");
+    navigate(buildMeetingHandoffPath({
+      source: "grc",
+      event: "GRC_EXCEPTION_MATERIAL",
+      sourceId: selectedException.id,
+      organ: escalateCommittee,
+      matter: escalateMatter,
+      rationale: escalateRationale,
+    }));
   };
 
   return (
@@ -623,21 +598,11 @@ export default function Excepciones() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createLink.isPending}
                   className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  {createLink.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Procesando…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5" />
-                      Proponer Punto
-                    </>
-                  )}
+                  <Send className="h-3.5 w-3.5" />
+                  Proponer Punto
                 </button>
               </div>
             </form>

@@ -165,20 +165,40 @@ export default function TPRM() {
         signedBy: `${signatoryName} (${signatoryEmail})`
       });
 
-      // Update exit plan signed state in payload
+      // Codex review #2-UI: el estado FINAL "firmado" del tercero solo se persiste si
+      // la firma es real (no sandbox). En sandbox se guarda metadata no-final para no
+      // falsear que el plan quedó sellado y para no ocultar la necesidad de firma real.
       await updateMutation.mutateAsync({
         id: selected.id,
-        payload: {
-          ...selected.payload,
-          exit_plan_signed: true,
-          exit_plan_hash: signRes.documentHash,
-          exit_plan_signed_by: signatoryName,
-          exit_plan_signed_at: signRes.signed_at,
-          exit_plan_transaction: signRes.srId,
-        }
+        payload: signRes.sandbox
+          ? {
+              ...selected.payload,
+              // Limpia cualquier flag final stale (Codex #2-UI): una firma sandbox no
+              // debe dejar el plan marcado como firmado/sellado por datos previos.
+              exit_plan_signed: false,
+              exit_plan_hash: null,
+              exit_plan_signed_by: null,
+              exit_plan_signed_at: null,
+              exit_plan_transaction: null,
+              exit_plan_sandbox: true,
+              exit_plan_sandbox_at: signRes.signed_at,
+              exit_plan_sandbox_hash: signRes.documentHash,
+            }
+          : {
+              ...selected.payload,
+              exit_plan_signed: true,
+              exit_plan_hash: signRes.documentHash,
+              exit_plan_signed_by: signatoryName,
+              exit_plan_signed_at: signRes.signed_at,
+              exit_plan_transaction: signRes.srId,
+            }
       });
 
-      toast.success("Plan de Salida firmado digitalmente y sellado en ledger WORM.");
+      toast.success(
+        signRes.sandbox
+          ? "Plan de Salida firmado en modo SANDBOX (demo) — evidencia NO sellada como final."
+          : "Plan de Salida firmado digitalmente y sellado en ledger WORM."
+      );
       refetch();
     } catch (err: any) {
       console.error(err);

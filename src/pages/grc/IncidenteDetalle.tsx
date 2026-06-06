@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useIncident, type RegulatoryNotificationLite } from "@/hooks/useIncidents";
 import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { 
@@ -13,8 +13,10 @@ import {
   severityChip,
 } from "@/lib/grc/status-labels";
 import { useQTSPSign } from "@/hooks/useQTSPSign";
-import { useCrossModuleLinks, useCreateModuleLink, useCreateModuleEvent } from "@/hooks/useCrossModuleLinks";
+import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
 import { useEvidenceBundlesForObject, useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
+import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import { toast } from "sonner";
 
 /** Countdown component that re-renders every minute */
@@ -92,8 +94,7 @@ export default function IncidenteDetalle() {
 
   // V2 Integration Hooks
   const { signMutation } = useQTSPSign();
-  const createLink = useCreateModuleLink();
-  const createEvent = useCreateModuleEvent();
+  const navigate = useNavigate();
   const createEvidence = useCreateEvidenceBundle();
 
   const { data: declarations = [], refetch: refetchDeclarations } = useEvidenceBundlesForObject(
@@ -101,6 +102,8 @@ export default function IncidenteDetalle() {
     "INCIDENT",
     id ?? ""
   );
+  // Codex #2-UI: solo la evidencia final (SEALED/VERIFIED) cuenta como "certificada".
+  const finalDeclarations = declarations.filter((d) => isFinalSealedEvidence(d.status));
 
   const { data: crossLinks = [], refetch: refetchCrossLinks } = useCrossModuleLinks(
     "GRC",
@@ -137,47 +140,22 @@ export default function IncidenteDetalle() {
     setShowEscalationModal(true);
   };
 
-  const handleEscalateSubmit = async (e: React.FormEvent) => {
+  const handleEscalateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await createLink.mutateAsync({
-        source_module: "GRC",
-        source_object_type: "INCIDENT",
-        source_object_id: incident.id,
-        target_module: "SECRETARIA",
-        target_object_type: "MEETING",
-        target_object_id: null,
-        relation_type: "AGENDA_PROPOSAL",
-        status: "PROPOSED",
-        payload: {
-          organ: escalateCommittee,
-          matter: escalateMatter,
-          rationale: escalateRationale,
-          proposed_by: "Compliance GRC Compass Module"
-        }
-      });
-
-      await createEvent.mutateAsync({
-        source_module: "GRC",
-        event_type: "GRC_INCIDENT_MATERIAL_ESCALATION",
-        event_status: "PROPOSED",
-        target_module: "SECRETARIA",
-        source_object_type: "INCIDENT",
-        source_object_id: incident.id,
-        payload: {
-          organ: escalateCommittee,
-          matter: escalateMatter,
-          rationale: escalateRationale
-        }
-      });
-
-      toast.success("Propuesta de Orden del Día enviada a Secretaría con éxito");
-      setShowEscalationModal(false);
-      refetchCrossLinks();
-    } catch (err) {
-      console.error(err);
-      toast.error("Error al registrar propuesta de escalado");
-    }
+    // Handoff READ-ONLY a Secretaría (guardrail CLAUDE.md: no se escribe en
+    // governance_module_*). Navega al intake de Secretaría con la propuesta como
+    // query params; la materialización (convocatoria/orden del día) la decide
+    // Secretaría desde su propio owner.
+    setShowEscalationModal(false);
+    toast.success("Abriendo intake de Secretaría con la propuesta (handoff read-only)…");
+    navigate(buildMeetingHandoffPath({
+      source: "grc",
+      event: "GRC_INCIDENT_MATERIAL",
+      sourceId: incident.id,
+      organ: escalateCommittee,
+      matter: escalateMatter,
+      rationale: escalateRationale,
+    }));
   };
 
   const handleSignDeclaration = async () => {
@@ -235,7 +213,11 @@ export default function IncidenteDetalle() {
         signedBy: `${signatoryName} (${signatoryEmail})`
       });
 
-      toast.success("Acta de Cierre Forense firmada con QES y sellada en ledger WORM");
+      toast.success(
+        signRes.sandbox
+          ? "Acta de Cierre firmada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
+          : "Acta de Cierre Forense firmada con QES y sellada en ledger WORM"
+      );
       setShowSignModal(false);
       refetchDeclarations();
     } catch (err: any) {
@@ -589,20 +571,20 @@ export default function IncidenteDetalle() {
             {/* Evidence bundles / closures status */}
             <div 
               className={`flex items-center gap-2.5 px-3 py-2.5 mb-4 border ${
-                declarations.length > 0
+                finalDeclarations.length > 0
                   ? "bg-[var(--g-surface-subtle)] border-[var(--status-success)]/30"
                   : "bg-[var(--g-surface-muted)] border-[var(--g-border-subtle)]"
               }`}
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              <div className={`h-2.5 w-2.5 rounded-full ${declarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
+              <div className={`h-2.5 w-2.5 rounded-full ${finalDeclarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
               <div className="flex-1">
                 <span className="block text-xs font-semibold text-[var(--g-text-primary)]">
-                  {declarations.length > 0 ? "Cierre Forense Certificado QES" : "Cierre Forense Pendiente"}
+                  {finalDeclarations.length > 0 ? "Cierre Forense Certificado QES" : "Cierre Forense Pendiente"}
                 </span>
                 <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
-                  {declarations.length > 0 
-                    ? `Archivado en ledger WORM (${declarations.length} actas)` 
+                  {finalDeclarations.length > 0 
+                    ? `Archivado en ledger WORM (${finalDeclarations.length} actas)` 
                     : "Requiere firma cualificada por Apoderado / Compliance Officer"}
                 </span>
               </div>
@@ -624,10 +606,16 @@ export default function IncidenteDetalle() {
                       <span className="font-mono text-[10px] font-bold text-[var(--g-text-primary)]">
                         {dec.reference_code || "ACTA-CIERRE"}
                       </span>
-                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] bg-[var(--status-success)]/10 text-[var(--status-success)] font-medium" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                        <CheckCircle2 className="h-2.5 w-2.5" />
-                        SEALED
-                      </span>
+                      {isFinalSealedEvidence(dec.status) ? (
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] bg-[var(--status-success)]/10 text-[var(--status-success)] font-medium" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          SEALED
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] bg-[var(--status-warning)]/15 text-[var(--status-warning)] font-medium" style={{ borderRadius: "var(--g-radius-sm)" }} title="Evidencia sandbox de demo: NO sellada como final (no es una transacción EAD Trust real)">
+                          SANDBOX
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[var(--g-text-secondary)]">
                       <div>Firmante: {dec.signed_by}</div>
@@ -759,21 +747,11 @@ export default function IncidenteDetalle() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createLink.isPending}
                   className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  {createLink.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Procesando…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5" />
-                      Proponer Punto
-                    </>
-                  )}
+                  <Send className="h-3.5 w-3.5" />
+                  Proponer Punto
                 </button>
               </div>
             </form>

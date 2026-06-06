@@ -11,6 +11,9 @@ export interface EvidenceBundle {
   hash_sha512: string | null;
   signed_by: string | null;
   signature_date: string | null;
+  /** OPEN | SEALED | VERIFIED. Codex #2-UI: solo SEALED/VERIFIED son evidencia final;
+   *  los bundles sandbox se persisten como OPEN (ver evidence-sandbox-gate). */
+  status?: string | null;
   chain_of_custody: Record<string, unknown> | null;
   legal_hold: boolean;
   created_at: string;
