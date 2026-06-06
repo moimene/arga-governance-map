@@ -358,7 +358,7 @@ export default function PenalAnticorrupcion() {
           { label: "Delitos Catalogados", value: DELITOS_TAXONOMY.length, icon: Activity },
           { label: "Riesgos Penales Activos", value: risks.filter(r => r.module_id === "penal" || r.code.startsWith("RSK-PEN")).length || 9, icon: AlertTriangle },
           { label: "Obligaciones Jurídicas", value: penalObligations.length || 12, icon: FileText },
-          { label: "Evidencias WORM Selladas", value: evidences.filter(e => e.source_module === "GRC_PENAL").length || 4, icon: ShieldCheck },
+          { label: "Evidencias WORM Selladas", value: evidences.filter(e => e.source_module === "GRC_PENAL" && isFinalSealedEvidence(e.status)).length, icon: ShieldCheck },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -426,11 +426,15 @@ export default function PenalAnticorrupcion() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {delitoEvidences.length > 0 && (
+                  {delitoEvidences.some(e => isFinalSealedEvidence(e.status)) ? (
                     <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[var(--status-success)] font-semibold font-mono bg-[var(--status-success)]/10 px-2 py-1 border border-[var(--status-success)]/20" style={{ borderRadius: "var(--g-radius-sm)" }}>
                       <CheckCircle2 className="h-3 w-3" /> WORM Sealed
                     </span>
-                  )}
+                  ) : delitoEvidences.length > 0 ? (
+                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[var(--status-warning)] font-semibold font-mono bg-[var(--status-warning)]/10 px-2 py-1 border border-[var(--status-warning)]/20" style={{ borderRadius: "var(--g-radius-sm)" }} title="Evidencia sandbox de demo: no sellada como final">
+                      SANDBOX
+                    </span>
+                  ) : null}
                   {isExpanded ? (
                     <ChevronUp className="h-5 w-5 text-[var(--g-text-secondary)]" />
                   ) : (

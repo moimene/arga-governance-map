@@ -90,4 +90,18 @@ describe("isFinalSealedEvidence — gate UI (Codex #2-UI)", () => {
     const resolved = resolveSandboxSafeEvidencePersistence({ sandbox: true, status: "SEALED", manifest: {} });
     expect(isFinalSealedEvidence(resolved.status)).toBe(false);
   });
+
+  it("contador de evidencia final: solo SEALED/VERIFIED cuentan; OPEN no; vacío → 0", () => {
+    // Contrato del KPI "Evidencias WORM Selladas" y badges WORM Sealed (Codex final round).
+    const bundles = [
+      { status: "SEALED" },
+      { status: "OPEN" }, // sandbox
+      { status: "VERIFIED" },
+      { status: "OPEN" }, // sandbox
+      { status: null },
+    ];
+    const finalCount = bundles.filter((b) => isFinalSealedEvidence(b.status)).length;
+    expect(finalCount).toBe(2); // solo SEALED + VERIFIED
+    expect([].filter((b: { status?: string }) => isFinalSealedEvidence(b.status)).length).toBe(0);
+  });
 });
