@@ -158,6 +158,7 @@ const VOTE_BADGE_CLASS: Record<VoteChoice, string> = {
   FOR: "bg-[var(--status-success)]",
   AGAINST: "bg-[var(--status-error)]",
   ABSTAIN: "bg-[var(--status-warning)]",
+  OBJECT_PROCEDURE: "bg-[var(--status-warning)]",
 };
 
 export default function AcuerdoSinSesionStepper() {

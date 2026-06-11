@@ -399,6 +399,19 @@ export default function AcuerdoSinSesionDetalle() {
                 <MinusCircle className="h-4 w-4" />
                 Abstenerme
               </button>
+              {!r.requires_unanimity ? (
+                <button
+                  type="button"
+                  onClick={() => castVote.mutate("OBJECT_PROCEDURE")}
+                  disabled={castVote.isPending}
+                  title="Art. 248.2 LSC: la votación por escrito solo es admisible si ningún consejero se opone al procedimiento. Una oposición cierra el expediente."
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors disabled:opacity-50"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <XCircle className="h-4 w-4 text-[var(--status-warning)]" />
+                  Oponerme al procedimiento (art. 248.2 LSC)
+                </button>
+              ) : null}
             </div>
             {castVote.isPending && (
               <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">

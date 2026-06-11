@@ -73,7 +73,7 @@
 | ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | HECHO |
 | ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | BLOQUEADO-HUMANO (escritor alineado forward-only; re-anclaje de génesis pendiente de decisión) |
 | ITEM-046 | A8 | ✅ | Verificador offline siempre reporta '✗ Error de integridad' para documentos legítimos — mismatch SHA-256 vs DJB2 | HECHO |
-| ITEM-047 | A9 | ✅ | Art. 248.2 LSC no operativo: la oposición al procedimiento escrito (OBJECION_PROCEDIMIENTO) es inalcanzable en UI y el servidor la degrada a voto en contra | PENDIENTE |
+| ITEM-047 | A9 | ✅ | Art. 248.2 LSC no operativo: la oposición al procedimiento escrito (OBJECION_PROCEDIMIENTO) es inalcanzable en UI y el servidor la degrada a voto en contra | HECHO |
 | ITEM-048 | A9 | ✅ | Regla de adopción sin sesión server-side: pluralidad por cabezas que ignora matter_class y capital; el auto-cierre por vencimiento rechaza en bloque incluso con mayoría a favor (evidencia Cloud) | BLOQUEADO-LEGAL |
 | ITEM-049 | A9 | ✅ | PactosParasocialesCard del expediente evalúa con votos inventados (70/30) y presenta veredictos de incumplimiento como reales | HECHO |
 | ITEM-050 | A9 | ✅ | CO_APROBACION y SOLIDARIO: validación circular de administradores vigentes y sin reglas de mancomunidad (arts. 210 y 233.2 LSC) | PENDIENTE |

@@ -1,4 +1,5 @@
-export type VoteChoice = "FOR" | "AGAINST" | "ABSTAIN";
+// ITEM-047: OBJECT_PROCEDURE = oposición al procedimiento escrito (art. 248.2 LSC, solo consejo).
+export type VoteChoice = "FOR" | "AGAINST" | "ABSTAIN" | "OBJECT_PROCEDURE";
 
 export interface NoSessionVoteState {
   status: string;

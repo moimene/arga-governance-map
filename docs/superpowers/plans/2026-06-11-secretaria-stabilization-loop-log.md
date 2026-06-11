@@ -480,3 +480,17 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   callback de éxito en ProcessDocxButton — la decisión consta ahora bajo identidad del decisor,
   que era el defecto jurídico central.
 - **Verificación:** 2048 tests 0 fail; gates verdes; e2e 18+25 6/6.
+
+### Iteración 26 — ITEM-047 [P1] Oposición al procedimiento escrito del consejo (art. 248.2) (HECHO)
+
+- **Evidencia:** el motor modelaba OBJECION_PROCEDIMIENTO pero (1) la UI solo ofrecía
+  FOR/AGAINST/ABSTAIN; (2) la RPC la contaba como un voto en contra más — en el camino mayoritario
+  (default del stepper) el acuerdo podía APROBARSE con oposición al procedimiento, contra el art.
+  248.2 LSC ("siempre que ningún consejero se oponga a este procedimiento").
+- **Fix:** migración 20260611214000 — rama prioritaria en fn_no_session_cast_response: UNA
+  oposición en CIRCULACION_CONSEJO cierra RECHAZADO/CERRADO_FAIL con motivo 'procedure_objected'
+  (cuerpo restante idéntico al vigente; verificado parche desplegado). Cliente: VoteChoice +=
+  OBJECT_PROCEDURE, mapeo a OBJECION_PROCEDIMIENTO en el cast, y botón "Oponerme al procedimiento
+  (art. 248.2 LSC)" visible solo en procesos de consejo (no en unanimidad SL).
+- **Verificación:** gates verdes (2048 tests 0 fail); prosrc desplegado contiene la rama; e2e
+  07+18 verdes.

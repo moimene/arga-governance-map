@@ -165,7 +165,8 @@ export function useCastVote(resolutionId: string | undefined) {
 
       const sentido =
         choice === "FOR" ? "CONSENTIMIENTO" :
-        choice === "AGAINST" ? "OBJECION" : "SILENCIO";
+        choice === "AGAINST" ? "OBJECION" :
+        choice === "OBJECT_PROCEDURE" ? "OBJECION_PROCEDIMIENTO" : "SILENCIO";
       const { error: rpcError } = await supabase.rpc("fn_no_session_cast_response", {
         p_tenant_id: tenantId,
         p_resolution_id: resolutionId,
