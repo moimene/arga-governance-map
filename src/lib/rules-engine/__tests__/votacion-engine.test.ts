@@ -312,10 +312,11 @@ describe('Gate 4: Unanimidad', () => {
 // ============================================================
 
 describe('Gate 6: Voto de Calidad', () => {
-  it('Empate + voto calidad habilitado → resuelto', () => {
+  it('Empate + voto calidad habilitado + presidente FAVOR → resuelto', () => {
     const input = createBaseInput({
       esEmpate: true,
       votoCalidadHabilitado: true,
+      votoPresidente: 'FAVOR',
       votos: {
         favor: 8,
         contra: 8,
@@ -362,6 +363,102 @@ describe('Gate 6: Voto de Calidad', () => {
 
     expect(result.votoCalidadUsado).toBeUndefined();
     expect(result.mayoriaAlcanzada).toBe(false);
+  });
+
+  it('ITEM-017/039: empate con presidente CONTRA → NO se adopta', () => {
+    const input = createBaseInput({
+      esEmpate: true,
+      votoCalidadHabilitado: true,
+      votoPresidente: 'CONTRA',
+      votos: {
+        favor: 8,
+        contra: 8,
+        abstenciones: 1,
+        en_blanco: 0,
+        capital_presente: 750,
+        capital_total: 1000,
+      },
+    });
+    const pack = createBaseRulePack({
+      votacion: {
+        mayoria: {
+          SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
+          SL: createBaseMajoritySpec(),
+          CONSEJO: createBaseMajoritySpec(),
+        },
+        abstenciones: 'no_cuentan',
+        votoCalidadPermitido: true,
+      },
+    });
+    const result = evaluarVotacion(input, [pack]);
+
+    expect(result.votoCalidadUsado).toBeUndefined();
+    expect(result.mayoriaAlcanzada).toBe(false);
+    expect(result.acuerdoProclamable).toBe(false);
+    expect(result.blocking_issues).toContain('majority_not_achieved');
+  });
+
+  it('ITEM-017/039: empate sin voto del presidente en el input → fail-closed, NO se adopta', () => {
+    const input = createBaseInput({
+      esEmpate: true,
+      votoCalidadHabilitado: true,
+      votos: {
+        favor: 8,
+        contra: 8,
+        abstenciones: 1,
+        en_blanco: 0,
+        capital_presente: 750,
+        capital_total: 1000,
+      },
+    });
+    const pack = createBaseRulePack({
+      votacion: {
+        mayoria: {
+          SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
+          SL: createBaseMajoritySpec(),
+          CONSEJO: createBaseMajoritySpec(),
+        },
+        abstenciones: 'no_cuentan',
+        votoCalidadPermitido: true,
+      },
+    });
+    const result = evaluarVotacion(input, [pack]);
+
+    expect(result.votoCalidadUsado).toBeUndefined();
+    expect(result.mayoriaAlcanzada).toBe(false);
+    expect(result.acuerdoProclamable).toBe(false);
+  });
+
+  it('ITEM-017: el voto de calidad nunca satisface una mayoría reforzada (2/3)', () => {
+    const input = createBaseInput({
+      esEmpate: true,
+      votoCalidadHabilitado: true,
+      votoPresidente: 'FAVOR',
+      votos: {
+        favor: 8,
+        contra: 8,
+        abstenciones: 1,
+        en_blanco: 0,
+        capital_presente: 750,
+        capital_total: 1000,
+      },
+    });
+    const pack = createBaseRulePack({
+      votacion: {
+        mayoria: {
+          SA: createBaseMajoritySpec({ formula: 'favor >= 2/3_emitidos' }),
+          SL: createBaseMajoritySpec(),
+          CONSEJO: createBaseMajoritySpec(),
+        },
+        abstenciones: 'no_cuentan',
+        votoCalidadPermitido: true,
+      },
+    });
+    const result = evaluarVotacion(input, [pack]);
+
+    expect(result.votoCalidadUsado).toBeUndefined();
+    expect(result.mayoriaAlcanzada).toBe(false);
+    expect(result.acuerdoProclamable).toBe(false);
   });
 });
 
@@ -758,11 +855,12 @@ describe('G3: vetoActivo', () => {
     expect(result.warnings.some((w) => w.includes('VETO_PACTO_ACTIVO'))).toBe(true);
   });
 
-  it('V-G3-03: sin veto, voto de calidad funciona en empate', () => {
+  it('V-G3-03: sin veto, voto de calidad funciona en empate (presidente FAVOR)', () => {
     const input = createBaseInput({
       votos: { favor: 5, contra: 5, abstenciones: 0, en_blanco: 0, capital_presente: 500, capital_total: 1000 },
       esEmpate: true,
       votoCalidadHabilitado: true,
+      votoPresidente: 'FAVOR',
       vetoActivo: false,
     });
     const result = evaluarVotacion(input, [packCalidad]);

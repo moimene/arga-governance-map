@@ -125,6 +125,8 @@ export interface MeetingAdoptionSnapshotInput {
   consentimientosPrevios?: string[];
   vetoRenunciado?: string[];
   votoCalidadHabilitado?: boolean;
+  /** Sentido del voto del presidente (para dirimir empates con voto de calidad). */
+  votoPresidente?: 'FAVOR' | 'CONTRA' | 'ABSTENCION' | null;
 }
 
 export interface VoteSummary {
@@ -162,6 +164,7 @@ export interface MeetingAdoptionSnapshot {
     capital_total: number;
     quorum_reached: boolean;
     voto_calidad_habilitado: boolean;
+    voto_presidente?: 'FAVOR' | 'CONTRA' | 'ABSTENCION' | null;
   };
   status_resolucion: "ADOPTED" | "REJECTED";
   vote_summary: VoteSummary;
@@ -323,6 +326,7 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
       conflictos,
       votoCalidadHabilitado: input.votoCalidadHabilitado,
       esEmpate: voteSummary.favor === voteSummary.contra && voteSummary.favor > 0,
+      votoPresidente: input.votoPresidente ?? null,
       vetoActivo: pactoVetoActivo,
     },
     input.packs,
@@ -368,6 +372,7 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
       capital_total: capitalTotal,
       quorum_reached: quorumReached,
       voto_calidad_habilitado: input.votoCalidadHabilitado === true,
+      voto_presidente: input.votoPresidente ?? null,
     },
     status_resolucion: societaryOk ? "ADOPTED" : "REJECTED",
     vote_summary: voteSummary,

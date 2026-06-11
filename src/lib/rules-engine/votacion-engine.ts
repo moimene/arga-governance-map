@@ -443,6 +443,10 @@ export function evaluarVotacion(
   // ================================================================
 
   if (input.esEmpate && input.votoCalidadHabilitado) {
+    // El voto de calidad solo puede dirimir mayorías de la familia simple/
+    // absoluta: nunca "satisface" una mayoría reforzada (2/3, 3/4...) ni
+    // sustituye la unanimidad.
+    const mayoriaReforzada = /2\/3|3\/4|4\/5|unanimidad/i.test(effectiveMajority.formula);
     // Check if veto or unanimidad would prevent use
     if (vetoAplicado || unanimidadRequired) {
       const vetoCalidadNode: ExplainNode = {
@@ -450,6 +454,30 @@ export function evaluarVotacion(
         fuente: 'ESTATUTOS',
         resultado: 'WARNING',
         mensaje: 'Empate existe pero voto de calidad no permitido (existe veto o unanimidad requerida)',
+      };
+      explainNodes.push(vetoCalidadNode);
+    } else if (mayoriaReforzada) {
+      const vetoCalidadNode: ExplainNode = {
+        regla: 'Voto de calidad no aplicable',
+        fuente: 'ESTATUTOS',
+        resultado: 'WARNING',
+        mensaje: `El voto de calidad no puede satisfacer una mayoría reforzada (${effectiveMajority.formula}) — el empate no se dirime`,
+      };
+      explainNodes.push(vetoCalidadNode);
+    } else if (input.votoPresidente !== 'FAVOR') {
+      // El voto de calidad dirime el empate EN EL SENTIDO del voto del
+      // presidente. Si votó CONTRA, se abstuvo o su voto no consta en el
+      // input, el acuerdo NO se adopta (fail-closed).
+      const vetoCalidadNode: ExplainNode = {
+        regla: 'Voto de calidad no ejercido a favor',
+        fuente: 'ESTATUTOS',
+        resultado: 'WARNING',
+        mensaje:
+          input.votoPresidente === 'CONTRA'
+            ? 'El presidente votó en contra: el voto de calidad dirime el empate en contra de la adopción'
+            : input.votoPresidente === 'ABSTENCION'
+              ? 'El presidente se abstuvo: el empate no se dirime y el acuerdo no se adopta'
+              : 'El voto del presidente no consta en la evaluación: el empate no se dirime (se requiere su voto FAVOR para adoptar)',
       };
       explainNodes.push(vetoCalidadNode);
     } else {
@@ -464,7 +492,7 @@ export function evaluarVotacion(
         regla: 'Voto de calidad (desempate)',
         fuente: 'ESTATUTOS',
         resultado: 'OK',
-        mensaje: 'Empate resuelto con voto de calidad del presidente/administrador',
+        mensaje: 'Empate resuelto con voto de calidad del presidente (votó a favor)',
       };
       explainNodes.push(vetoCalidadNode);
       if (blockingIssues.length === 0) severity = 'OK';

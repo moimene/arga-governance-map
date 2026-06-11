@@ -600,6 +600,12 @@ export interface VotacionInput {
   conflictos?: ConflictoInteres[];
   votoCalidadHabilitado?: boolean;
   esEmpate?: boolean;
+  /**
+   * Sentido del voto del presidente en la votación empatada. El voto de
+   * calidad solo dirime el empate EN EL SENTIDO del voto del presidente:
+   * sin un voto FAVOR confirmado, el empate no se dirime (fail-closed).
+   */
+  votoPresidente?: 'FAVOR' | 'CONTRA' | 'ABSTENCION' | null;
   decisionFirmada?: boolean;
   noSessionInput?: NoSessionInput;
   coAprobacionConfig?: CoAprobacionConfig;

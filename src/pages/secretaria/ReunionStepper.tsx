@@ -269,7 +269,11 @@ function votingWeightFor(voter: VoterRow, organoTipo: TipoOrgano) {
 }
 
 function votoCalidadHabilitadoPorOrgano(organoTipo: TipoOrgano, quorumRule?: Record<string, unknown> | null) {
-  if (organoTipo === "COMISION_DELEGADA") return false;
+  // ITEM-040/052: la configuración explícita del órgano manda. El Comité
+  // Ejecutivo de ARGA (body_type COMITE → COMISION_DELEGADA) tiene
+  // quorum_rule.voto_calidad_presidente=true (DL-5); el early-return por
+  // bucket lo dejaba como código muerto. Default sin config: CONSEJO sí,
+  // comisiones delegadas no.
   const explicit = quorumRule?.voto_calidad_presidente;
   if (typeof explicit === "boolean") return explicit;
   return organoTipo === "CONSEJO";
@@ -2408,6 +2412,19 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     organoTipo,
     meetingRaw?.governing_bodies?.quorum_rule ?? null
   );
+  // ITEM-017/039: para dirimir empates con voto de calidad el motor necesita
+  // el SENTIDO del voto del presidente del órgano.
+  const bodyIdForVotes = (meetingForDebates as { body_id?: string | null } | null)?.body_id ?? undefined;
+  const { data: bodyMembersForVotes = [] } = useBodyMembers(bodyIdForVotes);
+  const presidentPersonIds = useMemo(
+    () =>
+      new Set(
+        bodyMembersForVotes
+          .filter((m) => m.tipo_condicion === "PRESIDENTE")
+          .map((m) => m.person_id)
+      ),
+    [bodyMembersForVotes]
+  );
   const quorumData = meetingRaw?.quorum_data ?? null;
   const savedQuorumForVote = quorumData?.quorum as { reached?: boolean } | undefined;
   const quorumReachedForVote = savedQuorumForVote?.reached === true;
@@ -2608,6 +2625,13 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       overrides: voteOverrides,
       pactos: pactosVigentes,
       votoCalidadHabilitado,
+      votoPresidente: (() => {
+        const presidentRow = rowsForPoint.find(
+          (voter) => voter.person_id && presidentPersonIds.has(voter.person_id)
+        );
+        const vote = presidentRow?.vote;
+        return vote === "FAVOR" || vote === "CONTRA" || vote === "ABSTENCION" ? vote : null;
+      })(),
     });
 
     if (mode === "operational" && voteRuleContext.hasFallback) {

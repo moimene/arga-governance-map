@@ -156,3 +156,20 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   suite 2018 tests 0 fail; typecheck/lint/build verdes; e2e 05+18 6/6.
 - **Nota:** actas/reuniones antiguas con attendees persistidos (voting_rights null) conservan su
   comportamiento; al re-guardar asistencia desde el stepper adoptan el marcador.
+
+### Iteración 7 — ITEM-017/039/040/052 [P1] Cluster voto de calidad (HECHO)
+
+- **Evidencia:** (1) Gate 6 de evaluarVotacion adoptaba CUALQUIER empate con votoCalidadHabilitado
+  sin conocer el voto del presidente (snapshot ADOPTED jurídicamente inválido si votó en contra) y
+  podía "satisfacer" mayorías reforzadas; (2) votoCalidadHabilitadoPorOrgano hacía return false
+  incondicional para COMISION_DELEGADA antes de leer quorum_rule.voto_calidad_presidente, dejando
+  sin efecto el true del Comité Ejecutivo (DL-5; verificado en Cloud: solo ese órgano tiene flag).
+- **Fix:** VotacionInput.votoPresidente ('FAVOR'|'CONTRA'|'ABSTENCION'|null); Gate 6 fail-closed —
+  solo dirime con voto FAVOR confirmado, nunca sobre mayoría reforzada (regex 2/3|3/4|4/5),
+  explain nodes específicos para cada rechazo; plumbing por meeting-adoption-snapshot
+  (voting_context.voto_presidente persistido) y VotacionesStep (presidente desde condiciones del
+  órgano, voto leído de la fila del punto); votoCalidadHabilitadoPorOrgano reordenado (config
+  explícita manda; default CONSEJO sí / comisiones no).
+- **Verificación:** 4 tests actualizados (camino positivo ahora exige FAVOR) + 5 regresiones nuevas
+  (presidente CONTRA, sin voto informado fail-closed, reforzada 2/3, snapshot REJECTED ×2). Suite
+  2023 tests 0 fail; typecheck/lint/build verdes; e2e 05+18 6/6.

@@ -43,7 +43,7 @@
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
 | ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | PENDIENTE |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | PENDIENTE |
-| ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | PENDIENTE |
+| ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO |
 | ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | PENDIENTE |
 | ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | PENDIENTE |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | PENDIENTE |
@@ -65,8 +65,8 @@
 | ITEM-036 | A6 | ✅ | Mayoría de consejo: fórmulas con 'total_miembros' se evalúan contra presentes y DELEGACION_FACULTADES ignora el 2/3 de componentes del art. 249.3 LSC | PENDIENTE |
 | ITEM-037 | A6 | ✅ | El Secretario no consejero computa en quórum y vota en el CdA (arts. 247.2 y 248.1 LSC) | HECHO |
 | ITEM-038 | A6 | ✅ | primeraConvocatoria hardcodeado a true: el quórum de 2ª convocatoria (arts. 193/194 LSC) nunca se evalúa y bloquea juntas legalmente constituidas | PENDIENTE |
-| ITEM-039 | A6 | ✅ | Voto de calidad desempata siempre hacia la adopción sin verificar el sentido del voto del presidente | PENDIENTE |
-| ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | PENDIENTE |
+| ITEM-039 | A6 | ✅ | Voto de calidad desempata siempre hacia la adopción sin verificar el sentido del voto del presidente | HECHO |
+| ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | HECHO |
 | ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | PENDIENTE |
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | PENDIENTE |
 | ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
@@ -78,7 +78,7 @@
 | ITEM-049 | A9 | ✅ | PactosParasocialesCard del expediente evalúa con votos inventados (70/30) y presenta veredictos de incumplimiento como reales | PENDIENTE |
 | ITEM-050 | A9 | ✅ | CO_APROBACION y SOLIDARIO: validación circular de administradores vigentes y sin reglas de mancomunidad (arts. 210 y 233.2 LSC) | PENDIENTE |
 | ITEM-051 | A9 | ✅ | Decisiones unipersonales: nacen FIRMADA sin firmante, checklist pre-firma ficticio y sin validación de unipersonalidad (arts. 15-16 LSC) | PENDIENTE |
-| ITEM-052 | A9 | ✅ | Voto de calidad imposible en Comité Ejecutivo: el early-return COMISION_DELEGADA ignora quorum_rule.voto_calidad_presidente=true (contradice la estructura demo ARGA) | PENDIENTE |
+| ITEM-052 | A9 | ✅ | Voto de calidad imposible en Comité Ejecutivo: el early-return COMISION_DELEGADA ignora quorum_rule.voto_calidad_presidente=true (contradice la estructura demo ARGA) | HECHO |
 | ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | BLOQUEADO-LEGAL |
 
 ### ITEM-004 [P1] Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados

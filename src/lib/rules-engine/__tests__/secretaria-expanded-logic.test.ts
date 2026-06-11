@@ -292,6 +292,7 @@ describe("Secretaría expanded rule logic — votación", () => {
       materias: ["PLAN_NEGOCIO"],
       votos: { favor: 3, contra: 3, abstenciones: 0, en_blanco: 0, capital_presente: 0, capital_total: 0, total_miembros: 7, miembros_presentes: 6 },
       esEmpate: true,
+      votoPresidente: "FAVOR" as const,
     };
 
     const withQualityVote = evaluarVotacion(votacionInput({ ...tied, votoCalidadHabilitado: true }), [consejoPack]);

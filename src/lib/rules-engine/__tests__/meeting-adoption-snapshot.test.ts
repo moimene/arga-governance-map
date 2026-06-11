@@ -267,7 +267,7 @@ describe("A3 — buildMeetingAdoptionSnapshot voto de calidad CdA", () => {
     },
   });
 
-  it("CdA SA empate 3-3 + votoCalidadHabilitado=true → ADOPTED con voto_calidad_usado=true", () => {
+  it("CdA SA empate 3-3 + votoCalidadHabilitado=true + presidente FAVOR → ADOPTED con voto_calidad_usado=true", () => {
     const snapshot = buildMeetingAdoptionSnapshot({
       agendaItemIndex: 0,
       resolutionText: "Aprobar cuentas anuales 2025 — empate resuelto por voto de calidad del Presidente",
@@ -278,6 +278,7 @@ describe("A3 — buildMeetingAdoptionSnapshot voto de calidad CdA", () => {
       adoptionMode: "MEETING",
       quorumReached: true,
       votoCalidadHabilitado: true,
+      votoPresidente: "FAVOR",
       voters: [
         { id: "c1-pres", vote: "FAVOR", voting_weight: 1 },
         { id: "c2", vote: "FAVOR", voting_weight: 1 },
@@ -340,6 +341,67 @@ describe("A3 — buildMeetingAdoptionSnapshot voto de calidad CdA", () => {
     expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeUndefined();
     expect(snapshot.societary_validity.ok).toBe(false);
     expect(snapshot.societary_validity.majority_reached).toBe(false);
+  });
+
+  it("ITEM-017/039: empate con voto de calidad habilitado pero presidente CONTRA → REJECTED", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Empate con presidente en contra — el voto de calidad dirime EN CONTRA",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: true,
+      votoCalidadHabilitado: true,
+      votoPresidente: "CONTRA",
+      voters: [
+        { id: "c1-pres", vote: "CONTRA", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "FAVOR", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+        { id: "c6", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+    expect(snapshot.voting_context.voto_presidente).toBe("CONTRA");
+    expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeUndefined();
+    expect(snapshot.societary_validity.ok).toBe(false);
+  });
+
+  it("ITEM-017/039: empate sin voto del presidente informado → fail-closed REJECTED", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 0,
+      resolutionText: "Empate sin identificar el voto del presidente",
+      materia: "APROBACION_CUENTAS",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      adoptionMode: "MEETING",
+      quorumReached: true,
+      votoCalidadHabilitado: true,
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+        { id: "c3", vote: "FAVOR", voting_weight: 1 },
+        { id: "c4", vote: "CONTRA", voting_weight: 1 },
+        { id: "c5", vote: "CONTRA", voting_weight: 1 },
+        { id: "c6", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 6,
+      capitalTotal: 6,
+      packs: [consejoOrdinariaPack()],
+    });
+
+    expect(snapshot.status_resolucion).toBe("REJECTED");
+    expect(snapshot.voting_context.voto_presidente).toBeNull();
+    expect(snapshot.societary_validity.voting.votoCalidadUsado).toBeUndefined();
+    expect(snapshot.societary_validity.ok).toBe(false);
   });
 
   it("CdA con mayoría clara (4-2) NO necesita voto de calidad aunque esté habilitado", () => {
