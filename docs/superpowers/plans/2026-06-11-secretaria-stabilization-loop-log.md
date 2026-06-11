@@ -394,3 +394,15 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   (mayoría absoluta); la literalidad de «supera» exigiría >50% (nota para Comité Legal).
 - **Verificación:** 1 test actualizado al contrato legal + 5 regresiones nuevas; 2045 tests 0
   fail; gates verdes; e2e 05+18 6/6; migración alineada.
+
+### Iteración 21 — ITEM-012 [P1] Quórum SL inventado en 11 packs (HECHO, re-triado)
+
+- **Evidencia (BOE):** la LSC no establece quórum de constitución para la junta de SL (el control
+  es la mayoría con suelo de los arts. 198-199). 11 packs activos codificaban quorum.SL=50 citando
+  los arts. 196/197 (derecho de información): una junta SL con el 40% del capital quedaba
+  BLOQUEADA pese a poder adoptar válidamente. Dos packs citaban además el art. 190 (conflictos)
+  como fuente del quórum SA del 25% (es el 193.1).
+- **Fix:** migración 20260611210000 — quorum.SL=0 con referencia legal correcta en los 11 packs
+  (scoped por id + guard de valor) y citas 190→193.1 en los dos ordinarias. Verificado en Cloud:
+  0 packs con SL=50, 0 citas 190 restantes.
+- **Verificación:** 2045 tests 0 fail; gates verdes; e2e 05+18 6/6; migración alineada.

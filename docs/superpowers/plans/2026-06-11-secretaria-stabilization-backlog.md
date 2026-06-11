@@ -38,7 +38,7 @@
 | ITEM-009 | A10 | ✅ | Art. 248.1 LSC: la mayoría del consejo se evalúa sobre miembros totales en vez de concurrentes; 'favor > presentes_mitad' se remapea silenciosamente a total | HECHO |
 | ITEM-010 | A10 | ✅ | Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo | HECHO (re-triado: corrección factual BOE, no redacción nueva) |
 | ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | BLOQUEADO-LEGAL |
-| ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | BLOQUEADO-LEGAL |
+| ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (re-triado: corrección factual BOE; 11 packs) |
 | ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (contradicción resuelta — ambos en 201.2; consolidar duplicado queda P3) |
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
 | ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | PENDIENTE |
