@@ -44,6 +44,19 @@ describe("F8.1 — RPCs acta/certificación", () => {
   });
 });
 
+describe("ITEM-003 — RPC fn_aprobar_acta (aprobar y firmar acta)", () => {
+  it("fn_aprobar_acta existe con la firma (p_minute_id) y está vetada para anon", async () => {
+    const { error } = await supabase.rpc("fn_aprobar_acta", {
+      p_minute_id: "00000000-0000-0000-0000-000000000000",
+    });
+    expect(error?.message ?? "").not.toMatch(/function .* does not exist/i);
+    expect(error?.message ?? "").not.toMatch(/could not find the function/i);
+    // Contrato de hardening: REVOKE EXECUTE FROM anon — el cliente anónimo
+    // nunca debe poder ejecutarla (ni siquiera para recibir "no encontrada").
+    expect(error?.message ?? "").toMatch(/permission denied/i);
+  });
+});
+
 describe("F8.2 — RPCs firma/emisión", () => {
   it("fn_firmar_certificacion existe y acepta (cert_id, qtsp_token, tsq_token)", async () => {
     const { error } = await supabase.rpc("fn_firmar_certificacion", {

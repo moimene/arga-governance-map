@@ -15,11 +15,11 @@
 
 | ID | Área | Verif. | Título | Estado |
 |---|---|---|---|---|
-| ITEM-003 | A7 | ✅ | Acta generada en la app nunca es certificable: no existe acción para aprobar/firmar el acta (gate signed_at sin escritor) | PENDIENTE |
+| ITEM-003 | A7 | ✅ | Acta generada en la app nunca es certificable: no existe acción para aprobar/firmar el acta (gate signed_at sin escritor) | HECHO |
 
 ### ITEM-003 [P0] Acta generada en la app nunca es certificable: no existe acción para aprobar/firmar el acta (gate signed_at sin escritor)
 
-- **Área:** A7 · **Estado:** PENDIENTE
+- **Área:** A7 · **Estado:** HECHO (Iteración 3 — migración `20260611180327_fn_aprobar_acta` + `AprobarActaButton` en ActaDetalle)
 - **Descripción:** EmitirCertificacionButton en ActaDetalle está bloqueado por actaApprovalGateReason cuando minutes.signed_at es NULL ('el acta debe estar aprobada o firmada antes de certificar acuerdos (RRM arts. 108-109)'). Pero fn_generar_acta (ambas versiones, 3-arg y 4-arg) inserta signed_at NULL, y NO existe ningún código en src/ ni en edge functions que haga UPDATE de minutes (cero .update() sobre la tabla minutes en todo el repo). Resultado: toda acta creada por el flujo operativo (ReunionStepper CierreStep → fn_generar_acta) queda permanentemente bloqueada para emitir certificación; el mensaje pide un paso ('aprobar o firmar el acta') que no existe en la UI. Solo las 6 actas seed con signed_at preexistente pueden certificar. El gate se introdujo en commit c8887ef (2026-05-19) sin añadir la acción de firma correspondiente.
 - **Evidencia:** src/pages/secretaria/ActaDetalle.tsx:354-358 (actaApprovalGateReason gate). supabase/migrations/20260515070446_agenda_driven_minutes_contract.sql (fn_generar_acta: VALUES ... NULL, false para signed_at/is_locked) y 20260421214352_rpcs_acta_certificacion_f81.sql (ídem). grep -rn 'from("minutes")' en src + supabase/functions: 8 call sites, todos SELECT, ningún UPDATE. Cloud SQL: SELECT count(*), count(signed_at) FROM minutes WHERE tenant_id='00000000-0000-0000-0000-000000000001' → total 11, signed 6 (todas seed); las 5 sin firmar no pueden certificar.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ActaDetalle.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/supabase/migrations/20260515070446_agenda_driven_minutes_contract.sql, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/components/secretaria/EmitirCertificacionButton.tsx

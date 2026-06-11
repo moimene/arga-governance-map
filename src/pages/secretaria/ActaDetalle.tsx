@@ -9,6 +9,7 @@ import {
   useCertificationPlanForMinute,
   useMaterializeMeetingPointAgreement,
 } from "@/hooks/useActas";
+import { AprobarActaButton } from "@/components/secretaria/AprobarActaButton";
 import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
@@ -352,7 +353,7 @@ export default function ActaDetalle() {
   const certificationReadinessReason =
     readiness?.status === "reference_only" ? demoReadinessMessage(readiness) : null;
   const actaApprovalGateReason = !m.signed_at
-    ? "No se puede emitir certificación: el acta debe estar aprobada o firmada antes de certificar acuerdos (RRM arts. 108-109)."
+    ? "No se puede emitir certificación: el acta debe estar aprobada o firmada antes de certificar acuerdos (RRM arts. 108-109). Usa «Aprobar y firmar acta»."
     : null;
   const certificationGateReason =
     actaApprovalGateReason ?? certificationReadinessReason ?? certificationDisabledReason;
@@ -765,16 +766,25 @@ export default function ActaDetalle() {
                   Certificaciones emitidas
                 </h2>
               </div>
-              {id && acta.entity_id ? (
-                <EmitirCertificacionButton
-                  minuteId={id}
-                  entityId={acta.entity_id}
-                  bodyId={acta.body_id}
-                  agreementIds={certificationAgreementRefs}
-                  userRole={primaryRole}
-                  disabledReason={certificationGateReason}
-                />
-              ) : null}
+              <div className="flex items-center gap-2">
+                {id && !m.signed_at ? (
+                  <AprobarActaButton
+                    minuteId={id}
+                    userRole={primaryRole}
+                    hasContent={Boolean(m.content && m.content.trim().length > 0)}
+                  />
+                ) : null}
+                {id && acta.entity_id ? (
+                  <EmitirCertificacionButton
+                    minuteId={id}
+                    entityId={acta.entity_id}
+                    bodyId={acta.body_id}
+                    agreementIds={certificationAgreementRefs}
+                    userRole={primaryRole}
+                    disabledReason={certificationGateReason}
+                  />
+                ) : null}
+              </div>
             </div>
             <div className="divide-y divide-[var(--g-border-subtle)]">
               {certs && certs.length > 0 ? (

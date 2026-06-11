@@ -51,6 +51,25 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   motor/pack contra texto BOE verificado no es redacción legal nueva (§1.4 aplica a cláusulas de
   plantillas y decisiones de producto). Se revisará ítem a ítem al seleccionarlos.
 
+### Iteración 3 — ITEM-003 [P0] Acta nunca certificable: no existía acción de aprobar/firmar (HECHO)
+
+- **Evidencia:** gate `actaApprovalGateReason` exige `minutes.signed_at` (ActaDetalle.tsx) pero
+  `fn_generar_acta` inserta `signed_at NULL` y NO existía ningún UPDATE de `minutes` en todo el
+  producto. Cloud: 11 actas demo, solo 6 (seed) firmadas. Toda acta del flujo operativo quedaba
+  bloqueada para certificación pidiendo un paso inexistente.
+- **Fix:** migración `20260611180327_fn_aprobar_acta` (RPC SECURITY DEFINER con aserción de tenant
+  vía `fn_current_tenant_id`, patrón 20260606165443; idempotente; exige contenido; firma + bloquea
+  `is_locked` en una operación — `trg_minutes_lock_guard` garantiza inmutabilidad posterior; REVOKE
+  anon/PUBLIC, GRANT authenticated). Hook `useAprobarActa` (useActas.ts), componente
+  `AprobarActaButton` (capability CERTIFICATION + window.confirm por irreversibilidad), montado
+  junto a EmitirCertificacionButton; mensaje del gate ahora accionable.
+- **Verificación:** smoke conductual en Cloud (scratch row): firma+lock OK, tamper post-firma
+  bloqueado por guard, idempotencia OK, rechazo de acta sin contenido OK, scratch limpiado. Probe
+  test `ITEM-003` en rpcs-acta-cert.test.ts verifica existencia + veto a anon. Gates: bun test 2007
+  (0 fail), typecheck, lint sin nuevos, build, e2e 05+18 (golden path completo) 6/6.
+- **Cloud:** head migraciones = `20260611180327`, `migration list --linked` alineado. Nota: el head
+  previo real era 20260606175406 (CLAUDE.md decía 20260606165443 — drift de docs anotado).
+
 ### Iteración 2 — ITEM-002 [P2] Spec e2e 12-navigation desfasado (HECHO, commit cbbe102)
 
 - Baseline e2e checkpoint: 46/48 → fix de 3 expectativas estancas (label "Personas y cargos",

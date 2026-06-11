@@ -222,6 +222,37 @@ export function useCertificationsByMinute(minuteId: string | undefined) {
   });
 }
 
+export interface AprobarActaResult {
+  minute_id: string;
+  signed_at: string;
+  already_signed: boolean;
+}
+
+/**
+ * Aprueba y firma el acta (minutes.signed_at) y la bloquea (is_locked) vía
+ * fn_aprobar_acta. Es el paso que desbloquea el gate de certificación de
+ * ActaDetalle (RRM arts. 108-109): sin él, ningún acta generada por el flujo
+ * operativo podía emitir certificación (ITEM-003 del loop de estabilización).
+ */
+export function useAprobarActa(minuteId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!minuteId) throw new Error("Acta no disponible.");
+      const { data, error } = await supabase.rpc("fn_aprobar_acta", {
+        p_minute_id: minuteId,
+      });
+      if (error) throw error;
+      return data as AprobarActaResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
+    },
+  });
+}
+
 export interface MaterializeMeetingPointAgreementInput {
   meetingId: string;
   bodyId: string | null;
