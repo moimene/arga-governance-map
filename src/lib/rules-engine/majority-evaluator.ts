@@ -228,12 +228,17 @@ function evaluateFormula(
     };
   }
 
-  // One third of total voting capital (art. 198 LSC)
+  // ITEM-007 — art. 198 LSC (SL, mayoría ordinaria; BOE literal): doble
+  // condición — (1) mayoría de los votos válidamente emitidos (favor > contra;
+  // los blancos no computan) Y (2) que el favor represente AL MENOS un tercio
+  // (>=, no estricto) de los votos correspondientes al total de
+  // participaciones. Antes solo se comprobaba favor > total/3: un 34% a favor
+  // con 40% en contra se proclamaba.
   if (formulaActual === 'favor > 1/3_capital_total_con_voto') {
-    const requerido = capital_total / 3;
+    const suelo = capital_total / 3;
     return {
-      alcanzada: favor > requerido,
-      valorRequerido: requerido,
+      alcanzada: favor > contra && favor >= suelo,
+      valorRequerido: Math.max(contra, suelo),
       valorObtenido: favor,
     };
   }
@@ -269,6 +274,12 @@ function evaluateFormula(
   }
 
   // SA reinforced matters under art. 201.2 LSC.
+  // ITEM-008 — BOE literal: con capital presente >50% basta mayoría absoluta;
+  // en el tramo [25%, 50%) se exige el voto favorable de los DOS TERCIOS DEL
+  // CAPITAL PRESENTE o representado (no de los votos emitidos — con
+  // abstenciones el cómputo sobre emitidos producía falsos positivos).
+  // Caso límite de concurrencia exactamente 50%: se mantiene la lectura
+  // mayoritaria (mayoría absoluta) documentada en el backlog del loop.
   if (formulaActual === 'lsc_201_2_reforzada') {
     const capitalRatio = capital_total > 0 ? capital_presente / capital_total : 0;
     if (capitalRatio >= 0.5) {
@@ -279,10 +290,10 @@ function evaluateFormula(
         valorObtenido: favor,
       };
     }
-    if (emitidos === 0) {
+    if (capital_presente === 0) {
       return { alcanzada: false, valorRequerido: 1, valorObtenido: 0 };
     }
-    const requerido = (2 * emitidos) / 3;
+    const requerido = (2 * capital_presente) / 3;
     return {
       alcanzada: favor >= requerido,
       valorRequerido: requerido,

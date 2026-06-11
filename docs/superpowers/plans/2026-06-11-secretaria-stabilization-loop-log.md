@@ -375,3 +375,22 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   typology_code coherente con el órgano convocado (sin match → null, mejor sin badge que con un
   badge de otro órgano).
 - **Verificación:** gates verdes (2041 tests 0 fail); migración alineada; e2e 04+18 6/6.
+
+### Iteración 20 — ITEM-007/008/013 [P1] Mayorías SL 198 y SA reforzada 201.2 (HECHO, re-triados)
+
+- **ITEM-007 (BOE literal art. 198):** doble condición — mayoría de votos válidamente emitidos
+  (favor > contra, blancos no computan) Y favor >= 1/3 del capital total ("al menos" = no
+  estricto). El evaluador solo comprobaba favor > total/3: un 34% a favor con 40% en contra se
+  proclamaba. Fórmula compuesta implementada; los 5 packs SL que ya citaban 198 quedan correctos
+  automáticamente; RETRIBUCION_ADMIN SL migrado de 'Mayoría simple' a la fórmula 198.
+- **ITEM-008 (BOE literal art. 201.2 post-Ley 31/2014):** el 2/3 del tramo [25%,50%) es del
+  CAPITAL PRESENTE, no de los emitidos (falsos positivos con abstenciones); y con >50% basta
+  mayoría absoluta (los packs con 2/3 plano sobre-exigían). Evaluador corregido + migración
+  20260611204500: 9 packs SA → 'reforzada art. 201.2 LSC' (3 citaban además el 194.1, que es de
+  QUÓRUM). Verificado en Cloud: 0 fórmulas planas restantes, 10 packs en 201.2.
+- **ITEM-013:** la contradicción MOD_ESTATUTOS vs MODIFICACION_ESTATUTOS queda resuelta (ambos
+  201.2); la consolidación del duplicado pasa a P3.
+- **Caso límite documentado:** concurrencia exactamente 50% — se mantiene la lectura mayoritaria
+  (mayoría absoluta); la literalidad de «supera» exigiría >50% (nota para Comité Legal).
+- **Verificación:** 1 test actualizado al contrato legal + 5 regresiones nuevas; 2045 tests 0
+  fail; gates verdes; e2e 05+18 6/6; migración alineada.

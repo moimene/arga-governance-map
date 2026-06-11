@@ -216,12 +216,21 @@ describe('majority-evaluator', () => {
       ).alcanzada,
     ).toBe(true);
 
+    // ITEM-008 — art. 201.2 LSC (BOE literal): en el tramo [25%, 50%) el 2/3
+    // se computa sobre el CAPITAL PRESENTE (40 → exige 26,7), no sobre los
+    // emitidos (30 → exigía 20 y producía falsos positivos con abstención).
     expect(
       evaluarMayoria(
         createMajoritySpec('reforzada art. 201.2 LSC'),
         createVotos(20, 10, 0, 0, 40, 100),
       ).alcanzada,
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      evaluarMayoria(
+        createMajoritySpec('reforzada art. 201.2 LSC'),
+        createVotos(27, 10, 3, 0, 40, 100),
+      ).alcanzada,
+    ).toBe(true); // 27 >= 26,67 (2/3 del capital presente)
   });
 
   // ===== Test: Abstenciones handling =====
@@ -379,5 +388,49 @@ describe("ITEM-009/010 — mayorías del consejo (arts. 248.1 y 249.3 LSC)", () 
       { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 9, capital_total: 15, total_miembros: 15, miembros_presentes: 9 },
     );
     expect(result.alcanzada).toBe(true);
+  });
+});
+
+describe("ITEM-007/008 — arts. 198 y 201.2 LSC (contrastados BOE)", () => {
+  const createMajoritySpec = (formula: string): MajoritySpec => ({ formula, fuente: "LEY" });
+  const createVotos = (
+    favor: number,
+    contra: number,
+    abstenciones = 0,
+    en_blanco = 0,
+    capital_presente = 0,
+    capital_total = 0,
+  ): VotosInput => ({ favor, contra, abstenciones, en_blanco, capital_presente, capital_total });
+
+  it("198 SL: favor 34% con contra 40% NO se proclama (falta mayoría de emitidos)", () => {
+    const result = evaluarMayoria(
+      createMajoritySpec("favor > 1/3_capital_total_con_voto"),
+      createVotos(34, 40, 0, 0, 90, 100),
+    );
+    expect(result.alcanzada).toBe(false);
+  });
+
+  it("198 SL: favor 30% con contra 20% NO se proclama (no alcanza el suelo de 1/3)", () => {
+    const result = evaluarMayoria(
+      createMajoritySpec("favor > 1/3_capital_total_con_voto"),
+      createVotos(30, 20, 0, 0, 60, 100),
+    );
+    expect(result.alcanzada).toBe(false); // 30 < 33,3
+  });
+
+  it("198 SL: 'al menos un tercio' es >= (no estricto) — favor exactamente 1/3 con mayoría adopta", () => {
+    const result = evaluarMayoria(
+      createMajoritySpec("favor > 1/3_capital_total_con_voto"),
+      createVotos(34, 10, 0, 0, 60, 102),
+    );
+    expect(result.alcanzada).toBe(true); // 34 >= 34 (1/3 de 102) y 34 > 10
+  });
+
+  it("201.2 SA con >50% de concurrencia: basta mayoría absoluta del presente", () => {
+    const result = evaluarMayoria(
+      createMajoritySpec("reforzada art. 201.2 LSC"),
+      createVotos(31, 29, 0, 0, 60, 100),
+    );
+    expect(result.alcanzada).toBe(true); // 31 > 30
   });
 });

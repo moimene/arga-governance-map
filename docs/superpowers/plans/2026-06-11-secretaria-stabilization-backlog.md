@@ -33,13 +33,13 @@
 | ITEM-004 | A1 | ✅ | Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados | HECHO |
 | ITEM-005 | A1 | ✅ | calcularAntelacion aplica overrides numéricos de cualquier clave: un override de quórum puede inflar la antelación de convocatoria | HECHO |
 | ITEM-006 | A1 | ✅ | Alias divergentes materia UI ↔ rule pack rompen el match silenciosamente (convocatoria emite con warning genérico sin reglas) | HECHO (residual: packs duplicados MOD_ESTATUTOS↔MODIFICACION_ESTATUTOS en ITEM-013 y lifecycle de cooptación, legal/data) |
-| ITEM-007 | A10 | ✅ | Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto | BLOQUEADO-LEGAL |
-| ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | BLOQUEADO-LEGAL |
+| ITEM-007 | A10 | ✅ | Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto | HECHO (re-triado: corrección factual BOE) |
+| ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | HECHO (re-triado: corrección factual BOE) |
 | ITEM-009 | A10 | ✅ | Art. 248.1 LSC: la mayoría del consejo se evalúa sobre miembros totales en vez de concurrentes; 'favor > presentes_mitad' se remapea silenciosamente a total | HECHO |
 | ITEM-010 | A10 | ✅ | Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo | HECHO (re-triado: corrección factual BOE, no redacción nueva) |
 | ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | BLOQUEADO-LEGAL |
 | ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | BLOQUEADO-LEGAL |
-| ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | BLOQUEADO-LEGAL |
+| ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (contradicción resuelta — ambos en 201.2; consolidar duplicado queda P3) |
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
 | ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | PENDIENTE |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
