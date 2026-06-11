@@ -1256,6 +1256,19 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
   const updateQuorum = useUpdateQuorumData(meetingId);
 
+  // ITEM-016/038: el quórum de junta SA depende de si la sesión se celebra en
+  // 1ª o 2ª convocatoria (arts. 193-194 LSC). El secretario lo declara aquí y
+  // queda persistido en quorum_data para constitución y votación.
+  const [convocatoriaLlamada, setConvocatoriaLlamada] = useState<"PRIMERA" | "SEGUNDA">("PRIMERA");
+  const [llamadaInitialized, setLlamadaInitialized] = useState(false);
+  useEffect(() => {
+    if (llamadaInitialized || !meeting) return;
+    const saved = (existingQuorum?.quorum as { convocatoria_llamada?: string } | undefined)
+      ?.convocatoria_llamada;
+    if (saved === "SEGUNDA") setConvocatoriaLlamada("SEGUNDA");
+    setLlamadaInitialized(true);
+  }, [llamadaInitialized, meeting, existingQuorum]);
+
   const agendaForRules = agendaSources.length > 0
     ? agendaSources
     : ((existingQuorum?.debates ?? []) as DebatePunto[]);
@@ -1390,7 +1403,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       tipoSocial,
       organoTipo,
       adoptionMode: "MEETING",
-      primeraConvocatoria: true,
+      primeraConvocatoria: convocatoriaLlamada !== "SEGUNDA",
       materiaClase,
       capitalConDerechoVoto: capitalTotal,
       capitalPresenteRepresentado: capitalPresente,
@@ -1438,6 +1451,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
         total,
         pct: pct.toFixed(1),
         reached: quorumReached,
+        convocatoria_llamada: convocatoriaLlamada,
         engine: "evaluarConstitucion",
         organo_tipo: organoTipo,
         tipo_social: tipoSocial,
@@ -1471,6 +1485,34 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
           ? `${universalMeetingLabel(organoTipo)} exige ${universalMeetingRequirementLabel(organoTipo)} y aceptación unánime del orden del día. El sistema bloquea el avance si falta cualquier participación.`
           : "El quórum se calcula con el motor de constitución según órgano, tipo social y materias debatidas. En juntas se usa capital/derechos de voto cuando existe dato disponible; en consejo se usa mayoría de miembros."}
       </p>
+
+      {organoTipo === "JUNTA_GENERAL" && (tipoSocial === "SA" || tipoSocial === "SAU") && !isUniversalMeeting ? (
+        <div
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <label
+            htmlFor="convocatoria-llamada"
+            className="block text-sm font-medium text-[var(--g-text-primary)]"
+          >
+            Convocatoria en la que se celebra la sesión
+          </label>
+          <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+            El quórum exigible cambia entre 1ª y 2ª convocatoria (arts. 193-194 LSC).
+          </p>
+          <select
+            id="convocatoria-llamada"
+            value={convocatoriaLlamada}
+            onChange={(e) => setConvocatoriaLlamada(e.target.value === "SEGUNDA" ? "SEGUNDA" : "PRIMERA")}
+            className="mt-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            data-testid="quorum-convocatoria-llamada"
+          >
+            <option value="PRIMERA">Primera convocatoria</option>
+            <option value="SEGUNDA">Segunda convocatoria</option>
+          </select>
+        </div>
+      ) : null}
 
       <div
         className="grid grid-cols-3 gap-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
@@ -2608,7 +2650,11 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       tipoSocial,
       organoTipo,
       adoptionMode,
-      primeraConvocatoria: true,
+      // ITEM-016/038: la llamada (1ª/2ª convocatoria) se declara en el paso
+      // de quórum y queda persistida en quorum_data.quorum.
+      primeraConvocatoria:
+        (quorumData?.quorum as { convocatoria_llamada?: string } | undefined)
+          ?.convocatoria_llamada !== "SEGUNDA",
       quorumReached: quorumReachedForVote,
       voters: rowsForPoint.map((voter) => ({
         id: voter.id,

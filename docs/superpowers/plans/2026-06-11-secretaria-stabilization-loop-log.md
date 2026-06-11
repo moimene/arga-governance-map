@@ -173,3 +173,18 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Verificación:** 4 tests actualizados (camino positivo ahora exige FAVOR) + 5 regresiones nuevas
   (presidente CONTRA, sin voto informado fail-closed, reforzada 2/3, snapshot REJECTED ×2). Suite
   2023 tests 0 fail; typecheck/lint/build verdes; e2e 05+18 6/6.
+
+### Iteración 8 — ITEM-016/038 [P1] primeraConvocatoria hardcodeado a true (HECHO)
+
+- **Evidencia:** QuorumStep y buildSnapshotForPoint pasaban primeraConvocatoria:true fijo. Una JGE
+  en 2ª convocatoria con 30% de capital y materia estatutaria (válida, art. 194.2: 25%) quedaba
+  bloqueada con el umbral del 50% de 1ª (art. 194.1). El motor codifica 193/194 correctamente
+  (verificado contra BOE); el dato simplemente no llegaba.
+- **Fix:** el secretario declara la llamada en el paso de Quórum (selector "Primera/Segunda
+  convocatoria", visible solo para JUNTA_GENERAL de SA/SAU no universal), persistida en
+  quorum_data.quorum.convocatoria_llamada; propagada a evaluarConstitucion y al snapshot de
+  votación (primeraConvocatoria = llamada !== SEGUNDA). Reanudación restaura el valor guardado.
+- **Residual anotado:** useAgreementCompliance/usePreviewAcuerdo conservan default 1ª convocatoria
+  (evaluación de forma con votos placeholder — cubierto por la deuda DL-2/ITEM-019, no por este
+  ítem). ConvocatoriasStepper evalúa la convocatoria en 1ª por diseño.
+- **Verificación:** gates verdes (2023 tests 0 fail, typecheck, lint, build); e2e 05+18 6/6.
