@@ -1217,18 +1217,44 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
   const { data: pactos = [] } = usePactosVigentes(agreement.entity_id);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Material mapping: agreement_kind → materias for evaluation
+  // Material mapping: agreement_kind → materias del vocabulario de cláusulas
+  // (materia_ambito de pacto_clausulas). ITEM-049: incluye los kinds
+  // estructurales que generan los steppers y alinea capital con el
+  // vocabulario real (AUMENTO_CAPITAL, no AMPLIACION_CAPITAL).
   const MATERIA_MAP: Record<string, string[]> = {
     FUSION: ["FUSION"],
     ESCISION: ["ESCISION"],
+    FUSION_ESCISION: ["FUSION", "ESCISION"],
     DISOLUCION: ["DISOLUCION"],
     TRANSFORMACION: ["TRANSFORMACION"],
-    AMPLIACION_CAPITAL: ["AMPLIACION_CAPITAL"],
-    EMISION_CONVERTIBLES: ["EMISION_CONVERTIBLES"],
+    OPERACION_ESTRUCTURAL: ["FUSION", "ESCISION", "TRANSFORMACION", "CESION_GLOBAL_ACTIVO", "DISOLUCION"],
+    VENTA_ACTIVOS_SUSTANCIALES: ["CESION_GLOBAL_ACTIVO"],
+    CESION_GLOBAL_ACTIVO: ["CESION_GLOBAL_ACTIVO"],
+    AMPLIACION_CAPITAL: ["AUMENTO_CAPITAL"],
+    AUMENTO_CAPITAL: ["AUMENTO_CAPITAL"],
+    REDUCCION_CAPITAL: ["REDUCCION_CAPITAL"],
+    EMISION_CONVERTIBLES: ["EMISION_OBLIGACIONES"],
+    EMISION_OBLIGACIONES: ["EMISION_OBLIGACIONES"],
     OPERACION_VINCULADA: ["OPERACION_VINCULADA"],
     MOD_ESTATUTOS: ["MOD_ESTATUTOS"],
+    MODIFICACION_ESTATUTOS: ["MOD_ESTATUTOS"],
     APROBACION_CUENTAS: ["APROBACION_CUENTAS"],
   };
+
+  // ITEM-049: la evaluación de cumplimiento solo es legítima con la votación
+  // REAL. El compliance_snapshot congelado al adoptar (origen reunión) trae
+  // vote_summary; sin votos reales la card opera en modo "aplicabilidad"
+  // (qué pactos aplican a la materia) sin veredictos de cumplimiento.
+  const snapshotVotes = (() => {
+    const snap = (agreement as { compliance_snapshot?: unknown }).compliance_snapshot as
+      | { vote_summary?: { favor?: number; contra?: number; voting_weight?: number; capital_total?: number } }
+      | null
+      | undefined;
+    const vs = snap?.vote_summary;
+    if (!vs || typeof vs.favor !== "number" || typeof vs.contra !== "number") return null;
+    return vs;
+  })();
+  const modoAplicabilidad = snapshotVotes === null;
 
   if (pactos.length === 0) {
     return (
@@ -1240,13 +1266,17 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
     );
   }
 
-  // Prepare evaluation input
+  // Prepare evaluation input (votos reales del snapshot o neutros para el
+  // modo aplicabilidad — en ese modo solo se muestra `aplica`, nunca
+  // cumple/incumple).
   const evalInput: PactosEvalInput = {
     materias: MATERIA_MAP[agreement.agreement_kind] ?? [agreement.agreement_kind],
-    capitalPresente: 100,
-    capitalTotal: 100,
-    votosFavor: 70,
-    votosContra: 30,
+    capitalPresente: snapshotVotes
+      ? (snapshotVotes.voting_weight ?? snapshotVotes.favor + snapshotVotes.contra)
+      : 0,
+    capitalTotal: snapshotVotes ? (snapshotVotes.capital_total ?? 100) : 100,
+    votosFavor: snapshotVotes?.favor ?? 0,
+    votosContra: snapshotVotes?.contra ?? 0,
     consentimientosPrevios: [],
     vetoRenunciado: [],
   };
@@ -1283,7 +1313,18 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
 
   return (
     <Card icon={<Handshake className="h-4 w-4" />} title="Pactos parasociales">
-      <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+      {modoAplicabilidad ? (
+        <div
+          className="mb-4 border-l-4 border-[var(--status-info)] bg-[var(--g-surface-muted)] p-3 text-xs text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Sin votación real registrada en el expediente: se muestra la
+          aplicabilidad de los pactos a la materia. La evaluación de
+          cumplimiento se realiza con la votación real en el momento de la
+          adopción (ver snapshot legal del punto en el acta).
+        </div>
+      ) : null}
+      <div className={`mb-4 grid ${modoAplicabilidad ? "grid-cols-2" : "grid-cols-3"} gap-3 text-sm`}>
         <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
           <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Evaluados</div>
           <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_evaluados}</div>
@@ -1292,10 +1333,12 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
           <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Aplicables</div>
           <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_aplicables}</div>
         </div>
-        <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
-          <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Cumplidos</div>
-          <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_cumplidos}</div>
-        </div>
+        {!modoAplicabilidad ? (
+          <div className="border border-[var(--g-border-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+            <div className="text-[11px] font-semibold text-[var(--g-text-secondary)] uppercase">Cumplidos</div>
+            <div className="mt-1 text-lg font-bold text-[var(--g-text-primary)]">{evalResult.pactos_cumplidos}</div>
+          </div>
+        ) : null}
       </div>
 
       {evalResult.resultados.length > 0 && (
@@ -1314,7 +1357,11 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
                 className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
               >
                 <div className="flex items-center gap-2 flex-1">
-                  {severityIcon(result.severity)}
+                  {modoAplicabilidad ? (
+                    <Circle className="h-4 w-4 text-[var(--g-text-secondary)]" />
+                  ) : (
+                    severityIcon(result.severity)
+                  )}
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-[var(--g-text-primary)]">
                       {result.pacto_titulo}
@@ -1324,23 +1371,38 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex px-2 py-0.5 text-[10px] font-semibold ${severityClass(
-                        result.severity
-                      )}`}
-                      style={{ borderRadius: "var(--g-radius-full)" }}
-                    >
-                      {result.severity}
-                    </span>
-                    {result.aplica && !result.cumple && (
-                      <span className="text-[10px] font-semibold text-[var(--status-error)]">
-                        INCUMPLE
+                    {modoAplicabilidad ? (
+                      <span
+                        className={`inline-flex px-2 py-0.5 text-[10px] font-semibold ${
+                          result.aplica
+                            ? "bg-[var(--status-info)] text-[var(--g-text-inverse)]"
+                            : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                        }`}
+                        style={{ borderRadius: "var(--g-radius-full)" }}
+                      >
+                        {result.aplica ? "APLICA" : "No aplica"}
                       </span>
-                    )}
-                    {!result.aplica && (
-                      <span className="text-[10px] text-[var(--g-text-secondary)]">
-                        No aplica
-                      </span>
+                    ) : (
+                      <>
+                        <span
+                          className={`inline-flex px-2 py-0.5 text-[10px] font-semibold ${severityClass(
+                            result.severity
+                          )}`}
+                          style={{ borderRadius: "var(--g-radius-full)" }}
+                        >
+                          {result.severity}
+                        </span>
+                        {result.aplica && !result.cumple && (
+                          <span className="text-[10px] font-semibold text-[var(--status-error)]">
+                            INCUMPLE
+                          </span>
+                        )}
+                        {!result.aplica && (
+                          <span className="text-[10px] text-[var(--g-text-secondary)]">
+                            No aplica
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1354,9 +1416,13 @@ function PactosParasocialesCard({ agreement }: { agreement: AgreementRow }) {
               {expanded === result.pacto_id && (
                 <div className="border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/30 p-3 space-y-2">
                   <div className="text-sm text-[var(--g-text-primary)]">
-                    {result.explain.mensaje}
+                    {modoAplicabilidad
+                      ? result.aplica
+                        ? "Esta cláusula aplica a la materia del acuerdo. El cumplimiento se evalúa con la votación real registrada en el acta."
+                        : "Esta cláusula no aplica a la materia del acuerdo."
+                      : result.explain.mensaje}
                   </div>
-                  {result.explain.hijos && result.explain.hijos.length > 0 && (
+                  {!modoAplicabilidad && result.explain.hijos && result.explain.hijos.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-[var(--g-border-subtle)] text-xs space-y-1">
                       {result.explain.hijos.map((hijo, idx) => (
                         <div key={idx} className="flex flex-col gap-1">

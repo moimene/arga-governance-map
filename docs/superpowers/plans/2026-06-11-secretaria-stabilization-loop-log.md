@@ -236,3 +236,17 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   estructural bloqueado, scratch limpiado); gates verdes; e2e 04+18 6/6.
 - **Residual P3 anotado:** 3 convocatorias seed en estado CELEBRADA sin sello (no pasaron por
   EMITIDA en su ciclo seed); las nuevas conservan el sello al transicionar.
+
+### Iteración 12 — ITEM-049 [P1] PactosParasocialesCard con votos inventados (HECHO)
+
+- **Evidencia:** la card del expediente evaluaba con votosFavor:70/votosContra:30 fijos →
+  "MAYORÍA PACTADA NO ALCANZADA" permanente en OPERACION_VINCULADA (70%<75%) y vetos siempre
+  ACTIVOS, con independencia de la votación real. MATERIA_MAP sin OPERACION_ESTRUCTURAL ni
+  alineación con el vocabulario real de cláusulas (AUMENTO_CAPITAL vs AMPLIACION_CAPITAL).
+- **Fix:** votos REALES desde compliance_snapshot.vote_summary (congelado al adoptar) cuando
+  existen; sin votación real la card opera en "modo aplicabilidad": banner explicativo, badge
+  APLICA/No aplica neutro, sin veredictos cumple/incumple ni KPI "Cumplidos", explain sustituido
+  por texto de aplicabilidad. MATERIA_MAP ampliado y alineado con materia_ambito de
+  pacto_clausulas (verificado en Cloud: FUSION/ESCISION/TRANSFORMACION/CESION_GLOBAL_ACTIVO/
+  DISOLUCION; AUMENTO/REDUCCION_CAPITAL; EMISION_OBLIGACIONES; OPERACION_VINCULADA).
+- **Verificación:** gates verdes (2026 tests 0 fail); e2e 07+18 verdes.
