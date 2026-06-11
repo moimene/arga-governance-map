@@ -8,7 +8,7 @@ import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import type { AdoptionMode } from "@/lib/rules-engine";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList, type EntityWithParent } from "@/hooks/useEntities";
-import { useCreateUnipersonalDecision } from "@/hooks/useDecisionesUnipers";
+import { useCreateUnipersonalDecision, useDecisorUnipersonal } from "@/hooks/useDecisionesUnipers";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
@@ -32,6 +32,8 @@ function TipoMateriaStep({
   isSociedadScoped,
   materias,
   isLoading,
+  decisorName,
+  decisorReason,
 }: {
   tipo: DecisionType;
   setTipo: (value: DecisionType) => void;
@@ -43,9 +45,15 @@ function TipoMateriaStep({
   isSociedadScoped: boolean;
   materias: MateriaCatalogRow[];
   isLoading: boolean;
+  decisorName: string | null;
+  decisorReason: string | null;
 }) {
   const adoptionMode = decisionAdoptionMode(tipo);
   const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
+  // ITEM-022: tipo social REAL de la entidad seleccionada (antes 'SL' fijo,
+  // evaluando el gate contra el tipo equivocado para SA/SAU).
+  const rawTipoSocial = String(selectedEntity?.tipo_social ?? selectedEntity?.legal_form ?? "SL").toUpperCase();
+  const tipoSocialReal = (["SA", "SL", "SLU", "SAU"].includes(rawTipoSocial) ? rawTipoSocial : rawTipoSocial.includes("ANONIMA") || rawTipoSocial.includes("ANÓNIMA") || rawTipoSocial === "S.A." ? "SA" : "SL") as "SA" | "SL" | "SLU" | "SAU";
 
   return (
     <div className="space-y-5">
@@ -101,13 +109,37 @@ function TipoMateriaStep({
               </span>
               <span className="text-xs text-[var(--g-text-secondary)]">
                 {t === "SOCIO_UNICO"
-                  ? "SL con un único socio titular del 100% del capital"
+                  ? "SLU o SAU: un único socio titular del 100% del capital (arts. 12-19 LSC)"
                   : "SA/SL con un único administrador con poderes plenos"}
               </span>
             </button>
           ))}
         </div>
       </div>
+
+      {selectedEntityId ? (
+        decisorName ? (
+          <div
+            className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" />
+            <p className="text-xs text-[var(--g-text-primary)]">
+              <span className="font-semibold">Decisor:</span> {decisorName}
+              {tipo === "SOCIO_UNICO" ? " (socio único — art. 15 LSC)" : " (administrador único — art. 210 LSC)"}
+            </p>
+          </div>
+        ) : decisorReason ? (
+          <div
+            className="flex items-start gap-2 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+            <p className="text-xs font-medium text-[var(--status-error)]">{decisorReason}</p>
+          </div>
+        ) : null
+      ) : null}
 
       <BookDestinationNotice
         bookKind={tipo === "SOCIO_UNICO" ? "LIBRO_CONTRATOS_SOCIO_UNICO" : "LIBRO_ACTAS"}
@@ -142,7 +174,7 @@ function TipoMateriaStep({
 
       {materia && (
         <PreviewGatePanel
-          params={{ materia, adoptionMode, tipoSocial: "SL", organoTipo: tipo === "SOCIO_UNICO" ? "JUNTA_GENERAL" : "CONSEJO" }}
+          params={{ materia, adoptionMode, tipoSocial: tipoSocialReal, organoTipo: tipo === "SOCIO_UNICO" ? "JUNTA_GENERAL" : "CONSEJO" }}
         />
       )}
     </div>
@@ -177,7 +209,7 @@ function TextoAcuerdoStep({
           rows={8}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ejemplo: El socio único de ARGA Seguros S.A., en uso de las facultades que le confiere el art. 15 LSC, adopta el siguiente acuerdo…"
+          placeholder="Ejemplo: El socio único de Cartera ARGA S.L.U., en uso de las facultades que le confiere el art. 15 LSC, adopta el siguiente acuerdo…"
           className="w-full resize-y rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         />
@@ -266,12 +298,12 @@ function FirmaArchivoStep({
             Modo adopción: UNIPERSONAL — sin quórum ni mayoría requerida
           </li>
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--status-success)]" />
-            Certificado OCSP verificado (EAD Trust)
+            <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
+            Firma QES y verificación EAD Trust: pendientes — se ejecutan al generar el documento desde el detalle (postura sandbox/reference)
           </li>
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--status-success)]" />
-            Hash SHA-512 del documento calculado
+            <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
+            Hash SHA-512: se calcula al archivar el documento, no antes
           </li>
         </ul>
       </div>
@@ -314,6 +346,11 @@ export default function DecisionUnipersonalStepper() {
   const selectedMateria = materias.find((item) => item.materia === materia) ?? null;
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
+  // ITEM-022/051: decisor unipersonal REAL (socio único 100% o admin único
+  // vigente). Sin decisor resoluble no se puede crear la decisión.
+  const { data: decisorResult } = useDecisorUnipersonal(selectedEntityId || undefined, tipo);
+  const decisor = decisorResult?.decisor ?? null;
+  const decisorReason = decisorResult?.reason ?? null;
 
   useEffect(() => {
     if (scope.mode === "sociedad" && scope.selectedEntity?.id) {
@@ -328,10 +365,17 @@ export default function DecisionUnipersonalStepper() {
 
   function handleCreate() {
     if (!selectedEntityId || !materia || !texto.trim() || !selectedMateria) return;
+    if (!decisor) {
+      toast.error("No se puede registrar la decisión", {
+        description: decisorReason ?? "La sociedad no tiene decisor unipersonal resoluble.",
+      });
+      return;
+    }
     createDecision.mutate(
       {
         entityId: selectedEntityId,
         decisionType: tipo,
+        decidedById: decisor.personId,
         agreementKind: materia,
         matterClass: selectedMateria.matter_class,
         title: selectedMateria.materia_label_es,
@@ -359,7 +403,7 @@ export default function DecisionUnipersonalStepper() {
       n: 1,
       label: "Tipo y materia",
       hint: "Selecciona sociedad, decisor unipersonal y materia",
-      canAdvance: Boolean(selectedEntityId && materia && !readinessBlocked),
+      canAdvance: Boolean(selectedEntityId && materia && !readinessBlocked && decisor),
       body: (
         <div className="space-y-5">
           <EntityReadinessNotice readiness={readiness} />
@@ -374,6 +418,8 @@ export default function DecisionUnipersonalStepper() {
             isSociedadScoped={isSociedadScoped}
             materias={materias}
             isLoading={materiasLoading}
+            decisorName={decisor?.fullName ?? null}
+            decisorReason={decisorReason}
           />
         </div>
       ),

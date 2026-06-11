@@ -462,3 +462,21 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   materia × requisitos" — los textos antiguos ya no existen en src). Spec 34 completo en verde
   por primera vez en el loop.
 - **Verificación:** 2048 tests 0 fail; gates verdes; e2e 34 2/2 + 18 verde; migración alineada.
+
+### Iteración 25 — ITEM-022/051 [P1] Decisiones unipersonales (HECHO con residual)
+
+- **Evidencia:** la decisión nacía FIRMADA con decided_by_id NULL (art. 15.2 LSC exige consignación
+  bajo firma del socio o su representante); el selector permitía registrar "decisión del socio
+  único" sobre ARGA Seguros S.A. (cotizada con free float); PreviewGatePanel evaluaba con
+  tipoSocial 'SL' fijo; el paso 3 mostraba checks OCSP/SHA-512 verdes sin que hubiera ocurrido
+  ninguna verificación (contra el trust boundary sandbox); placeholder con ejemplo incoherente.
+- **Fix:** nuevo hook `useDecisorUnipersonal` — resuelve el decisor REAL (socio único = titular
+  único del 100% en capital_holdings sin autocartera; admin único = condición ADMIN_UNICO VIGENTE)
+  con motivo accionable si la sociedad no es unipersonal; el paso 1 muestra el decisor o bloquea
+  con error; `decidedById` obligatorio en el insert; tipoSocial real derivado de la entidad;
+  checklist honesto (firma QES/SHA-512 marcados como pendientes, postura sandbox); copys
+  corregidos (SLU/SAU arts. 12-19; ejemplo Cartera ARGA S.L.U.).
+- **Residual anotado:** ligar la transición a FIRMADA con la firma documental real exigiría
+  callback de éxito en ProcessDocxButton — la decisión consta ahora bajo identidad del decisor,
+  que era el defecto jurídico central.
+- **Verificación:** 2048 tests 0 fail; gates verdes; e2e 18+25 6/6.

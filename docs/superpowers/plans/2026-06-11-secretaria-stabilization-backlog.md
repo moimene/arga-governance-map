@@ -48,7 +48,7 @@
 | ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO parcial (miembros_presentes real; capital_total fallback pendiente) |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | PENDIENTE |
 | ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | HECHO (guard UI + re-chequeo al guardar; RPC con assert queda P3) |
-| ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | PENDIENTE |
+| ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | HECHO |
 | ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
 | ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | HECHO |
 | ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
@@ -77,7 +77,7 @@
 | ITEM-048 | A9 | ✅ | Regla de adopción sin sesión server-side: pluralidad por cabezas que ignora matter_class y capital; el auto-cierre por vencimiento rechaza en bloque incluso con mayoría a favor (evidencia Cloud) | BLOQUEADO-LEGAL |
 | ITEM-049 | A9 | ✅ | PactosParasocialesCard del expediente evalúa con votos inventados (70/30) y presenta veredictos de incumplimiento como reales | HECHO |
 | ITEM-050 | A9 | ✅ | CO_APROBACION y SOLIDARIO: validación circular de administradores vigentes y sin reglas de mancomunidad (arts. 210 y 233.2 LSC) | PENDIENTE |
-| ITEM-051 | A9 | ✅ | Decisiones unipersonales: nacen FIRMADA sin firmante, checklist pre-firma ficticio y sin validación de unipersonalidad (arts. 15-16 LSC) | PENDIENTE |
+| ITEM-051 | A9 | ✅ | Decisiones unipersonales: nacen FIRMADA sin firmante, checklist pre-firma ficticio y sin validación de unipersonalidad (arts. 15-16 LSC) | HECHO (residual: ligar status FIRMADA a la firma documental real) |
 | ITEM-052 | A9 | ✅ | Voto de calidad imposible en Comité Ejecutivo: el early-return COMISION_DELEGADA ignora quorum_rule.voto_calidad_presidente=true (contradice la estructura demo ARGA) | HECHO |
 | ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | HECHO (re-triado) |
 

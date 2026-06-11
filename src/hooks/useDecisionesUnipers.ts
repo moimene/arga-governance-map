@@ -104,6 +104,8 @@ export function useAgreementForUnipersonalDecision(decisionId: string | undefine
 export interface CreateUnipersonalDecisionInput {
   entityId: string;
   decisionType: "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
+  /** ITEM-022/051: el decisor es obligatorio — art. 15.2 LSC exige consignación bajo su firma. */
+  decidedById: string;
   agreementKind: string;
   matterClass: string;
   title: string;
@@ -131,7 +133,10 @@ export function useCreateUnipersonalDecision() {
           title: input.title,
           content: input.content,
           decision_date: decisionDate,
-          decided_by_id: null,
+          // ITEM-051: la decisión consta bajo la identidad del decisor (art.
+          // 15.2 LSC). La firma QES del documento llega después vía
+          // ProcessDocxButton (residual: ligar status a la firma real).
+          decided_by_id: input.decidedById,
           status: "FIRMADA",
           requires_registry: input.requiresRegistry,
         })
@@ -164,6 +169,97 @@ export function useCreateUnipersonalDecision() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["unipersonal_decisions"] });
       queryClient.invalidateQueries({ queryKey: ["agreements"] });
+    },
+  });
+}
+
+export interface DecisorUnipersonal {
+  personId: string;
+  fullName: string;
+}
+
+export interface DecisorUnipersonalResult {
+  decisor: DecisorUnipersonal | null;
+  /** Motivo accionable cuando no hay decisor resoluble. */
+  reason: string | null;
+}
+
+/**
+ * ITEM-022/051 — resuelve el decisor unipersonal real de la entidad:
+ *  - SOCIO_UNICO: titular único del 100% del capital (capital_holdings
+ *    vigentes, sin autocartera).
+ *  - ADMINISTRADOR_UNICO: condición ADMIN_UNICO/ADMINISTRADOR_UNICO VIGENTE.
+ * Si la sociedad no es realmente unipersonal para el tipo pedido, devuelve
+ * decisor=null con motivo accionable (el stepper bloquea la creación).
+ */
+export function useDecisorUnipersonal(
+  entityId: string | undefined,
+  decisionType: "SOCIO_UNICO" | "ADMINISTRADOR_UNICO",
+) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!entityId && !!tenantId,
+    queryKey: ["decisor_unipersonal", tenantId, entityId, decisionType],
+    queryFn: async (): Promise<DecisorUnipersonalResult> => {
+      if (decisionType === "SOCIO_UNICO") {
+        const { data, error } = await supabase
+          .from("capital_holdings")
+          .select("holder_person_id, porcentaje_capital, is_treasury, holder:holder_person_id(full_name)")
+          .eq("tenant_id", tenantId!)
+          .eq("entity_id", entityId!)
+          .is("effective_to", null);
+        if (error) throw error;
+        type Row = {
+          holder_person_id: string;
+          porcentaje_capital: number | null;
+          is_treasury: boolean | null;
+          holder?: { full_name?: string | null } | null;
+        };
+        const holders = ((data ?? []) as Row[]).filter((h) => !h.is_treasury);
+        if (holders.length === 1 && Number(holders[0].porcentaje_capital ?? 0) >= 99.99) {
+          return {
+            decisor: {
+              personId: holders[0].holder_person_id,
+              fullName: holders[0].holder?.full_name ?? "Socio único",
+            },
+            reason: null,
+          };
+        }
+        return {
+          decisor: null,
+          reason:
+            holders.length === 0
+              ? "La sociedad no tiene libro de socios cargado: no puede registrarse una decisión de socio único."
+              : `La sociedad no es unipersonal: el libro de socios tiene ${holders.length} titulares. Las decisiones del socio único (art. 15 LSC) solo caben en SLU/SAU.`,
+        };
+      }
+
+      const { data, error } = await supabase
+        .from("condiciones_persona")
+        .select("person_id, tipo_condicion, person:person_id(full_name)")
+        .eq("tenant_id", tenantId!)
+        .eq("entity_id", entityId!)
+        .eq("estado", "VIGENTE")
+        .in("tipo_condicion", ["ADMIN_UNICO", "ADMINISTRADOR_UNICO"]);
+      if (error) throw error;
+      type CondRow = { person_id: string; person?: { full_name?: string | null } | null };
+      const admins = (data ?? []) as CondRow[];
+      if (admins.length === 1) {
+        return {
+          decisor: {
+            personId: admins[0].person_id,
+            fullName: admins[0].person?.full_name ?? "Administrador único",
+          },
+          reason: null,
+        };
+      }
+      return {
+        decisor: null,
+        reason:
+          admins.length === 0
+            ? "La sociedad no tiene administrador único vigente (condiciones_persona): el órgano de administración no es unipersonal."
+            : "Hay más de una condición de administrador único vigente — revisar el censo de cargos.",
+      };
     },
   });
 }
