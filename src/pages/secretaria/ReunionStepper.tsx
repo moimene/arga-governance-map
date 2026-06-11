@@ -818,6 +818,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         person_id: attendee.person_id!,
         tipo_condicion: organoTipo === "JUNTA_GENERAL" ? (tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO") : "MIEMBRO",
         full_name: attendee.full_name?.trim() || "Miembro sin identificar",
+        es_vocal: attendee.voting_rights === null || attendee.voting_rights === undefined || Number(attendee.voting_rights) !== 0,
         default_capital_representado: attendee.capital_representado ?? null,
         default_shares_represented: attendee.shares_represented ?? null,
       }));
@@ -831,6 +832,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         id: holding.id,
         person_id: holding.holder_person_id,
         tipo_condicion: tipoSocial === "SA" || tipoSocial === "SAU" ? "ACCIONISTA" : "SOCIO",
+        es_vocal: true,
         full_name:
           holding.holder?.full_name?.trim() ||
           holding.holder?.denomination?.trim() ||
@@ -930,7 +932,12 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         represented_by_id: attendanceType === "REPRESENTADO" ? entry?.represented_by_id || null : null,
         capital_representado: Number.isFinite(capitalValue) ? capitalValue : null,
         shares_represented: attendanceType === "AUSENTE" ? 0 : m.default_shares_represented ?? null,
-        voting_rights: Number.isFinite(capitalValue) ? capitalValue : null,
+        // ITEM-028/037: en órganos colegiados voting_rights marca la condición
+        // de vocal (1) o voz sin voto (0, secretario no consejero); en juntas
+        // conserva el capital con derecho a voto.
+        voting_rights: isJuntaCensus
+          ? (Number.isFinite(capitalValue) ? capitalValue : null)
+          : (m.es_vocal ? 1 : 0),
         via_representante: attendanceType === "REPRESENTADO",
       };
     });
@@ -946,7 +953,10 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     });
   }
 
-  const presentes = members.filter(
+  // ITEM-028/037: en órganos colegiados solo los vocales computan
+  // (el secretario no consejero asiste con voz sin voto — art. 247 LSC).
+  const censoVocal = isJuntaCensus ? members : members.filter((m) => m.es_vocal);
+  const presentes = censoVocal.filter(
     (m) => (attendance[m.person_id]?.attendance_type ?? "PRESENCIAL") !== "AUSENTE"
   ).length;
   const universalCapitalPct = members.reduce((sum, member) => {
@@ -957,7 +967,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
       : Number(entry?.capital_representado ?? 0);
     return Number.isFinite(raw) ? sum + raw : sum;
   }, 0);
-  const universalMembersPct = members.length > 0 ? (presentes / members.length) * 100 : 0;
+  const universalMembersPct = censoVocal.length > 0 ? (presentes / censoVocal.length) * 100 : 0;
   const universalConcurrencePct = organoTipo === "JUNTA_GENERAL" ? universalCapitalPct : universalMembersPct;
   const universalConcurrenceOk = universalConcurrencePct >= 99.999;
 
@@ -1052,8 +1062,11 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
                 via_representante: false,
               };
               const needsRepr = entry.attendance_type === "REPRESENTADO";
+              // ITEM-028/037: en consejo/comisiones solo cabe delegar en otro
+              // vocal (la secretaria no consejera no puede representar).
               const representativeOptions = members.filter((member) => {
                 if (member.person_id === m.person_id) return false;
+                if (!isJuntaCensus && !member.es_vocal) return false;
                 const candidateAttendance = attendance[member.person_id]?.attendance_type ?? "PRESENCIAL";
                 return candidateAttendance !== "AUSENTE";
               });
@@ -1064,6 +1077,14 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">
                     {TIPO_CONDICION_LABELS[m.tipo_condicion] ?? m.tipo_condicion}
+                    {!isJuntaCensus && !m.es_vocal ? (
+                      <span
+                        className="ml-2 inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-2 py-0.5 text-xs text-[var(--g-text-secondary)]"
+                        style={{ borderRadius: "var(--g-radius-full)" }}
+                      >
+                        Con voz sin voto
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <select
@@ -1330,8 +1351,18 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
     );
   }
 
-  const presentes = attendees.filter((a) => a.attendance_type !== "AUSENTE").length;
-  const total = members.length > 0 ? members.length : attendees.length;
+  // ITEM-028/037: en órganos colegiados el quórum se computa sobre VOCALES
+  // (arts. 247.1/247.2 LSC) — el secretario no consejero asiste con voz sin
+  // voto y no entra ni en numerador ni en denominador.
+  const isOrganoColegiado = organoTipo !== "JUNTA_GENERAL";
+  const vocalMembers = isOrganoColegiado ? members.filter((m) => m.es_vocal) : members;
+  const vocalPersonIds = new Set(vocalMembers.map((m) => m.person_id));
+  const countableAttendees =
+    isOrganoColegiado && members.length > 0
+      ? attendees.filter((a) => a.person_id && vocalPersonIds.has(a.person_id))
+      : attendees;
+  const presentes = countableAttendees.filter((a) => a.attendance_type !== "AUSENTE").length;
+  const total = vocalMembers.length > 0 ? vocalMembers.length : countableAttendees.length;
   const attendeeCapital = attendees.reduce(
     (sum, attendee) =>
       attendee.attendance_type === "AUSENTE" ? sum : sum + Number(attendee.capital_representado ?? 0),
@@ -2215,15 +2246,19 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         person?: { full_name?: string | null } | null;
       };
 
-      const voters = ((attendeesRes.data ?? []) as AttendeeRaw[]).map((a) => ({
-        id: a.id,
-        person_id: a.person_id,
-        attendance_type: a.attendance_type ?? null,
-        capital_representado: a.capital_representado ?? null,
-        shares_represented: a.shares_represented ?? null,
-        voting_rights: a.voting_rights ?? null,
-        person_name: a.person?.full_name ?? null,
-      }));
+      const voters = ((attendeesRes.data ?? []) as AttendeeRaw[])
+        .map((a) => ({
+          id: a.id,
+          person_id: a.person_id,
+          attendance_type: a.attendance_type ?? null,
+          capital_representado: a.capital_representado ?? null,
+          shares_represented: a.shares_represented ?? null,
+          voting_rights: a.voting_rights ?? null,
+          person_name: a.person?.full_name ?? null,
+        }))
+        // ITEM-028/037: voting_rights=0 marca asistentes con voz sin voto
+        // (secretario no consejero) — no son votantes (art. 248.1 LSC).
+        .filter((v) => v.voting_rights === null || Number(v.voting_rights) !== 0);
       const presentVoters = voters.filter((v) => v.attendance_type !== "AUSENTE");
 
       return {

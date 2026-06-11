@@ -54,7 +54,7 @@
 | ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
 | ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | PENDIENTE |
 | ITEM-027 | A2 | ✅ | Payloads postAcuerdo con incorrecciones registrales: aprobación de cuentas sin depósito (arts. 279-280 LSC), plazos/citas RRM dudosos e instrumento sobre-exigido en cese | BLOQUEADO-LEGAL |
-| ITEM-028 | A4 | ✅ | Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales) | PENDIENTE |
+| ITEM-028 | A4 | ✅ | Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales) | HECHO |
 | ITEM-029 | A4 | ✅ | authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista | HECHO |
 | ITEM-030 | A4 | ✅ | Composición CdA demo (17 condiciones) irreconciliable con la estructura declarada (15 miembros: 9 IND + 5 EJE + 1 DOM); categorías de consejero no modeladas | PENDIENTE |
 | ITEM-031 | A4 | ✅ | Transmisión de participaciones/acciones sin ningún gate de los arts. 106-112 LSC ni distinción SA/SL | BLOQUEADO-LEGAL |
@@ -63,7 +63,7 @@
 | ITEM-034 | A5 | ✅ | Segunda convocatoria sin ninguna regla del art. 177 LSC: sin gap mínimo de 24h, ofrecida para SL y CdA, y el motor nunca la evalúa | PENDIENTE |
 | ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | PENDIENTE |
 | ITEM-036 | A6 | ✅ | Mayoría de consejo: fórmulas con 'total_miembros' se evalúan contra presentes y DELEGACION_FACULTADES ignora el 2/3 de componentes del art. 249.3 LSC | PENDIENTE |
-| ITEM-037 | A6 | ✅ | El Secretario no consejero computa en quórum y vota en el CdA (arts. 247.2 y 248.1 LSC) | PENDIENTE |
+| ITEM-037 | A6 | ✅ | El Secretario no consejero computa en quórum y vota en el CdA (arts. 247.2 y 248.1 LSC) | HECHO |
 | ITEM-038 | A6 | ✅ | primeraConvocatoria hardcodeado a true: el quórum de 2ª convocatoria (arts. 193/194 LSC) nunca se evalúa y bloquea juntas legalmente constituidas | PENDIENTE |
 | ITEM-039 | A6 | ✅ | Voto de calidad desempata siempre hacia la adopción sin verificar el sentido del voto del presidente | PENDIENTE |
 | ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | PENDIENTE |
@@ -298,7 +298,7 @@
 
 ### ITEM-028 [P1] Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales)
 
-- **Área:** A4 · **Estado:** PENDIENTE
+- **Área:** A4 · **Estado:** HECHO (Iteración 6 — es_vocal en censo, quórum/votos/representantes sobre vocales)
 - **Descripción:** useBodyMembers devuelve TODAS las condiciones VIGENTES del órgano sin filtrar tipo_condicion, incluida la SECRETARIO. Para el CdA canónico de ARGA eso son 17 personas (15 CONSEJERO + 1 PRESIDENTE + 1 SECRETARIO), pero Dña. Lucía Paredes Vega solo tiene condición SECRETARIO (secretaria no consejera) y no es vocal a efectos del art. 247.2 LSC. AsistentesStep la inicializa PRESENCIAL por defecto y la persiste como meeting_attendee con voting_rights; QuorumStep usa total = members.length (17) y presentes incluye a la secretaria. Falso positivo concreto: 8 consejeros presentes + secretaria presente = 9/17 → quórum 'cubierto', cuando legalmente son 8 de 16 vocales = NO hay quórum. Además, el selector de representante en AsistentesStep ofrece a la secretaria como representante de un consejero (en SA cotizada solo cabe delegar en otro consejero, art. 529 quater LSC), y su voto entra en el cómputo de VotacionesStep. Nota menor asociada: constitucion-engine.ts:253-255 cita 'art. 247.1 LSC' para el quórum del Consejo de una SA; el precepto aplicable a SA es el 247.2 (el 247.1 es para SL).
 - **Evidencia:** src/hooks/useReunionSecretaria.ts:715-742 (useBodyMembers sin filtro de tipo_condicion); src/pages/secretaria/ReunionStepper.tsx:813-826 (members = bodyMembers para órganos no-junta), :848-883 (default PRESENCIAL para todos), :921-936 (persiste secretaria con voting_rights), :1055-1059 (representativeOptions incluye SECRETARIO), :1333-1334 y :1353-1364 (presentes/total → evaluarConstitucion con totalMiembros=17); src/lib/rules-engine/constitucion-engine.ts:246-255 (floor(total/2)+1 sobre totalMiembros). SQL Cloud: condiciones_persona body fe05ddd9-ce3e-47b0-8948-5b975c79ab59 estado=VIGENTE → 15 CONSEJERO + 1 PRESIDENTE (D. Antonio Ríos Valverde) + 1 SECRETARIO (Dña. Lucía Paredes Vega); Lucía Paredes Vega no tiene condición CONSEJERO en ese body.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useReunionSecretaria.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ReunionStepper.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/constitucion-engine.ts
@@ -379,7 +379,7 @@
 
 ### ITEM-037 [P1] El Secretario no consejero computa en quórum y vota en el CdA (arts. 247.2 y 248.1 LSC)
 
-- **Área:** A6 · **Estado:** PENDIENTE
+- **Área:** A6 · **Estado:** HECHO (Iteración 6)
 - **Descripción:** useBodyMembers devuelve todas las condiciones_persona VIGENTES del body sin filtrar tipo_condicion. El CdA de ARGA tiene en Cloud 17 filas (1 PRESIDENTE + 15 CONSEJERO + 1 SECRETARIO). El SECRETARIO (no consejero) entra en la lista de asistentes, suma al denominador del quórum (presentes/17 con umbral floor(17/2)+1=9) y aparece como votante con peso 1 en VotacionesStep. Art. 247.2 LSC constituye el consejo con la mayoría de los VOCALES y el art. 248.1 computa mayoría de consejeros concurrentes: el secretario no consejero ni computa ni vota. Caso concreto de fallo: 8 consejeros + el secretario presentes → motor declara quórum (9/17 = 52,9%) cuando legalmente solo concurren 8 de 16 vocales (se requieren 9).
 - **Evidencia:** src/hooks/useReunionSecretaria.ts:715-742 (useBodyMembers: .eq('estado','VIGENTE') sin filtro de tipo_condicion). src/pages/secretaria/ReunionStepper.tsx:1333-1334 (presentes/total sobre members) y 2188-2232 (todos los attendees no ausentes son votantes). SQL Cloud: SELECT tipo_condicion, count(*) FROM condiciones_persona WHERE body_id='fe05ddd9-ce3e-47b0-8948-5b975c79ab59' AND estado='VIGENTE' → PRESIDENTE 1, CONSEJERO 15, SECRETARIO 1.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useReunionSecretaria.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ReunionStepper.tsx

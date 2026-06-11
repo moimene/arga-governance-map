@@ -34,6 +34,7 @@ import {
   normalizeAgendaItemKind,
   type AgendaItemKind,
 } from "@/lib/secretaria/agenda-kind";
+import { computeVocalPersonIds } from "@/lib/secretaria/meeting-census";
 
 export interface MeetingSecretariaRow {
   id: string;
@@ -75,6 +76,11 @@ export interface BodyMember {
   person_id: string;
   tipo_condicion: string;
   full_name: string;
+  /**
+   * false para condiciones con voz sin voto (secretario no consejero,
+   * letrado asesor): no computan en quórum ni votan (arts. 247-248 LSC).
+   */
+  es_vocal: boolean;
 }
 
 export interface MeetingResolution {
@@ -731,11 +737,16 @@ export function useBodyMembers(bodyId: string | undefined) {
         tipo_condicion: string;
         person?: { full_name?: string | null } | null;
       };
-      return ((data ?? []) as Raw[]).map((r) => ({
+      const rows = (data ?? []) as Raw[];
+      // ITEM-028/037: el secretario no consejero (y análogos) asiste con voz
+      // sin voto — se marca para excluirlo de quórum, votación y representación.
+      const vocalIds = computeVocalPersonIds(rows);
+      return rows.map((r) => ({
         id: r.id,
         person_id: r.person_id,
         tipo_condicion: r.tipo_condicion,
         full_name: r.person?.full_name ?? "Sin nombre",
+        es_vocal: vocalIds.has(r.person_id),
       }));
     },
   });

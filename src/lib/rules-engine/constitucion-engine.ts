@@ -250,8 +250,12 @@ export function evaluarConstitucion(
     requiredQuorum = input.totalMiembros && input.totalMiembros > 0
       ? (Math.floor(input.totalMiembros / 2) + 1) / input.totalMiembros
       : 0.5;
+    // Art. 247 LSC: el apartado 1 regula la SL y el 2 la SA — en ambos casos
+    // "mayoría de los vocales", pero la cita debe ser la del tipo social.
     quorumReferencia = input.organoTipo === 'CONSEJO'
-      ? 'art. 247.1 LSC — mayoría de vocales del Consejo'
+      ? (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU'
+          ? 'art. 247.2 LSC — mayoría de los vocales del Consejo'
+          : 'art. 247.1 LSC — mayoría de los vocales del Consejo')
       : 'Reglamento/estatutos — mayoría de miembros de la comisión';
   } else if (input.tipoSocial === 'SA' || input.tipoSocial === 'SAU') {
     // SA: quorum depends on primeraConvocatoria and materiaClase

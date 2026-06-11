@@ -55,6 +55,37 @@ export function evaluateMeetingCensusAvailability(
   };
 }
 
+/**
+ * Condiciones que asisten con voz pero sin voto en órganos colegiados:
+ * el secretario/vicesecretario no consejero y el letrado asesor no son
+ * vocales — no computan en el quórum de constitución (arts. 247.1/247.2
+ * LSC) ni en la mayoría de votación (art. 248.1 LSC).
+ */
+export const NON_VOCAL_CONDITION_TYPES = new Set([
+  "SECRETARIO",
+  "VICESECRETARIO",
+  "LETRADO_ASESOR",
+]);
+
+/**
+ * Devuelve el set de person_id que son vocales del órgano. Una persona es
+ * vocal si tiene AL MENOS una condición vigente fuera de
+ * NON_VOCAL_CONDITION_TYPES (un consejero-secretario sigue siendo vocal;
+ * una secretaria no consejera no lo es).
+ */
+export function computeVocalPersonIds(
+  rows: Array<{ person_id: string; tipo_condicion: string | null | undefined }>
+): Set<string> {
+  const vocal = new Set<string>();
+  for (const row of rows) {
+    const tipo = String(row.tipo_condicion ?? "").trim().toUpperCase();
+    if (!NON_VOCAL_CONDITION_TYPES.has(tipo)) {
+      vocal.add(row.person_id);
+    }
+  }
+  return vocal;
+}
+
 export function selectVotingCapitalHoldings<T extends VotingCapitalHoldingLike>(holdings: T[]): T[] {
   return holdings.filter((holding) => {
     if (holding.is_treasury) return false;

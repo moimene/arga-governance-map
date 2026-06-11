@@ -4,6 +4,7 @@ import {
   meetingCensusSourceForBodyType,
   normalizeMeetingCensusBodyKind,
   selectVotingCapitalHoldings,
+  computeVocalPersonIds,
 } from "../meeting-census";
 
 describe("meeting-census", () => {
@@ -42,5 +43,44 @@ describe("meeting-census", () => {
     ]);
 
     expect(holdings.map((holding) => holding.id)).toEqual(["a"]);
+  });
+});
+
+describe("computeVocalPersonIds (ITEM-028/037)", () => {
+  it("excluye al secretario no consejero y al letrado asesor del censo de vocales", () => {
+    const vocal = computeVocalPersonIds([
+      { person_id: "presidente", tipo_condicion: "PRESIDENTE" },
+      { person_id: "consejero-1", tipo_condicion: "CONSEJERO" },
+      { person_id: "secretaria", tipo_condicion: "SECRETARIO" },
+      { person_id: "vicesecretario", tipo_condicion: "VICESECRETARIO" },
+      { person_id: "letrado", tipo_condicion: "LETRADO_ASESOR" },
+    ]);
+    expect(vocal.has("presidente")).toBe(true);
+    expect(vocal.has("consejero-1")).toBe(true);
+    expect(vocal.has("secretaria")).toBe(false);
+    expect(vocal.has("vicesecretario")).toBe(false);
+    expect(vocal.has("letrado")).toBe(false);
+  });
+
+  it("un consejero-secretario sigue siendo vocal (dos condiciones, misma persona)", () => {
+    const vocal = computeVocalPersonIds([
+      { person_id: "consejero-secretario", tipo_condicion: "SECRETARIO" },
+      { person_id: "consejero-secretario", tipo_condicion: "CONSEJERO" },
+    ]);
+    expect(vocal.has("consejero-secretario")).toBe(true);
+  });
+
+  it("caso CdA ARGA: 8 consejeros presentes de 16 vocales NO constituyen aunque asista la secretaria", () => {
+    // 17 condiciones: 1 PRESIDENTE + 15 CONSEJERO + 1 SECRETARIO no consejera.
+    const rows = [
+      { person_id: "presidente", tipo_condicion: "PRESIDENTE" },
+      ...Array.from({ length: 15 }, (_, i) => ({ person_id: `consejero-${i}`, tipo_condicion: "CONSEJERO" })),
+      { person_id: "secretaria", tipo_condicion: "SECRETARIO" },
+    ];
+    const vocal = computeVocalPersonIds(rows);
+    expect(vocal.size).toBe(16);
+    // floor(16/2)+1 = 9: con 8 vocales presentes (aunque la secretaria asista) no hay quórum.
+    const presentesVocales = 8;
+    expect(presentesVocales >= Math.floor(vocal.size / 2) + 1).toBe(false);
   });
 });

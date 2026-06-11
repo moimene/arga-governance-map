@@ -139,3 +139,20 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Nota derivada para ITEM-030:** el presidente del CdA (ejecutivo) preside también la Comisión de
   Auditoría con condición de respaldo — en cotizada el presidente de esa comisión debe ser
   independiente (art. 529 quaterdecies LSC). Tratar en la reconciliación de composición.
+
+### Iteración 6 — ITEM-028/037 [P1] Secretario no consejero computaba en quórum y votaba (HECHO)
+
+- **Evidencia:** useBodyMembers devolvía las 17 condiciones del CdA sin distinguir vocales; la
+  secretaria no consejera entraba en denominador de quórum (9/17 "cubierto" con solo 8 de 16
+  vocales — falso positivo vs arts. 247.1/247.2 LSC), votaba en VotacionesStep y se ofrecía como
+  representante de consejeros.
+- **Fix:** helper puro `computeVocalPersonIds` en meeting-census.ts (NON_VOCAL = SECRETARIO/
+  VICESECRETARIO/LETRADO_ASESOR; consejero-secretario sigue siendo vocal); `BodyMember.es_vocal`;
+  AsistentesStep persiste `voting_rights = es_vocal ? 1 : 0` en órganos colegiados (juntas
+  conservan capital), censo y % universal sobre vocales, representantes solo vocales, badge "Con
+  voz sin voto"; QuorumStep computa presentes/total sobre vocales; VotacionesStep excluye
+  voting_rights=0. Cita del engine corregida: art. 247.2 LSC para SA, 247.1 para SL.
+- **Verificación:** 3 tests nuevos en meeting-census.test.ts (incluido el caso CdA ARGA 8/16);
+  suite 2018 tests 0 fail; typecheck/lint/build verdes; e2e 05+18 6/6.
+- **Nota:** actas/reuniones antiguas con attendees persistidos (voting_rights null) conservan su
+  comportamiento; al re-guardar asistencia desde el stepper adoptan el marcador.
