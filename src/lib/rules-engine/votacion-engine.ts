@@ -289,7 +289,7 @@ export function evaluarVotacion(
   const gateElegibilidad: ExplainNode = {
     regla: 'Gate 1: Elegibilidad (conflictos de interés)',
     fuente: 'LEY',
-    referencia: 'art. 187 LSC',
+    referencia: 'art. 190.2 LSC',
     resultado: 'OK',
     mensaje: `Capital votante ajustado: ${denominadorAjustado.capital_votante} (excluidos ${denominadorAjustado.capital_excluido_voto})`,
   };

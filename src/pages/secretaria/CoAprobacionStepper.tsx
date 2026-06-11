@@ -238,7 +238,7 @@ function StepConfiguracion({
           className="h-4 w-4 accent-[var(--g-brand-3308)]"
         />
         <label htmlFor="estatutos" className="text-sm text-[var(--g-text-primary)]">
-          Los estatutos permiten adopción sin sesión (art. 160 LSC)
+          Los estatutos permiten adopción sin sesión (arts. 210 y 233.2.c LSC)
         </label>
       </div>
     </div>

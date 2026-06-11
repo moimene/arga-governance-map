@@ -273,7 +273,7 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
     explain.push({
       regla: 'Notificación fehaciente',
       fuente: 'LEY',
-      referencia: 'art. 625 LSC',
+      referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
       resultado: 'BLOCKING',
       mensaje: `${pendienteCount} notificación(es) aún no ENTREGADA(S) (estado: ${input.notificaciones
         .filter(n => n.estado !== 'ENTREGADA')
@@ -284,7 +284,7 @@ function evaluarNotificacion(input: NoSessionInput): NoSessionOutput['gates'][0]
     explain.push({
       regla: 'Notificación fehaciente',
       fuente: 'LEY',
-      referencia: 'art. 625 LSC',
+      referencia: 'art. 100 RRM (notificación fehaciente del procedimiento por escrito)',
       resultado: 'OK',
       mensaje: `Todas (${input.notificaciones.length}) notificaciones ENTREGADAS fehacientemente`,
     });
@@ -482,7 +482,7 @@ export function evaluarUnanimidadCapitalSL(input: NoSessionInput): {
     explain.push({
       regla: 'Unanimidad de capital (SL)',
       fuente: 'LEY',
-      referencia: 'art. 629 LSC',
+      referencia: 'art. 100 RRM (acuerdos por escrito y sin sesión) y estatutos sociales',
       resultado: 'BLOCKING',
       mensaje: `NO UNANIMIDAD: ${noConsienten.length} socio(s) no consiente(n) (${noConsienten
         .map(r => r.sentido)
@@ -495,7 +495,7 @@ export function evaluarUnanimidadCapitalSL(input: NoSessionInput): {
     explain.push({
       regla: 'Capital consentido = 100%',
       fuente: 'LEY',
-      referencia: 'art. 629 LSC',
+      referencia: 'art. 100 RRM (acuerdos por escrito y sin sesión) y estatutos sociales',
       resultado: 'BLOCKING',
       mensaje: `Capital consentido: ${(capitalConsentido / input.totalCapitalSocial * 100).toFixed(2)}% (debe ser 100%)`,
     });
@@ -505,7 +505,7 @@ export function evaluarUnanimidadCapitalSL(input: NoSessionInput): {
   explain.push({
     regla: 'Unanimidad de capital',
     fuente: 'LEY',
-    referencia: 'art. 629 LSC',
+    referencia: 'art. 100 RRM (acuerdos por escrito y sin sesión) y estatutos sociales',
     resultado: 'OK',
     mensaje: `Unanimidad alcanzada: ${consentimientos.length} socios consienten 100% del capital`,
   });
@@ -603,7 +603,7 @@ export function evaluarDecisionSocioUnico(input: NoSessionInput): {
     explain.push({
       regla: 'Decisión consignada',
       fuente: 'LEY',
-      referencia: 'art. 629/210 LSC',
+      referencia: 'arts. 15-16 LSC (socio único) y art. 210 LSC (órgano de administración)',
       resultado: 'BLOCKING',
       mensaje: 'Decisión unipersonal debe consignarse en acta',
     });
@@ -626,7 +626,7 @@ export function evaluarDecisionSocioUnico(input: NoSessionInput): {
   explain.push({
     regla: 'Decisión consignada con consentimiento',
     fuente: 'LEY',
-    referencia: 'art. 629/210 LSC',
+    referencia: 'arts. 15-16 LSC (socio único) y art. 210 LSC (órgano de administración)',
     resultado: 'OK',
     mensaje: 'Decisión consignada y consentimiento dado',
   });

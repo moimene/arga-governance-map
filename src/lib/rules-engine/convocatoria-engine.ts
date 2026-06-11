@@ -219,7 +219,7 @@ export function evaluarConvocatoria(
       createExplainNode(
         'Canales: SA sin web inscrita',
         'LEY',
-        'art. 179 LSC',
+        'art. 173 LSC',
         'OK',
         'SA sin web inscrita debe publicar en BORME + diario oficial',
         undefined
@@ -235,7 +235,7 @@ export function evaluarConvocatoria(
       createExplainNode(
         'Canales: SA con web inscrita',
         'LEY',
-        'art. 179 LSC',
+        'art. 173 LSC',
         'OK',
         'SA con web inscrita debe publicar en web de la sociedad',
         undefined
@@ -265,7 +265,7 @@ export function evaluarConvocatoria(
     createExplainNode(
       'Documentos obligatorios',
       'LEY',
-      'art. 180-181 LSC',
+      'arts. 196-197 y 272 LSC (según materia)',
       'OK',
       `${documentosObligatorios.length} documento(s) obligatorio(s) a disposición de los socios`,
       undefined
@@ -281,7 +281,7 @@ export function evaluarConvocatoria(
     createExplainNode(
       'Contenido mínimo',
       'LEY',
-      'art. 182 LSC',
+      'art. 174 LSC',
       'OK',
       `Convocatoria debe incluir: ${contenidoMinimo.join(', ')}`,
       undefined
@@ -300,7 +300,7 @@ export function evaluarConvocatoria(
     createExplainNode(
       'Ventana disponibilidad',
       'LEY',
-      'art. 180 LSC',
+      'arts. 196-197 y 272.2 LSC',
       'OK',
       `Documentos disponibles desde ${fechaLimitePublicacion} hasta ${input.fechaJunta}`,
       undefined
@@ -464,7 +464,7 @@ function calcularContenido(
     contenidoPack.forEach((c) => contenidoSet.add(c));
   }
 
-  // Always include "Orden del día" (mandatory per art. 182 LSC)
+  // Always include "Orden del día" (mandatory per art. 174 LSC)
   contenidoSet.add('Orden del día');
 
   return Array.from(contenidoSet);

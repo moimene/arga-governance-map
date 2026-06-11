@@ -292,7 +292,7 @@ export function evaluarAcuerdoCompleto(
     const pathNodeB: ExplainNode = {
       regla: `Flujo B: Decisión unipersonal (${adoptionMode})`,
       fuente: 'LEY',
-      referencia: 'art. 201-202 LSC',
+      referencia: 'arts. 15-17 y 210 LSC',
       resultado: 'OK',
       mensaje: `Evaluación de acuerdo en modo unipersonal (${adoptionMode === 'UNIPERSONAL_SOCIO' ? 'socio único' : 'administrador único'})`
     };
@@ -307,7 +307,7 @@ export function evaluarAcuerdoCompleto(
         {
           regla: 'skip_convocatoria_unipersonal',
           fuente: 'LEY',
-          referencia: 'art. 201-202 LSC',
+          referencia: 'arts. 15-17 y 210 LSC',
           resultado: 'OK',
           mensaje: `Convocatoria no requerida en modo ${adoptionMode}`,
         },
@@ -379,7 +379,7 @@ export function evaluarAcuerdoCompleto(
     const pathNodeC: ExplainNode = {
       regla: 'Flujo C: Proceso sin sesión',
       fuente: 'LEY',
-      referencia: 'art. 197 LSC',
+      referencia: 'art. 100 RRM; art. 248.2 LSC (consejo SA)',
       resultado: 'OK',
       mensaje: 'Evaluación de acuerdo en proceso sin sesión colectiva'
     };
@@ -394,7 +394,7 @@ export function evaluarAcuerdoCompleto(
         {
           regla: 'skip_convocatoria_nosession',
           fuente: 'LEY',
-          referencia: 'art. 197 LSC',
+          referencia: 'art. 100 RRM; art. 248.2 LSC (consejo SA)',
           resultado: 'OK',
           mensaje: 'Convocatoria no requerida en proceso sin sesión',
         },

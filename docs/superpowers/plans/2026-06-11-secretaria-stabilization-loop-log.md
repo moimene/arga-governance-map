@@ -406,3 +406,18 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   (scoped por id + guard de valor) y citas 190→193.1 en los dos ordinarias. Verificado en Cloud:
   0 packs con SL=50, 0 citas 190 restantes.
 - **Verificación:** 2045 tests 0 fail; gates verdes; e2e 05+18 6/6; migración alineada.
+
+### Iteración 22 — ITEM-011/018/053 [P1] Citas normativas en explain nodes (HECHO, re-triados)
+
+- **Evidencia (BOE):** los explain nodes — la justificación jurídica que la UI muestra y los
+  snapshots persisten — citaban artículos INEXISTENTES (625/629; la LSC termina en el 541, la API
+  del BOE devuelve 404) y 15+ referencias equivocadas (179 por 173, 182 por 174, 187 por 190,
+  208 por 202+26 CCom, 305 por 293, 224 por 173, 213 por 173.2, 160 en CoAprobación, etc.).
+- **Fix (cambios de string puros, sin lógica):** 8 archivos corregidos con el mapa verificado:
+  no-session → art. 100 RRM / arts. 15-16 y 210 LSC; orquestador Flujo B → arts. 15-17 y 210,
+  Flujo C → art. 100 RRM + 248.2; convocatoria → 173/174/196-197/272; constitución → 190, 193,
+  198-199; votación Gate 1 → 190.2; documentación → 196-197 y 202+26 CCom; bordes → 293/173/173.2;
+  CoAprobacionStepper → arts. 210 y 233.2.c.
+- **Guard nuevo:** test de lint jurídico `citas-lsc-lint.test.ts` — ninguna cita 'art. N LSC' del
+  motor puede superar el art. 541 (no valida idoneidad contextual, solo existencia).
+- **Verificación:** 2046 tests 0 fail; gates verdes; e2e 04+05+18 verdes.

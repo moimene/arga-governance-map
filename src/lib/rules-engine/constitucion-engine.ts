@@ -195,7 +195,7 @@ export function evaluarConstitucion(
     const gateNode: ExplainNode = {
       regla: 'Gate: Denominador ajustado',
       fuente: 'LEY',
-      referencia: 'art. 187 LSC (conflictos de interés)',
+      referencia: 'art. 190 LSC (conflictos de interés)',
       resultado: 'BLOCKING',
       mensaje: `Capital convocable = ${denominadorAjustado.capital_convocable} (≤0). Todos los socios excluidos del quórum.`,
     };
@@ -240,7 +240,7 @@ export function evaluarConstitucion(
   // ================================================================
   let requiredQuorum = 0;
   let quorumFuente: import('./types').Fuente = 'LEY';
-  let quorumReferencia = 'art. 188 LSC';
+  let quorumReferencia = 'art. 193 LSC';
   let isCombinadoProfile = false;
 
   if (input.organoTipo === 'CONSEJO' || input.organoTipo === 'COMISION_DELEGADA') {
@@ -290,7 +290,7 @@ export function evaluarConstitucion(
   } else if (input.tipoSocial === 'SL' || input.tipoSocial === 'SLU') {
     // SL: typically 0 (sin quórum legal) unless override
     requiredQuorum = 0;
-    quorumReferencia = 'art. 201 LSC (SL)';
+    quorumReferencia = 'arts. 198-199 LSC (SL — mayorías con suelo; sin quórum legal de constitución)';
 
     const packQuorum = resolvePackQuorum(matchedPacks, 'SL');
     if (packQuorum && packQuorum.valor > requiredQuorum) {

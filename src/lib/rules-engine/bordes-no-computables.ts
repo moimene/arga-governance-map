@@ -140,7 +140,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
         aplica: true,
         status: 'PENDIENTE',
         severity: 'BLOCKING',
-        resolucion: 'Obtener consentimiento de los accionistas afectados (art. 305 LSC).',
+        resolucion: 'Obtener consentimiento de los accionistas afectados (art. 293 LSC).',
       });
     } else if (input.perimetroClaseDefinido === true && input.consentimientoClaseResuelto === true) {
       resultado.push({
@@ -238,7 +238,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
     });
   }
 
-  // 6. BORDE_EVIDENCIA_PUBLICACION_SA — SA requiere publicación en BORME (art. 224 LSC)
+  // 6. BORDE_EVIDENCIA_PUBLICACION_SA — SA requiere publicación en BORME (art. 173 LSC)
   if (input.tipoSocial === 'SA') {
     const esConvocatoria = input.materias.some((m) =>
       ['CONVOCATORIA_JUNTA', 'CONVOCATORIA_JUNTA_GOR'].includes(m)
@@ -252,7 +252,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
         aplica: true,
         status: 'PENDIENTE',
         severity: 'WARNING',
-        resolucion: 'Verificar publicación en BORME (art. 224 LSC) y documentar prueba.',
+        resolucion: 'Verificar publicación en BORME (art. 173 LSC) y documentar prueba.',
       });
     } else if (esConvocatoria && input.evidenciaPublicacionSA === true) {
       resultado.push({
@@ -266,7 +266,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
     }
   }
 
-  // 7. BORDE_EVIDENCIA_NOTIFICACION_SL — SL requiere notificación individual (art. 213 LSC)
+  // 7. BORDE_EVIDENCIA_NOTIFICACION_SL — SL requiere notificación individual (art. 173.2 LSC)
   if (input.tipoSocial === 'SL') {
     const esConvocatoria = input.materias.some((m) =>
       ['CONVOCATORIA_JUNTA', 'CONVOCATORIA_JUNTA_GOR'].includes(m)
@@ -280,7 +280,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
         aplica: true,
         status: 'PENDIENTE',
         severity: 'WARNING',
-        resolucion: 'Verificar notificación individual a socios (art. 213 LSC) y documentar prueba de entrega.',
+        resolucion: 'Verificar notificación individual a socios (art. 173.2 LSC) y documentar prueba de entrega.',
       });
     } else if (esConvocatoria && input.evidenciaNotificacionSL === true) {
       resultado.push({

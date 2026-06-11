@@ -98,7 +98,7 @@ export function evaluarDocumentacion(
   explain.push({
     regla: 'completitud_documentacion',
     fuente: 'LEY',
-    referencia: 'art. 188 LSC',
+    referencia: 'arts. 196-197 LSC',
     resultado: documentosFaltantes.length === 0 ? 'OK' : 'BLOCKING',
     mensaje:
       documentosFaltantes.length === 0
@@ -200,7 +200,7 @@ export function evaluarDocumentacion(
         explain.push({
           regla: 'transcripcion_libro_obligatoria',
           fuente: 'LEY',
-          referencia: 'art. 208 LSC',
+          referencia: 'art. 202 LSC y art. 26 CCom',
           resultado: 'WARNING',
           mensaje: 'Transcripción a libro obligatorio pendiente',
         });

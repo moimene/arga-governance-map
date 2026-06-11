@@ -37,14 +37,14 @@
 | ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | HECHO (re-triado: corrección factual BOE) |
 | ITEM-009 | A10 | ✅ | Art. 248.1 LSC: la mayoría del consejo se evalúa sobre miembros totales en vez de concurrentes; 'favor > presentes_mitad' se remapea silenciosamente a total | HECHO |
 | ITEM-010 | A10 | ✅ | Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo | HECHO (re-triado: corrección factual BOE, no redacción nueva) |
-| ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | BLOQUEADO-LEGAL |
+| ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | HECHO (re-triado: los arts. no existen — corrección factual) |
 | ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (re-triado: corrección factual BOE; 11 packs) |
 | ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (contradicción resuelta — ambos en 201.2; consolidar duplicado queda P3) |
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
 | ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | PENDIENTE |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
 | ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO |
-| ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | PENDIENTE |
+| ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | HECHO |
 | ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO parcial (miembros_presentes real; capital_total fallback pendiente) |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | PENDIENTE |
 | ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | PENDIENTE |
@@ -79,7 +79,7 @@
 | ITEM-050 | A9 | ✅ | CO_APROBACION y SOLIDARIO: validación circular de administradores vigentes y sin reglas de mancomunidad (arts. 210 y 233.2 LSC) | PENDIENTE |
 | ITEM-051 | A9 | ✅ | Decisiones unipersonales: nacen FIRMADA sin firmante, checklist pre-firma ficticio y sin validación de unipersonalidad (arts. 15-16 LSC) | PENDIENTE |
 | ITEM-052 | A9 | ✅ | Voto de calidad imposible en Comité Ejecutivo: el early-return COMISION_DELEGADA ignora quorum_rule.voto_calidad_presidente=true (contradice la estructura demo ARGA) | HECHO |
-| ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | BLOQUEADO-LEGAL |
+| ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | HECHO (re-triado) |
 
 ### ITEM-004 [P1] Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados
 
