@@ -4021,7 +4021,7 @@ export default function ConvocatoriasStepper() {
 
               {/* Destinatarios count */}
               <p className="text-xs text-[var(--g-text-secondary)]">
-                <span className="font-semibold">{activeMandates.length - excludedPersonIds.size}</span> destinatario(s)
+                <span className="font-semibold">{Math.max(activeMandates.length - excludedPersonIds.size, 0)}</span> destinatario(s)
                 {adjuntos.length > 0 && (
                   <> · <span className="font-semibold">{adjuntos.length}</span> adjunto(s)</>
                 )}

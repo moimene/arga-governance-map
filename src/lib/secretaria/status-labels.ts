@@ -57,6 +57,16 @@ export const STATUS_LABEL: Record<string, string> = {
   REGISTERED:   "Inscrito",
   PUBLISHED:    "Publicado",
   REJECTED_REGISTRY: "Denegado en registro",
+
+  // ITEM-070: claves de estado en inglés que la BD emite en
+  // certificaciones/actas/workflow y que aparecían sin traducir en la UI.
+  SIGNED:       "Firmada",
+  APPROVED:     "Aprobado",
+  REJECTED:     "Rechazado",
+  PENDING:      "Pendiente",
+  ISSUED:       "Emitida",
+  SEALED:       "Sellada",
+  REVISED:      "Revisada",
 };
 
 export function statusLabel(status: string): string {

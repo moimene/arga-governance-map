@@ -550,7 +550,7 @@
 | ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | PENDIENTE |
 | ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | PENDIENTE |
 | ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | PENDIENTE |
-| ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | PENDIENTE |
+| ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | HECHO (UI) |
 | ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | PENDIENTE |
 | ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
 | ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
@@ -578,7 +578,7 @@
 | ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | PENDIENTE |
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
-| ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | PENDIENTE |
+| ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | PENDIENTE |
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | PENDIENTE |
@@ -730,7 +730,7 @@
 
 ### ITEM-070 [P2] Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos
 
-- **Área:** A13 · **Estado:** PENDIENTE
+- **Área:** A13 · **Estado:** HECHO (Ola UI; claves inglesas SIGNED/APPROVED/REJECTED/... en status-labels)
 - **Descripción:** Cruce de STATUS_LABEL contra valores reales en Cloud: (1) certifications.signature_status usa SIGNED (6 filas Cloud) y default 'PENDING' (migration 20260418044911:94) — ActaDetalle renderiza 'Firma: SIGNED' porque statusLabel no tiene esas claves; (2) mandatory_books.legalization_status NO_APLICA tiene 276 filas Cloud y LibrosObligatorios lo pasa por statusLabel → se muestra 'NO_APLICA' crudo en la columna de estado (la página sí tiene tono visual para él en LEG_STATUS_TONE pero no label); (3) entities.entity_status='Active' (46 filas Cloud) se renderiza crudo sin statusLabel en 4 páginas, mientras el fallback del scope usa 'Activa' en español — el usuario ve 'Active' e 'Activa' según contexto; (4) SociedadDetalle muestra source.status crudo.
 - **Evidencia:** SQL Cloud (governance_OS): certifications signature_status=SIGNED count=6; mandatory_books legalization_status NO_APLICA count=276; entities entity_status='Active' count=46. Código: src/lib/secretaria/status-labels.ts (sin SIGNED/PENDING/NO_APLICA/APPROVED); src/pages/secretaria/ActaDetalle.tsx:815; src/pages/secretaria/LibrosObligatorios.tsx:356,541; renders crudos de selectedEntity.status en LibroSocios.tsx:95, LibrosObligatorios.tsx:196, Plantillas.tsx:393, BoardPack.tsx:583; mapping en src/components/secretaria/shell/useSecretariaScope.ts:38 vs fallback 'Activa' en :119; SociedadDetalle.tsx:435.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/status-labels.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ActaDetalle.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/LibrosObligatorios.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/components/secretaria/shell/useSecretariaScope.ts
@@ -957,7 +957,7 @@
 
 ### ITEM-098 [P2] Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales
 
-- **Área:** A5 · **Estado:** PENDIENTE
+- **Área:** A5 · **Estado:** HECHO (Ola UI; conteo destinatarios con Math.max(...,0) evita negativos)
 - **Descripción:** El resumen del Paso 8 muestra '{activeMandates.length - excludedPersonIds.size} destinatario(s)', pero para organoTipo JUNTA_GENERAL los destinatarios reales son los socios derivados de capital_holdings (activeRecipients, construidos en el Paso 4) y excludedPersonIds contiene person_ids de esos socios. Restar exclusiones de socios sobre el conteo de mandatos del órgano produce cifras incoherentes: si el órgano junta tiene 0-pocos mandatos y hay exclusiones, el número puede ser menor que el real o negativo. El Paso 4 y el reminders_trace (recipients.total_active/selected_count) usan la colección correcta — solo el resumen final está mal.
 - **Evidencia:** src/pages/secretaria/ConvocatoriasStepper.tsx:3973-3974 (activeMandates.length - excludedPersonIds.size) vs :3193-3195 (Paso 4: activeRecipients.length - excludedPersonIds.size) y :1960-1965 (trace con activeRecipients).
 - **Archivos:** src/pages/secretaria/ConvocatoriasStepper.tsx
