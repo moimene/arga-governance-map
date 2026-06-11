@@ -286,3 +286,11 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   BLOQUEADO-LEGAL) y lifecycle NULL del pack de cooptación (data/legal).
 - **Verificación:** 3 tests nuevos (alias, no-alias jurídico, match+explain); 2029 tests 0 fail;
   gates verdes; e2e 04+06+18 verdes.
+
+## Checkpoints
+
+- **Checkpoint 1 (tras Iteración 5):** e2e ampliada 48/48; push 949228b..3d2b7e2.
+- **Checkpoint 2 (tras Iteración 9):** e2e ampliada 48/48; push 3d2b7e2..ee73f3d.
+- **Checkpoint 3 (tras Iteración 14):** e2e ampliada 48/48; push ee73f3d..463df10; migraciones
+  alineadas local/remoto hasta 20260611192500. Balance: 23 ítems cerrados (ITEM-001..003, 006,
+  016/017, 023, 028/029, 035, 037-046 parcial, 049, 052; 045 BLOQUEADO-HUMANO documentado).
