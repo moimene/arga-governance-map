@@ -294,3 +294,17 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Checkpoint 3 (tras Iteración 14):** e2e ampliada 48/48; push ee73f3d..463df10; migraciones
   alineadas local/remoto hasta 20260611192500. Balance: 23 ítems cerrados (ITEM-001..003, 006,
   016/017, 023, 028/029, 035, 037-046 parcial, 049, 052; 045 BLOQUEADO-HUMANO documentado).
+
+### Iteración 15 — ITEM-024/032 [P1] Plazos de convocatoria: cómputo y citas (HECHO)
+
+- **ITEM-024:** las 3 copias del motor de plazos de comunicaciones (TS cliente, _shared Edge
+  Function, gemelo plpgsql) citaban 'Art. 173 LSC' para el plazo de SL (el 173 regula la FORMA;
+  el plazo está en el 176.1 — contrastado BOE) y computaban el "un mes" de SA como 30 días.
+  Fix sincronizado en las 3 copias: cita unificada Art. 176.1 LSC y cómputo de fecha a fecha
+  (art. 5.1 CC) — `subtractOneMonthFechaAFecha` en TS, `- interval '1 month'` en plpgsql
+  (migración 20260611194500). Junta 31/07 → límite 30/06 (antes permitía 01/07, un día tarde).
+- **ITEM-032:** checkNoticePeriodByType (V1 'efectivo') aplicaba 30 días a toda junta ES: una
+  convocatoria SL con 15-29 días (legal) producía falso NOTICE_PERIOD + divergencia V1/V2
+  permanente. Fix: 15 días para SL/SLU, 30 para SA/SAU — alineado con calcularAntelacion V2.
+- **Verificación:** 3 tests nuevos (cita SL, borde 31/07→30/06, casos fecha-a-fecha); 2032 tests
+  0 fail; gates verdes; migración aplicada y alineada; e2e 04+18 6/6.

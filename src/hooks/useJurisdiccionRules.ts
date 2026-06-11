@@ -244,8 +244,13 @@ export function checkNoticePeriodByType(params: {
   if (params.tipoSocial === 'SLU' || params.tipoSocial === 'SAU') return true;
 
   // Para juntas, los plazos por jurisdicción + tipo de convocatoria.
+  // ITEM-032: art. 176.1 LSC — SA un mes (≈30 días en V1), SL 15 días.
+  // El 30 plano para toda junta ES producía falsos incumplimientos en SL
+  // (15-29 días son legales) y divergencia V1/V2 permanente.
+  const isSlFamily = params.tipoSocial === "SL" || params.tipoSocial === "SLU";
+  const esJuntaDays = isSlFamily ? 15 : 30;
   const minDays: Record<string, Record<string, number>> = {
-    ES: { ORDINARIA: 30, EXTRAORDINARIA: 30 }, // LSC art. 176.1 — SA: 1 mes mínimo
+    ES: { ORDINARIA: esJuntaDays, EXTRAORDINARIA: esJuntaDays },
     BR: { ORDINARIA: 8,  EXTRAORDINARIA: 3 },
     MX: { ORDINARIA: 15, EXTRAORDINARIA: 8 },
     PT: { ORDINARIA: 21, EXTRAORDINARIA: 8 },

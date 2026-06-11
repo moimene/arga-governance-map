@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularPlazoComunicacion, type NormativeProfile } from '../comms-plazo-engine';
+import { calcularPlazoComunicacion, subtractOneMonthFechaAFecha, type NormativeProfile } from '../comms-plazo-engine';
 
 const baseProfile: NormativeProfile = {
   tipo_social: 'SA',
@@ -99,5 +99,46 @@ describe('comms-plazo-engine', () => {
     });
     expect(result.warnings.some((w) => w.includes('BR'))).toBe(true);
     expect(result.referencia_legal).toMatch(/Multi-jurisdicción/);
+  });
+});
+
+describe("ITEM-024 — cómputo y citas del plazo de convocatoria de junta", () => {
+  const baseInput = {
+    tipo_comunicacion: "CONVOCATORIA" as const,
+    organo_tipo: "JUNTA_GENERAL" as const,
+    entity_id: "e-1",
+    template_id: null,
+  };
+
+  it("SL cita el art. 176.1 LSC (el 173 regula la forma, no el plazo)", () => {
+    const result = calcularPlazoComunicacion({
+      ...baseInput,
+      fecha_evento_referenciado: new Date("2026-09-20T10:00:00Z"),
+      normative_profile: { tipo_social: "SL", es_cotizada: false, jurisdiction: "ES" },
+    });
+    expect(result.plazo_dias).toBe(15);
+    expect(result.referencia_legal).toBe("Art. 176.1 LSC");
+  });
+
+  it("SA computa un mes de fecha a fecha: junta 31/07 → límite 30/06 (no 01/07)", () => {
+    const result = calcularPlazoComunicacion({
+      ...baseInput,
+      fecha_evento_referenciado: new Date(2026, 6, 31, 10, 0, 0), // 31 julio 2026
+      normative_profile: { tipo_social: "SA", es_cotizada: false, jurisdiction: "ES" },
+    });
+    expect(result.min_envio_date?.getMonth()).toBe(5); // junio
+    expect(result.min_envio_date?.getDate()).toBe(30);
+  });
+
+  it("subtractOneMonthFechaAFecha: casos de borde", () => {
+    // 31/03 → 28/02 (2026 no bisiesto)
+    const a = subtractOneMonthFechaAFecha(new Date(2026, 2, 31));
+    expect([a.getMonth(), a.getDate()]).toEqual([1, 28]);
+    // 15/05 → 15/04 (caso normal de fecha a fecha)
+    const b = subtractOneMonthFechaAFecha(new Date(2026, 4, 15));
+    expect([b.getMonth(), b.getDate()]).toEqual([3, 15]);
+    // 01/01 → 01/12 año anterior
+    const c = subtractOneMonthFechaAFecha(new Date(2026, 0, 1));
+    expect([c.getFullYear(), c.getMonth(), c.getDate()]).toEqual([2025, 11, 1]);
   });
 });

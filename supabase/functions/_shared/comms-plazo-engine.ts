@@ -50,6 +50,18 @@ function subtractDays(d: Date, n: number): Date {
   return out;
 }
 
+// ITEM-024: "un mes" del art. 176.1 LSC se computa de fecha a fecha (art. 5.1
+// CC); si el día no existe en el mes destino, último día de ese mes.
+function subtractOneMonthFechaAFecha(d: Date): Date {
+  const out = new Date(d);
+  const day = out.getDate();
+  out.setDate(1);
+  out.setMonth(out.getMonth() - 1);
+  const lastDayOfTargetMonth = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+  out.setDate(Math.min(day, lastDayOfTargetMonth));
+  return out;
+}
+
 function addDays(d: Date, n: number): Date {
   const out = new Date(d);
   out.setDate(out.getDate() + n);
@@ -92,14 +104,21 @@ function calcularPlazoConvocatoria(input: PlazoComunicacionInput): PlazoComunica
   const { organo_tipo, normative_profile, fecha_evento_referenciado } = input;
   if (organo_tipo === 'JUNTA_GENERAL') {
     const isSA = normative_profile.tipo_social === 'SA' || normative_profile.tipo_social === 'SAU';
+    // ITEM-024: SA = "un mes" de fecha a fecha (arts. 176.1 LSC + 5.1 CC);
+    // SL = 15 días naturales (art. 176.1 LSC — el 173 regula la FORMA).
     const plazo = isSA ? 30 : 15;
-    const ref = isSA ? 'Art. 176.1 LSC' : 'Art. 173 LSC';
+    const ref = 'Art. 176.1 LSC';
     const warnings: string[] = [];
     if (normative_profile.es_cotizada) {
       warnings.push('Sociedad cotizada: verificar art. 516 LSC para 2ª convocatoria');
     }
+    const minEnvio = fecha_evento_referenciado
+      ? isSA
+        ? subtractOneMonthFechaAFecha(fecha_evento_referenciado)
+        : subtractDays(fecha_evento_referenciado, plazo)
+      : null;
     return {
-      min_envio_date: fecha_evento_referenciado ? subtractDays(fecha_evento_referenciado, plazo) : null,
+      min_envio_date: minEnvio,
       plazo_dias: plazo,
       unidad: 'NATURAL',
       fecha_limite_default: null,

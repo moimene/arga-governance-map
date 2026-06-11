@@ -50,7 +50,7 @@
 | ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | PENDIENTE |
 | ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | PENDIENTE |
 | ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
-| ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | PENDIENTE |
+| ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | HECHO |
 | ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
 | ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | PENDIENTE |
 | ITEM-027 | A2 | ✅ | Payloads postAcuerdo con incorrecciones registrales: aprobación de cuentas sin depósito (arts. 279-280 LSC), plazos/citas RRM dudosos e instrumento sobre-exigido en cese | BLOQUEADO-LEGAL |
@@ -58,7 +58,7 @@
 | ITEM-029 | A4 | ✅ | authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista | HECHO |
 | ITEM-030 | A4 | ✅ | Composición CdA demo (17 condiciones) irreconciliable con la estructura declarada (15 miembros: 9 IND + 5 EJE + 1 DOM); categorías de consejero no modeladas | PENDIENTE |
 | ITEM-031 | A4 | ✅ | Transmisión de participaciones/acciones sin ningún gate de los arts. 106-112 LSC ni distinción SA/SL | BLOQUEADO-LEGAL |
-| ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | PENDIENTE |
+| ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | HECHO |
 | ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | BLOQUEADO-LEGAL |
 | ITEM-034 | A5 | ✅ | Segunda convocatoria sin ninguna regla del art. 177 LSC: sin gap mínimo de 24h, ofrecida para SL y CdA, y el motor nunca la evalúa | PENDIENTE |
 | ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | HECHO |
