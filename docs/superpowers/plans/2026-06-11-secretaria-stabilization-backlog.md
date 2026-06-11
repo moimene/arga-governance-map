@@ -59,7 +59,7 @@
 | ITEM-030 | A4 | ✅ | Composición CdA demo (17 condiciones) irreconciliable con la estructura declarada (15 miembros: 9 IND + 5 EJE + 1 DOM); categorías de consejero no modeladas | PENDIENTE |
 | ITEM-031 | A4 | ✅ | Transmisión de participaciones/acciones sin ningún gate de los arts. 106-112 LSC ni distinción SA/SL | BLOQUEADO-LEGAL |
 | ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | HECHO |
-| ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | BLOQUEADO-LEGAL |
+| ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | HECHO (re-triado: corrección factual BOE) |
 | ITEM-034 | A5 | ✅ | Segunda convocatoria sin ninguna regla del art. 177 LSC: sin gap mínimo de 24h, ofrecida para SL y CdA, y el motor nunca la evalúa | HECHO (residual P3: gate de motor leyendo second_call_gap_min_hours) |
 | ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | HECHO |
 | ITEM-036 | A6 | ✅ | Mayoría de consejo: fórmulas con 'total_miembros' se evalúan contra presentes y DELEGACION_FACULTADES ignora el 2/3 de componentes del art. 249.3 LSC | HECHO |

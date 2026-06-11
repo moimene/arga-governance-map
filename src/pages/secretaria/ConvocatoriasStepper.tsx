@@ -707,7 +707,22 @@ export default function ConvocatoriasStepper() {
     selectedEntityId ? jurisdiction : undefined,
     selectedEntityId ? tipoSocial : undefined,
   );
-  const activeRuleSet = ruleSets.find((r) => r.is_active) ?? ruleSets[0] ?? null;
+  // ITEM-033: el rule set debe corresponder al ÓRGANO convocado. Antes se
+  // tomaba find(is_active) ?? [0] sin orden determinista: el badge de preaviso
+  // y el statutory_basis persistido podían ser los de otro órgano (p.ej.
+  // 'art. 247' de CdA en una convocatoria de JGA, o 3 días para una junta).
+  const ruleSetTypologiesForOrgano: string[] =
+    organoTipo === "JUNTA_GENERAL"
+      ? ["JUNTA_GENERAL", "JGA", "JGE"]
+      : organoTipo === "CONSEJO"
+        ? ["CONSEJO_ADMINISTRACION", "CDA", "CONSEJO"]
+        : ["COMISION_DELEGADA", "COMISION", "COMITE"];
+  const activeRuleSet =
+    ruleSets.find(
+      (r) =>
+        r.is_active &&
+        ruleSetTypologiesForOrgano.includes(String(r.typology_code ?? "").toUpperCase())
+    ) ?? null;
   const liveNoticeDays = activeRuleSet?.rule_config?.notice_min_days_first_call ?? null;
 
   // ── Step 2 ──

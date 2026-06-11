@@ -362,3 +362,16 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Residual anotado:** effective-rule.ts sigue sin consumidor UI (la proyección completa); el
   motor ya aplica los overrides de mayoría directamente — decidir en el cierre si se cablea la
   proyección o se retira el módulo (P3).
+
+### Iteración 19 — ITEM-033 [P1] Rule set ES/SA junta a 15 días + selección sin órgano (HECHO)
+
+- **Evidencia (Cloud):** fila legacy 47448c9d (ES+SA+JUNTA_GENERAL, sin nombre ni legal_reference)
+  con notice_min_days_first_call=15 contra el art. 176.1 LSC (un mes); además el stepper tomaba
+  `find(is_active) ?? ruleSets[0]` sin filtrar por órgano — con 3 rule sets activos para ES+SA, el
+  badge de preaviso podía mostrar 3 días para una junta y el statutory_basis persistido podía
+  citar el art. 247 (CdA) en una convocatoria de JGA.
+- **Fix:** migración 20260611203000 (15→30 con nombre y referencia 176.1, scoped a la fila legacy;
+  re-triado de BLOQUEADO-LEGAL a corrección factual BOE) + selección del rule set por
+  typology_code coherente con el órgano convocado (sin match → null, mejor sin badge que con un
+  badge de otro órgano).
+- **Verificación:** gates verdes (2041 tests 0 fail); migración alineada; e2e 04+18 6/6.
