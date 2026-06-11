@@ -494,3 +494,18 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   (art. 248.2 LSC)" visible solo en procesos de consejo (no en unanimidad SL).
 - **Verificación:** gates verdes (2048 tests 0 fail); prosrc desplegado contiene la rama; e2e
   07+18 verdes.
+
+### Iteración 27 — ITEM-015 [P1] fn_generar_certificacion vs art. 109 RRM (HECHO)
+
+- **Evidencia (BOE literal 109 RRM):** la RPC exigía el Vº Bº solo si legal_form='SA' (109.1.a lo
+  exige SIEMPRE para certificaciones del secretario de órgano colegiado, sin distinción de tipo
+  social — y la grafía 'SAU' ni siquiera matcheaba), aceptaba cualquier uuid como Vº Bº sin
+  validar cargo, certificaba actas sin firmar (contra 109.4) y resolvía la autoridad del
+  certificante a nivel entidad ignorando el órgano del acta.
+- **Fix:** migración 20260611215500 — (1) gate 109.4: acta sin signed_at no es certificable (con
+  mensaje accionable hacia "Aprobar y firmar acta" de ITEM-003); (2) Vº Bº exigido siempre que
+  certifica SECRETARIO/VICESECRETARIO; (3) el Vº Bº debe ostentar PRESIDENTE/VICEPRESIDENTE
+  VIGENTE en la entidad con preferencia por el órgano del acta; (4) autoridad del certificante
+  resuelta con preferencia por body (determinista tras ITEM-029).
+- **Verificación:** probes RPC 5/5; gates verdes (2048 tests 0 fail); e2e 05+18 6/6 (el golden
+  path firma el acta antes de certificar, por lo que el gate server-side no lo afecta).

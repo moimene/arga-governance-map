@@ -41,7 +41,7 @@
 | ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (re-triado: corrección factual BOE; 11 packs) |
 | ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (contradicción resuelta — ambos en 201.2; consolidar duplicado queda P3) |
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
-| ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | PENDIENTE |
+| ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | HECHO |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
 | ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO |
 | ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | HECHO |
