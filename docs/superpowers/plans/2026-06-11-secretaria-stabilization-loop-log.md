@@ -209,3 +209,17 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   false sobre el histórico. Coherente con 000049 HOLD (evidencia nunca final productiva).
 - **Verificación:** 2025 tests 0 fail; typecheck/lint/build verdes; e2e 14+18 8/8. Migración head
   20260611190000 alineada.
+
+### Iteración 10 — ITEM-042 [P1] Certificar desde acta no transicionaba a CERTIFIED (HECHO)
+
+- **Evidencia:** fn_generar_certificacion (minute-based, golden path) no actualizaba
+  agreements.status (la variante sin sesión sí): 4 acuerdos con cert SIGNED atascados en ADOPTED
+  en Cloud — timeline del expediente y Mesa de control contradiciendo la certificación firmada.
+- **Fix:** migración 20260611191500 — fn_emitir_certificacion (paso final del pipeline) transiciona
+  ADOPTED→CERTIFIED los UUID de agreements_certified (scoped a tenant; ignora referencias no-UUID
+  de actas legacy) + backfill de los 4 atascados (verificado en Cloud: ahora CERTIFIED).
+- **Hallazgo colateral anotado en ITEM-045:** fn_emitir_certificacion inserta en audit_log sin
+  hash (uno de los escritores de filas NULL) — tolerado por el fix de la Iteración 9, candidato a
+  unificación de escritores si se decide el re-anclaje.
+- **Verificación:** test de invariante Cloud `agreement-certified-transition.test.ts` (cert SIGNED
+  ⇒ agreement no-ADOPTED); 2026 tests 0 fail; gates verdes; e2e 07+18 7/7.
