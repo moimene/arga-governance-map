@@ -562,3 +562,55 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   crea/borra filas Cloud) NO debe correr concurrente con spec 30 — provoca falsos rojos en los tests
   "detalle no-session" de spec 30 por interferencia cross-spec; correr aislado (gate
   `SECRETARIA_E2E_PHASE_B1=1`).
+
+## Campaña ultracode — completar el backlog (2026-06-11, en curso)
+
+Objetivo del usuario: "completa y termina todo el backlog" en modo ultracode + verificación adversarial.
+
+### Reconciliación inicial (bookkeeping)
+
+El backlog detalle estaba MUY desactualizado: marcaba PENDIENTE/BLOQUEADO ítems que el loop
+(iter.1-28) ya había cerrado pero sin volcar el estado. Reconciliado contra el loop-log:
+- **25 PENDIENTE → HECHO** (commit `c48594a`/reconcile): 004,005,006,009,016,018,021,022,024,026,032,
+  034,035,036,038,039,040,042,043,044,046,047,049,051,052 + ITEM-020 (= ITEM-050).
+- **11 BLOQUEADO/HUMANA → HECHO** (re-triados a corrección factual BOE por el loop): 007,008,010,011,
+  012,013,015,017,033,041,053. ITEM-045 permanece BLOQUEADO-HUMANO (re-anclaje WORM real).
+
+### Triaje paralelo verificado (workflow `wi9cty562`)
+
+18 agentes, ~1M tokens, 633 tool-uses, 105 ítems no-cerrados triados contra el CÓDIGO ACTUAL +
+verificación adversarial de cada ALREADY_FIXED. Resultado: las 28 iteraciones se centraron en
+P1/motor, así que la mayoría de P2/P3 (UI/copy/nav/doc/migración) **siguen siendo gap real**.
+- **92 accionables**: STILL_REAL 80 + PARTIAL 10 + STILL_REAL_AFTER_REFUTE 2 (058 y 092 reclamados
+  "ya arreglado" pero refutados por el escéptico). NEEDS_HUMAN 10, NOT_APPLICABLE 1.
+- Desglose: UI_STEPPER 39, MOTOR 18 (muchos legales/BOE), DOC 10, HOOK 7, OTHER 6, SEED_DATA 5
+  (Cloud), TYPING 3, TEST 3, MIGRATION 1. Effort: 37 S / 45 M / 10 L. Risk: 31 low / 40 med / 21 high.
+- Salida completa de veredictos por ítem (fixSpec+evidence) en el output del workflow; copia de
+  accionables en `/tmp/actionable.json` durante la sesión.
+
+### Olas ejecutadas
+
+- **Ola 1 (commit `7414a5f`) — DOC+copy, 10 ítems:** ITEM-055 (cita LMV derogada → Ley 6/2023/MAR),
+  072 ("el Registro Mercantil"), 118 (INDEX.md BORDE_COTIZADA), 121/131/136 (CLAUDE.md P0 = lista
+  vacía 2026-05-14), 122 (tabla rutas: −ExpedienteSinSesionStepper +4 reales), 131 (taxonomía
+  sidebar real), 140 (gestor visibleTabs+toast), 148 (auth role useCurrentUserRole), 058 (no-op).
+  Verificación: cada afirmación del triaje confirmada en el código antes de editar CLAUDE.md.
+- **Ola 2 (commit `c4af8ff`) — estados UI, 2 ítems:** ITEM-096 (EMITIDA en ConvocatoriasList),
+  147 (REJECTED_REGISTRY en TIMELINE_LABEL de ExpedienteAcuerdo).
+
+### Roadmap del remanente (~80 accionables + 10 NEEDS_HUMAN)
+
+Estrategia: olas por subsistema (evitar conflictos en archivos compartidos; commits y Cloud en
+serie), cada ola implementar→gates→adversarial→commit. Pendientes:
+- **MOTOR (18, alto valor/riesgo, BOE):** ITEM-019 (P1, capital_total cae a cabezas en juntas sin
+  datos de capital — meeting-adoption-snapshot.ts:281 + caller ReunionStepper), 014, 056, 057, 063,
+  064, 079, 090, 093, 108, 112, 113, 114, 123, 133, 141, 142, 145. Requieren verificación normativa
+  individual contra BOE + adversarial Codex.
+- **UI_STEPPER restantes (~37):** copy/nav/translations/error-handling. Mayoría S/M, bajo riesgo.
+- **HOOK (7), TYPING (3), TEST (3), OTHER (6).**
+- **SEED_DATA (5) + MIGRATION (1):** Cloud — serie, con `db:check-target` previo.
+- **NEEDS_HUMAN (10):** 027 (payloads postacuerdo legal), 030 (composición CdA modelado), 031
+  (transmisión SL gates), 078 (sidebar dup), 092 (capital-validation refutado) y otros — documentar
+  con recomendación; no auto-completables sin decisión de producto/legal.
+
+Próximo paso al reanudar: Ola MOTOR empezando por ITEM-019 (P1), con BOE + Codex adversarial por ítem.
