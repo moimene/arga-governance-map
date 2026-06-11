@@ -576,7 +576,7 @@
 | ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | PENDIENTE |
 | ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | PENDIENTE |
 | ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | PENDIENTE |
-| ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | PENDIENTE |
+| ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | PENDIENTE |
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
@@ -941,7 +941,7 @@
 
 ### ITEM-096 [P2] Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud)
 
-- **Área:** A5 · **Estado:** PENDIENTE
+- **Área:** A5 · **Estado:** HECHO (Ola 2; EMITIDA añadido a tono+filtro ConvocatoriasList)
 - **Descripción:** El selector de estado ofrece BORRADOR/CONVOCADA/CELEBRADA/CANCELADA y el mapa de tonos ESTADO_TONE cubre los mismos cuatro, pero useCreateConvocatoria siempre inserta estado='EMITIDA' y en Cloud hay 0 CONVOCADA y 0 CANCELADA frente a 11 EMITIDA: dos opciones del filtro no matchearán nunca nada y las convocatorias emitidas (las únicas del golden path) no pueden aislarse con el filtro; su chip cae al gris por defecto. statusLabel sí traduce 'Emitida' correctamente, igual que en ConvocatoriaDetalle.
 - **Evidencia:** src/pages/secretaria/ConvocatoriasList.tsx:8-13 (ESTADO_TONE) y 102-107 (opciones del filtro); src/hooks/useConvocatorias.ts:247 (estado: 'EMITIDA'). SQL Cloud: estados = BORRADOR 38, EMITIDA 11, CELEBRADA 3.
 - **Archivos:** src/pages/secretaria/ConvocatoriasList.tsx, src/hooks/useConvocatorias.ts
@@ -1138,7 +1138,7 @@
 | ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | PENDIENTE |
 | ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | PENDIENTE |
 | ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
-| ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | PENDIENTE |
+| ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | HECHO (Ola2) |
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
 | ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | PENDIENTE |
 | ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | PENDIENTE |
@@ -1397,7 +1397,7 @@
 
 ### ITEM-147 [P3] REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir
 
-- **Área:** A7 · **Estado:** PENDIENTE
+- **Área:** A7 · **Estado:** HECHO (Ola 2; REJECTED_REGISTRY añadido a TIMELINE_LABEL ExpedienteAcuerdo)
 - **Descripción:** El array TIMELINE de ExpedienteAcuerdo tiene 8 entradas y excluye REJECTED_REGISTRY (rama alternativa del ciclo declarado DRAFT→...→REGISTERED|REJECTED_REGISTRY→PUBLISHED). Si un agreement estuviera en REJECTED_REGISTRY: statusIndex=-1 → ningún paso del timeline se marca como alcanzado (visual de expediente 'sin empezar' pese a haber llegado a registro), el bloque 'Generar documento' se oculta (statusIndex >= indexOf('ADOPTED') falla), y el badge de cabecera muestra el literal crudo 'REJECTED_REGISTRY' porque TIMELINE_LABEL no lo contiene y la página no usa statusLabel() (que sí tiene 'Denegado en registro'). Sin datos actuales en ese estado (Cloud: 0 filas), pero el estado es legal según el CHECK de la tabla y alcanzable conceptualmente.
 - **Evidencia:** src/pages/secretaria/ExpedienteAcuerdo.tsx:69-89 (TIMELINE y TIMELINE_LABEL sin REJECTED_REGISTRY), :235 (statusIndex), :265 (fallback a.status crudo), :273 (gate CTA). supabase/migrations/20260418053633_secretaria_t1b_agreements.sql:20 (CHECK incluye REJECTED_REGISTRY). Cloud SQL: distribución de status sin REJECTED_REGISTRY (DRAFT 101, ADOPTED 30, CERTIFIED 27, PROPOSED 4, FILED 1, INSTRUMENTED 1).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ExpedienteAcuerdo.tsx

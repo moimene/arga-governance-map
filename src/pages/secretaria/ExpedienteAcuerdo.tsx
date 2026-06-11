@@ -86,6 +86,9 @@ const TIMELINE_LABEL: Record<string, string> = {
   FILED:        "Preparado para registro",
   REGISTERED:   "Inscrito",
   PUBLISHED:    "Publicado",
+  // ITEM-147: rama terminal de rechazo registral (no es etapa lineal del TIMELINE,
+  // por eso no se añade al array; solo a la etiqueta para el badge).
+  REJECTED_REGISTRY: "Rechazado por el Registro Mercantil",
 };
 
 const ADOPTION_MODES: AdoptionMode[] = [
