@@ -1,5 +1,6 @@
+import { detectOrphanNamespaces } from "../gate-pre-semantic";
 import { describe, it, expect } from "vitest";
-import { evaluateSemanticRules } from "../gate-pre-semantic";
+import { evaluateSemanticRules , detectOrphanNamespaces } from "../gate-pre-semantic";
 import type { PlantillaCandidate } from "../types";
 
 const template = (over: Partial<PlantillaCandidate>): PlantillaCandidate => ({
@@ -137,5 +138,20 @@ describe("gate-pre-semantic", () => {
       }),
     );
     expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
+});
+
+describe("SEM_NAMESPACE_SIN_PROVEEDOR (ITEM-026)", () => {
+  it("detecta namespaces huérfanos en capa1 y los lista ordenados", () => {
+    const orphans = detectOrphanNamespaces(
+      "Acta: {{DECISION.fecha}} en {{ENTIDAD.domicilio_social}} — {{REGISTRO.tomo}} {{#if ACUERDO.unanime}}x{{/if}} {{QTSP.sello}}"
+    );
+    expect(orphans).toEqual(["ACUERDO", "DECISION", "REGISTRO"]);
+  });
+
+  it("no marca los namespaces soportados ni QTSP", () => {
+    expect(
+      detectOrphanNamespaces("{{ENTIDAD.nif}} {{REUNION.hora_cierre}} {{QTSP.timestamp}} {{USUARIO.cargo}}")
+    ).toEqual([]);
   });
 });

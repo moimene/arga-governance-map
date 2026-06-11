@@ -180,6 +180,9 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     entity_type_detail: data.tipo_social || data.legal_form,
     denominacion_social: data.legal_name || data.common_name,
     cif: data.tax_id || data.registration_number || "—",
+    // ITEM-026: aliases usados por plantillas ACTIVA (el resolver emitía solo
+    // cif/tipo_social y las plantillas con nif/tipo_sociedad quedaban en blanco).
+    nif: data.tax_id || data.registration_number || "—",
     domicilio_social: data.address || "—",
     registro_mercantil: data.registry_location || "—",
     tomo: data.registry_volume || "—",
@@ -188,6 +191,7 @@ async function resolveEntityVars(entityId: string, tenantId: string): Promise<Re
     inscripcion: data.registry_inscription || "—",
     lugar: data.city || data.address || "—",
     tipo_social: data.tipo_social || data.legal_form,
+    tipo_sociedad: data.tipo_social || data.legal_form,
     articulo_estatutos_comision: data.bylaws_commission_article || "—",
     // Codex P2 round 12: derivar es_cotizada / es_unipersonal de la fila
     // entities (columnas booleanas reales). ARGA Seguros está seeded como
@@ -417,6 +421,9 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
     fecha: meetingDate,
     hora_inicio: meetingTyped.start_time || "—",
     hora_fin: meetingTyped.end_time || "—",
+    // ITEM-026: aliases de plantillas de acta (hora_cierre / medio de convocatoria).
+    hora_cierre: meetingTyped.end_time || "—",
+    medio_convocatoria: meetingTyped.publication_medium || "—",
     lugar: meetingTyped.location || "—",
     lugar_junta: meetingTyped.location || "—",
     fecha_junta: meetingDate,

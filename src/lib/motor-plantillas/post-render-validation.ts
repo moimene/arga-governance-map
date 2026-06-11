@@ -73,11 +73,23 @@ export function validatePostRenderDocument(
 
   const unresolved = Array.from(new Set(input.unresolvedVariables ?? []));
   if (unresolved.length > 0) {
+    // ITEM-026: en documentos FORMALES (actas, certificaciones) una variable
+    // sin valor produce un blanco silencioso que invalida el resultado
+    // jurídico (fecha, lugar, firmante, NIF vacíos) → BLOCKING. Los
+    // placeholders QTSP.* son post-firma by-design y quedan en WARNING.
+    const unresolvedNoQtsp = unresolved.filter(
+      (v) => !String(v).toUpperCase().startsWith("QTSP.")
+    );
+    const esDocumentoFormal = /^(ACTA|CERTIFICACION)/i.test(String(input.documentType ?? ""));
     pushIssue(issues, {
       code: "UNRESOLVED_VARIABLES",
-      severity: "WARNING",
+      severity: esDocumentoFormal && unresolvedNoQtsp.length > 0 ? "BLOCKING" : "WARNING",
       field_path: "variables",
-      message: `Variables referenciadas sin valor: ${unresolved.slice(0, 8).join(", ")}.`,
+      message: `Variables referenciadas sin valor: ${unresolved.slice(0, 8).join(", ")}.${
+        esDocumentoFormal && unresolvedNoQtsp.length > 0
+          ? " Un documento formal no puede emitirse con blancos — revisa la plantilla o completa los datos del expediente."
+          : ""
+      }`,
     });
   }
 

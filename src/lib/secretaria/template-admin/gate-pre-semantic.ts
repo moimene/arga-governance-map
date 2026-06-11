@@ -76,5 +76,45 @@ export function evaluateSemanticRules(t: PlantillaCandidate): GatePreIssue[] {
     }
   }
 
+  // ITEM-026 — namespaces sin proveedor en el resolver. Las plantillas más
+  // sensibles (actas formales, certificaciones) usan placeholders cuyos
+  // namespaces ningún código construye (ACUERDO.*, DECISION.*, COAP.*,
+  // REGISTRO.*...) y se renderizan en blanco. WARNING para hacerlos visibles
+  // en la consola de validación; la activación de plantillas nuevas con
+  // namespaces huérfanos debe resolverse (proveedor o migración de namespace).
+  const orphanNamespaces = detectOrphanNamespaces(t.capa1_inmutable ?? "");
+  if (orphanNamespaces.length > 0) {
+    issues.push({
+      severity: "WARNING",
+      code: "SEM_NAMESPACE_SIN_PROVEEDOR",
+      message: `La capa 1 usa namespaces sin proveedor en el resolver (renderizarán en blanco): ${orphanNamespaces.join(", ")}. Migrar a namespaces soportados (${[...SUPPORTED_VARIABLE_NAMESPACES].join("/")}) o implementar el proveedor.`,
+      field: "capa1_inmutable",
+    });
+  }
+
   return issues;
+}
+
+/**
+ * Namespaces que el resolver (variable-resolver.ts sourceMap) y el pipeline
+ * QTSP construyen hoy. Mantener sincronizado con el sourceMap.
+ */
+export const SUPPORTED_VARIABLE_NAMESPACES = new Set([
+  "ENTIDAD",
+  "ORGANO",
+  "REUNION",
+  "EXPEDIENTE",
+  "CAP_TABLE",
+  "MOTOR",
+  "SISTEMA",
+  "USUARIO",
+  "QTSP",
+]);
+
+export function detectOrphanNamespaces(capa1: string): string[] {
+  const namespaces = new Set<string>();
+  for (const match of capa1.matchAll(/\{\{\s*#?(?:if\s+|each\s+|unless\s+)?([A-Z_]{2,})\.[A-Za-z_]/g)) {
+    namespaces.add(match[1]);
+  }
+  return [...namespaces].filter((ns) => !SUPPORTED_VARIABLE_NAMESPACES.has(ns)).sort();
 }

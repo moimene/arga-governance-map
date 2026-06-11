@@ -424,3 +424,24 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Checkpoint 4 (tras Iteración 22):** e2e ampliada 48/48; push al día (815ea84..6527861);
   migraciones alineadas hasta 20260611210000. Balance acumulado: 40 ítems cerrados, incluidos
   9 BLOQUEADO-LEGAL re-triados como correcciones factuales BOE (007/008/010/011/012/013/033/053).
+
+### Iteración 23 — ITEM-026 [P1] Blancos silenciosos en documentos formales (HECHO parcial)
+
+- **Evidencia:** plantillas ACTIVA de actas/certificaciones usan namespaces que ningún código
+  construye (ACUERDO.*, DECISION.*, COAP.*, REGISTRO.*, meetings.junta.*...); la validación
+  post-render los trataba como WARNING y Handlebars rinde cadena vacía → acta/certificación sin
+  fecha, lugar, firmante o NIF, emitida sin fricción.
+- **Fix intermedio (3 capas):** (1) post-render: UNRESOLVED_VARIABLES pasa a BLOCKING en
+  documentos formales (ACTA*/CERTIFICACION) salvo QTSP.* (post-firma by-design) — un documento
+  formal ya no puede emitirse con blancos; (2) Gate PRE semántico: nueva regla
+  SEM_NAMESPACE_SIN_PROVEEDOR (WARNING) con detector de namespaces huérfanos y set
+  SUPPORTED_VARIABLE_NAMESPACES sincronizado con el sourceMap del resolver; (3) aliases baratos
+  añadidos al resolver: ENTIDAD.nif, ENTIDAD.tipo_sociedad, REUNION.hora_cierre,
+  REUNION.medio_convocatoria.
+- **Residual (decisión de contrato, REQUIERE HUMANO/LEGAL):** o el resolver construye los
+  namespaces documentales (ACUERDO desde no_session_resolutions, DECISION desde
+  unipersonal_decisions, COAP del expediente, REGISTRO desde entities.registry_*) o las plantillas
+  migran a los namespaces soportados. Hasta entonces los flujos afectados fallan EXPLÍCITAMENTE
+  (BLOCKING accionable) en vez de emitir documentos jurídicamente vacíos.
+- **Verificación:** 2 tests nuevos del detector; 2048 tests 0 fail; gates verdes; e2e 14+17+18
+  10/10 (el golden path documental resuelve sus variables — el BLOCKING no le afecta).

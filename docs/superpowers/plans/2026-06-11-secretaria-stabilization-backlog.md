@@ -52,7 +52,7 @@
 | ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
 | ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | HECHO |
 | ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
-| ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | PENDIENTE |
+| ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | HECHO parcial (blancos ya no silenciosos: BLOCKING formal + gate + aliases; proveedores de namespaces documentales = decisión de contrato pendiente) |
 | ITEM-027 | A2 | ✅ | Payloads postAcuerdo con incorrecciones registrales: aprobación de cuentas sin depósito (arts. 279-280 LSC), plazos/citas RRM dudosos e instrumento sobre-exigido en cese | BLOQUEADO-LEGAL |
 | ITEM-028 | A4 | ✅ | Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales) | HECHO |
 | ITEM-029 | A4 | ✅ | authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista | HECHO |
