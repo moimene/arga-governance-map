@@ -188,3 +188,24 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   (evaluación de forma con votos placeholder — cubierto por la deuda DL-2/ITEM-019, no por este
   ítem). ConvocatoriasStepper evalúa la convocatoria en 1ª por diseño.
 - **Verificación:** gates verdes (2023 tests 0 fail, typecheck, lint, build); e2e 05+18 6/6.
+
+### Iteración 9 — ITEM-044/045/046 [P1] Cluster evidencia/WORM (HECHO + 1 BLOQUEADO-HUMANO)
+
+- **ITEM-044 (HECHO):** archiveDocxToStorage insertaba bundles sin provenance y el hook resolvía
+  por source_object_type='AGREEMENT' → todo documento archivado quedaba irrecuperable desde el
+  expediente. Fix doble: el escritor popula source_module/source_object_type/source_object_id, y
+  useAgreementSignedDocumentUrl añade fallback de LECTURA por agreement_id para los 39 bundles
+  legacy (33 OPEN sin provenance + 6 SEALED seed con 'agreement' minúsculas) — sin mutar filas
+  WORM existentes.
+- **ITEM-046 (HECHO):** el verificador offline comparaba djb2(artifacts) contra un manifest_hash
+  que era el SHA-256 del contenido → '✗ Error de integridad' permanente sobre documentos íntegros.
+  El manifest se construye ahora con computeManifestHashSync([artifact]) (el SHA-256 sigue como
+  artifact.hash). 2 tests de regresión en evidence-bundle.test.ts.
+- **ITEM-045 (BLOQUEADO-HUMANO, parte hecha):** migración 20260611190000 alinea fn_audit_worm con
+  el verificador (prev = última fila HASHEADA por created_at,id — antes: sin excluir 95 NULLs y
+  sin tiebreaker sobre 163 created_at duplicados). Las entradas NUEVAS encadenan correctamente.
+  La cadena histórica (3000+ entradas) no es reparable sin RE-ANCLAJE documentado (nuevo génesis
+  con corte fechado) — decisión forense que requiere humano; mientras tanto chain_valid seguirá
+  false sobre el histórico. Coherente con 000049 HOLD (evidencia nunca final productiva).
+- **Verificación:** 2025 tests 0 fail; typecheck/lint/build verdes; e2e 14+18 8/8. Migración head
+  20260611190000 alineada.

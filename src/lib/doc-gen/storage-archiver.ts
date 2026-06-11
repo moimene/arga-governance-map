@@ -155,6 +155,13 @@ export async function archiveDocxToStorage(
     const { data: bundle, error: insertError } = await supabase.from("evidence_bundles").insert({
       tenant_id: tenantId,
       agreement_id: agreementId,
+      // ITEM-044: provenance obligatoria — useAgreementSignedDocumentUrl
+      // resuelve el bundle por source_object_type='AGREEMENT' +
+      // source_object_id; sin estos campos el documento archivado quedaba
+      // irrecuperable desde el expediente.
+      source_module: "secretaria",
+      source_object_type: "AGREEMENT",
+      source_object_id: agreementId,
       manifest,
       manifest_hash: manifestHash,
       hash_sha512: hashHex,

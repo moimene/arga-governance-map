@@ -440,3 +440,44 @@ describe('Integration: Full Evidence Bundle Workflow', () => {
     expect(paths).toContain('VERIFICAR.html');
   });
 });
+
+// ============================================================
+// ITEM-046 — contrato del verificador offline (DJB2, no SHA-256)
+// ============================================================
+
+describe('ITEM-046 — manifest del verificador offline construido a mano (GenerarDocumentoStepper)', () => {
+  const sha256DeContenido = 'a'.repeat(64); // SHA-256 hex del texto renderizado (64 chars)
+
+  it('un manifest con manifest_hash = computeManifestHashSync(artifacts) verifica', () => {
+    const artifact = {
+      type: 'PLANTILLA_SNAPSHOT' as const,
+      ref: 'storage://docs/acta.docx',
+      hash: sha256DeContenido,
+      timestamp: '2026-06-11T10:00:00.000Z',
+      metadata: { templateTipo: 'ACTA' },
+    };
+    const manifest = {
+      version: '1.0.0',
+      agreement_id: TEST_AGREEMENT_ID,
+      generated_at: '2026-06-11T10:00:01.000Z',
+      artifacts: [artifact],
+      artifact_count: 1,
+      manifest_hash: computeManifestHashSync([artifact]),
+    };
+    // El HTML del verificador recomputa computeManifestHashSync (djb2) sobre
+    // los artifacts y lo compara con manifest_hash: deben coincidir.
+    expect(computeManifestHashSync(manifest.artifacts)).toBe(manifest.manifest_hash);
+    expect(manifest.manifest_hash).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it('regresión: usar el SHA-256 del contenido como manifest_hash NUNCA verifica (bug original)', () => {
+    const artifact = {
+      type: 'PLANTILLA_SNAPSHOT' as const,
+      ref: 'storage://docs/acta.docx',
+      hash: sha256DeContenido,
+      timestamp: '2026-06-11T10:00:00.000Z',
+      metadata: {},
+    };
+    expect(computeManifestHashSync([artifact])).not.toBe(sha256DeContenido);
+  });
+});

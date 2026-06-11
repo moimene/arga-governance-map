@@ -81,7 +81,20 @@ export function useAgreementSignedDocumentUrl(
         .limit(1)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data?.id ?? null;
+      if (data?.id) return data.id;
+      // ITEM-044: fallback por agreement_id para bundles legacy creados sin
+      // provenance (33 OPEN del archivador antiguo y 6 SEALED seed con
+      // 'agreement' en minúsculas). No se mutan filas WORM existentes: el
+      // fallback de lectura las hace recuperables.
+      const { data: legacy, error: legacyError } = await supabase
+        .from("evidence_bundles")
+        .select("id")
+        .eq("agreement_id", agreementId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (legacyError) throw new Error(legacyError.message);
+      return legacy?.id ?? null;
     },
   });
 

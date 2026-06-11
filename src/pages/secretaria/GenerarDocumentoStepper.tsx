@@ -42,7 +42,7 @@ import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-reso
 import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
 import { downloadDocx, printRenderedDocument } from "@/lib/doc-gen/docx-generator";
 import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
-import { generarVerificadorOffline } from "@/lib/rules-engine";
+import { computeManifestHashSync, generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
 import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
@@ -1598,13 +1598,17 @@ export default function GenerarDocumentoStepper() {
                           templateVersion: selectedPlantilla?.version,
                         },
                       };
+                      // ITEM-046: el verificador offline recomputa
+                      // computeManifestHashSync (DJB2) sobre los artifacts —
+                      // manifest_hash debe usar el MISMO contrato (el SHA-256
+                      // del contenido ya viaja como artifact.hash).
                       const manifest: EvidenceManifest = {
                         version: "1.0.0",
                         agreement_id: agreement?.id ?? "",
                         generated_at: new Date().toISOString(),
                         artifacts: [artifact],
                         artifact_count: 1,
-                        manifest_hash: contentHash ?? "",
+                        manifest_hash: computeManifestHashSync([artifact]),
                       };
                       const html = generarVerificadorOffline(manifest);
                       const blob = new Blob([html], { type: "text/html" });

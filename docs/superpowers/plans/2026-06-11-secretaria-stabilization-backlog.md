@@ -70,9 +70,9 @@
 | ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | PENDIENTE |
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | PENDIENTE |
 | ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
-| ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | PENDIENTE |
-| ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | PENDIENTE |
-| ITEM-046 | A8 | ✅ | Verificador offline siempre reporta '✗ Error de integridad' para documentos legítimos — mismatch SHA-256 vs DJB2 | PENDIENTE |
+| ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | HECHO |
+| ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | BLOQUEADO-HUMANO (escritor alineado forward-only; re-anclaje de génesis pendiente de decisión) |
+| ITEM-046 | A8 | ✅ | Verificador offline siempre reporta '✗ Error de integridad' para documentos legítimos — mismatch SHA-256 vs DJB2 | HECHO |
 | ITEM-047 | A9 | ✅ | Art. 248.2 LSC no operativo: la oposición al procedimiento escrito (OBJECION_PROCEDIMIENTO) es inalcanzable en UI y el servidor la degrada a voto en contra | PENDIENTE |
 | ITEM-048 | A9 | ✅ | Regla de adopción sin sesión server-side: pluralidad por cabezas que ignora matter_class y capital; el auto-cierre por vencimiento rechaza en bloque incluso con mayoría a favor (evidencia Cloud) | BLOQUEADO-LEGAL |
 | ITEM-049 | A9 | ✅ | PactosParasocialesCard del expediente evalúa con votos inventados (70/30) y presenta veredictos de incumplimiento como reales | PENDIENTE |
