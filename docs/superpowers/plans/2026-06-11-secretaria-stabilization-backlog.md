@@ -33,17 +33,17 @@
 | ITEM-004 | A1 | ✅ | Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados | HECHO |
 | ITEM-005 | A1 | ✅ | calcularAntelacion aplica overrides numéricos de cualquier clave: un override de quórum puede inflar la antelación de convocatoria | HECHO |
 | ITEM-006 | A1 | ✅ | Alias divergentes materia UI ↔ rule pack rompen el match silenciosamente (convocatoria emite con warning genérico sin reglas) | HECHO (residual: packs duplicados MOD_ESTATUTOS↔MODIFICACION_ESTATUTOS en ITEM-013 y lifecycle de cooptación, legal/data) |
-| ITEM-007 | A10 | ✅ | Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto | HECHO (re-triado: corrección factual BOE) |
-| ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | HECHO (re-triado: corrección factual BOE) |
+| ITEM-007 | A10 | ✅ | Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto | HECHO (loop) |
+| ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | HECHO (loop) |
 | ITEM-009 | A10 | ✅ | Art. 248.1 LSC: la mayoría del consejo se evalúa sobre miembros totales en vez de concurrentes; 'favor > presentes_mitad' se remapea silenciosamente a total | HECHO |
-| ITEM-010 | A10 | ✅ | Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo | HECHO (re-triado: corrección factual BOE, no redacción nueva) |
-| ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | HECHO (re-triado: los arts. no existen — corrección factual) |
-| ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (re-triado: corrección factual BOE; 11 packs) |
-| ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (contradicción resuelta — ambos en 201.2; consolidar duplicado queda P3) |
+| ITEM-010 | A10 | ✅ | Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo | HECHO (loop) |
+| ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | HECHO (loop) |
+| ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (loop) |
+| ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (loop) |
 | ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
-| ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | HECHO |
+| ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | HECHO (loop) |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
-| ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO |
+| ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO (loop) |
 | ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | HECHO |
 | ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO parcial (miembros_presentes real; capital_total fallback pendiente) |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | HECHO (ITEM-050) |
@@ -59,7 +59,7 @@
 | ITEM-030 | A4 | ✅ | Composición CdA demo (17 condiciones) irreconciliable con la estructura declarada (15 miembros: 9 IND + 5 EJE + 1 DOM); categorías de consejero no modeladas | PENDIENTE |
 | ITEM-031 | A4 | ✅ | Transmisión de participaciones/acciones sin ningún gate de los arts. 106-112 LSC ni distinción SA/SL | BLOQUEADO-LEGAL |
 | ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | HECHO |
-| ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | HECHO (re-triado: corrección factual BOE) |
+| ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | HECHO (loop) |
 | ITEM-034 | A5 | ✅ | Segunda convocatoria sin ninguna regla del art. 177 LSC: sin gap mínimo de 24h, ofrecida para SL y CdA, y el motor nunca la evalúa | HECHO (residual P3: gate de motor leyendo second_call_gap_min_hours) |
 | ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | HECHO |
 | ITEM-036 | A6 | ✅ | Mayoría de consejo: fórmulas con 'total_miembros' se evalúan contra presentes y DELEGACION_FACULTADES ignora el 2/3 de componentes del art. 249.3 LSC | HECHO |
@@ -67,7 +67,7 @@
 | ITEM-038 | A6 | ✅ | primeraConvocatoria hardcodeado a true: el quórum de 2ª convocatoria (arts. 193/194 LSC) nunca se evalúa y bloquea juntas legalmente constituidas | HECHO |
 | ITEM-039 | A6 | ✅ | Voto de calidad desempata siempre hacia la adopción sin verificar el sentido del voto del presidente | HECHO |
 | ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | HECHO |
-| ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | HECHO (residual: modelo conflicto↔materia, decisión humana) |
+| ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | HECHO (loop) |
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | HECHO |
 | ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
 | ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | HECHO |
@@ -79,7 +79,7 @@
 | ITEM-050 | A9 | ✅ | CO_APROBACION y SOLIDARIO: validación circular de administradores vigentes y sin reglas de mancomunidad (arts. 210 y 233.2 LSC) | HECHO (residual: elegibilidad por modo + ADMIN_PJ representante — decisión de producto) |
 | ITEM-051 | A9 | ✅ | Decisiones unipersonales: nacen FIRMADA sin firmante, checklist pre-firma ficticio y sin validación de unipersonalidad (arts. 15-16 LSC) | HECHO (residual: ligar status FIRMADA a la firma documental real) |
 | ITEM-052 | A9 | ✅ | Voto de calidad imposible en Comité Ejecutivo: el early-return COMISION_DELEGADA ignora quorum_rule.voto_calidad_presidente=true (contradice la estructura demo ARGA) | HECHO |
-| ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | HECHO (re-triado) |
+| ITEM-053 | A9 | ✅ | Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto) | HECHO (loop) |
 
 ### ITEM-004 [P1] Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados
 
@@ -110,7 +110,7 @@
 
 ### ITEM-007 [P1] Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** Art. 198 LSC (BOE literal): «los acuerdos sociales se adoptarán por mayoría de los votos válidamente emitidos, siempre que representen al menos un tercio de los votos correspondientes a las participaciones». Es una doble condición: (1) favor > contra entre emitidos Y (2) favor >= 1/3 del total de votos. La fórmula 'favor > 1/3_capital_total_con_voto' del evaluador comprueba SOLO favor > 1/3 del capital total (estricto, no 'al menos') y omite por completo la mayoría de emitidos. Falso positivo flagrante: favor 34%, contra 40% del capital → el motor proclama el acuerdo (34 > 33,3) cuando la ley lo rechaza (contra > favor). Packs SL afectados (activos en Cloud): APROBACION_CUENTAS, APLICACION_RESULTADO, CESE_CONSEJERO, DISTRIBUCION_DIVIDENDOS, NOMBRAMIENTO_AUDITOR. Inversamente, RETRIBUCION_ADMIN SL codifica 'Mayoría simple' → favor>contra sin el suelo de 1/3 (falso positivo con favor 20% / contra 10%).
 - **Evidencia:** src/lib/rules-engine/majority-evaluator.ts:215-222 (favor > capital_total/3, sin condición favor>contra, comparador estricto). BOE API bloque a198 verificado literal. Payloads Cloud: SELECT sobre rule_pack_versions is_active=true — p.ej. APROBACION_CUENTAS SL {formula: 'favor > 1/3_capital_total_con_voto', referencia: 'art. 198 LSC'}; RETRIBUCION_ADMIN SL {formula: 'Mayoría simple', fuente: 'art. 198 LSC'}.
 - **Archivos:** src/lib/rules-engine/majority-evaluator.ts
@@ -119,7 +119,7 @@
 
 ### ITEM-008 [P1] Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** Art. 201.2 LSC (BOE literal): si el capital presente supera el 50% basta mayoría absoluta; el voto favorable de «los dos tercios del capital presente o representado» solo se exige en 2ª convocatoria con concurrencia [25%, 50%). El evaluador tiene la fórmula 'lsc_201_2_reforzada' con la estructura correcta PERO computa el 2/3 sobre `emitidos` (favor+contra) en lugar de sobre capital presente: con abstenciones produce falsos positivos (favor 30, contra 10, abst. 60 de un capital presente 100 al 30% de concurrencia → motor: 30 >= 26,7 OK; ley: 30 < 66,7 KO). Además, los packs AUMENTO_CAPITAL, MODIFICACION_ESTATUTOS y REDUCCION_CAPITAL codifican 'favor >= 2/3_emitidos' plano (citando art. 194.1 LSC, que es un artículo de QUÓRUM), y FUSION, ESCISION, TRANSFORMACION, DISOLUCION, CESION_GLOBAL_ACTIVO, SUPRESION_PREFERENTE y EMISION_OBLIGACIONES codifican '>= 2/3 emitidos SIEMPRE': sobre-restrictivo cuando concurre >=50% del capital (la ley solo pide mayoría absoluta: favor 55/contra 45 → ley adopta, motor bloquea) e infra-restrictivo con abstenciones en el tramo 25-50%. Solo el pack MOD_ESTATUTOS (duplicado, ver hallazgo aparte) codifica la estructura 201.2 correcta.
 - **Evidencia:** src/lib/rules-engine/majority-evaluator.ts:255-274 (rama else usa (2*emitidos)/3, no capital_presente). BOE bloques a201 y a194 verificados. Payloads Cloud activos: MODIFICACION_ESTATUTOS SA {formula:'favor >= 2/3_emitidos', referencia:'art. 194.1 LSC'}; FUSION/ESCISION/TRANSFORMACION/DISOLUCION SA {formula:'>= 2/3 emitidos SIEMPRE'}.
 - **Archivos:** src/lib/rules-engine/majority-evaluator.ts
@@ -137,7 +137,7 @@
 
 ### ITEM-010 [P1] Art. 249.3 LSC: DELEGACION_FACULTADES exige mayoría absoluta de miembros en vez de 2/3 de los componentes del consejo
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** Art. 249.3 LSC (BOE literal): la delegación permanente de facultades y la designación de consejeros delegados/comisión ejecutiva «requerirán para su validez el voto favorable de las dos terceras partes de los componentes del consejo» (y no producen efecto hasta inscripción en RM). El pack activo DELEGACION_FACULTADES (CONSEJO) codifica 'favor > total_miembros / 2' citando además art. 247.2 (artículo de quórum, no de mayoría). Falso positivo: CdA de 15, 8 votos a favor → motor proclama (8 > 7,5) cuando la ley exige 10. Es la única mayoría legal del consejo que sí se computa sobre componentes totales, y es justo la que el pack rebaja.
 - **Evidencia:** Payload Cloud activo DELEGACION_FACULTADES CONSEJO {SA/SL/CONSEJO formula:'favor > total_miembros / 2', referencia:'art. 247.2 LSC'}. BOE bloque a249 verificado literal («dos terceras partes de los componentes»). El evaluador no tiene fórmula de 2/3 sobre total_miembros (solo 2/3_emitidos y 2/3_capital).
 - **Archivos:** src/lib/rules-engine/majority-evaluator.ts
@@ -146,7 +146,7 @@
 
 ### ITEM-011 [P1] Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** El motor de acuerdos sin sesión cita «art. 625 LSC» (notificación fehaciente) y «art. 629 LSC» (unanimidad de capital SL y decisión de socio único, también como «art. 629/210 LSC») en los explain nodes que el producto muestra como justificación jurídica. La LSC (RDLeg 1/2010) termina en el art. 541: ambos artículos NO EXISTEN — la API del BOE devuelve 404 para los bloques a625 y a629 (verificado), mientras devuelve 200 para todos los demás artículos consultados. La base real más cercana es: art. 248.2 LSC (votación por escrito y sin sesión del consejo SA, admitida si ningún consejero se opone — que el gate de OBJECION_PROCEDIMIENTO sí implementa bien), art. 100 RRM (acuerdos por escrito), y art. 15 LSC para el socio único. Para la junta SL «sin sesión» no existe base en la LSC: el gate de habilitación estatutaria es una decisión de producto defendible, pero no puede apoyarse en artículos fabricados.
 - **Evidencia:** src/lib/rules-engine/no-session-engine.ts:277,287 (referencia 'art. 625 LSC'), :485,497,507 ('art. 629 LSC'), :606,629 ('art. 629/210 LSC'). BOE API bloques a625/a629 → 404 «La información solicitada no existe»; a541 es el último artículo.
 - **Archivos:** src/lib/rules-engine/no-session-engine.ts
@@ -155,7 +155,7 @@
 
 ### ITEM-012 [P1] Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** La LSC no establece quórum de constitución para la junta de la SL (el control es la mayoría sobre votos totales de los arts. 198-199). Sin embargo, 10 packs activos codifican constitucion.quorum.SL = 50 con fuente «art. 196 LSC» o «art. 197 LSC» — que son los artículos de DERECHO DE INFORMACIÓN de SL y SA respectivamente (verificado BOE). constitucion-engine toma el quórum del pack si es mayor que el legal (resolvePackQuorum + normalización 50→0.5), por lo que una junta SL con el 40% del capital presente queda BLOQUEADA aunque pudiera adoptar válidamente acuerdos ordinarios ex art. 198 (mayoría con suelo de 1/3). Falso negativo en: APLICACION_RESULTADO, RETRIBUCION_ADMIN, MOD_ESTATUTOS, FUSION, ESCISION, TRANSFORMACION, DISOLUCION, CESION_GLOBAL_ACTIVO, SUPRESION_PREFERENTE, EMISION_OBLIGACIONES, AUMENTO_CAPITAL_NO_DINERARIO. Nótese que otros packs (APROBACION_CUENTAS, NOMBRAMIENTO, AUMENTO_CAPITAL) traen correctamente SL=0. Los mismos packs citan «art. 190 LSC» (conflictos de interés) como fuente del quórum SA del 25% (debería ser 193).
 - **Evidencia:** Payloads Cloud activos: APLICACION_RESULTADO quorum {SL:{valor:50, fuente:'art. 196 LSC'}, SA_1a:{valor:25, fuente:'art. 190 LSC'}}; MOD_ESTATUTOS quorum {SL:{valor:50, fuente:'art. 197 LSC'}}. src/lib/rules-engine/constitucion-engine.ts:286-297 (rama SL toma packQuorum si > 0). BOE bloques a196/a197/a193 verificados.
 - **Archivos:** src/lib/rules-engine/constitucion-engine.ts
@@ -164,7 +164,7 @@
 
 ### ITEM-013 [P1] Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL** · **REQUIERE DECISIÓN HUMANA**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL** · **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** Existen DOS packs activos para la misma materia jurídica (modificación de estatutos, junta general) con mayorías SA contradictorias: MOD_ESTATUTOS codifica la estructura correcta del art. 201.2 («> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a» con dobleCondicional umbral 50) mientras MODIFICACION_ESTATUTOS codifica 'favor >= 2/3_emitidos' plano citando art. 194.1. El normalizador de agenda del flujo de reunión mapea cualquier título que contenga 'ESTATUT' a MODIFICACION_ESTATUTOS — es decir, el golden path de reuniones resuelve el pack INCORRECTO. El mismo resultado jurídico (¿se adoptó la modificación de estatutos?) depende de qué clave de materia se use. También difieren los quórums SL (50 inventado vs 0 correcto).
 - **Evidencia:** Payloads Cloud activos (query rule_packs × rule_pack_versions is_active=true): MOD_ESTATUTOS|JUNTA_GENERAL SA formula '> 1/2 presente en 1a; >= 2/3 emitidos si < 50% en 2a' + dobleCondicional; MODIFICACION_ESTATUTOS|JUNTA_GENERAL SA formula 'favor >= 2/3_emitidos' referencia 'art. 194.1 LSC'. src/lib/secretaria/meeting-agenda.ts:91 (raw.includes('ESTATUT') → 'MODIFICACION_ESTATUTOS'). src/lib/secretaria/group-campaign-engine.ts:7,148 usa 'MOD_ESTATUTOS'.
 - **Archivos:** src/lib/secretaria/meeting-agenda.ts, src/lib/secretaria/group-campaign-engine.ts
@@ -182,7 +182,7 @@
 
 ### ITEM-015 [P1] fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4)
 
-- **Área:** A10 · **Estado:** PENDIENTE · **REQUIERE DECISIÓN HUMANA**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** Art. 109 RRM (BOE literal): (1) las certificaciones del secretario del órgano colegiado «se emitirán siempre con el Visto Bueno del Presidente o, en su caso, del Vicepresidente» — sin distinción SA/SL: aplica a cualquier sociedad con consejo; (2) art. 109.4: «No se podrán certificar acuerdos que no consten en actas aprobadas y firmadas o en acta notarial». La RPC desplegada en Cloud: (a) condiciona el Vº Bº a v_entity.legal_form = 'SA' → una SL (o una entidad registrada como 'SAU') con consejo certificada por su SECRETARIO se emite sin Vº Bº; (b) acepta cualquier uuid como p_visto_bueno_persona_id sin comprobar que ostente PRESIDENTE/VICEPRESIDENTE vigente en authority_evidence (la verificación de vigencia solo se hace para el cargo certificante, y a nivel entidad, ignorando body_id); (c) no comprueba minutes.signed_at / is_locked / aprobación del acta — se puede generar, firmar QES y emitir certificación de un acta sin firmar ni aprobar. Verificado contra la definición viva en Cloud: pg_get_functiondef contiene legal_form pero no signed_at ni is_locked.
 - **Evidencia:** supabase/migrations/20260421214352_rpcs_acta_certificacion_f81.sql:88-103 (v_requires_vb := legal_form='SA' AND role<>'ADMIN_UNICO'; authority_evidence solo por cargo certificante). Cloud: SELECT pg_get_functiondef sobre fn_generar_certificacion → checks_signed=false, checks_locked=false, checks_legal_form=true. RRM BOE-A-1996-17533 bloque a109 verificado literal. Columnas disponibles para el check: supabase/functions/_types/database.ts (minutes.signed_at, is_locked, signed_by_president_id).
 - **Archivos:** supabase/migrations/20260421214352_rpcs_acta_certificacion_f81.sql
@@ -200,7 +200,7 @@
 
 ### ITEM-017 [P1] El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas
 
-- **Área:** A10 · **Estado:** PENDIENTE · **REQUIERE DECISIÓN HUMANA**
+- **Área:** A10 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** En Gate 6, si esEmpate && votoCalidadHabilitado (y no hay veto ni unanimidad), el motor fija votoCalidadUsado=true y mayoriaAlcanzada=true, retirando 'majority_not_achieved'. Dos problemas: (1) el voto de calidad es una facultad del presidente que solo opera si éste votó A FAVOR y decide ejercerla; el motor proclama el acuerdo en todo empate aunque el presidente haya votado EN CONTRA o se haya abstenido — falso positivo directo en el flujo vivo, porque ReunionStepper calcula esEmpate = favor===contra y pasa votoCalidadHabilitado de configuración, sin capturar el ejercicio efectivo ni la identidad/sentido del voto presidencial; (2) el desempate se aplica con independencia de la fórmula de mayoría: en una mayoría reforzada (p.ej. 2/3 ex art. 249.3 o 201.2) un empate desempatado por el presidente NO alcanza el umbral legal, pero el motor lo proclama. El guard actual solo excluye veto y unanimidad.
 - **Evidencia:** src/lib/rules-engine/votacion-engine.ts:445-471 (mayoriaAlcanzada=true y splice de 'majority_not_achieved' sin comprobar la fórmula ni el voto del presidente). src/lib/rules-engine/meeting-adoption-snapshot.ts:325 (esEmpate = favor===contra && favor>0, automático). CLAUDE.md DL-5 (voto calidad habilitado en CdA/Comité Ejecutivo) no exige auto-aplicación.
 - **Archivos:** src/lib/rules-engine/votacion-engine.ts, src/lib/rules-engine/meeting-adoption-snapshot.ts
@@ -343,7 +343,7 @@
 
 ### ITEM-033 [P1] jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano
 
-- **Área:** A5 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A5 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** El rule set Cloud activo para ES+SA+JUNTA_GENERAL tiene notice_min_days_first_call=15 — incorrecto para SA (art. 176.1 LSC exige un mes; 15 días solo cabría como excepción art. 515 LSC para JGE de cotizadas con condiciones, aquí sin condicionar). Además useEntityRules filtra solo por jurisdiction+company_form+is_active (sin typology_code) y el stepper toma `ruleSets.find(r => r.is_active) ?? ruleSets[0]` sin orden determinista: para ES+SA hay 3 rule sets activos (JUNTA=15, CDA=3, CONSEJO_ADMINISTRACION=3), así que el badge 'Preaviso mínimo (TGMS)' del Paso 1 puede mostrar 15 o 3 días para cualquier órgano, y el statutory_basis persistido en la emisión (activeRuleSet.legal_reference) puede corresponder a un órgano distinto del convocado (p.ej. 'art. 247' de CdA en una convocatoria de JGA).
 - **Evidencia:** SQL Cloud: SELECT company_form, typology_code, rule_config->>'notice_min_days_first_call' FROM jurisdiction_rule_sets WHERE jurisdiction='ES' → [SA/JUNTA_GENERAL=15, SA/CDA=3, SA/CONSEJO_ADMINISTRACION=3, SL/JUNTA_GENERAL=15, SRL/JUNTA_GENERAL=15]. src/hooks/useJurisdiccionRules.ts:74-91 (sin filtro typology_code); src/pages/secretaria/ConvocatoriasStepper.tsx:706-711 (activeRuleSet = find(is_active) ?? [0]) y 2013 (statutory_basis: activeRuleSet?.legal_reference).
 - **Archivos:** src/hooks/useJurisdiccionRules.ts, src/pages/secretaria/ConvocatoriasStepper.tsx, supabase/migrations/
@@ -415,7 +415,7 @@
 
 ### ITEM-041 [P1] Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC)
 
-- **Área:** A6 · **Estado:** PENDIENTE · **REQUIERE DECISIÓN HUMANA**
+- **Área:** A6 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** VotacionesStep marca conflict_flag=true (forzado, no desactivable: update() reimprime forcedConflict=true) para cualquier persona con conflicto en estado activo en conflicts_of_interest a nivel de entidad, en TODOS los puntos del orden del día de TODAS las reuniones. El motor entonces excluye su voto y su peso del numerador y denominador. El art. 190.1 LSC priva del voto solo en los supuestos enumerados y para el acuerdo afectado; el art. 190.3 (resto de conflictos) NO priva del voto; el art. 228.c (consejo) obliga a abstenerse solo en los acuerdos donde existe el conflicto. Un consejero con un conflicto declarado sobre una operación concreta queda excluido del voto sobre la aprobación de cuentas, nombramientos, etc., alterando denominadores y pudiendo invertir resultados (p.ej. un CONTRA con 30% de capital excluido convierte un acuerdo rechazado en adoptado).
 - **Evidencia:** src/pages/secretaria/ReunionStepper.tsx:2250-2289 (conflict_flag forzado por activeConflictPersonIds en todos los puntos) y :2423-2445 (update(): nextConflictFlag = forcedConflict ? true : ...). src/hooks/useConflicts.ts:141-165 (useActiveConflicts: scope entidad, sin vínculo a materia/punto). src/lib/rules-engine/meeting-adoption-snapshot.ts:262-291 (excluidos de numerador y denominador).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/ReunionStepper.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useConflicts.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/meeting-adoption-snapshot.ts
@@ -523,7 +523,7 @@
 
 ### ITEM-053 [P1] Citas legales erróneas o inexistentes en los árboles explain de los modos no presenciales (arts. 625/629 LSC inexistentes; 197/201-202/160 LSC fuera de contexto)
 
-- **Área:** A9 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A9 · **Estado:** HECHO (cerrado en el loop iter.1-28; re-triado de bloqueado a corrección factual BOE; reconciliado 2026-06-11) · **REQUIERE LEGAL**
 - **Descripción:** Los explain nodes que ve el usuario citan artículos incorrectos: no-session-engine cita 'art. 625 LSC' para la notificación fehaciente y 'art. 629 LSC' para la unanimidad de capital SL — la LSC no llega al art. 625/629 (termina en el entorno del art. 541); la base real del acuerdo escrito y sin sesión es el art. 100 RRM (que sí cita correctamente la cabecera de AcuerdosSinSesion.tsx) y el art. 248.2 LSC para consejo SA. El orquestador cita 'art. 197 LSC' (derecho de información) como fundamento del Flujo C sin sesión y 'art. 201-202 LSC' (mayorías y acta de junta) para el Flujo B unipersonal en lugar del art. 15 LSC. CoAprobacionStepper rotula el checkbox de habilitación estatutaria con 'art. 160 LSC' (competencias de la junta, ajeno). Para un producto cuyo diferencial es el rigor jurídico explicable, estas referencias invalidan la trazabilidad normativa de los veredictos.
 - **Evidencia:** src/lib/rules-engine/no-session-engine.ts:277,287,485,499,508,606,629 (art. 625/629 LSC); src/lib/rules-engine/orquestador.ts:296,310 (art. 201-202 LSC en Flujo B) y 382,397 (art. 197 LSC en Flujo C); src/pages/secretaria/CoAprobacionStepper.tsx:241 (art. 160 LSC).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/no-session-engine.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/orquestador.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/CoAprobacionStepper.tsx
