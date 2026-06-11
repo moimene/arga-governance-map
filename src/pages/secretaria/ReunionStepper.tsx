@@ -2342,7 +2342,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             vote: "" as VoteValue,
             conflict_flag: v.person_id ? activeConflictPersonIds.has(v.person_id) : false,
             conflict_reason: v.person_id && activeConflictPersonIds.has(v.person_id)
-              ? "Conflicto activo registrado en el expediente"
+              ? "Conflicto activo registrado en el expediente — revisar si afecta a este punto (arts. 190 y 228.c LSC)"
               : "",
           }))
         : [];
@@ -2515,15 +2515,15 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   }
 
   function update(id: string, patch: Partial<VoterRow>) {
-    const voter = voters.find((item) => item.id === id);
-    const forcedConflict = voter?.person_id ? activeConflictPersonIds.has(voter.person_id) : false;
+    // ITEM-041: el conflicto registrado PRE-MARCA el flag pero no lo impone.
+    // Arts. 190.1 (privación solo en supuestos tasados y para el acuerdo
+    // afectado), 190.3 (no priva del voto) y 228.c LSC (abstención en los
+    // acuerdos afectados): la decisión es por punto y la toma el secretario.
     setVotesByPoint((prev) => {
       const currentPoint = prev[selectedPointIndex] ?? {};
       const existing = currentPoint[id] ?? { vote: "" as VoteValue, conflict_flag: false, conflict_reason: "" };
-      const nextConflictFlag = forcedConflict ? true : patch.conflict_flag ?? existing.conflict_flag;
-      const nextConflictReason = forcedConflict
-        ? (patch.conflict_reason ?? existing.conflict_reason) || "Conflicto activo registrado en el expediente"
-        : patch.conflict_reason ?? existing.conflict_reason;
+      const nextConflictFlag = patch.conflict_flag ?? existing.conflict_flag;
+      const nextConflictReason = patch.conflict_reason ?? existing.conflict_reason;
       return {
         ...prev,
         [selectedPointIndex]: {
@@ -3124,7 +3124,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
                         {hasActiveConflict && (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--status-warning)]">
                             <AlertTriangle className="h-3 w-3" />
-                            Conflicto de interés activo — abstención recomendada
+                            Conflicto de interés activo — valorar exclusión solo en los puntos afectados (arts. 190 y 228.c LSC)
                           </span>
                         )}
                       </div>

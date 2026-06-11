@@ -250,3 +250,21 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   pacto_clausulas (verificado en Cloud: FUSION/ESCISION/TRANSFORMACION/CESION_GLOBAL_ACTIVO/
   DISOLUCION; AUMENTO/REDUCCION_CAPITAL; EMISION_OBLIGACIONES; OPERACION_VINCULADA).
 - **Verificación:** gates verdes (2026 tests 0 fail); e2e 07+18 verdes.
+
+### Iteración 13 — ITEM-041 [P1] Sobre-exclusión por conflicto de interés (HECHO con residual)
+
+- **Evidencia:** update() reimponía conflict_flag=true para cualquier persona con conflicto activo
+  en la entidad, en TODOS los puntos de TODAS las reuniones (el checkbox existía pero era
+  inoperante). El motor excluía su voto y peso de numerador y denominador: un conflicto sobre una
+  operación concreta alteraba la aprobación de cuentas, nombramientos, etc. (arts. 190.1 —
+  privación solo en supuestos tasados y para el acuerdo afectado—, 190.3 —no priva— y 228.c —
+  abstención en los acuerdos afectados—).
+- **Fix:** el conflicto registrado PRE-MARCA el flag como sugerencia editable por punto (la
+  decisión es del secretario, punto a punto — el estado por punto en votesByPoint ya daba la
+  granularidad); copys actualizados con el alcance legal correcto. El fast-track unánime mantiene
+  la exclusión como default bulk, ajustable después por punto.
+- **Residual (decisión humana, anotado):** vincular conflicts_of_interest a materia/expediente para
+  pre-marcar solo los puntos afectados (taxonomía 190.1 vs 190.3 vs 228.c) — requiere modelo de
+  datos del alcance del conflicto.
+- **Verificación:** gates verdes (2026 tests 0 fail); e2e 05+18 verdes (spec 57 conflictos skipped
+  por diseño de la serie test-a).

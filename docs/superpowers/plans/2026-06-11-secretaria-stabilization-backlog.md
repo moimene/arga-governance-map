@@ -67,7 +67,7 @@
 | ITEM-038 | A6 | ✅ | primeraConvocatoria hardcodeado a true: el quórum de 2ª convocatoria (arts. 193/194 LSC) nunca se evalúa y bloquea juntas legalmente constituidas | HECHO |
 | ITEM-039 | A6 | ✅ | Voto de calidad desempata siempre hacia la adopción sin verificar el sentido del voto del presidente | HECHO |
 | ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | HECHO |
-| ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | PENDIENTE |
+| ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | HECHO (residual: modelo conflicto↔materia, decisión humana) |
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | HECHO |
 | ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
 | ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | HECHO |
