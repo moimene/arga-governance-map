@@ -445,3 +445,20 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   (BLOCKING accionable) en vez de emitir documentos jurídicamente vacíos.
 - **Verificación:** 2 tests nuevos del detector; 2048 tests 0 fail; gates verdes; e2e 14+17+18
   10/10 (el golden path documental resuelve sus variables — el BLOCKING no le afecta).
+
+### Iteración 24 — ITEM-021 [P1] + FK representaciones (hallazgo derivado P0) (HECHO)
+
+- **ITEM-021:** AnadirSocioStepper solo validaba títulos>0 e insertaba directo en capital_holdings
+  (0 triggers en Cloud): el libro de socios podía superar el 100% y corromper denominadores de
+  quórum/mayoría. Fix: guard vivo en el paso Participación (títulos restantes + % acumulado ≤100,
+  label con "restan X de Y", alerta role=alert) y re-chequeo al guardar. RPC con assert de suma
+  anotada como deuda P3.
+- **Hallazgo derivado (clase P0, preexistente):** representaciones.meeting_id no tenía FK a
+  meetings → el embed PostgREST de useRepresentaciones fallaba SIEMPRE ("Could not find a
+  relationship") y la pestaña Representaciones mostraba "Sin representaciones vigentes" con datos
+  reales. Migración 20260611212000: FK creada (0 huérfanos verificados) + NOTIFY pgrst. Probe
+  conductual: el SELECT exacto del hook devuelve la fila como usuario demo.
+- **Spec 34 (drift):** actualizado al panel rediseñado ("Ancla normativa de sociedad" / "Matriz
+  materia × requisitos" — los textos antiguos ya no existen en src). Spec 34 completo en verde
+  por primera vez en el loop.
+- **Verificación:** 2048 tests 0 fail; gates verdes; e2e 34 2/2 + 18 verde; migración alineada.

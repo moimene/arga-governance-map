@@ -47,7 +47,7 @@
 | ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | HECHO |
 | ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO parcial (miembros_presentes real; capital_total fallback pendiente) |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | PENDIENTE |
-| ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | PENDIENTE |
+| ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | HECHO (guard UI + re-chequeo al guardar; RPC con assert queda P3) |
 | ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | PENDIENTE |
 | ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
 | ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | HECHO |

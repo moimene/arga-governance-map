@@ -74,9 +74,10 @@ test.describe('Secretaría — ficha societaria ARGA golden path', () => {
     await expect(main.getByText('Cargo certificante')).toBeVisible();
 
     await main.getByRole('button', { name: 'Marco normativo' }).click();
-    await expect(main.getByRole('heading', { name: 'Motor de reglas por materia' })).toBeVisible({ timeout: 15_000 });
-    await expect(main.getByText('Acuerdo 360 es el expediente trazable')).toBeVisible();
-    await expect(main.getByText(/rule packs activos/)).toBeVisible();
+    // Panel rediseñado (NormativeFrameworkPanel): los headings vigentes son
+    // "Ancla normativa de sociedad" y "Matriz materia × requisitos".
+    await expect(main.getByRole('heading', { name: 'Ancla normativa de sociedad' })).toBeVisible({ timeout: 15_000 });
+    await expect(main.getByRole('heading', { name: 'Matriz materia × requisitos' })).toBeVisible();
 
     expect(failedSupabaseResponses, 'La ficha societaria ARGA no debe disparar errores REST').toEqual([]);
   });

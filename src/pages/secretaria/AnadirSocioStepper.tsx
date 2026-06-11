@@ -68,18 +68,43 @@ export default function AnadirSocioStepper() {
 
   const pctAsignado = totalTitulos ? Math.round((totalAsignado / totalTitulos) * 10000) / 100 : 0;
 
+  // ITEM-021: el libro de socios no puede superar el capital escriturado.
+  // capital_holdings no tiene trigger de suma en Cloud, así que el guard vive
+  // aquí (RPC con assert de suma queda como deuda anotada).
+  const titulosRestantes = totalTitulos > 0 ? Math.max(totalTitulos - totalAsignado, 0) : null;
+  const pctAcumuladoExistente = useMemo(
+    () => (holdings ?? []).reduce((acc, h) => acc + (Number(h.porcentaje_capital) || 0), 0),
+    [holdings]
+  );
+  const pctNuevo = Number(draft.porcentaje_capital) || suggestedPct;
+  const sobreasignaTitulos =
+    titulosRestantes !== null && Number(draft.numero_titulos) > titulosRestantes;
+  const sobreasignaPct = pctAcumuladoExistente + pctNuevo > 100.001;
+  const sobreasignacionError = sobreasignaTitulos
+    ? `No quedan títulos suficientes: restan ${titulosRestantes} de ${totalTitulos} (asignados ${totalAsignado}).`
+    : sobreasignaPct
+      ? `El capital asignado superaría el 100%: ${pctAcumuladoExistente.toFixed(2)}% ya asignado + ${pctNuevo.toFixed(2)}% nuevo.`
+      : null;
+
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
   const canNext = (() => {
     if (step === 0) return !!draft.holder_person_id;
-    if (step === 1) return !!draft.share_class_id && Number(draft.numero_titulos) > 0;
+    if (step === 1)
+      return !!draft.share_class_id && Number(draft.numero_titulos) > 0 && !sobreasignacionError;
     return true;
   })();
 
   async function guardar() {
     if (!entityId) return;
+    // ITEM-021: re-chequeo en el momento de guardar (el censo puede haber
+    // cambiado mientras el stepper estaba abierto).
+    if (sobreasignacionError) {
+      toast.error("No se puede guardar: " + sobreasignacionError);
+      return;
+    }
     setSaving(true);
     try {
       const pct = Number(draft.porcentaje_capital) || suggestedPct;
@@ -212,12 +237,25 @@ export default function AnadirSocioStepper() {
               </select>
             </label>
             <Input
-              label="Número de títulos *"
+              label={
+                titulosRestantes !== null
+                  ? `Número de títulos * (restan ${titulosRestantes} de ${totalTitulos})`
+                  : "Número de títulos *"
+              }
               type="number"
               value={draft.numero_titulos}
               onChange={(v) => update("numero_titulos", v)}
               placeholder="100"
             />
+            {sobreasignacionError ? (
+              <div
+                className="md:col-span-2 flex items-start gap-2 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-3"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                role="alert"
+              >
+                <p className="text-xs font-medium text-[var(--status-error)]">{sobreasignacionError}</p>
+              </div>
+            ) : null}
             <Input
               label={`% sobre capital (auto ≈ ${suggestedPct}%)`}
               type="number"
