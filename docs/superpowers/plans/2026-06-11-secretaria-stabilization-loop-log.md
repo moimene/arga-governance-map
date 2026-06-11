@@ -35,7 +35,27 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   contrastados contra BOE).
 - **Salida esperada:** backlog priorizado completo + matriz de cobertura A2 en
   `docs/superpowers/reviews/`.
-- Resultado: PENDIENTE.
+- **Resultado (HECHO):** 80 agentes, ~46 min, 2.462 tool uses. **153 hallazgos**; 67 P0/P1 pasaron
+  verificación adversarial → 50 confirmados (13 con severidad ajustada), 4 refutados. Backlog
+  consolidado: **149 activos = 1 P0 + 50 P1 + 62 P2 + 36 P3**. 1 hallazgo P0/P1 de A10 quedó sin
+  verificación individual por cap (12/área) — anotado en el ítem.
+- **Entregables:** backlog (`2026-06-11-secretaria-stabilization-backlog.md`), informe con resúmenes
+  por área + 13 anexos (`docs/superpowers/reviews/2026-06-11-iteracion0-auditoria-secretaria.md`),
+  matriz de cobertura A2 (`docs/superpowers/reviews/2026-06-11-matriz-cobertura-acuerdos-plantillas.md`).
+- **Lectura transversal:** clusters de hallazgos duplicados entre áreas (mismo defecto raíz):
+  consejo base de mayoría (ITEM-009/036), primeraConvocatoria hardcoded (016/038), voto de calidad
+  (017/039/040/052), secretario no consejero en censo (028/037), authority_evidence duplicada
+  (029/043), arts. 625/629 inexistentes (011/053), unipersonal (022/051), co-aprobación/solidario
+  circular (020/050). Se agruparán en iteraciones temáticas.
+- **Nota de triaje:** varios BLOQUEADO-LEGAL del backlog son re-triables a accionables — corregir un
+  motor/pack contra texto BOE verificado no es redacción legal nueva (§1.4 aplica a cláusulas de
+  plantillas y decisiones de producto). Se revisará ítem a ítem al seleccionarlos.
+
+### Iteración 2 — ITEM-002 [P2] Spec e2e 12-navigation desfasado (HECHO, commit cbbe102)
+
+- Baseline e2e checkpoint: 46/48 → fix de 3 expectativas estancas (label "Personas y cargos",
+  botón dashboard "Nuevo acuerdo sin sesión", heading "Actas y certificaciones vinculadas") →
+  **48/48** (spec 12: 5/5).
 
 ### Iteración 1 — ITEM-001 [P0] Suite de tests rota por fuga global de mocks (HECHO)
 
