@@ -613,4 +613,24 @@ serie), cada ola implementar→gates→adversarial→commit. Pendientes:
   (transmisión SL gates), 078 (sidebar dup), 092 (capital-validation refutado) y otros — documentar
   con recomendación; no auto-completables sin decisión de producto/legal.
 
-Próximo paso al reanudar: Ola MOTOR empezando por ITEM-019 (P1), con BOE + Codex adversarial por ítem.
+- **Ola MOTOR (commit `007156b`) — ITEM-019 (P1):** junta sin datos de capital → WARNING
+  persistido `census_not_available` (flag `capitalDataAvailable` en el snapshot + caller), en vez
+  de degradar en silencio las mayorías de capital (arts. 198-201 LSC) al peso presente. 3 tests;
+  e2e 05+18 6/6. Residual: resolver capital real desde `entity_capital_profile`.
+- **Ola UI (commit `466c9d5`) — ITEM-070/098:** claves de estado inglesas (SIGNED/APPROVED/...) en
+  status-labels; conteo de destinatarios con `Math.max(...,0)`.
+- **Grupo NEEDS_HUMAN (commit `448e385`) — 10 ítems documentados:** decisión+recomendación por ítem
+  en `docs/superpowers/reviews/2026-06-11-decisiones-pendientes-secretaria.md` (027/030/031/048/054/
+  082/091/095/106/151). 4 re-triables a corrección factual tras validación legal (048/151/106/027).
+
+### Estado de los 4 grupos (todos en marcha)
+
+| Grupo | Hechos | Remanente | Notas |
+|---|---|---|---|
+| MOTOR | 050, 019 (+ DOC 055/118) | ~16 (014,056,057,063,064,079,090,093,108,112,113,114,123,133,141,142,145) | legales/BOE+Codex por ítem |
+| UI/HOOK/TYPING/TEST/OTHER | 096,147,070,098 (+DOC) | ~50 | mayoría S/M bajo riesgo; lotes por archivo |
+| Cloud (SEED/MIGRATION) | — | 6 (071,073,081,085,134,149) + 091/048 | serie con `db:check-target` |
+| NEEDS_HUMAN | 10 documentados | 0 (esperan decisión) | doc de decisiones creado |
+
+**Todos los P1 cerrados.** Próximo al reanudar: continuar Ola MOTOR (BOE+Codex por ítem),
+Ola UI por lotes de archivo, y Ola Cloud con guardrail `db:check-target`.
