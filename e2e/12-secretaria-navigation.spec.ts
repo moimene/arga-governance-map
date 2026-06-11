@@ -3,12 +3,12 @@ import { test, expect } from './fixtures/base';
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/secretaria', heading: 'Mesa de trabajo del secretario' },
   { label: 'Sociedades', path: '/secretaria/sociedades', heading: 'Sociedades' },
-  { label: 'Personas', path: '/secretaria/personas', heading: 'Personas' },
+  { label: 'Personas y cargos', path: '/secretaria/personas', heading: 'Personas' },
   { label: 'Board Pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
   { label: 'Campañas de grupo', path: '/secretaria/procesos-grupo', heading: 'Campañas de grupo' },
   { label: 'Convocatorias', path: '/secretaria/convocatorias', heading: 'Convocatorias' },
   { label: 'Reuniones', path: '/secretaria/reuniones', heading: 'Reuniones' },
-  { label: 'Actas', path: '/secretaria/actas', heading: 'Actas y certificaciones' },
+  { label: 'Actas', path: '/secretaria/actas', heading: 'Actas y certificaciones vinculadas' },
   {
     label: 'Decisiones unipersonales',
     path: '/secretaria/decisiones-unipersonales',
@@ -47,7 +47,7 @@ test.describe('Secretaría navigation smoke', () => {
     await expect(page.getByText('Empezar un flujo')).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva convocatoria/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva reunión/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Generar documento/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Nuevo acuerdo sin sesión/ })).toBeVisible();
   });
 
   test('cambia entre modo Sociedad y Grupo sin crash', async ({ page }) => {
