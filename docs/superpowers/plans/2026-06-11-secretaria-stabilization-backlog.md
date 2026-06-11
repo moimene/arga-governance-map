@@ -49,7 +49,7 @@
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | PENDIENTE |
 | ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | PENDIENTE |
 | ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | PENDIENTE |
-| ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | PENDIENTE |
+| ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
 | ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | PENDIENTE |
 | ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
 | ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | PENDIENTE |
@@ -253,7 +253,7 @@
 
 ### ITEM-023 [P1] fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant
 
-- **Área:** A12 · **Estado:** PENDIENTE
+- **Área:** A12 · **Estado:** HECHO (Iteración 4 — migraciones 20260611181010 + 20260611182500 fail-closed; test comms-rpc-hardening)
 - **Descripción:** La RPC hace v_tenant_id := COALESCE((p_comm->>'tenant_id')::uuid, fn_current_tenant_id()) sin asertar que coincida con el tenant del caller. El check de rol (SECRETARIO/ADMIN_TENANT) no está acotado por tenant, así que un SECRETARIO del tenant B autenticado puede insertar communications (y sus attachments/recipients colgantes) en el tenant A pasando p_comm.tenant_id, saltándose la RLS communications_staff_insert (que sí exige tenant_id = fn_current_tenant_id()) porque la función es SECURITY DEFINER. Es exactamente la misma clase de fallo [critical] que el equipo corrigió el 2026-06-06 en fn_create_governance_evidence_bundle (migración 20260606165443: aserción de tenant del caller). Tampoco se valida que entity_id/body_id/meeting_id/agreement_id pertenezcan al tenant resuelto (provenance). En demo single-tenant el impacto práctico es nulo, pero contradice el patrón de hardening ya establecido en el repo.
 - **Evidencia:** supabase/migrations/20260518083234_comms_fn_create_communication_atomic.sql:33-39 (COALESCE sin assert). Verificado en Cloud vía pg_get_functiondef sobre public.fn_create_communication_atomic: la versión desplegada es idéntica (sin aserción). Contraste: commit 1135f9c / migración 20260606165443 hardening del mismo patrón en evidence bundles. pg_policies confirma que la RLS de communications sí exige fn_current_tenant_id() — la RPC la puentea.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/supabase/migrations/20260518083234_comms_fn_create_communication_atomic.sql

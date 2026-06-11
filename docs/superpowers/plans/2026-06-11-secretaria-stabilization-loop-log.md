@@ -99,3 +99,24 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Commit:** (ver git log — `test(secretaria)`).
 - **Pendiente derivado:** ninguno. Higiene futura: cualquier `vi.mock` nuevo debe seguir el patrón
   captura+restore.
+
+### Iteración 4 — ITEM-023 [P1] Forja cross-tenant en fn_create_communication_atomic (HECHO)
+
+- **Evidencia:** la RPC SECURITY DEFINER resolvía tenant como
+  `COALESCE(p_comm->>'tenant_id', fn_current_tenant_id())` sin aserción — un SECRETARIO
+  autenticado podía crear comunicaciones/adjuntos/destinatarios en cualquier tenant. El check de
+  rol tampoco estaba scoped por tenant.
+- **Fix en dos pasos con lección aprendida:** la primera migración (20260611181010) usó el patrón
+  v1 `v_caller_tenant IS NOT NULL AND ...` — el MISMO patrón fail-open que la saga del evidence
+  bundle ya había corregido (test evidence-bundle-rpc-hardening.test.ts lo prohíbe). Detectado al
+  releer ese test; la migración 20260611182500 eleva fn_create_communication_atomic **y también
+  fn_aprobar_acta (ITEM-003)** al contrato fail-closed v3: solo service_role TRUE explícito
+  bypassa; el resto exige tenant resuelto (fn_assert_current_tenant_id) y coincidente (42501).
+  Check de rol scoped (`rur.tenant_id = v_tenant_id`).
+- **Verificación:** smoke Cloud (DO block): contexto sin tenant resoluble → rechazado (fail-closed
+  real); con claim service_role → firma OK. Test nuevo `comms-rpc-hardening.test.ts`: contrato de
+  contenido + prueba conductual real (demo user → forja cross-tenant denegada; fn_aprobar_acta
+  ejecutable por authenticated con error de negocio, no de permisos). Gates: 2013 tests 0 fail,
+  typecheck, lint sin nuevos, build. Head migraciones = 20260611182500 alineado.
+- **Regla para el resto del loop:** todo SECURITY DEFINER nuevo o tocado usa el contrato
+  fail-closed v3 — nunca el patrón `IS NOT NULL`.
