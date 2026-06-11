@@ -509,3 +509,56 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   resuelta con preferencia por body (determinista tras ITEM-029).
 - **Verificación:** probes RPC 5/5; gates verdes (2048 tests 0 fail); e2e 05+18 6/6 (el golden
   path firma el acta antes de certificar, por lo que el gate server-side no lo afecta).
+
+### Iteración 28 — ITEM-050 [P1] CO_APROBACION/SOLIDARIO: validación circular de administradores (HECHO, doble verificación adversarial)
+
+- **Evidencia (el P1):** ambos asistentes pasaban al motor `adminVigentes = firmas.map(f=>f.adminId)`
+  (CoAprob) y `[adminId]` (Solidario) — la lista de "vigentes" ERA la de firmantes tecleados a mano
+  con ids sintéticos (`admin-${Date.now()}`). El filtro `firmasValidas` del motor era una tautología:
+  cualquier conjunto de nombres inventados producía "Co-aprobación válida" y un agreement ADOPTED.
+  Sin tipoSocial ni reglas de mancomunidad (k admitía 1).
+- **Verificación normativa (BOE, API datos abiertos):** art. 210.2 LSC transcrito — específico de la
+  SA: «cuando la administración conjunta se confíe a dos administradores… y, cuando se confíe a más
+  de dos administradores, constituirán consejo de administración». Art. 233.2.c LSC — SL con >2
+  conjuntos: representación «mancomunadamente al menos por dos». Ambas citas del motor verificadas.
+- **Fix (núcleo):** selector de administradores REALES del censo en ambos steppers. Resolución por
+  ENTIDAD vía `useAdministradores` (no `useBodyMandates`): los administradores no colegiados
+  (solidarios/mancomunados/único/PJ) tienen `body_id NULL` por CHECK `chk_condicion_body_coherente`.
+  `adminVigentes` = person_ids reales; `n` derivado del censo (readonly); `tipoSocial` real
+  (`deriveTipoSocial`, helper compartido extraído — 3º uso con DecisionUnipersonalStepper). Motor:
+  guards `k>=2` (art. 233.2.c) y SA `n>2` BLOCKING (art. 210.2).
+- **Auto-segunda-opinión (atrapó bug pre-ejecución):** el primer cableado con `useBodyMandates(bodyId)`
+  habría devuelto 0 filas (body_id NULL). Corregido a resolución por entidad antes de correr e2e.
+- **Codex adversarial ronda 1 (9 hallazgos):** confirmó P1 cerrado. Actuados: #1/#2 (censo incluía
+  consejeros → cambiado a `useAdministradores` no colegiado; verificado en Cloud que ARGA tiene 0 no
+  colegiados → bloquea correctamente, es administrada por consejo), #5 (motor sin `n>=k` → guard
+  `k>n` BLOCKING + test CO-09), #9 (spec 42 reforzado: afirma ADOPTED + firmas = person_ids reales +
+  n derivado + tipoSocial). Documentados: #4/#6/#7/#8.
+- **Codex adversarial ronda 2 (verdict needs-attention, 2 [high]) — sobre el código ya remediado:**
+  - **#B (HECHO, fail-closed):** `tipoSocial` opcional dejaba fail-open el guard SA fuera del stepper.
+    Caller real confirmado: `buildCoAprobacionConfigFromExecution` (useAgreementCompliance) reconstruía
+    el config SIN tipoSocial → re-evaluación de expedientes eludía art. 210.2. Fix: `tipoSocial`
+    REQUERIDO en el tipo (typecheck fuerza a todos los constructores); el builder lo recupera del
+    config persistido o lo deriva de `entities.legal_form`; el guard SA se ata al censo REAL
+    (`Math.max(config.n, adminVigentes.length)`) para que subdeclarar `n` no lo eluda. Tests CO-09/CO-10.
+  - **#A (DOCUMENTADO, requiere decisión de producto):** `useAdministradores` devuelve todas las clases
+    no colegiadas (ÚNICO/SOLIDARIO/MANCOMUNADO/PJ); Codex pide filtrar por modo (SOLIDARIO solo
+    solidarios, CO_APROBACION solo mancomunados) y resolver el representante de ADMIN_PJ. **No
+    implementado**: (1) la taxonomía existente del producto agrupa intencionadamente solidarios bajo
+    co-aprobación (`matter-registry.ts`/`organo-canonico.ts`: `ADMIN_CONJUNTA_O_COAPROBADORES =
+    [ADMIN_CONJUNTA, ADMIN_SOLIDARIOS, CO_APROBADORES]`), así que el filtro estricto contradice una
+    decisión de diseño vigente; (2) en entidades bien formadas `useAdministradores` ya devuelve un
+    único régimen (el de `forma_administracion`), por lo que el cruce de clases solo es explotable en
+    censos malformados (multi-régimen). Recomendación anotada: filtrar por `forma_administracion` de
+    la entidad y resolver representante de ADMIN_PJ cuando se aborde el modelado de elegibilidad por
+    modo.
+- **Residuales (decisión humana/producto):** #A (elegibilidad por modo + ADMIN_PJ representante);
+  acoplamiento body_id seleccionado ↔ régimen del censo (el body_id del agreement puede no coincidir
+  con el régimen, pre-existente); vigencia editable del actuante solidario vs `fecha_inicio` real.
+- **Verificación:** `bun test` 1907 pass / 0 fail (CO-01..10, tipo-social, compliance); typecheck,
+  lint (tocados), build verdes. e2e **spec 30 aislada 13/13** (incluye bloqueo de régimen ARGA para
+  co-aprobación y solidario), **spec 42 aislada 4/4** (B6.1/B6.2/B6.3 ADOPTED con person_ids reales,
+  n derivado, tipoSocial cableado), golden path 18 verde. Hallazgo operativo: spec 42 (destructivo,
+  crea/borra filas Cloud) NO debe correr concurrente con spec 30 — provoca falsos rojos en los tests
+  "detalle no-session" de spec 30 por interferencia cross-spec; correr aislado (gate
+  `SECRETARIA_E2E_PHASE_B1=1`).

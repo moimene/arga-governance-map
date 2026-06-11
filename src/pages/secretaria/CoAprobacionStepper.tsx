@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
@@ -7,14 +7,16 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
+import { useAdministradores } from "@/hooks/useCargos";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { evaluarCoAprobacion } from "@/lib/rules-engine/votacion-engine";
-import type { CoAprobacionConfig } from "@/lib/rules-engine/types";
+import type { CoAprobacionConfig, TipoSocial } from "@/lib/rules-engine/types";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
+import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
@@ -33,6 +35,13 @@ interface FirmaLocal {
   adminId: string;
   adminNombre: string;
   fechaFirma: string;
+}
+
+/** Administrador vigente del censo (proyección mínima de CargoDetailRow). */
+interface AdminOption {
+  person_id: string;
+  full_name: string | null;
+  role: string | null;
 }
 
 // ─── Step bodies ─────────────────────────────────────────────────────────────
@@ -164,24 +173,46 @@ function StepTipoAcuerdo({
 
 function StepConfiguracion({
   k, setK,
-  n, setN,
+  n,
+  tipoSocial,
   ventana, setVentana,
   estatutos, setEstatutos,
 }: {
   k: number; setK: (v: number) => void;
-  n: number; setN: (v: number) => void;
+  n: number;
+  tipoSocial: TipoSocial;
   ventana: string; setVentana: (v: string) => void;
   estatutos: boolean; setEstatutos: (v: boolean) => void;
 }) {
+  const esSA = tipoSocial === "SA" || tipoSocial === "SAU";
+  // ITEM-050: el total de administradores (n) se deriva del censo real del
+  // órgano (no es un número libre). La cota mínima de mancomunados es 2
+  // (art. 233.2.c LSC); en la SA la administración conjunta solo cabe con dos
+  // administradores (art. 210.2 LSC).
+  const insufficient = n < 2;
   return (
     <div className="space-y-4">
       <div
         className="border border-[var(--g-border-subtle)] bg-[var(--g-sec-100)] p-4 text-sm text-[var(--g-text-secondary)]"
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
-        La co-aprobación requiere que al menos <strong>k</strong> administradores de los <strong>n</strong> vigentes
-        aprueben el acuerdo dentro de la ventana temporal. Art. 210 LSC.
+        La co-aprobación requiere que al menos <strong>k</strong> administradores de los <strong>n</strong> mancomunados
+        vigentes aprueben el acuerdo dentro de la ventana temporal. La actuación mancomunada exige
+        al menos dos administradores (art. 233.2.c LSC){esSA ? "; en la SA la administración conjunta solo cabe con dos (más de dos exige consejo, art. 210.2 LSC)" : ""}.
       </div>
+      {insufficient && (
+        <div
+          className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+          role="alert"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <span>
+            El órgano seleccionado tiene {n} administrador{n === 1 ? "" : "es"} vigente{n === 1 ? "" : "s"} en el censo.
+            La co-aprobación mancomunada requiere al menos dos (art. 233.2.c LSC).
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="coaprobacion-k" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
@@ -190,27 +221,28 @@ function StepConfiguracion({
           <input
             id="coaprobacion-k"
             type="number"
-            min={1}
-            max={n}
+            min={2}
+            max={Math.max(2, n)}
             value={k}
-            onChange={(e) => setK(Math.max(1, parseInt(e.target.value) || 1))}
+            onChange={(e) => setK(Math.max(2, Math.min(Math.max(2, n), parseInt(e.target.value) || 2)))}
             className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           />
         </div>
         <div>
           <label htmlFor="coaprobacion-n" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
-            Total de administradores (n)
+            Administradores vigentes (n)
           </label>
           <input
             id="coaprobacion-n"
             type="number"
-            min={k}
             value={n}
-            onChange={(e) => setN(Math.max(k, parseInt(e.target.value) || k))}
-            className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
+            readOnly
+            aria-readonly="true"
+            className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)] focus:outline-none"
             style={{ borderRadius: "var(--g-radius-md)" }}
           />
+          <p className="mt-1 text-xs text-[var(--g-text-secondary)]">Derivado del censo del órgano</p>
         </div>
       </div>
       <div>
@@ -246,48 +278,47 @@ function StepConfiguracion({
 }
 
 function StepFirmas({
-  firmas, setFirmas,
+  activeAdmins, firmas, setFirmas,
 }: {
+  activeAdmins: AdminOption[];
   firmas: FirmaLocal[];
   setFirmas: (v: FirmaLocal[]) => void;
 }) {
-  const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
+  const selectedIds = new Set(firmas.map((f) => f.adminId));
 
-  function addFirma() {
-    if (!nombre.trim()) return;
-    setFirmas([
-      ...firmas,
-      {
-        adminId: `admin-${Date.now()}`,
-        adminNombre: nombre.trim(),
-        fechaFirma: `${fecha}T12:00:00Z`,
-      },
-    ]);
-    setNombre("");
-  }
-
-  function removeFirma(idx: number) {
-    setFirmas(firmas.filter((_, i) => i !== idx));
+  // ITEM-050: las firmas solo pueden provenir de administradores que constan
+  // en el censo de la sociedad (condiciones_persona VIGENTE). Antes el alta era
+  // de texto libre con ids sintéticos (`admin-${Date.now()}`) y la lista de
+  // "vigentes" era la propia lista de firmantes → validación circular.
+  function toggle(admin: AdminOption) {
+    if (selectedIds.has(admin.person_id)) {
+      setFirmas(firmas.filter((f) => f.adminId !== admin.person_id));
+    } else {
+      setFirmas([
+        ...firmas,
+        {
+          adminId: admin.person_id,
+          adminNombre: admin.full_name ?? admin.person_id,
+          fechaFirma: `${fecha}T12:00:00Z`,
+        },
+      ]);
+    }
   }
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--g-text-secondary)]">
-        Registra las firmas de los administradores que aprueban el acuerdo. Cada firma incluye la fecha de suscripción.
+        Selecciona los administradores mancomunados vigentes del órgano que suscriben el acuerdo.
+        Solo pueden firmar quienes constan en el censo (arts. 210.2 y 233.2.c LSC).
       </p>
 
-      <div className="flex gap-2">
+      <div>
+        <label htmlFor="coaprobacion-fecha-firma" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
+          Fecha de suscripción
+        </label>
         <input
-          aria-label="Nombre del administrador firmante"
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre del administrador"
-          className="flex-1 border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        />
-        <input
+          id="coaprobacion-fecha-firma"
           aria-label="Fecha de firma del administrador"
           type="date"
           value={fecha}
@@ -295,40 +326,59 @@ function StepFirmas({
           className="border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         />
-        <button
-          type="button"
-          onClick={addFirma}
-          disabled={!nombre.trim()}
-          className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-40"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          Añadir
-        </button>
       </div>
 
-      {firmas.length === 0 ? (
-        <div className="py-6 text-center text-sm text-[var(--g-text-secondary)]">
-          Ninguna firma registrada todavía
+      {activeAdmins.length === 0 ? (
+        <div
+          className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+          role="alert"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+          <span>
+            No hay administradores vigentes en el censo de este órgano. No puede registrarse una
+            co-aprobación sin administradores reales.
+          </span>
         </div>
       ) : (
-        <div className="divide-y divide-[var(--g-border-subtle)] border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-          {firmas.map((f, i) => (
-            <div key={i} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <div className="text-sm font-medium text-[var(--g-text-primary)]">{f.adminNombre}</div>
-                <div className="text-xs text-[var(--g-text-secondary)]">{f.fechaFirma.split("T")[0]}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeFirma(i)}
-                className="text-xs text-[var(--status-error)] hover:underline"
+        <div
+          className="divide-y divide-[var(--g-border-subtle)] border border-[var(--g-border-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          {activeAdmins.map((admin) => {
+            const checked = selectedIds.has(admin.person_id);
+            return (
+              <label
+                key={admin.person_id}
+                htmlFor={`coaprobacion-firma-${admin.person_id}`}
+                className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--g-surface-subtle)]/50"
               >
-                Eliminar
-              </button>
-            </div>
-          ))}
+                <input
+                  id={`coaprobacion-firma-${admin.person_id}`}
+                  type="checkbox"
+                  aria-label={admin.full_name ?? admin.person_id}
+                  checked={checked}
+                  onChange={() => toggle(admin)}
+                  className="h-4 w-4 accent-[var(--g-brand-3308)]"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[var(--g-text-primary)]">
+                    {admin.full_name ?? admin.person_id}
+                  </div>
+                  {admin.role ? (
+                    <div className="text-xs text-[var(--g-text-secondary)]">{admin.role}</div>
+                  ) : null}
+                </div>
+                {checked ? <Check className="h-4 w-4 text-[var(--status-success)]" /> : null}
+              </label>
+            );
+          })}
         </div>
       )}
+
+      <p className="text-xs text-[var(--g-text-secondary)]">
+        {firmas.length} de {activeAdmins.length} administradores seleccionados.
+      </p>
     </div>
   );
 }
@@ -436,6 +486,33 @@ export default function CoAprobacionStepper() {
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
 
+  // ITEM-050: tipo social real + censo real de administradores NO COLEGIADOS de
+  // la sociedad. La co-aprobación mancomunada es un régimen no colegiado por
+  // definición (art. 210.1 LSC: "de forma conjunta"); un consejo adopta
+  // colegiadamente, no por co-aprobación. Por eso se usa useAdministradores
+  // (ADMIN_UNICO/SOLIDARIO/MANCOMUNADO/PJ, body_id NULL) y NO los consejeros.
+  // El motor necesita el tipo social para las reglas de mancomunidad (arts.
+  // 210.2/233.2.c LSC) y la lista de VIGENTES para que la validación de firmas
+  // no sea circular.
+  const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
+  const tipoSocial = deriveTipoSocial(selectedEntity);
+  const { data: cargos = [] } = useAdministradores(selectedEntityId ?? undefined);
+  const activeAdmins = useMemo<AdminOption[]>(() => {
+    const byPersonId = new Map<string, AdminOption>();
+    for (const c of cargos) {
+      if (!byPersonId.has(c.person_id)) {
+        byPersonId.set(c.person_id, {
+          person_id: c.person_id,
+          full_name: c.person?.full_name ?? null,
+          role: c.tipo_condicion ?? null,
+        });
+      }
+    }
+    return Array.from(byPersonId.values());
+  }, [cargos]);
+  const n = activeAdmins.length;
+  const adminVigentes = useMemo(() => activeAdmins.map((a) => a.person_id), [activeAdmins]);
+
   useEffect(() => {
     if (!scopedEntityId) return;
     setSelectedEntityId(scopedEntityId);
@@ -444,12 +521,17 @@ export default function CoAprobacionStepper() {
 
   // Step 2 state
   const [k, setK] = useState(2);
-  const [n, setN] = useState(3);
   const [ventana, setVentana] = useState("15d");
   const [estatutos, setEstatutos] = useState(true);
 
   // Step 3 state
   const [firmas, setFirmas] = useState<FirmaLocal[]>([]);
+
+  // Reset de firmas al cambiar de sociedad: las firmas referencian person_ids
+  // del censo de la sociedad anterior, que dejan de ser válidas.
+  useEffect(() => {
+    setFirmas([]);
+  }, [selectedEntityId]);
 
   // Step 4 — computed result
   const motorResult: ReturnType<typeof evaluarCoAprobacion> | null =
@@ -458,6 +540,7 @@ export default function CoAprobacionStepper() {
           {
             k,
             n,
+            tipoSocial,
             ventanaConsenso: ventana,
             estatutosPermitenSinSesion: estatutos,
             firmas: firmas.map((f) => ({
@@ -466,7 +549,7 @@ export default function CoAprobacionStepper() {
               hashDocumento: `sha256-${f.adminId}`,
             })),
           } satisfies CoAprobacionConfig,
-          firmas.map((f) => f.adminId),
+          adminVigentes,
           new Date().toISOString()
         )
       : null;
@@ -499,6 +582,7 @@ export default function CoAprobacionStepper() {
             selected_template_id: requestedPlantillaId,
             config: {
               k, n,
+              tipoSocial,
               ventanaConsenso: ventana,
               estatutosPermitenSinSesion: estatutos,
               firmas: firmas.map((f) => ({
@@ -535,7 +619,9 @@ export default function CoAprobacionStepper() {
       case 1:
         return !!selectedEntityId && !!selectedBodyId && !!materia && texto.trim().length > 0 && !readinessBlocked;
       case 2:
-        return k > 0 && n >= k && Boolean(ventana);
+        // ITEM-050: la co-aprobación mancomunada exige al menos 2 administradores
+        // reales (n del censo) y k entre 2 y n.
+        return k >= 2 && n >= 2 && n >= k && Boolean(ventana);
       case 3:
         return firmas.length > 0;
       case 4:
@@ -570,13 +656,14 @@ export default function CoAprobacionStepper() {
         return (
           <StepConfiguracion
             k={k} setK={setK}
-            n={n} setN={setN}
+            n={n}
+            tipoSocial={tipoSocial}
             ventana={ventana} setVentana={setVentana}
             estatutos={estatutos} setEstatutos={setEstatutos}
           />
         );
       case 3:
-        return <StepFirmas firmas={firmas} setFirmas={setFirmas} />;
+        return <StepFirmas activeAdmins={activeAdmins} firmas={firmas} setFirmas={setFirmas} />;
       case 4:
         return <StepEvaluacion result={motorResult} />;
       case 5:

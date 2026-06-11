@@ -624,6 +624,54 @@ export function evaluarCoAprobacion(
     return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
   }
 
+  // ITEM-050 — reglas de mancomunidad (BOE): en SL los mancomunados actúan
+  // "al menos dos" (art. 233.2.c LSC) → k >= 2; en SA la administración
+  // conjunta solo cabe con DOS administradores (más de dos exige consejo,
+  // art. 210.2 LSC) → n <= 2.
+  if (config.k < 2) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: mínimo de mancomunados',
+      fuente: 'LEY',
+      referencia: 'art. 233.2.c LSC',
+      resultado: 'BLOCKING',
+      mensaje: `La actuación mancomunada exige al menos dos administradores (k=${config.k}).`,
+    };
+    blockingIssues.push('co_aprobacion_k_menor_que_dos');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+  // El guard se ata al censo REAL pasado al motor (adminVigentes), no solo al
+  // config.n declarado: tras la revisión adversarial Codex #B, un caller que
+  // subdeclarase n (pasando un adminVigentes mayor) eludiría la comprobación
+  // estatutaria. Se toma el máximo de ambos como tamaño efectivo de la
+  // administración conjunta.
+  const censoEfectivo = Math.max(config.n, adminVigentes.length);
+  if ((config.tipoSocial === 'SA' || config.tipoSocial === 'SAU') && censoEfectivo > 2) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: administración conjunta en SA',
+      fuente: 'LEY',
+      referencia: 'art. 210.2 LSC',
+      resultado: 'BLOCKING',
+      mensaje: `En la SA la administración conjunta solo cabe con dos administradores; con ${censoEfectivo} debe constituirse consejo de administración.`,
+    };
+    blockingIssues.push('co_aprobacion_sa_mas_de_dos_conjuntos');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+  // ITEM-050 (hardening tras revisión adversarial): el mínimo de firmas k no
+  // puede superar el número de administradores n. Un caller directo del motor
+  // (fuera del stepper, que ya deriva n del censo) podría pasar n < k con k
+  // firmas válidas y "satisfacer" el umbral; se rechaza fail-closed.
+  if (config.n < config.k) {
+    const node: ExplainNode = {
+      regla: 'CO_APROBACION: k de n incoherente',
+      fuente: 'LEY',
+      referencia: 'art. 233.2.c LSC',
+      resultado: 'BLOCKING',
+      mensaje: `El mínimo de firmas requerido (k=${config.k}) supera el número de administradores mancomunados (n=${config.n}).`,
+    };
+    blockingIssues.push('co_aprobacion_k_mayor_que_n');
+    return { ok: false, severity: 'BLOCKING', explain: node, blocking_issues: blockingIssues, warnings };
+  }
+
   const firmasValidas = config.firmas.filter(f => adminVigentes.includes(f.adminId));
 
   if (firmasValidas.length < config.k) {

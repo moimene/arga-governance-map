@@ -9,6 +9,7 @@ function makeCoAprobConfig(overrides?: Partial<CoAprobacionConfig>): CoAprobacio
   return {
     k: 2,
     n: 3,
+    tipoSocial: 'SL',
     ventanaConsenso: '15d',
     estatutosPermitenSinSesion: true,
     firmas: [
@@ -76,15 +77,63 @@ describe('evaluarCoAprobacion', () => {
     expect(result.blocking_issues).toContain('co_aprobacion_no_permitida_estatutos');
   });
 
-  // CO-05
-  it('CO-05: k=1 n=1 caso mínimo → ok=true', () => {
+  // CO-05 — actualizado ITEM-050: la actuación mancomunada exige al menos
+  // dos administradores (art. 233.2.c LSC). k=1 ya no es un caso válido de
+  // co-aprobación (sería un administrador único → flujo UNIPERSONAL_ADMIN).
+  it('CO-05: k=1 → BLOCKING por mínimo de mancomunados (art. 233.2.c LSC)', () => {
     const config = makeCoAprobConfig({
       k: 1,
       n: 1,
       firmas: [{ adminId: 'admin-1', fechaFirma: '2026-04-20T10:00:00Z', hashDocumento: 'h1' }],
     });
     const result = evaluarCoAprobacion(config, ADMIN_VIGENTES, FECHA_ACUERDO);
+    expect(result.ok).toBe(false);
+    expect(result.blocking_issues).toContain('co_aprobacion_k_menor_que_dos');
+  });
+
+  // CO-07 — ITEM-050: en SA la administración conjunta solo cabe con dos
+  // administradores; con más de dos debe constituirse consejo (art. 210.2 LSC).
+  it('CO-07: SA con n=3 conjuntos → BLOCKING (art. 210.2 LSC)', () => {
+    const config = makeCoAprobConfig({ k: 2, n: 3, tipoSocial: 'SA' });
+    const result = evaluarCoAprobacion(config, ADMIN_VIGENTES, FECHA_ACUERDO);
+    expect(result.ok).toBe(false);
+    expect(result.blocking_issues).toContain('co_aprobacion_sa_mas_de_dos_conjuntos');
+  });
+
+  it('CO-08: SL con n=3 mancomunados y k=2 sigue siendo válido (art. 233.2.c LSC)', () => {
+    const config = makeCoAprobConfig({ k: 2, n: 3, tipoSocial: 'SL' });
+    const result = evaluarCoAprobacion(config, ADMIN_VIGENTES, FECHA_ACUERDO);
     expect(result.ok).toBe(true);
+  });
+
+  // CO-09 — hardening tras revisión adversarial: k no puede superar n, aunque
+  // se aporten k firmas válidas (bypass de caller directo del motor).
+  it('CO-09: k=2 n=1 con 2 firmas válidas → BLOCKING (k>n incoherente)', () => {
+    const config = makeCoAprobConfig({
+      k: 2,
+      n: 1,
+      firmas: [
+        { adminId: 'admin-1', fechaFirma: '2026-04-20T10:00:00Z', hashDocumento: 'h1' },
+        { adminId: 'admin-2', fechaFirma: '2026-04-20T11:00:00Z', hashDocumento: 'h2' },
+      ],
+    });
+    const result = evaluarCoAprobacion(config, ADMIN_VIGENTES, FECHA_ACUERDO);
+    expect(result.ok).toBe(false);
+    expect(result.blocking_issues).toContain('co_aprobacion_k_mayor_que_n');
+  });
+
+  // CO-10 — hardening Codex #B: el guard SA n>2 se ata al censo REAL
+  // (adminVigentes), no solo al config.n declarado. Subdeclarar n no elude la
+  // comprobación estatutaria del art. 210.2 LSC.
+  it('CO-10: SA con n declarado=2 pero censo real de 4 admins → BLOCKING vía censo', () => {
+    const config = makeCoAprobConfig({ k: 2, n: 2, tipoSocial: 'SA' });
+    const result = evaluarCoAprobacion(
+      config,
+      ['admin-1', 'admin-2', 'admin-3', 'admin-4'],
+      FECHA_ACUERDO,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.blocking_issues).toContain('co_aprobacion_sa_mas_de_dos_conjuntos');
   });
 
   // CO-06

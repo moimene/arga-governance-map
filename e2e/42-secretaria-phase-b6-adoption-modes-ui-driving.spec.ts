@@ -540,8 +540,7 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
     // Los defaults pueden estar en 0 — los seteamos a k=2, n=4
     const inputs = page.locator('input[type="number"]');
     await expect(inputs.first()).toBeVisible({ timeout: 5_000 });
-    await inputs.nth(0).fill('2'); // k
-    await inputs.nth(1).fill('4'); // n
+    await inputs.nth(0).fill('2'); // k (n se deriva del censo real del órgano — readonly)
     // ventana es un select o un input — la dejamos por default si existe
     const ventanaSelect = page.locator('select').last();
     if (await ventanaSelect.isVisible().catch(() => false)) {
@@ -551,28 +550,21 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
     await expect(next2).toBeEnabled({ timeout: 10_000 });
     await next2.click();
 
-    // STEP 3 — Firmas: añadir 2 firmas (k=2 mínimo)
-    // Patrón del componente: input "Nombre del administrador firmante" + botón
-    // "Añadir" deshabilitado hasta que el input tenga texto. Cada Añadir hace
-    // push y limpia el input, así que llenamos + click + repetimos.
+    // STEP 3 — Firmas: ITEM-050 — las firmas se seleccionan del censo REAL del
+    // órgano (checkboxes etiquetados por nombre del administrador vigente), no
+    // por texto libre. Seleccionamos 2 de los 4 administradores (k=2 mínimo).
     await expect(
       page.getByRole('heading', { name: /Paso 3\. Firmas/i }),
     ).toBeVisible({ timeout: 10_000 });
-    const nombreFirmaInput = page.getByLabel(/Nombre del administrador firmante/i);
-    const addFirmaBtn = page.getByRole('button', { name: 'Añadir' });
+    const firma0 = page.getByLabel(fixture.admins[0].nombre, { exact: true });
+    const firma1 = page.getByLabel(fixture.admins[1].nombre, { exact: true });
+    await expect(firma0).toBeVisible({ timeout: 10_000 });
+    await firma0.check();
+    await firma1.check();
 
-    // Firma 1
-    await nombreFirmaInput.fill(fixture.admins[0].nombre);
-    await expect(addFirmaBtn).toBeEnabled({ timeout: 5_000 });
-    await addFirmaBtn.click();
-    // Firma 2
-    await nombreFirmaInput.fill(fixture.admins[1].nombre);
-    await expect(addFirmaBtn).toBeEnabled({ timeout: 5_000 });
-    await addFirmaBtn.click();
-
-    // Verificar que las 2 firmas aparecen en la lista
-    await expect(page.getByText(fixture.admins[0].nombre).first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(fixture.admins[1].nombre).first()).toBeVisible({ timeout: 5_000 });
+    // Verificar que las 2 firmas quedan seleccionadas
+    await expect(firma0).toBeChecked();
+    await expect(firma1).toBeChecked();
 
     const next3 = page.getByRole('button', { name: /Siguiente|Continuar/ }).first();
     await expect(next3).toBeEnabled({ timeout: 10_000 });
@@ -610,6 +602,22 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
     const exec = agr.execution_mode as Record<string, unknown>;
     expect(exec.tipo).toBe('CO_APROBACION');
 
+    // ITEM-050 (refuerzo tras revisión adversarial Codex #9): probar que NO es
+    // tautológico. El acuerdo se adoptó (motor ok con k=2 firmas válidas) y las
+    // firmas persisten los person_ids REALES del censo seleccionados en la UI,
+    // no ids fabricados; n se derivó del censo (4) y tipoSocial se cableó.
+    expect(agr.status, 'co-aprobación válida ⇒ ADOPTED').toBe('ADOPTED');
+    const cfg = (exec.config ?? {}) as {
+      firmas?: Array<{ adminId?: string }>;
+      n?: number;
+      tipoSocial?: string;
+    };
+    const firmadoIds = (cfg.firmas ?? []).map((f) => f.adminId);
+    expect(firmadoIds, 'firmas con person_ids reales del censo').toContain(fixture.admins[0].personId);
+    expect(firmadoIds).toContain(fixture.admins[1].personId);
+    expect(cfg.n, 'n derivado del censo real (4 admins)').toBe(4);
+    expect(cfg.tipoSocial).toBe('SL');
+
     stepperCreated.push({ table: 'agreements', id: agr.id, marker: fixture.runId });
   });
 
@@ -637,10 +645,10 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
     await expect(next1).toBeEnabled({ timeout: 10_000 });
     await next1.click();
 
-    // STEP 2 — Admin actuante
+    // STEP 2 — Admin actuante: ITEM-050 — el actuante se elige del censo REAL
+    // del órgano (select por person_id), no por texto libre.
     await expect(page.locator('#solidario-admin-id')).toBeVisible({ timeout: 10_000 });
-    await page.locator('#solidario-admin-id').fill(fixture.admins[0].personId);
-    await page.locator('#solidario-admin-nombre').fill(fixture.admins[0].nombre);
+    await page.locator('#solidario-admin-id').selectOption(fixture.admins[0].personId);
     // vigencia desde — fecha de hoy
     const today = new Date().toISOString().slice(0, 10);
     await page.locator('#solidario-vigencia-desde').fill(today);
@@ -680,6 +688,12 @@ test.describe('Phase B6 — UI driving destructive multi-adoption-modes (CO_APRO
     expect(agr.execution_mode, 'execution_mode con tipo SOLIDARIO').toBeTruthy();
     const exec = agr.execution_mode as Record<string, unknown>;
     expect(exec.tipo).toBe('SOLIDARIO');
+
+    // ITEM-050 (refuerzo Codex #9): el actuante persiste el person_id REAL del
+    // censo seleccionado (no un id de texto libre) y el acuerdo se adoptó.
+    expect(agr.status, 'solidario válido ⇒ ADOPTED').toBe('ADOPTED');
+    const cfg = (exec.config ?? {}) as { adminActuante?: string };
+    expect(cfg.adminActuante, 'actuante = person_id real del censo').toBe(fixture.admins[0].personId);
 
     stepperCreated.push({ table: 'agreements', id: agr.id, marker: fixture.runId });
   });

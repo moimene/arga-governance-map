@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
@@ -7,6 +7,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
+import { useAdministradores } from "@/hooks/useCargos";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
@@ -25,6 +26,15 @@ const STEPS = [
   { n: 3, label: "Evaluación motor", hint: "Verificación de validez por el motor LSC" },
   { n: 4, label: "Registrar", hint: "Crear acuerdo de administrador solidario" },
 ];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+/** Administrador vigente del censo (proyección mínima de CargoDetailRow). */
+interface AdminOption {
+  person_id: string;
+  full_name: string | null;
+  role: string | null;
+}
 
 // ─── Step bodies ─────────────────────────────────────────────────────────────
 
@@ -154,13 +164,13 @@ function StepTipoAcuerdo({
 }
 
 function StepAdminActuante({
-  adminId, setAdminId,
-  adminNombre, setAdminNombre,
+  activeAdmins,
+  adminId, setActuante,
   vigenciaDesde, setVigenciaDesde,
   materiasRestringidas, setMateriasRestringidas,
 }: {
-  adminId: string; setAdminId: (v: string) => void;
-  adminNombre: string; setAdminNombre: (v: string) => void;
+  activeAdmins: AdminOption[];
+  adminId: string; setActuante: (id: string, nombre: string) => void;
   vigenciaDesde: string; setVigenciaDesde: (v: string) => void;
   materiasRestringidas: string[]; setMateriasRestringidas: (v: string[]) => void;
 }) {
@@ -179,37 +189,48 @@ function StepAdminActuante({
         style={{ borderRadius: "var(--g-radius-md)" }}
       >
         El administrador solidario puede actuar individualmente para adoptar acuerdos de gestión
-        ordinaria. Materias estructurales pueden requerir cofirma estatutaria (art. 210 LSC).
+        ordinaria; cada administrador ostenta el poder de representación (art. 233.2.b LSC).
+        Materias estructurales pueden requerir cofirma estatutaria.
       </div>
 
       <div>
         <label htmlFor="solidario-admin-id" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
-          ID del administrador actuante
+          Administrador actuante
         </label>
-        <input
+        {/* ITEM-050: el actuante se elige del censo real del órgano
+            (condiciones_persona VIGENTE), no por texto libre. Antes el id era
+            arbitrario y la lista de "vigentes" era [adminId] → autovalidación. */}
+        <select
           id="solidario-admin-id"
-          type="text"
           value={adminId}
-          onChange={(e) => setAdminId(e.target.value)}
-          placeholder="Ej: admin-solid-1"
-          className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
+          disabled={activeAdmins.length === 0}
+          onChange={(e) => {
+            const picked = activeAdmins.find((a) => a.person_id === e.target.value);
+            setActuante(e.target.value, picked?.full_name ?? "");
+          }}
+          className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="solidario-admin-nombre" className="block text-sm font-medium text-[var(--g-text-primary)] mb-1">
-          Nombre del administrador
-        </label>
-        <input
-          id="solidario-admin-nombre"
-          type="text"
-          value={adminNombre}
-          onChange={(e) => setAdminNombre(e.target.value)}
-          placeholder="Nombre completo"
-          className="w-full border border-[var(--g-border-default)] px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] focus:outline-none focus:border-[var(--g-border-focus)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        />
+        >
+          <option value="">Seleccionar administrador vigente…</option>
+          {activeAdmins.map((a) => (
+            <option key={a.person_id} value={a.person_id}>
+              {a.full_name ?? a.person_id}{a.role ? ` · ${a.role}` : ""}
+            </option>
+          ))}
+        </select>
+        {activeAdmins.length === 0 && (
+          <div
+            className="mt-2 flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+            <span>
+              No hay administradores vigentes en el censo de este órgano. No puede registrarse un
+              acuerdo solidario sin un administrador real.
+            </span>
+          </div>
+        )}
       </div>
 
       <div>
@@ -383,6 +404,29 @@ export default function SolidarioStepper() {
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
 
+  // ITEM-050: censo real de administradores NO COLEGIADOS de la sociedad. El
+  // administrador solidario es un régimen no colegiado (art. 210.1 LSC: "de
+  // forma solidaria"); un consejero no es administrador solidario. Por eso se
+  // usa useAdministradores (ADMIN_UNICO/SOLIDARIO/MANCOMUNADO/PJ, body_id NULL)
+  // y NO los consejeros. El motor valida que el actuante conste como VIGENTE;
+  // antes adminVigentes era [adminId] (el propio actuante), una autovalidación
+  // tautológica.
+  const { data: cargos = [] } = useAdministradores(selectedEntityId ?? undefined);
+  const activeAdmins = useMemo<AdminOption[]>(() => {
+    const byPersonId = new Map<string, AdminOption>();
+    for (const c of cargos) {
+      if (!byPersonId.has(c.person_id)) {
+        byPersonId.set(c.person_id, {
+          person_id: c.person_id,
+          full_name: c.person?.full_name ?? null,
+          role: c.tipo_condicion ?? null,
+        });
+      }
+    }
+    return Array.from(byPersonId.values());
+  }, [cargos]);
+  const adminVigentes = useMemo(() => activeAdmins.map((a) => a.person_id), [activeAdmins]);
+
   useEffect(() => {
     if (!scopedEntityId) return;
     setSelectedEntityId(scopedEntityId);
@@ -397,6 +441,18 @@ export default function SolidarioStepper() {
   );
   const [materiasRestringidas, setMateriasRestringidas] = useState<string[]>([]);
 
+  function setActuante(id: string, nombre: string) {
+    setAdminId(id);
+    setAdminNombre(nombre);
+  }
+
+  // Reset del actuante al cambiar de sociedad (el person_id pertenece al censo
+  // de la sociedad anterior).
+  useEffect(() => {
+    setAdminId("");
+    setAdminNombre("");
+  }, [selectedEntityId]);
+
   // Step 3 — computed result
   const motorResult: ReturnType<typeof evaluarSolidario> | null =
     adminId.trim()
@@ -409,7 +465,7 @@ export default function SolidarioStepper() {
             })),
             vigenciaDesde: `${vigenciaDesde}T00:00:00Z`,
           } satisfies SolidarioConfig,
-          [adminId],
+          adminVigentes,
           materia || "OTROS",
           new Date().toISOString()
         )
@@ -477,7 +533,9 @@ export default function SolidarioStepper() {
       case 1:
         return !!selectedEntityId && !!selectedBodyId && !!materia && texto.trim().length > 0 && !readinessBlocked;
       case 2:
-        return adminId.trim().length > 0 && adminNombre.trim().length > 0 && Boolean(vigenciaDesde);
+        // ITEM-050: el actuante debe ser un administrador real del censo
+        // (adminId = person_id); el nombre se deriva de la selección.
+        return adminId.trim().length > 0 && Boolean(vigenciaDesde);
       case 3:
         return !!motorResult;
       default:
@@ -509,8 +567,8 @@ export default function SolidarioStepper() {
       case 2:
         return (
           <StepAdminActuante
-            adminId={adminId} setAdminId={setAdminId}
-            adminNombre={adminNombre} setAdminNombre={setAdminNombre}
+            activeAdmins={activeAdmins}
+            adminId={adminId} setActuante={setActuante}
             vigenciaDesde={vigenciaDesde} setVigenciaDesde={setVigenciaDesde}
             materiasRestringidas={materiasRestringidas}
             setMateriasRestringidas={setMateriasRestringidas}

@@ -245,6 +245,14 @@ export interface CoAprobacionConfig {
   n: number;
   ventanaConsenso: string;  // e.g. "15d"
   estatutosPermitenSinSesion: boolean;
+  /**
+   * ITEM-050: reglas de mancomunidad dependen del tipo social (arts. 210.2 y
+   * 233.2.c LSC). REQUERIDO (fail-closed tras revisión adversarial Codex #B):
+   * un caller que lo omitiera dejaría sin efecto el guard de administración
+   * conjunta en la SA. Todo constructor (stepper, builder de compliance, tests)
+   * debe aportarlo.
+   */
+  tipoSocial: TipoSocial;
   firmas: Array<{ adminId: string; fechaFirma: string; hashDocumento: string }>;
 }
 

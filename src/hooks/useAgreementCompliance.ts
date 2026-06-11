@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 import {
   evaluarAcuerdoCompleto,
   evaluarPuntoOrdenDia,
@@ -255,6 +256,13 @@ function buildCoAprobacionConfigFromExecution(a: AgreementWithEntity): CoAprobac
     n: typeof config.n === "number" ? config.n : Math.max(config.firmas.length, 1),
     ventanaConsenso: typeof config.ventanaConsenso === "string" ? config.ventanaConsenso : "15d",
     estatutosPermitenSinSesion: config.estatutosPermitenSinSesion !== false,
+    // ITEM-050 / Codex #B: recuperar el tipo social persistido por el stepper;
+    // para expedientes legacy sin él, derivarlo de la forma jurídica de la
+    // entidad (fail-closed: el campo es requerido y nunca queda indefinido).
+    tipoSocial:
+      typeof config.tipoSocial === "string"
+        ? deriveTipoSocial({ legal_form: String(config.tipoSocial) })
+        : deriveTipoSocial({ legal_form: a.entities?.legal_form }),
     firmas: config.firmas
       .filter(isRecord)
       .map((firma) => ({

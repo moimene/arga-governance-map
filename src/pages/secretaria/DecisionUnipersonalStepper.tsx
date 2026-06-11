@@ -12,6 +12,7 @@ import { useCreateUnipersonalDecision, useDecisorUnipersonal } from "@/hooks/use
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
+import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 
 type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
 
@@ -50,10 +51,11 @@ function TipoMateriaStep({
 }) {
   const adoptionMode = decisionAdoptionMode(tipo);
   const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
-  // ITEM-022: tipo social REAL de la entidad seleccionada (antes 'SL' fijo,
-  // evaluando el gate contra el tipo equivocado para SA/SAU).
-  const rawTipoSocial = String(selectedEntity?.tipo_social ?? selectedEntity?.legal_form ?? "SL").toUpperCase();
-  const tipoSocialReal = (["SA", "SL", "SLU", "SAU"].includes(rawTipoSocial) ? rawTipoSocial : rawTipoSocial.includes("ANONIMA") || rawTipoSocial.includes("ANÓNIMA") || rawTipoSocial === "S.A." ? "SA" : "SL") as "SA" | "SL" | "SLU" | "SAU";
+  // ITEM-022/050: tipo social REAL de la entidad seleccionada (antes 'SL' fijo,
+  // evaluando el gate contra el tipo equivocado para SA/SAU). Lógica centralizada
+  // en deriveTipoSocial para compartirla con los asistentes de co-aprobación y
+  // solidario.
+  const tipoSocialReal = deriveTipoSocial(selectedEntity);
 
   return (
     <div className="space-y-5">

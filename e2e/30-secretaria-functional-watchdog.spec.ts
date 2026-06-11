@@ -690,8 +690,7 @@ test.describe('Secretaría functional watchdog', () => {
     await expect(page.getByRole('button', { name: 'Adoptar acuerdo' })).toBeDisabled();
   });
 
-  test('co-aprobación queda cableada a sociedad, órgano, plantilla y registro no destructivo', async ({ page }) => {
-    await stubAgreementCreation(page, FAKE_AGREEMENT_ID);
+  test('co-aprobación: SA administrada por consejo no ofrece co-aprobación mancomunada (régimen no colegiado)', async ({ page }) => {
     await page.goto(`/secretaria/acuerdos-sin-sesion/co-aprobacion?plantilla=${TEMPLATE_PARAM_ID}&tipo=ACTA_DECISION_CONJUNTA`);
 
     await expect(page.getByRole('heading', { name: 'Asistente de acuerdo por co-aprobación (k de n)' })).toBeVisible();
@@ -700,27 +699,22 @@ test.describe('Secretaría functional watchdog', () => {
 
     const selects = page.locator('main select');
     await selectOptionByText(selects.nth(0), /ARGA Seguros, S\.A\./);
-    await selectOptionByText(selects.nth(1), /Consejo|Junta|Administraci/);
+    await selectOptionByText(selects.nth(1), /Consejo/);
     await selectOptionByText(selects.nth(2), /Delegación|Aprobación|Otros/);
     await page.locator('#coaprobacion-texto').fill('Acuerdo QA de co-aprobación no destructivo.');
     await expect(page.getByRole('button', { name: /Siguiente/ })).toBeEnabled();
     await page.getByRole('button', { name: /Siguiente/ }).click();
 
-    await page.locator('#coaprobacion-k').fill('1');
-    await page.getByRole('button', { name: /Siguiente/ }).click();
-    await page.getByLabel('Nombre del administrador firmante').fill('Administradora QA');
-    await page.getByRole('button', { name: 'Añadir' }).click();
-    await page.getByRole('button', { name: /Siguiente/ }).click();
-    await expect(page.getByText(/Co-aprobación válida|Co-aprobación inválida/)).toBeVisible();
-    await page.getByRole('button', { name: /Siguiente/ }).click();
-
-    await page.getByRole('button', { name: 'Registrar acuerdo' }).click();
-    await expect(page.getByText('Acuerdo registrado')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Generar documento/ })).toBeVisible();
+    // ITEM-050: ARGA es una SA administrada por consejo → sin administradores no
+    // colegiados (solidarios/mancomunados). El asistente refleja el censo real
+    // (useAdministradores) y bloquea: no puede fabricarse una co-aprobación
+    // mancomunada inexistente. El censo derivado es n=0 y el paso no avanza.
+    await expect(page.getByText(/administradores vigentes en el censo/i).first()).toBeVisible();
+    await expect(page.getByText(/al menos dos \(art\. 233\.2\.c LSC\)/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Siguiente/ })).toBeDisabled();
   });
 
-  test('administrador solidario queda cableado a sociedad, órgano, plantilla y registro no destructivo', async ({ page }) => {
-    await stubAgreementCreation(page, '10000000-0000-4000-8000-000000000032');
+  test('administrador solidario: SA administrada por consejo no ofrece administrador solidario (régimen no colegiado)', async ({ page }) => {
     await page.goto(`/secretaria/acuerdos-sin-sesion/solidario?plantilla=${TEMPLATE_PARAM_ID}&tipo=ACTA_ORGANO_ADMIN`);
 
     await expect(page.getByRole('heading', { name: 'Asistente de acuerdo por administrador solidario' })).toBeVisible();
@@ -729,20 +723,18 @@ test.describe('Secretaría functional watchdog', () => {
 
     const selects = page.locator('main select');
     await selectOptionByText(selects.nth(0), /ARGA Seguros, S\.A\./);
-    await selectOptionByText(selects.nth(1), /Consejo|Junta|Administraci/);
+    await selectOptionByText(selects.nth(1), /Consejo/);
     await selectOptionByText(selects.nth(2), /Delegación|Aprobación|Otros/);
     await page.locator('#solidario-texto').fill('Acuerdo QA de administrador solidario no destructivo.');
     await page.getByRole('button', { name: /Siguiente/ }).click();
 
-    await page.locator('#solidario-admin-id').fill('admin-solidario-qa');
-    await page.locator('#solidario-admin-nombre').fill('Administrador Solidario QA');
-    await page.getByRole('button', { name: /Siguiente/ }).click();
-    await expect(page.getByText(/Acuerdo solidario válido|Acuerdo solidario inválido/)).toBeVisible();
-    await page.getByRole('button', { name: /Siguiente/ }).click();
-
-    await page.getByRole('button', { name: 'Registrar acuerdo' }).click();
-    await expect(page.getByText('Acuerdo registrado')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Generar documento/ })).toBeVisible();
+    // ITEM-050: ARGA (SA administrada por consejo) no tiene administradores
+    // solidarios. El selector queda deshabilitado y el asistente bloquea: no se
+    // puede fabricar un administrador solidario inexistente (censo real vía
+    // useAdministradores, no texto libre).
+    await expect(page.locator('#solidario-admin-id')).toBeDisabled();
+    await expect(page.getByText(/No hay administradores vigentes en el censo de este órgano/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Siguiente/ })).toBeDisabled();
   });
 
   test('detalle no-session materializado enlaza expediente y generador documental', async ({ page }) => {
