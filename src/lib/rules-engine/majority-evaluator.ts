@@ -66,7 +66,13 @@ export function evaluarMayoria(
       : votos.contra;
   const favor_ajustado = votos.favor;
 
-  // Evaluate formula
+  // Evaluate formula. Concurrentes (art. 248.1): si no llega el dato, el
+  // fallback prudente es favor+contra+abstenciones (quien votó o se abstuvo
+  // estaba concurrente), nunca solo los emitidos.
+  const concurrentes =
+    votos.miembros_presentes && votos.miembros_presentes > 0
+      ? votos.miembros_presentes
+      : votos.favor + votos.contra + votos.abstenciones;
   const result = evaluateFormula(
     formulaActual,
     favor_ajustado,
@@ -75,7 +81,7 @@ export function evaluarMayoria(
     votos.capital_presente,
     votos.capital_total,
     votos.total_miembros || 0,
-    votos.miembros_presentes || 0
+    concurrentes
   );
 
   return {
@@ -130,9 +136,20 @@ function canonicalFormula(formula: string) {
   const compact = normalized.replace(/\s+/g, '');
 
   if (compact === 'favor>contra' || normalized === 'favor > contra') return 'favor > contra';
-  if (normalized === 'favor > presentes_mitad') return 'mayoria_consejeros';
+  // ITEM-009/036 — art. 248.1 LSC (literal BOE): los acuerdos del consejo se
+  // adoptan "por mayoría absoluta de los consejeros CONCURRENTES a la sesión".
+  // Las dos grafías de pack que citan 248.1 se canonicalizan a la base de
+  // concurrentes, no al tamaño total del órgano ('mayoria_consejeros' queda
+  // para fórmulas que exijan explícitamente mayoría del total).
+  if (normalized === 'favor > presentes_mitad') return 'favor > 1/2_miembros_presentes';
   if (normalized === 'favor > presentes_mitad_no_vinculados') return 'favor > 1/2_capital_presente';
-  if (normalized === 'favor > total_miembros / 2') return 'mayoria_consejeros';
+  if (normalized === 'favor > total_miembros / 2') return 'favor > 1/2_miembros_presentes';
+  // ITEM-010 — art. 249.3 LSC: la delegación permanente de facultades exige
+  // el voto favorable de las DOS TERCERAS PARTES DE LOS COMPONENTES del
+  // consejo (sí sobre el total del órgano, no sobre concurrentes).
+  if (normalized === 'favor >= 2/3_total_miembros' || normalized === 'favor >= 2/3 componentes') {
+    return 'favor >= 2/3_total_miembros';
+  }
   if (normalized === 'mayoria' || normalized === 'mayoria simple') return 'favor > contra';
   if (normalized === 'favor > mitad_capital_con_voto') return 'favor > 1/2_capital_total_con_voto';
   if (normalized === '> 1/2 capital') return 'favor > 1/2_capital_total_con_voto';
@@ -278,6 +295,36 @@ function evaluateFormula(
     const requerido = total_miembros / 2;
     return {
       alcanzada: favor > requerido,
+      valorRequerido: requerido,
+      valorObtenido: favor,
+    };
+  }
+
+  // ITEM-009 — art. 248.1 LSC: mayoría absoluta de los consejeros
+  // CONCURRENTES a la sesión (el caller resuelve el fallback de
+  // miembros_presentes con favor+contra+abstenciones).
+  if (formulaActual === 'favor > 1/2_miembros_presentes') {
+    if (miembros_presentes === 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
+    const requerido = miembros_presentes / 2;
+    return {
+      alcanzada: favor > requerido,
+      valorRequerido: requerido,
+      valorObtenido: favor,
+    };
+  }
+
+  // ITEM-010 — art. 249.3 LSC: 2/3 de los componentes del consejo
+  // (delegación permanente de facultades y designación de consejeros
+  // delegados/comisiones ejecutivas).
+  if (formulaActual === 'favor >= 2/3_total_miembros') {
+    if (total_miembros === 0) {
+      return { alcanzada: false, valorRequerido: 1, valorObtenido: favor };
+    }
+    const requerido = (2 * total_miembros) / 3;
+    return {
+      alcanzada: favor >= requerido,
       valorRequerido: requerido,
       valorObtenido: favor,
     };

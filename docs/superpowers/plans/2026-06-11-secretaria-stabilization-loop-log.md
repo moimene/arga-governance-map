@@ -322,3 +322,24 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Residual P3:** gate de motor V2 que consuma rule_config.second_call_gap_min_hours (hoy sin
   consumidores) — el quórum de 2ª ya se evalúa vía Iteración 8.
 - **Verificación:** gates verdes (2032 tests 0 fail); e2e 04+18 6/6.
+
+### Iteración 17 — ITEM-009/010/036 (+019 parcial) [P1] Mayorías del consejo: base de cómputo (HECHO)
+
+- **Evidencia (BOE literal):** art. 248.1 — "mayoría absoluta de los consejeros CONCURRENTES";
+  art. 249.3 — delegación permanente exige "dos terceras partes de los COMPONENTES". El evaluador
+  remapeaba 'favor > presentes_mitad' a mayoría del TOTAL (CdA 15, 9 presentes, 5-4: ley adopta,
+  motor exigía 7.5 → falso negativo, compensado por accidente porque el stepper pasaba presentes
+  como total — falseando a la vez voting_context.total_miembros). DELEGACION_FACULTADES exigía
+  mitad del total citando 247.2 (que es el QUÓRUM); FORMULACION_CUENTAS 'Mayoría' → simple.
+- **Fix:** (1) evaluador: nueva fórmula 'favor > 1/2_miembros_presentes' (concurrentes; fallback
+  prudente favor+contra+abstenciones) y 'favor >= 2/3_total_miembros' (componentes);
+  'favor > presentes_mitad' y 'favor > total_miembros / 2' canonicalizan a concurrentes.
+  (2) snapshot: miembros_presentes = concurrentes reales (antes ¡los votos a favor! — mitad de
+  ITEM-019) e input miembrosPresentes; (3) stepper: totalMiembros = vocales reales del censo en
+  órganos colegiados, concurrentes aparte; (4) migración 20260611201500: packs
+  DELEGACION_FACULTADES → 2/3 componentes (art. 249.3) y FORMULACION_CUENTAS → mayoría absoluta
+  de concurrentes (art. 248.1) — re-triados de BLOQUEADO-LEGAL a corrección factual BOE.
+- **Verificación:** 5 regresiones nuevas (5-4/9 adopta; 4F-3C-2A no; fallback con abstenciones;
+  9/15 no delega, 10/15 sí; grafía total_miembros/2 sobre concurrentes); 2037 tests 0 fail;
+  gates verdes; e2e 05+18 6/6; migración alineada.
+- **Residual ITEM-019:** fallback de capital_total al peso presente sigue pendiente (mitad restante).

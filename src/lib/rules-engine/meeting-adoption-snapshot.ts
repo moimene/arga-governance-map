@@ -118,6 +118,11 @@ export interface MeetingAdoptionSnapshotInput {
   quorumReached?: boolean;
   voters: MeetingAdoptionVoter[];
   totalMiembros: number;
+  /**
+   * Concurrentes a la sesión (art. 248.1 LSC). Si no se informa, se asume
+   * que `voters` son los presentes (voters.length).
+   */
+  miembrosPresentes?: number;
   capitalTotal: number;
   packs: RulePack[];
   overrides?: RuleParamOverride[];
@@ -321,7 +326,9 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
         capital_presente: voteSummary.voting_weight,
         capital_total: voteSummary.capital_total,
         total_miembros: input.totalMiembros,
-        miembros_presentes: voteSummary.favor,
+        // ITEM-009/019: concurrentes reales (antes se rellenaba con los
+        // votos a favor — dato incoherente que invalidaba el snapshot).
+        miembros_presentes: input.miembrosPresentes ?? input.voters.length,
       },
       conflictos,
       votoCalidadHabilitado: input.votoCalidadHabilitado,

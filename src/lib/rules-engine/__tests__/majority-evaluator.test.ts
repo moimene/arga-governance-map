@@ -333,3 +333,51 @@ describe('majority-evaluator', () => {
     expect(result.explain.mensaje).toContain('NO alcanzada');
   });
 });
+
+describe("ITEM-009/010 — mayorías del consejo (arts. 248.1 y 249.3 LSC)", () => {
+  it("248.1: CdA de 15 con 9 concurrentes y 5-4 SÍ adopta (mayoría absoluta de concurrentes)", () => {
+    const result = evaluarMayoria(
+      { formula: "favor > presentes_mitad", fuente: "LEY", referencia: "art. 248.1 LSC" },
+      { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 9, capital_total: 15, total_miembros: 15, miembros_presentes: 9 },
+    );
+    expect(result.alcanzada).toBe(true); // 5 > 4.5 — antes exigía 5 > 7.5 (falso negativo)
+  });
+
+  it("248.1: 4F/3C/2A con 9 concurrentes NO adopta (4 no supera 4.5)", () => {
+    const result = evaluarMayoria(
+      { formula: "favor > presentes_mitad", fuente: "LEY", referencia: "art. 248.1 LSC" },
+      { favor: 4, contra: 3, abstenciones: 2, en_blanco: 0, capital_presente: 9, capital_total: 15, total_miembros: 15, miembros_presentes: 9 },
+    );
+    expect(result.alcanzada).toBe(false);
+  });
+
+  it("248.1 fallback sin dato de concurrentes: usa favor+contra+abstenciones, no solo emitidos", () => {
+    const result = evaluarMayoria(
+      { formula: "favor > presentes_mitad", fuente: "LEY" },
+      { favor: 4, contra: 3, abstenciones: 3, en_blanco: 0, capital_presente: 0, capital_total: 0 },
+    );
+    // concurrentes inferidos = 10 → requiere > 5; con solo emitidos (7) habría adoptado (4 > 3.5)
+    expect(result.alcanzada).toBe(false);
+  });
+
+  it("249.3: delegación de facultades exige 2/3 de los COMPONENTES — 9/15 no llega (requiere 10)", () => {
+    const result = evaluarMayoria(
+      { formula: "favor >= 2/3_total_miembros", fuente: "LEY", referencia: "art. 249.3 LSC" },
+      { favor: 9, contra: 0, abstenciones: 0, en_blanco: 0, capital_presente: 9, capital_total: 15, total_miembros: 15, miembros_presentes: 9 },
+    );
+    expect(result.alcanzada).toBe(false); // 9 < 10
+    const result10 = evaluarMayoria(
+      { formula: "favor >= 2/3_total_miembros", fuente: "LEY" },
+      { favor: 10, contra: 0, abstenciones: 0, en_blanco: 0, capital_presente: 10, capital_total: 15, total_miembros: 15, miembros_presentes: 10 },
+    );
+    expect(result10.alcanzada).toBe(true);
+  });
+
+  it("'favor > total_miembros / 2' (grafía de packs que citan 248.1) evalúa sobre concurrentes", () => {
+    const result = evaluarMayoria(
+      { formula: "favor > total_miembros / 2", fuente: "LEY", referencia: "art. 248.1 LSC" },
+      { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 9, capital_total: 15, total_miembros: 15, miembros_presentes: 9 },
+    );
+    expect(result.alcanzada).toBe(true);
+  });
+});

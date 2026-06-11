@@ -2665,7 +2665,19 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         conflict_reason: voter.conflict_reason,
         voting_weight: votingWeightFor(voter, organoTipo),
       })),
-      totalMiembros: Math.max(voters.length, rowsForPoint.length, 1),
+      // ITEM-009/036: total = tamaño real del órgano (vocales del censo);
+      // concurrentes aparte. Antes total era el nº de presentes, falseando
+      // voting_context.total_miembros y las fórmulas sobre el total.
+      totalMiembros:
+        organoTipo === "JUNTA_GENERAL"
+          ? Math.max(voters.length, rowsForPoint.length, 1)
+          : Math.max(
+              bodyMembersForVotes.filter((m) => m.es_vocal).length,
+              voters.length,
+              rowsForPoint.length,
+              1
+            ),
+      miembrosPresentes: rowsForPoint.length,
       capitalTotal,
       packs: mode === "cloud_strict" ? strictVotePacks : votePacks,
       overrides: voteOverrides,
