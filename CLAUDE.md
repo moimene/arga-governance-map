@@ -59,7 +59,7 @@ Reglas:
 
 ### Taxonomía sidebar Secretaría — decisión 2026-05-12
 
-Tras el rediseño del menú lateral (`src/lib/secretaria/sidebar-visibility.ts` + `navigation.ts`) la nueva taxonomía de secciones en modo sociedad es **CONTEXTO / EXPEDIENTES / REGISTRO / CONFIGURACIÓN Y REGLAS**, con item "Procesos" para `/secretaria/calendario`.
+Tras sucesivos rediseños del menú lateral (`src/lib/secretaria/sidebar-visibility.ts` + `src/components/secretaria/shell/navigation.ts`) la taxonomía vigente de secciones en modo sociedad es **Inicio / Adopción / Documentación / Registro público / Libros y registros sociales / Sociedades y personas / Configuración y reglas**, con item "Procesos" para `/secretaria/calendario` dentro de "Libros y registros sociales". (La taxonomía anterior `CONTEXTO / EXPEDIENTES / REGISTRO / CONFIGURACIÓN Y REGLAS` del 2026-05-12 quedó superada; "Registro público" sustituye a "REGISTRO" y resuelve la colisión con el Registro Mercantil.)
 
 Crítica impeccable conocida (no bloqueante, deuda intencional):
 
@@ -575,7 +575,7 @@ hash basado en censo WORM. Plan: `docs/superpowers/plans/2026-04-21-gestion-soci
 - `fn_emitir_certificacion(p_certification_id) → text` (F8.2) — devuelve URI del evidence bundle
 
 **Componente F9:**
-- `src/components/secretaria/EmitirCertificacionButton.tsx` — ejecuta los 3 pasos en cadena, precarga Vº Bº con `usePresidenteVigente`, oculto si `useHasCapability(userRole, "CERTIFICATION")` es false. Demo default `userRole="SECRETARIO"` hasta sprint de auth real.
+- `src/components/secretaria/EmitirCertificacionButton.tsx` — ejecuta los 3 pasos en cadena, precarga Vº Bº con `usePresidenteVigente`, oculto si `useHasCapability(userRole, "CERTIFICATION")` es false. El rol se resuelve del usuario real vía `useCurrentUserRole` (`primaryRole`); subsiste un default `"SECRETARIO"` como fallback demo inofensivo.
 - `src/hooks/useAuthorityEvidence.ts` — añadido `usePresidenteVigente(entityId, bodyId?)` para precargar Vº Bº en SA.
 - `src/hooks/useActas.ts` — añadido `useAgreementIdsForMinute(minuteId)` + extendido `ActaRow` con `body_id` + `entity_id`.
 - `src/pages/secretaria/ActaDetalle.tsx` — botón montado con guard `id && acta.entity_id`.
@@ -613,7 +613,7 @@ Probes de existencia vs Cloud para las 4 RPCs — aceptan cualquier error que NO
 - ~~2 PRESIDENTEs VIGENTEs para el mismo body_id~~ — **Resuelto 2026-04-24**: duplicados eliminados. Quedan `00000000-...-0102` (Antonio Ríos, PRESIDENTE) y `00000000-...-0101` (Lucía Paredes, SECRETARIO). `usePresidenteVigente` sin ambigüedad.
 - Actas legacy (2 demo pre-F8.1) tienen `meeting_resolutions` vacío → `p_agreements_certified = []`. La RPC acepta arrays vacíos. Actas nuevas creadas via pipeline F5→F6→F7 sí tienen resolutions.
 - `snapshot_id` NULL en actas legacy → RPC usa `COALESCE 'NO_SNAPSHOT_HASH'` como gate. Sin WORM retroactivo (intencional — preservaría la cadena).
-- `userRole="SECRETARIO"` hardcodeado en el botón F9. La integración con `useUserRole` + `auth.users` es del sprint de auth real.
+- El rol del botón F9 ya se resuelve del usuario real (`useCurrentUserRole` → `primaryRole`, p.ej. en `ActaDetalle.tsx`/`AcuerdoSinSesionDetalle.tsx`); subsiste un default `"SECRETARIO"` como fallback demo. Pendiente: ciclo de estados post-CERTIFIED (INSTRUMENTED/FILED/REGISTERED/PUBLISHED) solo poblado por seed.
 
 **Tests: 356/356 pass (59 skipped por RPC `execute_sql` no expuesto), tsc 0 errors, build clean.**
 
@@ -755,17 +755,16 @@ Refactor de la consola de plantillas que consolida tres vistas dispersas (`/secr
 
 **Realidad RBAC en demo:**
 - El usuario demo (`demo@arga-seguros.com`) es **SECRETARIO**, no ADMIN_TENANT.
-- Las pestañas Importar y Validación quedan **bloqueadas con `AlertBanner`** en demo a menos que se siembre un user con rol ADMIN_TENANT en `rbac_user_roles`.
-- Los e2e específicos de RBAC (`e2e/24-secretaria-gestor-rbac.spec.ts`) cubren ambos caminos.
+- Las pestañas Importar y Validación quedan **ocultas del nav** (filtradas en `visibleTabs` vía `useTabAccess`, `GestorPlantillas.tsx`) + **toast de redirección** si se accede por URL directa, en demo a menos que se siembre un user con rol ADMIN_TENANT en `rbac_user_roles`.
+- Los e2e específicos de RBAC (`e2e/24-secretaria-gestor-rbac.spec.ts`) cubren el camino SECRETARIO; ADMIN_TENANT/COMPLIANCE quedan fuera de scope del spec.
 
 **Redirect 301:**
 - `/secretaria/plantillas-tracker` → `/secretaria/gestor-plantillas?tab=metricas` (registrado en `src/App.tsx` ~línea 212).
 - `/admin/PlantillasMantenimiento` → **eliminada por completo**. Su contenido vive ahora en el tab `auditoria`.
 
-**Plantillas P0 conocidas (toleradas con warning):**
-- `e3697ad9-...` — `FUSION_ESCISION` (badge `ACTIVE_WITH_P0`).
-- `edd5c389-...` — `RATIFICACION_ACTOS` (badge `ACTIVE_WITH_P0`).
-- Ambas emiten `WARNING` runtime cuando se usan, pero no se bloquean. Pendientes de corrección por **Comité Legal de Plantillas**. Lista canónica en `src/lib/secretaria/template-admin/known-p0.ts`.
+**Plantillas P0 conocidas — RESUELTAS (2026-05-14):**
+- La lista canónica `src/lib/secretaria/template-admin/known-p0.ts` (`KNOWN_P0_TEMPLATES`) está **vacía (`[]`)** desde el 2026-05-14.
+- Histórico: `FUSION_ESCISION` (`e3697ad9-...`) y `RATIFICACION_ACTOS` (`edd5c389-...`) fueron toleradas con `WARNING` (badge `ACTIVE_WITH_P0`); ambas se corrigieron (RATIFICACION_ACTOS saneada y condicional `requiere_experto` añadido en FUSION_ESCISION). Ya no hay plantillas P0 toleradas.
 
 **Library canónica `src/lib/secretaria/template-admin/`:**
 Esta es la **ubicación canónica** para futuras adiciones a las reglas del Gate PRE (estructurales y semánticas), el importer JSON, el cálculo de functional key y los helpers de Supabase asociados. Cualquier nueva regla de validación debe añadirse a `gate-pre.ts` o `gate-pre-semantic.ts` con su test unitario asociado. NO duplicar lógica de gate en componentes UI; los tabs consumen exclusivamente del servicio.
@@ -961,7 +960,6 @@ export function useXxx(param?: string) {
   <Route path="/secretaria/acuerdos-sin-sesion/nuevo"            element={<AcuerdoSinSesionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/co-aprobacion"    element={<CoAprobacionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/solidario"        element={<SolidarioStepper />} />
-  <Route path="/secretaria/acuerdos-sin-sesion/expediente"       element={<ExpedienteSinSesionStepper />} />
   <Route path="/secretaria/acuerdos-sin-sesion/:id"              element={<AcuerdoSinSesionDetalle />} />
   <Route path="/secretaria/decisiones-unipersonales"             element={<DecisionesUnipersonales />} />
   <Route path="/secretaria/decisiones-unipersonales/nueva"       element={<DecisionUnipersonalStepper />} />
@@ -989,9 +987,13 @@ export function useXxx(param?: string) {
   <Route path="/secretaria/sociedades/:id/transmision"   element={<TransmisionStepper />} />
   <Route path="/secretaria/sociedades/:id/admin/nuevo"   element={<DesignarAdminStepper />} />
   <Route path="/secretaria/sociedades/:id/reglas"        element={<ReglasAplicables />} />
+  <Route path="/secretaria/cargos/nuevo"                 element={<DesignarAdminStepper />} />        {/* alta de cargo cross-context */}
   <Route path="/secretaria/personas"                     element={<PersonasList />} />
   <Route path="/secretaria/personas/nueva"               element={<PersonaNuevaStepper />} />
+  <Route path="/secretaria/personas/importar"            element={<PersonasImportStepper />} />
   <Route path="/secretaria/personas/:id"                 element={<PersonaDetalle />} />
+  <Route path="/secretaria/personas/:id/representante/nuevo" element={<RepresentanteAdminPJStepper />} />  {/* PJ → representante PF */}
+  <Route path="/secretaria/representaciones/nueva"       element={<RepresentacionPuntualStepper />} />
 </Route>
 ```
 

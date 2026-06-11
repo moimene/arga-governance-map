@@ -57,12 +57,15 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
   if (input.esCotizada) {
     resultado.push({
       id: 'BORDE_COTIZADA_LMV_HECHO_RELEVANTE',
-      nombre: 'Cotizada — Verificar hecho relevante CNMV',
+      nombre: 'Cotizada — Otra información relevante CNMV',
       condicion: 'esCotizada === true',
       aplica: true,
       status: 'PENDIENTE',
       severity: 'WARNING',
-      resolucion: 'Verificar si el acuerdo constituye hecho relevante (art. 228 LMV). Comunicar a CNMV si procede.',
+      // ITEM-055: el TRLMV (RDL 4/2015, art. 228 "hecho relevante") quedó derogado
+      // por la Ley 6/2023 (LMVSI); la categoría se desdobla en información
+      // privilegiada (art. 17 MAR) y otra información relevante (Ley 6/2023).
+      resolucion: 'Verificar si el acuerdo constituye otra información relevante (Ley 6/2023, LMVSI) o información privilegiada (art. 17 MAR). Comunicar a CNMV si procede.',
     });
     resultado.push({
       id: 'BORDE_COTIZADA_LMV_IPDD',

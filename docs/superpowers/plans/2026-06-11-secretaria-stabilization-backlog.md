@@ -535,10 +535,10 @@
 | ID | Área | Verif. | Título | Estado |
 |---|---|---|---|---|
 | ITEM-054 | A1 | — | 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo | BLOQUEADO-LEGAL |
-| ITEM-055 | A10 | — | Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023 | BLOQUEADO-LEGAL |
+| ITEM-055 | A10 | — | Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023 | HECHO (Ola1) |
 | ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | PENDIENTE |
 | ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
-| ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | BLOQUEADO-LEGAL |
+| ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | HECHO (Ola1) |
 | ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | PENDIENTE |
 | ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | PENDIENTE |
 | ITEM-061 | A11 | — | SociedadNuevaStepper: 11 pasos con draft solo-local (se pierde al refrescar) y píldoras que saltan validación por paso | PENDIENTE |
@@ -552,7 +552,7 @@
 | ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | PENDIENTE |
 | ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | PENDIENTE |
 | ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | PENDIENTE |
-| ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | PENDIENTE |
+| ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
 | ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
 | ITEM-074 | A13 | — | Terminología 'resolución' vs 'acuerdo' inconsistente en la UI de ReunionStepper | PENDIENTE |
 | ITEM-075 | A13 | — | Toasts de error no accionables que descartan el detalle disponible | PENDIENTE |
@@ -607,7 +607,7 @@
 
 ### ITEM-055 [P2] Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (Ola 1; cita LMV actualizada: TRLMV derogado por Ley 6/2023)· **REQUIERE LEGAL**
 - **Descripción:** El borde de cotizadas (DL-2, correctamente solo-WARNING) cita «art. 228 LMV» y la categoría «hecho relevante». El RDL 4/2015 (TRLMV) fue derogado por la disposición derogatoria única.1.a) de la Ley 6/2023, de 17 de marzo, de los Mercados de Valores y de los Servicios de Inversión (confirmado en metadatos BOE), y la categoría «hecho relevante» fue sustituida desde 2020 por «información privilegiada» (art. 17 MAR, que el borde contiguo SÍ cita bien) y «otra información relevante» (OIR). Para el cliente asegurador cotizado objetivo, mostrar una referencia derogada en la advertencia LMV daña la credibilidad del demo.
 - **Evidencia:** src/lib/rules-engine/bordes-no-computables.ts:59-66. BOE API legislacion-consolidada id BOE-A-2015-11435: «Norma derogada por la disposición derogatoria única.1.a) de la Ley 6/2023, de 17 de marzo». Pendiente de contraste fino: el artículo exacto de la Ley 6/2023 para OIR (no verificado bloque a bloque).
 - **Archivos:** src/lib/rules-engine/bordes-no-computables.ts
@@ -631,7 +631,7 @@
 
 ### ITEM-058 [P2] Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación
 
-- **Área:** A11 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A11 · **Estado:** HECHO (Ola 1; ya correcto en código — cita arts. 210 y 233.2.c LSC; backlog stale)· **REQUIERE LEGAL**
 - **Descripción:** El checkbox de Co-aprobación dice 'Los estatutos permiten adopción sin sesión (art. 160 LSC)'. El art. 160 LSC regula las competencias de la junta general, no la adopción de acuerdos sin sesión. Para acuerdos del consejo por votación por escrito y sin sesión la base es el art. 248.2 LSC (SA) y art. 100 RRM; para junta, el régimen es distinto. La cita errónea aparece en un control que condiciona la evaluación del motor (estatutosPermitenSinSesion).
 - **Evidencia:** CoAprobacionStepper.tsx:241 — label literal 'Los estatutos permiten adopción sin sesión (art. 160 LSC)'. El mismo archivo cita correctamente art. 210 LSC en línea 183 para el régimen k-de-n.
 - **Archivos:** src/pages/secretaria/CoAprobacionStepper.tsx
@@ -746,7 +746,7 @@
 
 ### ITEM-072 [P2] Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente
 
-- **Área:** A13 · **Estado:** PENDIENTE
+- **Área:** A13 · **Estado:** HECHO (Ola 1; "el Registro Mercantil" en stepper + fixtures)
 - **Descripción:** La decisión 2026-05-12 prohíbe usar 'Registro' en código/copies/tests para referirse al Registro Mercantil mientras exista la sección de sidebar homónima. Hay copies activos que lo incumplen: TramitadorStepper ('este entorno demo no realiza envío telemático al Registro', 'Subsanación requerida por el Registro', 'El Registro ha solicitado subsanación') y los fixtures de plantillas legales ('el Registro solicito subsanacion...', 'los extremos requeridos por el Registro'), más un comentario en cargo-validation. La colisión es real: la sección sidebar se llama 'Registro público' y el órgano se menciona como 'el Registro' en la misma pantalla.
 - **Evidencia:** src/pages/secretaria/TramitadorStepper.tsx:1481, :1636, :1639; src/lib/secretaria/legal-template-fixtures.ts:585, :596, :567; src/lib/secretaria/cargo-validation.ts:151. Restricción documentada en CLAUDE.md sección 'Taxonomía sidebar Secretaría — decisión 2026-05-12'.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/TramitadorStepper.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/legal-template-fixtures.ts
@@ -1109,11 +1109,11 @@
 |---|---|---|---|---|
 | ITEM-116 | A1 | ✅ | DL-2 incompleta en runtime: esCotizada se acepta pero ningún engine cableado lo consume, y los hooks lo hardcodean de forma contradictoria | PENDIENTE |
 | ITEM-117 | A1 | — | ~10 módulos del motor son dead code sin consumidor runtime (incl. DL-2 y DL-4 canónicos) | PENDIENTE |
-| ITEM-118 | A1 | — | INDEX.md del motor desactualizado y contradictorio con DL-2 | PENDIENTE |
+| ITEM-118 | A1 | — | INDEX.md del motor desactualizado y contradictorio con DL-2 | HECHO (Ola1) |
 | ITEM-119 | A1 | — | DL-4 duplicado: implementación canónica muerta en plantillas-engine vs implementación inline divergente en ConvocatoriasStepper | PENDIENTE |
 | ITEM-120 | A1 | — | Ruido de smoke-tests en el marco normativo de la entidad canónica ARGA (incl. override UNANIMIDAD legalmente inadmisible) | PENDIENTE |
-| ITEM-121 | A10 | — | CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía | PENDIENTE |
-| ITEM-122 | A11 | — | CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos | PENDIENTE |
+| ITEM-121 | A10 | — | CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía | HECHO (Ola1) |
+| ITEM-122 | A11 | — | CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos | HECHO (Ola1) |
 | ITEM-123 | A11 | — | TransmisionStepper: fallback cliente no transaccional (código hoy muerto) que podría perder títulos a mitad de operación | PENDIENTE |
 | ITEM-124 | A11 | — | Cobertura e2e ausente en 4 steppers de capital/personas y en la ruta sociedad de DesignarAdmin | PENDIENTE |
 | ITEM-125 | A11 | — | Duplicación estructural: 3 familias de shell de stepper y componentes Input/Field/Checkbox copiados idénticos | PENDIENTE |
@@ -1122,16 +1122,16 @@
 | ITEM-128 | A12 | — | Doble implementación del pipeline de despacho: la librería src/lib/comms solo la consumen los tests; la Edge Function lo reimplementa inline y ya diverge | PENDIENTE |
 | ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | PENDIENTE |
 | ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | PENDIENTE |
-| ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | PENDIENTE |
+| ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | PENDIENTE |
 | ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | PENDIENTE |
 | ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | PENDIENTE |
-| ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | PENDIENTE |
+| ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
 | ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | PENDIENTE |
 | ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | PENDIENTE |
 | ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | PENDIENTE |
-| ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | PENDIENTE |
+| ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |
 | ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |
 | ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | PENDIENTE |
 | ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | PENDIENTE |
@@ -1139,7 +1139,7 @@
 | ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | PENDIENTE |
 | ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
 | ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | PENDIENTE |
-| ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | PENDIENTE |
+| ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
 | ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | PENDIENTE |
 | ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | PENDIENTE |
 | ITEM-151 | A9 | — | CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING | BLOQUEADO-LEGAL |
@@ -1163,7 +1163,7 @@
 
 ### ITEM-118 [P3] INDEX.md del motor desactualizado y contradictorio con DL-2
 
-- **Área:** A1 · **Estado:** PENDIENTE
+- **Área:** A1 · **Estado:** HECHO (Ola 1; INDEX.md BORDE_COTIZADA + CLAUDE.md P0 reconciliados)
 - **Descripción:** src/lib/rules-engine/INDEX.md describe BORDE_COTIZADA como 'FUERA_DE_ALCANCE (bloqueo total, retorna immediate)', exactamente lo contrario de la implementación vigente (WARNING sin early-return, DL-2 resuelta 2026-04-19) — un lector (humano o IA) que confíe en el índice reintroduciría el bloqueo de cotizadas. Además lista como consumidores de integración archivos inexistentes (src/hooks/useMotorReglas.ts, src/domain/agreements/validation.ts, backend/app/domain/secretaria/motor_service.py), referencia una ruta de workspace ajena (/sessions/determined-confident-pascal/...) y solo documenta 4 de los ~27 módulos. CLAUDE.md también está desfasado en sentido inverso: documenta como toleradas las plantillas P0 FUSION_ESCISION y RATIFICACION_ACTOS, pero known-p0.ts cerró la lista a cero el 2026-05-14 (ya corregidas).
 - **Evidencia:** src/lib/rules-engine/INDEX.md:54 ('BORDE_COTIZADA — Entidad cotizada → FUERA_DE_ALCANCE (bloqueo total, retorna immediate)') vs src/lib/rules-engine/bordes-no-computables.ts:54-104 (WARNING + 'NO return early'); INDEX.md:263-267 consumidores inexistentes (ls confirma que src/hooks/useMotorReglas.ts y src/domain no existen); src/lib/secretaria/template-admin/known-p0.ts:15 (KNOWN_P0_TEMPLATES = [] 'lista cerrada a cero tras corregir RATIFICACION_ACTOS y añadir condicional requiere_experto en FUSION_ESCISION').
 - **Archivos:** src/lib/rules-engine/INDEX.md, src/lib/rules-engine/bordes-no-computables.ts, src/lib/secretaria/template-admin/known-p0.ts, CLAUDE.md
@@ -1187,7 +1187,7 @@
 
 ### ITEM-121 [P3] CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía
 
-- **Área:** A10 · **Estado:** PENDIENTE
+- **Área:** A10 · **Estado:** HECHO (Ola 1; CLAUDE.md P0 templates = lista vacía 2026-05-14)
 - **Descripción:** El CLAUDE.md afirma que las plantillas e3697ad9 (FUSION_ESCISION) y edd5c389 (RATIFICACION_ACTOS) siguen ACTIVE_WITH_P0 emitiendo WARNING runtime y «pendientes de corrección por Comité Legal». Sin embargo known-p0.ts declara: «Estado 2026-05-14: lista cerrada a cero tras corregir RATIFICACION_ACTOS y añadir condicional requiere_experto en FUSION_ESCISION» y KNOWN_P0_TEMPLATES = []. Respuesta a la pregunta del encargo: NO requieren ya redacción legal — están corregidas; lo que queda es deuda documental. Riesgo menor: auditores o agentes futuros que lean CLAUDE.md re-reportarán un problema inexistente (como casi ocurre en esta auditoría).
 - **Evidencia:** src/lib/secretaria/template-admin/known-p0.ts (lista vacía, comentario fechado 2026-05-14) vs CLAUDE.md sección 'Plantillas P0 conocidas (toleradas con warning)'.
 - **Archivos:** src/lib/secretaria/template-admin/known-p0.ts, CLAUDE.md
@@ -1195,7 +1195,7 @@
 
 ### ITEM-122 [P3] CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos
 
-- **Área:** A11 · **Estado:** PENDIENTE
+- **Área:** A11 · **Estado:** HECHO (Ola 1; tabla rutas CLAUDE.md: -ExpedienteSinSesionStepper +4 rutas reales)
 - **Descripción:** La tabla de rutas de CLAUDE.md incluye /secretaria/acuerdos-sin-sesion/expediente → ExpedienteSinSesionStepper, pero ni la ruta ni el archivo existen, y el test de readiness lo afirma explícitamente como invariante (la eliminación fue deliberada). A la inversa, CLAUDE.md no documenta rutas reales de App.tsx: /secretaria/cargos/nuevo (DesignarAdminStepper), /secretaria/personas/importar (PersonasImportStepper), /secretaria/personas/:id/representante/nuevo (RepresentanteAdminPJStepper) y /secretaria/representaciones/nueva (RepresentacionPuntualStepper).
 - **Evidencia:** src/test/secretaria/secretaria-demo-readiness-routes.test.ts:11-12 (expect not.toContain('ExpedienteSinSesionStepper') + existsSync===false); src/App.tsx:264-271 (rutas reales no documentadas); CLAUDE.md sección 'Rutas Secretaría' (línea con ExpedienteSinSesionStepper).
 - **Archivos:** CLAUDE.md, src/App.tsx, src/test/secretaria/secretaria-demo-readiness-routes.test.ts
@@ -1268,7 +1268,7 @@
 
 ### ITEM-131 [P3] CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real
 
-- **Área:** A13 · **Estado:** PENDIENTE
+- **Área:** A13 · **Estado:** HECHO (Ola 1; taxonomía sidebar real en CLAUDE.md + P0)
 - **Descripción:** Dos derivas de documentación: (1) CLAUDE.md afirma que FUSION_ESCISION y RATIFICACION_ACTOS están 'toleradas con warning' pendientes del Comité Legal, pero known-p0.ts declara la lista cerrada a cero desde 2026-05-14 tras corregir RATIFICACION_ACTOS y añadir el condicional requiere_experto a FUSION_ESCISION — la deuda ya no existe (resuelta sin necesidad de redacción legal adicional); (2) la taxonomía de secciones documentada (CONTEXTO/EXPEDIENTES/REGISTRO/CONFIGURACIÓN Y REGLAS) no coincide con la implementada (Inicio/Adopción/Documentación/Registro público/Libros y registros sociales/Sociedades y personas/Configuración y reglas).
 - **Evidencia:** src/lib/secretaria/template-admin/known-p0.ts:15 (KNOWN_P0_TEMPLATES = [] con comentario 'lista cerrada a cero' 2026-05-14) vs CLAUDE.md sección 'Plantillas P0 conocidas (toleradas con warning)'. src/components/secretaria/shell/navigation.ts:32-93 vs CLAUDE.md 'Taxonomía sidebar Secretaría — decisión 2026-05-12'.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/template-admin/known-p0.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/CLAUDE.md
@@ -1309,7 +1309,7 @@
 
 ### ITEM-136 [P3] Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío
 
-- **Área:** A2 · **Estado:** PENDIENTE
+- **Área:** A2 · **Estado:** HECHO (Ola 1; CLAUDE.md P0 reconciliado; UNIQUE constraint = residual P3 migración)
 - **Descripción:** Estado real MEJOR que el documentado: known-p0.ts declara lista cerrada a cero desde 2026-05-14. Verificado en Cloud: FUSION_ESCISION v2.0.0 (e3697ad9) incluye el condicional requiere_experto y referencia correcta al RDL 5/2023 (régimen vigente de modificaciones estructurales); RATIFICACION_ACTOS v1.1.0 (edd5c389) exige actos individualizados con fundamento en art. 1261 CC y arts. 234-235 LSC. Ninguna requiere redacción legal nueva. CLAUDE.md (sección Sprint 1 Gestor de Plantillas) sigue listándolas como 'toleradas con warning' y badge ACTIVE_WITH_P0 — induce a error a quien retome el proyecto. Adicional menor: materia_template_binding tiene filas duplicadas exactas (CONTRATOS_SOCIO_UNICO_SOCIEDAD, EXCLUSION_SOCIO, PRESTACIONES_ACCESORIAS, TRANSMISION_PARTICIPACIONES ×2; MODIFICACION_ESTATUTOS ×3 con priorities 0/0/10) — falta UNIQUE(materia, template_id).
 - **Evidencia:** src/lib/secretaria/template-admin/known-p0.ts:15 (KNOWN_P0_TEMPLATES = []); SQL: capa1 de e3697ad9 contiene 'requiere_experto' y RDL 5/2023; capa1 de edd5c389 contiene cláusula de individualización art. 1261 CC; SQL materia_template_binding → filas duplicadas listadas. CLAUDE.md sección 'Plantillas P0 conocidas (toleradas con warning)'.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/template-admin/known-p0.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/CLAUDE.md
@@ -1341,7 +1341,7 @@
 
 ### ITEM-140 [P3] Documentación CLAUDE.md desactualizada respecto al estado real del gestor
 
-- **Área:** A3 · **Estado:** PENDIENTE
+- **Área:** A3 · **Estado:** HECHO (Ola 1; CLAUDE.md gestor: visibleTabs+toast, no AlertBanner)
 - **Descripción:** Tres drifts verificados: (1) CLAUDE.md dice que las tabs Importar/Validación quedan 'bloqueadas con AlertBanner' para el demo — en el código actual las tabs se ocultan y solo hay un toast de redirección, sin AlertBanner; (2) dice que 'e2e/24-secretaria-gestor-rbac.spec.ts cubre ambos caminos' RBAC — el propio spec declara fuera de scope la cobertura ADMIN_TENANT/COMPLIANCE (solo testea el camino SECRETARIO); (3) mantiene a FUSION_ESCISION y RATIFICACION_ACTOS como 'plantillas P0 toleradas con badge ACTIVE_WITH_P0' con 'lista canónica en known-p0.ts' — known-p0.ts está vacío desde 2026-05-14 y el badge ya no se muestra para ninguna plantilla. Además el gestor tiene 8 tabs (existe 'configuracion') pero CLAUDE.md documenta 7.
 - **Evidencia:** CLAUDE.md secciones 'Realidad RBAC en demo' y 'Plantillas P0 conocidas'; e2e/24-secretaria-gestor-rbac.spec.ts:14-16 ('cobertura RBAC completa... queda fuera de scope'); src/lib/secretaria/template-admin/known-p0.ts:15 (KNOWN_P0_TEMPLATES = []); src/pages/secretaria/GestorPlantillas.tsx:34-43 (8 tabs incl. configuracion).
 - **Archivos:** CLAUDE.md, src/lib/secretaria/template-admin/known-p0.ts, e2e/24-secretaria-gestor-rbac.spec.ts
@@ -1405,7 +1405,7 @@
 
 ### ITEM-148 [P3] Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor
 
-- **Área:** A7 · **Estado:** PENDIENTE
+- **Área:** A7 · **Estado:** HECHO (Ola 1; CLAUDE.md auth role: useCurrentUserRole; ciclo post-CERTIFIED = residual)
 - **Descripción:** Verificación de la deuda conocida: ActaDetalle (línea 774) y AcuerdoSinSesionDetalle (línea 256) ya pasan userRole={primaryRole} desde useCurrentUserRole(), y en Cloud el usuario demo (85e24c66) tiene fila activa en rbac_user_roles con role_code SECRETARIO y user_profiles.role_code=SECRETARIO — el rol real se resuelve sin sprint de auth; solo queda el default de prop userRole='SECRETARIO' en EmitirCertificacionButton.tsx:72 como fallback inofensivo (y el fallback 'SECRETARIO' en useCurrentUserRole.ts:62 que enmascararía un usuario sin rol). CLAUDE.md sigue afirmando 'userRole=SECRETARIO hardcodeado en el botón F9... integración con useUserRole es del sprint de auth real' — desactualizado. Relacionado con el ciclo: tras CERTIFIED ningún flujo escribe INSTRUMENTED/FILED/REGISTERED/PUBLISHED (registrar escritura/seguimiento del tramitador no toca agreements.status; las únicas filas FILED/INSTRUMENTED en Cloud son seed), de modo que la mitad final del timeline de 8 estados es hoy solo representable con datos sembrados, no operables.
 - **Evidencia:** src/pages/secretaria/ActaDetalle.tsx:769-776 (userRole={primaryRole}); src/pages/secretaria/AcuerdoSinSesionDetalle.tsx:252-257; Cloud SQL: rbac_user_roles+rbac_roles → SECRETARIO is_active=true para demo@arga-seguros.com; grep migrations/src: ningún writer de INSTRUMENTED/FILED/REGISTERED/PUBLISHED fuera de seeds; Cloud: FILED 1, INSTRUMENTED 1 (seed).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/CLAUDE.md, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/components/secretaria/EmitirCertificacionButton.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useCurrentUser.ts

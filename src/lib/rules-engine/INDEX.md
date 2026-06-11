@@ -51,7 +51,7 @@ evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable[]
 ```
 
 **Los 7 bordes:**
-1. **BORDE_COTIZADA** — Entidad cotizada → FUERA_DE_ALCANCE (bloqueo total, retorna immediate)
+1. **BORDE_COTIZADA** — Entidad cotizada → WARNING + advertencias LMV (DL-2: evalúa LSC y continúa, no bloquea)
 2. **BORDE_CONSENTIMIENTO_CLASE** — Consentimiento de clase en materias estatutarias
    - Sin perimetro definido → BLOCKING
    - Con perimetro pero no resuelto → BLOCKING

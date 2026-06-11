@@ -1633,10 +1633,10 @@ function TramitadorNuevo() {
             <>
               <div className="flex items-center gap-2 text-sm font-semibold text-[var(--status-warning)]">
                 <AlertTriangle className="h-4 w-4" />
-                Subsanación requerida por el Registro
+                Subsanación requerida por el Registro Mercantil
               </div>
               <p className="text-xs text-[var(--g-text-secondary)]">
-                El Registro ha solicitado subsanación. Indique el motivo de la respuesta y los documentos adjuntos.
+                El Registro Mercantil ha solicitado subsanación. Indique el motivo de la respuesta y los documentos adjuntos.
               </p>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-[var(--g-text-primary)]">
