@@ -342,6 +342,37 @@ describe('evaluarConvocatoria', () => {
     expect(result.antelacionDiasRequerida).toBe(40);
   });
 
+  it('ITEM-005: un override de QUÓRUM no contamina la antelación de convocatoria', () => {
+    const pack = createTestPack({
+      convocatoria: {
+        ...createTestPack().convocatoria,
+        antelacionDias: {
+          SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+        },
+      },
+    });
+
+    const quorumOverride: RuleParamOverride = {
+      id: 'ov-q33',
+      entity_id: 'ent-001',
+      materia: 'PRUEBA',
+      clave: 'constitucion_quorum_pct',
+      valor: 33,
+      fuente: 'LEY',
+      referencia: 'art. 194 LSC',
+    };
+
+    const result = evaluarConvocatoria(
+      { ...defaultInput, tipoSocial: 'SA' },
+      [pack],
+      [quorumOverride]
+    );
+
+    // Antes: 33 > 30 → la antelación se inflaba a 33 días.
+    expect(result.antelacionDiasRequerida).toBe(30);
+  });
+
   // ================================================================
   // Test 8: Documentos — unión de obligatorios de todos los packs
   // ================================================================

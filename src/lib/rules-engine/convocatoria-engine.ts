@@ -390,8 +390,15 @@ function calcularAntelacion(
     }
   }
 
-  // Apply overrides using jerarquia_normativa
-  const resolved = resolverReglaEfectiva(maxAntelacion, overrides, 'mayor');
+  // ITEM-005: solo overrides de clave de ANTELACIÓN. resolveRulePackForMatter
+  // filtra por materia pero no por clave, y el modo 'mayor' aplicaba cualquier
+  // override numérico superior (p.ej. constitucion_quorum_pct=33 inflaba la
+  // antelación de 30 a 33 días). Espejo del patrón isQuorumOverride de
+  // constitucion-engine.
+  const antelacionOverrides = overrides.filter((override) =>
+    String(override.clave ?? '').toUpperCase().includes('ANTELACION')
+  );
+  const resolved = resolverReglaEfectiva(maxAntelacion, antelacionOverrides, 'mayor');
 
   if (typeof resolved.valor === 'number') return resolved.valor;
   return defaultForOrgano();

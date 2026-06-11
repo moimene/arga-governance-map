@@ -343,3 +343,22 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   9/15 no delega, 10/15 sí; grafía total_miembros/2 sobre concurrentes); 2037 tests 0 fail;
   gates verdes; e2e 05+18 6/6; migración alineada.
 - **Residual ITEM-019:** fallback de capital_total al peso presente sigue pendiente (mitad restante).
+
+### Iteración 18 — ITEM-004/005 [P1] Cluster overrides estatutarios (HECHO)
+
+- **ITEM-004:** evaluarVotacion ignoraba los overrides de clave votacion.mayoria pese a que la
+  matriz efectiva y el rulesetSnapshotId los certificaban como aplicados (trazabilidad de una
+  evaluación que no ocurría; el único módulo que los resolvía, effective-rule.ts, es huérfano).
+  Fix: Gate 3 aplica los overrides de mayoría con contrato "nunca silencio" — fórmula evaluable →
+  SE APLICA (nodo OK con sustitución trazada); unanimidad estatutaria → NO aplicada con WARNING
+  (inadmisible, art. 200.1 LSC — caso real en Cloud para ARGA/MODIFICACION_ESTATUTOS); formato no
+  evaluable (majority_code desconocido) → NO aplicada con WARNING accionable.
+- **ITEM-005:** calcularAntelacion pasaba TODOS los overrides de la materia a resolverReglaEfectiva
+  en modo 'mayor': un constitucion_quorum_pct=33 (caso real Cloud, ARGA Portugal) inflaba la
+  antelación de 30 a 33 días. Fix: filtro por clave ANTELACION (espejo de isQuorumOverride).
+- **Verificación:** 4 regresiones nuevas (override reforzado aplicado y trazado; unanimidad
+  rechazada con pack vigente; formato no soportado explícito; quórum no contamina antelación);
+  2041 tests 0 fail; gates verdes; e2e 04+05+18 10/10.
+- **Residual anotado:** effective-rule.ts sigue sin consumidor UI (la proyección completa); el
+  motor ya aplica los overrides de mayoría directamente — decidir en el cierre si se cablea la
+  proyección o se retira el módulo (P3).

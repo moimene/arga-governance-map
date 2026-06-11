@@ -871,3 +871,82 @@ describe('G3: vetoActivo', () => {
     expect(result.blocking_issues).not.toContain('majority_not_achieved');
   });
 });
+
+// ============================================================
+// ITEM-004: overrides estatutarios de mayoría (votacion.mayoria)
+// ============================================================
+
+describe('ITEM-004: overrides estatutarios de mayoría', () => {
+  const packSimple = createBaseRulePack({
+    votacion: {
+      mayoria: {
+        SA: createBaseMajoritySpec({ formula: 'favor > contra' }),
+        SL: createBaseMajoritySpec({ formula: 'favor > contra' }),
+        CONSEJO: createBaseMajoritySpec({ formula: 'favor > contra' }),
+      },
+      abstenciones: 'no_cuentan',
+    },
+  });
+
+  it('aplica un override con fórmula reforzada y lo traza en el explain', () => {
+    const input = createBaseInput({
+      votos: { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 900, capital_total: 1000 },
+    });
+    const override = {
+      id: 'ov-mayoria',
+      entity_id: 'ent-001',
+      materia: input.materias[0],
+      clave: 'votacion.mayoria',
+      valor: 'favor >= 2/3_emitidos',
+      fuente: 'ESTATUTOS' as const,
+      referencia: 'Estatutos art. 21',
+    };
+
+    const sinOverride = evaluarVotacion(input, [packSimple]);
+    const conOverride = evaluarVotacion(input, [packSimple], [override]);
+
+    expect(sinOverride.mayoriaAlcanzada).toBe(true); // 5 > 4 (simple)
+    expect(conOverride.mayoriaAlcanzada).toBe(false); // 5 < 6 (2/3 de 9 emitidos)
+    expect(conOverride.explain.some((n) => n.regla === 'Override estatutario de mayoría aplicado')).toBe(true);
+  });
+
+  it('rechaza la unanimidad estatutaria (art. 200.1 LSC) con WARNING y evalúa la mayoría del pack', () => {
+    const input = createBaseInput({
+      votos: { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 900, capital_total: 1000 },
+    });
+    const override = {
+      id: 'ov-unanimidad',
+      entity_id: 'ent-001',
+      materia: input.materias[0],
+      clave: 'votacion.mayoria',
+      valor: { majority_code: 'UNANIMIDAD' },
+      fuente: 'ESTATUTOS' as const,
+      referencia: 'Estatutos art. 22',
+    };
+
+    const result = evaluarVotacion(input, [packSimple], [override]);
+
+    expect(result.mayoriaAlcanzada).toBe(true); // pack simple sigue mandando
+    expect(result.warnings.some((w) => w.includes('OVERRIDE_MAYORIA_INADMISIBLE'))).toBe(true);
+    expect(result.explain.some((n) => n.regla === 'Override estatutario de mayoría NO aplicado')).toBe(true);
+  });
+
+  it('un valor no evaluable queda explícitamente NO aplicado (nunca silencio)', () => {
+    const input = createBaseInput({
+      votos: { favor: 5, contra: 4, abstenciones: 0, en_blanco: 0, capital_presente: 900, capital_total: 1000 },
+    });
+    const override = {
+      id: 'ov-raro',
+      entity_id: 'ent-001',
+      materia: input.materias[0],
+      clave: 'votacion.mayoria',
+      valor: { majority_code: 'REFORZADA_CUSTOM' },
+      fuente: 'ESTATUTOS' as const,
+    };
+
+    const result = evaluarVotacion(input, [packSimple], [override]);
+
+    expect(result.mayoriaAlcanzada).toBe(true);
+    expect(result.warnings.some((w) => w.includes('OVERRIDE_MAYORIA_FORMATO_NO_SOPORTADO'))).toBe(true);
+  });
+});

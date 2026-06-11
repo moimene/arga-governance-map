@@ -361,8 +361,79 @@ export function evaluarVotacion(
     };
   }
 
-  // Use the majority spec (overrides would be applied at a higher level if needed)
-  const effectiveMajority = majoritySpec;
+  // ITEM-004: overrides estatutarios de mayoría (clave votacion.mayoria).
+  // Antes el motor los ignoraba pese a que la matriz efectiva y el
+  // rulesetSnapshotId los presentaban como aplicados — trazabilidad que
+  // certificaba una evaluación que no ocurría. Ahora cada override o bien
+  // SE APLICA (nodo OK) o bien queda explícitamente NO aplicado con motivo
+  // (nodo WARNING): nunca silencio.
+  let effectiveMajority = majoritySpec;
+  const majorityOverrides = overrides.filter((override) => {
+    const clave = String(override.clave ?? '');
+    return clave === 'votacion.mayoria' || clave.endsWith('.votacion.mayoria');
+  });
+  for (const override of majorityOverrides) {
+    if (override.materia && !input.materias.includes(override.materia)) continue;
+    const rawValor = override.valor as unknown;
+    const formulaCandidate =
+      typeof rawValor === 'string'
+        ? rawValor
+        : rawValor && typeof rawValor === 'object' &&
+            typeof (rawValor as { formula?: unknown }).formula === 'string'
+          ? (rawValor as { formula: string }).formula
+          : null;
+    const majorityCode =
+      rawValor && typeof rawValor === 'object'
+        ? String((rawValor as { majority_code?: unknown }).majority_code ?? '')
+        : '';
+
+    const exigeUnanimidad =
+      majorityCode.toUpperCase() === 'UNANIMIDAD' ||
+      (formulaCandidate ?? '').toLowerCase().includes('unanimidad');
+    if (exigeUnanimidad) {
+      // Art. 200.1 LSC: los estatutos pueden reforzar la mayoría "sin llegar
+      // a la unanimidad" (criterio análogo de la DGSJFP para la SA).
+      warnings.push(
+        'OVERRIDE_MAYORIA_INADMISIBLE: la exigencia estatutaria de unanimidad no es admisible (art. 200.1 LSC) — se evalúa la mayoría del pack'
+      );
+      explainNodes.push({
+        regla: 'Override estatutario de mayoría NO aplicado',
+        fuente: 'ESTATUTOS',
+        referencia: override.referencia,
+        resultado: 'WARNING',
+        mensaje:
+          'El override exige unanimidad, inadmisible como mayoría estatutaria (art. 200.1 LSC); se mantiene la mayoría del rule pack.',
+      });
+      continue;
+    }
+
+    if (formulaCandidate) {
+      explainNodes.push({
+        regla: 'Override estatutario de mayoría aplicado',
+        fuente: override.fuente ?? 'ESTATUTOS',
+        referencia: override.referencia,
+        resultado: 'OK',
+        mensaje: `Mayoría efectiva por override: ${formulaCandidate} (sustituye a "${effectiveMajority.formula}")`,
+      });
+      effectiveMajority = {
+        formula: formulaCandidate,
+        fuente: override.fuente ?? 'ESTATUTOS',
+        referencia: override.referencia,
+      };
+    } else {
+      warnings.push(
+        `OVERRIDE_MAYORIA_FORMATO_NO_SOPORTADO: ${JSON.stringify(override.valor)} — se evalúa la mayoría del pack`
+      );
+      explainNodes.push({
+        regla: 'Override estatutario de mayoría NO aplicado',
+        fuente: override.fuente ?? 'ESTATUTOS',
+        referencia: override.referencia,
+        resultado: 'WARNING',
+        mensaje:
+          'El valor del override no es una fórmula evaluable; se mantiene la mayoría del rule pack (revisar la publicación del marco normativo).',
+      });
+    }
+  }
 
   // Get abstenciones treatment from pack
   const abstractencionesTratamiento = matchedPacks[0]?.votacion.abstenciones ?? 'no_cuentan';

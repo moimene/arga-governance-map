@@ -30,8 +30,8 @@
 
 | ID | Área | Verif. | Título | Estado |
 |---|---|---|---|---|
-| ITEM-004 | A1 | ✅ | Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados | PENDIENTE |
-| ITEM-005 | A1 | ✅ | calcularAntelacion aplica overrides numéricos de cualquier clave: un override de quórum puede inflar la antelación de convocatoria | PENDIENTE |
+| ITEM-004 | A1 | ✅ | Overrides estatutarios de mayoría (votacion.mayoria) ignorados por el motor de votación pese a mostrarse como aplicados | HECHO |
+| ITEM-005 | A1 | ✅ | calcularAntelacion aplica overrides numéricos de cualquier clave: un override de quórum puede inflar la antelación de convocatoria | HECHO |
 | ITEM-006 | A1 | ✅ | Alias divergentes materia UI ↔ rule pack rompen el match silenciosamente (convocatoria emite con warning genérico sin reglas) | HECHO (residual: packs duplicados MOD_ESTATUTOS↔MODIFICACION_ESTATUTOS en ITEM-013 y lifecycle de cooptación, legal/data) |
 | ITEM-007 | A10 | ✅ | Art. 198 LSC mal codificado para SL: falta la condición de mayoría de votos emitidos y el suelo de 1/3 se trata como estricto | BLOQUEADO-LEGAL |
 | ITEM-008 | A10 | ✅ | Art. 201.2 LSC SA reforzada: el 2/3 se computa sobre votos emitidos en vez de sobre capital presente, y 9 packs codifican un 2/3 plano | BLOQUEADO-LEGAL |
