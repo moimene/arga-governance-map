@@ -718,6 +718,22 @@ export default function ConvocatoriasStepper() {
   const [habilitarSegunda, setHabilitarSegunda] = useState(false);
   const [fechaReunion2, setFechaReunion2] = useState("");
   const [horaReunion2, setHoraReunion2] = useState("10:30");
+  // ITEM-034 — art. 177 LSC: la segunda convocatoria es figura exclusiva de
+  // la junta de SA/SAU (177.1) y entre ambas reuniones debe mediar al menos
+  // un plazo de 24 horas (177.2).
+  const segundaConvocatoriaDisponible =
+    organoTipo === "JUNTA_GENERAL" && (tipoSocial === "SA" || tipoSocial === "SAU");
+  const segundaConvocatoriaGapWarning = (() => {
+    if (!habilitarSegunda || !fechaReunion || !fechaReunion2) return null;
+    const first = new Date(`${fechaReunion}T${horaReunion || "00:00"}:00`);
+    const second = new Date(`${fechaReunion2}T${horaReunion2 || "00:00"}:00`);
+    if (Number.isNaN(first.getTime()) || Number.isNaN(second.getTime())) return null;
+    const gapHours = (second.getTime() - first.getTime()) / 3_600_000;
+    if (gapHours < 24) {
+      return `Entre la primera y la segunda convocatoria debe mediar, por lo menos, un plazo de 24 horas (art. 177.2 LSC). Gap actual: ${gapHours.toFixed(1)} h.`;
+    }
+    return null;
+  })();
   const lastAutoLugarRef = useRef("");
 
   useEffect(() => {
@@ -1975,7 +1991,9 @@ export default function ConvocatoriasStepper() {
   // ── Submit ──
   async function handleEmitir() {
     if (!selectedBodyId || !fechaReunion || createConvocatoria.isPending) return;
-    const fecha2Iso = habilitarSegunda && fechaReunion2
+    // ITEM-034: la 2ª convocatoria solo se persiste cuando la figura existe
+    // (junta SA/SAU, art. 177.1 LSC).
+    const fecha2Iso = habilitarSegunda && segundaConvocatoriaDisponible && fechaReunion2
       ? new Date(`${fechaReunion2}T${horaReunion2}:00`).toISOString()
       : null;
     try {
@@ -2787,47 +2805,64 @@ export default function ConvocatoriasStepper() {
                 </div>
               )}
 
-              {/* Segunda convocatoria */}
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={habilitarSegunda}
-                    onChange={(e) => setHabilitarSegunda(e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-[var(--g-text-primary)]">
-                    Habilitar segunda convocatoria
-                  </span>
-                </label>
-                {habilitarSegunda && (
-                  <div className="mt-3 grid grid-cols-2 gap-4 pl-6">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                        Fecha segunda convocatoria
-                      </label>
-                      <input
-                        type="date"
-                        value={fechaReunion2}
-                        onChange={(e) => setFechaReunion2(e.target.value)}
-                        min={fechaReunion}
-                        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-[var(--g-text-primary)]">Hora</label>
-                      <input
-                        type="time"
-                        value={horaReunion2}
-                        onChange={(e) => setHoraReunion2(e.target.value)}
-                        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Segunda convocatoria — solo juntas de SA/SAU (art. 177.1 LSC;
+                  la DGSJFP la rechaza para SL y la figura no existe en
+                  consejo/comisiones). ITEM-034. */}
+              {organoTipo === "JUNTA_GENERAL" && (tipoSocial === "SA" || tipoSocial === "SAU") ? (
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={habilitarSegunda}
+                      onChange={(e) => setHabilitarSegunda(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-[var(--g-text-primary)]">
+                      Habilitar segunda convocatoria
+                    </span>
+                  </label>
+                  {habilitarSegunda && (
+                    <>
+                      <div className="mt-3 grid grid-cols-2 gap-4 pl-6">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                            Fecha segunda convocatoria
+                          </label>
+                          <input
+                            type="date"
+                            value={fechaReunion2}
+                            onChange={(e) => setFechaReunion2(e.target.value)}
+                            min={fechaReunion}
+                            className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[var(--g-text-primary)]">Hora</label>
+                          <input
+                            type="time"
+                            value={horaReunion2}
+                            onChange={(e) => setHoraReunion2(e.target.value)}
+                            className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          />
+                        </div>
+                      </div>
+                      {segundaConvocatoriaGapWarning ? (
+                        <div
+                          className="mt-3 ml-6 flex items-start gap-2 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3"
+                          style={{ borderRadius: "var(--g-radius-md)" }}
+                        >
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+                          <p className="text-xs text-[var(--g-text-primary)]">
+                            {segundaConvocatoriaGapWarning}
+                          </p>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

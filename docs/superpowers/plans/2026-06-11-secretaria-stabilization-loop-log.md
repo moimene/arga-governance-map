@@ -308,3 +308,17 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   permanente. Fix: 15 días para SL/SLU, 30 para SA/SAU — alineado con calcularAntelacion V2.
 - **Verificación:** 3 tests nuevos (cita SL, borde 31/07→30/06, casos fecha-a-fecha); 2032 tests
   0 fail; gates verdes; migración aplicada y alineada; e2e 04+18 6/6.
+
+### Iteración 16 — ITEM-034 [P1] Segunda convocatoria sin reglas del art. 177 LSC (HECHO)
+
+- **Evidencia:** el checkbox de 2ª convocatoria se ofrecía a cualquier tipo social y órgano
+  (incluidas SL — figura reservada a la SA, art. 177.1 — y consejos), el input permitía el mismo
+  día (defaults sugerían gap de 30 min vs 24h del 177.2) y el seed 3a829751 tenía gap de 2h.
+- **Fix:** (1) la 2ª convocatoria solo se ofrece y persiste para JUNTA_GENERAL de SA/SAU;
+  (2) warning vivo no-bloqueante cuando el gap 1ª↔2ª es inferior a 24h (art. 177.2, cita del
+  hallazgo verificada BOE), coherente con la filosofía non-blocking del paso; (3) migración
+  20260611200000: gap del seed corregido a 24h + sellado de las 3 CELEBRADA sin immutable_at
+  (residual de Iteración 11). Verificado en Cloud: gap 24.0h, 0 celebradas sin sello.
+- **Residual P3:** gate de motor V2 que consuma rule_config.second_call_gap_min_hours (hoy sin
+  consumidores) — el quórum de 2ª ya se evalúa vía Iteración 8.
+- **Verificación:** gates verdes (2032 tests 0 fail); e2e 04+18 6/6.
