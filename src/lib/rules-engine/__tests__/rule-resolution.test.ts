@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  MATERIA_PACK_ALIASES,
+  normalizeMateriaForRulePack,
   normalizeRuleLifecycleStatus,
   normalizeRulePackVersion,
   resolveRulePackForMatter,
@@ -295,5 +297,40 @@ describe("rule-resolution", () => {
       expect(result.ok).toBe(true);
       expect(result.rulePack?.organoTipo).toBe("JUNTA_GENERAL");
     });
+  });
+});
+
+describe("ITEM-006 — alias de materia UI ↔ rule pack", () => {
+  it("normaliza las grafías del catálogo al id canónico del pack", () => {
+    expect(normalizeMateriaForRulePack("APROBACION_PRESUPUESTOS")).toBe("APROBACION_PRESUPUESTO");
+    expect(normalizeMateriaForRulePack("CESION_GLOBAL")).toBe("CESION_GLOBAL_ACTIVO");
+    expect(normalizeMateriaForRulePack("REMUNERACION_CONSEJEROS")).toBe("RETRIBUCION_ADMIN");
+    expect(normalizeMateriaForRulePack("AMPLIACION_CAPITAL")).toBe("AUMENTO_CAPITAL");
+    expect(normalizeMateriaForRulePack("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe("SUPRESION_PREFERENTE");
+    // Identidad para materias canónicas.
+    expect(normalizeMateriaForRulePack("APROBACION_CUENTAS")).toBe("APROBACION_CUENTAS");
+  });
+
+  it("DISTRIBUCION_RESERVAS NO se alía a DIVIDENDO_A_CUENTA (arts. 273 vs 277 LSC)", () => {
+    expect(MATERIA_PACK_ALIASES.DISTRIBUCION_RESERVAS).toBeUndefined();
+    expect(normalizeMateriaForRulePack("DISTRIBUCION_RESERVAS")).toBe("DISTRIBUCION_RESERVAS");
+  });
+
+  it("resolveRulePackForMatter matchea vía alias y lo deja trazado en el explain", () => {
+    const result = resolveRulePackForMatter({
+      materia: "APROBACION_PRESUPUESTOS",
+      versions: [
+        {
+          pack_id: "APROBACION_PRESUPUESTO",
+          version: "1.0.0",
+          status: "ACTIVE",
+          payload: { materia: "APROBACION_PRESUPUESTO" },
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.rulePack?.packId).toBe("APROBACION_PRESUPUESTO");
+    expect(result.explain.some((node) => node.regla === "RULE_PACK_ALIAS")).toBe(true);
   });
 });

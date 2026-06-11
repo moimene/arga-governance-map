@@ -53,6 +53,8 @@ export { evaluarBordesNoComputables } from './bordes-no-computables';
 export { evaluarPactosParasociales } from './pactos-engine';
 export type { PactoParasocial, PactosEvalInput, PactoEvalResult, PactosEvalOutput, TipoPacto } from './pactos-engine';
 export {
+  MATERIA_PACK_ALIASES,
+  normalizeMateriaForRulePack,
   normalizeRuleLifecycleStatus,
   normalizeRulePackVersion,
   resolveRulePackForMatter,

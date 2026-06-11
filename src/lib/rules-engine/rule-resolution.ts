@@ -239,6 +239,32 @@ function makeExplain(regla: string, resultado: EvalSeverity, mensaje: string): E
   };
 }
 
+/**
+ * ITEM-006 — Alias de materia UI/catálogo → materia canónica de rule pack.
+ *
+ * Los ids del catálogo de agenda y de materia_catalog divergen de los ids
+ * sembrados en rule_packs; el match exacto fallaba en silencio y la
+ * convocatoria se emitía sin quórum/mayoría/antelación de pack (mismo patrón
+ * que ya rompió OPERACION_VINCULADA en su día). Solo se alían grafías de la
+ * MISMA materia jurídica — DISTRIBUCION_RESERVAS no se alía a
+ * DIVIDENDO_A_CUENTA (arts. 273 vs 277 LSC: operaciones distintas; queda como
+ * materia sin pack hasta que el Comité Legal apruebe uno propio).
+ */
+export const MATERIA_PACK_ALIASES: Record<string, string> = {
+  APROBACION_PRESUPUESTOS: "APROBACION_PRESUPUESTO",
+  CESION_GLOBAL: "CESION_GLOBAL_ACTIVO",
+  REMUNERACION_CONSEJEROS: "RETRIBUCION_ADMIN",
+  CAMBIO_DOMICILIO_SOCIAL: "TRASLADO_DOMICILIO_NACIONAL",
+  MODIFICACION_REGLAMENTO: "APROBACION_REGLAMENTO_CONSEJO",
+  AMPLIACION_CAPITAL: "AUMENTO_CAPITAL",
+  EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "SUPRESION_PREFERENTE",
+};
+
+export function normalizeMateriaForRulePack(materia: string): string {
+  const key = String(materia ?? "").trim().toUpperCase();
+  return MATERIA_PACK_ALIASES[key] ?? key;
+}
+
 export function resolveRulePackForMatter(input: RuleResolutionInput): RuleResolution {
   const now = input.now instanceof Date ? input.now : new Date(input.now ?? Date.now());
   const normalized = input.versions.map(normalizeRulePackVersion);
@@ -248,8 +274,24 @@ export function resolveRulePackForMatter(input: RuleResolutionInput): RuleResolu
 
   explain.push(makeExplain("RULE_PACK_LOOKUP", "OK", `Buscando rule pack para materia ${input.materia}.`));
 
+  const materiaCanonica = normalizeMateriaForRulePack(input.materia);
+  if (materiaCanonica !== input.materia) {
+    explain.push(
+      makeExplain(
+        "RULE_PACK_ALIAS",
+        "OK",
+        `Materia ${input.materia} normalizada a ${materiaCanonica} para el match de rule pack (alias de catálogo).`
+      )
+    );
+  }
+
   const matterMatches = normalized.filter((version) => {
-    return version.materia === input.materia || version.packId === input.materia;
+    return (
+      version.materia === input.materia ||
+      version.packId === input.materia ||
+      version.materia === materiaCanonica ||
+      version.packId === materiaCanonica
+    );
   });
 
   if (matterMatches.length === 0) {

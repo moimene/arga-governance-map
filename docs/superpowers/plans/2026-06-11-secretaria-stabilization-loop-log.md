@@ -268,3 +268,21 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   datos del alcance del conflicto.
 - **Verificación:** gates verdes (2026 tests 0 fail); e2e 05+18 verdes (spec 57 conflictos skipped
   por diseño de la serie test-a).
+
+### Iteración 14 — ITEM-006 [P1] Alias divergentes materia UI ↔ rule pack (HECHO)
+
+- **Evidencia:** 7 ids del catálogo de agenda/materia_catalog no matchean los ids sembrados en
+  rule_packs (APROBACION_PRESUPUESTOS/O, CESION_GLOBAL/_ACTIVO, REMUNERACION_CONSEJEROS/
+  RETRIBUCION_ADMIN, CAMBIO_DOMICILIO_SOCIAL/TRASLADO_DOMICILIO_NACIONAL, MODIFICACION_REGLAMENTO/
+  APROBACION_REGLAMENTO_CONSEJO, AMPLIACION_CAPITAL/AUMENTO_CAPITAL, EXCLUSION_DERECHO_
+  SUSCRIPCION_PREFERENTE/SUPRESION_PREFERENTE): la convocatoria emitía con accepted-warning
+  genérico SIN reglas de pack (mismo patrón que rompió OPERACION_VINCULADA en su día).
+- **Fix:** mapa central MATERIA_PACK_ALIASES + normalizeMateriaForRulePack en rule-resolution.ts,
+  aplicado en resolveRulePackForMatter (con nodo RULE_PACK_ALIAS en el explain para trazabilidad)
+  y en useRulePackForMateria (normaliza antes de consultar Cloud). DISTRIBUCION_RESERVAS NO se
+  alía a DIVIDENDO_A_CUENTA (arts. 273 vs 277 LSC: operaciones distintas — gap honesto hasta pack
+  propio aprobado por Comité Legal).
+- **Residual:** packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS (cubierto por ITEM-013
+  BLOQUEADO-LEGAL) y lifecycle NULL del pack de cooptación (data/legal).
+- **Verificación:** 3 tests nuevos (alias, no-alias jurídico, match+explain); 2029 tests 0 fail;
+  gates verdes; e2e 04+06+18 verdes.

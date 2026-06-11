@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { normalizeMateriaForRulePack } from "@/lib/rules-engine";
 
 export interface PostAcuerdoPayload {
   inscribible: boolean;
@@ -73,8 +74,11 @@ export interface RulePackData {
  *     const { inscribible, instrumentoRequerido } = data.payload;
  *   }
  */
-export function useRulePackForMateria(materiaCla: string | undefined) {
+export function useRulePackForMateria(materiaInput: string | undefined) {
   const { tenantId } = useTenantContext();
+  // ITEM-006: el catálogo UI y los packs sembrados divergen en grafías —
+  // normalizamos al id canónico del pack antes de consultar Cloud.
+  const materiaCla = materiaInput ? normalizeMateriaForRulePack(materiaInput) : materiaInput;
   return useQuery<RulePackData | null, Error>({
     enabled: !!materiaCla && !!tenantId,
     queryKey: ["rule_packs", tenantId, "byMateria", materiaCla],
