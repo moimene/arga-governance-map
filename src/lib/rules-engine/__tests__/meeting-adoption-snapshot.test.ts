@@ -93,6 +93,78 @@ describe("buildMeetingAdoptionSnapshot", () => {
     expect(snapshot.pacto_compliance.severity).toBe("WARNING");
   });
 
+  // ITEM-019: junta sin datos de capital → census_not_available WARNING persistido
+  it("ITEM-019: JUNTA_GENERAL sin datos de capital emite WARNING census_not_available", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 1,
+      resolutionText: "Modificar estatutos",
+      materia: "MODIFICACION_ESTATUTOS",
+      materiaClase: "ESTATUTARIA",
+      tipoSocial: "SL",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [
+        { id: "a1", vote: "FAVOR", voting_weight: 1 },
+        { id: "a2", vote: "CONTRA", voting_weight: 1 },
+      ],
+      totalMiembros: 3,
+      capitalTotal: 2,
+      capitalDataAvailable: false,
+      packs: [packWithMajority("MODIFICACION_ESTATUTOS", "favor > 1/2_capital_total_con_voto")],
+    });
+    expect(
+      snapshot.societary_validity.warnings.some((w) => w.includes("census_not_available")),
+    ).toBe(true);
+    expect(
+      snapshot.societary_validity.explain.some(
+        (e) => e.resultado === "WARNING" && /capital no disponible/i.test(e.regla),
+      ),
+    ).toBe(true);
+  });
+
+  it("ITEM-019: JUNTA_GENERAL con datos de capital reales NO emite census_not_available", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 1,
+      resolutionText: "Modificar estatutos",
+      materia: "MODIFICACION_ESTATUTOS",
+      materiaClase: "ESTATUTARIA",
+      tipoSocial: "SL",
+      organoTipo: "JUNTA_GENERAL",
+      quorumReached: true,
+      voters: [{ id: "a1", vote: "FAVOR", voting_weight: 80 }],
+      totalMiembros: 1,
+      capitalTotal: 100,
+      capitalDataAvailable: true,
+      packs: [packWithMajority("MODIFICACION_ESTATUTOS", "favor > 1/2_capital_total_con_voto")],
+    });
+    expect(
+      snapshot.societary_validity.warnings.some((w) => w.includes("census_not_available")),
+    ).toBe(false);
+  });
+
+  it("ITEM-019: CONSEJO (base por miembros) no aplica census_not_available aunque falte capital", () => {
+    const snapshot = buildMeetingAdoptionSnapshot({
+      agendaItemIndex: 1,
+      resolutionText: "Delegar facultades",
+      materia: "DELEGACION_FACULTADES",
+      materiaClase: "ORDINARIA",
+      tipoSocial: "SA",
+      organoTipo: "CONSEJO",
+      quorumReached: true,
+      voters: [
+        { id: "c1", vote: "FAVOR", voting_weight: 1 },
+        { id: "c2", vote: "FAVOR", voting_weight: 1 },
+      ],
+      totalMiembros: 3,
+      capitalTotal: 2,
+      capitalDataAvailable: false,
+      packs: [pack("DELEGACION_FACULTADES")],
+    });
+    expect(
+      snapshot.societary_validity.warnings.some((w) => w.includes("census_not_available")),
+    ).toBe(false);
+  });
+
   it("bloquea societariamente si hay veto estatutario aplicable", () => {
     const override: RuleParamOverride = {
       id: "override-veto",

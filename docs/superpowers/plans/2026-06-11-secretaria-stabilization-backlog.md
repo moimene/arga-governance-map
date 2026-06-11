@@ -45,7 +45,7 @@
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
 | ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO (loop) |
 | ITEM-018 | A10 | ✅ | Cluster de citas normativas erróneas en explain nodes (15+ referencias equivocadas confirmadas contra BOE) | HECHO |
-| ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO parcial (miembros_presentes real; capital_total fallback pendiente) |
+| ITEM-019 | A10 | — | Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor | HECHO (motor) |
 | ITEM-020 | A11 | ✅ | Co-aprobación y Solidario: evaluación de motor circular sobre censo manual; agreements persisten ADOPTED con hash documental sintético | HECHO (ITEM-050) |
 | ITEM-021 | A11 | ✅ | AnadirSocioStepper permite sobre-asignar capital (>100% / más títulos que el total) sin guard UI ni trigger DB | HECHO (guard UI + re-chequeo al guardar; RPC con assert queda P3) |
 | ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | HECHO |
@@ -218,7 +218,7 @@
 
 ### ITEM-019 [P1] Inputs del snapshot de votación incoherentes: capital_total cae al peso presente sin datos de capital y miembros_presentes se rellena con los votos a favor
 
-- **Área:** A10 · **Estado:** PENDIENTE
+- **Área:** A10 · **Estado:** HECHO (Ola MOTOR; census_not_available WARNING persistido en juntas sin datos de capital; residual: resolver capital real desde entity_capital_profile)
 - **Descripción:** (a) En buildSnapshotForPoint, para JUNTA_GENERAL sin datos explícitos de capital (voting_rights/capital_representado ausentes), capitalTotal = peso presente (1 por cabeza). Todas las fórmulas SL sobre capital TOTAL (arts. 198 suelo 1/3, 199.a >1/2, 199.b 2/3) pasan a evaluarse sobre los presentes: una SL con 60% de asistencia aprobaría una modificación de estatutos con >30% del capital real (motor: >50% de los presentes) cuando el art. 199.a exige >50% de TODO el capital. Degradación silenciosa, sin warning específico. (b) En buildMeetingAdoptionSnapshot el campo miembros_presentes del input de votación se rellena con voteSummary.favor (los votos a favor) — dato falso que hoy es latente (ninguna fórmula consume miembros_presentes, ver hallazgo del art. 248.1) pero que se convertirá en bug activo en cuanto se corrija la fórmula de concurrentes, y que ya contamina el contrato del input. (c) El snapshot persiste voting_context.total_miembros = nº de presentes, no el tamaño del órgano.
 - **Evidencia:** src/pages/secretaria/ReunionStepper.tsx:2543-2548 (capitalTotal proxy) y :2570 (totalMiembros = voters.length con voters=presentVoters, :2227-2231). src/lib/rules-engine/meeting-adoption-snapshot.ts:321 (miembros_presentes: voteSummary.favor) y :273 (capitalTotal fallback a presentWeight).
 - **Archivos:** src/pages/secretaria/ReunionStepper.tsx, src/lib/rules-engine/meeting-adoption-snapshot.ts

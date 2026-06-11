@@ -124,6 +124,16 @@ export interface MeetingAdoptionSnapshotInput {
    */
   miembrosPresentes?: number;
   capitalTotal: number;
+  /**
+   * ITEM-019: indica si `capitalTotal` proviene de datos REALES de capital
+   * (censo / capital_representado de los asistentes) o es un proxy por cabezas.
+   * Para una JUNTA_GENERAL las mayorías de los arts. 198-201 LSC se computan
+   * sobre el capital social; si esto es `false`, el motor emite un WARNING
+   * `census_not_available` en lugar de degradar en silencio a cabezas.
+   * Para órganos colegiados (consejo) la base es por miembros, no por capital,
+   * así que el flag no aplica (déjese `true` o sin informar).
+   */
+  capitalDataAvailable?: boolean;
   packs: RulePack[];
   overrides?: RuleParamOverride[];
   pactos?: PactoParasocial[];
@@ -353,6 +363,30 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
     mensaje: "Existe un veto estatutario aplicable a la materia. Bloquea la proclamacion societaria hasta renuncia o consentimiento.",
   }));
 
+  // ITEM-019: en una JUNTA_GENERAL las mayorías de los arts. 198-201 LSC se
+  // computan sobre el capital social total. Si no constan datos reales de
+  // capital (capitalDataAvailable === false), `capital_total` es un proxy por
+  // cabezas y la evaluación de esas mayorías queda degradada: se emite un
+  // WARNING explícito y persistido en lugar de degradar en silencio.
+  const capitalProxy =
+    input.organoTipo === "JUNTA_GENERAL" && input.capitalDataAvailable === false;
+  const capitalProxyWarnings = capitalProxy
+    ? ["census_not_available: mayoría de capital evaluada sobre peso presente (proxy por cabezas), no sobre capital social total"]
+    : [];
+  const capitalProxyExplain: ExplainNode[] = capitalProxy
+    ? [{
+        regla: "Censo de capital no disponible",
+        fuente: "LEY",
+        referencia:
+          input.tipoSocial === "SL" || input.tipoSocial === "SLU"
+            ? "arts. 198-199 LSC"
+            : "arts. 193-201 LSC",
+        resultado: "WARNING",
+        mensaje:
+          "No constan los datos de capital de los asistentes; las mayorías de capital se han evaluado sobre el peso presente (proxy por cabezas), no sobre el capital social total. Cargar el capital real desde el censo para una evaluación societaria válida.",
+      }]
+    : [];
+
   const quorumReached = input.quorumReached !== false;
   const societaryBlocking = [
     ...votingResult.blocking_issues,
@@ -361,7 +395,7 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
     ...(voteCompleteness.complete ? [] : ["votes_incomplete_for_point"]),
   ];
   const societaryOk = votingResult.acuerdoProclamable && quorumReached && !statutoryVetoActive && voteCompleteness.complete;
-  const societaryExplain = [...votingResult.explain, ...statutoryVetoExplain];
+  const societaryExplain = [...votingResult.explain, ...statutoryVetoExplain, ...capitalProxyExplain];
 
   return {
     schema_version: "meeting-adoption-snapshot.v2",
@@ -393,7 +427,7 @@ export function buildMeetingAdoptionSnapshot(input: MeetingAdoptionSnapshotInput
       agreement_proclaimable: societaryOk,
       statutory_veto_active: statutoryVetoActive,
       blocking_issues: societaryBlocking,
-      warnings: votingResult.warnings,
+      warnings: [...votingResult.warnings, ...capitalProxyWarnings],
       explain: societaryExplain,
       voting: votingResult,
     },

@@ -2679,6 +2679,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             ),
       miembrosPresentes: rowsForPoint.length,
       capitalTotal,
+      // ITEM-019: señala si capitalTotal son datos REALES de capital o un proxy
+      // por cabezas. En consejo la base es por miembros (no aplica); en junta
+      // sin datos de capital el motor emite census_not_available.
+      capitalDataAvailable: organoTipo !== "JUNTA_GENERAL" || explicitVotingData,
       packs: mode === "cloud_strict" ? strictVotePacks : votePacks,
       overrides: voteOverrides,
       pactos: pactosVigentes,
