@@ -421,3 +421,6 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
 - **Guard nuevo:** test de lint jurídico `citas-lsc-lint.test.ts` — ninguna cita 'art. N LSC' del
   motor puede superar el art. 541 (no valida idoneidad contextual, solo existencia).
 - **Verificación:** 2046 tests 0 fail; gates verdes; e2e 04+05+18 verdes.
+- **Checkpoint 4 (tras Iteración 22):** e2e ampliada 48/48; push al día (815ea84..6527861);
+  migraciones alineadas hasta 20260611210000. Balance acumulado: 40 ítems cerrados, incluidos
+  9 BLOQUEADO-LEGAL re-triados como correcciones factuales BOE (007/008/010/011/012/013/033/053).
