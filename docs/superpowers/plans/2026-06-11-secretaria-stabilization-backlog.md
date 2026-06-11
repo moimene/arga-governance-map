@@ -61,7 +61,7 @@
 | ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | PENDIENTE |
 | ITEM-033 | A5 | ✅ | jurisdiction_rule_sets ES/SA/JUNTA_GENERAL declara 15 días (art. 176 LSC: un mes) y el stepper elige el rule set sin filtrar por órgano | BLOQUEADO-LEGAL |
 | ITEM-034 | A5 | ✅ | Segunda convocatoria sin ninguna regla del art. 177 LSC: sin gap mínimo de 24h, ofrecida para SL y CdA, y el motor nunca la evalúa | PENDIENTE |
-| ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | PENDIENTE |
+| ITEM-035 | A5 | ✅ | Las convocatorias emitidas nunca quedan inmutables: 11/11 EMITIDA en Cloud con immutable_at NULL | HECHO |
 | ITEM-036 | A6 | ✅ | Mayoría de consejo: fórmulas con 'total_miembros' se evalúan contra presentes y DELEGACION_FACULTADES ignora el 2/3 de componentes del art. 249.3 LSC | PENDIENTE |
 | ITEM-037 | A6 | ✅ | El Secretario no consejero computa en quórum y vota en el CdA (arts. 247.2 y 248.1 LSC) | HECHO |
 | ITEM-038 | A6 | ✅ | primeraConvocatoria hardcodeado a true: el quórum de 2ª convocatoria (arts. 193/194 LSC) nunca se evalúa y bloquea juntas legalmente constituidas | HECHO |

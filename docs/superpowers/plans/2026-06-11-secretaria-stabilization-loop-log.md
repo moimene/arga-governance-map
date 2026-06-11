@@ -223,3 +223,16 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   unificación de escritores si se decide el re-anclaje.
 - **Verificación:** test de invariante Cloud `agreement-certified-transition.test.ts` (cert SIGNED
   ⇒ agreement no-ADOPTED); 2026 tests 0 fail; gates verdes; e2e 07+18 7/7.
+
+### Iteración 11 — ITEM-035 [P1] Convocatorias emitidas nunca inmutables (HECHO)
+
+- **Evidencia:** el guard solo sellaba en la transición a EMITIDA por UPDATE, pero el stepper
+  INSERTa directamente en EMITIDA → 11/11 emitidas con immutable_at NULL y campos estructurales
+  (body_id, fechas, canales) mutables tras la comunicación.
+- **Fix:** migración 20260611192500 — guard unificado TG_OP-aware (sella en INSERT y UPDATE cuando
+  NEW.estado='EMITIDA' sin sello previo; mantiene bloqueo estructural), trigger BEFORE INSERT nuevo
+  y backfill de las 11 EMITIDA (sello = updated_at/created_at).
+- **Verificación:** Cloud 11/11 selladas; smoke conductual (INSERT directo sella + UPDATE
+  estructural bloqueado, scratch limpiado); gates verdes; e2e 04+18 6/6.
+- **Residual P3 anotado:** 3 convocatorias seed en estado CELEBRADA sin sello (no pasaron por
+  EMITIDA en su ciclo seed); las nuevas conservan el sello al transicionar.
