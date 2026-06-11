@@ -55,7 +55,7 @@
 | ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | PENDIENTE |
 | ITEM-027 | A2 | ✅ | Payloads postAcuerdo con incorrecciones registrales: aprobación de cuentas sin depósito (arts. 279-280 LSC), plazos/citas RRM dudosos e instrumento sobre-exigido en cese | BLOQUEADO-LEGAL |
 | ITEM-028 | A4 | ✅ | Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales) | PENDIENTE |
-| ITEM-029 | A4 | ✅ | authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista | PENDIENTE |
+| ITEM-029 | A4 | ✅ | authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista | HECHO |
 | ITEM-030 | A4 | ✅ | Composición CdA demo (17 condiciones) irreconciliable con la estructura declarada (15 miembros: 9 IND + 5 EJE + 1 DOM); categorías de consejero no modeladas | PENDIENTE |
 | ITEM-031 | A4 | ✅ | Transmisión de participaciones/acciones sin ningún gate de los arts. 106-112 LSC ni distinción SA/SL | BLOQUEADO-LEGAL |
 | ITEM-032 | A5 | ✅ | Plazo V1 'efectivo' aplica 30 días a junta de SL (art. 176 LSC: 15 días) — falso incumplimiento y divergencia V1/V2 sistemática | PENDIENTE |
@@ -69,7 +69,7 @@
 | ITEM-040 | A6 | ✅ | Comité Ejecutivo: voto de calidad bloqueado por código pese a quorum_rule.voto_calidad_presidente=true en BD (contradice config demo ARGA / DL-5) | PENDIENTE |
 | ITEM-041 | A6 | ✅ | Un conflicto de interés activo excluye forzosamente a la persona de TODAS las votaciones de la entidad (sobre-exclusión vs arts. 190 y 228.c LSC) | PENDIENTE |
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | PENDIENTE |
-| ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | PENDIENTE |
+| ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
 | ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | PENDIENTE |
 | ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | PENDIENTE |
 | ITEM-046 | A8 | ✅ | Verificador offline siempre reporta '✗ Error de integridad' para documentos legítimos — mismatch SHA-256 vs DJB2 | PENDIENTE |
@@ -307,7 +307,7 @@
 
 ### ITEM-029 [P1] authority_evidence con cargos fantasma: 2 PRESIDENTE y 2 SECRETARIO VIGENTES en el CdA canónico; usePresidenteVigente resuelve de forma no determinista
 
-- **Área:** A4 · **Estado:** PENDIENTE
+- **Área:** A4 · **Estado:** HECHO (Iteración 5)
 - **Descripción:** La limpieza 2026-04-24 (documentada en CLAUDE.md como 'Resuelto: usePresidenteVigente sin ambigüedad') purgó las personas dummy de condiciones_persona pero NO de authority_evidence. Hoy el CdA canónico tiene 2 PRESIDENTE VIGENTES ('Antonio Ríos' dummy 00000000-...-0102 sin condición de respaldo, y 'D. Antonio Ríos Valverde' canónico) y 2 SECRETARIO VIGENTES ('Lucía Paredes' dummy 00000000-...-0101 y 'Dña. Lucía Paredes Vega'). En total hay 10 authority_evidence VIGENTES sin condición vigente de respaldo en la entidad ARGA (9 de cargo PRESIDENTE, repartidos por las comisiones, que muestran 2 presidentes cada una). usePresidenteVigente hace .limit(1).maybeSingle() SIN ORDER BY: el Vº Bº que precarga EmitirCertificacionButton puede atribuirse a la persona fantasma, invalidando la certificación conforme a arts. 109-111 RRM (Vº Bº de quien no es presidente). Esto es PEOR que la deuda documentada: la ambigüedad se declaró resuelta y persiste en la tabla que realmente lee el hook.
 - **Evidencia:** SQL Cloud: authority_evidence body fe05ddd9 estado=VIGENTE → filas e932a0fa (person 00000000-0000-0000-0000-000000000102 'Antonio Ríos', cargo PRESIDENTE, tiene_condicion_vigente=false) y eb99f73e ('D. Antonio Ríos Valverde', true); a2aca8d3 ('Lucía Paredes' dummy SECRETARIO, false) y a9ed5fe2 ('Dña. Lucía Paredes Vega', true). Query agregada: 10 AE VIGENTES sin condición de respaldo en entity 6d7ed736 (9 PRESIDENTE); las 9 comisiones/comités muestran cargo PRESIDENTE duplicado (n=2). Código: src/hooks/useAuthorityEvidence.ts:124-149 (usePresidenteVigente con limit(1).maybeSingle() sin order); src/components/secretaria/EmitirCertificacionButton.tsx:79 (precarga Vº Bº); src/hooks/useAgreementCompliance.ts:872 también lee authority_evidence.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useAuthorityEvidence.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/components/secretaria/EmitirCertificacionButton.tsx

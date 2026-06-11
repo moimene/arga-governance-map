@@ -109,7 +109,11 @@ export function useAuthorityEvidenceFor(params: {
         .eq("estado", "VIGENTE")
         .in("cargo", cargos);
       q = bodyId ? q.eq("body_id", bodyId) : q.is("body_id", null);
-      const { data, error } = await q.limit(1).maybeSingle();
+      const { data, error } = await q
+        .order("fecha_inicio", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return (data as AuthorityEvidenceRow) ?? null;
     },
@@ -141,7 +145,14 @@ export function usePresidenteVigente(
         .eq("cargo", "PRESIDENTE")
         .eq("estado", "VIGENTE");
       if (bodyId) q = q.eq("body_id", bodyId);
-      const { data, error } = await q.limit(1).maybeSingle();
+      // Orden determinista (ITEM-029): tras la purga de cargos fantasma y el
+      // índice único parcial, por órgano solo hay un PRESIDENTE VIGENTE; el
+      // orden cubre el caso sin bodyId (varios órganos de la entidad).
+      const { data, error } = await q
+        .order("fecha_inicio", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return (data as AuthorityEvidenceDetailRow) ?? null;
     },

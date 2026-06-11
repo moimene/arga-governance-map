@@ -120,3 +120,22 @@ Nota: CLAUDE.md habla de "23 warnings conocidos" de lint; la realidad actual es 
   typecheck, lint sin nuevos, build. Head migraciones = 20260611182500 alineado.
 - **Regla para el resto del loop:** todo SECURITY DEFINER nuevo o tocado usa el contrato
   fail-closed v3 — nunca el patrón `IS NOT NULL`.
+
+### Iteración 5 — ITEM-029/043 [P1] authority_evidence con cargos fantasma (HECHO)
+
+- **Evidencia (Cloud):** 37 AE VIGENTES en ARGA; 12 sin condiciones_persona VIGENTE de respaldo
+  cargo-a-cargo (regla `tipo_condicion = cargo` mismo persona+entidad+órgano): 2 PRESIDENTE y 2
+  SECRETARIO en el CdA, presidentes duplicados en las 9 comisiones. La regla cargo-a-cargo resuelve
+  también los 2 casos donde ambos duplicados tenían "alguna" condición (Retribuciones → Isabel
+  Moreno; Sostenibilidad → Álvaro Mendoza). usePresidenteVigente hacía limit(1) sin ORDER BY.
+- **Fix:** migración `20260611183000_cease_phantom_authority_evidence` — UPDATE a CESADO de las 12
+  fantasma (con motivo en metadata) + índice único parcial
+  `ux_authority_evidence_pres_sec_vigente` (PRESIDENTE/SECRETARIO VIGENTE únicos por órgano;
+  verificada 0 colisión global pre-creación; no restringe VICEPRESIDENTE — ARGA declara 2).
+  Hooks `usePresidenteVigente` y `useAuthorityEvidenceLookup` con orden determinista.
+- **Verificación:** Cloud post-fix: 25 vigentes, 0 fantasmas, 1 PRESIDENTE en CdA, índice creado.
+  Test regresión `authority-evidence-integrity.test.ts` (2 tests contra Cloud como demo user).
+  Gates: 2015 tests 0 fail, typecheck, lint sin nuevos, build, e2e 05+18 6/6.
+- **Nota derivada para ITEM-030:** el presidente del CdA (ejecutivo) preside también la Comisión de
+  Auditoría con condición de respaldo — en cotizada el presidente de esa comisión debe ser
+  independiente (art. 529 quaterdecies LSC). Tratar en la reconciliación de composición.
