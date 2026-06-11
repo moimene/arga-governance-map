@@ -1,3 +1,8 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@/integrations/supabase/client";
+import * as __realModule1 from "@/hooks/useCurrentUser";
+import * as __realModule2 from "@/hooks/useUserRole";
+import * as __realModule3 from "@/context/TenantContext";
 /**
  * Task 5 — Tests del hook `useReclassifyAgendaItemKind`.
  *
@@ -71,6 +76,22 @@ const agendaItemStore: { current: { data: unknown; error: unknown } } = {
     error: null,
   },
 };
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@/integrations/supabase/client", { ...__realModule0 }],
+  ["@/hooks/useCurrentUser", { ...__realModule1 }],
+  ["@/hooks/useUserRole", { ...__realModule2 }],
+  ["@/context/TenantContext", { ...__realModule3 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@/integrations/supabase/client", () => {
   return {

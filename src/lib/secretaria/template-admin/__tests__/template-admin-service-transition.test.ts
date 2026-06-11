@@ -1,3 +1,5 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@/integrations/supabase/client";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { PlantillaCandidate } from "../types";
 
@@ -5,6 +7,19 @@ const mockState = {
   current: null as PlantillaCandidate | null,
   updateCalls: [] as Array<Record<string, unknown>>,
 };
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@/integrations/supabase/client", { ...__realModule0 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@/integrations/supabase/client", () => {
   function selectChain() {

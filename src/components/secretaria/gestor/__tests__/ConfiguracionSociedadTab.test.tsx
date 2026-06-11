@@ -1,3 +1,10 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "sonner";
+import * as __realModule1 from "@/components/secretaria/shell";
+import * as __realModule2 from "@/hooks/useEntitySettingsCatalog";
+import * as __realModule3 from "@/hooks/useEntitySettings";
+import * as __realModule4 from "@/hooks/usePlantillasProtegidas";
+import * as __realModule5 from "@/hooks/useCapa3Overrides";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ConfiguracionSociedadTab } from "../ConfiguracionSociedadTab";
@@ -7,6 +14,24 @@ const mockUpsert = vi.fn();
 const mockDelete = vi.fn();
 
 let mockSelectedEntityId: string | null = "entity-1";
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["sonner", { ...__realModule0 }],
+  ["@/components/secretaria/shell", { ...__realModule1 }],
+  ["@/hooks/useEntitySettingsCatalog", { ...__realModule2 }],
+  ["@/hooks/useEntitySettings", { ...__realModule3 }],
+  ["@/hooks/usePlantillasProtegidas", { ...__realModule4 }],
+  ["@/hooks/useCapa3Overrides", { ...__realModule5 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("sonner", () => ({
   toast: {

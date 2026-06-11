@@ -1,3 +1,8 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "sonner";
+import * as __realModule1 from "@/hooks/useBloquesSectoriales";
+import * as __realModule2 from "@/hooks/useEntitySettingsCatalog";
+import * as __realModule3 from "@/integrations/supabase/client";
 // src/components/secretaria/__tests__/BloquesSectorialesPanel.test.tsx
 /**
  * WORM contract regression: when bloque_insertions INSERT fails (RLS,
@@ -15,6 +20,22 @@ import { BloquesSectorialesPanel } from "../BloquesSectorialesPanel";
 import type { ReactNode } from "react";
 
 // Mock toast to capture success/error calls
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["sonner", { ...__realModule0 }],
+  ["@/hooks/useBloquesSectoriales", { ...__realModule1 }],
+  ["@/hooks/useEntitySettingsCatalog", { ...__realModule2 }],
+  ["@/integrations/supabase/client", { ...__realModule3 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

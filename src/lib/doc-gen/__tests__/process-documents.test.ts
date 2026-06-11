@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import {
   resolveAgreementDocumentTrace,
@@ -6,9 +6,29 @@ import {
 } from "@/lib/secretaria/agreement-document-contract";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import { createHash } from "node:crypto";
+import {
+  buildPrintableDocumentHtml,
+  computeContentHash,
+  downloadDocx,
+  generateDocx,
+  printRenderedDocument,
+} from "../docx-generator";
 
-vi.mock("../docx-generator", () => {
+// mock.module es global al proceso de bun test: un mock parcial sin restaurar
+// se fuga a los archivos de test posteriores (rompía openxml-validation,
+// composer-smoke, document-draft-persistence...). El mock debe ser COMPLETO
+// (todos los exports reales) y restaurarse en afterAll.
+const realDocxGenerator = {
+  buildPrintableDocumentHtml,
+  computeContentHash,
+  downloadDocx,
+  generateDocx,
+  printRenderedDocument,
+};
+
+mock.module("../docx-generator", () => {
   return {
+    ...realDocxGenerator,
     computeContentHash: async (text: string) => {
       const data = new TextEncoder().encode(text);
       const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -19,6 +39,10 @@ vi.mock("../docx-generator", () => {
     generateDocx: async ({ renderedText }: { renderedText: string }) => new TextEncoder().encode(renderedText),
     downloadDocx: () => undefined,
   };
+});
+
+afterAll(() => {
+  mock.module("../docx-generator", () => realDocxGenerator);
 });
 
 let buildProcessDocumentTraceFooterLines: typeof import("../process-documents").buildProcessDocumentTraceFooterLines;

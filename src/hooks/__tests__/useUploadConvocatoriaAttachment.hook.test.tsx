@@ -1,3 +1,6 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@/context/TenantContext";
+import * as __realModule1 from "@/integrations/supabase/client";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
@@ -13,6 +16,20 @@ const mocks = vi.hoisted(() => ({
   insertPayloads: [] as Array<Record<string, unknown>>,
   insertError: { current: null as { message: string } | null },
 }));
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@/context/TenantContext", { ...__realModule0 }],
+  ["@/integrations/supabase/client", { ...__realModule1 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@/context/TenantContext", () => ({
   useTenantContext: () => ({ tenantId: "tenant-1" }),

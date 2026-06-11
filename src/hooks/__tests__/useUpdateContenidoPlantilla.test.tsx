@@ -1,3 +1,8 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@tanstack/react-query";
+import * as __realModule1 from "@/context/TenantContext";
+import * as __realModule2 from "@/hooks/useCurrentUser";
+import * as __realModule3 from "@/integrations/supabase/client";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 if (typeof vi.hoisted !== "function") {
@@ -18,6 +23,22 @@ const mocks = vi.hoisted(() => ({
   changelogInsertError: null as unknown,
   changelogInsertCalls: [] as Array<Record<string, unknown>>,
 }));
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@tanstack/react-query", { ...__realModule0 }],
+  ["@/context/TenantContext", { ...__realModule1 }],
+  ["@/hooks/useCurrentUser", { ...__realModule2 }],
+  ["@/integrations/supabase/client", { ...__realModule3 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),

@@ -1,3 +1,9 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@tanstack/react-query";
+import * as __realModule1 from "@/context/TenantContext";
+import * as __realModule2 from "@/hooks/useCurrentUser";
+import * as __realModule3 from "@/lib/secretaria/template-admin/import-preflight";
+import * as __realModule4 from "@/integrations/supabase/client";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
 
@@ -11,6 +17,23 @@ const mocks = vi.hoisted(() => ({
   plantillaInsertCalls: [] as Array<Record<string, unknown>>,
   changelogInsertCalls: [] as Array<Record<string, unknown>>,
 }));
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@tanstack/react-query", { ...__realModule0 }],
+  ["@/context/TenantContext", { ...__realModule1 }],
+  ["@/hooks/useCurrentUser", { ...__realModule2 }],
+  ["@/lib/secretaria/template-admin/import-preflight", { ...__realModule3 }],
+  ["@/integrations/supabase/client", { ...__realModule4 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),

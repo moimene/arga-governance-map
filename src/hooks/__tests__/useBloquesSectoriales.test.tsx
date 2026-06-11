@@ -1,3 +1,6 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "@/integrations/supabase/client";
+import * as __realModule1 from "@/context/TenantContext";
 // src/hooks/__tests__/useBloquesSectoriales.test.tsx
 /**
  * R10 contract: useBloquesSectoriales must NOT fetch when sector='GENERICO'
@@ -47,6 +50,20 @@ const ALL_BLOQUES = [
 // what the hook would actually fetch. The mock chains all .eq() calls into
 // a single PostgREST-like builder and resolves with the filtered subset.
 const lastEqCalls: Record<string, string> = {};
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["@/integrations/supabase/client", { ...__realModule0 }],
+  ["@/context/TenantContext", { ...__realModule1 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("@/integrations/supabase/client", () => {
   // The chain is: from(table).select(*).eq("estado","ACTIVA")[.eq("sector",X)]

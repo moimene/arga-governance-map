@@ -1,9 +1,26 @@
+import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
+import * as __realModule0 from "sonner";
+import * as __realModule1 from "@/hooks/usePlantillasProtegidas";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TriCapaEditor } from "../TriCapaEditor";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 
 const mockMutateAsync = vi.fn();
+
+// Captura eager de los módulos reales ANTES de registrar los mocks:
+// mock.module de bun es global al proceso de test y se fuga a los archivos
+// posteriores, así que cada mock se restaura al terminar este archivo.
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["sonner", { ...__realModule0 }],
+  ["@/hooks/usePlantillasProtegidas", { ...__realModule1 }],
+];
+
+__afterAllRestore(() => {
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
+  }
+});
 
 vi.mock("sonner", () => ({
   toast: {
