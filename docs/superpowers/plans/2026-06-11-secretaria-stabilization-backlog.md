@@ -542,14 +542,14 @@
 | ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | PENDIENTE |
 | ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | ✅ HECHO (loop+codex) |
 | ITEM-061 | A11 | — | SociedadNuevaStepper: 11 pasos con draft solo-local (se pierde al refrescar) y píldoras que saltan validación por paso | ✅ HECHO (loop+codex) |
-| ITEM-062 | A11 | — | Salidas sin destino al artefacto creado: Convocatorias navega a lista y Tramitador no enlaza el expediente registral | PENDIENTE |
+| ITEM-062 | A11 | — | Salidas sin destino al artefacto creado: Convocatorias navega a lista y Tramitador no enlaza el expediente registral | ✅ HECHO (loop) |
 | ITEM-063 | A12 | ✅ | Botón 'Enviar notificación ERDS' en AcuerdoSinSesionDetalle siempre falla (QTSP_SERVER_PROXY_REQUIRED) y el resultado no persiste | PENDIENTE |
 | ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | PENDIENTE |
 | ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | PENDIENTE |
 | ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | ✅ HECHO (loop+codex) |
 | ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | ✅ HECHO (loop) |
-| ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | PENDIENTE |
-| ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | PENDIENTE |
+| ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | ✅ HECHO (loop) |
+| ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | ✅ HECHO (loop) |
 | ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | HECHO (UI) |
 | ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | PENDIENTE |
 | ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
@@ -584,7 +584,7 @@
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | PENDIENTE |
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | PENDIENTE |
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
-| ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | PENDIENTE |
+| ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | 🟡 PARCIAL (TramitacionDetalle cross-link; ExpedienteAcuerdo cards en oleada cross-module) |
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
 | ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | ✅ HECHO (loop) |

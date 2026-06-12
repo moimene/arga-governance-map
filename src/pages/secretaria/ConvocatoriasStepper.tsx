@@ -2213,14 +2213,23 @@ export default function ConvocatoriasStepper() {
               )}
             </div>
           )}
-          <div className="mt-6 flex justify-center gap-3">
+          {/* ITEM-069/062: el CTA primario abre la convocatoria recién emitida
+              (antes ambos botones iban a listas genéricas, dejando el artefacto
+              creado sin destino directo). */}
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(scopedListPath)}
+              onClick={() =>
+                navigate(
+                  isSociedadScoped && scopedEntityId
+                    ? `/secretaria/convocatorias/${emitidoId}?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
+                    : `/secretaria/convocatorias/${emitidoId}`,
+                )
+              }
               className="bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              Ver convocatorias
+              Abrir convocatoria
             </button>
             <button
               type="button"
@@ -2229,6 +2238,14 @@ export default function ConvocatoriasStepper() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Ir a reuniones
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(scopedListPath)}
+              className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Ver convocatorias
             </button>
           </div>
         </div>

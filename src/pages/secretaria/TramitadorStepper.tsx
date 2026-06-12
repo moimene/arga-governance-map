@@ -198,6 +198,7 @@ function buildSubsanacionFallback({
 }
 
 type TramitacionDetalleRow = {
+  agreement_id?: string | null;
   filing_number?: string | null;
   filing_via?: string | null;
   presentation_date?: string | null;
@@ -243,12 +244,25 @@ function TramitacionDetalle({ id }: { id: string }) {
       style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}
     >
       <div className="mx-auto max-w-5xl space-y-6">
-        <Link
-          to="/secretaria/tramitador"
-          className="inline-flex items-center text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
-        >
-          ← Volver al tramitador
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            to="/secretaria/tramitador"
+            className="inline-flex items-center text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+          >
+            ← Volver al tramitador
+          </Link>
+          {/* ITEM-104: enlace al expediente del acuerdo de origen (antes el
+              detalle registral era un dead-end con solo "Volver al tramitador",
+              pese a tener agreement_id cargado). */}
+          {filing?.agreement_id && (
+            <Link
+              to={`/secretaria/acuerdos/${filing.agreement_id}`}
+              className="inline-flex items-center text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+            >
+              Ver expediente del acuerdo →
+            </Link>
+          )}
+        </div>
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
@@ -1779,6 +1793,11 @@ function TramitadorNuevo() {
           { ...STEPS[3], body: step4Body },
           { ...STEPS[4], body: step5Body },
         ]}
+        /* ITEM-068/062: tras registrar la escritura/subsanación, el último paso
+           ofrece un CTA al expediente registral creado (antes era dead-end: el
+           stepper no tenía ninguna llamada a navigate). */
+        finishTo={registryFilingId ? `/secretaria/tramitador/${registryFilingId}` : null}
+        finishLabel="Ver expediente registral"
       />
       <Capa3CaptureDialog
         open={modeloCapa3Open}
