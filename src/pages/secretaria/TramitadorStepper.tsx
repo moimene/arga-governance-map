@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Gavel } from "lucide-react";
 import { toast } from "sonner";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/hooks/useAgreementsList";
@@ -260,6 +260,18 @@ function TramitacionDetalle({ id }: { id: string }) {
               className="inline-flex items-center text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
             >
               Ver expediente del acuerdo →
+            </Link>
+          )}
+          {/* ITEM-103: CTA para responder la subsanación desde el detalle,
+              preseleccionando el acuerdo en el stepper (antes el usuario tenía que
+              adivinar que debía ir a /nuevo y re-seleccionar el mismo acuerdo). */}
+          {filing?.status === "SUBSANACION" && filing?.agreement_id && (
+            <Link
+              to={`/secretaria/tramitador/nuevo?agreement=${filing.agreement_id}`}
+              className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-3 py-1.5 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Gavel className="h-4 w-4" /> Responder subsanación
             </Link>
           )}
         </div>

@@ -560,7 +560,7 @@
 | ITEM-077 | A13 | — | DecisionDetalle no enlaza al expediente Acuerdo 360 vinculado | ✅ HECHO (loop+codex) |
 | ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | ✅ HECHO (loop) |
 | ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | HECHO (motor) |
-| ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
+| ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | ✅ HECHO (decisión producto documentada) |
 | ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | 🟡 PARCIAL (fase 1: huérfanos re-apuntados + pack alias retirado; fase 2 dedup catálogo/organo/versionado diferida) |
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
 | ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | HECHO (UI) |
@@ -583,7 +583,7 @@
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | ✅ HECHO (loop) |
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | ✅ HECHO (loop) |
-| ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
+| ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | ✅ HECHO (loop+cloud) |
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | 🟡 PARCIAL (TramitacionDetalle cross-link; ExpedienteAcuerdo cards en oleada cross-module) |
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | ✅ HECHO (loop) |
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
@@ -592,7 +592,7 @@
 | ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | ✅ HECHO (loop) |
 | ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | ✅ HECHO (loop) |
 | ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | ⏸ DIFERIDO (gateado por fix cadena WORM — montar verificación rota sería peor) |
-| ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | PENDIENTE |
+| ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | ✅ HECHO (decisión producto documentada) |
 | ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | PENDIENTE |
 | ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |
 | ITEM-115 | A9 | — | no_session_resolutions admite UPDATE directo por cualquier usuario del tenant (contadores y status manipulables); las respuestas WORM sí están protegidas | ✅ HECHO (loop+cloud) |
