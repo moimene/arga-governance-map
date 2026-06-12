@@ -39,6 +39,7 @@ import { evaluarPactosParasociales } from "@/lib/rules-engine/pactos-engine";
 import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
 import type { AgreementNormativeSnapshot, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -56,6 +57,27 @@ interface RuleEvaluationResult {
   explain: Record<string, unknown> | null;
   blocking_issues: string[] | null;
   warnings: string[] | null;
+}
+
+// ITEM-104
+interface AgreementCertRow {
+  id: string;
+  tipo_certificacion: string | null;
+  signature_status: string | null;
+  created_at: string;
+  agreement_id: string | null;
+  agreements_certified: string[] | null;
+  minute_id: string | null;
+}
+
+interface AgreementRegistryFilingRow {
+  id: string;
+  status: string;
+  filing_via: string;
+  filing_number: string | null;
+  presentation_date: string | null;
+  inscription_number: string | null;
+  created_at: string;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -223,6 +245,43 @@ export default function ExpedienteAcuerdo() {
     enabled: !!id,
   });
 
+  // ITEM-104: cross-link inverso — certificaciones de este acuerdo (por agreement_id
+  // directo o por pertenencia al array agreements_certified de una certificación
+  // minute-based) y el expediente registral más reciente.
+  const { data: certificaciones = [] } = useQuery({
+    queryKey: ["agreement_certifications", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("certifications")
+        .select(
+          "id, tipo_certificacion, signature_status, created_at, agreement_id, agreements_certified, minute_id",
+        )
+        .or(`agreement_id.eq.${id},agreements_certified.cs.{${id}}`)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as AgreementCertRow[];
+    },
+    enabled: !!id,
+  });
+
+  const { data: registryFiling = null } = useQuery({
+    queryKey: ["agreement_registry_filing", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("registry_filings")
+        .select(
+          "id, status, filing_via, filing_number, presentation_date, inscription_number, created_at",
+        )
+        .eq("agreement_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as AgreementRegistryFilingRow | null;
+    },
+    enabled: !!id,
+  });
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-[1200px] p-6 text-sm text-[var(--g-text-secondary)]">
@@ -241,13 +300,12 @@ export default function ExpedienteAcuerdo() {
   const a = agreement;
   const statusIndex = TIMELINE.indexOf(a.status);
   const generarTo = scope.createScopedTo(`/secretaria/acuerdos/${id}/generar`);
-  const tramitadorTo = scope.createScopedTo("/secretaria/tramitador");
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate(tramitadorTo)}
+        onClick={() => navigate(-1)}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -438,7 +496,62 @@ export default function ExpedienteAcuerdo() {
                 }
               />
             </div>
+            {/* ITEM-104: link al expediente registral más reciente del acuerdo. */}
+            {registryFiling ? (
+              <div className="mt-3 border-t border-[var(--g-border-subtle)] pt-3 text-sm">
+                <Link
+                  to={scope.createScopedTo(`/secretaria/tramitador/${registryFiling.id}`)}
+                  className="text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
+                >
+                  Ver expediente registral
+                </Link>
+                <span className="text-[var(--g-text-secondary)]">
+                  {" "}· {statusLabel(registryFiling.status)}
+                  {registryFiling.filing_number ? ` · ${registryFiling.filing_number}` : ""}
+                </span>
+              </div>
+            ) : null}
           </Card>
+
+          {/* ITEM-104: card de certificaciones del acuerdo (cross-link inverso). */}
+          {certificaciones.length > 0 ? (
+            <Card icon={<FileSignature className="h-4 w-4" />} title="Certificaciones">
+              <ul className="space-y-2">
+                {certificaciones.map((c) => {
+                  const agreementParam = a.entity_id
+                    ? `&agreement=${encodeURIComponent(id!)}`
+                    : "";
+                  const tramTo = a.entity_id
+                    ? `/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}${agreementParam}&scope=sociedad&entity=${encodeURIComponent(a.entity_id)}`
+                    : scope.createScopedTo(
+                        `/secretaria/tramitador/nuevo?certificacion=${encodeURIComponent(c.id)}${agreementParam}`,
+                      );
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex items-center justify-between gap-3 border border-[var(--g-border-subtle)] px-3 py-2 text-sm"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[var(--g-text-primary)]">
+                          {c.tipo_certificacion ?? "Certificación"}
+                        </span>
+                        <span className="text-xs text-[var(--g-text-secondary)]">
+                          {statusLabel(c.signature_status ?? "—")}
+                        </span>
+                      </span>
+                      <Link
+                        to={tramTo}
+                        className="shrink-0 text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
+                      >
+                        Abrir en tramitador
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          ) : null}
 
           {compliance?.publication_required ? (
             <Card icon={<Megaphone className="h-4 w-4" />} title="Publicación">
