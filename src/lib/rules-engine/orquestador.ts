@@ -178,6 +178,9 @@ export function evaluarAcuerdoCompleto(
   const allExplain: ExplainNode[] = [];
   const allBlockingIssues: string[] = [];
   const allWarnings: string[] = [];
+  // ITEM-151: canal SEPARADO para incumplimientos de pacto parasocial
+  // (contractuales, art. 29 LSC) — nunca se mezclan con los bloqueos societarios.
+  const pactoBlockingIssues: string[] = [];
   let ok = true;
   let path: 'A' | 'B' | 'C' = 'A';
 
@@ -630,24 +633,26 @@ export function evaluarAcuerdoCompleto(
       inputs.pactos.evalInput
     );
 
-    // Add pactos explain nodes
+    // ITEM-151 / P14 (Comité Legal + Garrigues): el incumplimiento de un pacto
+    // parasocial es CONTRACTUAL (eficacia inter partes, art. 29 LSC), no
+    // invalidez societaria. NO se mezcla con los blocking_issues societarios
+    // (LSC/RRM): va en un canal separado y etiquetado `pacto_blocking_issues`,
+    // y el encabezado se reporta como WARNING. El usuario ve "incumplimiento de
+    // pacto", no "acuerdo societariamente inválido".
     const pactosHeader: ExplainNode = {
       regla: 'pactos_parasociales',
       fuente: 'PACTO_PARASOCIAL',
-      resultado: pactosResult.pacto_ok ? 'OK' : 'BLOCKING',
+      resultado: pactosResult.pacto_ok ? 'OK' : 'WARNING',
       mensaje: pactosResult.pacto_ok
         ? `Pactos parasociales: ${pactosResult.pactos_aplicables} evaluados, todos cumplidos.`
-        : `PACTOS INCUMPLIDOS: ${pactosResult.pactos_incumplidos} de ${pactosResult.pactos_aplicables} pactos aplicables no se cumplen.`,
+        : `INCUMPLIMIENTO DE PACTO (contractual, no invalida el acuerdo): ${pactosResult.pactos_incumplidos} de ${pactosResult.pactos_aplicables} pactos aplicables no se cumplen.`,
       hijos: pactosResult.explain,
     };
     allExplain.push(pactosHeader);
-    allBlockingIssues.push(...pactosResult.blocking_issues);
+    // Canal separado: NO se vierte en allBlockingIssues (societario). Las
+    // advertencias de pacto se surfacean como warnings para visibilidad.
+    pactoBlockingIssues.push(...pactosResult.blocking_issues);
     allWarnings.push(...pactosResult.warnings);
-
-    // Pactos blocking → warning, NOT ok=false
-    // Reason: pactos are contractual obligations, not corporate validity.
-    // The agreement is still legally valid (proclamable), but breaches the pact.
-    // We surface it as blocking_issues for the UI to show, but don't flip ok.
   }
 
   return {
@@ -658,6 +663,7 @@ export function evaluarAcuerdoCompleto(
     explain: allExplain,
     blocking_issues: allBlockingIssues,
     warnings: allWarnings,
+    pacto_blocking_issues: pactoBlockingIssues,
     pactosResult,
   };
 }

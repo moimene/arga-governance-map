@@ -670,6 +670,12 @@ export interface ComplianceResult {
   explain: ExplainNode[];
   blocking_issues: string[];
   warnings: string[];
+  /**
+   * ITEM-151 / P14: incumplimientos de pacto parasocial (CONTRACTUALES, art. 29
+   * LSC). Canal separado de `blocking_issues` (societario, LSC/RRM) — no invalida
+   * el acuerdo, se ventila inter partes.
+   */
+  pacto_blocking_issues?: string[];
   snapshot_hash?: string;
   gate_hash?: string;
   pactosResult?: import('./pactos-engine').PactosEvalOutput;

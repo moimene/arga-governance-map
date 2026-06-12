@@ -1142,7 +1142,7 @@
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
 | ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | PENDIENTE |
 | ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | HECHO (UI) |
-| ITEM-151 | A9 | — | CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING | BLOQUEADO-LEGAL |
+| ITEM-151 | A9 | — | CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING | HECHO (legal) |
 
 ### ITEM-116 [P3] DL-2 incompleta en runtime: esCotizada se acepta pero ningún engine cableado lo consume, y los hooks lo hardcodean de forma contradictoria
 
@@ -1429,7 +1429,7 @@
 
 ### ITEM-151 [P3] CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING
 
-- **Área:** A9 · **Estado:** REQUIERE DECISIÓN HUMANA (documentado con recomendación → docs/superpowers/reviews/2026-06-11-decisiones-pendientes-secretaria.md)· **REQUIERE LEGAL**
+- **Área:** A9 · **Estado:** HECHO (Comité Legal+Garrigues; incumplimiento de pacto = WARNING contractual en canal separado pacto_blocking_issues, no invalidez societaria; art. 29 LSC)· **REQUIERE LEGAL**
 - **Descripción:** En pactos-engine.ts, el evaluador de CONSENTIMIENTO_INVERSOR no obtenido lleva un comentario que razona 'No obtenido → WARNING (no BLOCKING, porque el acuerdo es válido societariamente... la consecuencia es contractual, no de nulidad)' e inmediatamente devuelve severity:'BLOCKING'. El orquestador no voltea ok por pactos (los trata como veredicto paralelo, líneas 647-651), así que el efecto práctico es solo de presentación, pero el blocking_issue resultante se mezcla en allBlockingIssues con los bloqueos societarios reales, contaminando la semántica de la lista para cualquier consumidor de ComplianceResult. La calibración de severidad (BLOCKING contractual vs WARNING) es además una decisión jurídica que debe quedar consistente entre comentario, código y doctrina del módulo.
 - **Evidencia:** src/lib/rules-engine/pactos-engine.ts:428-436 (comentario WARNING vs severity BLOCKING); src/lib/rules-engine/orquestador.ts:644-651 (blocking_issues de pactos fusionados en allBlockingIssues sin marcar origen).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/pactos-engine.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/rules-engine/orquestador.ts

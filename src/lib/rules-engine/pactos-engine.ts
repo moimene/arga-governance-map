@@ -433,18 +433,22 @@ function evaluarConsentimientoInversor(
     tipo: 'CONSENTIMIENTO_INVERSOR',
     aplica: true,
     cumple: false,
-    severity: 'BLOCKING',
+    // ITEM-151 (Comité Legal + Garrigues): el incumplimiento del consentimiento
+    // de inversor es CONTRACTUAL (eficacia inter partes del pacto, art. 29 LSC),
+    // no invalidez societaria. WARNING, no BLOCKING — el acuerdo es válido y
+    // proclamable; la consecuencia se ventila en el plano del pacto.
+    severity: 'WARNING',
     explain: {
       regla: 'consentimiento_no_obtenido',
       fuente,
       referencia: pacto.documento_ref,
-      resultado: 'BLOCKING',
-      mensaje: `CONSENTIMIENTO NO OBTENIDO: Se requiere consentimiento previo de ${pacto.titular_veto ?? 'accionistas que representen ≥' + (pacto.capital_minimo_pct ?? '?') + '% del capital'} para las materias: ${materiasCoincidentes.join(', ')}. ${pacto.condicion_detallada ?? ''}`,
+      resultado: 'WARNING',
+      mensaje: `INCUMPLIMIENTO DE PACTO (contractual, no invalida el acuerdo societario): se requiere consentimiento previo de ${pacto.titular_veto ?? 'accionistas que representen ≥' + (pacto.capital_minimo_pct ?? '?') + '% del capital'} para las materias: ${materiasCoincidentes.join(', ')}. ${pacto.condicion_detallada ?? ''}`,
       hijos: [
         {
           regla: 'consentimiento_requisito',
           fuente,
-          resultado: 'BLOCKING',
+          resultado: 'WARNING',
           mensaje: `Capital mínimo requerido: ${pacto.capital_minimo_pct ?? '?'}% — Titular: ${pacto.titular_veto ?? 'No especificado'}`,
         },
       ],

@@ -153,13 +153,15 @@ describe('evaluarPactosParasociales — MAYORIA_REFORZADA_PACTADA', () => {
 // ─── CONSENTIMIENTO_INVERSOR ──────────────────────────────────────────────────
 
 describe('evaluarPactosParasociales — CONSENTIMIENTO_INVERSOR', () => {
-  it('sin consentimiento → BLOCKING', () => {
+  it('sin consentimiento → WARNING (incumplimiento contractual, no nulidad — ITEM-151)', () => {
     const pacto = makePactoConsentimiento();
     const out = evaluarPactosParasociales([pacto], makeInput({ consentimientosPrevios: [] }));
     expect(out.pacto_ok).toBe(false);
     const r = out.resultados[0];
     expect(r.cumple).toBe(false);
-    expect(r.severity).toBe('BLOCKING');
+    // Comité Legal + Garrigues: el consentimiento de inversor es contractual
+    // (art. 29 LSC, inter partes), no invalidez societaria → WARNING, no BLOCKING.
+    expect(r.severity).toBe('WARNING');
   });
 
   it('con consentimiento previo → OK', () => {
