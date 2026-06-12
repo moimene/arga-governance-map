@@ -537,7 +537,7 @@
 | ITEM-054 | A1 | — | 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo | ✅ HECHO (Garrigues OK; 14/15 packs, PACTO→ITEM-113) |
 | ITEM-055 | A10 | — | Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023 | HECHO (Ola1) |
 | ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | 🟡 PARCIAL (p1 vía ITEM-142; p2 residual) |
-| ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
+| ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | ✅ HECHO (Garrigues OK; workflow ultracode) |
 | ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | HECHO (Ola1) |
 | ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | ✅ HECHO (workflow ultracode) |
 | ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | ✅ HECHO (loop+codex) |
@@ -579,7 +579,7 @@
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | ✅ HECHO (workflow ultracode) |
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
-| ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
+| ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | ✅ HECHO (Garrigues OK; workflow ultracode) |
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | ✅ HECHO (loop) |
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | ✅ HECHO (loop) |
@@ -593,7 +593,7 @@
 | ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | ✅ HECHO (loop) |
 | ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | ⏸ DIFERIDO (gateado por fix cadena WORM — montar verificación rota sería peor) |
 | ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | ✅ HECHO (decisión producto documentada) |
-| ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | PENDIENTE |
+| ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | ✅ HECHO (Garrigues OK; workflow ultracode) |
 | ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |
 | ITEM-115 | A9 | — | no_session_resolutions admite UPDATE directo por cualquier usuario del tenant (contadores y status manipulables); las respuestas WORM sí están protegidas | ✅ HECHO (loop+cloud) |
 

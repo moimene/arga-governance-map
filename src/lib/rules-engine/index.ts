@@ -50,8 +50,28 @@ export { evaluarProcesoSinSesion, evaluarVentana } from './no-session-engine';
 export { evaluarDocumentacion, evaluarActa } from './documentacion-engine';
 export { determinarAdoptionMode, componerPerfilSesion, evaluarAcuerdoCompleto } from './orquestador';
 export { evaluarBordesNoComputables } from './bordes-no-computables';
+// ITEM-099 — Validación legal de representaciones (proxy junta arts. 183-187/523 LSC + delegación consejo art. 529 quáter LSC)
+export {
+  validarProxyJunta,
+  validarDelegacionConsejo,
+  type ProxyJuntaInput,
+  type DelegacionConsejoInput,
+  type RepresentacionValidacionResult,
+  type RepresentacionHallazgo,
+  type RepresentacionSeverity,
+  type RepresentacionStatus,
+  type VinculoRepresentanteSL,
+  type CaracterConsejero,
+} from './representacion-validator';
 export { evaluarPactosParasociales } from './pactos-engine';
 export type { PactoParasocial, PactosEvalInput, PactoEvalResult, PactosEvalOutput, TipoPacto } from './pactos-engine';
+// ITEM-113 — normalización de materias operativas ↔ materias de cláusula de pacto
+export {
+  normalizeMateriaPacto,
+  materiaPactoCoincide,
+  materiasPactoCoincidentes,
+  type MateriaPactoCanonica,
+} from './materia-pacto-mapping';
 export {
   MATERIA_PACK_ALIASES,
   normalizeMateriaForRulePack,

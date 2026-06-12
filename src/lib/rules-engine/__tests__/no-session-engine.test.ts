@@ -468,7 +468,9 @@ describe('Gate 4: Circulación Consejo', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('Quórum participación insuficiente → WARNING', () => {
+  // ITEM-057 (1): participación inferior al 50% de consejeros BLOQUEA la
+  // adopción (antes era WARNING no bloqueante).
+  it('ITEM-057: participación insuficiente (<50%) → BLOCKING', () => {
     const input = createBaseInput({
       organoTipo: 'CONSEJO',
       totalDestinatarios: 10,
@@ -498,8 +500,167 @@ describe('Gate 4: Circulación Consejo', () => {
     });
 
     const result = evaluarCirculacionConsejo(input);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+    expect(result.explain.some(n => n.regla.includes('Participación'))).toBe(true);
+  });
+
+  // ITEM-057 (1): participación exactamente al 50% es suficiente y no bloquea.
+  it('ITEM-057: participación exactamente al 50% → OK', () => {
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      totalDestinatarios: 4,
+      respuestas: [
+        {
+          person_id: '1',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+        {
+          person_id: '2',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+      ],
+    });
+
+    const result = evaluarCirculacionConsejo(input);
     expect(result.ok).toBe(true);
-    expect(result.severity).toBe('WARNING');
+    expect(result.severity).toBe('OK');
+  });
+
+  // ITEM-057 (2): las respuestas SILENCIO no computan en el denominador de la
+  // mayoría — el caso [C,C,X,SILENCIO,SILENCIO] con 5 consejeros se proclama
+  // (3 concurrentes, mayoría absoluta 2, 2 consienten, participación 60%).
+  it('ITEM-057: SILENCIO fuera del denominador de la mayoría → OK', () => {
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      totalDestinatarios: 5,
+      respuestas: [
+        {
+          person_id: '1',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+        {
+          person_id: '2',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+        {
+          person_id: '3',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'OBJECION',
+        },
+        {
+          person_id: '4',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+        {
+          person_id: '5',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+      ],
+    });
+
+    const result = evaluarCirculacionConsejo(input);
+    expect(result.ok).toBe(true);
+    expect(result.severity).toBe('OK');
+  });
+
+  // ITEM-057 (2): los SILENCIO no inflan la participación; si solo concurre 1 de
+  // 5 consejeros (resto silencio) la adopción se BLOQUEA por participación <50%.
+  it('ITEM-057: SILENCIO no cuenta para participación → BLOCKING', () => {
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      totalDestinatarios: 5,
+      respuestas: [
+        {
+          person_id: '1',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+        {
+          person_id: '2',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+        {
+          person_id: '3',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+        {
+          person_id: '4',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+        {
+          person_id: '5',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'SILENCIO',
+        },
+      ],
+    });
+
+    const result = evaluarCirculacionConsejo(input);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+  });
+
+  // ITEM-057 (2): sin mayoría absoluta de concurrentes (empate 1C-1X de 2
+  // concurrentes, mayoría absoluta = 2) → BLOCKING aunque participación ≥50%.
+  it('ITEM-057: empate de concurrentes sin mayoría absoluta → BLOCKING', () => {
+    const input = createBaseInput({
+      organoTipo: 'CONSEJO',
+      totalDestinatarios: 3,
+      respuestas: [
+        {
+          person_id: '1',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'CONSENTIMIENTO',
+        },
+        {
+          person_id: '2',
+          capital_participacion: 0,
+          porcentaje_capital: 0,
+          es_consejero: true,
+          sentido: 'OBJECION',
+        },
+      ],
+    });
+
+    const result = evaluarCirculacionConsejo(input);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
   });
 });
 

@@ -15,6 +15,11 @@
 // ============================================================
 
 import type { ExplainNode, EvalSeverity, Fuente } from './types';
+// ITEM-113 — matching de materias vía tabla de normalización canónica
+// (AUMENTO_CAPITAL↔AMPLIACION_CAPITAL, DISOLUCION↔LIQUIDACION, paraguas
+// OPERACION_ESTRUCTURAL→{FUSION,ESCISION,...}). Sin esto los pactos nunca
+// disparaban porque los vocabularios de materias eran disjuntos.
+import { materiasPactoCoincidentes } from './materia-pacto-mapping';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -177,8 +182,10 @@ function evaluarPactoWarningOnly(
   input: PactosEvalInput
 ): PactoEvalResult {
   const fuente: Fuente = 'PACTO_PARASOCIAL';
-  const materiasCoincidentes = input.materias.filter(m =>
-    pacto.materias_aplicables.includes(m)
+  // ITEM-113 — matching normalizado en vez de includes() literal.
+  const materiasCoincidentes = materiasPactoCoincidentes(
+    input.materias,
+    pacto.materias_aplicables
   );
 
   if (materiasCoincidentes.length === 0) {
@@ -229,8 +236,10 @@ function evaluarVeto(
   const fuente: Fuente = 'PACTO_PARASOCIAL';
 
   // Comprobar si alguna materia del acuerdo está en las materias del pacto
-  const materiasCoincidentes = input.materias.filter(m =>
-    pacto.materias_aplicables.includes(m)
+  // ITEM-113 — matching normalizado: DISOLUCION↔LIQUIDACION, OPERACION_ESTRUCTURAL→{...}.
+  const materiasCoincidentes = materiasPactoCoincidentes(
+    input.materias,
+    pacto.materias_aplicables
   );
 
   if (materiasCoincidentes.length === 0) {
@@ -313,8 +322,10 @@ function evaluarMayoriaReforzada(
   const fuente: Fuente = 'PACTO_PARASOCIAL';
 
   // Comprobar si alguna materia aplica
-  const materiasCoincidentes = input.materias.filter(m =>
-    pacto.materias_aplicables.includes(m)
+  // ITEM-113 — matching normalizado: AUMENTO_CAPITAL↔AMPLIACION_CAPITAL, etc.
+  const materiasCoincidentes = materiasPactoCoincidentes(
+    input.materias,
+    pacto.materias_aplicables
   );
 
   if (materiasCoincidentes.length === 0) {
@@ -382,8 +393,10 @@ function evaluarConsentimientoInversor(
   const fuente: Fuente = 'PACTO_PARASOCIAL';
 
   // Comprobar si alguna materia aplica
-  const materiasCoincidentes = input.materias.filter(m =>
-    pacto.materias_aplicables.includes(m)
+  // ITEM-113 — matching normalizado: AUMENTO_CAPITAL↔AMPLIACION_CAPITAL, etc.
+  const materiasCoincidentes = materiasPactoCoincidentes(
+    input.materias,
+    pacto.materias_aplicables
   );
 
   if (materiasCoincidentes.length === 0) {

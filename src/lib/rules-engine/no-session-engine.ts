@@ -529,62 +529,79 @@ export function evaluarCirculacionConsejo(input: NoSessionInput): {
   const objecionesProcedimiento = respuestas.filter(
     r => r.sentido === 'OBJECION_PROCEDIMIENTO'
   ).length;
+  // ITEM-057 (2): las respuestas SILENCIO NO computan en el denominador de la
+  // mayoría — solo cuentan los concurrentes al procedimiento (respuestas
+  // expresas: CONSENTIMIENTO, OBJECION u OBJECION_PROCEDIMIENTO).
+  const concurrentes = respuestas.filter(r => r.sentido !== 'SILENCIO').length;
 
-  // Level 1: objeción de procedimiento bloquea
+  // Level 1: objeción de procedimiento bloquea (art. 248.2 LSC: basta que un
+  // solo consejero se oponga al procedimiento escrito para impedir su adopción)
   if (objecionesProcedimiento > 0) {
     explain.push({
       regla: 'Objeción de procedimiento',
-      fuente: 'ESTATUTOS',
+      fuente: 'LEY',
+      referencia: 'art. 248.2 LSC / art. 100 RRM (votación por escrito y sin sesión del consejo)',
       resultado: 'BLOCKING',
       mensaje: `Circulación rechazada: ${objecionesProcedimiento} consejero(s) objetan el procedimiento escrito`,
     });
     return { ok: false, severity: 'BLOCKING', explain };
   }
 
-  // Level 2: among respuestas, mayoría de CONSENTIMIENTO > OBJECION
-  if (respuestas.length === 0) {
+  // Level 2: deben existir concurrentes al procedimiento (respuestas expresas)
+  if (concurrentes === 0) {
     explain.push({
-      regla: 'Sin respuestas',
-      fuente: 'ESTATUTOS',
+      regla: 'Sin respuestas expresas',
+      fuente: 'LEY',
+      referencia: 'art. 248.2 LSC / art. 100 RRM',
       resultado: 'BLOCKING',
-      mensaje: 'Ningún consejero ha respondido',
+      mensaje: 'Ningún consejero ha respondido expresamente (solo silencios)',
     });
     return { ok: false, severity: 'BLOCKING', explain };
   }
 
-  const mayoriaAlcanzada = consentimientos > objeciones;
-
-  if (!mayoriaAlcanzada) {
-    explain.push({
-      regla: 'Mayoría de consentimientos',
-      fuente: 'ESTATUTOS',
-      resultado: 'BLOCKING',
-      mensaje: `Mayoría NO alcanzada: ${consentimientos} consienten vs ${objeciones} objetan`,
-    });
-    return { ok: false, severity: 'BLOCKING', explain };
-  }
-
-  // Participation quorum (50% of total)
-  const participationPct = respuestas.length / input.totalDestinatarios;
+  // ITEM-057 (1): la participación inferior al 50% de los consejeros BLOQUEA la
+  // adopción (antes solo emitía WARNING). El cómputo de participación usa los
+  // concurrentes al procedimiento (respuestas expresas), no los silencios.
+  const participationPct = concurrentes / input.totalDestinatarios;
   const quorumParticipacion = participationPct >= 0.5;
 
   if (!quorumParticipacion) {
     explain.push({
-      regla: 'Quórum de participación (≥50%)',
-      fuente: 'ESTATUTOS',
-      resultado: 'WARNING',
-      mensaje: `Participación baja: ${(participationPct * 100).toFixed(0)}% (${respuestas.length}/${input.totalDestinatarios})`,
+      regla: 'Participación de consejeros (≥50%)',
+      fuente: 'LEY',
+      referencia: 'art. 248.2 LSC / art. 100 RRM',
+      resultado: 'BLOCKING',
+      mensaje: `Participación insuficiente: ${(participationPct * 100).toFixed(0)}% (${concurrentes}/${input.totalDestinatarios} consejeros concurren al procedimiento; se exige ≥50%)`,
     });
+    return { ok: false, severity: 'BLOCKING', explain };
+  }
+
+  // Level 3: mayoría absoluta de los concurrentes al procedimiento.
+  // ITEM-057 (2): el denominador es el número de respuestas expresas
+  // (concurrentes), excluidos los silencios, conforme al art. 248.2 LSC.
+  const mayoriaAbsoluta = Math.floor(concurrentes / 2) + 1;
+  const mayoriaAlcanzada = consentimientos >= mayoriaAbsoluta;
+
+  if (!mayoriaAlcanzada) {
+    explain.push({
+      regla: 'Mayoría absoluta de los concurrentes',
+      fuente: 'LEY',
+      referencia: 'art. 248.2 LSC / art. 100 RRM',
+      resultado: 'BLOCKING',
+      mensaje: `Mayoría NO alcanzada: ${consentimientos} consienten de ${concurrentes} concurrentes (se exigen ${mayoriaAbsoluta}; ${objeciones} objetan)`,
+    });
+    return { ok: false, severity: 'BLOCKING', explain };
   }
 
   explain.push({
-    regla: 'Mayoría de consentimientos',
-    fuente: 'ESTATUTOS',
+    regla: 'Mayoría absoluta de los concurrentes',
+    fuente: 'LEY',
+    referencia: 'art. 248.2 LSC / art. 100 RRM',
     resultado: 'OK',
-    mensaje: `Mayoría alcanzada: ${consentimientos} consienten > ${objeciones} objetan (participación: ${(participationPct * 100).toFixed(0)}%)`,
+    mensaje: `Mayoría alcanzada: ${consentimientos} consienten ≥ ${mayoriaAbsoluta} requeridos (concurrentes: ${concurrentes}, ${objeciones} objetan, participación: ${(participationPct * 100).toFixed(0)}%)`,
   });
 
-  return { ok: true, severity: quorumParticipacion ? 'OK' : 'WARNING', explain };
+  return { ok: true, severity: 'OK', explain };
 }
 
 // ================================================================
