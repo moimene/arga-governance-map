@@ -565,7 +565,7 @@
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
 | ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | HECHO (UI) |
 | ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | ✅ HECHO (loop) |
-| ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | PENDIENTE |
+| ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | ✅ HECHO (loop+cloud) |
 | ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
 | ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | ✅ HECHO (workflow ultracode) |
 | ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | ✅ HECHO (loop+codex) |
