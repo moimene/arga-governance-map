@@ -77,17 +77,35 @@ export interface RulePackData {
  *     const { inscribible, instrumentoRequerido } = data.payload;
  *   }
  */
-export function useRulePackForMateria(materiaInput: string | undefined) {
+// ITEM-133: familia de órgano canónica para desempatar packs que comparten
+// materia entre Junta y Consejo (p. ej. AUTORIZACION_GARANTIA tiene un pack por
+// órgano). CONSEJO/CONSEJO_ADMIN/CONSEJO_ADMINISTRACION → 'CONSEJO';
+// JGA/JUNTA_GENERAL/JUNTA → 'JUNTA'.
+function organoFamily(value?: string | null): "CONSEJO" | "JUNTA" | null {
+  if (!value) return null;
+  const v = value.toUpperCase();
+  if (v.includes("CONSEJO") || v === "CDA") return "CONSEJO";
+  if (v.includes("JUNTA") || v === "JGA" || v === "JGE") return "JUNTA";
+  return null;
+}
+
+export function useRulePackForMateria(materiaInput: string | undefined, organoTipo?: string | null) {
   const { tenantId } = useTenantContext();
   // ITEM-006: el catálogo UI y los packs sembrados divergen en grafías —
   // normalizamos al id canónico del pack antes de consultar Cloud.
   const materiaCla = materiaInput ? normalizeMateriaForRulePack(materiaInput) : materiaInput;
+  const organo = organoFamily(organoTipo);
   return useQuery<RulePackData | null, Error>({
     enabled: !!materiaCla && !!tenantId,
-    queryKey: ["rule_packs", tenantId, "byMateria", materiaCla],
+    queryKey: ["rule_packs", tenantId, "byMateria", materiaCla, organo ?? "any"],
     queryFn: async () => {
       if (!materiaCla) return null;
 
+      // ITEM-133: sin filtrar órgano ni ordenar, dos packs activos de la misma
+      // materia (Junta vs Consejo) hacían que limit(1) devolviera uno arbitrario.
+      // Se traen todos los packs activos de la materia con orden determinista y se
+      // prefiere el del órgano del acuerdo cuando se conoce; si no hay match de
+      // órgano, se cae al primero determinista (compatibilidad legacy).
       const { data, error } = await supabase
         .from("rule_packs")
         .select(
@@ -111,11 +129,13 @@ export function useRulePackForMateria(materiaInput: string | undefined) {
         .eq("tenant_id", tenantId!)
         .eq("materia", materiaCla)
         .eq("rule_pack_versions.is_active", true)
-        .limit(1);
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
 
-      const first = ((data ?? []) as unknown as RulePackWithVersions[])[0];
+      const rows = (data ?? []) as unknown as RulePackWithVersions[];
+      const first =
+        (organo ? rows.find((r) => organoFamily(r.organo_tipo) === organo) : undefined) ?? rows[0];
       if (!first) return null;
 
       const versions = first.rule_pack_versions ?? [];
