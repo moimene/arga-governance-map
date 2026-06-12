@@ -563,10 +563,10 @@
 | ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
 | ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | PENDIENTE |
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
-| ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | PENDIENTE |
+| ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | HECHO (UI) |
 | ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | PENDIENTE |
 | ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | PENDIENTE |
-| ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | PENDIENTE |
+| ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
 | ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | PENDIENTE |
 | ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | PENDIENTE |
 | ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | PENDIENTE |
@@ -835,7 +835,7 @@
 
 ### ITEM-083 [P2] Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida
 
-- **Área:** A3 · **Estado:** PENDIENTE
+- **Área:** A3 · **Estado:** HECHO (Ola UI/typing; lista_actos_ratificados aceptado en gate-pre-semantic)
 - **Descripción:** La regla SEM_RATIFICACION_IDENTIFICACION exige un campo capa3 OBLIGATORIO dentro de IDENTIFICACION_FIELDS = [enumeracion_actos, identificacion_actos, relacion_actos, actos_a_ratificar, anexo_actos]. La plantilla ACTIVA real en Cloud (edd5c389-0187-476c-9592-c020058fdc69) fue corregida usando el campo `lista_actos_ratificados` (array OBLIGATORIO con item_schema completo: fecha_acto, contraparte, descripcion min 20 chars, fundamento — jurídicamente más sólido que la lista esperada), pero ese nombre NO está en la lista del gate. Consecuencias: (a) el tab Validación (Gate PRE global) reporta 1 BLOCKING falso sobre una plantilla jurídicamente correcta, contradiciendo a known-p0.ts que declara 'lista cerrada a cero' y al KPI 'P0 activos = 0' del Dashboard; (b) cualquier ciclo futuro de reactivación de esa plantilla quedaría bloqueado en transitionTemplateState sin salida desde UI. La FUSION_ESCISION (e3697ad9) sí pasa: verificado que su capa1 contiene el condicional requiere_experto.
 - **Evidencia:** src/lib/secretaria/template-admin/gate-pre-semantic.ts:10-57 (IDENTIFICACION_FIELDS sin lista_actos_ratificados). SQL Cloud: SELECT capa3_editables FROM plantillas_protegidas WHERE id='edd5c389-...' → único campo de identificación es lista_actos_ratificados (OBLIGATORIO); has_experto_conditional=true para e3697ad9. grep: 'lista_actos_ratificados' no aparece en ningún archivo de src/. Test gate-pre-semantic.test.ts:55 solo usa enumeracion_actos.
 - **Archivos:** src/lib/secretaria/template-admin/gate-pre-semantic.ts, src/lib/secretaria/template-admin/known-p0.ts, src/lib/secretaria/template-admin/__tests__/gate-pre-semantic.test.ts
@@ -860,7 +860,7 @@
 
 ### ITEM-086 [P2] Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente
 
-- **Área:** A3 · **Estado:** PENDIENTE
+- **Área:** A3 · **Estado:** HECHO (Ola UI/typing; countOrphanTemplates excluye ARCHIVADA)
 - **Descripción:** plantilla_changelog tiene exactamente 1 entrada en todo el tenant; 58 de 59 ACTIVA, las 16 BORRADOR y las 35 ARCHIVADA carecen de registro. Efectos en cascada: el Dashboard muestra permanentemente la alerta WARNING '109 plantilla(s) sin changelog — revisar Auditoría' y el KPI 'Sin changelog: 109'; el tab Auditoría (cuyo propósito es trazabilidad) muestra una tabla de changelog con 1 fila y la sección de huérfanos en rojo. Una alerta que nunca puede resolverse entrena al usuario a ignorar warnings, y la historia de auditoría (argumento central de venta del gestor) no es demostrable. Nota agravante: countOrphanTemplates cuenta también las 35 ARCHIVADA legacy, inflando el número con plantillas fuera de circulación.
 - **Evidencia:** SQL Cloud: SELECT count(*) FROM plantilla_changelog WHERE tenant_id='00000000-...0001' → total_changelog=1, distinct_plantillas=1. LEFT JOIN huérfanos por estado: ACTIVA 58, ARCHIVADA 35, BORRADOR 16. UI: src/components/secretaria/gestor/DashboardTab.tsx:93-99 y 164-170; AuditoriaTab.tsx:127-132. Conteo: src/lib/secretaria/template-admin/cloud-helpers.ts:62-75 (sin filtro de estado).
 - **Archivos:** src/lib/secretaria/template-admin/cloud-helpers.ts, src/components/secretaria/gestor/DashboardTab.tsx, src/components/secretaria/gestor/AuditoriaTab.tsx

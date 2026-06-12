@@ -60,10 +60,14 @@ export async function detectAllActiveDuplicates(tenantId: string): Promise<
 }
 
 export async function countOrphanTemplates(tenantId: string): Promise<number> {
+  // ITEM-086: solo cuentan como "huérfanas" las plantillas en estados vivos.
+  // Las ARCHIVADA legítimamente pueden no tener changelog y no deben inflar el
+  // contador de huérfanas.
   const { data: plantillas, error: e1 } = await supabase
     .from("plantillas_protegidas")
     .select("id")
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .in("estado", ["ACTIVA", "BORRADOR", "REVISADA", "APROBADA"]);
   if (e1) throw e1;
   const { data: changelog, error: e2 } = await supabase
     .from("plantilla_changelog")

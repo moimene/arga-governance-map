@@ -13,6 +13,8 @@ const IDENTIFICACION_FIELDS = [
   "relacion_actos",
   "actos_a_ratificar",
   "anexo_actos",
+  // ITEM-083: variante usada por las plantillas reales de RATIFICACION_ACTOS.
+  "lista_actos_ratificados",
 ];
 
 // G5 — Sustituye el probe §6.2 del prompt de auditoría. Una plantilla ACTIVA
