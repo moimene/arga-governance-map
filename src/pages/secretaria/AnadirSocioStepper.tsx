@@ -124,8 +124,23 @@ export default function AnadirSocioStepper() {
       toast.success("Socio añadido correctamente");
       navigate(`/secretaria/sociedades/${entityId}`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error("No se pudo añadir el socio: " + msg);
+      // ITEM-092: traducir el error de constraint de duplicado (23505 sobre
+      // ux_capital_holdings_vigente) a un mensaje accionable en vez del crudo
+      // de Postgres.
+      const code = (e as { code?: string } | null)?.code;
+      const rawMsg = e instanceof Error ? e.message : String(e);
+      const isDuplicate =
+        code === "23505" || /ux_capital_holdings_vigente|duplicate key/i.test(rawMsg);
+      toast.error(
+        isDuplicate
+          ? "Esta persona ya es titular vigente de esa clase de títulos."
+          : "No se pudo añadir el socio",
+        {
+          description: isDuplicate
+            ? "Usa Transmisión de participaciones para modificar su posición en lugar de un alta nueva."
+            : rawMsg,
+        },
+      );
     } finally {
       setSaving(false);
     }

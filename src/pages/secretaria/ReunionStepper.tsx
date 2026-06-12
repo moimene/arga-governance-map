@@ -2884,12 +2884,12 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       const materialized = savedPoints.filter((point) => Boolean(point.agreement_id)).length;
       setSnapshotOnlySaved(false);
       toast.success(
-        `${rows.length} resolución(es) registrada(s); ${materialized} acuerdo(s) 360 materializado(s)`
+        `${rows.length} acuerdo(s) votado(s) y registrado(s); ${materialized} acuerdo(s) 360 materializado(s)`
       );
       setResolutionsSaved(true);
     } catch (e) {
       setSnapshotOnlySaved(false);
-      toast.error(e instanceof Error ? e.message : "Error al registrar resoluciones");
+      toast.error(e instanceof Error ? e.message : "Error al registrar la votación de los acuerdos");
     }
   }
 
@@ -3410,8 +3410,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           >
             <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--status-success)]" />
             <p className="text-sm font-medium text-[var(--g-text-primary)]">
-              {existingResolutions.length > 0 ? existingResolutions.length : "Las"} resoluciones
-              ya están registradas; {linkedAgreementCount} expediente(s)
+              {existingResolutions.length > 0 ? existingResolutions.length : "Los"} acuerdos
+              ya están votados y registrados; {linkedAgreementCount} expediente(s)
               Acuerdo 360 vinculado(s). Continúa al paso de cierre.
             </p>
           </div>
@@ -3424,7 +3424,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
             <p className="text-sm text-[var(--g-text-secondary)]">
-              Hay resoluciones operativas sin expediente Acuerdo 360 o con snapshot no
+              Hay acuerdos votados sin expediente Acuerdo 360 o con snapshot no
               proclamable. Puede recalcular la votación para crear o actualizar el expediente
               canónico con el snapshot legal actual.
             </p>
@@ -3439,7 +3439,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             aria-busy={saveResolutions.isPending || updateQuorumData.isPending}
             title={
               !hasPersistentVoters
-                ? "Guarda asistentes reales antes de registrar resoluciones"
+                ? "Guarda asistentes reales antes de registrar la votación de los acuerdos"
                 : !allPointsHaveVotes
                 ? "Registra voto expreso de cada votante elegible y motivo de cada conflicto"
                 : undefined
@@ -3453,8 +3453,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               <Save className="h-4 w-4" />
             )}
             {canRecalculateExistingResolutions
-              ? "Recalcular resolución y crear expediente Acuerdo 360"
-              : "Registrar resolución y crear expediente Acuerdo 360"}
+              ? "Recalcular votación del acuerdo y crear expediente Acuerdo 360"
+              : "Registrar votación del acuerdo y crear expediente Acuerdo 360"}
           </button>
         ) : null}
       </div>
@@ -3807,7 +3807,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
               Acta generada en borrador
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-              {resolutions.length} resolución(es) registrada(s), {materializedAgreementCount} expediente(s)
+              {resolutions.length} acuerdo(s) votado(s), {materializedAgreementCount} expediente(s)
               Acuerdo 360 vinculados. Procede a firmar el acta y emitir la certificación.
             </p>
           </div>
@@ -4056,8 +4056,8 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Hay {adoptedWithoutAgreement.length} resolución(es) aprobada(s) sin expediente
-            Acuerdo 360. Vuelve al paso de votaciones y recalcula la resolución antes de generar
+            Hay {adoptedWithoutAgreement.length} acuerdo(s) aprobado(s) sin expediente
+            Acuerdo 360. Vuelve al paso de votaciones y recalcula la votación antes de generar
             el acta.
           </p>
         </div>
@@ -4116,7 +4116,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
             : actaPuntos.length === 0
               ? "Guarda al menos un punto del orden del día antes de generar el acta"
             : adoptedWithoutAgreement.length > 0
-              ? "Recalcula las resoluciones adoptadas sin Acuerdo 360 antes de generar el acta"
+              ? "Recalcula los acuerdos adoptados sin Acuerdo 360 antes de generar el acta"
               : !actaValidationOk
                 ? "Corrige la estructura legal del acta antes de generar el documento"
               : undefined
