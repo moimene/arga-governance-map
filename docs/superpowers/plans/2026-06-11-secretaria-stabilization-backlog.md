@@ -561,7 +561,7 @@
 | ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | ✅ HECHO (loop) |
 | ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | HECHO (motor) |
 | ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
-| ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | PENDIENTE |
+| ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | 🟡 PARCIAL (fase 1: huérfanos re-apuntados + pack alias retirado; fase 2 dedup catálogo/organo/versionado diferida) |
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
 | ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | HECHO (UI) |
 | ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | ✅ HECHO (loop) |
