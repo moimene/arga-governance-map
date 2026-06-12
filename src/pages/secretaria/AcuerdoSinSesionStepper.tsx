@@ -6,6 +6,7 @@ import {
   ThumbsUp, ThumbsDown, Minus, Users, AlertTriangle,
 } from "lucide-react";
 import { useEntitiesList } from "@/hooks/useEntities";
+import { StepRail } from "./_shared/StepNav";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
@@ -469,54 +470,15 @@ export default function AcuerdoSinSesionStepper() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-        {/* Stepper rail */}
-        <nav
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-2"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          aria-label="Pasos"
-        >
-          {STEPS.map((s) => {
-            const done = s.n < current;
-            const active = s.n === current;
-            // ITEM-060: una vez abierta la votación (resolutionId !== null) los
-            // pasos previos (1-3) quedan congelados: volver atrás y pulsar
-            // "Iniciar votación" crearía un segundo proceso huérfano. Solo se
-            // permite navegar entre los pasos posteriores (4-5).
-            const frozen = resolutionId !== null && s.n < 4;
-            const canGoBack = done && !frozen;
-            const locked = (s.n > current && s.n !== 4) || frozen; // paso 4 se abre via handleOpenVoting
-            return (
-              <button
-                key={s.n}
-                type="button"
-                onClick={() => canGoBack && setCurrent(s.n)}
-                disabled={locked}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                  active
-                    ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
-                    : canGoBack
-                    ? "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50 cursor-pointer"
-                    : "text-[var(--g-text-secondary)] opacity-40 cursor-default"
-                }`}
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[11px] font-bold ${
-                    done
-                      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                      : active
-                      ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {done ? <Check className="h-3.5 w-3.5" /> : s.n}
-                </span>
-                <span className="flex-1 truncate">{s.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Stepper rail — ITEM-125: rail compartido. ITEM-060: tras abrir la votación
+            (resolutionId !== null) los pasos 1-3 quedan congelados (lockBack), para que
+            volver atrás y pulsar "Iniciar votación" no cree un segundo proceso huérfano. */}
+        <StepRail
+          steps={STEPS}
+          current={current}
+          canNavigateTo={(n) => n < current && !(resolutionId !== null && n < 4)}
+          onNavigate={setCurrent}
+        />
 
         {/* Step body */}
         <div

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { StepRail } from "./_shared/StepNav";
 import { useTenantContext } from "@/context/TenantContext";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useEntitiesList } from "@/hooks/useEntities";
@@ -749,47 +750,13 @@ export default function CoAprobacionStepper() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-        <nav
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-2"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          aria-label="Pasos"
-        >
-          {STEPS.map((s) => {
-            const done = s.n < current;
-            const active = s.n === current;
-            const locked = s.n > current;
-            return (
-              <button
-                key={s.n}
-                type="button"
-                onClick={() => done && setCurrent(s.n)}
-                disabled={locked}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                  active
-                    ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
-                    : done
-                      ? "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50"
-                      : "text-[var(--g-text-secondary)] opacity-40"
-                }`}
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[11px] font-bold ${
-                    done
-                      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                      : active
-                      ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {done ? <Check className="h-3.5 w-3.5" /> : s.n}
-                </span>
-                <span className="flex-1 truncate">{s.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* ITEM-125: rail compartido. */}
+        <StepRail
+          steps={STEPS}
+          current={current}
+          canNavigateTo={(n) => n < current}
+          onNavigate={setCurrent}
+        />
 
         <div
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
