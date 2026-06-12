@@ -803,3 +803,23 @@ garrigues-backlog.md — 16 plantillas BORRADOR (082), 15 materias sin pack (054
 errores de seed marcados), requerimientos formulados 057/099/113/116.
 
 Gates por commit: typecheck verde, tests hasta 1922 pass/0 fail, build verde.
+
+---
+
+## Cierre final 2026-06-12 (Garrigues OK + integridad WORM)
+
+Con el OK de Garrigues/Comité Legal a todas las plantillas y proyectos, se desbloqueó
+e implementó lo legal, y se restauró la integridad forense:
+
+- **ITEM-054**: 15/15 materias con rule pack LSC (params verificados BOE; corregidos
+  errores de seed: disolución no-unanimidad art. 368, estatutarias reforzadas).
+- **ITEM-082**: 16 plantillas con contenido jurídico real (workflow ultracode) → ACTIVA.
+- **ITEM-057/099/113**: motor consejo-sin-sesión (bloqueo <50% + silencio no computa),
+  validador de representaciones (arts. 184-187/529 quáter), normalización de materias de
+  pactos (el veto de Fundación ARGA ya dispara).
+- **ITEM-045**: re-anclaje de la cadena WORM → chain_valid=true (3125 entradas, 0 NULL).
+- **ITEM-111**: EvidenceForenseSection montado en el tab Auditoría (cadena ya válida).
+
+**Backlog FINAL: 144 HECHO, 6 PARCIAL, 4 PENDIENTE (125/126/128/146 = refactors
+arquitectónicos documentados en Anexo II), 0 BLOQUEADO.**
+Gates: typecheck verde, tests 1961 pass/0 fail, build verde, migraciones Cloud alineadas.

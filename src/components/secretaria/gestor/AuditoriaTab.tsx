@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, FolderOpen, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { EvidenceForenseSection } from "@/components/EvidenceForenseSection";
 import { usePlantillaChangelog } from "@/hooks/secretaria/usePlantillaChangelog";
 import { countOrphanTemplates } from "@/lib/secretaria/template-admin";
 import { AlertBanner } from "./AlertBanner";
@@ -130,6 +131,11 @@ export function AuditoriaTab() {
           mensaje={`${orphansCount} plantilla(s) sin changelog detectadas. Revisar trazabilidad.`}
         />
       ) : null}
+
+      {/* ITEM-111: verificación de la cadena WORM + bundles de evidencia forense.
+          El componente estaba huérfano (ninguna ruta lo montaba); ahora que la
+          cadena verifica (chain_valid=true tras ITEM-045) se expone en Auditoría. */}
+      <EvidenceForenseSection />
 
       <section
         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
