@@ -644,13 +644,19 @@ export default function GenerarDocumentoStepper() {
         templateTipo: selectedPlantilla?.tipo,
         templateVersion: selectedPlantilla?.version,
         contentHash,
-        signedBy: qesResult ? "EAD Trust" : undefined,
+        // ITEM-109: en modo sandbox, signedDocumentData es el buffer ORIGINAL sin
+        // firmar y los IDs son SR-SANDBOX-*/SIGN-SANDBOX-*; no debe etiquetarse
+        // como firmado por 'EAD Trust' ni como QTSP_SIGNED_DOCX. Se propaga
+        // sandbox para que el manifest deje constancia (sandbox:true).
+        signedBy: qesResult && !qesResult.sandbox ? "EAD Trust" : undefined,
+        sandbox: qesResult?.sandbox === true,
         qesSrId: qesResult?.srId,
         qesDocumentId: qesResult?.documentId,
         qesDocumentHash: qesResult?.documentHash,
         qesSignatoryIds: qesResult?.signatoryIds,
         qesSignedAt: qesResult?.signed_at,
-        archivedBufferKind: qesResult?.signedDocumentData ? "QTSP_SIGNED_DOCX" : "ORIGINAL_DOCX",
+        archivedBufferKind:
+          qesResult?.signedDocumentData && !qesResult.sandbox ? "QTSP_SIGNED_DOCX" : "ORIGINAL_DOCX",
         normativeSnapshotId: normativeSnapshot?.snapshot_id ?? null,
         normativeProfileId: normativeSnapshot?.profile_id ?? null,
         normativeProfileHash: normativeSnapshot?.profile_hash ?? null,
@@ -1477,11 +1483,27 @@ export default function GenerarDocumentoStepper() {
                     <CheckCircle2 className="h-4 w-4" />
                     <span className="text-sm font-medium">Solicitud QES activada correctamente</span>
                   </div>
-                  <p className="text-xs text-[var(--g-text-secondary)]">
-                    EAD Trust ha registrado la solicitud de firma. El archivo se archivará con los
-                    identificadores QTSP y, si el proveedor entrega un artefacto firmado, se archivará
-                    ese binario firmado.
-                  </p>
+                  {/* ITEM-109: distinguir la firma sandbox de demo de una transacción
+                      EAD Trust real. En sandbox el buffer NO va firmado y el manifest
+                      se marca sandbox:true; el usuario debe saberlo. */}
+                  {qesResult?.sandbox ? (
+                    <div
+                      className="flex items-start gap-2 px-3 py-2 bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span className="text-xs">
+                        Firma sandbox de demo — NO es una transacción EAD Trust real. El documento se
+                        archiva sin firma cualificada y la evidencia queda marcada como sandbox (no sellada).
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--g-text-secondary)]">
+                      EAD Trust ha registrado la solicitud de firma. El archivo se archivará con los
+                      identificadores QTSP y, si el proveedor entrega un artefacto firmado, se archivará
+                      ese binario firmado.
+                    </p>
+                  )}
                   {qesResult ? (
                     <p className="font-mono text-[10px] text-[var(--g-text-secondary)]">
                       SR {qesResult.srId} · DOC {qesResult.documentId} · hash {qesResult.documentHash.slice(0, 12)}
@@ -1555,17 +1577,30 @@ export default function GenerarDocumentoStepper() {
                     <span className="text-sm font-medium">Documento archivado como evidencia demo operativa</span>
                   </div>
                   {archiveUrl && (
-                    <p className="text-xs text-[var(--g-text-secondary)]">
-                      Disponible en:{" "}
-                      <a
-                        href={archiveUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[var(--g-brand-3308)] hover:underline"
-                      >
-                        Descargar desde Storage
-                      </a>
-                    </p>
+                    /* ITEM-110: archiveUrl es el sentinel evidence-bundle://<path>,
+                       NO navegable (bucket privado; el acceso real pasa por la Edge
+                       Function sign-evidence-url). No renderizar un anchor roto:
+                       mostrar el documento como referencia custodiada. La descarga
+                       firmada se ofrece desde el expediente del acuerdo
+                       (AgreementArchivedDocLink / useAgreementSignedDocumentUrl). */
+                    archiveUrl.startsWith("evidence-bundle://") ? (
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        Custodiado en Storage privado. Descárgalo con URL firmada desde el
+                        expediente del acuerdo.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        Disponible en:{" "}
+                        <a
+                          href={archiveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--g-brand-3308)] hover:underline"
+                        >
+                          Descargar desde Storage
+                        </a>
+                      </p>
+                    )
                   )}
                   <div className="flex flex-wrap gap-2">
                     <span

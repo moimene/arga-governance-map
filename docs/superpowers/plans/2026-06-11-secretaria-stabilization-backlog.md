@@ -574,7 +574,7 @@
 | ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | PENDIENTE |
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | PENDIENTE |
 | ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | ✅ HECHO (loop) |
-| ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | PENDIENTE |
+| ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | ✅ HECHO (loop) |
 | ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | HECHO (legal) |
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
@@ -589,9 +589,9 @@
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
 | ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | ✅ HECHO (loop) |
 | ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | ✅ HECHO (loop) |
-| ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | PENDIENTE |
-| ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | PENDIENTE |
-| ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | PENDIENTE |
+| ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | ✅ HECHO (loop) |
+| ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | ✅ HECHO (loop) |
+| ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | ⏸ DIFERIDO (gateado por fix cadena WORM — montar verificación rota sería peor) |
 | ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | PENDIENTE |
 | ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | PENDIENTE |
 | ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |

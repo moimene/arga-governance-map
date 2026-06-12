@@ -536,23 +536,43 @@ export default function ConvocatoriaDetalle() {
           <Card title="Adjuntos" icon={Paperclip}>
             {attachments && attachments.length > 0 ? (
               <ul className="space-y-2 text-sm">
-                {attachments.map((a) => (
-                  <li key={a.id}>
-                    <a
-                      href={a.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
-                    >
-                      {a.file_name}
-                    </a>
-                    {a.file_hash ? (
-                      <span className="ml-2 font-mono text-[11px] text-[var(--g-text-secondary)]">
-                        {a.file_hash.slice(0, 12)}…
-                      </span>
-                    ) : null}
-                  </li>
-                ))}
+                {attachments.map((a) => {
+                  // ITEM-094: file_url puede ser el sentinel evidence-bundle://<path>
+                  // (bucket privado tras F3.G3) o una URL https legacy de un bucket
+                  // ahora privado — ambos abren un anchor roto. Solo se renderiza un
+                  // enlace si el esquema es navegable; el resto se muestra como
+                  // referencia custodiada (nombre + hash + badge).
+                  const isNavigable = /^https?:\/\//i.test(a.file_url ?? "");
+                  return (
+                    <li key={a.id} className="flex flex-wrap items-center gap-2">
+                      {isNavigable ? (
+                        <a
+                          href={a.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                        >
+                          {a.file_name}
+                        </a>
+                      ) : (
+                        <span className="text-[var(--g-text-primary)]">{a.file_name}</span>
+                      )}
+                      {!isNavigable && (
+                        <span
+                          className="bg-[var(--g-surface-muted)] px-2 py-0.5 text-[10px] text-[var(--g-text-secondary)]"
+                          style={{ borderRadius: "var(--g-radius-full)" }}
+                        >
+                          Custodiado en Storage
+                        </span>
+                      )}
+                      {a.file_hash ? (
+                        <span className="font-mono text-[11px] text-[var(--g-text-secondary)]">
+                          {a.file_hash.slice(0, 12)}…
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="text-sm text-[var(--g-text-secondary)]">Sin adjuntos.</div>

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { resolveSandboxSafeEvidencePersistence } from "@/lib/secretaria/evidence-sandbox-gate";
 
 export interface ArchiveResult {
   ok: boolean;
@@ -19,6 +20,10 @@ export interface ArchiveMetadata {
   templateVersion?: string;
   contentHash?: string;
   signedBy?: string;
+  /** ITEM-109: true cuando la firma QES provino del adaptador sandbox de demo
+   *  (no es una transacción EAD Trust real). Marca el manifest con sandbox:true
+   *  vía el gate de custodia para que la cadena deje constancia explícita. */
+  sandbox?: boolean;
   qesSrId?: string;
   qesDocumentId?: string;
   qesDocumentHash?: string;
@@ -155,7 +160,16 @@ export async function archiveDocxToStorage(
       ],
       metadata,
     };
-    const manifestHash = await computeSha256(canonicalJson(manifest));
+    // ITEM-109: si la firma fue sandbox, el gate marca el manifest con
+    // sandbox:true + sandbox_reason (el status ya es OPEN, nunca SEALED). Así la
+    // cadena de custodia no presenta un buffer sin firmar como QES real.
+    const persistence = resolveSandboxSafeEvidencePersistence({
+      sandbox: metadata.sandbox === true,
+      status: "OPEN",
+      manifest,
+    });
+    const effectiveManifest = persistence.manifest;
+    const manifestHash = await computeSha256(canonicalJson(effectiveManifest));
 
     // Insert into evidence_bundles table.
     // F3.G15: populamos `storage_path` (forma nueva, source of truth para
@@ -171,13 +185,13 @@ export async function archiveDocxToStorage(
       source_module: "secretaria",
       source_object_type: "AGREEMENT",
       source_object_id: agreementId,
-      manifest,
+      manifest: effectiveManifest,
       manifest_hash: manifestHash,
       hash_sha512: hashHex,
       storage_path: storagePath,
       document_url: sentinelUrl,
       signed_by: metadata.signedBy ?? "SISTEMA",
-      status: "OPEN",
+      status: persistence.status,
     }).select("id").maybeSingle();
 
     if (insertError) {
