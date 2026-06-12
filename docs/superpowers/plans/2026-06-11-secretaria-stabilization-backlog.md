@@ -536,7 +536,7 @@
 |---|---|---|---|---|
 | ITEM-054 | A1 | — | 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo | BLOQUEADO-LEGAL |
 | ITEM-055 | A10 | — | Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023 | HECHO (Ola1) |
-| ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | PENDIENTE |
+| ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | 🟡 PARCIAL (p1 vía ITEM-142; p2 residual) |
 | ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
 | ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | HECHO (Ola1) |
 | ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | PENDIENTE |
@@ -615,7 +615,7 @@
 
 ### ITEM-056 [P2] Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado
 
-- **Área:** A10 · **Estado:** PENDIENTE
+- **Área:** A10 · **Estado:** PARCIAL — parte 1 (un mes ≠ 30 días) HECHO vía ITEM-142 (commit 1690cba: subMonths fecha-a-fecha en el default legal SA, verificado BOE); parte 2 (art. 176.2 cómputo desde envío al último socio) RESIDUAL: requiere exponer fechaEnvioUltimoSocio como input y threadearlo desde el flujo de convocatoria individual SL/ERDS (sin consumidor hoy; modelado de producto, bajo impacto demo).
 - **Descripción:** Art. 176.1 LSC (BOE literal): «un plazo de, al menos, UN MES en las sociedades anónimas y quince días en las sociedades de responsabilidad limitada». El motor usa 30 días para SA: en meses de 31 días valida convocatorias un día cortas (p.ej. anuncio 1-jul para junta 31-jul: 30 días OK para el motor; un mes de fecha a fecha exige 1-ago). Además, art. 176.2: en convocatoria individual el plazo se computa «a partir de la fecha en que hubiere sido remitido el anuncio al último de ellos» — el motor solo resta días a la fecha de la junta y no ancla el cómputo al envío al último socio (relevante para SL con comunicación individual y para los canales ERDS del producto). Los 15 días SL sí son correctos.
 - **Evidencia:** src/lib/rules-engine/convocatoria-engine.ts:364 (tipoSocial === 'SA' ? 30 : 15) y :469-473 (restarDias). BOE bloque a176 verificado literal.
 - **Archivos:** src/lib/rules-engine/convocatoria-engine.ts
