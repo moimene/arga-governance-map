@@ -182,6 +182,9 @@ export default function Plantillas() {
   const assignTemplate = useAssignTemplateBinding();
   const { primaryRole } = useCurrentUserRole();
   const normativeRole = normativeRoleFromAppRole(primaryRole);
+  // ITEM-084: solo ADMIN_TENANT gestiona el ciclo de vida de plantillas desde el
+  // catálogo de uso (paridad con el guard del gestor).
+  const canManageLifecycle = primaryRole === "ADMIN_TENANT";
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
   const initialMateriaFilter = searchParams.get("materia") ?? "";
   const initialTipoFilter = searchParams.get("tipo") ?? "";
@@ -214,6 +217,15 @@ export default function Plantillas() {
   const handleTransicion = (plantilla: PlantillaProtegidaRow) => {
     const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
     if (!transition) return;
+    // ITEM-084: confirmación explícita antes de mutar el ciclo de vida (paridad
+    // con el window.confirm del gestor; evita archivar/activar de un solo clic).
+    if (
+      !window.confirm(
+        `¿Confirmar la transición de la plantilla a "${estadoLabel(transition.nextState)}"? Esta acción queda registrada en la auditoría.`,
+      )
+    ) {
+      return;
+    }
 
     updateEstado.mutate(
       { id: plantilla.id, nuevo_estado: transition.nextState },
@@ -978,7 +990,13 @@ export default function Plantillas() {
                     {getTemplateUsageTarget(selected).hint}
                   </p>
                 ) : null}
-                {WORKFLOW_TRANSITIONS[selected.estado] && (
+                {/* ITEM-084: la gestión de ciclo de vida (revisar/aprobar/activar/
+                    archivar) solo se ofrece a ADMIN_TENANT, coherente con el gestor
+                    (CatalogoTab gatea con canAccess('validacion')). El catálogo
+                    /secretaria/plantillas es de USO para el SECRETARIO; sin este
+                    guard, el demo (SECRETARIO) podía archivar una plantilla ACTIVA
+                    de producción con un clic (la RLS solo aísla por tenant). */}
+                {canManageLifecycle && WORKFLOW_TRANSITIONS[selected.estado] && (
                   (() => {
                     const transition = WORKFLOW_TRANSITIONS[selected.estado];
                     const IconComponent = transition.icon;

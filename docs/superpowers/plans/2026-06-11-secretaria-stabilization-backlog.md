@@ -545,7 +545,7 @@
 | ITEM-062 | A11 | — | Salidas sin destino al artefacto creado: Convocatorias navega a lista y Tramitador no enlaza el expediente registral | ✅ HECHO (loop) |
 | ITEM-063 | A12 | ✅ | Botón 'Enviar notificación ERDS' en AcuerdoSinSesionDetalle siempre falla (QTSP_SERVER_PROXY_REQUIRED) y el resultado no persiste | PENDIENTE |
 | ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | PENDIENTE |
-| ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | PENDIENTE |
+| ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | 🟡 PARCIAL (nav sidebar añadido; empty-state CTA + contentRoute libro pendientes) |
 | ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | ✅ HECHO (loop+codex) |
 | ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | ✅ HECHO (loop) |
 | ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | ✅ HECHO (loop) |
@@ -564,7 +564,7 @@
 | ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | PENDIENTE |
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
 | ITEM-083 | A3 | ✅ | Gate PRE semántico marca BLOCKING falso sobre la plantilla RATIFICACION_ACTOS ACTIVA ya corregida | HECHO (UI) |
-| ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | PENDIENTE |
+| ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | ✅ HECHO (loop) |
 | ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | PENDIENTE |
 | ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
 | ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | PENDIENTE |

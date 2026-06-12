@@ -15,6 +15,7 @@ import {
   Library,
   Repeat2,
   ScrollText,
+  Send,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -56,6 +57,9 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
       { label: "Actas pendientes", to: "/secretaria/actas?vista=pendientes", icon: FileSignature },
       { label: "Certificaciones vinculadas", to: "/secretaria/actas?vista=certificaciones", icon: FileSignature },
+      // ITEM-065: las rutas /secretaria/comunicaciones existían sin entrada de
+      // sidebar (página huérfana). Se añade aquí en Documentación.
+      { label: "Comunicaciones", to: "/secretaria/comunicaciones", icon: Send },
       { label: "Documentos en revisión", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
@@ -204,6 +208,14 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         label: "Certificaciones vinculadas",
         to: "/secretaria/actas?vista=certificaciones",
         icon: FileSignature,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        // ITEM-065: entrada de Comunicaciones también en modo sociedad.
+        label: "Comunicaciones",
+        to: "/secretaria/comunicaciones",
+        icon: Send,
         requiresEntity: true,
         visibility: { requiresEntity: true },
       },
