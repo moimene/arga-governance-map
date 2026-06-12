@@ -823,3 +823,39 @@ e implementó lo legal, y se restauró la integridad forense:
 **Backlog FINAL: 144 HECHO, 6 PARCIAL, 4 PENDIENTE (125/126/128/146 = refactors
 arquitectónicos documentados en Anexo II), 0 BLOQUEADO.**
 Gates: typecheck verde, tests 1961 pass/0 fail, build verde, migraciones Cloud alineadas.
+
+---
+
+## Pasada de refactor arquitectónico 2026-06-12 — ITEM-125 (shell común de stepper)
+
+Cierre con diseño previo (no en caliente). Decisiones de producto aprobadas por el usuario:
+3 familias completas (F1+F2+F3), lockBack en F2, directo al código. Rama
+`feature/item125-shell-comun`, 4 commits secuenciales (interdependientes, no fan-out):
+
+- **A** `67cb75d` — `_shared/WizardFields.tsx`: extrae WizardInput/Field/Checkbox (antes
+  copiados byte a byte en AnadirSocio/Transmisión/DesignarAdmin). PersonaNueva conserva su
+  Field (variante con fallback `—`). PersonSelector fuera (un solo consumidor con esa forma).
+- **B** `2fe9873` — `_shared/StepNav.tsx`: StepRail (rail vertical) + StepPills (píldoras),
+  política de navegación inyectable `canNavigateTo(n)`. StepperShell consume StepRail (F1
+  sin cambio de comportamiento).
+- **C** `fabcbf3` — F2 (AcuerdoSinSesión/CoAprobación/Solidario) → StepRail. AcuerdoSinSesión
+  con lockBack `n<current && !(resolutionId && n<4)`: congela pasos 1-3 tras abrir votación
+  (preserva guard ITEM-060).
+- **D** `a6c5a94` — F3 píldoras → StepPills (AnadirSocio/Transmisión/DesignarAdmin display-only;
+  SociedadNueva clicable-guardado con high-watermark `maxStepReached`, cierra el salto ciego
+  residual de ITEM-061). PersonaNueva conserva píldoras en grid (variante de layout).
+
+**Verificación:** gates por commit (typecheck · bun test 1961/0 · build) verdes; lint 0
+problemas nuevos (los 15 errores `any` GRC/AIMS + 2 warnings Convocatorias son
+pre-existentes). e2e cubriendo F1 (05✓, 38✓), F2 (38✓, 42✓), F3 (43✓, 44 steppers✓). Dos
+fallos e2e (18-golden-path `:193` apertura; 44:64 PersonaDetalle heading ambiguo) son
+**pre-existentes** — verificado idéntico contra baseline 72302b5 en worktree temporal de
+solo lectura. **Codex (review adversarial)**: 0 regresiones de navegación, confirma F1-F4
+equivalentes (único cambio: paso 4 de AcuerdoSinSesión pasa de "enabled inerte" a "disabled"
+en algunos estados, sin alterar ningún salto posible — mejora menor).
+
+Deuda relacionada no cerrada por este refactor: ITEM-059 (deriveStep desde meeting.status +
+canAdvance por paso en ReunionStepper.buildSteps) — StepRail ahora centraliza la política,
+dejando el cableado trivial, pero el cambio de reanudación requiere su propio e2e.
+
+**Recuento tras ITEM-125: 145 HECHO, 6 PARCIAL, 3 PENDIENTE (126/128/146), 0 BLOQUEADO.**
