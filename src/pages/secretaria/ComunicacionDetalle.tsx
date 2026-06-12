@@ -29,6 +29,10 @@ export default function ComunicacionDetalle() {
     tipo_comunicacion: string;
     cuerpo_render: string;
     tiene_rebotes: boolean;
+    entity_id: string | null;
+    body_id: string | null;
+    meeting_id: string | null;
+    agreement_id: string | null;
     communication_recipients?: Array<{
       id: string;
       canal_original: string;
@@ -63,6 +67,51 @@ export default function ComunicacionDetalle() {
           {c.tiene_rebotes && <span className="text-[var(--status-warning)] ml-2">⚠ Tiene rebotes</span>}
         </p>
       </header>
+
+      {/* Origen — trazabilidad bidireccional al acto de origen */}
+      {(c.meeting_id || c.agreement_id || c.entity_id) && (
+        <section
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: 'var(--g-radius-md)' }}
+        >
+          <h2 className="text-lg font-medium text-[var(--g-text-primary)] mb-2">Origen</h2>
+          <ul className="text-sm space-y-1">
+            {c.meeting_id && (
+              <li className="text-[var(--g-text-secondary)]">
+                Reunión:{' '}
+                <Link
+                  to={`/secretaria/reuniones/${c.meeting_id}`}
+                  className="text-[var(--g-link)] hover:underline"
+                >
+                  Ver reunión de origen
+                </Link>
+              </li>
+            )}
+            {c.agreement_id && (
+              <li className="text-[var(--g-text-secondary)]">
+                Expediente:{' '}
+                <Link
+                  to={`/secretaria/acuerdos/${c.agreement_id}`}
+                  className="text-[var(--g-link)] hover:underline"
+                >
+                  Ver expediente del acuerdo
+                </Link>
+              </li>
+            )}
+            {c.entity_id && (
+              <li className="text-[var(--g-text-secondary)]">
+                Sociedad:{' '}
+                <Link
+                  to={`/secretaria/sociedades/${c.entity_id}`}
+                  className="text-[var(--g-link)] hover:underline"
+                >
+                  Ver sociedad
+                </Link>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
 
       {/* Recipients table */}
       <section>

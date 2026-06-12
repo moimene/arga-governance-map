@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -243,6 +243,8 @@ export default function AcuerdoSinSesionStepper() {
 
   // ── Step 4: voting ──
   const [resolutionId, setResolutionId] = useState<string | null>(null);
+  // ITEM-060 (Codex #P1): mutex síncrono contra doble-creación de votación.
+  const openingVotingRef = useRef(false);
   const [memberVotes, setMemberVotes] = useState<Record<string, VoteChoice>>({});
   const castVote = useCastVote(resolutionId ?? undefined);
   const { data: resolution } = useAcuerdoSinSesionById(resolutionId ?? undefined);
@@ -271,7 +273,18 @@ export default function AcuerdoSinSesionStepper() {
 
   // ── Step 3 → 4 transition: create resolution ──
   async function handleOpenVoting() {
-    if (!selectedBodyId || !tenantEntityId || createResolution.isPending) return;
+    // ITEM-060 (Codex #P1): mutex SÍNCRONO contra doble-click. `isPending` y
+    // `resolutionId` solo se actualizan tras el re-render que sigue a
+    // mutateAsync; un doble-click rápido entraría dos veces con resolutionId
+    // null y crearía dos no_session_resolution (uno huérfano en VOTING_OPEN con
+    // votos WORM). El ref bloquea de forma inmediata.
+    if (!selectedBodyId || !tenantEntityId || createResolution.isPending || openingVotingRef.current) return;
+    // Si el proceso ya está abierto, reabrir el paso 4 en lugar de crear otro.
+    if (resolutionId) {
+      setCurrent(4);
+      return;
+    }
+    openingVotingRef.current = true;
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + deadlineDays);
     try {
@@ -302,6 +315,8 @@ export default function AcuerdoSinSesionStepper() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al crear el proceso";
       toast.error("No se pudo iniciar la votación", { description: msg });
+    } finally {
+      openingVotingRef.current = false;
     }
   }
 
@@ -463,17 +478,23 @@ export default function AcuerdoSinSesionStepper() {
           {STEPS.map((s) => {
             const done = s.n < current;
             const active = s.n === current;
-            const locked = s.n > current && s.n !== 4; // paso 4 se abre via handleOpenVoting
+            // ITEM-060: una vez abierta la votación (resolutionId !== null) los
+            // pasos previos (1-3) quedan congelados: volver atrás y pulsar
+            // "Iniciar votación" crearía un segundo proceso huérfano. Solo se
+            // permite navegar entre los pasos posteriores (4-5).
+            const frozen = resolutionId !== null && s.n < 4;
+            const canGoBack = done && !frozen;
+            const locked = (s.n > current && s.n !== 4) || frozen; // paso 4 se abre via handleOpenVoting
             return (
               <button
                 key={s.n}
                 type="button"
-                onClick={() => done && setCurrent(s.n)}
+                onClick={() => canGoBack && setCurrent(s.n)}
                 disabled={locked}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   active
                     ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
-                    : done
+                    : canGoBack
                     ? "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50 cursor-pointer"
                     : "text-[var(--g-text-secondary)] opacity-40 cursor-default"
                 }`}

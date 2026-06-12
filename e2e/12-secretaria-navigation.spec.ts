@@ -75,7 +75,7 @@ test.describe('Secretaría navigation smoke', () => {
     expect(sociedadValue).toBeTruthy();
     await sociedadSelect.selectOption(sociedadValue!);
 
-    await page.getByRole('link', { name: 'Convocatorias', exact: true }).click();
+    await page.locator('[data-sidebar-item="Convocatorias"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/convocatorias\?scope=sociedad&entity=/);
     await expect(page.locator('main').getByRole('heading', { name: 'Convocatorias', exact: true })).toBeVisible({
       timeout: 10_000,
@@ -83,7 +83,7 @@ test.describe('Secretaría navigation smoke', () => {
     await expect(page.getByText('Ha ocurrido un error', { exact: false })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Grupo', exact: true }).click();
-    await page.getByRole('link', { name: 'Campañas de grupo', exact: true }).click();
+    await page.locator('[data-sidebar-item="Campañas de grupo"]').first().click();
     await expect(page).toHaveURL('/secretaria/procesos-grupo');
     await expect(page.locator('main').getByRole('heading', { name: 'Campañas de grupo', exact: true })).toBeVisible({
       timeout: 10_000,
@@ -107,7 +107,7 @@ test.describe('Secretaría navigation smoke', () => {
 
     for (const item of NAV_ITEMS) {
       const failuresBeforeRoute = failedSupabaseResponses.length;
-      await page.getByRole('link', { name: item.label, exact: true }).click();
+      await page.locator(`[data-sidebar-item="${item.label}"]`).first().click();
 
       await expect(page).toHaveURL(new RegExp(`${item.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
       await expect(

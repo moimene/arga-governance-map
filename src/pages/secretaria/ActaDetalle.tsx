@@ -18,6 +18,7 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import { demoReadinessMessage } from "@/lib/secretaria/entity-demo-readiness";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import { useReunionAttendees } from "@/hooks/useReunionSecretaria";
 import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
@@ -252,7 +253,10 @@ export default function ActaDetalle() {
   const isJunta = (meeting?.meeting_type ?? meeting?.governing_bodies?.body_type ?? "").toUpperCase().includes("JUNTA");
   const meetingTypeLabel = bodyTypeLabel(meeting?.meeting_type ?? meeting?.governing_bodies?.body_type);
   const quorumRecord = asRecord(meeting?.quorum_data);
-  const sourceLinks = asRecord(quorumRecord?.source_links);
+  // ITEM-076 (Codex #P2): normaliza source_links vía helper tipado. Descarta valores
+  // no-string y prioriza convocatoria_ids[0]; evita navegar a /convocatorias/null o
+  // /convocatorias/[object Object] desde payloads JSON legacy.
+  const sourceLinks = extractMeetingSourceLinks(meeting?.quorum_data);
   const actaOrganKind = inferActaOrganKind(meeting?.governing_bodies?.body_type ?? meeting?.meeting_type);
   const isUniversal = quorumRecord?.is_universal === true || quorumRecord?.junta_universal === true;
   const convocationText =
@@ -462,14 +466,40 @@ export default function ActaDetalle() {
 
   return (
     <div className="mx-auto max-w-[1200px] p-6">
-      <button
-        type="button"
-        onClick={() => navigate(scope.createScopedTo("/secretaria/actas"))}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver al listado
-      </button>
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          onClick={() => navigate(scope.createScopedTo("/secretaria/actas"))}
+          className="inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver al listado
+        </button>
+        {m.meeting_id ? (
+          <button
+            type="button"
+            onClick={() => navigate(scope.createScopedTo(`/secretaria/reuniones/${m.meeting_id}`))}
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
+          >
+            <Link2 className="h-4 w-4" />
+            Abrir reunión
+          </button>
+        ) : null}
+        {sourceLinks?.convocatoria_id ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                scope.createScopedTo(`/secretaria/convocatorias/${String(sourceLinks.convocatoria_id)}`),
+              )
+            }
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
+          >
+            <Link2 className="h-4 w-4" />
+            Abrir convocatoria
+          </button>
+        ) : null}
+      </div>
 
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>

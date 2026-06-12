@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { useImportPlantillaPackage } from "@/hooks/secretaria/useImportPlantillaPackage";
 import { useTemplatePreflight } from "@/hooks/secretaria/useTemplatePreflight";
 import { parseImport } from "@/lib/secretaria/template-admin/template-importer";
+import { mapSchemaIssues, type SchemaIssue } from "@/lib/secretaria/template-admin/schema-issue-mapper";
 import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -43,7 +44,7 @@ export function TemplateImportWizard() {
   const [step, setStep] = useState<Step>(1);
   const [json, setJson] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
+  const [schemaIssues, setSchemaIssues] = useState<SchemaIssue[] | null>(null);
   const [gatePre, setGatePre] = useState<GatePreResult | null>(null);
   const [ack, setAck] = useState("");
   const navigate = useNavigate();
@@ -62,19 +63,21 @@ export function TemplateImportWizard() {
         // preflight (que requiere ida a Cloud para Gate PRE contexto).
         const r = parseImport(parsed);
         if (!r.ok) {
-          setParseError(
-            JSON.stringify(
-              (r as { ok: false; error: { issues: unknown[] } }).error.issues.slice(0, 5),
-              null,
-              2,
-            ),
+          setSchemaIssues(
+            mapSchemaIssues((r as { ok: false; error: { issues: unknown[] } }).error.issues),
           );
         } else {
-          setParseError(null);
+          setSchemaIssues(null);
           setStep(3);
         }
       } catch (e) {
-        setParseError(e instanceof Error ? e.message : "JSON inválido");
+        setSchemaIssues([
+          {
+            code: "(fichero)",
+            message: "El fichero no es JSON válido y no se pudo leer.",
+            hint: e instanceof Error ? e.message : "Revisa que sea un .json bien formado.",
+          },
+        ]);
       }
     };
     reader.readAsText(file);
@@ -101,7 +104,8 @@ export function TemplateImportWizard() {
       | { ok: false; reason: "WARNINGS_NEED_ACK"; gatePre: GatePreResult }
       | { ok: false; reason: "INSERT_FAILED"; details: unknown };
     if (fail.reason === "PARSE_FAILED") {
-      setParseError(JSON.stringify(fail.details, null, 2));
+      setSchemaIssues(mapSchemaIssues(fail.details));
+      setStep(2);
       toast.error("Error de schema: revisa el JSON");
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
       setGatePre(fail.gatePre);
@@ -133,7 +137,7 @@ export function TemplateImportWizard() {
       | { ok: false; reason: "WARNINGS_NEED_ACK"; gatePre: GatePreResult }
       | { ok: false; reason: "INSERT_FAILED"; details: unknown };
     if (fail.reason === "PARSE_FAILED") {
-      setParseError(JSON.stringify(fail.details, null, 2));
+      setSchemaIssues(mapSchemaIssues(fail.details));
       setStep(2);
       toast.error("Error de schema: revisa el JSON");
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
@@ -228,13 +232,31 @@ export function TemplateImportWizard() {
               Archivo seleccionado: <code className="font-mono">{fileName}</code>
             </p>
           )}
-          {parseError && (
-            <pre
-              className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap border border-[var(--status-error)] bg-[var(--status-error)]/10 p-3 text-xs text-[var(--status-error)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              {parseError}
-            </pre>
+          {schemaIssues && schemaIssues.length > 0 && (
+            <div className="mt-4 space-y-2" aria-label="Errores de validación del paquete">
+              <p className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                {schemaIssues.length}{" "}
+                {schemaIssues.length === 1 ? "error de schema" : "errores de schema"} a corregir
+              </p>
+              {schemaIssues.map((i, idx) => (
+                <div
+                  key={`${i.code}-${idx}`}
+                  className="flex gap-2 border border-[var(--status-error)] bg-[var(--status-error)]/10 p-3 text-sm text-[var(--g-text-primary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="flex-1">
+                    <strong className="font-mono text-xs text-[var(--g-text-primary)]">
+                      {i.code}
+                    </strong>{" "}
+                    <span className="text-[var(--g-text-secondary)]">— {i.message}</span>
+                    {i.hint && (
+                      <p className="mt-1 text-xs text-[var(--g-text-secondary)]">{i.hint}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
       )}
@@ -251,18 +273,19 @@ export function TemplateImportWizard() {
             Ejecuta Gate PRE headless: detecta duplicados activos, fuentes no
             catalogadas, helpers prohibidos. No escribe nada hasta paso 5.
           </p>
-          {parseError && (
+          {schemaIssues && schemaIssues.length > 0 && (
             <div
               className="mb-4 border border-[var(--status-error)] bg-[var(--status-error)]/10 p-3 text-sm text-[var(--status-error)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              JSON inválido a nivel schema. Corrige antes de continuar.
+              JSON inválido a nivel schema. Vuelve al paso 2 y corrige los errores
+              antes de continuar.
             </div>
           )}
           <button
             type="button"
             onClick={() => runPreflight()}
-            disabled={preflightMut.isPending || !!parseError || !json}
+            disabled={preflightMut.isPending || !!(schemaIssues && schemaIssues.length) || !json}
             className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >

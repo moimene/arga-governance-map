@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Building2, Check, ChevronLeft } from "lucide-react";
@@ -113,6 +113,53 @@ function adapterContextFromTx1(tenantId: string, tx1: Tx1Result): AdapterContext
   };
 }
 
+const DRAFT_STORAGE_PREFIX = "secretaria.sociedad-nueva.draft";
+
+function draftStorageKey(tenantId: string) {
+  return `${DRAFT_STORAGE_PREFIX}:${tenantId}`;
+}
+
+interface PersistedDraftState {
+  step: number;
+  draft: SociedadOnboardingDraft;
+}
+
+function loadPersistedDraft(tenantId: string): PersistedDraftState | null {
+  try {
+    const raw = sessionStorage.getItem(draftStorageKey(tenantId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedDraftState>;
+    if (!parsed || typeof parsed !== "object" || !parsed.draft) return null;
+    const step = typeof parsed.step === "number" ? parsed.step : 0;
+    // ITEM-061 (Codex #P1): mergear con el draft vacío canónico para garantizar
+    // todas las claves de nivel superior. Un draft legacy/corrupto ({} o parcial)
+    // no debe crashear validateSociedadOperability al acceder a
+    // draft.identification/capital/shareClasses/...
+    return {
+      step: Math.min(Math.max(step, 0), STEPS.length - 1),
+      draft: { ...createEmptySociedadDraft(), ...(parsed.draft as Partial<SociedadOnboardingDraft>) } as SociedadOnboardingDraft,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedDraft(tenantId: string, state: PersistedDraftState) {
+  try {
+    sessionStorage.setItem(draftStorageKey(tenantId), JSON.stringify(state));
+  } catch {
+    // best-effort; ignore quota / serialization errors
+  }
+}
+
+function clearPersistedDraft(tenantId: string) {
+  try {
+    sessionStorage.removeItem(draftStorageKey(tenantId));
+  } catch {
+    // ignore
+  }
+}
+
 function permanentRepresentativeInputs(cargos: CargoInputDraft[]): RepresentacionAdminPJInput[] {
   const reps: RepresentacionAdminPJInput[] = [];
   for (const cargo of cargos) {
@@ -135,6 +182,35 @@ export default function SociedadNuevaStepper() {
   const [draft, dispatch] = useReducer(draftReducer, undefined, () => createEmptySociedadDraft());
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Persistencia de borrador en sessionStorage por tenant: recupera el draft al
+  // montar y lo conserva ante refresh/navegacion accidental. Se limpia tras crear
+  // la sociedad. restoredForTenant evita pisar el draft recuperado al re-renderizar.
+  const restoredForTenant = useRef<string | null>(null);
+  // ITEM-061 (Codex #P2): evita que el autosave guarde el draft vacío inicial
+  // ANTES de que el dispatch de restauración se refleje en el render siguiente
+  // (lo que sobrescribiría el borrador persistido).
+  const pendingRestoreRef = useRef(false);
+
+  useEffect(() => {
+    if (!tenantId || restoredForTenant.current === tenantId) return;
+    restoredForTenant.current = tenantId;
+    const persisted = loadPersistedDraft(tenantId);
+    if (persisted) {
+      pendingRestoreRef.current = true;
+      dispatch({ updater: () => persisted.draft });
+      setStep(persisted.step);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!tenantId || restoredForTenant.current !== tenantId) return;
+    if (pendingRestoreRef.current) {
+      // Render pre-hidratación: el draft aún es el inicial vacío; no guardar.
+      pendingRestoreRef.current = false;
+      return;
+    }
+    savePersistedDraft(tenantId, { step, draft });
+  }, [tenantId, step, draft]);
 
   const parentOptions = useMemo(
     () =>
@@ -244,6 +320,7 @@ export default function SociedadNuevaStepper() {
         toast.warning("Sociedad creada con cargos pendientes", {
           description: `TX2 no se completo: ${errorMessage(tx2Error)}`,
         });
+        clearPersistedDraft(tenantId);
         navigate(`/secretaria/sociedades/${tx1.entityId}`);
         return;
       }
@@ -290,6 +367,7 @@ export default function SociedadNuevaStepper() {
       }
 
       await invalidateSociedadQueries(tenantId, tx1.entityId);
+      clearPersistedDraft(tenantId);
       navigate(`/secretaria/sociedades/${tx1.entityId}`);
     } catch (error) {
       const suffix = createdEntityId ? ` Sociedad creada: ${createdEntityId}` : "";

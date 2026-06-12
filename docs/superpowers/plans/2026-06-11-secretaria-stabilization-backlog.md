@@ -540,13 +540,13 @@
 | ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
 | ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | HECHO (Ola1) |
 | ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | PENDIENTE |
-| ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | PENDIENTE |
-| ITEM-061 | A11 | — | SociedadNuevaStepper: 11 pasos con draft solo-local (se pierde al refrescar) y píldoras que saltan validación por paso | PENDIENTE |
+| ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | ✅ HECHO (loop+codex) |
+| ITEM-061 | A11 | — | SociedadNuevaStepper: 11 pasos con draft solo-local (se pierde al refrescar) y píldoras que saltan validación por paso | ✅ HECHO (loop+codex) |
 | ITEM-062 | A11 | — | Salidas sin destino al artefacto creado: Convocatorias navega a lista y Tramitador no enlaza el expediente registral | PENDIENTE |
 | ITEM-063 | A12 | ✅ | Botón 'Enviar notificación ERDS' en AcuerdoSinSesionDetalle siempre falla (QTSP_SERVER_PROXY_REQUIRED) y el resultado no persiste | PENDIENTE |
 | ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | PENDIENTE |
 | ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | PENDIENTE |
-| ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | PENDIENTE |
+| ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | ✅ HECHO (loop+codex) |
 | ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | PENDIENTE |
 | ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | PENDIENTE |
 | ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | PENDIENTE |
@@ -556,8 +556,8 @@
 | ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
 | ITEM-074 | A13 | — | Terminología 'resolución' vs 'acuerdo' inconsistente en la UI de ReunionStepper | PENDIENTE |
 | ITEM-075 | A13 | — | Toasts de error no accionables que descartan el detalle disponible | PENDIENTE |
-| ITEM-076 | A13 | — | ActaDetalle sin backlink a la reunión origen y convocatoria referenciada como UUID crudo | PENDIENTE |
-| ITEM-077 | A13 | — | DecisionDetalle no enlaza al expediente Acuerdo 360 vinculado | PENDIENTE |
+| ITEM-076 | A13 | — | ActaDetalle sin backlink a la reunión origen y convocatoria referenciada como UUID crudo | ✅ HECHO (loop+codex) |
+| ITEM-077 | A13 | — | DecisionDetalle no enlaza al expediente Acuerdo 360 vinculado | ✅ HECHO (loop+codex) |
 | ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | PENDIENTE |
 | ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | HECHO (motor) |
 | ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
@@ -568,7 +568,7 @@
 | ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | PENDIENTE |
 | ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
 | ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | PENDIENTE |
-| ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | PENDIENTE |
+| ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | ✅ HECHO (loop+codex) |
 | ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | PENDIENTE |
 | ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | PENDIENTE |
 | ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | PENDIENTE |
@@ -1121,7 +1121,7 @@
 | ITEM-127 | A12 | — | Idempotencia ERDS degenerada: el discriminador del evidenceId nunca incluye hash ni número de intento | PENDIENTE |
 | ITEM-128 | A12 | — | Doble implementación del pipeline de despacho: la librería src/lib/comms solo la consumen los tests; la Edge Function lo reimplementa inline y ya diverge | PENDIENTE |
 | ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | PENDIENTE |
-| ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | PENDIENTE |
+| ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | ✅ HECHO (loop+codex) |
 | ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | PENDIENTE |
 | ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | PENDIENTE |
