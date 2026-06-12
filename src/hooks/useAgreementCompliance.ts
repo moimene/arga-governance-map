@@ -118,8 +118,10 @@ export interface AgreementFull {
 }
 
 /** Subconjunto de agreement con entidad anidada usado por el motor de compliance. */
+// ITEM-116: la entidad anidada incluye `es_cotizada` (dato canónico DL-2) para
+// que el motor reciba el flag real de cotizada, no un hardcode.
 type AgreementWithEntity = AgreementFull & {
-  entities: { jurisdiction: string | null; legal_form: string | null } | null;
+  entities: { jurisdiction: string | null; legal_form: string | null; es_cotizada: boolean | null } | null;
   governing_bodies?: { name: string; body_type: string } | null;
   entity_id: string | null;
 };
@@ -361,6 +363,10 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   const organoTipo = resolveAgreementOrganoTipo(a);
   const adoptionMode = a.adoption_mode as AdoptionMode;
   const materiaClase = toMateriaClase(a.matter_class);
+  // ITEM-116: DL-2 — leer el dato canónico `entities.es_cotizada` en vez del hardcode `false`.
+  // Solo corrige el flag que se pasa al motor; el cableado de evaluarBordesNoComputables
+  // al orquestador queda pendiente (criterio legal LMV documentado para Garrigues).
+  const esCotizada = a.entities?.es_cotizada === true;
   const fechaAcuerdo = a.decision_date ? `${a.decision_date}T12:00:00Z` : new Date().toISOString();
   let noSessionInput: NoSessionInput | undefined;
   let coAprobacionConfig: CoAprobacionConfig | undefined;
@@ -500,7 +506,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
         organoTipo,
         adoptionMode,
         fechaJunta: new Date().toISOString(),
-        esCotizada: false,
+        esCotizada, // ITEM-116: dato canónico entities.es_cotizada (DL-2)
         webInscrita: false,
         primeraConvocatoria: true,
         esJuntaUniversal: adoptionMode === "UNIVERSAL",
@@ -593,9 +599,10 @@ export function useAgreementCompliance(agreementId?: string) {
     staleTime: 60_000,
     queryFn: async (): Promise<ComplianceResult | null> => {
       // 1. Acuerdo + entidad (V2 carga body_type adicional)
+      // ITEM-116: incluir `es_cotizada` para alimentar DL-2 (advertencias LMV) con el dato canónico.
       const selectCols = ENGINE_V2
-        ? "*, entities(jurisdiction, legal_form), governing_bodies(name, body_type)"
-        : "*, entities(jurisdiction, legal_form)";
+        ? "*, entities(jurisdiction, legal_form, es_cotizada), governing_bodies(name, body_type)"
+        : "*, entities(jurisdiction, legal_form, es_cotizada)";
       const { data: agreement, error: aErr } = await supabase
         .from("agreements")
         .select(selectCols)

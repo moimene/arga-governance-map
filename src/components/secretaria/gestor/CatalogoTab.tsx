@@ -335,6 +335,19 @@ function LegalReviewBadge({ review }: { review?: LegalTemplateReviewRow }) {
   );
 }
 
+// ITEM-089: badge que distingue los fixtures locales del freeze del inventario Cloud real
+function LocalFixtureBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+      style={{ borderRadius: "var(--g-radius-full)" }}
+    >
+      <FileCode2 className="h-3 w-3" aria-hidden="true" />
+      Fixture local · no usable
+    </span>
+  );
+}
+
 function ActiveWithP0Badge() {
   return (
     <span
@@ -533,6 +546,8 @@ function PlantillaDetailPanel({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <EstadoBadge estado={estado} />
+            {/* ITEM-089: distingue fixtures locales del freeze frente a plantillas ACTIVA reales de Cloud */}
+            {localFixture ? <LocalFixtureBadge /> : null}
             {isActiveP0 ? <ActiveWithP0Badge /> : null}
             <LegalReviewBadge review={review} />
           </div>
@@ -540,7 +555,8 @@ function PlantillaDetailPanel({
 
         {transition ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {estado === "ACTIVA" ? (
+            {/* ITEM-089: el CTA "Usar plantilla" no aplica a fixtures locales (id no resoluble en Cloud) */}
+            {estado === "ACTIVA" && !localFixture ? (
               <button
                 type="button"
                 onClick={() => onUseTemplate(plantilla)}
@@ -580,7 +596,8 @@ function PlantillaDetailPanel({
           </div>
         ) : null}
 
-        {estado === "ACTIVA" && !transition ? (
+        {/* ITEM-089: el CTA "Usar plantilla" no aplica a fixtures locales (id no resoluble en Cloud) */}
+        {estado === "ACTIVA" && !transition && !localFixture ? (
           <button
             type="button"
             onClick={() => onUseTemplate(plantilla)}
@@ -592,7 +609,8 @@ function PlantillaDetailPanel({
           </button>
         ) : null}
 
-        {estado === "ACTIVA" ? (
+        {/* ITEM-089: el hint de uso solo es válido para plantillas Cloud reales, no fixtures locales */}
+        {estado === "ACTIVA" && !localFixture ? (
           <p className="mt-2 text-xs text-[var(--g-text-secondary)]">{usageTarget.hint}</p>
         ) : null}
 

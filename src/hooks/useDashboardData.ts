@@ -19,7 +19,15 @@ export function useDashboardKpis() {
 
       const [ent, man, pol, fnd, del] = await Promise.all([
         supabase.from("entities").select("*", { count: "exact", head: true }).eq("entity_status", "Active"),
-        supabase.from("mandates").select("*", { count: "exact", head: true }).eq("status", "Activo").lt("end_date", in90Iso),
+        // ITEM-090: mandatos por vencer leídos de condiciones_persona (fuente
+        // canónica). estado VIGENTE == mandato activo; fecha_fin == end_date.
+        // mandates queda solo para vistas legacy del shell TGMS.
+        supabase
+          .from("condiciones_persona")
+          .select("*", { count: "exact", head: true })
+          .eq("estado", "VIGENTE")
+          .not("fecha_fin", "is", null)
+          .lt("fecha_fin", in90Iso),
         supabase.from("policies").select("*", { count: "exact", head: true }).in("status", ["In Review", "Approval Pending"]),
         supabase.from("findings").select("*", { count: "exact", head: true }).eq("status", "Abierto"),
         supabase.from("delegations").select("*", { count: "exact", head: true }).eq("status", "Caducada"),

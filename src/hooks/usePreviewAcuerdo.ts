@@ -23,6 +23,9 @@ export interface PreviewParams {
   materializeAgreement?: boolean;
   capitalPresentePct?: number;
   votosFavorPct?: number;
+  // ITEM-116 (DL-2): entidad del acuerdo, para leer el dato canónico
+  // `entities.es_cotizada` en vez de asumir que toda SA es cotizada.
+  entityId?: string;
 }
 
 type RpRow = {
@@ -55,6 +58,7 @@ export function usePreviewAcuerdo(params: PreviewParams) {
       params.materializeAgreement,
       params.capitalPresentePct,
       params.votosFavorPct,
+      params.entityId,
     ],
     enabled: !!params.materia && !!tenantId,
     staleTime: 30_000,
@@ -102,6 +106,21 @@ export function usePreviewAcuerdo(params: PreviewParams) {
       const version = best?.rule_pack_versions?.[0];
       if (!version?.payload) return null;
 
+      // ITEM-116 (DL-2): leer el dato canónico `entities.es_cotizada` cuando hay entidad,
+      // en vez del antiguo hardcode `tipoSocial === "SA"` (falso positivo para SA no cotizadas).
+      // Sin entidad, por defecto NO cotizada. El cableado de evaluarBordesNoComputables al
+      // orquestador queda pendiente (criterio legal LMV documentado para Garrigues).
+      let esCotizada = false;
+      if (params.entityId) {
+        const { data: ent } = await supabase
+          .from("entities")
+          .select("es_cotizada")
+          .eq("tenant_id", tenantId!)
+          .eq("id", params.entityId)
+          .maybeSingle();
+        esCotizada = ent?.es_cotizada === true;
+      }
+
       const pack = version.payload as RulePack;
       const mode: AdoptionMode = params.adoptionMode ?? "NO_SESSION";
       const tipoSocial: TipoSocial = params.tipoSocial ?? "SA";
@@ -126,7 +145,7 @@ export function usePreviewAcuerdo(params: PreviewParams) {
               organoTipo,
               adoptionMode: mode,
               fechaJunta: new Date().toISOString(),
-              esCotizada: tipoSocial === "SA",
+              esCotizada, // ITEM-116: dato canónico entities.es_cotizada (DL-2)
               webInscrita: false,
               primeraConvocatoria: true,
               esJuntaUniversal: esUniversal,

@@ -70,22 +70,25 @@ const formatDateTime = (s: string | null) => {
 
 export const conflictTypeLabel = (t: string) => t.toUpperCase();
 
-// Fetch a map: person_id → primary active role (first mandate role)
+// Fetch a map: person_id → primary active role.
+// ITEM-090: rol leído de condiciones_persona (fuente canónica). tipo_condicion
+// equivale a mandates.role; estado VIGENTE == mandato activo. mandates queda
+// solo para vistas legacy del shell TGMS.
 async function fetchRolesByPersonIds(ids: string[], tenantId: string | null) {
   if (ids.length === 0) return new Map<string, string>();
   let query = supabase
-    .from("mandates")
-    .select("person_id, role, status")
+    .from("condiciones_persona")
+    .select("person_id, tipo_condicion, estado")
     .in("person_id", ids)
-    .eq("status", "Activo");
+    .eq("estado", "VIGENTE");
   if (tenantId) {
     query = query.eq("tenant_id", tenantId);
   }
   const { data } = await query;
   const map = new Map<string, string>();
-  type MandateRoleRow = { person_id: string; role: string; status: string };
-  ((data ?? []) as MandateRoleRow[]).forEach((m) => {
-    if (!map.has(m.person_id)) map.set(m.person_id, m.role);
+  type CondicionRoleRow = { person_id: string; tipo_condicion: string; estado: string };
+  ((data ?? []) as CondicionRoleRow[]).forEach((m) => {
+    if (!map.has(m.person_id)) map.set(m.person_id, m.tipo_condicion);
   });
   return map;
 }

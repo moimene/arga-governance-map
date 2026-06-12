@@ -569,8 +569,8 @@
 | ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
 | ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | ✅ HECHO (workflow ultracode) |
 | ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | ✅ HECHO (loop+codex) |
-| ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | 🟡 PARCIAL (073 tildes hecho; guard CatalogoTab difiere por solape 087) |
-| ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | PENDIENTE |
+| ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | ✅ HECHO (workflow ultracode) |
+| ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | ✅ HECHO (workflow ultracode) |
 | ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | ✅ HECHO (loop+cloud 091a+091b) |
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | ✅ HECHO (loop) |
 | ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | ✅ HECHO (loop) |
@@ -1107,20 +1107,20 @@
 
 | ID | Área | Verif. | Título | Estado |
 |---|---|---|---|---|
-| ITEM-116 | A1 | ✅ | DL-2 incompleta en runtime: esCotizada se acepta pero ningún engine cableado lo consume, y los hooks lo hardcodean de forma contradictoria | PENDIENTE |
-| ITEM-117 | A1 | — | ~10 módulos del motor son dead code sin consumidor runtime (incl. DL-2 y DL-4 canónicos) | PENDIENTE |
+| ITEM-116 | A1 | ✅ | DL-2 incompleta en runtime: esCotizada se acepta pero ningún engine cableado lo consume, y los hooks lo hardcodean de forma contradictoria | ✅ HECHO (workflow ultracode) |
+| ITEM-117 | A1 | — | ~10 módulos del motor son dead code sin consumidor runtime (incl. DL-2 y DL-4 canónicos) | ✅ HECHO (workflow ultracode) |
 | ITEM-118 | A1 | — | INDEX.md del motor desactualizado y contradictorio con DL-2 | HECHO (Ola1) |
-| ITEM-119 | A1 | — | DL-4 duplicado: implementación canónica muerta en plantillas-engine vs implementación inline divergente en ConvocatoriasStepper | PENDIENTE |
+| ITEM-119 | A1 | — | DL-4 duplicado: implementación canónica muerta en plantillas-engine vs implementación inline divergente en ConvocatoriasStepper | ✅ HECHO (workflow ultracode) |
 | ITEM-120 | A1 | — | Ruido de smoke-tests en el marco normativo de la entidad canónica ARGA (incl. override UNANIMIDAD legalmente inadmisible) | ✅ HECHO (loop+cloud) |
 | ITEM-121 | A10 | — | CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía | HECHO (Ola1) |
 | ITEM-122 | A11 | — | CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos | HECHO (Ola1) |
 | ITEM-123 | A11 | — | TransmisionStepper: fallback cliente no transaccional (código hoy muerto) que podría perder títulos a mitad de operación | ✅ HECHO (workflow ultracode) |
-| ITEM-124 | A11 | — | Cobertura e2e ausente en 4 steppers de capital/personas y en la ruta sociedad de DesignarAdmin | PENDIENTE |
+| ITEM-124 | A11 | — | Cobertura e2e ausente en 4 steppers de capital/personas y en la ruta sociedad de DesignarAdmin | ✅ HECHO (workflow ultracode) |
 | ITEM-125 | A11 | — | Duplicación estructural: 3 familias de shell de stepper y componentes Input/Field/Checkbox copiados idénticos | PENDIENTE |
 | ITEM-126 | A12 | ✅ | Tres vías paralelas de 'envío' con modelos de estado divergentes — la consolidación a dispatcher único no está completada | PENDIENTE |
 | ITEM-127 | A12 | — | Idempotencia ERDS degenerada: el discriminador del evidenceId nunca incluye hash ni número de intento | ✅ HECHO (workflow ultracode) |
 | ITEM-128 | A12 | — | Doble implementación del pipeline de despacho: la librería src/lib/comms solo la consumen los tests; la Edge Function lo reimplementa inline y ya diverge | PENDIENTE |
-| ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | PENDIENTE |
+| ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | ✅ HECHO (workflow ultracode) |
 | ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | ✅ HECHO (loop+codex) |
 | ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | ✅ HECHO (loop) |

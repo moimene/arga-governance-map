@@ -42,7 +42,9 @@ type MaybeJoin<T> = T | T[] | null | undefined;
 type ConvRow = { id: string; fecha_1: string | null; estado: string | null; governing_bodies?: MaybeJoin<{ name: string | null }> };
 type LibroRow = { id: string; book_kind: string | null; legalization_deadline: string | null };
 type AcuerdoSinSesionRow = { id: string; title: string | null; status: string; voting_deadline: string | null };
-type MandatoRow = { id: string; role: string | null; end_date: string | null; persons?: MaybeJoin<{ full_name: string | null }> };
+// ITEM-090: migrado de mandates a condiciones_persona (fuente canónica).
+// tipo_condicion == "role"; fecha_fin == "end_date"; estado VIGENTE == mandato vigente.
+type MandatoRow = { id: string; tipo_condicion: string | null; fecha_fin: string | null; persons?: MaybeJoin<{ full_name: string | null }> };
 type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; estimated_resolution: string | null };
 
 function firstJoin<T>(value: MaybeJoin<T>): T | null {
@@ -122,17 +124,21 @@ function useCalendarioDeadlines(entityId?: string | null) {
         return (data ?? []) as AcuerdoSinSesionRow[];
       }
 
+      // ITEM-090: vencimientos de mandato leídos de condiciones_persona
+      // (fuente canónica). fecha_fin equivale a end_date; estado VIGENTE filtra
+      // los cargos activos. mandates queda solo para vistas legacy del shell TGMS.
       async function fetchMandatos(): Promise<MandatoRow[]> {
         if (bodyIds?.length === 0) return [];
         let query = supabase
-          .from("mandates")
-          .select("id, end_date, role, persons(full_name)")
+          .from("condiciones_persona")
+          .select("id, fecha_fin, tipo_condicion, persons(full_name)")
           .eq("tenant_id", tenantId!)
-          .gte("end_date", today)
-          .lte("end_date", en90);
+          .eq("estado", "VIGENTE")
+          .gte("fecha_fin", today)
+          .lte("fecha_fin", en90);
         if (bodyIds) query = query.in("body_id", bodyIds);
         const { data, error } = await query
-          .order("end_date", { ascending: true })
+          .order("fecha_fin", { ascending: true })
           .limit(10);
         if (error) throw error;
         return (data ?? []) as unknown as MandatoRow[];
@@ -212,18 +218,18 @@ function useCalendarioDeadlines(entityId?: string | null) {
         });
       });
 
-      // Mandatos próximos a vencer
+      // Mandatos próximos a vencer (ITEM-090: condiciones_persona.fecha_fin)
       mandates.forEach((m) => {
-        if (!m.end_date) return;
-        const days = daysFromNow(m.end_date);
+        if (!m.fecha_fin) return;
+        const days = daysFromNow(m.fecha_fin);
         const person = firstJoin(m.persons);
         const personName = person?.full_name ?? "Consejero/a";
         items.push({
           id: m.id,
           kind: "RENOVACION_MANDATO",
-          label: `${personName} — ${m.role ?? "Cargo"}`,
+          label: `${personName} — ${m.tipo_condicion ?? "Cargo"}`,
           sublabel: "Vencimiento de mandato",
-          deadline: m.end_date,
+          deadline: m.fecha_fin,
           daysLeft: days,
           urgency: urgencyFor(days),
           nav_to: "/secretaria",

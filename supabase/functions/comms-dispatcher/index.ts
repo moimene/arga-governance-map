@@ -132,6 +132,21 @@ async function eadTrustTimestamp(bodyHash: string): Promise<{ ok: true; evidence
   }
 }
 
+// ITEM-127: discriminador de idempotencia ERDS derivado de la clave COMPLETA.
+// `idempotencyKey.substring(0,8)` solo capturaba los primeros 8 chars del UUID
+// del recipient (constante por destinatario), ignorando cuerpo_hash e
+// intento_reenvio_n que la clave pretende incorporar. Un hash corto djb2 (FNV-like)
+// de la clave entera asegura que reintentos manuales (intento reseteado) o reenvíos
+// con cuerpo distinto produzcan un evidenceId distinto, evitando que EAD Trust lo
+// rechace como duplicado o lo asocie al envío equivocado.
+function shortHashIdempotencyKey(key: string): string {
+  let hash = 5381;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) + hash + key.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
 async function eadTrustErdsSend(opts: {
   recipientId: string; cuerpoHtml: string; cuerpoSha512: string; asunto: string; destino: string; idempotencyKey: string;
   metadata: Record<string, string>;
@@ -143,7 +158,9 @@ async function eadTrustErdsSend(opts: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${EAD_TRUST_KEY}` },
       body: JSON.stringify({
-        evidenceId: `ERDS-${opts.recipientId}-${opts.idempotencyKey.substring(0, 8)}`,
+        // ITEM-127: discriminador con hash corto de la idempotencyKey COMPLETA
+        // (recipient + cuerpo_hash + intento), no solo los primeros 8 chars del UUID.
+        evidenceId: `ERDS-${opts.recipientId}-${shortHashIdempotencyKey(opts.idempotencyKey)}`,
         hash: opts.cuerpoSha512,
         capturedAt: new Date().toISOString(),
         custodyType: 'EXTERNAL',
