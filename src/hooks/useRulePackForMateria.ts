@@ -8,7 +8,10 @@ export interface PostAcuerdoPayload {
   instrumentoRequerido: "ESCRITURA" | "INSTANCIA" | "NINGUNO";
   publicacionRequerida: boolean;
   canalesPublicacion?: string[];
-  plazoInscripcion?: number;
+  // ITEM-135: el payload persistido admite la forma escalar (número de días) o
+  // la estructurada {dias, fuente, referencia}; la normalización de este hook
+  // maneja ambas, así que el tipo las declara en vez de solo `number`.
+  plazoInscripcion?: number | { dias: number; fuente?: string; referencia?: string };
   notas?: string;
   [key: string]: unknown;
 }

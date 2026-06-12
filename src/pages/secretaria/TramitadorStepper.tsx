@@ -1232,12 +1232,15 @@ function TramitadorNuevo() {
         </div>
       </div>
 
-      {registryRulePackData.payload.plazoInscripcion && (
+      {registryRulePackData.payload.plazoInscripcion != null && (
         <div
           className="px-4 py-2 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          Plazo de inscripción: {registryRulePackData.payload.plazoInscripcion} días
+          {/* ITEM-135: el plazo puede ser escalar o estructurado {dias} — extraer el número. */}
+          Plazo de inscripción: {typeof registryRulePackData.payload.plazoInscripcion === "number"
+            ? registryRulePackData.payload.plazoInscripcion
+            : registryRulePackData.payload.plazoInscripcion.dias} días
         </div>
       )}
 

@@ -1126,7 +1126,7 @@
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | PENDIENTE |
 | ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | PENDIENTE |
 | ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
-| ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | PENDIENTE |
+| ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
 | ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | PENDIENTE |
 | ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | PENDIENTE |
@@ -1301,7 +1301,7 @@
 
 ### ITEM-135 [P3] Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número
 
-- **Área:** A2 · **Estado:** PENDIENTE
+- **Área:** A2 · **Estado:** HECHO (Ola typing; tipo plazoInscripcion ensanchado + corregido render latente en TramitadorStepper)
 - **Descripción:** PostAcuerdoPayload declara plazoInscripcion?: number, pero en Cloud AUMENTO_CAPITAL/CESE_CONSEJERO usan objeto {dias, fuente, referencia} y DELEGACION_FACULTADES usa la clave alternativa plazoInscripcionDias (número). Cualquier render directo de payload.plazoInscripcion mostraría '[object Object]' o undefined según el pack (no verificado en UI — falta comprobar el render del paso de reglas del Tramitador).
 - **Evidencia:** src/hooks/useRulePackForMateria.ts:5-14 (plazoInscripcion?: number); SQL payload->'postAcuerdo': AUMENTO_CAPITAL {"plazoInscripcion":{"dias":60,...}} vs DELEGACION_FACULTADES {"plazoInscripcionDias":30}.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useRulePackForMateria.ts
