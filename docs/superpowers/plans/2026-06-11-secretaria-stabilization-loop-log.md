@@ -681,3 +681,37 @@ Próximo al reanudar: Ola MOTOR ítem a ítem (BOE+Codex), luego Ola Cloud (guar
 - Varios motor "rápidos" del fixSpec NO lo son: ITEM-056/142 (antelación "un mes") requieren refactor
   de firma de `getDefaultAntelacionDias` (devuelve `number`, no fecha); ITEM-133 (filtro órgano en
   resolución de pack) requiere cambio de firma + 2 callers. Hacer con contexto fresco.
+
+### Paquete legal (Comité Legal + Garrigues, firmado 2026-06-12)
+
+El usuario aportó el documento `Propuesta consolidada de respuesta a los temas pendientes de
+decisión legal` y lo aprobó como **firmado por Comité Legal + asesores externos (Garrigues)** —
+desbloquea los ítems NEEDS_HUMAN sustantivos. Implementado (commits 009e066, 93c64ed, df90703):
+
+- **ITEM-095 (copy):** panel ERDS de AcuerdoSinSesionDetalle deja de prometer "notificación
+  certificada enviada con evidencia cualificada" → "registrada (entorno demo/sandbox)".
+- **ITEM-025 (copy/factual):** BORME retirado como canal de presentación (es publicación POSTERIOR
+  a la inscripción); glosas corregidas por jurisdicción (JUCERJA = Junta Comercial do Rio de
+  Janeiro, BR; + Registro Mercantil ES).
+- **ITEM-151 / P14 (motor):** incumplimiento de pacto parasocial = CONTRACTUAL (art. 29 LSC), no
+  invalidez societaria. CONSENTIMIENTO_INVERSOR → WARNING; orquestador rutea pacto issues a canal
+  separado `pacto_blocking_issues` (nuevo campo en ComplianceResult), header WARNING. Test al
+  contrato legal.
+- **ITEM-106 (motor/UI):** gate art. 107 RRM — en vía directa (?agreement= sin certificación
+  firmada) se bloquea la elevación a público salvo override justificado. Nuevo hook
+  useAgreementHasCertification + banner + checkbox override. e2e/30:815 actualizado.
+
+Restante del paquete legal (spec'ado en el documento, pendiente de implementar con su rigor):
+- **Cloud/migración:** ITEM-027 (nuevas versiones de rule pack: APROBACION_CUENTAS depósito,
+  AUMENTO_CAPITAL plazo 1 mes art. 19.2 RRM, CESE_CONSEJERO certificación), ITEM-048 (adopción sin
+  sesión server-side con conciencia de matter_class/capital/mayoría), ITEM-030 (composición real del
+  CdA: categorías, VP×2, coordinador, presidente-consejero, secretaria fuera de cómputo), ITEM-091
+  (saneamiento QA + JGA duplicada — datos, no doctrina).
+- **UI/catálogo:** ITEM-054 (etiqueta "sin regla aprobada" + priorizar packs), ITEM-082 (promoción/
+  archivado de borradores), ITEM-031 (gates de transmisión SL art. 106 LSC).
+- **MatterExecutionProfile P3 (severidad dinámica fusión), P5-P9, P11-P13** (perfiles): fase 1 como
+  panel informativo no disruptivo, overrides en compliance_snapshot.
+
+Regla operativa del paquete: el documento autoriza cambios sustantivos (rule packs, severidades,
+gates) **bajo la firma legal ya dada**; "no editar versiones activas en caliente" → crear nuevas
+versiones de rule_pack. Migraciones Cloud con `db:check-target` + mirror + `db push` + verify.
