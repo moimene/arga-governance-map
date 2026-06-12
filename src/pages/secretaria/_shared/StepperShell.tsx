@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { StepRail } from "./StepNav";
 
 export interface StepDef {
   n: number;
@@ -94,50 +95,12 @@ export function StepperShell({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-        <nav
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-2"
-          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          aria-label="Pasos"
-        >
-          {steps.map((s) => {
-            const done = s.n < current;
-            const active = s.n === current;
-            const blockedByEarlierStep = Boolean(firstBlockedStep && s.n > firstBlockedStep.n);
-            return (
-              <button
-                key={s.n}
-                type="button"
-                onClick={() => {
-                  if (!blockedByEarlierStep) setCurrent(s.n);
-                }}
-                disabled={blockedByEarlierStep}
-                title={blockedByEarlierStep ? "Complete el paso bloqueante antes de continuar" : undefined}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                  active
-                    ? "bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-brand-3308)]"
-                    : blockedByEarlierStep
-                    ? "cursor-not-allowed text-[var(--g-text-secondary)] opacity-50"
-                    : "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)]/50"
-                }`}
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center text-[11px] font-bold ${
-                    done
-                      ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                      : active
-                      ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {done ? <Check className="h-3.5 w-3.5" /> : s.n}
-                </span>
-                <span className="flex-1 truncate">{s.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        <StepRail
+          steps={steps}
+          current={current}
+          canNavigateTo={(n) => !(firstBlockedStep && n > firstBlockedStep.n)}
+          onNavigate={setCurrent}
+        />
 
         <div
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
