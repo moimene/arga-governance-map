@@ -28,6 +28,15 @@ export function templateOrganoMatches(templateOrgano?: string | null, bodyType?:
   return organoFamily(templateOrgano) === organoFamily(bodyType);
 }
 
+// ITEM-080/112 — Decisión de producto (no requiere cambio de schema): la
+// discriminación SA/SL (DL-4) NO se modela como eje `tipo_social` en
+// `plantillas_protegidas`. Las plantillas de acta/certificación (ACTA_*,
+// CERTIFICACION) son agnósticas del tipo social, y la selección automática SA/SL
+// vive en el Tramitador vía los MODELO_ACUERDO por materia (useModelosAcuerdo).
+// Por eso este filtro de compatibilidad no incluye `tipo_social`: la dimensión
+// relevante para la plantilla es materia × órgano × jurisdicción × adopción.
+// Si en el futuro se requieren actas tipificadas por SA/SL, añadir aquí la columna
+// + filtro; hoy no hay caso real de mismatch (las ACTA_* compatibles son neutrales).
 export function templateCompatibleWithAgreement(
   template: PlantillaProtegidaRow,
   agreement: AgreementTemplateContext,

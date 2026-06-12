@@ -152,3 +152,25 @@ compliance y a las `cotizadaWarnings` del Board Pack.
 | 117 / 119 | ~10 módulos del motor sin consumidor runtime + DL-4 duplicado: cablear vs eliminar (decidir por módulo). |
 | 146 | ¿Estado intermedio `EN_CURSO` en `meetings` reservando CELEBRADA para el cierre? (afecta KPIs/e2e). |
 | 081 fase 2 | Dedup de `materia_catalog` (retirar alias MOD_ESTATUTOS, NOMBRAMIENTO_CESE, unificar AMPLIACION/AUMENTO_CAPITAL) con re-binding de plantillas. |
+
+---
+
+## Anexo II — Deuda arquitectónica (refactor con diseño, no apresurar)
+
+Estos ítems NO son legales ni de modelado simple: son refactors estructurales que
+requieren diseño y re-verificación e2e amplia. Hacerlos a ciegas rompería flujos.
+Recomendación: pasada dedicada con su propio plan + e2e de regresión.
+
+| Ítem | Refactor | Por qué no se hace en caliente |
+|---|---|---|
+| **125** | Unificar las 3 familias de shell de stepper + componentes Input/Field/Checkbox duplicados | Toca ~15 steppers a la vez; un shell común mal diseñado rompe todos los flujos de adopción. Necesita diseño del contrato del shell + migración stepper a stepper con e2e por flujo. |
+| **128** | Doble implementación del pipeline de despacho (lib `src/lib/comms` solo en tests vs Edge Function inline, ya divergen) | Consolidar el despacho en una sola fuente de verdad cruza el límite cliente/Edge Function (Deno) con contratos de tipos distintos; requiere decidir dónde vive la lógica y desplegar la Edge Function. |
+| **126** | Tres vías paralelas de 'envío' con modelos de estado divergentes | Es la capa de comunicaciones completa; unificar los estados de envío (convocatoria / ERDS acuerdo / board pack) necesita un modelo de estado común acordado antes de tocar código. |
+| **146** | Estado intermedio `EN_CURSO` en `meetings` (reservar CELEBRADA para el cierre) | Cambia el ciclo de vida de la reunión del que dependen `deriveReunionInitialStep` (ITEM-059), `isOpen`, KPIs del dashboard y ~8 specs e2e. Cambio coordinado + re-verificación e2e completa. Estaba marcado REQUIERE DECISIÓN HUMANA. |
+
+**Decisiones de producto ya tomadas y documentadas en código (cerradas):**
+- ITEM-080/112: la discriminación SA/SL (DL-4) vive en el Tramitador (modelos por
+  materia); `plantillas_protegidas` no añade eje `tipo_social`. Documentado en
+  `agreement-template-compatibility.ts`.
+- ITEM-090: las lecturas de vencimientos/KPIs/conflictos migran a `condiciones_persona`
+  (fuente canónica); `mandates` queda para vistas legacy del shell TGMS.
