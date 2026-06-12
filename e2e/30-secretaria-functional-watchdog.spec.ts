@@ -850,6 +850,12 @@ test.describe('Secretaría functional watchdog', () => {
 
     await next.click();
     await expect(main.getByText('Pendiente de registrar escritura en expediente')).toBeVisible();
+    // ITEM-106 (Comité Legal + Garrigues): entrada DIRECTA por agreement sin
+    // certificación firmada → la elevación a público queda bloqueada (art. 107
+    // RRM); el botón se deshabilita y aparece el aviso, salvo override justificado.
+    await expect(main.getByText(/sin certificación firmada — no inscribible/i)).toBeVisible();
+    await expect(main.getByRole('button', { name: 'Registrar escritura' })).toBeDisabled();
+    await main.getByRole('checkbox', { name: /Proceder sin certificación/i }).check();
     await expect(main.getByRole('button', { name: 'Registrar escritura' })).toBeEnabled();
     await expect(main.getByRole('button', { name: 'Documento registral DOCX' })).toBeVisible();
   });

@@ -181,3 +181,30 @@ export function useCertificationRegistryIntake(certificationId: string | null | 
     },
   });
 }
+
+/**
+ * ITEM-106 (Comité Legal + Garrigues): ¿el acuerdo tiene una certificación
+ * FIRMADA que lo cubra? Sin ella, la elevación a público no debe registrarse
+ * (art. 107 RRM: la inscripción exige título — escritura o certificación con el
+ * acuerdo). Se consulta por `agreement_id` directo o por `agreements_certified`
+ * que contenga el id. Devuelve `false` solo cuando no consta ninguna firmada.
+ */
+export function useAgreementHasCertification(agreementId: string | null | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!agreementId && !!tenantId,
+    queryKey: ["certifications", "byAgreement", tenantId, agreementId ?? "none"],
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase
+        .from("certifications")
+        .select("id, signature_status")
+        .eq("tenant_id", tenantId!)
+        .or(`agreement_id.eq.${agreementId},agreements_certified.cs.{${agreementId}}`);
+      if (error) throw error;
+      const SIGNED = new Set(["SIGNED", "FIRMADA", "EMITIDA", "ISSUED", "SEALED", "EMITTED"]);
+      return (data ?? []).some((c) =>
+        SIGNED.has(String((c as { signature_status?: string | null }).signature_status ?? "").toUpperCase()),
+      );
+    },
+  });
+}

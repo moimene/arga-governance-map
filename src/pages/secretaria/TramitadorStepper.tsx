@@ -8,7 +8,7 @@ import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/ho
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
-import { useCertificationRegistryIntake, useTramitacionById } from "@/hooks/useTramitador";
+import { useCertificationRegistryIntake, useTramitacionById, useAgreementHasCertification } from "@/hooks/useTramitador";
 import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
@@ -436,6 +436,19 @@ function TramitadorNuevo() {
     (certificationIntake?.agreementIds.length === 1 ? certificationIntake.agreementIds[0] : null);
   const effectiveSelectedAgreementId = selectedAgreementId ?? defaultAgreementId;
   const { data: selectedAgreement } = useAgreementById(effectiveSelectedAgreementId || undefined);
+  // ITEM-106 (Comité Legal + Garrigues): en la vía DIRECTA (sin ?certificacion=)
+  // se comprueba que el acuerdo tenga certificación firmada antes de permitir la
+  // elevación a público (art. 107 RRM). Cuando se entra por certificación, el
+  // intake ya garantiza el título y este check no aplica.
+  const { data: agreementHasCertification, isLoading: agreementCertCheckLoading } =
+    useAgreementHasCertification(!requestedCertificationId ? effectiveSelectedAgreementId || undefined : undefined);
+  const agreementLacksCertification = Boolean(
+    !requestedCertificationId &&
+      effectiveSelectedAgreementId &&
+      !agreementCertCheckLoading &&
+      agreementHasCertification === false,
+  );
+  const [deedCertificationOverride, setDeedCertificationOverride] = useState(false);
 
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
     selectedAgreement?.agreement_kind
@@ -793,6 +806,9 @@ function TramitadorNuevo() {
       selectedAgreement &&
       selectedAgreementAllowedByCertification &&
       certificationRegistryReady &&
+      // ITEM-106: bloqueo duro si el acuerdo no tiene certificación firmada en la
+      // vía directa, salvo override justificado del usuario (art. 107 RRM).
+      !(agreementLacksCertification && !deedCertificationOverride) &&
       isDeedRequired &&
       filingType &&
       instrumentData.notary.trim() &&
@@ -1527,6 +1543,36 @@ function TramitadorNuevo() {
                   : "Se guardará en el tramitador registral como elevada a público."}
               </div>
             </div>
+
+            {agreementLacksCertification && !deedSaved && (
+              <div
+                className="flex items-start gap-2 border border-[var(--status-error)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                role="alert"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
+                <div className="space-y-1.5">
+                  <div className="font-medium">
+                    Acuerdo sin certificación firmada — no inscribible (art. 107 RRM)
+                  </div>
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    La elevación a público exige un título inscribible (escritura o certificación del
+                    acuerdo). Este acuerdo no tiene una certificación firmada vinculada. Emite primero
+                    la certificación desde el acta, o marca el override justificado para proceder bajo
+                    tu responsabilidad.
+                  </p>
+                  <label className="flex items-center gap-2 text-xs text-[var(--g-text-primary)]">
+                    <input
+                      type="checkbox"
+                      checked={deedCertificationOverride}
+                      onChange={(e) => setDeedCertificationOverride(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-[var(--g-brand-3308)]"
+                    />
+                    Proceder sin certificación (override justificado)
+                  </label>
+                </div>
+              </div>
+            )}
 
             {deedSaved ? (
               <div className="inline-flex items-center gap-2 rounded-full bg-[var(--g-sec-100)] px-3 py-1 text-xs font-semibold text-[var(--g-brand-3308)]">

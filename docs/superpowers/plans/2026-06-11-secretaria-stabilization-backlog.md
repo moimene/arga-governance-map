@@ -586,7 +586,7 @@
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | PENDIENTE |
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
-| ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | PENDIENTE |
+| ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
 | ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | PENDIENTE |
 | ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | PENDIENTE |
 | ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | PENDIENTE |
@@ -1023,7 +1023,7 @@
 
 ### ITEM-106 [P2] El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=)
 
-- **Área:** A7 · **Estado:** REQUIERE DECISIÓN HUMANA (documentado con recomendación → docs/superpowers/reviews/2026-06-11-decisiones-pendientes-secretaria.md)· **REQUIERE DECISIÓN HUMANA**
+- **Área:** A7 · **Estado:** HECHO (Comité Legal+Garrigues; gate art. 107 RRM: elevación a público sin certificación firmada bloqueada salvo override justificado, en vía directa por agreement)· **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** El paso 1 del TramitadorStepper admite acuerdos CERTIFIED y ADOPTED (useAgreementsList(['CERTIFIED','ADOPTED'])). El gate 'la certificación debe estar firmada y con evidencia vinculada' (certificationRegistryReady) solo se evalúa cuando se entra con ?certificacion=: en la entrada directa, certificationIntake es null y certificationRegistryReady es true por defecto, por lo que se puede registrar la escritura de elevación de un acuerdo meramente ADOPTED sin ninguna certificación ni acta enlazada como base documental. RRM art. 107 exige que la elevación a instrumento público se base en acta, testimonio o certificación de los acuerdos; el prototipo no exige ni referencia ese soporte en la vía directa, debilitando la trazabilidad probatoria que el propio flujo promete ('La tramitación se inicia desde un acuerdo o certificación inscribible, nunca como expediente libre'). Decisión de producto pendiente: exigir siempre certificación/acta vinculada o degradar a warning explícito.
 - **Evidencia:** src/pages/secretaria/TramitadorStepper.tsx:379-382 (useAgreementsList(['CERTIFIED','ADOPTED'])), :772 (certificationRegistryReady = !certificationIntake || ...), :826-845 (handleRegisterDeed solo valida certificación si hay intake). Copy contradictorio en TramitadorLista.tsx:76-80.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/TramitadorStepper.tsx
