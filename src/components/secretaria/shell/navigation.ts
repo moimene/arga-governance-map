@@ -90,7 +90,8 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
-      { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+      // ITEM-078: duplicado de "Documentos en revisión" (sección Documentación)
+      // hacia la misma ruta con otro label — eliminado.
     ],
   },
 ];
@@ -285,7 +286,8 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
       { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
       { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
-      { label: "Revisión documentos", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+      // ITEM-078: duplicado de "Documentos en revisión" (sección Documentación)
+      // hacia la misma ruta con otro label — eliminado.
     ],
   },
 ];

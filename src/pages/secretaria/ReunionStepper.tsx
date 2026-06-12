@@ -4000,9 +4000,12 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-info)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            No hay acuerdos registrados. Si la sesión solo contiene puntos informativos,
-            deliberativos, toma de razón o ruegos y preguntas, el acta se generará como
-            constancia de los asuntos tratados sin Acuerdo 360.
+            {/* ITEM-101: la copy prometía generar un acta de constancia, pero el
+                gate (canGenerateMinute) exige al menos un punto guardado, dejando
+                el botón bloqueado. Se alinea el mensaje con el gate real. */}
+            Todavía no hay ningún punto del orden del día guardado. Añade y guarda los puntos
+            en el paso «Agenda y debate» (informativos, deliberativos o de acuerdo) para poder
+            generar el acta; los puntos sin votación quedarán como constancia, sin Acuerdo 360.
           </p>
         </div>
       ) : (

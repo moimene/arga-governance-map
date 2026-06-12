@@ -555,10 +555,10 @@
 | ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
 | ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
 | ITEM-074 | A13 | — | Terminología 'resolución' vs 'acuerdo' inconsistente en la UI de ReunionStepper | PENDIENTE |
-| ITEM-075 | A13 | — | Toasts de error no accionables que descartan el detalle disponible | PENDIENTE |
+| ITEM-075 | A13 | — | Toasts de error no accionables que descartan el detalle disponible | ✅ HECHO (loop) |
 | ITEM-076 | A13 | — | ActaDetalle sin backlink a la reunión origen y convocatoria referenciada como UUID crudo | ✅ HECHO (loop+codex) |
 | ITEM-077 | A13 | — | DecisionDetalle no enlaza al expediente Acuerdo 360 vinculado | ✅ HECHO (loop+codex) |
-| ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | PENDIENTE |
+| ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | ✅ HECHO (loop) |
 | ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | HECHO (motor) |
 | ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
 | ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | PENDIENTE |
@@ -581,7 +581,7 @@
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
-| ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | PENDIENTE |
+| ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | ✅ HECHO (loop) |
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | PENDIENTE |
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | 🟡 PARCIAL (TramitacionDetalle cross-link; ExpedienteAcuerdo cards en oleada cross-module) |
@@ -1123,7 +1123,7 @@
 | ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | PENDIENTE |
 | ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | ✅ HECHO (loop+codex) |
 | ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
-| ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | PENDIENTE |
+| ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | ✅ HECHO (loop) |
 | ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | PENDIENTE |
 | ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |

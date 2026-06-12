@@ -114,7 +114,17 @@ export function TemplateImportWizard() {
       setGatePre(fail.gatePre);
       setStep(4);
     } else if (fail.reason === "INSERT_FAILED") {
-      toast.error("Error al insertar el borrador");
+      // ITEM-075: incluir el detalle del error (antes se descartaba fail.details).
+      toast.error("Error al insertar el borrador", {
+        description:
+          fail.details instanceof Error
+            ? fail.details.message
+            : typeof fail.details === "string"
+              ? fail.details
+              : fail.details
+                ? JSON.stringify(fail.details)
+                : undefined,
+      });
     }
   }
 
@@ -148,7 +158,17 @@ export function TemplateImportWizard() {
       setGatePre(fail.gatePre);
       setStep(4);
     } else if (fail.reason === "INSERT_FAILED") {
-      toast.error("Error al insertar el borrador");
+      // ITEM-075: incluir el detalle del error (antes se descartaba fail.details).
+      toast.error("Error al insertar el borrador", {
+        description:
+          fail.details instanceof Error
+            ? fail.details.message
+            : typeof fail.details === "string"
+              ? fail.details
+              : fail.details
+                ? JSON.stringify(fail.details)
+                : undefined,
+      });
     }
   }
 

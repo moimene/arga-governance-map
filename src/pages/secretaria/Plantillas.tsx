@@ -222,8 +222,12 @@ export default function Plantillas() {
           toast.success(`Plantilla transicionada a ${estadoLabel(transition.nextState)}`);
           setSelected(null);
         },
-        onError: () => {
-          toast.error("Error al actualizar el estado de la plantilla");
+        onError: (error) => {
+          // ITEM-075: no descartar el detalle del error (antes onError sin
+          // parámetro mostraba un mensaje genérico no accionable).
+          toast.error("Error al actualizar el estado de la plantilla", {
+            description: error instanceof Error ? error.message : String(error),
+          });
         },
       }
     );

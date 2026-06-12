@@ -1120,8 +1120,8 @@ function TramitadorNuevo() {
       )}
       {requestedMateriaWithoutAgreement && (
         <div
-          className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)]"
-          style={{ borderRadius: "var(--g-radius-md)", background: "var(--g-surface-muted)" }}
+          className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           No hay acuerdos disponibles de materia {requestedMateria} en el ámbito actual. Se muestran el resto de acuerdos tramitables.
@@ -1134,11 +1134,8 @@ function TramitadorNuevo() {
         </div>
       ) : displayedAgreements.length === 0 ? (
         <div
-          className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)]"
-          style={{
-            borderRadius: "var(--g-radius-md)",
-            background: "var(--g-surface-muted)",
-          }}
+          className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
@@ -1297,8 +1294,8 @@ function TramitadorNuevo() {
           <div className="space-y-2">
             {requestedModeloMissing ? (
               <div
-                className="flex items-start gap-2 px-3 py-2 text-xs text-[var(--status-warning)]"
-                style={{ borderRadius: "var(--g-radius-sm)", background: "var(--g-surface-muted)" }}
+                className="flex items-start gap-2 px-3 py-2 text-xs text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+                style={{ borderRadius: "var(--g-radius-sm)" }}
               >
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 La plantilla indicada no corresponde a los modelos disponibles para esta materia. Seleccione un modelo alternativo.
@@ -1391,11 +1388,8 @@ function TramitadorNuevo() {
     </div>
   ) : (
     <div
-      className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-warning)]"
-      style={{
-        borderRadius: "var(--g-radius-md)",
-        background: "var(--g-surface-muted)",
-      }}
+      className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+      style={{ borderRadius: "var(--g-radius-md)" }}
     >
       <AlertTriangle className="h-4 w-4" />
       Seleccione un acuerdo en el paso anterior
@@ -1457,11 +1451,8 @@ function TramitadorNuevo() {
 
       {registryRulePackData?.payload.instrumentoRequerido === "INSTANCIA" && (
         <div
-          className="px-4 py-3 text-sm text-[var(--g-text-secondary)]"
-          style={{
-            borderRadius: "var(--g-radius-md)",
-            background: "var(--g-surface-muted)",
-          }}
+          className="px-4 py-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           Tramitación vía instancia notarial. Los datos se completarán en el paso siguiente.
         </div>
@@ -1469,11 +1460,8 @@ function TramitadorNuevo() {
     </div>
   ) : (
     <div
-      className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-warning)]"
-      style={{
-        borderRadius: "var(--g-radius-md)",
-        background: "var(--g-surface-muted)",
-      }}
+      className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+      style={{ borderRadius: "var(--g-radius-md)" }}
     >
       <AlertTriangle className="h-4 w-4" />
       Este acuerdo no requiere instrumento especial (NINGUNO)
@@ -1507,11 +1495,8 @@ function TramitadorNuevo() {
 
       {filingChannel && (
         <div
-          className="px-4 py-3 text-sm text-[var(--g-text-secondary)]"
-          style={{
-            borderRadius: "var(--g-radius-md)",
-            background: "var(--g-surface-subtle)",
-          }}
+          className="px-4 py-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-subtle)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           Canal "{filingChannel}" seleccionado. El expediente queda preparado para presentación;
           este entorno demo no realiza envío telemático al Registro.
@@ -1768,11 +1753,8 @@ function TramitadorNuevo() {
       )}
 
       <div
-        className="px-4 py-3 text-xs text-[var(--g-text-secondary)]"
-        style={{
-          borderRadius: "var(--g-radius-md)",
-          background: "var(--g-surface-muted)",
-        }}
+        className="px-4 py-3 text-xs text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
+        style={{ borderRadius: "var(--g-radius-md)" }}
       >
         El sistema monitorizará automáticamente el estado de la presentación y le notificará de
         cambios o subsanaciones requeridas.

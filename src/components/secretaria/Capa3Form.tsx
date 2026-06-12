@@ -130,8 +130,8 @@ export function Capa3Form({
   if (fields.length === 0) {
     return (
       <div
-        className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--g-text-secondary)]"
-        style={{ borderRadius: "var(--g-radius-md)", background: "var(--g-surface-subtle)" }}
+        className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-subtle)]"
+        style={{ borderRadius: "var(--g-radius-md)" }}
       >
         <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
         Esta plantilla no requiere campos editables.
@@ -254,15 +254,12 @@ export function Capa3Form({
                 aria-required={required}
                 aria-invalid={required && isEmpty}
                 aria-describedby={`capa3-${field.campo}-desc`}
-                className={`w-full px-3 py-2 text-sm text-[var(--g-text-primary)] border ${
+                className={`w-full px-3 py-2 text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)] border ${
                   required && isEmpty
                     ? config.borderClass
                     : "border-[var(--g-border-subtle)]"
                 } focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] transition-colors`}
-                style={{
-                  borderRadius: "var(--g-radius-md)",
-                  background: "var(--g-surface-card)",
-                }}
+                style={{ borderRadius: "var(--g-radius-md)" }}
                 placeholder={`${field.descripcion}...`}
               />
             )}
