@@ -12,6 +12,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
+import { SOURCE_OBJECT_TYPE } from "@/lib/secretaria/evidence-source-types";
 
 const SIGNED_URL_TTL_MS = 300_000; // 5 min, mismo TTL que la Edge Function
 
@@ -76,7 +77,7 @@ export function useAgreementSignedDocumentUrl(
         .from("evidence_bundles")
         .select("id")
         .eq("source_object_id", agreementId!)
-        .eq("source_object_type", "AGREEMENT")
+        .eq("source_object_type", SOURCE_OBJECT_TYPE.AGREEMENT)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

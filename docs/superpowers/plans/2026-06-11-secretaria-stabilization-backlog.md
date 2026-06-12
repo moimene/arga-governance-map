@@ -551,7 +551,7 @@
 | ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | ✅ HECHO (loop) |
 | ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | ✅ HECHO (loop) |
 | ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | HECHO (UI) |
-| ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | PENDIENTE |
+| ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | ✅ HECHO (loop+cloud) |
 | ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
 | ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
 | ITEM-074 | A13 | — | Terminología 'resolución' vs 'acuerdo' inconsistente en la UI de ReunionStepper | ✅ HECHO (loop) |
@@ -1111,7 +1111,7 @@
 | ITEM-117 | A1 | — | ~10 módulos del motor son dead code sin consumidor runtime (incl. DL-2 y DL-4 canónicos) | PENDIENTE |
 | ITEM-118 | A1 | — | INDEX.md del motor desactualizado y contradictorio con DL-2 | HECHO (Ola1) |
 | ITEM-119 | A1 | — | DL-4 duplicado: implementación canónica muerta en plantillas-engine vs implementación inline divergente en ConvocatoriasStepper | PENDIENTE |
-| ITEM-120 | A1 | — | Ruido de smoke-tests en el marco normativo de la entidad canónica ARGA (incl. override UNANIMIDAD legalmente inadmisible) | PENDIENTE |
+| ITEM-120 | A1 | — | Ruido de smoke-tests en el marco normativo de la entidad canónica ARGA (incl. override UNANIMIDAD legalmente inadmisible) | ✅ HECHO (loop+cloud) |
 | ITEM-121 | A10 | — | CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía | HECHO (Ola1) |
 | ITEM-122 | A11 | — | CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos | HECHO (Ola1) |
 | ITEM-123 | A11 | — | TransmisionStepper: fallback cliente no transaccional (código hoy muerto) que podría perder títulos a mitad de operación | PENDIENTE |
@@ -1140,7 +1140,7 @@
 | ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
 | ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | HECHO (Ola2) |
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
-| ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | PENDIENTE |
+| ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | ✅ HECHO (loop+cloud) |
 | ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | HECHO (UI) |
 | ITEM-151 | A9 | — | CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING | HECHO (legal) |
 

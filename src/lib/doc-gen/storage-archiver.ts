@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { resolveSandboxSafeEvidencePersistence } from "@/lib/secretaria/evidence-sandbox-gate";
+import { SOURCE_OBJECT_TYPE } from "@/lib/secretaria/evidence-source-types";
 
 export interface ArchiveResult {
   ok: boolean;
@@ -183,7 +184,7 @@ export async function archiveDocxToStorage(
       // source_object_id; sin estos campos el documento archivado quedaba
       // irrecuperable desde el expediente.
       source_module: "secretaria",
-      source_object_type: "AGREEMENT",
+      source_object_type: SOURCE_OBJECT_TYPE.AGREEMENT,
       source_object_id: agreementId,
       manifest: effectiveManifest,
       manifest_hash: manifestHash,
