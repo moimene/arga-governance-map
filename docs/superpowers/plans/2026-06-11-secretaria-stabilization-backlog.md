@@ -534,7 +534,7 @@
 
 | ID | Área | Verif. | Título | Estado |
 |---|---|---|---|---|
-| ITEM-054 | A1 | — | 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo | BLOQUEADO-LEGAL |
+| ITEM-054 | A1 | — | 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo | ✅ HECHO (Garrigues OK; 14/15 packs, PACTO→ITEM-113) |
 | ITEM-055 | A10 | — | Referencia a norma derogada: 'hecho relevante (art. 228 LMV)' — el TRLMV 2015 fue derogado por la Ley 6/2023 | HECHO (Ola1) |
 | ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | 🟡 PARCIAL (p1 vía ITEM-142; p2 residual) |
 | ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
