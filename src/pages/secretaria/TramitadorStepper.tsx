@@ -41,7 +41,7 @@ const STEPS: StepDef[] = [
   {
     n: 4,
     label: "Presentación",
-    hint: "Preparación registral demo por BORME, PSM, SIGER, JUCERJA o CONSERVATORIA según jurisdicción",
+    hint: "Preparación registral demo por Registro Mercantil (ES), SIGER/PSM (MX), JUCERJA (BR) o Conservatória (PT) según jurisdicción",
   },
   {
     n: 5,
@@ -1464,11 +1464,14 @@ function TramitadorNuevo() {
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <option value="">Seleccionar canal</option>
-          <option value="BORME">BORME (Boletín Oficial del Registro Mercantil)</option>
-          <option value="PSM">PSM (Portal de Servicios del Ministerio)</option>
-          <option value="SIGER">SIGER (Sistema de Gestión de Registros Mercantiles)</option>
-          <option value="JUCERJA">JUCERJA (Junta Central del Registro Mercantil)</option>
-          <option value="CONSERVATORIA">Conservatoria (Portugal)</option>
+          {/* ITEM-025: BORME es publicación POSTERIOR a la inscripción, no un canal de
+              presentación → se retira del selector. Canales corregidos por jurisdicción
+              (glosas reales: JUCERJA es brasileña, no "Junta Central"). */}
+          <option value="REGISTRO_MERCANTIL">Registro Mercantil (España)</option>
+          <option value="SIGER">SIGER — Sistema Integral de Gestión Registral (México)</option>
+          <option value="PSM">PSM — Portal de Servicios (México)</option>
+          <option value="JUCERJA">JUCERJA — Junta Comercial do Rio de Janeiro (Brasil)</option>
+          <option value="CONSERVATORIA">Conservatória do Registo Comercial (Portugal)</option>
         </select>
       </div>
 

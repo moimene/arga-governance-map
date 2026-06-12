@@ -483,7 +483,9 @@ export default function AcuerdoSinSesionDetalle() {
           {erdsStatus === "idle" && (
             <>
               <p className="mb-4 text-xs text-[var(--g-text-secondary)]">
-                Envíe una notificación certificada (ERDS) a los destinatarios del acuerdo con evidencia electrónica cualificada.
+                Registre la notificación (ERDS) a los destinatarios del acuerdo. En este entorno demo
+                el despacho es simulado (sandbox QTSP): la evidencia electrónica cualificada y el envío
+                certificado real se gestionan desde el módulo de Comunicaciones / EAD Trust.
               </p>
               <button
                 type="button"
@@ -503,7 +505,7 @@ export default function AcuerdoSinSesionDetalle() {
           {erdsStatus === "sending" && (
             <div className="flex items-center gap-2 py-2 text-sm text-[var(--g-text-secondary)]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Enviando notificación certificada…
+              Registrando notificación ERDS (demo)…
             </div>
           )}
 
@@ -511,7 +513,7 @@ export default function AcuerdoSinSesionDetalle() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-[var(--status-success)]">
                 <Mail className="h-4 w-4" />
-                <span className="font-medium">Notificación ERDS enviada correctamente</span>
+                <span className="font-medium">Notificación ERDS registrada (entorno demo / sandbox)</span>
               </div>
               {erdsRef && (
                 <p className="text-xs text-[var(--g-text-secondary)]">

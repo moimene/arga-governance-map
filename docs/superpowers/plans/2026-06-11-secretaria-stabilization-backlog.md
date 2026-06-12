@@ -51,7 +51,7 @@
 | ITEM-022 | A11 | ✅ | DecisionUnipersonalStepper: gate evaluado siempre como SL, sin verificar unipersonalidad real de la sociedad, y checks de pre-firma hardcodeados | HECHO |
 | ITEM-023 | A12 | ✅ | fn_create_communication_atomic (SECURITY DEFINER) confía el tenant_id suministrado por el caller — vector de forja cross-tenant | HECHO |
 | ITEM-024 | A12 | ✅ | Incorrección normativa replicada en 3 copias del motor de plazos: plazo SL citado como 'Art. 173 LSC' y plazo SA computado como 30 días en vez de 'un mes' de fecha a fecha | HECHO |
-| ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | BLOQUEADO-LEGAL |
+| ITEM-025 | A13 | ✅ | Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper | HECHO (legal) |
 | ITEM-026 | A2 | ✅ | Familias de variables de las actas formales sin proveedor en el resolver — los documentos se generan con blancos silenciosos (solo WARNING) | HECHO parcial (blancos ya no silenciosos: BLOCKING formal + gate + aliases; proveedores de namespaces documentales = decisión de contrato pendiente) |
 | ITEM-027 | A2 | ✅ | Payloads postAcuerdo con incorrecciones registrales: aprobación de cuentas sin depósito (arts. 279-280 LSC), plazos/citas RRM dudosos e instrumento sobre-exigido en cese | BLOQUEADO-LEGAL |
 | ITEM-028 | A4 | ✅ | Quórum de consejo computado sobre censo que incluye a la secretaria no consejera (base 17 vs 16 vocales) | HECHO |
@@ -271,7 +271,7 @@
 
 ### ITEM-025 [P1] Canales de presentación registral incorrectos y sin filtro jurisdiccional en TramitadorStepper
 
-- **Área:** A13 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A13 · **Estado:** HECHO (canales registrales: BORME retirado como presentación + glosas reales por jurisdicción; Comité Legal OK)· **REQUIERE LEGAL**
 - **Descripción:** El paso 4 del tramitador ofrece como 'Canal de presentación' opciones jurídicamente incorrectas: (1) BORME no es un canal de presentación, es el boletín de publicación posterior a la inscripción; (2) 'JUCERJA (Junta Central del Registro Mercantil)' es una glosa inventada — JUCERJA es la Junta Comercial do Estado do Rio de Janeiro (Brasil), no existe ninguna 'Junta Central del Registro Mercantil' en derecho registral español; (3) 'PSM (Portal de Servicios del Ministerio)' es incorrecto — en el dominio del propio seed (TRAM-003 PSM MX) PSM es el sistema mexicano de Publicaciones de Sociedades Mercantiles de la Secretaría de Economía; (4) SIGER (MX) se glosa de forma imprecisa. Además, el hint del paso dice 'según jurisdicción' pero el select muestra los 5 canales a la vez sin filtrar por la jurisdicción de la entidad del acuerdo: a una SA española se le ofrece SIGER/JUCERJA.
 - **Evidencia:** src/pages/secretaria/TramitadorStepper.tsx:1464-1468 (options del select), :44 (hint 'según jurisdicción' incumplido). Columnas reales borme_ref/psm_ref/siger_ref/jucerja_ref en :233-237 confirman el modelo multi-jurisdicción subyacente.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/TramitadorStepper.tsx
@@ -575,7 +575,7 @@
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | PENDIENTE |
 | ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | PENDIENTE |
 | ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | PENDIENTE |
-| ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | PENDIENTE |
+| ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | HECHO (legal) |
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
@@ -933,7 +933,7 @@
 
 ### ITEM-095 [P2] ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían
 
-- **Área:** A5 · **Estado:** REQUIERE DECISIÓN HUMANA (documentado con recomendación → docs/superpowers/reviews/2026-06-11-decisiones-pendientes-secretaria.md)· **REQUIERE DECISIÓN HUMANA**
+- **Área:** A5 · **Estado:** HECHO (copy ERDS honesto: registra en demo/sandbox, no promete envío certificado; Comité Legal OK)· **REQUIERE DECISIÓN HUMANA**
 - **Descripción:** useERDSNotification (D3) solo está cableado a AcuerdoSinSesionDetalle (flujo NO_SESSION, con estados idle/sending/sent/error y errores visibles — correcto allí). En el flujo de convocatoria, ERDS existe únicamente como canal seleccionable (y auto-sugerido para plantilla CONVOCATORIA_SL_NOTIFICACION); emitir con ERDS/email seleccionados no invoca ningún adapter (el módulo src/lib/comms con EADTrustERDSAdapter solo lo usan las campañas de grupo de Comunicaciones), no hay estados de envío/acuse en ConvocatoriaDetalle ni enlace al módulo Comunicaciones. Pese a ello, la pantalla de éxito afirma 'Los destinatarios recibirán la notificación según los canales seleccionados' — promesa falsa que contradice el propio copy del Paso 5 ('quedan como trazabilidad si la publicación o notificación se ejecuta fuera de TGMS'). Sandbox: no hay riesgo de sello SEALED falso porque no hay envío, y ead-trust-client lanza QTSP_SERVER_PROXY_REQUIRED en browser; la referencia QTSP del borrador va correctamente etiquetada como 'demo/operativo pendiente de emisión'. CLAUDE.md (D3) afirma cobertura 'NO_SESSION + Convocatoria SL', desalineado con la realidad del código.
 - **Evidencia:** grep useERDSNotification en src → solo src/pages/secretaria/AcuerdoSinSesionDetalle.tsx:118; src/pages/secretaria/ConvocatoriasStepper.tsx:1010-1012 (auto-añade canal ERDS), 2150-2153 (copy de éxito); grep 'comunicaciones' en ConvocatoriasStepper/ConvocatoriaDetalle → 0; src/lib/comms/adapters/EADTrustERDSAdapter.ts consumido solo por group campaigns.
 - **Archivos:** src/pages/secretaria/ConvocatoriasStepper.tsx, src/hooks/useERDSNotification.ts, src/lib/comms/adapters/EADTrustERDSAdapter.ts, CLAUDE.md
