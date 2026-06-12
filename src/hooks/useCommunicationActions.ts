@@ -56,11 +56,25 @@ export function useRetryRecipient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (recipientId: string) => {
+      // ITEM-127: NO resetear intento_reenvio_n a 0. La clave de idempotencia del
+      // dispatcher (Resend Idempotency-Key y discriminador ERDS) deriva de
+      // `${recipientId}-${cuerpo_hash}-${intento_reenvio_n}`; resetear a 0 regenera
+      // la clave del intento original, que puede caer en la ventana de deduplicación
+      // de Resend (~24h) y suprimir silenciosamente un reenvío legítimo. Conservamos
+      // el contador y lo incrementamos para que la clave cambie en cada reenvío manual.
+      const { data: current, error: readError } = await supabase
+        .from('communication_recipients')
+        .select('intento_reenvio_n')
+        .eq('id', recipientId)
+        .in('estado_entrega', ['ERROR', 'REBOTADO'])
+        .maybeSingle();
+      if (readError) throw readError;
+      if (!current) return; // ya no está en ERROR/REBOTADO: nada que reenviar
       const { error } = await supabase
         .from('communication_recipients')
         .update({
           estado_entrega: 'PENDIENTE',
-          intento_reenvio_n: 0,
+          intento_reenvio_n: (current.intento_reenvio_n ?? 0) + 1,
           ultimo_error: null,
           updated_at: new Date().toISOString(),
         })

@@ -7,7 +7,6 @@ import { useSociedad } from "@/hooks/useSociedades";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useTenantContext } from "@/context/TenantContext";
-import { isMissingSupabaseRpcError } from "@/lib/secretaria/supabase-rpc-fallback";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 
 interface Draft {
@@ -69,11 +68,17 @@ export default function TransmisionStepper() {
     setSaving(true);
     try {
       const titulosATransmitir = Number(draft.numero_titulos);
-      const titulosOrigen = sourceHolding.numero_titulos ?? 0;
-      const pctOrigen = sourceHolding.porcentaje_capital ?? 0;
-      const pctATransmitir = titulosOrigen > 0 ? (pctOrigen * titulosATransmitir) / titulosOrigen : 0;
       const today = draft.effective_from;
 
+      // ITEM-123/ITEM-141: la RPC transaccional fn_registrar_transmision_capital es la
+      // ÚNICA vía de registro. Cierre de origen + remanente + fusión/alta de destino +
+      // registro de movimientos suceden atómicamente en el servidor (FOR UPDATE + rollback).
+      // El antiguo fallback cliente en 3 escrituras secuenciales sin transacción se
+      // eliminó: ante un fallo entre el cierre del origen y el alta del destino podía
+      // perder títulos a mitad de operación, y además divergía del comportamiento de la
+      // RPC (no fusionaba destino vigente de la misma clase, chocando con
+      // ux_capital_holdings_vigente). Si la RPC no existiera (entorno sin migración
+      // 000052/000053), el error es bloqueante; no se intenta ninguna escritura parcial.
       const { error: rpcError } = await supabase.rpc("fn_registrar_transmision_capital", {
         p_tenant_id: tenantId!,
         p_source_holding_id: sourceHolding.id,
@@ -84,60 +89,7 @@ export default function TransmisionStepper() {
         p_support_doc_ref: draft.support_doc_ref.trim(),
         p_notas: draft.motivo || "transmision_inter_vivos",
       });
-      if (!rpcError) {
-        toast.success("Transmisión registrada correctamente");
-        navigate(`/secretaria/sociedades/${entityId}`);
-        return;
-      }
-      if (!isMissingSupabaseRpcError(rpcError)) {
-        throw rpcError;
-      }
-
-      // 1) Cerrar la holding de origen (effective_to = today)
-      const { error: closeErr } = await supabase
-        .from("capital_holdings")
-        .update({ effective_to: today })
-        .eq("id", sourceHolding.id);
-      if (closeErr) throw closeErr;
-
-      // 2) Si queda remanente en el origen, crear nueva holding con (titulos - transmitidos)
-      const remanente = titulosOrigen - titulosATransmitir;
-      if (remanente > 0) {
-        const { error: remErr } = await supabase.from("capital_holdings").insert({
-          tenant_id: tenantId!,
-          entity_id: entityId,
-          holder_person_id: sourceHolding.holder_person_id,
-          share_class_id: sourceHolding.share_class_id,
-          numero_titulos: remanente,
-          porcentaje_capital: pctOrigen - pctATransmitir,
-          voting_rights: sourceHolding.voting_rights,
-          is_treasury: sourceHolding.is_treasury,
-          effective_from: today,
-          effective_to: null,
-        });
-        if (remErr) throw remErr;
-      }
-
-      // 3) Crear holding de destino
-      const { error: destErr } = await supabase.from("capital_holdings").insert({
-        tenant_id: tenantId!,
-        entity_id: entityId,
-        holder_person_id: draft.destino_person_id,
-        share_class_id: sourceHolding.share_class_id,
-        numero_titulos: titulosATransmitir,
-        porcentaje_capital: pctATransmitir,
-        voting_rights: sourceHolding.voting_rights,
-        is_treasury: false,
-        effective_from: today,
-        effective_to: null,
-        metadata: {
-          motivo: draft.motivo || "transmision_inter_vivos",
-          origen_holding_id: sourceHolding.id,
-          support_doc_ref: draft.support_doc_ref.trim(),
-          gestor_documental_context: "sociedad",
-        },
-      });
-      if (destErr) throw destErr;
+      if (rpcError) throw rpcError;
 
       toast.success("Transmisión registrada correctamente");
       navigate(`/secretaria/sociedades/${entityId}`);

@@ -4142,25 +4142,42 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
 
 // ── Steps ────────────────────────────────────────────────────────────────────
 
-function buildSteps(meetingId?: string): StepDef[] {
+// ITEM-059: gates de avance por paso derivados del estado real del proceso para
+// unificar la semántica de bloqueo con los steppers hand-rolled (CoAprobación /
+// AcuerdoSinSesión). Cada flag es el canAdvance del paso correspondiente; cuando
+// es false StepperShell bloquea el salto a pasos posteriores.
+interface ReunionStepGates {
+  constitucion?: boolean; // paso 1: sesión abierta (status CELEBRADA)
+  asistentes?: boolean; // paso 2: hay asistentes registrados
+  quorum?: boolean; // paso 3: quórum evaluado
+  votaciones?: boolean; // paso 5: resultados/acuerdos registrados
+}
+
+function buildSteps(meetingId?: string, gates?: ReunionStepGates): StepDef[] {
   return [
     {
       n: 1,
       label: "Constitución",
       hint: "Verificación del contexto de constitución y declaración de apertura de la sesión",
       body: <ConstitutionStep meetingId={meetingId} />,
+      // ITEM-059: no se avanza a Asistentes hasta declarar abierta la sesión.
+      canAdvance: gates?.constitucion,
     },
     {
       n: 2,
       label: "Asistentes",
       hint: "Registro de presentes, representados y ausentes — cálculo de capital representado",
       body: <AsistentesStep meetingId={meetingId} />,
+      // ITEM-059: no se avanza a Quórum sin asistentes registrados.
+      canAdvance: gates?.asistentes,
     },
     {
       n: 3,
       label: "Quórum",
       hint: "Evaluación automática del quórum de constitución contra la regla jurisdiccional aplicable",
       body: <QuorumStep meetingId={meetingId} />,
+      // ITEM-059: no se avanza a Agenda sin haber evaluado el quórum.
+      canAdvance: gates?.quorum,
     },
     {
       n: 4,
@@ -4173,6 +4190,8 @@ function buildSteps(meetingId?: string): StepDef[] {
       label: "Votaciones",
       hint: "Resultado por punto con mayoría, conflictos, vetos, pactos y snapshot legal",
       body: <VotacionesStep meetingId={meetingId} />,
+      // ITEM-059: no se avanza a Cierre sin resultados de votación registrados.
+      canAdvance: gates?.votaciones,
     },
     {
       n: 6,
@@ -4181,6 +4200,23 @@ function buildSteps(meetingId?: string): StepDef[] {
       body: <CierreStep meetingId={meetingId} />,
     },
   ];
+}
+
+// ITEM-059: deriva el paso inicial de reanudación a partir del estado del proceso.
+// Una sesión abierta sin asistentes reabre en Asistentes (2); con quórum evaluado,
+// en Agenda (4); con resultados de votación, en Cierre (6). Sin sesión abierta se
+// reabre en Constitución (1).
+function deriveReunionInitialStep(opts: {
+  meetingOpen: boolean;
+  hasAttendees: boolean;
+  hasQuorum: boolean;
+  hasResolutions: boolean;
+}): number {
+  if (!opts.meetingOpen) return 1;
+  if (opts.hasResolutions) return 6;
+  if (opts.hasQuorum) return 4;
+  if (opts.hasAttendees) return 3;
+  return 2;
 }
 
 const UNIVERSAL_MODALITY_OPTIONS: Array<{ value: UniversalMeetingModality; label: string }> = [
@@ -4665,6 +4701,63 @@ function ReunionIntake() {
   );
 }
 
+// ITEM-059: vista conectada de /secretaria/reuniones/:id. Aislada en su propio
+// componente para poder ejecutar siempre los hooks de reanudación (las salidas
+// tempranas de intake del default export impedían llamarlos sin romper el orden
+// de hooks de React). Deriva el paso inicial y los gates de avance del estado real
+// de la reunión (status, asistentes, quórum, resultados) y los pasa a StepperShell.
+function ReunionStepperConnected({ id, backTo }: { id: string; backTo: string }) {
+  const { data: meeting, isLoading: meetingLoading } = useReunionById(id);
+  const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(id);
+  const { data: resolutions = [], isLoading: resolutionsLoading } = useReunionResolutions(id);
+
+  const meetingOpen = (meeting as { status?: string | null } | null)?.status === "CELEBRADA";
+  const quorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
+  const hasAttendees = attendees.length > 0;
+  const hasQuorum = Boolean(quorumData?.quorum);
+  const hasResolutions = resolutions.length > 0;
+
+  // ITEM-059: StepperShell lee initialStep una sola vez al montar (lazy useState).
+  // Esperamos a que las tres queries de reanudación resuelvan antes de montarlo,
+  // para que el paso derivado refleje el estado real y no el de carga (todo false →
+  // Constitución). Cada paso re-lee Supabase de forma independiente al renderizarse.
+  if (meetingLoading || attendeesLoading || resolutionsLoading) {
+    return (
+      <div className="mx-auto flex max-w-[1200px] items-center gap-2 p-6 text-[var(--g-text-secondary)]">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Cargando el estado de la reunión…</span>
+      </div>
+    );
+  }
+
+  const initialStep = deriveReunionInitialStep({
+    meetingOpen,
+    hasAttendees,
+    hasQuorum,
+    hasResolutions,
+  });
+
+  // ITEM-059: gates de avance coherentes con el progreso del proceso. Mientras el
+  // dato no esté cargado o no se cumpla la condición, el paso bloquea el salto a
+  // pasos posteriores (semántica unificada con los steppers hand-rolled).
+  const gates: ReunionStepGates = {
+    constitucion: meetingOpen,
+    asistentes: hasAttendees,
+    quorum: hasQuorum,
+    votaciones: hasResolutions,
+  };
+
+  return (
+    <StepperShell
+      eyebrow="Secretaría · Reunión"
+      title="Asistente de sesión societaria"
+      backTo={backTo}
+      steps={buildSteps(id, gates)}
+      initialStep={initialStep}
+    />
+  );
+}
+
 export default function ReunionStepper() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -4677,12 +4770,5 @@ export default function ReunionStepper() {
   if (!id && flow === "junta-universal") return <UniversalMeetingIntake />;
   if (!id) return <ReunionIntake />;
 
-  return (
-    <StepperShell
-      eyebrow="Secretaría · Reunión"
-      title="Asistente de sesión societaria"
-      backTo={backTo}
-      steps={buildSteps(id)}
-    />
-  );
+  return <ReunionStepperConnected id={id} backTo={backTo} />;
 }

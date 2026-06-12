@@ -417,7 +417,8 @@ describe("motor-plantillas composer smoke", () => {
       { fecha: "2026-06-01" },
     );
 
-    expect(result.renderedText).toContain("CERTIFICACION");
+    // ITEM-073: el fixture de certificación se restituyó con tildes correctas.
+    expect(result.renderedText).toContain("CERTIFICACIÓN");
   });
 
   it("genera INFORME_PRECEPTIVO sin variables huerfanas", async () => {
@@ -487,7 +488,8 @@ describe("motor-plantillas composer smoke", () => {
       },
     );
 
-    expect(result.renderedText).toContain("ACTA DE ACUERDO ESCRITO SIN SESION");
+    // ITEM-073: el fixture sin sesión se restituyó con tildes correctas.
+    expect(result.renderedText).toContain("ACTA DE ACUERDO ESCRITO SIN SESIÓN");
   });
 
   it("genera DECISION_UNIPERSONAL sin variables huerfanas", async () => {
@@ -509,6 +511,7 @@ describe("motor-plantillas composer smoke", () => {
       },
     );
 
-    expect(result.renderedText).toContain("DECISION DEL SOCIO UNICO");
+    // ITEM-073: el fixture de socio único se restituyó con tildes correctas.
+    expect(result.renderedText).toContain("DECISIÓN DEL SOCIO ÚNICO");
   });
 });

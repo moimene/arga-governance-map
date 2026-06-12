@@ -8,6 +8,26 @@ import {
   type TransitionResult,
 } from "@/lib/secretaria/template-admin/template-admin-service";
 
+// ITEM-087: re-exportamos TransitionResult para que los consumidores de las
+// transiciones (CatalogoTab, Plantillas) puedan tipar el `result` adjunto al
+// Error sin alcanzar el módulo template-admin-service directamente.
+export type { TransitionResult } from "@/lib/secretaria/template-admin/template-admin-service";
+
+/**
+ * ITEM-087: extrae el `TransitionResult` adjunto al Error lanzado por
+ * `useUpdateEstadoPlantilla` cuando la transición es rechazada (ver el
+ * bloque `if (result.ok === false)` más abajo, que hace `(err).result = result`).
+ * Devuelve `undefined` si el error no transporta un resultado de transición
+ * (p. ej. un fallo de red o un Error genérico), para que el caller pueda
+ * hacer fallback al mensaje plano.
+ */
+export function extractTransitionResult(err) {
+  if (err && typeof err === "object" && "result" in err) {
+    return (err as { result?: TransitionResult }).result;
+  }
+  return undefined;
+}
+
 export interface PlantillaProtegidaRow {
   id: string;
   tenant_id: string;

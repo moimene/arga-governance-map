@@ -40,8 +40,10 @@ import { toast } from "sonner";
 import {
   usePlantillasProtegidas,
   useUpdateEstadoPlantilla,
+  extractTransitionResult,
   type PlantillaProtegidaRow,
 } from "@/hooks/usePlantillasProtegidas";
+import type { GatePreIssue } from "@/lib/secretaria/template-admin/types";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import {
@@ -188,6 +190,122 @@ function isLocalFixture(plantilla: PlantillaProtegidaRow) {
   );
 }
 
+// ITEM-087: lista accionable de issues del Gate PRE (código + mensaje + hint),
+// con el mismo lenguaje visual que el preflight del TemplateImportWizard. Se usa
+// tanto para los bloqueantes (GATE_PRE_BLOCKING) como para los warnings que el
+// usuario debe reconocer (WARNINGS_NEED_ACK).
+function GatePreIssueList({ issues }: { issues: GatePreIssue[] }) {
+  return (
+    <div className="space-y-2" aria-label="Incidencias del Gate PRE">
+      {issues.map((i, idx) => (
+        <div
+          key={`${i.code}-${idx}`}
+          className={`flex gap-2 border p-3 text-sm ${
+            i.severity === "BLOCKING"
+              ? "border-[var(--status-error)] bg-[var(--status-error)]/10 text-[var(--g-text-primary)]"
+              : i.severity === "WARNING"
+                ? "border-[var(--status-warning)] bg-[var(--status-warning)]/10 text-[var(--g-text-primary)]"
+                : "border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]"
+          }`}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <strong className="text-[var(--g-text-primary)]">{i.code}</strong>{" "}
+            <span className="text-[var(--g-text-secondary)]">— {i.message}</span>
+            {i.hint ? (
+              <p className="mt-1 text-xs text-[var(--g-text-secondary)]">{i.hint}</p>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ITEM-087: diálogo de reconocimiento de warnings no-bloqueantes (WARNINGS_NEED_ACK),
+// reutilizando el patrón del wizard de importación (motivo ≥20 chars persistido en
+// changelog). Sin esto, una transición APROBADA→ACTIVA con cualquier warning era
+// imposible de completar desde el catálogo.
+function TransitionAckDialog({
+  issues,
+  pending,
+  onConfirm,
+  onCancel,
+}: {
+  issues: GatePreIssue[];
+  pending: boolean;
+  onConfirm: (motivo: string) => void;
+  onCancel: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const tooShort = motivo.trim().length < 20;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-text-primary)]/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reconocer warnings antes de activar la plantilla"
+    >
+      <div
+        className="w-full max-w-lg border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+        style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
+      >
+        <h2 className="mb-2 text-lg font-semibold text-[var(--g-text-primary)]">
+          Reconocer warnings del Gate PRE
+        </h2>
+        <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
+          La transición detectó warnings no-bloqueantes. Para completarla, escribe un
+          motivo de ≥20 caracteres que se persiste en el changelog como evidencia
+          documental.
+        </p>
+        <div className="mb-4 max-h-48 overflow-y-auto">
+          <GatePreIssueList issues={issues} />
+        </div>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-[var(--g-text-primary)]">
+            Motivo (≥20 caracteres)
+          </span>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="P. ej.: Warnings revisadas con Comité Legal; se acepta activar tal cual."
+            className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]/30"
+            rows={4}
+            aria-describedby="ack-catalogo-help"
+            aria-invalid={motivo.length > 0 && tooShort ? "true" : undefined}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+          <p id="ack-catalogo-help" className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            {motivo.trim().length}/20 caracteres mínimos
+          </p>
+        </label>
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(motivo.trim())}
+            disabled={tooShort || pending}
+            aria-busy={pending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {pending ? "Procesando…" : "Reconocer y activar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EstadoBadge({ estado }: { estado: string }) {
   const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.BORRADOR;
   const Icon = config.icon;
@@ -296,23 +414,73 @@ function PlantillaDetailPanel({
   const usageTarget = getTemplateUsageTarget(plantilla);
   const isActiveP0 = estado === "ACTIVA" && isKnownP0(plantilla.id);
 
-  const handleTransition = () => {
+  // ITEM-087: el TransitionResult adjunto al Error ya no se descarta. Los issues
+  // bloqueantes del Gate PRE se listan en un panel accionable; los warnings que
+  // requieren ack abren un diálogo de reconocimiento (motivo ≥20 chars) que
+  // reintenta con ackWarnings:true.
+  const [blockingIssues, setBlockingIssues] = useState<GatePreIssue[]>([]);
+  const [ackIssues, setAckIssues] = useState<GatePreIssue[] | null>(null);
+
+  const runTransition = (motivo?: string, ackWarnings?: boolean) => {
     if (!transition) return;
-    if (!window.confirm(transition.confirm)) return;
     updateEstado.mutate(
       {
         id: plantilla.id,
         nuevo_estado: transition.next,
         aprobada_por: user?.email ?? "Comité Legal TGMS",
+        motivo,
+        ackWarnings,
       },
       {
-        onSuccess: () =>
+        onSuccess: () => {
+          setBlockingIssues([]);
+          setAckIssues(null);
           toast.success(
             `Plantilla actualizada a ${ESTADO_CONFIG[transition.next]?.label ?? transition.next}`,
-          ),
-        onError: () => toast.error("No se pudo actualizar el estado de la plantilla"),
+          );
+        },
+        onError: (error) => {
+          const result = extractTransitionResult(error);
+          if (result && result.ok === false && result.reason === "GATE_PRE_BLOCKING") {
+            // Gate PRE bloqueante: el usuario debe corregir la plantilla antes de
+            // activarla. Se listan los issues (código + mensaje) en el panel.
+            setBlockingIssues(result.issues);
+            setAckIssues(null);
+            toast.error(
+              `El Gate PRE bloqueó la activación con ${result.issues.length} incidencia(s). Revisa el detalle.`,
+            );
+          } else if (result && result.ok === false && result.reason === "WARNINGS_NEED_ACK") {
+            // Warnings no-bloqueantes: se abre el diálogo de reconocimiento.
+            setBlockingIssues([]);
+            setAckIssues(result.issues);
+          } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            toast.error(`Transición no permitida: ${result.from} → ${result.to}.`);
+          } else if (result && result.ok === false && result.reason === "MISSING_APPROVAL_DATA") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            toast.error(
+              "Faltan datos de aprobación (aprobada_por/fecha) para activar la plantilla.",
+            );
+          } else {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            toast.error("No se pudo actualizar el estado de la plantilla", {
+              description: error instanceof Error ? error.message : String(error),
+            });
+          }
+        },
       },
     );
+  };
+
+  const handleTransition = () => {
+    if (!transition) return;
+    if (!window.confirm(transition.confirm)) return;
+    setBlockingIssues([]);
+    setAckIssues(null);
+    runTransition();
   };
 
   const editorReadOnlyReason = localFixture
@@ -394,6 +562,21 @@ function PlantillaDetailPanel({
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
               {updateEstado.isPending ? "Procesando…" : transition.label}
             </button>
+          </div>
+        ) : null}
+
+        {/* ITEM-087: panel accionable con los issues bloqueantes del Gate PRE,
+            que antes solo eran visibles re-ejecutando manualmente el tab Validación. */}
+        {blockingIssues.length > 0 ? (
+          <div
+            className="mt-3 border border-[var(--status-error)] bg-[var(--status-error)]/5 p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--status-error)]">
+              <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+              Gate PRE bloqueó la activación
+            </div>
+            <GatePreIssueList issues={blockingIssues} />
           </div>
         ) : null}
 
@@ -505,6 +688,17 @@ function PlantillaDetailPanel({
           </div>
         </SectionToggle>
       </div>
+
+      {/* ITEM-087: diálogo de reconocimiento de warnings. Reintenta la transición
+          con ackWarnings:true y el motivo escrito (persistido en changelog). */}
+      {ackIssues ? (
+        <TransitionAckDialog
+          issues={ackIssues}
+          pending={updateEstado.isPending}
+          onConfirm={(motivo) => runTransition(motivo, true)}
+          onCancel={() => setAckIssues(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -15,11 +15,18 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBodyMandates } from "@/hooks/useBodies";
 import {
   useConvocatoriasList,
+  useConvocatoriaById,
   useCreateConvocatoria,
   useUploadConvocatoriaAttachment,
   type AgendaItem,
   type ConvocatoriaWithBody,
 } from "@/hooks/useConvocatorias";
+// ITEM-064: paso de envío de la comunicación de convocatoria (genera la fila
+// en `communications` vía `fn_create_communication_atomic`). Se monta en la
+// pantalla de éxito tras emitir, respetando la decisión adversarial M4
+// (wiring desde el stepper sin tocar el state management del monolito).
+import { PasoEnvioMiembros } from "@/components/secretaria/comunicaciones/PasoEnvioMiembros";
+import type { OrganoTipo as CommsOrganoTipo } from "@/lib/comms/types";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -590,6 +597,16 @@ function serializeRuleResolution(resolution: RuleResolution) {
   };
 }
 
+// ITEM-064: el stepper razona en `TipoOrgano` del motor V2 (JUNTA_GENERAL /
+// CONSEJO / COMISION_DELEGADA), mientras que el módulo de comunicaciones usa
+// `OrganoTipo` (JUNTA_GENERAL / CONSEJO_ADMIN / COMISION_DELEGADA / ...).
+// Mapeo conservador para alimentar PasoEnvioMiembros.
+function toCommsOrganoTipo(organoTipo: TipoOrgano): CommsOrganoTipo {
+  if (organoTipo === "JUNTA_GENERAL") return "JUNTA_GENERAL";
+  if (organoTipo === "COMISION_DELEGADA") return "COMISION_DELEGADA";
+  return "CONSEJO_ADMIN";
+}
+
 export default function ConvocatoriasStepper() {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
@@ -597,6 +614,10 @@ export default function ConvocatoriasStepper() {
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const requestedPlantillaId = searchParams.get("plantilla");
+  // ITEM-097: `?draft=<id>` permite retomar una convocatoria en estado
+  // BORRADOR (p.ej. las creadas por campañas de grupo) para completarla y
+  // emitirla, en vez de quedar como dead-end sin ruta de continuación.
+  const requestedDraftId = searchParams.get("draft");
   const isSociedadScoped = Boolean(scopedEntityId);
   const scopedListPath = isSociedadScoped && scopedEntityId
     ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`
@@ -620,6 +641,11 @@ export default function ConvocatoriasStepper() {
   const [current, setCurrent] = useState(1);
   const [expandExplain, setExpandExplain] = useState(false);
   const [emitidoId, setEmitidoId] = useState<string | null>(null);
+  // ITEM-064: en la pantalla de éxito, abre el paso de generación de la
+  // comunicación de convocatoria (PasoEnvioMiembros). `comunicacionId` guarda
+  // la fila creada para reflejar el éxito.
+  const [enviarComOpen, setEnviarComOpen] = useState(false);
+  const [comunicacionId, setComunicacionId] = useState<string | null>(null);
   const [appliedPlantillaId, setAppliedPlantillaId] = useState<string | null>(null);
   const [templateCapa3Open, setTemplateCapa3Open] = useState(false);
   const [templateCapa3Values, setTemplateCapa3Values] = useState<Capa3Values>({});
@@ -1514,6 +1540,103 @@ export default function ConvocatoriasStepper() {
   // `canAdvance` mientras pending=true.
   const [borradorRenderPending, setBorradorRenderPending] = useState(false);
 
+  // ── ITEM-097: retomar BORRADOR vía `?draft=<id>` ──
+  // Carga la convocatoria pedida (cualquier estado, pero el caso de uso son
+  // los BORRADOR sin ruta de continuación) y aplica sus campos una sola vez.
+  // A diferencia de `applyCloneFromConvocatoria` (clona dentro del mismo
+  // órgano), aquí seleccionamos también entidad/órgano y restauramos
+  // fecha/hora y el texto del borrador para que el secretario pueda completar
+  // y emitir el borrador existente.
+  const { data: draftConvocatoria } = useConvocatoriaById(requestedDraftId ?? undefined);
+  const appliedDraftRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedDraftId || !draftConvocatoria) return;
+    if (appliedDraftRef.current === requestedDraftId) return;
+    const source = draftConvocatoria;
+    appliedDraftRef.current = requestedDraftId;
+
+    if (source.entity_id) setSelectedEntityId(source.entity_id);
+    if (source.body_id) setSelectedBodyId(source.body_id);
+    if (isConvocatoriaType(source.tipo_convocatoria)) {
+      setTipoConvocatoria(source.tipo_convocatoria);
+    }
+    if (isFormatoReunion(source.modalidad)) {
+      setFormatoReunion(source.modalidad);
+    }
+    if (source.lugar) {
+      setLugar(source.lugar);
+      lastAutoLugarRef.current = source.lugar;
+    }
+    // fecha_1 / fecha_2 son ISO; los partimos en fecha (YYYY-MM-DD) y hora.
+    if (source.fecha_1) {
+      const d = new Date(source.fecha_1);
+      if (!Number.isNaN(d.getTime())) {
+        setFechaReunion(d.toISOString().slice(0, 10));
+        setHoraReunion(d.toISOString().slice(11, 16));
+      }
+    }
+    if (source.fecha_2) {
+      const d2 = new Date(source.fecha_2);
+      if (!Number.isNaN(d2.getTime())) {
+        setHabilitarSegunda(true);
+        setFechaReunion2(d2.toISOString().slice(0, 10));
+        setHoraReunion2(d2.toISOString().slice(11, 16));
+      }
+    }
+    setChannels(Array.isArray(source.publication_channels) ? source.publication_channels : []);
+    setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
+    if (Array.isArray(source.agenda_items) && source.agenda_items.length > 0) {
+      setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
+    }
+    if (source.convocatoria_text) {
+      setBorradorTexto(source.convocatoria_text);
+    }
+    setBorradorDirty(false);
+    toast.info("Borrador de convocatoria cargado", {
+      description: "Revisa los pasos y emite cuando esté completo.",
+    });
+    // organoTipo se deriva del órgano; en el primer render aún puede ser el
+    // por defecto, pero la agenda se renormaliza al cambiar organoTipo en el
+    // efecto de saneamiento de materias ya existente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedDraftId, draftConvocatoria]);
+
+  // ── ITEM-097: trabajo sin guardar ──
+  // El stepper no persiste nada hasta `handleEmitir`. Detectamos si el
+  // usuario ha introducido datos significativos para (1) avisar con
+  // `beforeunload` ante refresh/cierre y (2) confirmar al cancelar.
+  const hasUnsavedWork =
+    !emitidoId &&
+    (Boolean(selectedBodyId) ||
+      Boolean(fechaReunion) ||
+      Boolean(borradorTexto.trim()) ||
+      channels.length > 0 ||
+      agendaItems.some((i) => i.titulo.trim().length > 0));
+
+  useEffect(() => {
+    if (!hasUnsavedWork) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Algunos navegadores requieren returnValue para mostrar el diálogo.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedWork]);
+
+  // ITEM-097: cancelar con confirmación si hay trabajo sin guardar.
+  const handleCancel = useCallback(() => {
+    if (
+      hasUnsavedWork &&
+      !window.confirm(
+        "Tienes una convocatoria sin emitir. Si sales ahora se perderán los datos introducidos. ¿Seguro que quieres salir?",
+      )
+    ) {
+      return;
+    }
+    navigate(scopedListPath);
+  }, [hasUnsavedWork, navigate, scopedListPath]);
+
   // Guard contra setState tras unmount o tras nueva regeneración (cancela
   // promesas en vuelo). Sin esto, navegar fuera de Paso 7 mientras el
   // import dinámico de `template-renderer` resuelve produciría un React
@@ -2213,10 +2336,62 @@ export default function ConvocatoriasStepper() {
               )}
             </div>
           )}
-          {/* ITEM-069/062: el CTA primario abre la convocatoria recién emitida
-              (antes ambos botones iban a listas genéricas, dejando el artefacto
-              creado sin destino directo). */}
+          {/* ITEM-064: generación de la comunicación de convocatoria. La
+              emisión registra la convocatoria; la notificación a los miembros
+              del órgano (fila en `communications` + recipients) se materializa
+              aquí vía PasoEnvioMiembros (fn_create_communication_atomic). */}
+          {comunicacionId ? (
+            <div
+              className="mt-4 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-3 text-left text-xs text-[var(--g-text-primary)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="font-medium">Comunicación de convocatoria programada.</p>
+              <p className="mt-1 text-[var(--g-text-secondary)]">
+                El envío certificado quedará trazado en Comunicaciones.
+              </p>
+            </div>
+          ) : enviarComOpen && selectedBodyId && selectedEntityId ? (
+            <div
+              className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-left"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <PasoEnvioMiembros
+                bodyId={selectedBodyId}
+                entityId={selectedEntityId}
+                organoTipo={toCommsOrganoTipo(organoTipo)}
+                meetingDate={fechaReunion ? new Date(meetingIso) : null}
+                tipoComunicacion="CONVOCATORIA"
+                documentUri={`convocatoria:${emitidoId}`}
+                documentLabel="Convocatoria"
+                documentTipo="DOCUMENTO_GENERADO"
+                asunto={`Convocatoria · ${selectedBody?.name ?? "órgano"}${fechaReunion ? ` · ${fechaReunion}` : ""}`}
+                cuerpoHtml={
+                  borradorTexto.trim()
+                    ? borradorTexto
+                    : `Se convoca reunión del órgano ${selectedBody?.name ?? ""}.`
+                }
+                onProgramado={(commId) => {
+                  setComunicacionId(commId);
+                  setEnviarComOpen(false);
+                  toast.success("Comunicación de convocatoria programada");
+                }}
+                onCancel={() => setEnviarComOpen(false)}
+              />
+            </div>
+          ) : null}
+          {/* ITEM-069/062 + ITEM-064: CTA de comunicación (si procede) + navegación
+              al artefacto creado. "Abrir convocatoria" es el destino primario. */}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {!comunicacionId && !enviarComOpen && (
+              <button
+                type="button"
+                onClick={() => setEnviarComOpen(true)}
+                className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Generar comunicación
+              </button>
+            )}
             <button
               type="button"
               onClick={() =>
@@ -2257,7 +2432,7 @@ export default function ConvocatoriasStepper() {
     <div className="mx-auto max-w-[1200px] p-6">
       <button
         type="button"
-        onClick={() => navigate(scopedListPath)}
+        onClick={handleCancel}
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -3298,7 +3473,9 @@ export default function ConvocatoriasStepper() {
 
               <p className="text-xs text-[var(--g-text-secondary)]">
                 {activeRecipients.length - excludedPersonIds.size} destinatario(s) seleccionado(s).
-                Las notificaciones se enviarán por los canales que configures en el paso siguiente.
+                {/* ITEM-064: tras emitir, la pantalla de éxito ofrece generar la
+                    comunicación de convocatoria a estos destinatarios. */}
+                Tras emitir podrás generar la comunicación de convocatoria a estos destinatarios.
               </p>
             </div>
           )}
@@ -3404,7 +3581,10 @@ export default function ConvocatoriasStepper() {
 
               {channels.length === 0 && (
                 <p className="text-xs text-[var(--status-warning)]">
-                  Sin canales seleccionados la convocatoria se archivará pero no generará notificaciones.
+                  {/* ITEM-064: los canales son trazabilidad del expediente; la
+                      notificación efectiva se genera tras emitir desde
+                      "Generar comunicación". */}
+                  Sin canales seleccionados quedan sin recordatorio de publicación; podrás generar la comunicación a los destinatarios tras emitir.
                 </p>
               )}
             </div>

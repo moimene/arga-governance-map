@@ -539,12 +539,12 @@
 | ITEM-056 | A10 | — | Antelación de convocatoria SA: 30 días no equivale a 'un mes' (art. 176.1) y el cómputo desde el envío (176.2) no está modelado | 🟡 PARCIAL (p1 vía ITEM-142; p2 residual) |
 | ITEM-057 | A10 | — | Circulación de consejo sin sesión: participación inferior al 50% es solo WARNING y las respuestas SILENCIO no computan en el denominador | BLOQUEADO-LEGAL |
 | ITEM-058 | A11 | ✅ | Cita normativa incorrecta: 'adopción sin sesión (art. 160 LSC)' en Co-aprobación | HECHO (Ola1) |
-| ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | PENDIENTE |
+| ITEM-059 | A11 | — | StepperShell sin reanudación: ReunionStepper /:id siempre reabre en 'Constitución' y permite salto libre hacia delante | ✅ HECHO (workflow ultracode) |
 | ITEM-060 | A11 | — | AcuerdoSinSesionStepper: doble creación de proceso de votación posible vía rail lateral | ✅ HECHO (loop+codex) |
 | ITEM-061 | A11 | — | SociedadNuevaStepper: 11 pasos con draft solo-local (se pierde al refrescar) y píldoras que saltan validación por paso | ✅ HECHO (loop+codex) |
 | ITEM-062 | A11 | — | Salidas sin destino al artefacto creado: Convocatorias navega a lista y Tramitador no enlaza el expediente registral | ✅ HECHO (loop) |
-| ITEM-063 | A12 | ✅ | Botón 'Enviar notificación ERDS' en AcuerdoSinSesionDetalle siempre falla (QTSP_SERVER_PROXY_REQUIRED) y el resultado no persiste | PENDIENTE |
-| ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | PENDIENTE |
+| ITEM-063 | A12 | ✅ | Botón 'Enviar notificación ERDS' en AcuerdoSinSesionDetalle siempre falla (QTSP_SERVER_PROXY_REQUIRED) y el resultado no persiste | ✅ HECHO (workflow ultracode) |
+| ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | ✅ HECHO (workflow ultracode) |
 | ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | 🟡 PARCIAL (nav sidebar añadido; empty-state CTA + contentRoute libro pendientes) |
 | ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | ✅ HECHO (loop+codex) |
 | ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | ✅ HECHO (loop) |
@@ -553,7 +553,7 @@
 | ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | HECHO (UI) |
 | ITEM-071 | A13 | — | Fila demo con status 'APPROVED' (inglés) en acuerdos sin sesión: badge crudo y escapa al filtro 'Aprobado' | ✅ HECHO (loop+cloud) |
 | ITEM-072 | A13 | — | Copies usan 'el Registro' a secas para el Registro Mercantil, violando la restricción vigente | HECHO (Ola1) |
-| ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | PENDIENTE |
+| ITEM-073 | A13 | — | Fixtures de plantillas legales completamente sin tildes — documentos DOCX generados con ortografía incorrecta | ✅ HECHO (workflow ultracode) |
 | ITEM-074 | A13 | — | Terminología 'resolución' vs 'acuerdo' inconsistente en la UI de ReunionStepper | ✅ HECHO (loop) |
 | ITEM-075 | A13 | — | Toasts de error no accionables que descartan el detalle disponible | ✅ HECHO (loop) |
 | ITEM-076 | A13 | — | ActaDetalle sin backlink a la reunión origen y convocatoria referenciada como UUID crudo | ✅ HECHO (loop+codex) |
@@ -567,9 +567,9 @@
 | ITEM-084 | A3 | — | Plantillas.tsx expone transiciones de ciclo de vida sin RBAC ni confirmación, bypaseando el modelo del gestor | ✅ HECHO (loop) |
 | ITEM-085 | A3 | — | No existe usuario ADMIN_TENANT logueable: tabs Importar/Validación/Configuración no demostrables en demo | PENDIENTE |
 | ITEM-086 | A3 | — | Changelog casi vacío: 109/110 plantillas huérfanas → consola Auditoría sin contenido y alerta WARNING permanente | HECHO (UI) |
-| ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | PENDIENTE |
+| ITEM-087 | A3 | — | Errores de transición no accionables y dead-end de warnings: ningún UI de transición puede hacer ack | ✅ HECHO (workflow ultracode) |
 | ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | ✅ HECHO (loop+codex) |
-| ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | PENDIENTE |
+| ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | 🟡 PARCIAL (073 tildes hecho; guard CatalogoTab difiere por solape 087) |
 | ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | PENDIENTE |
 | ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | ✅ HECHO (loop+cloud 091a+091b) |
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | ✅ HECHO (loop) |
@@ -577,7 +577,7 @@
 | ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | ✅ HECHO (loop) |
 | ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | HECHO (legal) |
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |
-| ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
+| ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | ✅ HECHO (workflow ultracode) |
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
@@ -1114,11 +1114,11 @@
 | ITEM-120 | A1 | — | Ruido de smoke-tests en el marco normativo de la entidad canónica ARGA (incl. override UNANIMIDAD legalmente inadmisible) | ✅ HECHO (loop+cloud) |
 | ITEM-121 | A10 | — | CLAUDE.md desactualizado: las plantillas P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) ya fueron corregidas y la lista known-p0 está vacía | HECHO (Ola1) |
 | ITEM-122 | A11 | — | CLAUDE.md desactualizado: documenta ExpedienteSinSesionStepper eliminado y omite 4 rutas de steppers nuevos | HECHO (Ola1) |
-| ITEM-123 | A11 | — | TransmisionStepper: fallback cliente no transaccional (código hoy muerto) que podría perder títulos a mitad de operación | PENDIENTE |
+| ITEM-123 | A11 | — | TransmisionStepper: fallback cliente no transaccional (código hoy muerto) que podría perder títulos a mitad de operación | ✅ HECHO (workflow ultracode) |
 | ITEM-124 | A11 | — | Cobertura e2e ausente en 4 steppers de capital/personas y en la ruta sociedad de DesignarAdmin | PENDIENTE |
 | ITEM-125 | A11 | — | Duplicación estructural: 3 familias de shell de stepper y componentes Input/Field/Checkbox copiados idénticos | PENDIENTE |
 | ITEM-126 | A12 | ✅ | Tres vías paralelas de 'envío' con modelos de estado divergentes — la consolidación a dispatcher único no está completada | PENDIENTE |
-| ITEM-127 | A12 | — | Idempotencia ERDS degenerada: el discriminador del evidenceId nunca incluye hash ni número de intento | PENDIENTE |
+| ITEM-127 | A12 | — | Idempotencia ERDS degenerada: el discriminador del evidenceId nunca incluye hash ni número de intento | ✅ HECHO (workflow ultracode) |
 | ITEM-128 | A12 | — | Doble implementación del pipeline de despacho: la librería src/lib/comms solo la consumen los tests; la Edge Function lo reimplementa inline y ya diverge | PENDIENTE |
 | ITEM-129 | A12 | — | Cobertura e2e nula para el módulo de comunicaciones | PENDIENTE |
 | ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | ✅ HECHO (loop+codex) |
@@ -1132,7 +1132,7 @@
 | ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | ✅ HECHO (loop) |
 | ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | HECHO (UI) |
 | ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |
-| ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |
+| ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | ✅ HECHO (workflow ultracode) |
 | ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | ✅ HECHO (loop+BOE) |
 | ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | HECHO (UI) |
 | ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | ✅ HECHO (ya resuelto ITEM-009/019) |

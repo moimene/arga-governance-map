@@ -114,10 +114,11 @@ describe("legal-template-fixtures", () => {
 
     expect(decision.ok).toBe(true);
     expect(decision.unresolvedVariables).toEqual([]);
-    expect(decision.text).toContain("DECISION DEL SOCIO UNICO");
+    // ITEM-073: la ortografía de los fixtures se restituyó con tildes correctas.
+    expect(decision.text).toContain("DECISIÓN DEL SOCIO ÚNICO");
     expect(escrito.ok).toBe(true);
     expect(escrito.unresolvedVariables).toEqual([]);
-    expect(escrito.text).toContain("ACTA DE ACUERDO ESCRITO SIN SESION");
+    expect(escrito.text).toContain("ACTA DE ACUERDO ESCRITO SIN SESIÓN");
     expect(escrito.text).toContain("Consejera A - A favor - 28/04/2026");
   });
 

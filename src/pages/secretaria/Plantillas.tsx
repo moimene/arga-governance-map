@@ -5,17 +5,25 @@ import {
   Clock,
   Archive,
   AlertCircle,
+  AlertTriangle,
   Play,
   FolderOpen,
   Building2,
   ShieldCheck,
   Filter,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAssignTemplateBinding } from "@/hooks/useNormativeGovernance";
-import { usePlantillasProtegidas, useUpdateEstadoPlantilla, PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import {
+  usePlantillasProtegidas,
+  useUpdateEstadoPlantilla,
+  extractTransitionResult,
+  PlantillaProtegidaRow,
+} from "@/hooks/usePlantillasProtegidas";
+import type { GatePreIssue } from "@/lib/secretaria/template-admin/types";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
@@ -173,6 +181,120 @@ function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdi
   );
 }
 
+// ITEM-087: lista accionable de issues del Gate PRE (código + mensaje + hint),
+// con el mismo lenguaje visual que el preflight del TemplateImportWizard.
+function GatePreIssueList({ issues }: { issues: GatePreIssue[] }) {
+  return (
+    <div className="space-y-2" aria-label="Incidencias del Gate PRE">
+      {issues.map((i, idx) => (
+        <div
+          key={`${i.code}-${idx}`}
+          className={`flex gap-2 border p-3 text-sm ${
+            i.severity === "BLOCKING"
+              ? "border-[var(--status-error)] bg-[var(--status-error)]/10 text-[var(--g-text-primary)]"
+              : i.severity === "WARNING"
+                ? "border-[var(--status-warning)] bg-[var(--status-warning)]/10 text-[var(--g-text-primary)]"
+                : "border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]"
+          }`}
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <strong className="text-[var(--g-text-primary)]">{i.code}</strong>{" "}
+            <span className="text-[var(--g-text-secondary)]">— {i.message}</span>
+            {i.hint ? (
+              <p className="mt-1 text-xs text-[var(--g-text-secondary)]">{i.hint}</p>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ITEM-087: diálogo de reconocimiento de warnings no-bloqueantes (WARNINGS_NEED_ACK),
+// reutilizando el patrón del wizard de importación (motivo ≥20 chars persistido en
+// changelog). Sin esto, una transición APROBADA→ACTIVA con cualquier warning era
+// imposible de completar desde el catálogo de uso.
+function TransitionAckDialog({
+  issues,
+  pending,
+  onConfirm,
+  onCancel,
+}: {
+  issues: GatePreIssue[];
+  pending: boolean;
+  onConfirm: (motivo: string) => void;
+  onCancel: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const tooShort = motivo.trim().length < 20;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-text-primary)]/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reconocer warnings antes de activar la plantilla"
+    >
+      <div
+        className="w-full max-w-lg border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
+        style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
+      >
+        <h2 className="mb-2 text-lg font-semibold text-[var(--g-text-primary)]">
+          Reconocer warnings del Gate PRE
+        </h2>
+        <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
+          La transición detectó warnings no-bloqueantes. Para completarla, escribe un
+          motivo de ≥20 caracteres que se persiste en el changelog como evidencia
+          documental.
+        </p>
+        <div className="mb-4 max-h-48 overflow-y-auto">
+          <GatePreIssueList issues={issues} />
+        </div>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-[var(--g-text-primary)]">
+            Motivo (≥20 caracteres)
+          </span>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="P. ej.: Warnings revisadas con Comité Legal; se acepta activar tal cual."
+            className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]/30"
+            rows={4}
+            aria-describedby="ack-plantillas-help"
+            aria-invalid={motivo.length > 0 && tooShort ? "true" : undefined}
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          />
+          <p id="ack-plantillas-help" className="mt-1 text-xs text-[var(--g-text-secondary)]">
+            {motivo.trim().length}/20 caracteres mínimos
+          </p>
+        </label>
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(motivo.trim())}
+            disabled={tooShort || pending}
+            aria-busy={pending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {pending ? "Procesando…" : "Reconocer y activar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Plantillas() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -186,6 +308,10 @@ export default function Plantillas() {
   // catálogo de uso (paridad con el guard del gestor).
   const canManageLifecycle = primaryRole === "ADMIN_TENANT";
   const [selected, setSelected] = useState<PlantillaProtegidaRow | null>(null);
+  // ITEM-087: estado para superficie de errores accionables de transición.
+  const [blockingIssues, setBlockingIssues] = useState<GatePreIssue[]>([]);
+  const [ackIssues, setAckIssues] = useState<GatePreIssue[] | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<PlantillaProtegidaRow | null>(null);
   const initialMateriaFilter = searchParams.get("materia") ?? "";
   const initialTipoFilter = searchParams.get("tipo") ?? "";
   const materiaFilterParam = searchParams.get("materia") ?? "";
@@ -214,7 +340,11 @@ export default function Plantillas() {
     return { active, modelos, informes, exactJurisdiction };
   }, [scopedData, selectedJurisdiction]);
 
-  const handleTransicion = (plantilla: PlantillaProtegidaRow) => {
+  const runTransicion = (
+    plantilla: PlantillaProtegidaRow,
+    motivo?: string,
+    ackWarnings?: boolean,
+  ) => {
     const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
     if (!transition) return;
     // ITEM-084: confirmación explícita antes de mutar el ciclo de vida (paridad
@@ -228,21 +358,63 @@ export default function Plantillas() {
     }
 
     updateEstado.mutate(
-      { id: plantilla.id, nuevo_estado: transition.nextState },
+      { id: plantilla.id, nuevo_estado: transition.nextState, motivo, ackWarnings },
       {
         onSuccess: () => {
+          setBlockingIssues([]);
+          setAckIssues(null);
+          setPendingTransition(null);
           toast.success(`Plantilla transicionada a ${estadoLabel(transition.nextState)}`);
           setSelected(null);
         },
         onError: (error) => {
-          // ITEM-075: no descartar el detalle del error (antes onError sin
-          // parámetro mostraba un mensaje genérico no accionable).
-          toast.error("Error al actualizar el estado de la plantilla", {
-            description: error instanceof Error ? error.message : String(error),
-          });
+          // ITEM-075 + ITEM-087: el TransitionResult adjunto al Error ya no se descarta. Los
+          // issues bloqueantes del Gate PRE se listan en un panel accionable y los
+          // warnings que requieren ack abren el diálogo de reconocimiento.
+          const result = extractTransitionResult(error);
+          if (result && result.ok === false && result.reason === "GATE_PRE_BLOCKING") {
+            setBlockingIssues(result.issues);
+            setAckIssues(null);
+            setPendingTransition(null);
+            toast.error(
+              `El Gate PRE bloqueó la activación con ${result.issues.length} incidencia(s). Revisa el detalle.`,
+            );
+          } else if (result && result.ok === false && result.reason === "WARNINGS_NEED_ACK") {
+            setBlockingIssues([]);
+            setAckIssues(result.issues);
+            setPendingTransition(plantilla);
+          } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            toast.error(`Transición no permitida: ${result.from} → ${result.to}.`);
+          } else if (result && result.ok === false && result.reason === "MISSING_APPROVAL_DATA") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            toast.error(
+              "Faltan datos de aprobación (aprobada_por/fecha) para activar la plantilla.",
+            );
+          } else {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            toast.error("Error al actualizar el estado de la plantilla", {
+              description: error instanceof Error ? error.message : String(error),
+            });
+          }
         },
       }
     );
+  };
+
+  const handleTransicion = (plantilla: PlantillaProtegidaRow) => {
+    const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
+    if (!transition) return;
+    setBlockingIssues([]);
+    setAckIssues(null);
+    setPendingTransition(null);
+    runTransicion(plantilla);
   };
 
   const handleAssignBinding = (plantilla: PlantillaProtegidaRow) => {
@@ -1013,6 +1185,21 @@ export default function Plantillas() {
                     );
                   })()
                 )}
+                {/* ITEM-087: panel accionable con los issues bloqueantes del Gate
+                    PRE, que antes solo eran visibles re-ejecutando manualmente el
+                    tab Validación del gestor. */}
+                {blockingIssues.length > 0 ? (
+                  <div
+                    className="border border-[var(--status-error)] bg-[var(--status-error)]/5 p-3"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--status-error)]">
+                      <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                      Gate PRE bloqueó la activación
+                    </div>
+                    <GatePreIssueList issues={blockingIssues} />
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -1027,6 +1214,20 @@ export default function Plantillas() {
           )}
         </div>
       </div>
+
+      {/* ITEM-087: diálogo de reconocimiento de warnings. Reintenta la transición
+          con ackWarnings:true y el motivo escrito (persistido en changelog). */}
+      {ackIssues && pendingTransition ? (
+        <TransitionAckDialog
+          issues={ackIssues}
+          pending={updateEstado.isPending}
+          onConfirm={(motivo) => runTransicion(pendingTransition, motivo, true)}
+          onCancel={() => {
+            setAckIssues(null);
+            setPendingTransition(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

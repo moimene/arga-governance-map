@@ -146,6 +146,21 @@ export default function AcuerdoSinSesionDetalle() {
       email: participant.email!.trim(),
       name: participant.full_name ?? participant.email!.trim(),
     }));
+  // ITEM-063: el cliente EAD Trust (useERDSNotification → generateEvidence → getOktaToken) exige
+  // client_credentials que NO pueden vivir en el navegador (clientSecret hardcodeado a '': trust
+  // boundary intencional). En browser el envío siempre lanza QTSP_SERVER_PROXY_REQUIRED, así que
+  // deshabilitamos el CTA con explicación accionable en vez de dejar una acción garantizada a error.
+  // El despacho certificado real se origina server-side desde el módulo Comunicaciones / EAD Trust.
+  const erdsProxyAvailable = Boolean(
+    import.meta.env.VITE_EAD_TRUST_OKTA_TOKEN_URL &&
+      import.meta.env.VITE_EAD_TRUST_CLIENT_ID &&
+      import.meta.env.VITE_EAD_TRUST_EVIDENCE_API_BASE_URL,
+  );
+  const erdsDisabledReason = !erdsProxyAvailable
+    ? "El despacho certificado ERDS se ejecuta server-side desde el módulo Comunicaciones (proxy QTSP / EAD Trust). No está disponible desde el navegador en este entorno."
+    : erdsRecipients.length === 0
+      ? "No hay destinatarios vigentes con email en el órgano"
+      : null;
   const body = r.governing_bodies?.name ?? "Órgano";
   const entity = r.governing_bodies?.entities?.common_name ?? "—";
   const jurisdiction = r.governing_bodies?.entities?.jurisdiction ?? null;
@@ -180,6 +195,15 @@ export default function AcuerdoSinSesionDetalle() {
 
   const handleSendERDS = async () => {
     if (!r.id) return;
+    // ITEM-063: sin proxy QTSP server-side el envío lanzaría QTSP_SERVER_PROXY_REQUIRED;
+    // cortamos en seco con explicación accionable en vez de propagar el error del cliente.
+    if (!erdsProxyAvailable) {
+      setErdsError(
+        "El despacho certificado ERDS no está disponible desde el navegador. Gestiónelo desde el módulo Comunicaciones (proxy QTSP / EAD Trust).",
+      );
+      setErdsStatus("error");
+      return;
+    }
     if (erdsRecipients.length === 0) {
       setErdsError("No hay destinatarios vigentes con email en el órgano.");
       setErdsStatus("error");
@@ -482,23 +506,28 @@ export default function AcuerdoSinSesionDetalle() {
         <div className="p-5">
           {erdsStatus === "idle" && (
             <>
+              {/* ITEM-063: copy honesto — el envío certificado real es server-side; el CTA in-browser
+                  queda deshabilitado con explicación accionable cuando no hay proxy QTSP configurado. */}
               <p className="mb-4 text-xs text-[var(--g-text-secondary)]">
-                Registre la notificación (ERDS) a los destinatarios del acuerdo. En este entorno demo
-                el despacho es simulado (sandbox QTSP): la evidencia electrónica cualificada y el envío
-                certificado real se gestionan desde el módulo de Comunicaciones / EAD Trust.
+                {erdsProxyAvailable
+                  ? "Envíe una notificación certificada (ERDS) a los destinatarios del acuerdo con evidencia electrónica cualificada vía EAD Trust."
+                  : "El envío certificado ERDS (evidencia cualificada vía EAD Trust) se ejecuta server-side desde el módulo de Comunicaciones. Este entorno no expone el proxy QTSP en el navegador, por lo que el envío directo desde esta pantalla no está habilitado."}
               </p>
               <button
                 type="button"
                 onClick={handleSendERDS}
-                disabled={sendCertifiedNotification.isPending || erdsRecipients.length === 0}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50"
+                disabled={sendCertifiedNotification.isPending || Boolean(erdsDisabledReason)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderRadius: "var(--g-radius-md)" }}
                 aria-busy={sendCertifiedNotification.isPending}
-                title={erdsRecipients.length === 0 ? "No hay destinatarios vigentes con email en el órgano" : undefined}
+                title={erdsDisabledReason ?? undefined}
               >
                 <Mail className="h-4 w-4" />
                 Enviar notificación ERDS{erdsRecipients.length > 0 ? ` (${erdsRecipients.length})` : ""}
               </button>
+              {erdsDisabledReason ? (
+                <p className="mt-2 text-xs text-[var(--g-text-secondary)]">{erdsDisabledReason}</p>
+              ) : null}
             </>
           )}
 

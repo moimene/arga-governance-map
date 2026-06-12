@@ -27,6 +27,14 @@ interface StepperShellProps {
    */
   finishTo?: string | null;
   finishLabel?: string;
+  /**
+   * ITEM-059: paso inicial al montar (reanudación). Permite al caller derivar el
+   * paso desde el estado del proceso (p. ej. una reunión con quórum reabre en el
+   * paso de agenda en vez de en Constitución). Solo se lee una vez al montar; tras
+   * ello la navegación queda en manos del usuario. Se acota al rango de pasos y se
+   * clampa al primer paso bloqueante (canAdvance===false) por el efecto inferior.
+   */
+  initialStep?: number;
 }
 
 export function StepperShell({
@@ -37,10 +45,16 @@ export function StepperShell({
   placeholderNote,
   finishTo,
   finishLabel,
+  initialStep,
 }: StepperShellProps) {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
-  const [current, setCurrent] = useState(1);
+  // ITEM-059: el paso inicial deriva del estado del proceso (initialStep) en lugar
+  // de reabrir siempre en 1; useState lo lee una sola vez al montar y lo acota al
+  // rango disponible de pasos.
+  const [current, setCurrent] = useState(() =>
+    Math.min(Math.max(initialStep ?? 1, 1), steps.length || 1),
+  );
   const firstBlockedStep = useMemo(
     () => [...steps].sort((a, b) => a.n - b.n).find((step) => step.canAdvance === false) ?? null,
     [steps],
