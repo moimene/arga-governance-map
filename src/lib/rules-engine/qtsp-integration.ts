@@ -622,6 +622,20 @@ export interface IntegrityVerificationResult {
 }
 
 /**
+ * Artefacto verificable por el Trust Center. `HASH` representa la integridad de
+ * un documento archivado (DOCX con SHA-512) sin sello QTSP tipado; el resto son
+ * sellos cualificados EAD Trust (QES/QSEAL/TSQ) o notificación certificada (ERDS).
+ */
+export interface VerifiableArtifact {
+  type: 'HASH' | 'QES' | 'QSEAL' | 'TSQ' | 'NOTIFICATION';
+  ref: string;
+  hash: string;
+  signer_id?: string;
+  signer_role?: string;
+  timestamp?: string;
+}
+
+/**
  * Verify integrity of artifacts signed by QTSP.
  * Performs comprehensive checks on QES signatures, seals, timestamps, and identity.
  *
@@ -631,14 +645,7 @@ export interface IntegrityVerificationResult {
  */
 export function verificarIntegridad(
   agreementId: string,
-  artifacts: Array<{
-    type: 'QES' | 'QSEAL' | 'TSQ' | 'NOTIFICATION';
-    ref: string;
-    hash: string;
-    signer_id?: string;
-    signer_role?: string;
-    timestamp?: string;
-  }>
+  artifacts: VerifiableArtifact[]
 ): IntegrityVerificationResult {
   const checks: IntegrityCheckDetail[] = [];
   const explain: ExplainNode[] = [];

@@ -1,17 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useCommunication } from '@/hooks/useCommunication';
 import { useRetryRecipient } from '@/hooks/useCommunicationActions';
-
-const ESTADO_LABELS: Record<string, string> = {
-  PENDIENTE: 'Pendiente',
-  ENVIANDO: 'Enviando',
-  ENVIADO: 'Enviado',
-  ENTREGADO: 'Entregado',
-  LEIDO: 'Leído',
-  RESPONDIDO: 'Respondido',
-  REBOTADO: 'Rebotado',
-  ERROR: 'Error',
-};
+import { statusLabel } from '@/lib/secretaria/status-labels';
 
 export default function ComunicacionDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -63,7 +53,7 @@ export default function ComunicacionDetalle() {
         </Link>
         <h1 className="text-2xl font-semibold text-[var(--g-text-primary)] mt-2">{c.asunto}</h1>
         <p className="text-sm text-[var(--g-text-secondary)] mt-1">
-          {c.tipo_comunicacion} · {c.organo_tipo} · Estado: <strong>{c.estado}</strong>
+          {c.tipo_comunicacion} · {c.organo_tipo} · Estado: <strong>{statusLabel(c.estado)}</strong>
           {c.tiene_rebotes && <span className="text-[var(--status-warning)] ml-2">⚠ Tiene rebotes</span>}
         </p>
       </header>
@@ -168,7 +158,7 @@ export default function ComunicacionDetalle() {
                             : 'text-[var(--g-text-primary)]'
                         }
                       >
-                        {ESTADO_LABELS[r.estado_entrega] ?? r.estado_entrega}
+                        {statusLabel(r.estado_entrega)}
                       </span>
                       {r.ultimo_error && (
                         <p className="text-xs text-[var(--status-error)]">{r.ultimo_error}</p>

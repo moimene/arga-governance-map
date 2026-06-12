@@ -67,6 +67,23 @@ export const STATUS_LABEL: Record<string, string> = {
   ISSUED:       "Emitida",
   SEALED:       "Sellada",
   REVISED:      "Revisada",
+
+  // ITEM-067: estados de comunicaciones (nivel campaña) y de entrega por
+  // destinatario, que ComunicacionDetalle/Comunicaciones mostraban en crudo.
+  // BORRADOR/PROGRAMADA/ENVIADA/CANCELADA ya cubiertos arriba.
+  ENVIANDO:           "Enviando",
+  ENTREGADA_PARCIAL:  "Entregada parcial",
+  ENTREGADA_TOTAL:    "Entregada",
+  RESPONDIDA_PARCIAL: "Respondida parcial",
+  RESPONDIDA_TOTAL:   "Respondida",
+  EXPIRADA:           "Expirada",
+  ERROR:              "Error",
+  // Entrega por destinatario
+  ENVIADO:    "Enviado",
+  ENTREGADO:  "Entregado",
+  LEIDO:      "Leído",
+  RESPONDIDO: "Respondido",
+  REBOTADO:   "Rebotado",
 };
 
 export function statusLabel(status: string): string {

@@ -49,7 +49,10 @@ interface RuleEvaluationResult {
   etapa: string;
   ok: boolean;
   severity: "OK" | "WARNING" | "BLOCKING";
-  explain_json: Record<string, unknown> | null;
+  // ITEM-107: la columna real de rule_evaluation_results es `explain` (jsonb),
+  // no `explain_json`; el campo anterior quedaba siempre undefined y la sección
+  // de detalle de evaluación no se renderizaba nunca.
+  explain: Record<string, unknown> | null;
   blocking_issues: string[] | null;
   warnings: string[] | null;
 }
@@ -489,7 +492,10 @@ export default function ExpedienteAcuerdo() {
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
                 Evidencias de confianza
               </h3>
-              {verification?.ok && (
+              {/* ITEM-107: solo mostrar el badge verde cuando realmente se ha
+                  verificado al menos un artefacto. Antes lucía "Verificación OK"
+                  incluso con checks=[] (señal de confianza vacua). */}
+              {verification?.ok && (verification.checks?.length ?? 0) > 0 && (
                 <span
                   className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                   style={{ borderRadius: "var(--g-radius-full)" }}
@@ -1184,10 +1190,10 @@ function RuleValidationRow({
         <div className="space-y-1 border-t border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/30 p-3">
           {results.map((r) => (
             <div key={r.id} className="text-xs text-[var(--g-text-secondary)]">
-              {r.explain_json ? (
+              {r.explain ? (
                 <>
-                  {typeof r.explain_json === "object" &&
-                    Object.entries(r.explain_json).map(([key, value]) => (
+                  {typeof r.explain === "object" &&
+                    Object.entries(r.explain).map(([key, value]) => (
                       <div key={key} className="ml-2">
                         <span className="font-mono text-[10px]">{key}:</span>{" "}
                         <span className="text-[var(--g-text-primary)]">

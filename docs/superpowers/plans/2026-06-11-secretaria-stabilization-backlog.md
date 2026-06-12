@@ -547,7 +547,7 @@
 | ITEM-064 | A12 | ✅ | La convocatoria se 'emite' sin generar ninguna comunicación: PasoEnvioMiembros no está montado en ConvocatoriasStepper y los canales del Paso 5 son solo metadata | PENDIENTE |
 | ITEM-065 | A12 | — | /secretaria/comunicaciones es una página huérfana: sin entrada en el sidebar y solo enlazada desde un libro auxiliar semánticamente incompatible | PENDIENTE |
 | ITEM-066 | A12 | — | Trazabilidad bidireccional comunicación↔origen existe en el modelo de datos pero no se afloró en ninguna UI | ✅ HECHO (loop+codex) |
-| ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | PENDIENTE |
+| ITEM-067 | A12 | — | ComunicacionDetalle muestra claves DB sin traducir en cabecera y no usa el mapa central status-labels (H2) | ✅ HECHO (loop) |
 | ITEM-068 | A13 | — | TramitadorStepper /nuevo es un dead-end: no navega nunca al expediente registral creado | PENDIENTE |
 | ITEM-069 | A13 | — | ConvocatoriasStepper termina en listas genéricas en vez de en la convocatoria emitida | PENDIENTE |
 | ITEM-070 | A13 | — | Estados sin traducir: SIGNED, PENDING, NO_APLICA y entity_status 'Active' se muestran crudos | HECHO (UI) |
@@ -587,7 +587,7 @@
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | PENDIENTE |
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
-| ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | PENDIENTE |
+| ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | ✅ HECHO (loop) |
 | ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | PENDIENTE |
 | ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | PENDIENTE |
 | ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | PENDIENTE |

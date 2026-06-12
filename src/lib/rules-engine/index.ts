@@ -79,6 +79,7 @@ export {
   type OCSPVerificationResult,
   type IntegrityCheckDetail,
   type IntegrityVerificationResult,
+  type VerifiableArtifact,
 } from './qtsp-integration';
 export {
   generarEvidenceBundle,

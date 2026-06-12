@@ -9,20 +9,28 @@ import { useTenantContext } from "@/context/TenantContext";
 import {
   verificarIntegridad,
   type IntegrityVerificationResult,
+  type VerifiableArtifact,
 } from "@/lib/rules-engine";
 
+
+// ITEM-107: la columna real es `manifest` (jsonb); los artefactos viven en
+// manifest.artifacts (ver migración F3.G15). NO existe columna `artifacts`.
+interface EvidenceManifestArtifact {
+  type?: string;
+  ref?: string;
+  hash?: string;
+  hash_sha512?: string;
+  filename?: string;
+  signer_id?: string;
+  signer_role?: string;
+  timestamp?: string;
+  timestamp_iso?: string;
+}
 
 interface EvidenceBundleRow {
   id: string;
   agreement_id: string;
-  artifacts: Array<{
-    type: string;
-    ref: string;
-    hash: string;
-    signer_id?: string;
-    signer_role?: string;
-    timestamp?: string;
-  }>;
+  manifest: { artifacts?: EvidenceManifestArtifact[] } | null;
   created_at: string;
 }
 
@@ -32,7 +40,8 @@ interface RuleEvaluationResultRow {
   etapa: string;
   ok: boolean;
   severity: string;
-  explain_json: Record<string, unknown> | null;
+  // ITEM-107: la columna real de rule_evaluation_results es `explain`, no `explain_json`.
+  explain: Record<string, unknown> | null;
   blocking_issues: string[] | null;
   warnings: string[] | null;
   created_at: string;
@@ -95,57 +104,42 @@ export function useQTSPVerification(agreementId: string | undefined) {
 function buildArtifactsFromData(
   bundles: EvidenceBundleRow[],
   evaluations: RuleEvaluationResultRow[]
-): Array<{
-  type: "QES" | "QSEAL" | "TSQ" | "NOTIFICATION";
-  ref: string;
-  hash: string;
-  signer_id?: string;
-  signer_role?: string;
-  timestamp?: string;
-}> {
-  const artifacts: Array<{
-    type: "QES" | "QSEAL" | "TSQ" | "NOTIFICATION";
-    ref: string;
-    hash: string;
-    signer_id?: string;
-    signer_role?: string;
-    timestamp?: string;
-  }> = [];
+): VerifiableArtifact[] {
+  const artifacts: VerifiableArtifact[] = [];
 
-  // Extract artifacts from evidence bundles
+  // ITEM-107: extraer artefactos de manifest.artifacts (la columna real es
+  // `manifest` jsonb). En producción los artefactos son DOCX archivados con
+  // hash SHA-512 en `hash_sha512`; se mapean a tipo HASH (integridad de
+  // documento). Si en el futuro el manifest trae sellos QTSP tipados
+  // (QES/QSEAL/TSQ/NOTIFICATION) con `hash`, se respetan tal cual.
+  const KNOWN_QTSP_TYPES = new Set(["QES", "QSEAL", "TSQ", "NOTIFICATION"]);
   for (const bundle of bundles) {
-    if (bundle.artifacts && Array.isArray(bundle.artifacts)) {
-      for (const art of bundle.artifacts) {
-        // Validate artifact has required fields
-        if (
-          art.type &&
-          (art.type === "QES" ||
-            art.type === "QSEAL" ||
-            art.type === "TSQ" ||
-            art.type === "NOTIFICATION") &&
-          art.ref &&
-          art.hash
-        ) {
-          artifacts.push({
-            type: art.type,
-            ref: art.ref,
-            hash: art.hash,
-            signer_id: art.signer_id,
-            signer_role: art.signer_role,
-            timestamp: art.timestamp,
-          });
-        }
-      }
+    const manifestArtifacts = bundle.manifest?.artifacts;
+    if (!Array.isArray(manifestArtifacts)) continue;
+    for (const art of manifestArtifacts) {
+      const hash = art.hash ?? art.hash_sha512;
+      const ref = art.ref ?? art.filename;
+      if (!hash || !ref) continue;
+      const timestamp = art.timestamp ?? art.timestamp_iso;
+      const isKnownQtsp = typeof art.type === "string" && KNOWN_QTSP_TYPES.has(art.type);
+      artifacts.push({
+        type: isKnownQtsp ? (art.type as VerifiableArtifact["type"]) : "HASH",
+        ref,
+        hash,
+        signer_id: art.signer_id,
+        signer_role: art.signer_role,
+        timestamp,
+      });
     }
   }
 
   // Extract QES artifacts from rule evaluations (if they contain signature data)
   for (const evaluation of evaluations) {
     if (
-      evaluation.explain_json &&
-      typeof evaluation.explain_json === "object"
+      evaluation.explain &&
+      typeof evaluation.explain === "object"
     ) {
-      const explainData = evaluation.explain_json;
+      const explainData = evaluation.explain;
 
       // Check for signature ref in explain data
       if ("signature_ref" in explainData && typeof explainData.signature_ref === "string") {
