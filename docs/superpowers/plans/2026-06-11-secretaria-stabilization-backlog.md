@@ -571,7 +571,7 @@
 | ITEM-088 | A3 | — | Wizard de importación muestra errores Zod crudos en JSON, ilegibles para el Comité Legal | ✅ HECHO (loop+codex) |
 | ITEM-089 | A3 | — | 16 fixtures locales del freeze Supabase siguen inyectándose como plantillas ACTIVA en el catálogo del gestor | PENDIENTE |
 | ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | PENDIENTE |
-| ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | PENDIENTE |
+| ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | ✅ HECHO (loop+cloud 091a+091b) |
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | ✅ HECHO (loop) |
 | ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | ✅ HECHO (loop) |
 | ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | ✅ HECHO (loop) |
