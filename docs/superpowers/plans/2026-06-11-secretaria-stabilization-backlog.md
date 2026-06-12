@@ -580,7 +580,7 @@
 | ITEM-097 | A5 | — | Wizard de 8 pasos sin persistencia de borrador (refresh/cancelar pierde todo) y 38 convocatorias BORRADOR en Cloud sin ruta para retomarlas | PENDIENTE |
 | ITEM-098 | A5 | — | Paso 8 cuenta destinatarios con activeMandates en lugar de activeRecipients: número incorrecto (o negativo) para juntas generales | HECHO (UI) |
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
-| ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | PENDIENTE |
+| ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | PENDIENTE |
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | PENDIENTE |
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
@@ -973,7 +973,7 @@
 
 ### ITEM-100 [P2] 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA
 
-- **Área:** A6 · **Estado:** PENDIENTE
+- **Área:** A6 · **Estado:** HECHO (Ola UI; filtro operational-bodies excluye órganos QA phase-b)
 - **Descripción:** El filtro de cuerpos operativos excluye slug 'e2e-real-*', nombre '[E2E REAL]' y config.e2e_real_run_id, pero una segunda generación de cuerpos QA usa slug 'qa-no-session-arga-real-*', nombre 'Consejo QA arga-real-*' y config sin marca. Estos 11 cuerpos (con quorum_rule.mode='E2E_REAL_SINGLE_VOTER') pasan el filtro y aparecen en useBodiesByEntity, es decir en el dropdown de órgano de la reunión universal y demás selectores de Secretaría para ARGA Seguros — ruido visible en demo y riesgo de crear reuniones reales sobre cuerpos QA con reglas de quórum ficticias (required:1).
 - **Evidencia:** src/lib/secretaria/operational-bodies.ts:7-18 (condiciones del filtro). SQL Cloud: governing_bodies de ARGA incluye 11 filas 'Consejo QA arga-real-*' con slug 'qa-no-session-arga-real-…', config->>'e2e_real_run_id' IS NULL y reference_only IS NULL (ej. id 0d0b5d06-c81d-4263-a2ab-f0e0f17754a3); el duplicado de Junta General sí está neutralizado vía reference_only=true (e288fe36).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/operational-bodies.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useBodies.ts
@@ -1130,18 +1130,18 @@
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
 | ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | PENDIENTE |
 | ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | PENDIENTE |
-| ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | PENDIENTE |
+| ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | HECHO (UI) |
 | ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |
 | ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |
 | ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | PENDIENTE |
-| ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | PENDIENTE |
+| ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | HECHO (UI) |
 | ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | PENDIENTE |
 | ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | PENDIENTE |
 | ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
 | ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | HECHO (Ola2) |
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
 | ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | PENDIENTE |
-| ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | PENDIENTE |
+| ITEM-150 | A9 | — | useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO | HECHO (UI) |
 | ITEM-151 | A9 | — | CONSENTIMIENTO_INVERSOR: el comentario declara WARNING (validez societaria intacta, art. 29 LSC) pero el código devuelve BLOCKING | BLOQUEADO-LEGAL |
 
 ### ITEM-116 [P3] DL-2 incompleta en runtime: esCotizada se acepta pero ningún engine cableado lo consume, y los hooks lo hardcodean de forma contradictoria
@@ -1333,7 +1333,7 @@
 
 ### ITEM-139 [P3] Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system'
 
-- **Área:** A3 · **Estado:** PENDIENTE
+- **Área:** A3 · **Estado:** HECHO (Ola UI; aprobada_por = email del usuario real en CatalogoTab)
 - **Descripción:** CatalogoTab pasa aprobada_por:'Comité Legal TGMS' fijo en toda transición (el hook lo usa como actor del changelog), y Plantillas.tsx no pasa actor alguno (→ 'system'). En cambio useUpdateContenidoPlantilla sí usa user?.email. Resultado: el tab Auditoría — cuyo valor es la trazabilidad — registra autores ficticios/inconsistentes para los cambios de estado, que son precisamente los eventos más sensibles. Con sesión real disponible (useCurrentUser), no hay razón para el hardcode.
 - **Evidencia:** src/components/secretaria/gestor/CatalogoTab.tsx:349-355 (aprobada_por:'Comité Legal TGMS' fijo); src/hooks/usePlantillasProtegidas.ts:155 (actor = input.actor ?? input.aprobada_por ?? 'system'); contraste con useUpdateContenidoPlantilla:278 (user?.email ?? user?.id).
 - **Archivos:** src/components/secretaria/gestor/CatalogoTab.tsx, src/pages/secretaria/Plantillas.tsx, src/hooks/usePlantillasProtegidas.ts
@@ -1365,7 +1365,7 @@
 
 ### ITEM-143 [P3] accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión
 
-- **Área:** A5 · **Estado:** PENDIENTE
+- **Área:** A5 · **Estado:** HECHO (Ola UI; accepted_by = email del usuario real en ConvocatoriasStepper)
 - **Descripción:** buildConvocatoriaTrace marca cada advertencia aceptada con accepted_by: 'demo-user' fijo, sin leer el usuario autenticado (supabase.auth) ni useUserRole. Misma familia que la deuda conocida de userRole en EmitirCertificacionButton, pero instancia distinta: aquí afecta a la atribución de la aceptación de warnings jurídicos (plazo incumplido, canales pendientes) en una traza pensada para auditoría. Viable de conectar ya: el email del usuario demo está disponible en la sesión de Supabase Auth sin esperar al sprint de auth real.
 - **Evidencia:** src/pages/secretaria/ConvocatoriasStepper.tsx:1967-1971 (accepted_by: 'demo-user').
 - **Archivos:** src/pages/secretaria/ConvocatoriasStepper.tsx
@@ -1421,7 +1421,7 @@
 
 ### ITEM-150 [P3] useNoSessionExpediente.ts es un hook muerto sin consumidores que ya soporta OBJECION_PROCEDIMIENTO
 
-- **Área:** A9 · **Estado:** PENDIENTE
+- **Área:** A9 · **Estado:** HECHO (Ola UI; eliminado hook muerto useNoSessionExpediente.ts, 0 consumidores)
 - **Descripción:** El hook src/hooks/useNoSessionExpediente.ts (tipado de sentidos CONSENTIMIENTO|OBJECION|OBJECION_PROCEDIMIENTO|SILENCIO y cast de respuestas sobre el expediente WORM) no es importado por ninguna página ni componente — el único match de grep es el propio archivo. Es exactamente la pieza que el hallazgo del art. 248.2 necesita en UI, pero quedó huérfana; mientras tanto el flujo usa useCastVote con el enum reducido FOR/AGAINST/ABSTAIN. Duplicación latente y confusión para quien retome el carril.
 - **Evidencia:** grep -rln useNoSessionExpediente sobre src/ solo devuelve /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useNoSessionExpediente.ts; comparación con src/hooks/useAcuerdosSinSesion.ts:166-168.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useNoSessionExpediente.ts

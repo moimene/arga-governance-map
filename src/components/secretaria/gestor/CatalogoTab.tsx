@@ -55,6 +55,7 @@ import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-f
 import { isKnownP0 } from "@/lib/secretaria/template-admin";
 import { TriCapaEditor } from "./TriCapaEditor";
 import { useTabAccess } from "./tab-guards";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const ESTADO_CONFIG: Record<string, { label: string; className: string; icon: ElementType }> = {
   BORRADOR: {
@@ -328,6 +329,7 @@ function PlantillaDetailPanel({
 }) {
   const updateEstado = useUpdateEstadoPlantilla();
   const { canAccess } = useTabAccess();
+  const { user } = useCurrentUser();
   const canManageTemplates = canAccess("validacion");
   const estado = safeString(plantilla.estado, "BORRADOR");
   const tipo = safeString(plantilla.tipo, "SIN_TIPO");
@@ -350,7 +352,7 @@ function PlantillaDetailPanel({
       {
         id: plantilla.id,
         nuevo_estado: transition.next,
-        aprobada_por: "Comité Legal TGMS",
+        aprobada_por: user?.email ?? "Comité Legal TGMS",
       },
       {
         onSuccess: () =>

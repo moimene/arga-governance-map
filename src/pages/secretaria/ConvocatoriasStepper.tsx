@@ -11,6 +11,7 @@ import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useBodyMandates } from "@/hooks/useBodies";
 import {
   useConvocatoriasList,
@@ -591,6 +592,7 @@ function serializeRuleResolution(resolution: RuleResolution) {
 
 export default function ConvocatoriasStepper() {
   const navigate = useNavigate();
+  const { user } = useCurrentUser();
   const [searchParams] = useSearchParams();
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
@@ -1998,7 +2000,7 @@ export default function ConvocatoriasStepper() {
       accepted_warnings: acceptedWarnings.map((warning) => ({
         ...warning,
         accepted_at: emittedAt,
-        accepted_by: "demo-user",
+        accepted_by: user?.email ?? "demo-user",
       })),
     };
   }

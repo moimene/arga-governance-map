@@ -14,6 +14,10 @@ export function isOperationalSecretariaBody(body: OperationalBodyLike) {
   if (config.e2e_real_run_id) return false;
   if (config.reference_only) return false;
   if (config.hidden_from_secretaria_operational_flows) return false;
+  // ITEM-100: excluir también los órganos sintéticos de los specs destructivos
+  // de fases (B1/B6) que pueden quedar como residuo en Cloud.
+  if (config.e2e_phase_b_run) return false;
+  if (slug.startsWith("phase-b")) return false;
 
   return true;
 }
