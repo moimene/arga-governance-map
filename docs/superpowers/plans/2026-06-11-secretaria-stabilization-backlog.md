@@ -582,7 +582,7 @@
 | ITEM-099 | A6 | — | Representaciones sin validación legal: ni proxy de junta (arts. 183-187 LSC) ni restricciones de delegación en consejo (art. 529 quáter para cotizada) | PENDIENTE |
 | ITEM-100 | A6 | — | 11 órganos QA 'Consejo QA arga-real-*' escapan al filtro isOperationalSecretariaBody y contaminan los selectores operativos de ARGA | HECHO (UI) |
 | ITEM-101 | A6 | — | CierreStep: copy contradictoria para sesiones sin puntos — el aviso promete acta de constancia pero el botón queda bloqueado | ✅ HECHO (loop) |
-| ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | PENDIENTE |
+| ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | ✅ HECHO (loop) |
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | 🟡 PARCIAL (TramitacionDetalle cross-link; ExpedienteAcuerdo cards en oleada cross-module) |
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
@@ -1128,7 +1128,7 @@
 | ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
-| ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | PENDIENTE |
+| ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | ✅ HECHO (loop) |
 | ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | ✅ HECHO (loop) |
 | ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | HECHO (UI) |
 | ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |

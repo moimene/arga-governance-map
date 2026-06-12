@@ -600,7 +600,7 @@ function TramitadorNuevo() {
       if (!row) return;
       setRegistryFilingId(row.id as string);
       setFilingStatus(String(row.status ?? "DRAFT"));
-      setDeedSaved(["ELEVATED", "SUBMITTED", "INSCRIBED"].includes(String(row.status ?? "")));
+      setDeedSaved(["ELEVADA", "PRESENTADA", "INSCRITA", "ELEVATED", "SUBMITTED", "INSCRIBED"].includes(String(row.status ?? ""))); // ITEM-102: vocabulario ES canónico (+ inglés legacy)
     })();
     return () => { cancelled = true; };
   }, [effectiveSelectedAgreementId, filingStatus, registryFilingId, tenantId]);
@@ -892,7 +892,7 @@ function TramitadorNuevo() {
       notary_name: instrumentData.notary.trim(),
       protocol_number: instrumentData.protocolNumber.trim(),
       elevated_at: new Date().toISOString(),
-      status: "ELEVATED",
+      status: "ELEVADA", // ITEM-102
       filing_type: filingType,
       filing_via: filingChannel || null,
     };
@@ -954,7 +954,7 @@ function TramitadorNuevo() {
 
       setDeedSaved(true);
       setRegistryFilingId(registryFilingId);
-      setFilingStatus("ELEVATED");
+      setFilingStatus("ELEVADA"); // ITEM-102
       await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
       await queryClient.invalidateQueries({ queryKey: ["evidence_bundles", tenantId] });
     } catch (error) {
@@ -990,12 +990,12 @@ function TramitadorNuevo() {
 
       const { error } = await supabase
         .from("registry_filings")
-        .update({ status: "SUBMITTED" })
+        .update({ status: "PRESENTADA" }) // ITEM-102
         .eq("id", targetFilingId)
         .eq("tenant_id", tenantId);
       if (error) throw error;
       setRegistryFilingId(targetFilingId);
-      setFilingStatus("SUBMITTED");
+      setFilingStatus("PRESENTADA"); // ITEM-102
       setSubsanacionDone(true);
       await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
     } catch (error) {

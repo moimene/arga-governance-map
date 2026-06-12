@@ -4,8 +4,11 @@ export const STATUS_LABEL: Record<string, string> = {
   Active:       "Activa",
   INACTIVE:     "Inactiva",
   Inactive:     "Inactiva",
+  // ITEM-102: claves inglesas legacy del Tramitador (ya migradas en Cloud al
+  // vocabulario español canónico, se mantienen por compatibilidad de lectura).
   ELEVATED:     "Elevada a público",
-  SUBMITTED:    "Preparada para tramitación",
+  SUBMITTED:    "Presentada",
+  INSCRIBED:    "Inscrita",
 
   // Acuerdos sin sesión
   BORRADOR:     "Borrador",
@@ -13,12 +16,14 @@ export const STATUS_LABEL: Record<string, string> = {
   APROBADO:     "Aprobado",
   RECHAZADO:    "Rechazado",
 
-  // Tramitador
+  // Tramitador — vocabulario canónico español (ITEM-102: PRESENTADA ya no colisiona
+  // con SUBMITTED; ELEVADA es la elevación a público).
   PREPARADA:    "Preparada",
-  PRESENTADA:   "Preparada para tramitación",
+  PRESENTADA:   "Presentada",
   EN_TRAMITE:   "En trámite",
   SUBSANACION:  "Subsanación",
   INSCRITA:     "Inscrita",
+  ELEVADA:      "Elevada a público",
   DENEGADA:     "Denegada",
 
   // Reuniones

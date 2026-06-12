@@ -28,6 +28,7 @@ const STATUS_TONE: Record<string, string> = {
   EN_TRAMITE:  "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   SUBSANACION: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   INSCRITA:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  ELEVADA:     "bg-[var(--status-success)] text-[var(--g-text-inverse)]", // ITEM-102
   DENEGADA:    "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
