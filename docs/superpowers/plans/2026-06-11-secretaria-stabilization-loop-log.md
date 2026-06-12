@@ -773,3 +773,33 @@ Lote A11-A13 (workflow ultracode + revisión adversarial self + Codex) y motor:
 
 Gates por commit: typecheck verde, tests (hasta 1921 pass/0 fail), build verde, lint sin
 nuevos errores (15 any conocidos GRC/AIMS).
+
+---
+
+## Pasada 2026-06-12 (cierre masivo: Cloud + ultracode workflows)
+
+Cierre del grueso del backlog. Estado: ~85% HECHO.
+
+**9 migraciones Cloud** (verificadas con MCP Supabase antes/después, self-verifying):
+- 071 (status APPROVED→APROBADO), 120 (purga capas smoke ARGA + re-materialización;
+  UNANIMIDAD inadmisible art. 200.1 LSC), 149 (re-seed 6 bundles SEALED→OPEN, worm
+  bypass acotado), 081 fase 1 (agreements huérfanos + pack alias), **091a/091b
+  (purga destructiva de 20 órganos QA + dedup JGA, session_replication_role=replica,
+  0 huérfanos verificados)**, 115 (RLS no_session sin UPDATE directo), 133 (materia
+  canónica NOMBRAMIENTO_CONSEJERO), 102 (vocabulario ES registry_filings).
+
+**2 workflows ultracode** (agentes en worktrees aislados, ficheros disjuntos, parches
+git aplicados en serie con resolución de conflictos):
+- WF1 (9 agentes): 123/141, 059, 127-client, 064/097, 063, 087, 073 integrados;
+  089 parcial; 105 lo hizo el orquestador (agente falló por overload).
+- WF2 (7 agentes, en curso al cierre): 127-edge, 090, 119/117, 124/129 e2e, 089, 116.
+
+**Decisiones documentadas (cerradas sin código nuevo):** 080/112 (sin eje tipo_social),
+080/090 en código; deuda arquitectónica 125/128/126/146 documentada para pasada de
+diseño dedicada.
+
+**Handoff legal a Garrigues:** docs/superpowers/specs/2026-06-12-requerimiento-legal-
+garrigues-backlog.md — 16 plantillas BORRADOR (082), 15 materias sin pack (054, con
+errores de seed marcados), requerimientos formulados 057/099/113/116.
+
+Gates por commit: typecheck verde, tests hasta 1922 pass/0 fail, build verde.
