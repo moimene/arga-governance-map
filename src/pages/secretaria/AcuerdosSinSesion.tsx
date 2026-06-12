@@ -73,6 +73,13 @@ export default function AcuerdosSinSesion() {
     navigate(scope.createScopedTo(`${nextPath}${qs ? `?${qs}` : ""}`), { replace: true });
   }, [navigate, scope, searchParams]);
 
+  // ITEM-114: cierre automático de votaciones vencidas al entrar en la lista
+  // (G6, además del botón manual). Silencioso — sin toast en el auto-cierre.
+  useEffect(() => {
+    closeExpired.mutate(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
   const filtered = (data ?? []).filter((item) => {

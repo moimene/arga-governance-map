@@ -594,7 +594,7 @@
 | ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | PENDIENTE |
 | ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | PENDIENTE |
 | ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | PENDIENTE |
-| ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | PENDIENTE |
+| ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |
 | ITEM-115 | A9 | — | no_session_resolutions admite UPDATE directo por cualquier usuario del tenant (contadores y status manipulables); las respuestas WORM sí están protegidas | PENDIENTE |
 
 ### ITEM-054 [P2] 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo
@@ -1089,7 +1089,7 @@
 
 ### ITEM-114 [P2] Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron
 
-- **Área:** A9 · **Estado:** PENDIENTE
+- **Área:** A9 · **Estado:** HECHO (Ola MOTOR; restaurado cierre auto de votaciones vencidas on-mount, G6)
 - **Descripción:** El cierre de procesos VOTING_OPEN vencidos ya no se ejecuta al montar AcuerdosSinSesion.tsx (como documenta CLAUDE.md para G6): ahora hay un botón manual 'Cerrar vencidas' (handleCloseExpired). pg_cron está instalado en Cloud pero el único job es comms-dispatch-tick; no hay job para fn_cerrar_votaciones_vencidas pese a que el propio COMMENT de la función dice 'Puede invocarse desde frontend o pg_cron'. Mitigación parcial: fn_no_session_cast_response cierra el expediente concreto si alguien intenta votar tras el plazo. Consecuencia operativa: los KPI y listados muestran votaciones 'abiertas' caducadas indefinidamente hasta que alguien pulse el botón (gap de scheduling documentable). Nota: resolver este gap sin corregir antes el hallazgo del RECHAZADO incondicional automatizaría cierres jurídicamente incorrectos.
 - **Evidencia:** src/pages/secretaria/AcuerdosSinSesion.tsx:43-59 y 100-107 (botón manual, sin mutate en mount); SQL Cloud: SELECT * FROM cron.job devuelve solo jobid 1 'comms-dispatch-tick'; supabase/migrations/20260423145621_fn_cerrar_votaciones_vencidas.sql:28-30 (comentario pg_cron).
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/AcuerdosSinSesion.tsx, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/supabase/migrations/20260423145621_fn_cerrar_votaciones_vencidas.sql
