@@ -588,7 +588,7 @@
 | ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
 | ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | ✅ HECHO (loop) |
-| ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | PENDIENTE |
+| ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | ✅ HECHO (loop) |
 | ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | PENDIENTE |
 | ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | PENDIENTE |
 | ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | PENDIENTE |

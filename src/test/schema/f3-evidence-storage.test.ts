@@ -133,6 +133,17 @@ describe("F3.G3 — UI consumers refactored", () => {
   });
 
   it("storage-archiver uses tenant-prefix path schema (F3.G3 §5)", () => {
-    expect(storageArchiver).toMatch(/storagePath = `\$\{tenantId\}\/\$\{agreementId\}\/\$\{filename\}\.docx`/);
+    // ITEM-108: el path incluye ahora un fragmento del hash de contenido
+    // (`__<hash8>`) para evitar colisiones same-day con contenido distinto.
+    expect(storageArchiver).toMatch(
+      /storagePath = `\$\{tenantId\}\/\$\{agreementId\}\/\$\{filename\}__\$\{contentFragment\}\.docx`/,
+    );
+  });
+
+  it("storage-archiver uses upsert:true with content-addressed path (ITEM-108)", () => {
+    // Path direccionado por contenido → upsert solo sobreescribe bytes idénticos
+    // (reintento idempotente tras fallo parcial), sin dead-end de colisión.
+    expect(storageArchiver).toMatch(/upsert: true/);
+    expect(storageArchiver).toMatch(/const contentFragment = hashHex\.slice\(0, 8\)/);
   });
 });

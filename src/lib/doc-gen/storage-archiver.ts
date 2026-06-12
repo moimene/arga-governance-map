@@ -102,20 +102,29 @@ export async function archiveDocxToStorage(
     }
 
     // F3.G3: path schema con tenant prefix (era `agreements/${id}/...`).
-    // Forma nueva: `<tenant_id>/<agreement_id>/<filename>.docx`.
-    const storagePath = `${tenantId}/${agreementId}/${filename}.docx`;
+    // Forma nueva: `<tenant_id>/<agreement_id>/<filename>__<hash8>.docx`.
+    // ITEM-108: el filename antiguo tenía granularidad de día (sin hora ni
+    // hash), de modo que regenerar el mismo día con contenido distinto (tras
+    // editar el borrador) colisionaba en un path idéntico con upsert:false →
+    // dead-end 'The resource already exists'. Incluir 8 chars del SHA-512 del
+    // contenido hace que cada contenido distinto tenga su propio path, y
+    // permite upsert:true seguro: como el path identifica el contenido, un
+    // re-upload solo puede sobreescribir bytes idénticos (caso de fallo parcial:
+    // upload OK pero INSERT falló → reintento idempotente en vez de bucle).
+    const contentFragment = hashHex.slice(0, 8);
+    const storagePath = `${tenantId}/${agreementId}/${filename}__${contentFragment}.docx`;
     const archivedAt = new Date().toISOString();
     const { error: uploadError, data } = await supabase.storage
       .from("matter-documents")
       .upload(storagePath, buffer, {
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        upsert: false,
+        upsert: true,
       });
 
     if (uploadError) {
       return {
         ok: false,
-        error: `Upload fallido: ${uploadError.message}`,
+        error: `No se pudo archivar el documento: ${uploadError.message}. Si el problema persiste, revisa permisos de almacenamiento o vuelve a generarlo.`,
       };
     }
 
