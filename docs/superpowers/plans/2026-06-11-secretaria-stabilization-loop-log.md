@@ -715,3 +715,31 @@ Restante del paquete legal (spec'ado en el documento, pendiente de implementar c
 Regla operativa del paquete: el documento autoriza cambios sustantivos (rule packs, severidades,
 gates) **bajo la firma legal ya dada**; "no editar versiones activas en caliente" → crear nuevas
 versiones de rule_pack. Migraciones Cloud con `db:check-target` + mirror + `db push` + verify.
+
+### Ola Cloud (commits 21aded4, 58a604e) — paquete legal, migraciones BOE
+
+- **ITEM-027 (migración 20260612120000):** postAcuerdo de 3 packs. APROBACION_CUENTAS añade
+  obligación de depósito (art. 279 LSC verbatim). CESE_CONSEJERO instrumento ESCRITURA →
+  CERTIFICACION (art. 142 RRM verbatim). AUMENTO_CAPITAL plazo 60→30 (1 mes) — **la cita "art. 19
+  RRM" del seed Y de la propuesta legal era ERRÓNEA** (art. 19 RRM = cambio de domicilio a otra
+  provincia, verificado BOE); corregida sin propagarla.
+- **ITEM-048 (migración 20260612140000):** la adopción sin sesión del consejo respeta la mayoría
+  reforzada 2/3 para delegación permanente (art. 249.3 LSC verbatim); resto mayoría ordinaria
+  (248.1); unanimidad SL ya cubierta. **Re-creación de la RPC SECURITY DEFINER de 275 líneas** con
+  un único cambio de rama (self-contained, usa agreement_kind ya existente). Verificada: db push OK,
+  función corre, e2e/50 (cierre no-session real poderes/consejo) 2/2.
+
+**Disciplina BOE validada 2×:** la verificación contra BOE atrapó citas erróneas en la PROPIA
+propuesta legal firmada (art. 19 RRM; y antes arts. 625/629 LSC inexistentes). Ni con firma legal
+se propaga una cita que el BOE contradice — se corrige.
+
+Restante Cloud/UI del paquete (alto impacto o contenido):
+- **ITEM-030 (datos centrales, ALTO IMPACTO):** composición real del CdA (categorías, VP×2,
+  coordinador, presidente-consejero, secretaria fuera de vocales). Toca el censo central del demo →
+  afecta quórum/voto-calidad/board-pack/muchos e2e. Requiere pasada cuidadosa con re-verificación
+  amplia de e2e.
+- **ITEM-091 (saneamiento de datos, destructivo):** archivar bodies QA + JGA duplicada + reapuntar
+  meetings. Cloud destructivo → cuidado.
+- **ITEM-031 (UI):** gates de transmisión SL (art. 106 LSC) en TransmisionStepper — contenido, patrón
+  de gate como ITEM-106.
+- **ITEM-082, 054-packs:** promoción/archivado de plantillas + creación de packs.
