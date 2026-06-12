@@ -13,6 +13,7 @@ import type {
   TipoSocial,
 } from './types';
 import { resolverReglaEfectiva } from './jerarquia-normativa';
+import { subMonths } from 'date-fns';
 
 /**
  * evaluarConvocatoria — Main entry point
@@ -111,16 +112,17 @@ export function evaluarConvocatoria(
   // LSC art. 246.2 para CdA). Sin este dispatch, un CdA recibía la
   // antelación de junta (30 días para SA) — bug operativo.
   // ================================================================
-  const antelacionDiasRequerida = calcularAntelacion(
+  const { dias: antelacionDiasRequerida, mensual: antelacionMensual } = calcularAntelacion(
     input.tipoSocial,
     input.organoTipo,
     packs,
     overrides
   );
-  const fechaLimitePublicacion = restarDias(
-    input.fechaJunta,
-    antelacionDiasRequerida
-  );
+  // ITEM-142: para la junta de SA con plazo legal "un mes" se computa la fecha
+  // límite de fecha a fecha (art. 5.1 CC); en el resto, restando los días.
+  const fechaLimitePublicacion = antelacionMensual
+    ? restarUnMes(input.fechaJunta)
+    : restarDias(input.fechaJunta, antelacionDiasRequerida);
 
   const organoTipoUpper = (input.organoTipo ?? 'JGA').toUpperCase();
   const isJunta = organoTipoUpper === 'JGA' || organoTipoUpper === 'JGE' || organoTipoUpper.includes('JUNTA');
@@ -135,9 +137,11 @@ export function evaluarConvocatoria(
       isJunta ? 'LEY' : 'REGLAMENTO',
       isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
       'OK',
-      isJunta
-        ? `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial} (junta)`
-        : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default reglamento del órgano; override por rule_pack)`,
+      antelacionMensual
+        ? `Un mes de antelación requerido para ${input.tipoSocial} (junta) — cómputo de fecha a fecha (art. 176.1 LSC, art. 5.1 CC); fecha límite de publicación ${fechaLimitePublicacion}`
+        : isJunta
+          ? `${antelacionDiasRequerida} días de antelación requeridos para ${input.tipoSocial} (junta)`
+          : `${antelacionDiasRequerida} días de antelación para ${organoTipoUpper} (default reglamento del órgano; override por rule_pack)`,
       antelacionDiasRequerida
     )
   );
@@ -352,7 +356,7 @@ function calcularAntelacion(
   organoTipo: string | undefined,
   packs: RulePack[],
   overrides: RuleParamOverride[]
-): number {
+): { dias: number; mensual: boolean } {
   // Defaults por órgano cuando no hay pack aplicable.
   const organoUpper = (organoTipo ?? 'JGA').toUpperCase();
   const isJunta = organoUpper === 'JGA' || organoUpper === 'JGE' || organoUpper.includes('JUNTA');
@@ -367,13 +371,21 @@ function calcularAntelacion(
     return 5;
   };
 
+  // ITEM-142: la junta de SA tiene plazo legal de "un mes" (LSC art. 176.1),
+  // que se computa de fecha a fecha (art. 5.1 CC), NO 30 días fijos. Solo se
+  // aplica el cómputo mensual cuando el plazo es el DEFAULT legal (ningún pack
+  // ni override fija un número de días explícito): si un rule_pack/estatutos
+  // declara un número concreto, ese valor es autoritativo (jerarquía normativa)
+  // y se respeta tal cual en días.
+  const esJuntaSA = isJunta && tipoSocial === 'SA';
+
   // Collect all rules from applicable packs
   const antelacionFromPacks = packs
     .map((pack) => pack.convocatoria.antelacionDias[tipoSocial])
     .filter((entry) => entry !== undefined && entry !== null);
 
   if (antelacionFromPacks.length === 0) {
-    return defaultForOrgano();
+    return { dias: defaultForOrgano(), mensual: esJuntaSA };
   }
 
   // Take the most restrictive (highest) value across all packs
@@ -400,8 +412,9 @@ function calcularAntelacion(
   );
   const resolved = resolverReglaEfectiva(maxAntelacion, antelacionOverrides, 'mayor');
 
-  if (typeof resolved.valor === 'number') return resolved.valor;
-  return defaultForOrgano();
+  // Valor numérico explícito de pack/estatutos/override: autoritativo en días.
+  if (typeof resolved.valor === 'number') return { dias: resolved.valor, mensual: false };
+  return { dias: defaultForOrgano(), mensual: esJuntaSA };
 }
 
 /**
@@ -471,12 +484,44 @@ function calcularContenido(
 }
 
 /**
- * restarDias — subtract days from ISO date string
+ * parseDateOnly — toma solo la parte de fecha de un ISO y la construye en hora
+ * local al mediodía. ITEM-142: evita el drift de zona horaria del antiguo
+ * `new Date(iso)` + `toISOString()` (que en horas tempranas podía desplazar el
+ * cómputo un día). Mediodía local nunca cruza la frontera de día al formatear.
+ */
+function parseDateOnly(iso: string): Date {
+  const datePart = (iso ?? '').split('T')[0];
+  const [y, m, d] = datePart.split('-').map(Number);
+  return new Date(y || 1970, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+}
+
+/**
+ * toDateOnly — formatea una fecha local como YYYY-MM-DD sin tocar UTC.
+ */
+function toDateOnly(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * restarDias — subtract days from ISO date string (date-only, tz-safe)
  */
 function restarDias(fechaJunta: string, dias: number): string {
-  const date = new Date(fechaJunta);
+  const date = parseDateOnly(fechaJunta);
   date.setDate(date.getDate() - dias);
-  return date.toISOString().split('T')[0];
+  return toDateOnly(date);
+}
+
+/**
+ * restarUnMes — fecha límite de publicación cuando el plazo legal es "un mes"
+ * (LSC art. 176.1 para juntas de SA). ITEM-142: cómputo civil de fecha a fecha
+ * (art. 5.1 CC), no 30 días fijos — p. ej. junta el 9-ago → límite 9-jul, no
+ * 10-jul. date-fns `subMonths` ya clampa meses cortos (31-mar → 28/29-feb).
+ */
+function restarUnMes(fechaJunta: string): string {
+  return toDateOnly(subMonths(parseDateOnly(fechaJunta), 1));
 }
 
 /**

@@ -765,6 +765,12 @@ export default function ConvocatoriasStepper() {
 
   const lugarRequired = formatoReunion !== "TELEMATICA";
 
+  // ITEM-142: el fallback (sin fecha aún) alimenta SOLO el preview
+  // date-independiente del Paso 2 (antelación requerida, canales y documentos
+  // obligatorios, que no dependen de la fecha). Los indicadores date-dependientes
+  // (convergencia V1/V2, "plazo cumplido/no cumplido") están gateados por
+  // `fechaReunion` para no emitir veredictos sobre esta fecha ficticia. El paso 2
+  // exige fecha real para avanzar (canMoveNext case 2).
   const meetingIso = fechaReunion
     ? new Date(`${fechaReunion}T${horaReunion}:00`).toISOString()
     : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
@@ -2744,7 +2750,16 @@ export default function ConvocatoriasStepper() {
                       <MiniFact label="Overrides" value={String(agendaApplicableOverrides.length)} />
                       <MiniFact
                         label="Doble eval."
-                        value={noticeDoubleEvaluation.converged ? "Convergente" : "Divergente"}
+                        // ITEM-142: la convergencia V1/V2 depende de la fecha de
+                        // la reunión; sin fecha elegida no se muestra un veredicto
+                        // (evita señal sobre la fecha ficticia de fallback).
+                        value={
+                          fechaReunion
+                            ? noticeDoubleEvaluation.converged
+                              ? "Convergente"
+                              : "Divergente"
+                            : "—"
+                        }
                       />
                     </div>
                   ) : (
@@ -2773,7 +2788,7 @@ export default function ConvocatoriasStepper() {
                       Recordatorio: alguna regla aplicable no está lista para producción o su payload no es compatible con el motor de convocatoria.
                     </p>
                   )}
-                  {!noticeDoubleEvaluation.converged && (
+                  {fechaReunion && !noticeDoubleEvaluation.converged && (
                     <p className="mt-2 text-xs text-[var(--status-warning)]">
                       Doble evaluación V1/V2 divergente. Se conserva el criterio operativo V1 como recordatorio y se registra la divergencia para revisión.
                     </p>

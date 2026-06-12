@@ -1133,7 +1133,7 @@
 | ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | HECHO (UI) |
 | ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |
 | ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |
-| ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | PENDIENTE |
+| ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | ✅ HECHO (loop+BOE) |
 | ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | HECHO (UI) |
 | ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | PENDIENTE |
 | ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | PENDIENTE |

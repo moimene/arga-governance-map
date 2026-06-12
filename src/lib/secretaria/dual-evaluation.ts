@@ -1,4 +1,5 @@
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import { differenceInCalendarDays } from "date-fns";
 
 export type DualEvaluationStage = "CONVOCATORIA_NOTICE" | "MEETING_ADOPTION";
 export type DualEvaluationSource = "V1_LEGACY" | "V2_CLOUD";
@@ -39,10 +40,23 @@ export interface ConvocatoriaNoticeDualInput {
   v2Warnings?: string[];
 }
 
+// ITEM-142: cómputo en días de calendario (no Math.floor sobre milisegundos,
+// que mezclaba proyección local/UTC y producía off-by-one en horas tempranas).
+// La parte de fecha se parsea al mediodía local para que un ISO date-only no
+// cruce la frontera de día al convertirse.
+function parseDateOnlyLocal(value: string | Date): Date {
+  if (value instanceof Date) return value;
+  const datePart = (value ?? "").split("T")[0];
+  const [y, m, d] = datePart.split("-").map(Number);
+  if (y && m && d) return new Date(y, m - 1, d, 12, 0, 0, 0);
+  return new Date(value);
+}
+
 function daysUntil(meetingDate: string, now: string | Date = new Date()) {
-  const base = now instanceof Date ? now : new Date(now);
-  const meeting = new Date(meetingDate);
-  return Math.floor((meeting.getTime() - base.getTime()) / (1000 * 60 * 60 * 24));
+  return differenceInCalendarDays(
+    parseDateOnlyLocal(meetingDate),
+    parseDateOnlyLocal(now),
+  );
 }
 
 export function buildDualEvaluationComparison(input: {

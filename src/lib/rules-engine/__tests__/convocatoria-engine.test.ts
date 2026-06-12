@@ -498,6 +498,35 @@ describe('evaluarConvocatoria', () => {
   });
 
   // ================================================================
+  // Test 12b (ITEM-142): junta SA con plazo legal por defecto = "un mes"
+  // computado de fecha a fecha (art. 176.1 LSC, art. 5.1 CC), NO 30 días.
+  // ================================================================
+  it('ITEM-142: junta SA sin pack usa "un mes" (fecha a fecha), no 30 días', () => {
+    // Sin packs → ruta default legal. Agosto se alcanza desde un mes con 31
+    // días (julio), donde "un mes antes" (9-jul) ≠ "30 días antes" (10-jul).
+    const result = evaluarConvocatoria(
+      {
+        ...defaultInput,
+        tipoSocial: 'SA',
+        organoTipo: 'JUNTA_GENERAL',
+        fechaJunta: '2026-08-09',
+      },
+      [], // sin rule packs → plazo legal por defecto
+      []
+    );
+
+    // Cómputo correcto fecha-a-fecha: 9-ago → 9-jul.
+    expect(result.fechaLimitePublicacion).toBe('2026-07-09');
+    // NO el cómputo aproximado de 30 días (que daría 10-jul).
+    expect(result.fechaLimitePublicacion).not.toBe('2026-07-10');
+    // El día mostrado se mantiene como aproximación (30) para display.
+    expect(result.antelacionDiasRequerida).toBe(30);
+    // El explain refleja el cómputo mensual legal.
+    const antelacionNode = result.explain.find((n) => n.regla === 'Antelación requerida');
+    expect(antelacionNode?.mensaje).toContain('Un mes');
+  });
+
+  // ================================================================
   // Test 13: Pack sin documentos obligatorios — array vacío
   // ================================================================
   it('Pack sin documentos obligatorios: array vacío', () => {
