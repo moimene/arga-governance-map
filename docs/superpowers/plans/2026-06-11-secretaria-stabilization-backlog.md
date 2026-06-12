@@ -40,7 +40,7 @@
 | ITEM-011 | A10 | ✅ | Explain nodes citan artículos inexistentes de la LSC (arts. 625 y 629) como base legal de los acuerdos sin sesión | HECHO (loop) |
 | ITEM-012 | A10 | ✅ | Quórum del 50% inventado para juntas SL en 10 packs activos, citando artículos de derecho de información | HECHO (loop) |
 | ITEM-013 | A10 | ✅ | Materias duplicadas contradictorias: MOD_ESTATUTOS (fórmula 201.2 correcta) vs MODIFICACION_ESTATUTOS (2/3 emitidos plano) — el flujo vivo usa la incorrecta | HECHO (loop) |
-| ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | BLOQUEADO-LEGAL |
+| ITEM-014 | A10 | ✅ | Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA | HECHO (motor/cloud) |
 | ITEM-015 | A10 | ✅ | fn_generar_certificacion incumple el art. 109 RRM: Vº Bº exigido solo a SA, persona del Vº Bº sin validar y actas no firmadas certificables (109.4) | HECHO (loop) |
 | ITEM-016 | A10 | ✅ | primeraConvocatoria hardcodeada a true: las juntas en segunda convocatoria se evalúan con el quórum de la primera | HECHO |
 | ITEM-017 | A10 | ✅ | El voto de calidad se aplica automáticamente a cualquier empate sin verificar el sentido del voto del presidente, y puede 'satisfacer' mayorías reforzadas | HECHO (loop) |
@@ -173,7 +173,7 @@
 
 ### ITEM-014 [P1] Packs SL con mayorías sobre-restrictivas que contradicen su propia cita: TRANSMISION_PARTICIPACIONES (107.2.b), NOMBRAMIENTO y AUTORIZACION_GARANTIA
 
-- **Área:** A10 · **Estado:** BLOQUEADO-LEGAL · **REQUIERE LEGAL**
+- **Área:** A10 · **Estado:** HECHO (Ola MOTOR/Cloud; TRANSMISION_PARTICIPACIONES SL → mayoría ordinaria art. 198, verificado BOE art. 107.2.b; migración 20260612100000 aplicada)· **REQUIERE LEGAL**
 - **Descripción:** (a) TRANSMISION_PARTICIPACIONES SL: art. 107.2.b LSC (BOE literal) dice que el consentimiento de la sociedad a la transmisión se acuerda «por la mayoría ordinaria establecida por la ley» (=art. 198); el pack exige 'favor > 1/2_capital_total_con_voto' citando art. 199.a, tratando la transmisión como si fuera modificación estatutaria. (b) NOMBRAMIENTO SL y AUTORIZACION_GARANTIA SL: citan «art. 198 LSC» pero codifican 'favor > mitad_capital_con_voto' (que el evaluador canoniza a >1/2 del capital TOTAL) — el art. 198 es mayoría de emitidos con suelo de 1/3, no mayoría absoluta del capital. En los tres casos: falsos negativos (la junta SL no puede adoptar acuerdos que la ley sí permite) y discordancia fórmula/cita que invalida la trazabilidad jurídica del explain. Nota: como fuente declaran LEY, no ESTATUTOS, por lo que no puede defenderse como refuerzo estatutario ex art. 200.
 - **Evidencia:** Payloads Cloud activos: TRANSMISION_PARTICIPACIONES SL {formula:'favor > 1/2_capital_total_con_voto', referencia:'art. 199.a LSC'}; NOMBRAMIENTO SL {formula:'favor > mitad_capital_con_voto', referencia:'art. 198 LSC'}; AUTORIZACION_GARANTIA SL ídem. BOE bloques a107 (mayoría ordinaria), a198 y a199 verificados. Canonización: src/lib/rules-engine/majority-evaluator.ts:137 ('favor > mitad_capital_con_voto' → 'favor > 1/2_capital_total_con_voto').
 - **Archivos:** src/lib/rules-engine/majority-evaluator.ts
