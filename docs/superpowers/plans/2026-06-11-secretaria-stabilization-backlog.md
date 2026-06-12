@@ -573,7 +573,7 @@
 | ITEM-090 | A4 | — | Divergencia estructural prospectiva mandates ↔ condiciones_persona: las RPCs de cargos no escriben mandates y no hay trigger de sync, pero Calendario/Dashboard/Conflicts leen mandates | PENDIENTE |
 | ITEM-091 | A4 | — | Polución de datos QA en la entidad canónica: 19 órganos '[E2E REAL] Consejo QA...' y Junta General de Accionistas duplicada con meetings repartidos | PENDIENTE |
 | ITEM-092 | A4 | — | AnadirSocioStepper permite sobre-asignar capital (>100%) y expone errores de constraint Postgres sin traducir | PENDIENTE |
-| ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | PENDIENTE |
+| ITEM-093 | A5 | ✅ | El panel 'Evaluación Reglas — Motor LSC v2' del Paso 2 siempre muestra OK: el engine nunca puebla blocking_issues/warnings y el aviso de plazo incumplido es código muerto | ✅ HECHO (loop) |
 | ITEM-094 | A5 | — | Adjuntos de convocatoria renderizan enlaces muertos evidence-bundle:// en ConvocatoriaDetalle | PENDIENTE |
 | ITEM-095 | A5 | — | ERDS para convocatoria: solo sugerencia de canal, sin despacho real ni estados; la pantalla de éxito promete notificaciones que no se envían | HECHO (legal) |
 | ITEM-096 | A5 | — | Filtro de estados de ConvocatoriasList no incluye EMITIDA, el estado que crea el stepper (11/52 filas en Cloud) | HECHO (Ola2) |

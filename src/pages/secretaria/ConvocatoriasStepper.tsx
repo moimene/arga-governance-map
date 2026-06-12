@@ -2733,14 +2733,31 @@ export default function ConvocatoriasStepper() {
                         </p>
                       )}
                     </div>
-                    <span
-                      className={`inline-flex h-6 items-center px-2.5 text-[11px] font-semibold text-[var(--g-text-inverse)] ${
-                        evaluacionV2.ok ? "bg-[var(--status-success)]" : "bg-[var(--status-error)]"
-                      }`}
-                      style={{ borderRadius: "var(--g-radius-full)" }}
-                    >
-                      {evaluacionV2.ok ? "OK" : "Revisar"}
-                    </span>
+                    {/* ITEM-093: el badge reflejaba evaluacionV2.ok, que es
+                        vacuamente true (el motor V2 computa requisitos pero no
+                        recibe fecha de emisión, así que nunca puebla
+                        blocking_issues por plazo). El señal real de cumplimiento
+                        de plazo es noticeOk (= noticeDoubleEvaluation.effective_ok,
+                        que sí factoriza la fecha vía doble eval V1/V2). Sin fecha
+                        elegida se muestra estado neutro; el incumplimiento es un
+                        recordatorio no bloqueante (DL-2) → tono warning. */}
+                    {!fechaReunion ? (
+                      <span
+                        className="inline-flex h-6 items-center px-2.5 text-[11px] font-semibold bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                        style={{ borderRadius: "var(--g-radius-full)" }}
+                      >
+                        Pendiente fecha
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex h-6 items-center px-2.5 text-[11px] font-semibold text-[var(--g-text-inverse)] ${
+                          noticeOk ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"
+                        }`}
+                        style={{ borderRadius: "var(--g-radius-full)" }}
+                      >
+                        {noticeOk ? "OK" : "Revisar plazo"}
+                      </span>
+                    )}
                   </div>
 
                   {ruleResolutions.length > 0 ? (
@@ -2778,9 +2795,14 @@ export default function ConvocatoriasStepper() {
                     </p>
                   )}
 
-                  {!evaluacionV2.ok && fechaReunion && (
-                    <p className="mt-2 text-xs text-[var(--status-error)]">
-                      El plazo mínimo no está cumplido. Ajusta la fecha de la reunión.
+                  {/* ITEM-093: antes gateado por !evaluacionV2.ok (rama muerta,
+                      ok siempre true). Ahora usa noticeOk (cumplimiento real de
+                      plazo según doble eval V1/V2). Este bloque ya está dentro de
+                      tipoConvocatoria !== "UNIVERSAL". Recordatorio no bloqueante
+                      (DL-2) → warning. */}
+                  {!noticeOk && fechaReunion && (
+                    <p className="mt-2 text-xs text-[var(--status-warning)]">
+                      El plazo mínimo de antelación no parece cumplido para la fecha elegida. Es un recordatorio (no bloquea la emisión); ajusta la fecha de la reunión si procede.
                     </p>
                   )}
                   {ruleAlertActive && (
