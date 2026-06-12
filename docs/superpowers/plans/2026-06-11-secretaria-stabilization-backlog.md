@@ -595,7 +595,7 @@
 | ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | PENDIENTE |
 | ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | PENDIENTE |
 | ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |
-| ITEM-115 | A9 | — | no_session_resolutions admite UPDATE directo por cualquier usuario del tenant (contadores y status manipulables); las respuestas WORM sí están protegidas | PENDIENTE |
+| ITEM-115 | A9 | — | no_session_resolutions admite UPDATE directo por cualquier usuario del tenant (contadores y status manipulables); las respuestas WORM sí están protegidas | ✅ HECHO (loop+cloud) |
 
 ### ITEM-054 [P2] 14 materias del catálogo canónico sin rule pack ACTIVO y NOMBRAMIENTO_CESE retirado con expediente vivo
 
