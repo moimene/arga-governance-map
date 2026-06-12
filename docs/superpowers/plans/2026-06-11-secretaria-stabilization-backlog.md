@@ -71,7 +71,7 @@
 | ITEM-042 | A7 | ✅ | Certificar acuerdos desde acta no transiciona el agreement a CERTIFIED (asimetría con la vía sin sesión): el expediente sigue mostrando 'Adoptado' con certificación firmada | HECHO |
 | ITEM-043 | A7 | ✅ | authority_evidence con duplicados VIGENTE de PRESIDENTE/SECRETARIO en CdA y 9 comisiones — el dual check RM del botón de certificación es no determinista (peor que lo documentado como resuelto) | HECHO |
 | ITEM-044 | A8 | ✅ | Bundles del archivador sin source_object_* — el enlace 'documento archivado' del expediente nunca resuelve URL firmada | HECHO |
-| ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | BLOQUEADO-HUMANO (escritor alineado forward-only; re-anclaje de génesis pendiente de decisión) |
+| ITEM-045 | A8 | ✅ | fn_verify_audit_chain devuelve chain_valid=false en Cloud — la cadena WORM no verifica | ✅ HECHO (re-anclaje cadena WORM; chain_valid=true) |
 | ITEM-046 | A8 | ✅ | Verificador offline siempre reporta '✗ Error de integridad' para documentos legítimos — mismatch SHA-256 vs DJB2 | HECHO |
 | ITEM-047 | A9 | ✅ | Art. 248.2 LSC no operativo: la oposición al procedimiento escrito (OBJECION_PROCEDIMIENTO) es inalcanzable en UI y el servidor la degrada a voto en contra | HECHO |
 | ITEM-048 | A9 | ✅ | Regla de adopción sin sesión server-side: pluralidad por cabezas que ignora matter_class y capital; el auto-cierre por vencimiento rechaza en bloque incluso con mayoría a favor (evidencia Cloud) | HECHO (legal/cloud) |
@@ -591,7 +591,7 @@
 | ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | ✅ HECHO (loop) |
 | ITEM-109 | A8 | — | Trust boundary sandbox: el manifest de archivado etiqueta un buffer sandbox sin firmar como QTSP_SIGNED_DOCX de 'EAD Trust' sin marcador sandbox | ✅ HECHO (loop) |
 | ITEM-110 | A8 | — | Enlace 'Descargar desde Storage' apunta al sentinel no navegable evidence-bundle:// | ✅ HECHO (loop) |
-| ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | ⏸ DIFERIDO (gateado por fix cadena WORM — montar verificación rota sería peor) |
+| ITEM-111 | A8 | — | EvidenceForenseSection (UI de verificación de cadena WORM) está huérfana — ninguna ruta la monta | 🟡 DESBLOQUEADO (cadena WORM válida tras ITEM-045; falta montar EvidenceForenseSection en ruta de auditoría) |
 | ITEM-112 | A8 | — | DL-4 (selección de plantilla por tipo social SA/SL) no participa en el filtro de compatibilidad del stepper de documentos | ✅ HECHO (decisión producto documentada) |
 | ITEM-113 | A9 | ✅ | Pactos parasociales nunca disparan en ningún flujo operativo: vocabularios de materias disjuntos y flujos D/E/sin-sesión/unipersonal sin evaluación de pactos | ✅ HECHO (Garrigues OK; workflow ultracode) |
 | ITEM-114 | A9 | — | Auto-cierre de votaciones vencidas sin scheduling: depende de un botón manual y no existe job pg_cron | HECHO (motor) |
