@@ -181,9 +181,18 @@ function useTriCapaDiagnostics(
       })),
     ];
     const issues = [...gate.issues, ...localIssues];
+    const blockingIssues = issues.filter((issue) => issue.severity === "BLOCKING");
     return {
       issues,
-      blocking: issues.filter((issue) => issue.severity === "BLOCKING").length,
+      blocking: blockingIssues.length,
+      // ITEM-137: el guardado de CONTENIDO (capas 1-3) no debe bloquearse por
+      // problemas de METADATOS (META_*: version/referencia_legal/organo_tipo), que
+      // el editor tri-capa ni siquiera permite editar — eso convertía en dead-end
+      // cualquier borrador con metadata inválida. Los META_* siguen visibles como
+      // avisos y bloquean en la transición a ACTIVA (donde corresponde, vía el
+      // Gate PRE completo). El guardado solo se bloquea por problemas de las propias
+      // capas editables.
+      blockingForSave: blockingIssues.filter((issue) => !issue.code.startsWith("META_")).length,
       warning: issues.filter((issue) => issue.severity === "WARNING").length,
       info: issues.filter((issue) => issue.severity === "INFO").length,
     };
@@ -289,7 +298,8 @@ export function TriCapaEditor({
   };
 
   const save = async () => {
-    if (!canEdit || dirtyLayers.length === 0 || diagnostics.blocking > 0) return;
+    // ITEM-137: bloquear solo por problemas de las capas editables, no por META_*.
+    if (!canEdit || dirtyLayers.length === 0 || diagnostics.blockingForSave > 0) return;
     try {
       await updateContenido.mutateAsync({
         id: plantilla.id,
@@ -338,7 +348,7 @@ export function TriCapaEditor({
           <button
             type="button"
             onClick={save}
-            disabled={!canEdit || dirtyLayers.length === 0 || diagnostics.blocking > 0 || updateContenido.isPending}
+            disabled={!canEdit || dirtyLayers.length === 0 || diagnostics.blockingForSave > 0 || updateContenido.isPending}
             className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
             aria-busy={updateContenido.isPending}
