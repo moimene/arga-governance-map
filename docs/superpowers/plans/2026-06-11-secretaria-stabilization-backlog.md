@@ -1124,7 +1124,7 @@
 | ITEM-130 | A13 | — | Specs e2e navegan el sidebar por texto en vez de [data-sidebar-item] | ✅ HECHO (loop+codex) |
 | ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | ✅ HECHO (loop) |
-| ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | PENDIENTE |
+| ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | 🟡 PARCIAL (datos: materia canónica NOMBRAMIENTO_CONSEJERO corregida; filtro organo en hook pendiente) |
 | ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
