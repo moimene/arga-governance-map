@@ -141,14 +141,20 @@ function buildArtifactsFromData(
     ) {
       const explainData = evaluation.explain;
 
-      // Check for signature ref in explain data
+      // Check for signature ref in explain data.
+      // Codex (rev. ITEM-107): NO sintetizar hashes. Antes, si faltaba
+      // signature_hash se fabricaba `eval-${id}`, lo que hacía pasar el check de
+      // integridad sobre un valor inventado (confianza fabricada). Ahora se
+      // toma el signature_hash real; si no existe, se incluye con hash vacío
+      // para que verificarIntegridad lo marque como FALLIDO (fail-closed) en
+      // vez de ocultarlo o falsearlo.
       if ("signature_ref" in explainData && typeof explainData.signature_ref === "string") {
         artifacts.push({
           type: "QES",
           ref: `evaluation-${evaluation.id}-signature`,
           hash: typeof explainData.signature_hash === "string"
             ? explainData.signature_hash
-            : `eval-${evaluation.id}`,
+            : "",
           signer_id: typeof explainData.signer_id === "string"
             ? explainData.signer_id
             : undefined,

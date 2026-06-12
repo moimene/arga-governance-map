@@ -86,6 +86,59 @@ describe("verificarIntegridad", () => {
       expect(hashChecks.length).toBeGreaterThan(0);
       expect(hashChecks[0].passed).toBe(true);
     });
+
+    // Codex (rev. ITEM-107): fail-closed ante deriva de forma. Un hash con
+    // forma de URI (sentinel evidence-bundle://) o un fragmento demasiado corto
+    // NO deben pasar como verificados.
+    it("should FAIL HASH check when hash is a URI sentinel (not a digest)", () => {
+      const artifacts = [
+        {
+          type: "HASH" as const,
+          ref: "doc-001",
+          hash: "evidence-bundle://tenant/doc.docx",
+          timestamp: "2026-04-19T10:30:00Z",
+        },
+      ];
+
+      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+
+      expect(result.ok).toBe(false);
+      const hashChecks = result.checks.filter((c) => c.type === "HASH");
+      expect(hashChecks[0].passed).toBe(false);
+      expect(hashChecks[0].detail.toLowerCase()).toContain("formato inválido");
+    });
+
+    it("should FAIL HASH check when hash is too short to be a digest", () => {
+      const artifacts = [
+        {
+          type: "HASH" as const,
+          ref: "doc-002",
+          hash: "abc",
+          timestamp: "2026-04-19T10:30:00Z",
+        },
+      ];
+
+      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+
+      expect(result.ok).toBe(false);
+      expect(result.checks.find((c) => c.type === "HASH")?.passed).toBe(false);
+    });
+
+    it("should pass HASH check for a real SHA-512 hex digest", () => {
+      const artifacts = [
+        {
+          type: "HASH" as const,
+          ref: "doc-003",
+          hash: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+          timestamp: "2026-04-19T10:30:00Z",
+        },
+      ];
+
+      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+
+      const hashCheck = result.checks.find((c) => c.type === "HASH");
+      expect(hashCheck?.passed).toBe(true);
+    });
   });
 
   describe("QES signature verification", () => {

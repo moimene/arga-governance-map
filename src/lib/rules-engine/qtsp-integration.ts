@@ -635,6 +635,17 @@ export interface VerifiableArtifact {
   timestamp?: string;
 }
 
+// Codex (rev. ITEM-107): el Trust Center debe fallar cerrado ante deriva de
+// forma. Un digest plausible es hex/base64/base64url de longitud razonable
+// (≥8); esto rechaza cadenas vacías, URIs ("evidence-bundle://…" tiene ":") y
+// fragmentos demasiado cortos, que antes pasaban el check por ser meramente
+// no-vacías. La defensa primaria contra hashes fabricados es no sintetizarlos
+// en buildArtifactsFromData (un signature_hash ausente entra como "" → falla).
+const DIGEST_PATTERN = /^[A-Za-z0-9+/=_-]{8,}$/;
+function esDigestValido(hash: string | undefined | null): boolean {
+  return typeof hash === 'string' && DIGEST_PATTERN.test(hash.trim());
+}
+
 /**
  * Verify integrity of artifacts signed by QTSP.
  * Performs comprehensive checks on QES signatures, seals, timestamps, and identity.
@@ -704,13 +715,16 @@ export function verificarIntegridad(
   // Check each artifact
   for (const artifact of artifacts) {
     // Check 1: HASH integrity
+    const hashValido = esDigestValido(artifact.hash);
     const hashCheck: IntegrityCheckDetail = {
       type: 'HASH',
       label: `Hash ${artifact.type} (${artifact.ref})`,
-      passed: artifact.hash && artifact.hash.trim().length > 0,
-      detail: artifact.hash && artifact.hash.trim().length > 0
+      passed: hashValido,
+      detail: hashValido
         ? `Hash válido: ${artifact.hash.substring(0, 16)}...`
-        : 'Hash no disponible o vacío',
+        : artifact.hash && artifact.hash.trim().length > 0
+          ? 'Hash con formato inválido (no es un digest reconocible)'
+          : 'Hash no disponible o vacío',
       timestamp: artifact.timestamp,
     };
     checks.push(hashCheck);
@@ -725,7 +739,7 @@ export function verificarIntegridad(
         )
       );
     } else {
-      errors.push(`Hash faltante para artefacto ${artifact.ref}`);
+      errors.push(`Hash inválido o faltante para artefacto ${artifact.ref}`);
       explain.push(
         crearExplainNode(
           'VALIDACION_HASH_ARTEFACTO',
