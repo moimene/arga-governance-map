@@ -8,6 +8,7 @@ import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useTenantContext } from "@/context/TenantContext";
 import { isMissingSupabaseRpcError } from "@/lib/secretaria/supabase-rpc-fallback";
+import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
 
 interface Draft {
   source_holding_id: string;
@@ -26,6 +27,12 @@ export default function TransmisionStepper() {
   const { tenantId } = useTenantContext();
 
   const { data: sociedad } = useSociedad(entityId);
+  // ITEM-031 (Comité Legal + Garrigues): el régimen de transmisión depende del
+  // tipo social. SL/SLU: la transmisión voluntaria está sometida al régimen de
+  // consentimiento (art. 106-107 LSC) salvo cláusula estatutaria de libre
+  // transmisión; SA/SAU: puede haber restricciones estatutarias a advertir.
+  const tipoSocial = deriveTipoSocial(sociedad as { tipo_social?: string | null; legal_form?: string | null } | null | undefined);
+  const esSL = tipoSocial === "SL" || tipoSocial === "SLU";
   const { data: holdings } = useCapitalHoldings(entityId);
   const { data: personas } = usePersonasCanonical({});
 
@@ -281,6 +288,29 @@ export default function TransmisionStepper() {
               documental de la sociedad. Use una URL de expediente, referencia `evidence://...`,
               hash documental o código interno del adjunto.
             </div>
+            {/* ITEM-031: guía de régimen de transmisión por tipo social. */}
+            {esSL ? (
+              <div
+                className="rounded-md border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+                role="note"
+              >
+                <span className="font-medium">Sociedad limitada — régimen de consentimiento (arts. 106-107 LSC).</span>{" "}
+                Salvo cláusula estatutaria de libre transmisión, la transmisión voluntaria inter vivos
+                de participaciones está sometida al consentimiento de la sociedad (acuerdo de la Junta
+                General). El documento soporte debe ser el acuerdo de junta, la cláusula estatutaria
+                aplicable o el checklist documental que acredite el régimen cumplido.
+              </div>
+            ) : (
+              <div
+                className="rounded-md border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-secondary)]"
+                role="note"
+              >
+                <span className="font-medium text-[var(--g-text-primary)]">Sociedad anónima.</span>{" "}
+                Las acciones son libremente transmisibles salvo restricciones estatutarias (art. 123
+                LSC). Verifique cláusulas de adquisición preferente, autorización o limitaciones antes
+                de cerrar y consérvelas en el soporte.
+              </div>
+            )}
             <Input
               label="Documento soporte *"
               value={draft.support_doc_ref}
