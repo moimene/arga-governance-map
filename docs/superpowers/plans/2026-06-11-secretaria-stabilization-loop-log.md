@@ -628,9 +628,32 @@ serie), cada ola implementar→gates→adversarial→commit. Pendientes:
 | Grupo | Hechos | Remanente | Notas |
 |---|---|---|---|
 | MOTOR | 050, 019 (+ DOC 055/118) | ~16 (014,056,057,063,064,079,090,093,108,112,113,114,123,133,141,142,145) | legales/BOE+Codex por ítem |
-| UI/HOOK/TYPING/TEST/OTHER | 096,147,070,098 (+DOC) | ~50 | mayoría S/M bajo riesgo; lotes por archivo |
+| UI/HOOK/TYPING/TEST/OTHER | 096,147,070,098,100,139,143,150,083,086,135 | ~42 | safe pool casi agotada; resto e2e-coupled/state-vars |
 | Cloud (SEED/MIGRATION) | — | 6 (071,073,081,085,134,149) + 091/048 | serie con `db:check-target` |
 | NEEDS_HUMAN | 10 documentados | 0 (esperan decisión) | doc de decisiones creado |
 
-**Todos los P1 cerrados.** Próximo al reanudar: continuar Ola MOTOR (BOE+Codex por ítem),
-Ola UI por lotes de archivo, y Ola Cloud con guardrail `db:check-target`.
+**Todos los P1 cerrados.**
+
+### Olas UI/typing ejecutadas (commits b53eedf, e06cd39, 6830268, 5c85876)
+
+- **ITEM-100:** `isOperationalSecretariaBody` excluye órganos QA phase-b.
+- **ITEM-139/143:** `aprobada_por`/`accepted_by` = email del usuario real (`useCurrentUser`).
+- **ITEM-150:** eliminado `useNoSessionExpediente.ts` (480 líneas, 0 consumidores).
+- **ITEM-083:** gate-pre-semantic acepta `lista_actos_ratificados`.
+- **ITEM-086:** `countOrphanTemplates` excluye ARCHIVADA.
+- **ITEM-135:** tipo `plazoInscripcion` ensanchado a `number | {dias,...}`; destapó y corrigió
+  un render latente en TramitadorStepper (`[object Object]`).
+
+### Nota de cadencia (importante para reanudar)
+
+La reserva de quick-wins genuinamente seguros está casi agotada. El remanente exige trabajo
+cuidadoso por ítem, NO batcheable a ciegas, por estos acoplamientos detectados:
+- **e2e-coupled:** p.ej. ITEM-074 (copy 'resolución'→'acuerdo') rompería el selector del botón
+  en specs 18/40/49/51 — cualquier cambio de copy de botones debe actualizar sus specs.
+- **state-vars/hooks:** ITEM-062/069/076/077 necesitan ids/linkedAgreement no triviales.
+- **MOTOR legal:** 014/056/057/... exigen verificación BOE + Codex por ítem (como 050/019).
+- **Cloud:** SEED/MIGRATION en serie con `db:check-target` y verificación post-migración.
+- **NEEDS_HUMAN:** documentados; esperan decisión de producto/legal.
+
+Próximo al reanudar: Ola MOTOR ítem a ítem (BOE+Codex), luego Ola Cloud (guardrail
+`db:check-target`), luego UI e2e-coupled actualizando specs en el mismo commit.
