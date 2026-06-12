@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
-import { Gavel, Check, ChevronLeft } from "lucide-react";
+import { Gavel, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WizardInput as Input, WizardField as Field } from "./_shared/WizardFields";
+import { StepPills } from "./_shared/StepNav";
 import { useSociedad, useSociedades } from "@/hooks/useSociedades";
 import { usePersonasCanonical, usePersonaCanonical, type PersonaRow } from "@/hooks/usePersonasCanonical";
 import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
@@ -408,28 +409,7 @@ export default function DesignarAdminStepper() {
         </h1>
       </div>
 
-      <ol className="mb-6 flex items-center gap-2 text-xs">
-        {STEPS.map((label, i) => {
-          const active = i === step;
-          const done = i < step;
-          return (
-            <li
-              key={label}
-              className={`flex items-center gap-2 rounded-full px-3 py-1 ${
-                active
-                  ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                  : done
-                    ? "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
-                    : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-              }`}
-            >
-              <span>
-                {done ? <Check className="inline h-3 w-3" /> : i + 1}. {label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <StepPills steps={STEPS.map((label, i) => ({ n: i, label }))} current={step} />{/* ITEM-125 */}
 
       <div
         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
