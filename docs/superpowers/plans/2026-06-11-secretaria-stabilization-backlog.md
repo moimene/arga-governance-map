@@ -1135,8 +1135,8 @@
 | ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |
 | ITEM-142 | A5 | — | 'Un mes' del art. 176 LSC aproximado a 30 días y cómputo de plazos con Math.floor sobre timestamps con mezcla local/UTC | ✅ HECHO (loop+BOE) |
 | ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | HECHO (UI) |
-| ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | PENDIENTE |
-| ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | PENDIENTE |
+| ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | ✅ HECHO (ya resuelto ITEM-009/019) |
+| ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | ✅ HECHO (loop) |
 | ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
 | ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | HECHO (Ola2) |
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |

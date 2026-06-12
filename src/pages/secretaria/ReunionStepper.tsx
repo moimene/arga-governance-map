@@ -1236,6 +1236,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
 // ── Paso 3: Quórum ───────────────────────────────────────────────────────────
 
 function QuorumStep({ meetingId }: { meetingId?: string }) {
+  const { tenantId } = useTenantContext(); // ITEM-145: scoping del SELECT fresco de quorum_data
   const { data: meeting, isLoading: meetingLoading } = useReunionById(meetingId);
   const bodyId = (meeting as { body_id?: string } | null)?.body_id;
   const existingQuorum = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
@@ -1434,7 +1435,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       }
     | undefined;
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (isUniversalMeeting && !quorumReached) {
       toast.error(
         `${universalMeetingLabel(organoTipo)} requiere ${universalMeetingRequirementLabel(organoTipo)}. Concurrencia actual: ${formatPercent(pct)}%.`
@@ -1442,10 +1443,31 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
       return;
     }
 
+    // ITEM-145: re-leer quorum_data fresco de BD antes de construir el merge.
+    // Antes se partía de la copia en caché de TanStack Query (existingQuorum) y
+    // se sobreescribía el objeto entero, lo que podía pisar claves escritas por
+    // otros pasos (debates, point_snapshots) si la caché estaba desfasada. Mismo
+    // patrón que DebatesStep.
+    let latestQuorum: Record<string, unknown> | null = existingQuorum ?? null;
+    if (meetingId && tenantId) {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("quorum_data")
+        .eq("id", meetingId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      latestQuorum =
+        (data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? latestQuorum;
+    }
+
     const baseQuorumData: Record<string, unknown> = {
-      ...(existingQuorum ?? {}),
-      is_universal: isUniversalMeeting || existingQuorum?.is_universal === true,
-      junta_universal: isUniversalMeeting || existingQuorum?.junta_universal === true,
+      ...(latestQuorum ?? {}),
+      is_universal: isUniversalMeeting || latestQuorum?.is_universal === true,
+      junta_universal: isUniversalMeeting || latestQuorum?.junta_universal === true,
       quorum: {
         present: presentes,
         total,
@@ -2831,14 +2853,30 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         group_campaign_id: point.group_campaign_id ?? null,
         group_campaign_step: point.group_campaign_step ?? null,
       }));
+      // ITEM-145: re-leer quorum_data fresco de BD antes de mergear, para no
+      // pisar debates/source_links/otras claves con la copia de caché de
+      // TanStack Query si está desfasada. Mismo patrón que DebatesStep/QuorumStep.
+      let latestQuorumData: Record<string, unknown> | null =
+        (quorumData ?? null) as Record<string, unknown> | null;
+      if (meetingId && tenantId) {
+        const { data, error } = await supabase
+          .from("meetings")
+          .select("quorum_data")
+          .eq("id", meetingId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (error) throw error;
+        latestQuorumData =
+          (data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? latestQuorumData;
+      }
       const baseQuorumData = {
         ...patchQuorumDataSourceLinks(
-          (quorumData ?? {}) as Record<string, unknown>,
+          (latestQuorumData ?? {}) as Record<string, unknown>,
           sourceLinksFromAgendaPoints(agendaPointsWithAgreements)
         ),
         point_snapshots: enrichedSnapshots,
       };
-      const nextQuorumData = isUniversalMeetingQuorumData(quorumData)
+      const nextQuorumData = isUniversalMeetingQuorumData(latestQuorumData)
         ? patchUniversalVotingMetadata(baseQuorumData, agendaPointsWithAgreements, enrichedSnapshots)
         : baseQuorumData;
 
