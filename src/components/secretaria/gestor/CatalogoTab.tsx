@@ -52,7 +52,15 @@ import {
   type LegalTemplateReviewStatus,
 } from "@/lib/secretaria/legal-template-review";
 import { withLegalTeamTemplateFixtures } from "@/lib/secretaria/legal-template-fixtures";
-import { isKnownP0 } from "@/lib/secretaria/template-admin";
+import {
+  isKnownP0,
+  // ITEM-138: labels y transiciones canónicas compartidas (antes copiadas con
+  // divergencias). TEMPLATE_PRIMARY_TRANSITIONS deriva de TRANSITION_MATRIX.
+  TIPO_LABEL as TIPO_LABELS,
+  ORGANO_LABEL as ORGANO_LABELS,
+  MODE_LABEL as MODE_LABELS,
+  TEMPLATE_PRIMARY_TRANSITIONS as TRANSITION_MAP,
+} from "@/lib/secretaria/template-admin";
 import { TriCapaEditor } from "./TriCapaEditor";
 import { useTabAccess } from "./tab-guards";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -87,63 +95,6 @@ const ESTADO_CONFIG: Record<string, { label: string; className: string; icon: El
     label: "Deprecada",
     className: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
     icon: AlertTriangle,
-  },
-};
-
-const TIPO_LABELS: Record<string, string> = {
-  ACTA_SESION: "Acta de sesión",
-  ACTA_CONSIGNACION: "Acta de consignación",
-  ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
-  ACTA_DECISION_CONJUNTA: "Acta decisión conjunta",
-  ACTA_ORGANO_ADMIN: "Acta órgano de administración",
-  CERTIFICACION: "Certificación de acuerdos",
-  CONVOCATORIA: "Convocatoria",
-  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
-  MODELO_ACUERDO: "Modelo de acuerdo",
-  INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
-  DOCUMENTO_REGISTRAL: "Documento registral",
-  SUBSANACION_REGISTRAL: "Subsanación registral",
-  INFORME_GESTION: "Informe de gestión",
-};
-
-const ORGANO_LABELS: Record<string, string> = {
-  JUNTA_GENERAL: "Junta General",
-  CONSEJO: "Consejo de Administración",
-};
-
-const MODE_LABELS: Record<string, string> = {
-  MEETING: "Sesión",
-  UNIVERSAL: "Universal",
-  NO_SESSION: "Sin sesión",
-  UNIPERSONAL_SOCIO: "Socio único",
-  UNIPERSONAL_ADMIN: "Admin. único",
-  CO_APROBACION: "Co-aprobación",
-  SOLIDARIO: "Admin. solidario",
-};
-
-const TRANSITION_MAP: Record<string, { next: string; label: string; confirm: string }> = {
-  BORRADOR: {
-    next: "REVISADA",
-    label: "Marcar como revisada",
-    confirm: "¿Confirmar que el contenido jurídico ha sido revisado?",
-  },
-  REVISADA: {
-    next: "APROBADA",
-    label: "Aprobar",
-    confirm: "¿Confirmar la aprobación formal por el Comité Legal?",
-  },
-  APROBADA: {
-    next: "ACTIVA",
-    label: "Activar en producción",
-    confirm:
-      "¿Activar esta plantilla para uso en producción? Esta acción habilita el Gate PRE.",
-  },
-  ACTIVA: {
-    next: "ARCHIVADA",
-    label: "Archivar",
-    confirm:
-      "¿Archivar esta plantilla? Dejará de seleccionarse como plantilla activa.",
   },
 };
 

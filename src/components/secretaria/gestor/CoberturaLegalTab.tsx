@@ -32,43 +32,13 @@ import {
 import {
   computeCoreCoverage,
   CORE_V1_MATERIAS_COUNT,
+  // ITEM-138: labels canónicos compartidos (antes copiados con divergencias).
+  TIPO_LABEL as TIPO_LABELS,
+  ORGANO_LABEL as ORGANO_LABELS,
+  MODE_LABEL as MODE_LABELS,
 } from "@/lib/secretaria/template-admin";
 
 const FIVE_MINUTES = 5 * 60 * 1000;
-
-const TIPO_LABELS: Record<string, string> = {
-  ACTA_SESION: "Acta de sesión",
-  ACTA_CONSIGNACION: "Acta de consignación",
-  ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
-  ACTA_DECISION_CONJUNTA: "Acta decisión conjunta",
-  ACTA_ORGANO_ADMIN: "Acta órgano de administración",
-  CERTIFICACION: "Certificación de acuerdos",
-  CONVOCATORIA: "Convocatoria",
-  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
-  MODELO_ACUERDO: "Modelo de acuerdo",
-  INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
-  DOCUMENTO_REGISTRAL: "Documento registral",
-  SUBSANACION_REGISTRAL: "Subsanación registral",
-  INFORME_GESTION: "Informe de gestión",
-};
-
-const ORGANO_LABELS: Record<string, string> = {
-  JUNTA_GENERAL: "Junta General",
-  CONSEJO: "Consejo de Administración",
-  CONSEJO_ADMIN: "Consejo de Administración",
-  ORGANO_ADMIN: "Órgano de Administración",
-};
-
-const MODE_LABELS: Record<string, string> = {
-  MEETING: "Sesión",
-  UNIVERSAL: "Universal",
-  NO_SESSION: "Sin sesión",
-  UNIPERSONAL_SOCIO: "Socio único",
-  UNIPERSONAL_ADMIN: "Admin. único",
-  CO_APROBACION: "Co-aprobación",
-  SOLIDARIO: "Admin. solidario",
-};
 
 const COVERAGE_STATE_STYLE: Record<
   LegalTemplateCoverageState,

@@ -1129,7 +1129,7 @@
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
 | ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | PENDIENTE |
-| ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | PENDIENTE |
+| ITEM-138 | A3 | — | Lógica y constantes duplicadas entre Plantillas.tsx y el gestor, con divergencias latentes | ✅ HECHO (loop) |
 | ITEM-139 | A3 | — | Autor del changelog hardcodeado: la auditoría atribuye todas las transiciones a 'Comité Legal TGMS' o 'system' | HECHO (UI) |
 | ITEM-140 | A3 | — | Documentación CLAUDE.md desactualizada respecto al estado real del gestor | HECHO (Ola1) |
 | ITEM-141 | A4 | — | Fallback client-side de TransmisionStepper no transaccional y divergente del comportamiento de la RPC | PENDIENTE |

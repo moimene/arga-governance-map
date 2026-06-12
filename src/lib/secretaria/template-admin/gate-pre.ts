@@ -13,16 +13,12 @@ import type {
 import { isOrganoCanonico, normalizeOrganoTipo } from "./organo-canonico";
 import { detectActiveDuplicate } from "./functional-key";
 import { evaluateSemanticRules } from "./gate-pre-semantic";
+// ITEM-138: SEMVER y la lista de fuentes legales se centralizan en patterns.ts
+// (compartido con template-import-schema) para que gate e importer no diverjan.
+// META_REF_LEGAL_FORMAT usa la forma laxa: cualquier mención reconocible de
+// fuente legal (acepta "LSC (cuentas anuales)", "Arts. 295 LSC"; rechaza "n/a", "").
+import { SEMVER, REF_LEGAL_PATTERN_LAX as REF_LEGAL_PATTERN } from "./patterns";
 
-const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-// META_REF_LEGAL_FORMAT: cualquier mención reconocible de fuente legal. La
-// versión estricta (Art./Arts. ... LSC) bloqueaba plantillas existentes que
-// usan formatos como "LSC (cuentas anuales)" o "Arts. 295 LSC". La regla
-// se calibra para aceptar referencias bien formadas y rechazar "n/a", "".
-// Calibración Sprint 1 / Commit 7 (D6): se añade LGSM (Ley General de
-// Sociedades Mercantiles, México) para soportar batches FIRMA_LEGAL_BATCH
-// multi-jurisdicción importados por `import-templates-batch.ts`.
-const REF_LEGAL_PATTERN = /\b(LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|CNMV|CC|LGSM)\b/;
 const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
 const HELPER_ALLOWLIST = new Set(["if", "else", "each", "unless", "with"]);
 const PROTECTED_PREFIXES = ["ENTIDAD.", "ORGANO.", "REUNION.", "EXPEDIENTE.", "SISTEMA.", "QTSP."];

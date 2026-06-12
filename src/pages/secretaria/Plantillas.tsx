@@ -25,22 +25,25 @@ import {
 } from "@/lib/secretaria/mesa-control-societaria";
 import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
+import {
+  // ITEM-138: labels y transiciones canónicas compartidas (antes copiadas con
+  // divergencias en esta página, CatalogoTab y CoberturaLegalTab).
+  TEMPLATE_PRIMARY_TRANSITIONS,
+  tipoLabel,
+  estadoLabel,
+  jurisdictionLabel,
+} from "@/lib/secretaria/template-admin";
 import { toast } from "sonner";
 
+// ITEM-138 (d): badge de estado con DEPRECADA (antes omitido). Los colores son
+// presentación local; las ETIQUETAS vienen del módulo canónico labels.ts.
 const ESTADO_BADGE = {
   BORRADOR: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   REVISADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   APROBADA: "bg-[var(--g-sec-300)] text-[var(--g-brand-3308)]",
   ACTIVA: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   ARCHIVADA: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
-};
-
-const ESTADO_LABEL = {
-  BORRADOR: "Borrador",
-  REVISADA: "Revisada",
-  APROBADA: "Aprobada",
-  ACTIVA: "Activa",
-  ARCHIVADA: "Archivada",
+  DEPRECADA: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
 const ESTADO_SORT_RANK: Record<string, number> = {
@@ -49,14 +52,27 @@ const ESTADO_SORT_RANK: Record<string, number> = {
   REVISADA: 2,
   BORRADOR: 3,
   ARCHIVADA: 4,
+  DEPRECADA: 5,
 };
 
-const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; icon: LucideIcon }> = {
-  BORRADOR: { label: "Marcar como revisada", nextState: "REVISADA", icon: Clock },
-  REVISADA: { label: "Aprobar", nextState: "APROBADA", icon: CheckCircle },
-  APROBADA: { label: "Activar", nextState: "ACTIVA", icon: CheckCircle },
-  ACTIVA: { label: "Archivar", nextState: "ARCHIVADA", icon: Archive },
+// ITEM-138 (a): las transiciones se derivan del mapa canónico
+// TEMPLATE_PRIMARY_TRANSITIONS (que a su vez valida contra TRANSITION_MATRIX).
+// Aquí solo se adjunta el icono (capa UI) y se preserva el shape legacy
+// { label, nextState, icon } que consume esta página.
+const TRANSITION_ICONS: Record<string, LucideIcon> = {
+  BORRADOR: Clock,
+  REVISADA: CheckCircle,
+  APROBADA: CheckCircle,
+  ACTIVA: Archive,
 };
+
+const WORKFLOW_TRANSITIONS: Record<string, { label: string; nextState: string; icon: LucideIcon }> =
+  Object.fromEntries(
+    Object.entries(TEMPLATE_PRIMARY_TRANSITIONS).map(([from, t]) => [
+      from,
+      { label: t.label, nextState: t.next, icon: TRANSITION_ICONS[from] ?? Clock },
+    ]),
+  );
 
 const MATERIAS_ACUERDO = [
   'APLICACION_RESULTADO',
@@ -102,48 +118,11 @@ function matterGroup(value: string) {
   return FUNCTIONAL_MATTER_GROUPS.find((g) => g.id === groupId) ?? FALLBACK_MATTER_GROUP;
 }
 
-const JURISDICTION_LABEL: Record<string, string> = {
-  ES: "España",
-  PT: "Portugal",
-  BR: "Brasil",
-  MX: "México",
-  GLOBAL: "Global",
-  MULTI: "Multijurisdicción",
-};
-
-const TIPO_LABEL: Record<string, string> = {
-  ACTA_SESION: "Acta de sesión",
-  ACTA_CONSIGNACION: "Acta de consignación",
-  ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
-  CERTIFICACION: "Certificación de acuerdos",
-  CONVOCATORIA: "Convocatoria",
-  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
-  INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
-  INFORME_GESTION: "Informe de gestión",
-  MODELO_ACUERDO: "Modelo de acuerdo",
-};
-
 const INFORME_TIPOS = new Set([
   "INFORME_PRECEPTIVO",
   "INFORME_DOCUMENTAL_PRE",
   "INFORME_GESTION",
 ]);
-
-function jurisdictionLabel(code?: string | null) {
-  if (!code) return "Jurisdicción pendiente";
-  return JURISDICTION_LABEL[code] ?? code;
-}
-
-function tipoLabel(value?: string | null) {
-  if (!value) return "—";
-  return TIPO_LABEL[value] ?? value.replace(/_/g, " ");
-}
-
-function estadoLabel(value?: string | null) {
-  if (!value) return "Estado pendiente";
-  return ESTADO_LABEL[value as keyof typeof ESTADO_LABEL] ?? value.replace(/_/g, " ");
-}
 
 function templateEngineSort(a: PlantillaProtegidaRow, b: PlantillaProtegidaRow) {
   const rankA = ESTADO_SORT_RANK[a.estado] ?? 99;

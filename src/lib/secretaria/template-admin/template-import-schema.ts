@@ -44,28 +44,14 @@ import { ORGANO_CANONICO } from "./organo-canonico";
 export const VARIABLE_PATTERN =
   /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,4}(?:\.\*)?$/;
 
-// SEMVER: pre-release y build metadata aceptados (1.0.0+sl, 1.0.0-beta.1).
-export const SEMVER =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-
-// REF_LEGAL_PATTERN: tres formas aceptadas (orden importa para readibility):
-//  1. "Art. 160 LSC" / "Arts. 295-316 LSC" — prefijo Art./Arts. + ley.
-//  2. "LSC art. 15" / "RRM arts. 108-109" — ley + sufijo art./arts.
-//  3. Bare "LSC", "RRM", "RDL 5/2023" — ley sola como cita primaria.
-// Se acepta también RDLeg, LMV, CCom, RDLey, LOSSEAR. Estados Soporte
-// Interno (CONVOCATORIA_PRE / EXPEDIENTE_PRE) están exentos a nivel
-// Gate PRE (`organo_tipo === "SOPORTE_INTERNO"`), no aquí.
-//
-// Calibración Sprint 1 / Commit 7 (D6): se añade LGSM (Ley General de
-// Sociedades Mercantiles, México) como ley aceptada para soportar batches
-// multi-jurisdicción importados por el script `import-templates-batch.ts`.
-// El batch FIRMA_LEGAL_BATCH es la vía para incorporar plantillas legacy
-// firmadas offline por el Comité Legal, incluyendo jurisdicciones MX/BR
-// donde la referencia legal nativa no es LSC. La adición sólo amplía el
-// conjunto aceptado; no rechaza ningún caso previamente válido (tests del
-// schema y de Gate PRE siguen pasando).
-export const REF_LEGAL_PATTERN =
-  /(?:(?:Art\.|Arts\.|art\.|arts\.).*?\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b)|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b.*?(?:Art\.|Arts\.|art\.|arts\.))|(?:\b(?:LSC|RRM|RDL|LMV|RDLeg|CCom|RDLey|LOSSEAR|LGSM)\b)/;
+// ITEM-138: SEMVER y la forma estructurada de REF_LEGAL_PATTERN se centralizan
+// en patterns.ts (compartido con gate-pre) para que la lista de leyes aceptadas
+// no diverja. La forma estructurada acepta tres formas: "Art. 160 LSC",
+// "LSC art. 15" y "LSC" sola; ahora también CNMV/CC (alineado con el Gate PRE,
+// cerrando la divergencia de reimport). Estados Soporte Interno
+// (CONVOCATORIA_PRE / EXPEDIENTE_PRE) están exentos a nivel Gate PRE, no aquí.
+import { SEMVER, REF_LEGAL_PATTERN_STRUCTURED as REF_LEGAL_PATTERN } from "./patterns";
+export { SEMVER, REF_LEGAL_PATTERN };
 
 // MateriaEnum: unión cerrada de materias soportadas v1. Sin duplicados.
 // Calibrado D15: incluye las 39 materias presentes en Cloud + cubre los
