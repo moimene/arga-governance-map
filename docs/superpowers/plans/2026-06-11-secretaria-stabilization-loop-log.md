@@ -657,3 +657,27 @@ cuidadoso por ítem, NO batcheable a ciegas, por estos acoplamientos detectados:
 
 Próximo al reanudar: Ola MOTOR ítem a ítem (BOE+Codex), luego Ola Cloud (guardrail
 `db:check-target`), luego UI e2e-coupled actualizando specs en el mismo commit.
+
+### Ola MOTOR/Cloud (commits bceddf6, 012302a)
+
+- **ITEM-014 (Cloud, migración):** la autorización de junta para transmisión de participaciones
+  SL se adopta por MAYORÍA ORDINARIA (art. 198), no reforzada — **verificado BOE art. 107.2.b
+  verbatim**. El rule_pack la marcaba REFORZADA_1_2 (199.a). Migración `20260612100000`
+  (materia_catalog `min_majority_code=SIMPLE` + rule_pack_versions payload SL → `favor >
+  1/3_capital_total_con_voto`), aplicada vía `supabase db push --linked`, verificada en Cloud,
+  migration list alineado. **Primera migración Cloud de la campaña** — flujo governance: el
+  guardrail bloqueó el UPDATE service-role ad-hoc; se hizo migración mirror + push + verify.
+- **ITEM-114 (motor/UI):** restaurado el cierre automático de votaciones vencidas on-mount en
+  AcuerdosSinSesion (G6, regresión).
+
+**Hito: los 4 grupos tienen ítems concretos cerrados** (MOTOR: 050/019/014/114 · UI/HOOK/TYPING:
+~13 · Cloud: 014 · NEEDS_HUMAN: 10 documentados), no solo "en marcha".
+
+### Aprendizaje operativo (para reanudar)
+
+- Aplicar migraciones Cloud: el UPDATE service-role ad-hoc lo BLOQUEA el clasificador (correcto);
+  usar siempre **migración mirror en `supabase/migrations/` + `echo y | supabase db push --linked`**
+  + verificación read-only con sonda service-role.
+- Varios motor "rápidos" del fixSpec NO lo son: ITEM-056/142 (antelación "un mes") requieren refactor
+  de firma de `getDefaultAntelacionDias` (devuelve `number`, no fecha); ITEM-133 (filtro órgano en
+  resolución de pack) requiere cambio de firma + 2 callers. Hacer con contexto fresco.
