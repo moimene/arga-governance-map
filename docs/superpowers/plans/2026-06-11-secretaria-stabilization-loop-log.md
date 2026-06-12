@@ -743,3 +743,33 @@ Restante Cloud/UI del paquete (alto impacto o contenido):
 - **ITEM-031 (UI):** gates de transmisión SL (art. 106 LSC) en TransmisionStepper — contenido, patrón
   de gate como ITEM-106.
 - **ITEM-082, 054-packs:** promoción/archivado de plantillas + creación de packs.
+
+---
+
+## Pasada 2026-06-12 (continuación autónoma, ultracode + doble adversarial)
+
+Lote A11-A13 (workflow ultracode + revisión adversarial self + Codex) y motor:
+
+- **A11-A13 (commit 60c805a):** ITEM-060 (mutex síncrono `openingVotingRef` anti doble
+  creación de no_session_resolution), ITEM-061 (draft sessionStorage SociedadNuevaStepper:
+  merge con createEmptySociedadDraft anti-crash + flag pendingRestoreRef anti pisado),
+  ITEM-066 (sección Origen en ComunicacionDetalle), ITEM-076 (extractMeetingSourceLinks en
+  ActaDetalle), ITEM-077 (DecisionDetalle → expediente), ITEM-088 (schema-issue-mapper +
+  test), ITEM-130 (e2e por [data-sidebar-item]). **Codex atrapó 3×P1 + 2×P2** que el
+  self-review marcó "safe" → valida la capa doble adversarial.
+- **ITEM-067/107 (commit 4ec6934):** Trust Center verificaba 0 artefactos leyendo columnas
+  inexistentes (bundle.artifacts→manifest.artifacts, explain_json→explain) y lucía verde
+  vacuo; badge gateado a checks>0; estados de comunicación centralizados en status-labels.
+- **ITEM-107 hardening (commit 832ea15, rev. Codex):** **Codex atrapó** que el branch QES
+  fabricaba `eval-${id}` cuando faltaba signature_hash → confianza fabricada. Fail-closed:
+  no sintetizar (hash=''), esDigestValido valida forma de digest, +3 tests adversariales.
+- **ITEM-138 (commit bc59f9a):** unifica labels/transiciones (labels.ts deriva de
+  TRANSITION_MATRIX) y patrones (patterns.ts: SEMVER + LEGAL_LAW_SOURCES compartidos);
+  cierra el caso 'art. 1261 CC' que pasaba gate pero no reimportaba; +DEPRECADA en badge.
+- **ITEM-142 (commit 1690cba, BOE):** 'un mes' art. 176.1 LSC se computa fecha a fecha
+  (subMonths, art. 5.1 CC) en el default legal SA; el numérico de pack sigue autoritativo.
+  Plazos date-only tz-safe; daysUntil con differenceInCalendarDays; fallback ficticio del
+  stepper gateado en indicadores date-dependientes. Verificado BOE (art. 176.1).
+
+Gates por commit: typecheck verde, tests (hasta 1921 pass/0 fail), build verde, lint sin
+nuevos errores (15 any conocidos GRC/AIMS).
