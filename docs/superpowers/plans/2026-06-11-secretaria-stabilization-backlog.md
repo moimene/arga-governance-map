@@ -585,7 +585,7 @@
 | ITEM-102 | A7 | ✅ | Vocabulario de estados de registry_filings bifurcado (inglés en stepper vs español en lista/seeds): seguimiento registral incoherente y pestañas muertas | ✅ HECHO (loop) |
 | ITEM-103 | A7 | ✅ | Re-entrada de subsanación no operable end-to-end: el detalle :id es read-only sin CTA y el único expediente SUBSANACION del demo tiene agreement_id NULL | PENDIENTE |
 | ITEM-104 | A7 | — | Cadena acta↔certificación↔expediente↔tramitación solo navegable en sentido directo: dead-ends en TramitacionDetalle y ExpedienteAcuerdo | 🟡 PARCIAL (TramitacionDetalle cross-link; ExpedienteAcuerdo cards en oleada cross-module) |
-| ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | PENDIENTE |
+| ITEM-105 | A7 | — | ApprovalWorkflowCard: el paso QES_FIRMA nunca se completa y el estado 'totalmente aprobado' es inalcanzable; persistencia sin manejo de errores | ✅ HECHO (loop) |
 | ITEM-106 | A7 | — | El tramitador permite registrar elevación a público de acuerdos ADOPTED sin certificación vinculada (gate documental solo en la entrada ?certificacion=) | HECHO (legal) |
 | ITEM-107 | A8 | ✅ | Trust Center muestra 'Verificación OK' verificando cero artefactos — hook lee columnas inexistentes | ✅ HECHO (loop) |
 | ITEM-108 | A8 | — | Reintento de archivado: dead-end permanente tras fallo parcial o regeneración el mismo día (colisión de path con upsert:false) | ✅ HECHO (loop) |
@@ -1125,7 +1125,7 @@
 | ITEM-131 | A13 | — | CLAUDE.md desactualizado: plantillas P0 ya corregidas y taxonomía sidebar distinta a la real | HECHO (Ola1) |
 | ITEM-132 | A13 | — | Inline style background con var(--g-*) donde existe clase Tailwind equivalente (10 casos) | ✅ HECHO (loop) |
 | ITEM-133 | A2 | ✅ | useRulePackForMateria resuelve por materia sin filtrar órgano y con limit(1) sin order — nombramientos de Junta reciben el pack de cooptación del Consejo | 🟡 PARCIAL (datos: materia canónica NOMBRAMIENTO_CONSEJERO corregida; filtro organo en hook pendiente) |
-| ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | PENDIENTE |
+| ITEM-134 | A2 | — | Contrato variables-plantillas-v1.1.yaml desfasado respecto al catálogo real: solo 6 de 49 variables en uso y taxonomía de fuentes incompatible con el resolver | ✅ HECHO (loop) |
 | ITEM-135 | A2 | — | Tipo PostAcuerdoPayload desalineado con los payloads Cloud: plazoInscripcion convive como objeto y como número | HECHO (typing) |
 | ITEM-136 | A2 | — | Deuda documental: CLAUDE.md sigue declarando P0 toleradas (FUSION_ESCISION, RATIFICACION_ACTOS) que ya están corregidas en Cloud y known-p0.ts está vacío | HECHO (Ola1) |
 | ITEM-137 | A3 | — | TriCapaEditor: dead-end latente si un borrador tiene metadatos inválidos (no editables desde el UI) | ✅ HECHO (loop) |

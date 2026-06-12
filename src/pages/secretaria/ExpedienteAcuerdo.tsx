@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   FileCheck2,
@@ -480,6 +481,9 @@ export default function ExpedienteAcuerdo() {
             currentUserRole={primaryRole}
             currentUserName={displayName}
             initialWorkflow={normalizeApprovalWorkflow(a.approval_workflow)}
+            /* ITEM-105: cuando el documento ya está firmado/archivado (document_url),
+               el paso QES_FIRMA puede completarse y alcanzar 'totalmente aprobado'. */
+            documentArchived={Boolean(a.document_url)}
           />
 
           {/* Trust Center — Evidencias de confianza */}
@@ -1527,12 +1531,14 @@ function ApprovalWorkflowCard({
   currentUserRole = "SECRETARIO",
   currentUserName,
   initialWorkflow,
+  documentArchived = false,
 }: {
   agreementId: string;
   onNavigateGenerar: () => void;
   currentUserRole?: string;
   currentUserName?: string;
   initialWorkflow?: ApprovalStep[] | null;
+  documentArchived?: boolean;
 }) {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
@@ -1546,20 +1552,36 @@ function ApprovalWorkflowCard({
   const currentIdx = steps.findIndex((s) => s.approvedAt === null);
   const allApproved = currentIdx === -1;
 
-  const saveWorkflow = useCallback(async (next: ApprovalStep[] | null) => {
-    await supabase
+  // ITEM-105: saveWorkflow ya no ignora el error del update. Si la escritura falla,
+  // se revierte el estado en memoria al valor previo y se avisa con toast.error, en
+  // vez de mostrar pasos "aprobados" que no se persistieron.
+  const saveWorkflow = useCallback(async (next: ApprovalStep[] | null, prev?: ApprovalStep[]) => {
+    const { error } = await supabase
       .from("agreements")
       .update({ approval_workflow: next })
       .eq("id", agreementId)
       .eq("tenant_id", tenantId!);
+    if (error) {
+      if (prev) setSteps(prev);
+      toast.error("No se pudo guardar el flujo de aprobación", { description: error.message });
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["agreement", tenantId, agreementId] });
   }, [agreementId, tenantId, qc]);
 
   const approveStep = useCallback((idx: number) => {
-    if (idx === steps.length - 1) {
+    const isLast = idx === steps.length - 1;
+    // ITEM-105: el último paso (QES_FIRMA) solo se marca aprobado cuando el documento
+    // ya está firmado/archivado (document_url presente). Si aún no se ha firmado, se
+    // navega al generador de documento para ejecutar la firma; al volver con el
+    // documento archivado, este paso ya es completable y se alcanza 'totalmente
+    // aprobado'. Antes el último paso solo navegaba y nunca marcaba approvedAt, dejando
+    // el estado allApproved inalcanzable.
+    if (isLast && !documentArchived) {
       onNavigateGenerar();
       return;
     }
+    const prev = steps;
     const step = steps[idx];
     const approverName =
       step.role === currentUserRole && currentUserName
@@ -1571,8 +1593,8 @@ function ApprovalWorkflowCard({
         : s
     );
     setSteps(next);
-    saveWorkflow(next);
-  }, [steps, onNavigateGenerar, currentUserRole, currentUserName, saveWorkflow]);
+    saveWorkflow(next, prev);
+  }, [steps, onNavigateGenerar, currentUserRole, currentUserName, saveWorkflow, documentArchived]);
 
   const resetWorkflow = useCallback(() => {
     const fresh = makeDefaultSteps();

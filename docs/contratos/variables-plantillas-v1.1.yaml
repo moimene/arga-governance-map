@@ -9,6 +9,28 @@
 #   tipo: string | number | boolean | date | array
 #   requerido: true | false
 #   descripcion: descripción y ejemplo
+#
+# ─── ITEM-134: reconciliación con el resolver de runtime ─────────────────────────
+# Este contrato describe el catálogo LÓGICO de variables (agrupadas por origen
+# funcional). El resolver de runtime (src/lib/doc-gen/variable-resolver.ts) NO usa
+# estas claves de `fuente`: opera con NAMESPACES de plantilla y normaliza las fuentes
+# almacenadas en BD (dotted-paths como "entities.name") a estos namespaces vía
+# `normalizeFuente`:
+#
+#   fuente lógica (este YAML)   →   namespace del resolver (runtime)
+#   ─────────────────────────       ──────────────────────────────────
+#   sistema_bbdd                →   ENTIDAD (entities.*) · ORGANO (governing_bodies.*
+#                                   + condiciones_persona) · REUNION (meetings.* +
+#                                   agenda) · EXPEDIENTE (agreements.* — el acuerdo)
+#   sistema_motor               →   MOTOR (resultado del motor de reglas LSC)
+#   secretario_manual           →   USUARIO (capa3 editable del expediente)
+#   qtsp                        →   QTSP / SISTEMA (sellos EAD Trust, timestamps)
+#
+# Las plantillas referencian las variables con su namespace, p. ej.
+# `{{ENTIDAD.es_cotizada}}`, `{{ORGANO.presidente}}`, `{{EXPEDIENTE.id}}`. La fuente
+# de verdad operativa es el resolver; este YAML es documentación de cobertura.
+# Discrepancia conocida (no bloqueante): solo ~6 de las 49 variables están hoy en uso
+# real por plantillas activas; el resto es cobertura prospectiva.
 
 version: "1.1"
 fecha_creacion: "2026-04-20"
