@@ -559,7 +559,7 @@
 | ITEM-076 | A13 | — | ActaDetalle sin backlink a la reunión origen y convocatoria referenciada como UUID crudo | PENDIENTE |
 | ITEM-077 | A13 | — | DecisionDetalle no enlaza al expediente Acuerdo 360 vinculado | PENDIENTE |
 | ITEM-078 | A13 | — | Item de sidebar duplicado con dos labels distintos hacia la misma ruta | PENDIENTE |
-| ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | PENDIENTE |
+| ITEM-079 | A2 | ✅ | 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS) | HECHO (motor) |
 | ITEM-080 | A2 | — | El catálogo no tiene eje tipo_social: la selección automática SA/SL (DL-4) no es implementable con el modelo actual | PENDIENTE |
 | ITEM-081 | A2 | — | Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura | PENDIENTE |
 | ITEM-082 | A2 | — | Cobertura BORRADOR estancada: 15 modelos v0.1.0 sin contenido legal aprobado, incluidos ESCISION/FUSION/LIQUIDACION cuyo rule pack ya está activo | BLOQUEADO-LEGAL |
@@ -802,7 +802,7 @@
 
 ### ITEM-079 [P2] 6 MODELO_ACUERDO ACTIVA con materia_acuerdo NULL — invisibles para el Tramitador (incluye el golden path APROBACION_CUENTAS/FORMULACION_CUENTAS)
 
-- **Área:** A2 · **Estado:** PENDIENTE
+- **Área:** A2 · **Estado:** HECHO (Ola MOTOR; useModelosAcuerdo matchea materia/materia_acuerdo — cobertura nula resuelta)
 - **Descripción:** useModelosAcuerdo filtra estrictamente por .eq("materia_acuerdo", materia) sin fallback a la columna materia. En Cloud, las versiones ACTIVA de ACCION_SOCIAL_RESPONSABILIDAD, APROBACION_CUENTAS, DELEGACION_FACULTADES, FORMULACION_CUENTAS, OPERACION_VINCULADA y TRANSFORMACION tienen materia_acuerdo NULL (sus predecesoras ARCHIVADA sí la tenían poblada — regresión al activar las nuevas versiones). Resultado: el TramitadorStepper muestra "No hay modelo de acuerdo disponible para esta materia" precisamente en las materias más usadas del demo (APROBACION_CUENTAS: 64 agreements; FORMULACION_CUENTAS: 52 agreements). La matriz de cobertura dice ✅ pero el runtime dice ❌.
 - **Evidencia:** SQL: SELECT materia, materia_acuerdo, estado FROM plantillas_protegidas WHERE tipo='MODELO_ACUERDO' AND materia IN (...) → las 6 filas ACTIVA con materia_acuerdo NULL y las ARCHIVADA con valor poblado. Código: src/hooks/useModelosAcuerdo.ts:41 (.eq("materia_acuerdo", materia)); src/pages/secretaria/TramitadorStepper.tsx:455-457 (materia = selectedAgreement.agreement_kind). Datos demo: SELECT agreement_kind, count(*) FROM agreements → APROBACION_CUENTAS 64, FORMULACION_CUENTAS 52.
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useModelosAcuerdo.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/pages/secretaria/TramitadorStepper.tsx

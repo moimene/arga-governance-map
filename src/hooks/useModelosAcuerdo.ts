@@ -38,7 +38,10 @@ export function useModelosAcuerdo(materia: string, organoTipo?: string, adoption
         )
         .eq("tenant_id", tenantId!)
         .eq("tipo", "MODELO_ACUERDO")
-        .eq("materia_acuerdo", materia)
+        // ITEM-079: algunos MODELO_ACUERDO almacenan la materia en `materia` y no
+        // en `materia_acuerdo` (o viceversa); el filtro estricto a una sola
+        // columna producía cobertura nula. Se matchea cualquiera de las dos.
+        .or(`materia_acuerdo.eq.${materia},materia.eq.${materia}`)
         .in("estado", [...OPERATIONAL_TEMPLATE_QUERY_STATES])
         .order("version", { ascending: false });
 
