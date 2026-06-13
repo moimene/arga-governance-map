@@ -859,3 +859,27 @@ canAdvance por paso en ReunionStepper.buildSteps) — StepRail ahora centraliza 
 dejando el cableado trivial, pero el cambio de reanudación requiere su propio e2e.
 
 **Recuento tras ITEM-125: 145 HECHO, 6 PARCIAL, 3 PENDIENTE (126/128/146), 0 BLOQUEADO.**
+
+---
+
+## Cierre residual 2026-06-13 — ITEM-089 (contador del catálogo) + corrección de premisa
+
+ITEM-089 ya figuraba HECHO en la tabla (un workflow previo añadió `LocalFixtureBadge`,
+status `fixture_bridge`, filtro `LOCAL_FIXTURE` y gating del CTA `!localFixture`), pero el
+detalle seguía PENDIENTE/REQUIERE DECISIÓN y faltaba la pieza del contador.
+
+**Corrección de premisa (Confusion Protocol):** al retomar el ítem para "eliminar los
+fixtures", la inspección en frío contradijo la descripción del backlog. Los 16 fixtures
+**no** son un "dead-end silencioso" ni "desinformación": están etiquetados en 3 superficies,
+su CTA "Usar plantilla" está oculto para fixtures, y 3 e2e (14, 17×2) validan el flujo
+catálogo→tramitador end-to-end. Se revirtió el intento de eliminación y se re-presentó la
+decisión al usuario con los hechos reales.
+
+**Decisión humana:** "Separar el contador" (no eliminar). **Fix:** desglose en
+`CatalogoTab.tsx` — `{filtered} de {total} plantillas · {realCount} reales + {fixtureCount}
+fixtures puente` (desglose solo si `fixtureCount > 0`), vía useMemo sobre `isLocalFixture`.
+Cero e2e roto, cero flujo perdido.
+
+**Verificación:** typecheck verde · `bun test src/lib/secretaria/` 701 pass / 0 fail ·
+ningún e2e depende del texto del contador (grep). Detalle del backlog actualizado con la
+corrección factual.

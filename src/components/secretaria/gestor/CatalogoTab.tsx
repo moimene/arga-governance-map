@@ -772,6 +772,21 @@ export function CatalogoTab() {
     [filterEstado, filterReview, filterTipo, filterP0, legalReviewById, scopedPlantillas, searchQuery],
   );
 
+  // ITEM-089: el contador del catálogo desmezcla el inventario Cloud real de los
+  // fixtures locales puente (LEGAL-FIXTURE-2026-04-28). Antes sumaba ambos como si
+  // fueran plantillas equivalentes ("75"); ahora explicita la composición real
+  // ("59 reales + 16 fixtures puente"). El conteo filtrado (filtered.length) se
+  // mantiene íntegro porque el filtro "Fixtures locales" sigue siendo legítimo.
+  const { realCount, fixtureCount } = useMemo(() => {
+    let real = 0;
+    let fixture = 0;
+    for (const p of scopedPlantillas) {
+      if (isLocalFixture(p)) fixture += 1;
+      else real += 1;
+    }
+    return { realCount: real, fixtureCount: fixture };
+  }, [scopedPlantillas]);
+
   const selected = filtered.find((p) => p.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -889,6 +904,11 @@ export function CatalogoTab() {
         </label>
         <span className="pb-2 text-xs text-[var(--g-text-secondary)]">
           {filtered.length} de {scopedPlantillas.length} plantillas
+          {fixtureCount > 0
+            ? ` · ${realCount} ${realCount === 1 ? "real" : "reales"} + ${fixtureCount} ${
+                fixtureCount === 1 ? "fixture puente" : "fixtures puente"
+              }`
+            : ""}
         </span>
       </div>
 
