@@ -965,3 +965,30 @@ mirror renombradas a las versiones remotas exactas para alineación migration li
 128 LINK_FIRMADO+dead-code, 146 EN_CURSO completo). Patrón confirmado: de las 4 decisiones,
 3 toparon con premisa obsoleta o alcance mayor — verificar SIEMPRE el código real antes de
 ejecutar la acción del backlog.**
+
+---
+
+## Consolidación a producción + fixes de navegación 2026-06-13
+
+**Producción actualizada.** Los 11 commits del sprint (ITEM-125 A–E, 104, 065, 089, 126,
+128, 146) se consolidaron a `main` (merge --no-ff `41490e7`, push `origin/main`) y se desplegó
+producción vía `vercel --prod --archive=tgz` (alias `arga-governance-map.vercel.app`, READY).
+Migraciones Cloud `governance_OS` ya aplicadas (20260613090054/090131).
+
+**Auditoría e2e externa (paralela) — evaluada contra el merge:** 2 de sus 7 hallazgos eran
+STALE (snapshot pre-merge): #5 CELEBRADA-temprano (ya EN_CURSO/ITEM-146) y #4 doble pipeline
+comms (dead code ya eliminado/ITEM-128). #3 (alta manual de libro) es producto nuevo, no rotura
+de spec. Genuinos y corregidos ahora:
+
+- **Nav #1 — Board Pack por slug**: `/secretaria/board-pack/<slug>` daba 400 (slug usado como
+  uuid). BoardPack ahora detecta UUID vs slug y resuelve el slug→UUID antes de alimentar
+  useBoardPackData. Verificado contra Cloud (cda-22-04-2026 → c3305c16-…).
+- **Nav #2 — Representaciones**: el stepper solo leía `?entityId`; las rutas scoped enlazan con
+  `?entity`. Ahora acepta ambos.
+- Commit `9c60424`, merge `0d312eb`, push + redeploy producción. typecheck · bun test 1943/0 ·
+  build verdes.
+
+**Pendiente (siguiente batch, no bloqueante):** #6 Tramitador — affordance "Acuerdo 360"
+explícito en el listado (el detalle ya enlaza). #7 Transmisión — evidence picker + retorno/draft
+desde "crear persona" (núcleo funciona vía RPC). #3 Libros — decisión de producto: ¿alta/
+legalización manual end-to-end o se mantiene como portfolio derivado read-only?
