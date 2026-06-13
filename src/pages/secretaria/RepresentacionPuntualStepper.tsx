@@ -43,7 +43,10 @@ function formatMeetingLabel(value: {
 export default function RepresentacionPuntualStepper() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const entityId = searchParams.get("entityId") ?? "";
+  // Audit nav #2: las rutas scoped de Secretaría enlazan con ?entity=<uuid>
+  // (scope.createScopedTo), pero este stepper solo leía ?entityId, mostrando
+  // "Falta la sociedad de contexto" en el acceso scoped estándar. Aceptamos ambos.
+  const entityId = searchParams.get("entityId") ?? searchParams.get("entity") ?? "";
   const initialScope = searchParams.get("scope") === "CONSEJO_DELEGACION" ? "CONSEJO_DELEGACION" : "JUNTA_PROXY";
 
   const [scope, setScope] = useState<PuntualScope>(initialScope);
