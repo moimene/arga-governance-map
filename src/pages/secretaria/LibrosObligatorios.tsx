@@ -1,8 +1,14 @@
 import { Building2, Library, AlertTriangle, CheckCircle2, Clock, Loader2, Search, X, FileSignature, BookOpen, ClipboardList } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLibrosList } from "@/hooks/useLibros";
+import { toast } from "sonner";
+import { useLibrosList, useCerrarVolumen, useLegalizacionTransicion } from "@/hooks/useLibros";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import {
+  availableLegalizacionActions,
+  type LegalizacionStatus,
+  type LegalizacionAction,
+} from "@/lib/secretaria/libro-legalizacion";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   summarizeBookPortfolio,
@@ -11,6 +17,79 @@ import {
   type SocietaryBookGroup,
   type SocietaryBookView,
 } from "@/lib/secretaria/libros-societarios";
+
+// W4 — acciones de cierre de volumen + legalización para libros PERSISTIDOS y
+// legalizables (los virtuales no se pueden cerrar/legalizar). Surface read/write
+// mínimo: usa la máquina de estados pura y las RPC con tenant-assert.
+function LibroLegalizacionActions({ book }: { book: SocietaryBookView }) {
+  const cerrar = useCerrarVolumen();
+  const transicion = useLegalizacionTransicion();
+  if (book.is_virtual || book.legalization_requirement === "NO_APLICA") return null;
+  const libroId = book.source_book_id ?? book.id;
+  const volumeClosed = book.status === "CERRADO" || Boolean(book.closed_at);
+  const actions = availableLegalizacionActions(
+    book.legalization_status as LegalizacionStatus,
+    volumeClosed,
+  );
+  const busy = cerrar.isPending || transicion.isPending;
+  const LABELS: Record<LegalizacionAction, string> = {
+    PRESENTAR: "Presentar a legalización",
+    LEGALIZAR: "Marcar legalizado",
+    RECHAZAR: "Marcar rechazado",
+  };
+  const btnCls =
+    "inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-[11px] font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-60";
+  const onFail = (e: unknown) =>
+    toast.error(e instanceof Error ? e.message : "No se pudo completar la acción.");
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--g-border-subtle)] pt-3">
+      <span className="text-[11px] font-medium text-[var(--g-text-secondary)]">Legalización:</span>
+      {!volumeClosed && (
+        <button
+          type="button"
+          disabled={busy}
+          className={btnCls}
+          onClick={() =>
+            cerrar.mutate(libroId, {
+              onSuccess: () => toast.success("Volumen cerrado."),
+              onError: onFail,
+            })
+          }
+        >
+          Cerrar volumen
+        </button>
+      )}
+      {actions.map((a) => (
+        <button
+          key={a}
+          type="button"
+          disabled={busy}
+          className={btnCls}
+          onClick={() =>
+            transicion.mutate(
+              {
+                libroId,
+                action: a,
+                evidenceUrl: a === "LEGALIZAR" ? `CSV-DEMO-${libroId.slice(0, 8)}` : null,
+              },
+              {
+                onSuccess: () => toast.success(`${LABELS[a]} — hecho.`),
+                onError: onFail,
+              },
+            )
+          }
+        >
+          {LABELS[a]}
+        </button>
+      ))}
+      {volumeClosed && actions.length === 0 && (
+        <span className="text-[11px] text-[var(--g-text-secondary)]">
+          {statusLabel(book.legalization_status)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // BATCH 12 (ronda 2 F-E): mapping book_kind → ruta del contenido del libro.
 // En cierre demo-ready no dejamos "vista no disponible": cada libro enlaza a
@@ -420,6 +499,7 @@ export default function LibrosObligatorios() {
                   <Icon className="h-3.5 w-3.5" />
                   {route.label}
                 </button>
+                <LibroLegalizacionActions book={b} />
               </article>
             );
           })

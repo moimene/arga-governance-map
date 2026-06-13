@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { LegalizacionAction } from "@/lib/secretaria/libro-legalizacion";
 import {
   buildSocietaryBookPortfolio,
   normalizeMandatoryBookKind,
@@ -265,5 +266,42 @@ export function useLibrosList(entityId?: string | null) {
         cargos: (cargosRes.data ?? []) as ActivityRow[],
       });
     },
+  });
+}
+
+// W4 — mutaciones de cierre de volumen y legalización (RPCs SECURITY DEFINER).
+export function useCerrarVolumen() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (libroId: string) => {
+      const { data, error } = await supabase.rpc("fn_libro_cerrar_volumen", {
+        p_libro_id: libroId,
+      });
+      if (error) throw error;
+      return data as { libro_id: string; status: string; already_closed: boolean };
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mandatory_books", tenantId] }),
+  });
+}
+
+export function useLegalizacionTransicion() {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      libroId: string;
+      action: LegalizacionAction;
+      evidenceUrl?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc("fn_libro_legalizacion_transicion", {
+        p_libro_id: params.libroId,
+        p_action: params.action,
+        p_evidence_url: params.evidenceUrl ?? null,
+      });
+      if (error) throw error;
+      return data as { libro_id: string; legalization_status: string };
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mandatory_books", tenantId] }),
   });
 }
