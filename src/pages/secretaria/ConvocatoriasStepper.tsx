@@ -1748,10 +1748,31 @@ export default function ConvocatoriasStepper() {
   //      el usuario llega al Paso 7 el effect dispara una sola vez.
   //   2. no está "dirty" (no sobreescribir edits manuales del usuario).
   useEffect(() => {
-    if (current === 7 && !borradorDirty) {
+    if (borradorDirty) return;
+    if (current === 7) {
+      regenerateBorrador();
+      return;
+    }
+    // W0: el render del Paso 7 es asíncrono; un salto rápido 6→7→8 puede dejar
+    // `borradorTexto` vacío. Regeneramos también al entrar al Paso 8 si no hay
+    // texto y existe plantilla efectiva. Sin plantilla, regenerateBorrador no
+    // produce texto, así que NO lo llamamos en ese caso (evita bucle infinito).
+    if (
+      current === 8 &&
+      !borradorTexto.trim() &&
+      !borradorRenderPending &&
+      effectiveBorradorTemplate?.capa1_inmutable
+    ) {
       regenerateBorrador();
     }
-  }, [current, regenerateBorrador, borradorDirty]);
+  }, [
+    current,
+    regenerateBorrador,
+    borradorDirty,
+    borradorTexto,
+    borradorRenderPending,
+    effectiveBorradorTemplate,
+  ]);
 
   // Codex P2 round 8 PR #3: detectar stale draft. Si el usuario editó el
   // textarea (dirty) y luego cambió el contexto upstream (entidad / órgano
@@ -4159,7 +4180,24 @@ export default function ConvocatoriasStepper() {
                     className="mt-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-3 text-xs text-[var(--status-warning)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    No hay texto de convocatoria preparado en el Paso 7.
+                    <p>
+                      No hay texto de convocatoria preparado.
+                      {effectiveBorradorTemplate?.capa1_inmutable
+                        ? " Pulsa «Generar ahora» para componerlo desde la plantilla, o vuelve al Paso 7 para revisarlo."
+                        : " No hay plantilla de convocatoria disponible para este órgano/jurisdicción; escribe el texto en el Paso 7."}
+                    </p>
+                    {effectiveBorradorTemplate?.capa1_inmutable ? (
+                      <button
+                        type="button"
+                        onClick={regenerateBorrador}
+                        disabled={borradorRenderPending}
+                        aria-busy={borradorRenderPending}
+                        className="mt-2 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-3 py-1.5 font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-60"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        Generar ahora
+                      </button>
+                    ) : null}
                   </div>
                 )}
               </div>

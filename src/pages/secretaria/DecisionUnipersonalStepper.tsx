@@ -442,8 +442,8 @@ export default function DecisionUnipersonalStepper() {
     },
     {
       n: 3,
-      label: "Registro y documento",
-      hint: "Crea la decisión y el expediente de acuerdo vinculado",
+      label: "Firma y registro",
+      hint: "Crea y firma la decisión; el documento se genera después desde el detalle",
       body: (
         <FirmaArchivoStep
           onCreate={handleCreate}

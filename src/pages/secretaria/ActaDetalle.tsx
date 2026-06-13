@@ -8,7 +8,9 @@ import {
   useCertificationsByMinute,
   useCertificationPlanForMinute,
   useMaterializeMeetingPointAgreement,
+  useUpdateActaBorrador,
 } from "@/hooks/useActas";
+import { isActaBorradorEditable } from "@/lib/secretaria/acta-edicion";
 import { AprobarActaButton } from "@/components/secretaria/AprobarActaButton";
 import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertificacionButton";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
@@ -191,6 +193,10 @@ export default function ActaDetalle() {
   const requestedPlantillaId = searchParams.get("plantilla");
   const requestedTemplateType = searchParams.get("tipo");
   const [materializingPoint, setMaterializingPoint] = useState<number | null>(null);
+  // W0 — edición del contenido del acta en borrador.
+  const [editingActa, setEditingActa] = useState(false);
+  const [draftContent, setDraftContent] = useState("");
+  const updateBorrador = useUpdateActaBorrador(id);
 
   if (isLoading) {
     return (
@@ -559,11 +565,25 @@ export default function ActaDetalle() {
             className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
-            <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] px-5 py-3">
-              <FileSignature className="h-4 w-4 text-[var(--g-brand-3308)]" />
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Contenido del acta
-              </h2>
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <FileSignature className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Contenido del acta
+                </h2>
+              </div>
+              {isActaBorradorEditable(m) && !editingActa ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftContent(m.content ?? "");
+                    setEditingActa(true);
+                  }}
+                  className="text-xs font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                >
+                  Editar contenido
+                </button>
+              ) : null}
             </div>
             <div className="p-6">
               {actaValidationIssues.length > 0 || actaRrmIssues.length > 0 ? (
@@ -593,9 +613,61 @@ export default function ActaDetalle() {
               {/* Legibility BATCH 2: el contenido legal del acta sube de
                   text-sm (14px) a text-base (16px) con leading-loose y
                   padding generoso para facilitar revisión densa. */}
-              <pre className="whitespace-pre-wrap font-sans text-base leading-loose text-[var(--g-text-primary)]">
-                {actaPuntos.length > 0 ? renderActaLegalStructureText(actaLegalStructure) : m.content ?? "— Sin contenido —"}
-              </pre>
+              {editingActa ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={draftContent}
+                    onChange={(e) => setDraftContent(e.target.value)}
+                    rows={20}
+                    aria-label="Editar contenido del acta en borrador"
+                    className="w-full resize-y border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 font-sans text-base leading-loose text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={updateBorrador.isPending || !draftContent.trim()}
+                      aria-busy={updateBorrador.isPending}
+                      onClick={() => {
+                        updateBorrador.mutate(draftContent, {
+                          onSuccess: () => {
+                            toast.success("Borrador del acta guardado.");
+                            setEditingActa(false);
+                          },
+                          onError: (e) =>
+                            toast.error(
+                              e instanceof Error ? e.message : "No se pudo guardar el borrador del acta.",
+                            ),
+                        });
+                      }}
+                      className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-60"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      {updateBorrador.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Guardar borrador
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingActa(false)}
+                      className="px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  {actaPuntos.length > 0 ? (
+                    <p className="text-xs text-[var(--g-text-secondary)]">
+                      Esta acta tiene estructura por orden del día; la vista de lectura muestra esa
+                      estructura. Aquí editas el texto canónico almacenado (<code>minutes.content</code>),
+                      que es el que se usa para la aprobación y la certificación.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-base leading-loose text-[var(--g-text-primary)]">
+                  {actaPuntos.length > 0 ? renderActaLegalStructureText(actaLegalStructure) : m.content ?? "— Sin contenido —"}
+                </pre>
+              )}
             </div>
           </div>
 
@@ -811,6 +883,8 @@ export default function ActaDetalle() {
                     bodyId={acta.body_id}
                     agreementIds={certificationAgreementRefs}
                     userRole={primaryRole}
+                    entidadNombre={entity}
+                    organoNombre={body}
                     disabledReason={certificationGateReason}
                   />
                 ) : null}

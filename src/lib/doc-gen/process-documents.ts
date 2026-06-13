@@ -4,6 +4,7 @@ import { mergeVariables } from "./variable-resolver";
 import { renderTemplate } from "./template-renderer";
 import { archiveDocxToStorage } from "./storage-archiver";
 import { resolveProcessDocumentFinalEvidenceReadiness } from "./process-document-readiness";
+import { domainTextTargetForKind } from "./domain-text-target";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import type { SecretariaAIAssist } from "@/lib/secretaria/document-generation-boundary";
@@ -789,6 +790,27 @@ export async function persistProcessArchiveLink(
   archive: ProcessDocumentArchiveResult,
 ) {
   if (!archive.archived) return;
+
+  // W0 #1 — unificar la fuente de verdad de texto: reescribir el cuerpo
+  // revisado a la columna de dominio para que el detalle muestre lo mismo que
+  // se archivó (cierra la divergencia draft↔dominio). La política de qué kinds
+  // sincronizan vive —y se testea— en `domainTextTargetForKind`. RLS aísla por
+  // tenant; el call-site envuelve esta función en `.catch()` (best-effort).
+  const reviewedBody = input.reviewedBodyText?.trim();
+  const domainTarget = reviewedBody ? domainTextTargetForKind(input.kind) : null;
+  if (reviewedBody && domainTarget) {
+    if (domainTarget.table === "convocatorias") {
+      await supabase
+        .from("convocatorias")
+        .update({ convocatoria_text: reviewedBody })
+        .eq("id", input.recordId);
+    } else if (domainTarget.table === "unipersonal_decisions") {
+      await supabase
+        .from("unipersonal_decisions")
+        .update({ content: reviewedBody })
+        .eq("id", input.recordId);
+    }
+  }
 
   if (input.kind === "CERTIFICACION" && archive.evidenceBundleIds[0]) {
     await supabase
