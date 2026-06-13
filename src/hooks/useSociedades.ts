@@ -80,6 +80,9 @@ export function useSociedades() {
         .select("*")
         .eq("tenant_id", tenantId!)
         .not("person_id", "is", null)
+        // W3: oculta artefactos de E2E/pruebas del listado operativo. El detalle
+        // por id/slug NO filtra (un enlace directo a una TEST sigue abriendo).
+        .neq("data_class", "TEST")
         .order("common_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as SociedadRow[];
