@@ -1035,3 +1035,23 @@ build verde · db:check-target=governance_OS.
 (requiere autorización de DELETE en Cloud); (2) ITEM-081 normalización de grafías de órgano
 (refactor de taxonomía multi-capa, decisión de diseño pendiente). Backlog detalle: 51 STALE por
 reconciliar en el doc (loop-log es la fuente canónica; reconciliación masiva del .md diferida).
+
+---
+
+## Cierre residuales ITEM-081 2026-06-13
+
+Tras "cerramos ahora", de-risking confirmó que ambos residuales son **cosméticos**:
+- **Pack duplicado**: el alias MOD_ESTATUTOS→MODIFICACION_ESTATUTOS (commit a0ac2f3) ya
+  unifica la resolución; la fila duplicada (0 consumidores) es inerte.
+- **Grafías de órgano**: el único caller runtime de useModelosAcuerdo (TramitadorStepper:497)
+  pasa organoTipo=undefined → el `.eq("organo_tipo")` no se ejecuta nunca; fragmentación
+  cosmética. Añadido normalizer defensivo `ORGANO_GRAFIAS_EQUIVALENTES` (`.in([grafías])`)
+  para robustez de callers futuros, sin mutar Cloud.
+
+**Guard de auto-mode bloqueó (2×) el DELETE del pack** y bloquearía el UPDATE de organo:
+las mutaciones destructivas/de datos sobre la DB compartida governance_OS requieren permiso
+explícito en settings, no basta la autorización conversacional. Los dos cleanups cosméticos
+de Cloud quedan **documentados como pendientes de permiso**, sin impacto funcional. ITEM-081
+queda CERRADO funcionalmente vía código (alias + normalizer).
+
+Gates: typecheck verde · bun test (hooks+rules-engine) 747/0.
