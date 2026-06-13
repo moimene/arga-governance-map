@@ -478,10 +478,35 @@ export default function BoardPackPage() {
     },
   });
 
-  const meetingId = validParamId ?? fallbackMeeting?.id ?? "";
+  // ITEM (audit nav #1): la ruta /secretaria/board-pack/:id puede recibir un slug
+  // (p. ej. 'cda-22-04-2026') o un UUID. useBoardPackData consulta meetings por id
+  // (uuid) y los queries dependientes filtran por meeting_id (FK uuid), así que un
+  // slug crudo provocaba un 400 ("invalid input syntax for type uuid"). Resolvemos
+  // el slug a UUID ANTES de alimentar el hook; un UUID pasa directo.
+  const paramIsUuid =
+    !!validParamId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validParamId);
+  const paramIsSlug = !!validParamId && !paramIsUuid;
+  const { data: resolvedFromSlug, isLoading: loadingSlug } = useQuery({
+    queryKey: ["board-pack", "resolve-slug", tenantId, validParamId],
+    enabled: paramIsSlug && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("id")
+        .eq("slug", validParamId!)
+        .eq("tenant_id", tenantId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.id as string | undefined) ?? null;
+    },
+  });
+
+  const meetingId =
+    (paramIsUuid ? validParamId : resolvedFromSlug) ?? fallbackMeeting?.id ?? "";
   const { data: boardPackData, isLoading, error } = useBoardPackData(meetingId, scopedEntityId);
 
-  if (isLoading || loadingFallback) {
+  if (isLoading || loadingFallback || loadingSlug) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-[var(--g-text-secondary)]">Cargando Board Pack...</p>
