@@ -91,8 +91,8 @@ describe("evaluarAutorizacionesRegulatorias", () => {
     expect(r.required).toContain("DGSFP");
   });
 
-  it("grafías estructurales agregadas (FUSION_ESCISION, VENTA_ACTIVOS_SUSTANCIALES) disparan DGSFP", () => {
-    for (const materia of ["FUSION_ESCISION", "VENTA_ACTIVOS_SUSTANCIALES"]) {
+  it("grafías estructurales agregadas (FUSION_ESCISION, VENTA_ACTIVOS_SUSTANCIALES, MODIFICACION_OBJETO) disparan DGSFP", () => {
+    for (const materia of ["FUSION_ESCISION", "VENTA_ACTIVOS_SUSTANCIALES", "MODIFICACION_OBJETO"]) {
       const r = evaluarAutorizacionesRegulatorias({
         materia,
         esEntidadRegulada: true,

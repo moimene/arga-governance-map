@@ -54,6 +54,8 @@ const DGSFP_TRIGGER_MATERIAS = new Set<string>([
   "CESION_GLOBAL_ACTIVO",
   "OPERACION_ESTRUCTURAL",
   "AMPLIACION_OBJETO_SOCIAL",
+  "MODIFICACION_OBJETO",
+  "MODIFICACION_OBJETO_SOCIAL",
   // Grafías estructurales agregadas que aparecen como agreement_kind y que el
   // alias no normaliza (hallazgo /codex W7): cubrir las variantes evita falsos
   // negativos que ocultarían la exigencia de autorización.
