@@ -51,7 +51,7 @@ Los seis bloques y los tres anexos forman la **Parte I — Referencia funcional 
 
 El módulo de **Secretaría Societaria** es un prototipo operativo avanzado que cubre el ciclo de vida completo de los actos societarios formales de un grupo asegurador multinacional: desde la **convocatoria** del órgano, pasando por la **celebración** de la sesión (constitución, quórum, votación), el **levantamiento del acta**, la **certificación** del acuerdo y su **elevación a público e inscripción registral**, hasta la **generación documental** con firma cualificada y archivo probatorio. Soporta también las formas de adopción sin reunión (acuerdos por escrito, co-aprobación de administradores mancomunados, administrador solidario) y las decisiones de socio único y administrador único.
 
-Su rasgo diferencial es que **el conocimiento jurídico no está en el código sino externalizado en datos versionables**: un catálogo de **57 materias societarias** (58 *rule packs*) con su clase, quórum, mayoría, inscribibilidad e instrumento público por tipo social, evaluado por un **motor de reglas LSC determinista** (funciones puras, con árbol de explicación trazable nodo a nodo) que resuelve la jerarquía normativa LEY → ESTATUTOS → PACTO PARASOCIAL → REGLAMENTO, distingue el incumplimiento contractual (pacto) de la invalidez societaria, y trata las sociedades cotizadas evaluando y advirtiendo (LMV) sin bloquear.
+Su rasgo diferencial es que **el conocimiento jurídico no está en el código sino externalizado en datos versionables**: un catálogo de **56 materias societarias** (57 *rule packs*) con su clase, quórum, mayoría, inscribibilidad e instrumento público por tipo social, evaluado por un **motor de reglas LSC determinista** (funciones puras, con árbol de explicación trazable nodo a nodo) que resuelve la jerarquía normativa LEY → ESTATUTOS → PACTO PARASOCIAL → REGLAMENTO, distingue el incumplimiento contractual (pacto) de la invalidez societaria, y trata las sociedades cotizadas evaluando y advirtiendo (LMV) sin bloquear.
 
 Toda la producción documental se construye a partir de **plantillas protegidas en tres capas** (cuerpo jurídico inmutable / variables resueltas automáticamente desde la base de datos / campos editables), sujetas a un control de calidad pre-activación (**Gate PRE**) y a un ciclo de vida auditado. Cada acto certificado encadena una **cadena de evidencia criptográfica** (censo inmutable WORM → `gate_hash` → firma QES con sello de tiempo de EAD Trust → archivado SHA-512 → *evidence bundle*), respaldada por una **auditoría WORM** verificable. El acceso está gobernado por **RBAC** (5 roles), una **matriz de capacidades societarias** (quién puede congelar censo, votar y certificar, con razón jurídica anotada) y **segregación de funciones**.
 
@@ -63,20 +63,20 @@ La identidad societaria descansa en un **modelo canónico de 8 tablas** (entidad
 
 | Magnitud | Valor verificado | Nota |
 |---|---|---|
-| **Materias societarias (motor)** | **58 *rule packs* / 57 materias distintas** | Único duplicado: `AUTORIZACION_GARANTIA` (un pack por órgano: Junta + Consejo) |
-| Plantillas `MODELO_ACUERDO` | **70 totales / 58 ACTIVA** (54 materias) | El "58" de modelos activos coincide por azar con los packs; **son catálogos distintos** |
+| **Materias societarias (motor)** | **57 *rule packs* / 56 materias distintas** | Tras retirar el duplicado `MOD_ESTATUTOS` (W5, 2026-06-13). Único duplicado restante: `AUTORIZACION_GARANTIA` (un pack por órgano: Junta + Consejo) |
+| Plantillas `MODELO_ACUERDO` | **70 totales / 58 ACTIVA** (54 materias) | Catálogo distinto de los *rule packs* (`plantillas_protegidas` para documentos vs `rule_packs` para reglas) |
 | Plantillas protegidas (todas) | **110 totales / 75 ACTIVA / 35 ARCHIVADA** | 100 % jurisdicción `ES`; `tipo_social` NULL en todas |
 | Órganos de gobierno de ARGA Seguros, S.A. | **12** | 1 Junta + 1 CdA + 5 Comisiones + 5 Comités |
 | Composición del Consejo de Administración | **17 condiciones vigentes** | 1 Presidente + 1 Secretario (no consejero) + 15 Consejeros (uno PJ) |
 | Capital social de ARGA Seguros, S.A. | **307.955.327,30 €** | 3.079.553.273 títulos × 0,10 € nominal |
 | Cap table de control | **Cartera ARGA S.L.U. 69,69 % + free float 30,31 % = 100 %** | Clase única ORD |
-| Acuerdos (`agreements`) | **145 totales** | DRAFT 101 · PROPOSED 4 · ADOPTED 25 · CERTIFIED 13 · INSTRUMENTED 1 · FILED 1 |
+| Acuerdos (`agreements`) | **145 totales** | DRAFT 101 · PROPOSED 4 · ADOPTED 25 · CERTIFIED 12 · FILED 1 · REGISTERED 2 (golden path W2) |
 | Acuerdos por modo de adopción | MEETING 113 · UNIPERSONAL_SOCIO 20 · NO_SESSION 7 · UNIVERSAL 4 · UNIPERSONAL_ADMIN 1 | suma = 145 (control de integridad) |
 | Reuniones (`meetings`) | CONVOCADA 8 · CELEBRADA 16 | |
 | Acuerdos sin sesión | APROBADO 4 · RECHAZADO 6 | |
 | Decisiones unipersonales | BORRADOR 11 · FIRMADA 5 | |
 | Certificaciones | **7 firmadas** (`signature_status = SIGNED`) | |
-| Expedientes registrales (`registry_filings`) | **6** (PREPARADA 2 · PRESENTADA 1 · EN_TRAMITE 1 · SUBSANACION 1 · ELEVADA 1) | **Sin `INSCRITA` ni `DENEGADA`** poblados (ver Anexo C) |
+| Expedientes registrales (`registry_filings`) | **6** (PREPARADA 2 · INSCRITA 2 · DENEGADA 1 · ELEVADA 1) | Golden path sembrado (W2, 2026-06-13): 2 INSCRITA (directa + subsanación resuelta, con inscripción + BORME) + 1 DENEGADA con defecto calificado |
 | Libros y registros (`mandatory_books`) | **552 filas / 252 legalizables / 2 legalizadas** | Legalización prospectiva en la demo |
 | Pactos parasociales | **3 cláusulas VIGENTES** | VETO + MAYORIA_REFORZADA_PACTADA + CONSENTIMIENTO_INVERSOR |
 | RBAC | **5 roles · matriz de capacidades 35 filas (5×7) · 4 pares tóxicos SoD** | |
@@ -920,7 +920,7 @@ El conocimiento jurídico del módulo de Secretaría Societaria se externaliza e
 | `rule_pack_versions` | Versiones versionadas e inmutables de cada materia, con la regla material completa en `payload` (JSONB) | `pack_id`, `version`, `payload`, `is_active`, `status`, `effective_from`/`effective_to`, `approved_at`/`approved_by`, `payload_hash`, `supersedes_version_id` |
 | `rule_param_overrides` | Personalizaciones (estatutarias, pactadas, jurisdiccionales) que elevan —nunca rebajan— el suelo legal | `materia`, `clave`, `valor`, `fuente`, `referencia` |
 
-A fecha de extracción el catálogo contiene **58 *rule packs*** que cubren **57 materias jurídicas distintas** (verificado en Cloud: `count(*) = 58`, `count(DISTINCT materia) = 57`), todos del tenant demo. La única materia con doble pack es `AUTORIZACION_GARANTIA`, que tiene **un pack por órgano** (Junta General y Consejo de Administración). El número "58" se refiere por tanto a *packs de regla*, no a materias; no debe confundirse con las 58 plantillas `MODELO_ACUERDO` en estado ACTIVA (de un total de 70) que reporta la sección de gestión documental — son dos catálogos distintos (`rule_packs` para reglas, `plantillas_protegidas` para documentos) que coinciden numéricamente por casualidad. La regla material de cada materia (clase, quórum, mayoría, canales de convocatoria, documentación obligatoria, instrumento público, plazos de inscripción) no vive en columnas planas sino en el `payload` JSONB de la versión activa, estructurado **por tipo social** (`SA`, `SL`, `CONSEJO`) con su cita de artículo LSC/RRM. Por ejemplo, para `MODIFICACION_ESTATUTOS` el payload distingue `votacion.mayoria.SA` = "reforzada art. 201.2 LSC", `votacion.mayoria.SL` = "favor > 1/2 capital total con voto (art. 199.a LSC)", `constitucion.quorum.SA_1a` = 0,50 (art. 194.1 LSC) y `constitucion.quorum.SA_2a` = 0,25, con `postAcuerdo.inscribible = true`, `instrumentoRequerido = ESCRITURA` y `plazoInscripcion = 60 días (art. 19 RRM)`.
+A fecha de revisión el catálogo contiene **57 *rule packs*** que cubren **56 materias jurídicas distintas** (tras retirar el duplicado legacy `MOD_ESTATUTOS` en W5; verificado en Cloud el 2026-06-13: `count(*) = 57`, `count(DISTINCT materia) = 56`), todos del tenant demo. La única materia con doble pack es `AUTORIZACION_GARANTIA`, que tiene **un pack por órgano** (Junta General y Consejo de Administración). El número "57" se refiere a *packs de regla*, no a materias; no debe confundirse con las 58 plantillas `MODELO_ACUERDO` en estado ACTIVA (de un total de 70) que reporta la sección de gestión documental — son dos catálogos distintos (`rule_packs` para reglas, `plantillas_protegidas` para documentos). La regla material de cada materia (clase, quórum, mayoría, canales de convocatoria, documentación obligatoria, instrumento público, plazos de inscripción) no vive en columnas planas sino en el `payload` JSONB de la versión activa, estructurado **por tipo social** (`SA`, `SL`, `CONSEJO`) con su cita de artículo LSC/RRM. Por ejemplo, para `MODIFICACION_ESTATUTOS` el payload distingue `votacion.mayoria.SA` = "reforzada art. 201.2 LSC", `votacion.mayoria.SL` = "favor > 1/2 capital total con voto (art. 199.a LSC)", `constitucion.quorum.SA_1a` = 0,50 (art. 194.1 LSC) y `constitucion.quorum.SA_2a` = 0,25, con `postAcuerdo.inscribible = true`, `instrumentoRequerido = ESCRITURA` y `plazoInscripcion = 60 días (art. 19 RRM)`.
 
 Esto significa que para una misma materia el motor emite quórum y mayoría distintos según la entidad sea SA o SL, y según se convoque en primera o segunda convocatoria; las columnas "Quórum SA 1ª/2ª" y "Mayoría" de las tablas siguientes resumen esos valores ya resueltos desde el payload activo.
 
@@ -928,7 +928,7 @@ Trazabilidad de cada materia: tabla `rule_packs` (id/descripción/órgano) + `ru
 
 ---
 
-## 2. Inventario completo de materias (58 packs · 57 materias distintas)
+## 2. Inventario completo de materias (57 packs · 56 materias distintas)
 
 ### 2.1 Junta General — Materias ESTRUCTURALES
 
@@ -1900,7 +1900,7 @@ Estados de cada entidad del módulo, con su etiqueta en castellano (`status-labe
 |---|---|---|
 | **Acuerdo** (`agreements`) | `DRAFT` Borrador → `PROPOSED` Propuesto → `ADOPTED` Adoptado → `CERTIFIED` Certificado → `INSTRUMENTED` Instrumentado → `FILED` Preparado para registro → `REGISTERED` Inscrito → `PUBLISHED` Publicado · (rama terminal) `REJECTED_REGISTRY` Rechazado por el RM | 145 total: DRAFT 101 · PROPOSED 4 · ADOPTED 25 · CERTIFIED 13 · INSTRUMENTED 1 · FILED 1 |
 | **Reunión** (`meetings`) | `PROGRAMADA` → `CONVOCADA` → `EN_CURSO` → `CELEBRADA` · `CANCELADA` | CONVOCADA 8 · CELEBRADA 16 |
-| **Expediente registral** (`registry_filings`) | `PREPARADA` → `PRESENTADA` → `EN_TRAMITE` → `SUBSANACION` → `INSCRITA` · `ELEVADA` (a público) · `DENEGADA`. Alias legacy r/o: `SUBMITTED`/`INSCRIBED`/`ELEVATED` | PREPARADA 2 · PRESENTADA 1 · EN_TRAMITE 1 · SUBSANACION 1 · ELEVADA 1. **Sin `INSCRITA`/`DENEGADA`** (Anexo C) |
+| **Expediente registral** (`registry_filings`) | `PREPARADA` → `PRESENTADA` → `EN_TRAMITE` → `SUBSANACION` → `INSCRITA` · `ELEVADA` (a público) · `DENEGADA`. Alias legacy r/o: `SUBMITTED`/`INSCRIBED`/`ELEVATED` | PREPARADA 2 · INSCRITA 2 · DENEGADA 1 · ELEVADA 1 (golden path sembrado W2, 2026-06-13) |
 | **Acuerdo sin sesión** (`no_session_resolutions`) | `BORRADOR` → `VOTING_OPEN` Votación abierta → `APROBADO` · `RECHAZADO` | APROBADO 4 · RECHAZADO 6 |
 | **Decisión unipersonal** (`unipersonal_decisions`) | `BORRADOR` → `FIRMADA` | BORRADOR 11 · FIRMADA 5 |
 | **Certificación** (`certifications`) | `signature_status`: `PENDING` → `SIGNED` | SIGNED 7 |
@@ -1922,7 +1922,7 @@ Para una lectura jurídica honesta del prototipo, el equipo legal debe conocer l
 
 3. **El "camino feliz" registral no llega a inscripción real en la demo.** `registry_filings` no tiene ningún expediente en estado terminal `INSCRITA` ni `DENEGADA`; el golden path demostrativo se detiene antes de la inscripción registral efectiva. Es una limitación de datos demo, relevante antes de enseñar el cierre del ciclo a un cliente.
 
-4. **Cobertura jurídica íntegramente española.** Los 58 *rule packs* y las 110 plantillas son **100 % `ES`**. Portugal es *preview* de *overrides*; Brasil y México son post-GA. La pantalla de multi-jurisdicción es una herramienta de **formalización local** (ejecución de la decisión del grupo español + inscripción en la filial), **no** un motor de reglas extranjero: no valida quórum/mayorías de filial (irrelevante por socio/accionista único), no integra con JUCESP/IRN/RPC, ni gestiona autorizaciones SUSEP/CNSF/BdP (las gestiona el departamento legal).
+4. **Cobertura jurídica íntegramente española.** Los 57 *rule packs* y las 110 plantillas son **100 % `ES`**. Portugal es *preview* de *overrides*; Brasil y México son post-GA. La pantalla de multi-jurisdicción es una herramienta de **formalización local** (ejecución de la decisión del grupo español + inscripción en la filial), **no** un motor de reglas extranjero: no valida quórum/mayorías de filial (irrelevante por socio/accionista único), no integra con JUCESP/IRN/RPC, ni gestiona autorizaciones SUSEP/CNSF/BdP (las gestiona el departamento legal).
 
 5. **Comisión de Riesgos Regulada ≠ Comité de Riesgos.** ARGA tiene ambos órganos, que son figuras distintas: la **Comisión de Riesgos Regulada** es órgano societario-estatutario (art. 529 *quindecies* LSC para cotizadas, reforzado por la Ley 20/2015 para aseguradoras), mientras que el **Comité de Riesgos** es un comité interno de gestión. Tienen base legal y valor jurídico diferentes aunque el módulo los gestione en paralelo.
 
@@ -2150,7 +2150,7 @@ Los informes situaban en la "Fase 1 — cimientos" cinco trabajos que **ya está
 
 Heredadas de los informes y vigentes tras la validación:
 
-1. **Retirada del pack `MOD_ESTATUTOS`** (G5b): ¿eliminación física inmediata (0 consumidores verificados) o coexistencia con *deprecation warning*? El alias ya lo hace inocuo.
+1. ~~**Retirada del pack `MOD_ESTATUTOS`** (G5b)~~ — ✅ **RESUELTO (W5, 2026-06-13):** pack retirado en Cloud y todo el runtime hecho alias-safe (ver IV.4).
 2. **Hard block del RPC de certificación** (G3b): ¿replicar en `fn_generar_certificacion` la verificación de `inscripcion_rm_referencia` que hoy solo está en la UI, para defensa en profundidad?
 3. **ANCERT vs PRESCAR/SIR** (G2): canal de presentación registral preferente en el cierre del ciclo.
 4. **Retención por tipo documental** (G1/W1): ¿máximo legal (10 años fiscal) o mínimo (6 años CCom) por defecto?
@@ -2159,3 +2159,21 @@ Heredadas de los informes y vigentes tras la validación:
 7. **Gates sectoriales** (G13/W7): catálogo definitivo de organismos y si entran en el horizonte medio o evolutivo.
 8. **`data_class`** (G3d/W3): criterio de segregación demo/test/pre/prod y tratamiento de los artefactos E2E ya presentes en el tenant.
 
+
+## IV.4. Estado de ejecución del evolutivo correctivo (run autónomo 2026-06-13)
+
+Ejecución autónoma con revisión adversarial `/codex` por fase. Estado verificado de cada frente:
+
+| Frente | Estado | Detalle |
+|---|---|---|
+| **W0** Saneamiento generación documental | ✅ **Hecho** | Editor de acta en borrador (`fn_actualizar_borrador_acta`), endurecimiento de convocatoria, cuerpo de certificación, unificación de fuente de texto, decisión unipersonal renombrada. Merged a `main`. |
+| **W6** `capability_matrix.reason` 35/35 | ✅ **Hecho** | 6 razones jurídicas restantes anotadas + guard de regresión. |
+| **W5** Retirar pack `MOD_ESTATUTOS` | ✅ **Hecho (adversarial)** | Pack retirado en Cloud. La revisión `/codex` (5 rondas) destapó que la grafía era *load-bearing* en ~7 sitios de match exacto sin alias; se hizo **alias-safe todo el runtime** (`rulePackMateriaMatches` en compliance, preview, useRulePacks, ReunionStepper, matter-registry, votacion-engine, prototype-fallback), lo que además **corrige un bug latente para TODAS las grafías aliased** (AMPLIACION_CAPITAL, etc.). Overrides huérfanos limpiados. |
+| **W2** Golden path registral | ✅ **Hecho (demo)** | Sembrados 2 INSCRITA (directa + subsanación resuelta, con inscripción + BORME) + 1 DENEGADA con defecto; agreements coherentes a REGISTERED. El **canal registral real (PRESCAR/SIR/ANCERT) es externo y queda fuera de dev**. |
+| **W3** Calidad de datos (`data_class`) | ⏳ **Pendiente** | Requiere columna + clasificación + filtro de listas; el filtro global tiene riesgo de *spiral* (como el barrido de alias). Bounded como sprint propio. |
+| **W4** Libros: cierre de volumen + Legalia | ⏳ **Pendiente** | El esquema existe; falta RPC `fn_libro_cerrar_volumen` + UI + máquina de legalización. Feature de tamaño medio. |
+| **W7** Gates sectoriales (DGSFP/SUSEP/CNSF/BdP) | ⏳ **Pendiente** | Requiere tabla `autorizacion_regulatoria` + evaluador + enforcement; el *hard block* en el flujo es integración no trivial. |
+| **W1** Capa probatoria QTSP productiva | ⛔ **Bloqueado (externo)** | Necesita credenciales/proxy real de EAD Trust en servidor; no implementable en dev sin infra QTSP. El *fail-closed* y el gate sandbox ya existen. |
+| **W8/W9/W10** Multi-jurisdicción / cross-módulo / IA | ⏳ **Horizonte (no dev-autónomo)** | Features multi-semana (motores BR/MX/PT, *event bus*, redacción asistida). Fuera del alcance de un run autónomo. |
+
+**Gates del run:** `typecheck` ✓ · `build` ✓ · `bun test` 1991 pass / 0 fail · 9 migraciones Cloud aplicadas y espejadas · `main` consolidado y pusheado. Cada fase pasó revisión adversarial `/codex` (W5 requirió 5 rondas hasta veredicto CLEAN).
