@@ -1,6 +1,6 @@
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus, Copy } from "lucide-react";
 import { useConvocatoriaById, useConvocatoriaAttachments } from "@/hooks/useConvocatorias";
 import { useCreateMeetingFromConvocatoria, useMeetingForConvocatoria } from "@/hooks/useReunionSecretaria";
 import { statusLabel } from "@/lib/secretaria/status-labels";
@@ -417,6 +417,22 @@ export default function ConvocatoriaDetalle() {
           >
             <CalendarPlus className="h-4 w-4" />
             {scheduledMeeting ? "Abrir reunión" : "Programar reunión"}
+          </button>
+          {/* ITEM-097: el wizard de convocatoria no permite editar in situ un
+              BORRADOR existente. Opción ligera: clonar esta convocatoria como
+              base de una nueva, reutilizando el prefill `?clonarDe=<id>` del
+              stepper (órgano, entidad, tipo de sesión, fechas, canales, agenda…)
+              sin copiar identificadores ni estado. */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(scope.createScopedTo(`/secretaria/convocatorias/nueva?clonarDe=${conv.id}`))
+            }
+            className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <Copy className="h-4 w-4" />
+            Clonar como nueva
           </button>
           {conv.fecha_1 ? (
             <button

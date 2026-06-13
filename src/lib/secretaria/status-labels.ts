@@ -6,9 +6,9 @@ export const STATUS_LABEL: Record<string, string> = {
   Inactive:     "Inactiva",
   // ITEM-102: claves inglesas legacy del Tramitador (ya migradas en Cloud al
   // vocabulario español canónico, se mantienen por compatibilidad de lectura).
-  ELEVATED:     "Elevada a público",
-  SUBMITTED:    "Presentada",
-  INSCRIBED:    "Inscrita",
+  ELEVATED:     "Elevada a público (legacy)",
+  SUBMITTED:    "Presentada (legacy)",
+  INSCRIBED:    "Inscrita (legacy)",
 
   // Acuerdos sin sesión
   BORRADOR:     "Borrador",

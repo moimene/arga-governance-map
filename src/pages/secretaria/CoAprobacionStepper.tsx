@@ -15,6 +15,8 @@ import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNo
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { evaluarCoAprobacion } from "@/lib/rules-engine/votacion-engine";
 import type { CoAprobacionConfig, TipoSocial } from "@/lib/rules-engine/types";
+import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { PactosCompliancePanel } from "@/components/secretaria/PactosCompliancePanel";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
@@ -514,6 +516,11 @@ export default function CoAprobacionStepper() {
   const n = activeAdmins.length;
   const adminVigentes = useMemo(() => activeAdmins.map((a) => a.person_id), [activeAdmins]);
 
+  // ITEM-113: pactos parasociales vigentes de la sociedad. La co-aprobación es
+  // un flujo sin sesión que antes no evaluaba pactos; ahora un veto de
+  // operación estructural (Fundación ARGA) dispara su advertencia contractual.
+  const { data: pactosVigentes = [] } = usePactosVigentes(selectedEntityId ?? undefined);
+
   useEffect(() => {
     if (!scopedEntityId) return;
     setSelectedEntityId(scopedEntityId);
@@ -666,7 +673,12 @@ export default function CoAprobacionStepper() {
       case 3:
         return <StepFirmas activeAdmins={activeAdmins} firmas={firmas} setFirmas={setFirmas} />;
       case 4:
-        return <StepEvaluacion result={motorResult} />;
+        return (
+          <div className="space-y-4">
+            <StepEvaluacion result={motorResult} />
+            <PactosCompliancePanel pactos={pactosVigentes} materia={materia} />
+          </div>
+        );
       case 5:
         return (
           <div className="space-y-4">

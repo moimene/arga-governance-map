@@ -946,4 +946,57 @@ describe('evaluarConvocatoria', () => {
       expect(fallbackNode).toBeUndefined();
     });
   });
+
+  // ================================================================
+  // ITEM-093: plazo de antelación incumplido produce WARNING
+  // ================================================================
+  describe('plazo de antelación (ITEM-093)', () => {
+    it('emite WARNING cuando la publicación es posterior a la fecha límite', () => {
+      const pack = createTestPack();
+      // SA, junta el 2026-05-15, antelación 1 mes → límite 2026-04-15.
+      // Publicación el 2026-05-01 (tarde) → plazo incumplido.
+      const result = evaluarConvocatoria(
+        { ...defaultInput, tipoSocial: 'SA', fechaPublicacion: '2026-05-01' },
+        [pack],
+        [],
+      );
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some((w) => w.includes('antelación incumplido'))).toBe(true);
+      expect(result.severity).toBe('WARNING');
+      const node = result.explain.find(
+        (n) => n.regla === 'Antelación cumplida' && n.resultado === 'WARNING',
+      );
+      expect(node).toBeDefined();
+    });
+
+    it('NO emite WARNING cuando la publicación respeta la antelación', () => {
+      const pack = createTestPack();
+      // SA, junta el 2026-05-15, límite 2026-04-15. Publicación 2026-04-01 → OK.
+      const result = evaluarConvocatoria(
+        { ...defaultInput, tipoSocial: 'SA', fechaPublicacion: '2026-04-01' },
+        [pack],
+        [],
+      );
+
+      expect(result.warnings.length).toBe(0);
+      expect(result.severity).toBe('OK');
+      const node = result.explain.find(
+        (n) => n.regla === 'Antelación cumplida' && n.resultado === 'OK',
+      );
+      expect(node).toBeDefined();
+    });
+
+    it('NO evalúa el plazo cuando no se proporciona fechaPublicacion', () => {
+      const pack = createTestPack();
+      const result = evaluarConvocatoria(
+        { ...defaultInput, tipoSocial: 'SA' },
+        [pack],
+        [],
+      );
+
+      expect(result.warnings.length).toBe(0);
+      expect(result.explain.some((n) => n.regla === 'Antelación cumplida')).toBe(false);
+    });
+  });
 });

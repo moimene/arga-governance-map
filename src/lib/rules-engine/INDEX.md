@@ -2,13 +2,19 @@
 
 Implementación pura (sin side effects, sin DB, sin React/Supabase) del motor determinístico de gobernanza corporativa.
 
-> **Estado del índice (2026-06-11, ITEM-117 / ITEM-119):** este documento se ha
+> **Estado del índice (2026-06-13, ITEM-117 / ITEM-119):** este documento se ha
 > reescrito contra el código real del directorio. Antes describía 4 de los ~27
 > módulos, listaba consumidores inexistentes y contradecía DL-2. La sección
-> **Inventario de módulos** distingue ahora cada módulo como **VIVO** (tiene al
-> menos un consumidor runtime, directo o transitivo) o **DEAD-CODE** (solo lo
-> consumen tests). No se ha eliminado código en esta pasada; la decisión por
-> módulo queda documentada para una limpieza posterior supervisada.
+> **Inventario de módulos** clasifica ahora cada módulo en una de tres categorías:
+> **ACTIVO** (consumido en runtime, directa o transitivamente), **SPEC-ONLY**
+> (sin consumidor runtime; solo lo consumen sus tests, conserva valor de
+> especificación jurídica) o **SUPERSEDED** (sin consumidor runtime y además
+> reemplazado por una vía server-side o por `template-admin/`).
+>
+> **DECISIÓN ITEM-117: ARCHIVAR + DOCUMENTAR.** No se cablea ningún módulo al
+> motor en esta pasada, **no** se borra ningún archivo (rompería tests/imports
+> del barrel) y **no** se cambia su lógica. Los módulos SUPERSEDED llevan una
+> cabecera JSDoc `@deprecated ITEM-117`. Limpieza/poda posterior supervisada.
 
 ---
 
@@ -19,7 +25,20 @@ tests, y por trazabilidad transitiva a través del barrel `index.ts` y del
 orquestador (`evaluarAcuerdoCompleto`, consumido por `usePreviewAcuerdo.ts` y
 `useAgreementCompliance.ts`).
 
-### Módulos VIVOS (consumidor runtime directo o transitivo)
+**Taxonomía:**
+
+| Estado | Significado | Acción ITEM-117 |
+|---|---|---|
+| **ACTIVO** | Consumidor runtime directo o transitivo. | Conservar; ninguna. |
+| **SPEC-ONLY** | 0 consumidores runtime; solo lo consumen sus tests. Conserva valor de especificación jurídica. | Conservar como referencia; NO cablear, NO borrar. |
+| **SUPERSEDED** | 0 consumidores runtime y además reemplazado server-side o por `template-admin/`. | Marcar `@deprecated ITEM-117`; candidato a poda futura supervisada. |
+
+> Nota de verificación (2026-06-13): `evaluarBordesNoComputables` aparece
+> "importado" por `useAgreementCompliance.ts`/`usePreviewAcuerdo.ts`, pero son
+> **comentarios** que documentan la ausencia de cableado, no una llamada runtime.
+> Sigue siendo SPEC-ONLY.
+
+### Módulos ACTIVOS (consumidor runtime directo o transitivo)
 
 | Módulo | Vía de consumo |
 |---|---|
@@ -43,7 +62,7 @@ orquestador (`evaluarAcuerdoCompleto`, consumido por `usePreviewAcuerdo.ts` y
 | `evidence-bundle.ts` | `sha256`, `computeManifestHashSync`, `generarVerificadorOffline` consumidos por doc-gen/hooks. |
 | `comms-plazo-engine.ts` | Consumido por la capa de comunicaciones (1 importador externo). |
 
-> Nota sobre exports parcialmente muertos en módulos vivos: el módulo es VIVO
+> Nota sobre exports parcialmente muertos en módulos ACTIVOS: el módulo es ACTIVO
 > pero algunos símbolos exportados no tienen consumidor runtime, p. ej.
 > `calcularDenominadorAjustado`, `validarCapitalUniversal` (constitucion-engine),
 > `evaluateAgendaItemComplianceGate` (compliance-gates), `determinarAdoptionMode`,
@@ -51,19 +70,27 @@ orquestador (`evaluarAcuerdoCompleto`, consumido por `usePreviewAcuerdo.ts` y
 > (qtsp-integration), `generarEvidenceBundle`, `empaquetarASiCE` (evidence-bundle).
 > Son candidatos a poda de export, no a borrado de archivo.
 
-### Módulos DEAD-CODE (sin consumidor runtime — solo tests)
+### Módulos SPEC-ONLY (sin consumidor runtime — solo tests; valor de especificación)
 
-| Módulo | Símbolo(s) | Decisión |
-|---|---|---|
-| `bordes-no-computables.ts` | `evaluarBordesNoComputables` (DL-2) | **MANTENER (candidato a cablear).** Valor jurídico inmediato (cotizada, art. 182/213/224/305 LSC). DL-2 ya resuelta: emite WARNING + advertencias LMV, **no** bloquea. |
-| `plazos-engine.ts` | canales cotizada CNMV/BORME (art. 517 LSC) | **MANTENER (candidato a cablear).** Valor jurídico inmediato. |
-| `related-party-engine.ts` | operaciones vinculadas (art. 231 LSC) | **MANTENER (candidato a cablear).** Valor jurídico inmediato. |
-| `capital-voting.ts` | cómputo de capital/voto | MANTENER. Reservado; sin consumidor. |
-| `agreement-dependency-validator.ts` | validación de dependencias entre acuerdos | MANTENER. Reservado; sin consumidor. |
-| `effective-rule.ts` | `buildEffectiveRuleProjection` | **SUPERSEDED** por `fn_secretaria_materialize_effective_rule_matrix` (server-side). Candidato a archivar/eliminar tras confirmar la vía server-side. |
-| `rule-evaluation-persistence.ts` | `buildRuleEvaluationResultInsert` | **SUPERSEDED** por `fn_save_meeting_resolutions` (server-side). Candidato a archivar/eliminar. |
-| `plantillas-gate-config.ts` | configuración de gate de plantillas | **SUPERSEDED.** La configuración viva del gate vive en `template-admin/` (`gate-pre.ts` / `gate-pre-semantic.ts`). Candidato a archivar. |
-| `plantillas-engine.ts` (parcial) | `evaluarPlantillaProtegida`, `GO_LIVE_CONFIG`, `calcularRulesetSnapshotId`, `resolverPlantillaConvocatoria` (DL-4) | DEAD-CODE en runtime. Ver **DL-4 (ITEM-119)** abajo. |
+| Módulo | Símbolo(s) | Estado | Decisión |
+|---|---|---|---|
+| `bordes-no-computables.ts` | `evaluarBordesNoComputables` (DL-2) | SPEC-ONLY | **Conservar.** Valor jurídico (cotizada, art. 182/213/224/305 LSC). DL-2 ya resuelta: emite WARNING + advertencias LMV, **no** bloquea. Re-exportado por el barrel pero solo referido en comentarios de los hooks; sin llamada runtime. |
+| `plazos-engine.ts` | canales cotizada CNMV/BORME (art. 517 LSC) | SPEC-ONLY | **Conservar.** Valor jurídico inmediato. |
+| `related-party-engine.ts` | operaciones vinculadas (art. 231 LSC) | SPEC-ONLY | **Conservar.** Valor jurídico inmediato. |
+| `capital-voting.ts` | cómputo de capital/voto | SPEC-ONLY | **Conservar.** Reservado; sin consumidor. |
+| `agreement-dependency-validator.ts` | validación de dependencias entre acuerdos | SPEC-ONLY | **Conservar.** Reservado; sin consumidor. |
+| `plantillas-engine.ts` (parcial) | `evaluarPlantillaProtegida`, `GO_LIVE_CONFIG`, `calcularRulesetSnapshotId`, `resolverPlantillaConvocatoria` (DL-4) | SPEC-ONLY | Sin consumidor runtime. Ver **DL-4 (ITEM-119)** abajo. No se marca `@deprecated` porque sus tipos/símbolos los re-exporta `plantillas-gate-config.ts`. |
+
+### Módulos SUPERSEDED (sin consumidor runtime — reemplazados server-side / `template-admin/`)
+
+Marcados con cabecera JSDoc `@deprecated ITEM-117`. Candidatos a poda futura
+supervisada. NO borrados (rompería tests/imports del barrel).
+
+| Módulo | Símbolo(s) | Reemplazado por | `@deprecated` |
+|---|---|---|---|
+| `effective-rule.ts` | `buildEffectiveRuleProjection` | `fn_secretaria_materialize_effective_rule_matrix` (server-side) | ✅ |
+| `rule-evaluation-persistence.ts` | `buildRuleEvaluationResultInsert` | `fn_save_meeting_resolutions` (server-side) | ✅ |
+| `plantillas-gate-config.ts` | `GO_LIVE_CONFIG` (re-export) | gate vivo en `template-admin/` (`gate-pre.ts` / `gate-pre-semantic.ts`) | ✅ |
 
 > El hook `src/hooks/useMatterRegistry.ts` (resolución `materia_template_binding`)
 > también carece de consumidores runtime; queda fuera del `rules-engine/` pero se
@@ -83,7 +110,7 @@ regresiones. Decisión documentada:
   CONVOCATORIA]`; `SA`/`SAU` → `[CONVOCATORIA, CONVOCATORIA_SL_NOTIFICACION]`.
   Cubre los **4** valores de `TipoSocial` (`SA | SL | SLU | SAU`) y es la que
   realmente ejecuta en la UI.
-- **SUPERSEDED / DEAD-CODE:** `resolverPlantillaConvocatoria` en
+- **SUPERSEDED (SPEC-ONLY en runtime):** `resolverPlantillaConvocatoria` en
   `plantillas-engine.ts` (líneas ~444–478, refs art. 173.1/173.2 LSC). Tiene
   tests pero **0 consumidores runtime** y está tipada solo para `'SA' | 'SL'`
   (no contempla `SLU`/`SAU`). **No usar como fuente de verdad.** Cualquier cambio
@@ -131,7 +158,7 @@ shouldRunAgreementGatesForAgendaItem(input)
   sobre un punto no decisorio.
 - Mapear puntos no decisorios a outcomes de constancia para acta.
 
-### `bordes-no-computables.ts`  *(DEAD-CODE — candidato a cablear, DL-2)*
+### `bordes-no-computables.ts`  *(SPEC-ONLY — sin consumidor runtime, DL-2)*
 Evaluación de 7 "bordes no-computables" — edge cases que el motor determinístico no puede resolver sin intervención externa.
 
 **Función principal:**
@@ -163,7 +190,7 @@ evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable[]
 
 **Return:** Array vacío si ninguno aplica. `BORDE_COTIZADA` añade 1 item de WARNING pero **no** finaliza la evaluación del resto de bordes (DL-2, 2026-04-19).
 
-### `plantillas-engine.ts`  *(DEAD-CODE en runtime — SUPERSEDED, ver DL-4)*
+### `plantillas-engine.ts`  *(SPEC-ONLY en runtime — ver DL-4)*
 Gate PRE de verificación de plantillas documentarias antes de su uso. **Sin
 consumidor runtime.** El gate vivo en producción vive en `template-admin/`
 (`gate-pre.ts` / `gate-pre-semantic.ts`).
@@ -233,7 +260,7 @@ resolverPlantillaConvocatoria(tipoSocial, tipoActaRequerido)   // DL-4 — SUPER
 - Determinismo
 - No plantillas available
 
-> Nota: estos tests cubren código DEAD-CODE en runtime. Si se retira
+> Nota: estos tests cubren código SPEC-ONLY (sin consumidor runtime). Si se retira
 > `resolverPlantillaConvocatoria`, sus tests deben trasladarse a la lógica inline
 > de `ConvocatoriasStepper` (ITEM-119).
 

@@ -1,3 +1,9 @@
+/**
+ * @deprecated ITEM-117 — sin consumidor runtime; SUPERSEDED por
+ * `fn_secretaria_materialize_effective_rule_matrix` (server-side). SPEC-ONLY:
+ * solo lo consumen sus tests. No borrar (rompería tests/imports del barrel).
+ * Ver `src/lib/rules-engine/INDEX.md`.
+ */
 import type {
   EffectiveRuleResolution,
   EffectiveRuleSourceLayer,

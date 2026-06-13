@@ -11,6 +11,7 @@ const STATUS_TONE: Record<string, string> = {
   BORRADOR:    "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   VOTING_OPEN: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   APROBADO:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  APPROVED:    "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   RECHAZADO:   "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
@@ -82,8 +83,10 @@ export default function AcuerdosSinSesion() {
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
+  const normalize = (s: string) => (s === "APPROVED" ? "APROBADO" : s);
+
   const filtered = (data ?? []).filter((item) => {
-    if (filterStatus !== "ALL" && item.status !== filterStatus) return false;
+    if (filterStatus !== "ALL" && normalize(item.status) !== normalize(filterStatus)) return false;
     return true;
   });
 

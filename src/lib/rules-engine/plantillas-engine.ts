@@ -433,16 +433,42 @@ function validarProtecciones(
 }
 
 /**
+ * ITEM-119: tipo social de convocatoria aceptado por DL-4. Cubre los 4 tipos
+ * sociales reales (SA/SL/SAU/SLU); el régimen de convocatoria se determina por
+ * mapeo: SAU→SA (publicación BORME + web) y SLU→SL (notificación individual).
+ */
+export type TipoSocialConvocatoria = 'SA' | 'SL' | 'SAU' | 'SLU';
+
+/**
+ * ITEM-119: mapea cada tipo social a su régimen de convocatoria.
+ * - SA / SAU → régimen SA (publicación BORME + web, art. 173.1 LSC)
+ * - SL / SLU → régimen SL (notificación individual certificada, art. 173.2 LSC)
+ */
+function regimenConvocatoria(
+  tipoSocial: TipoSocialConvocatoria
+): 'SA' | 'SL' {
+  return tipoSocial === 'SA' || tipoSocial === 'SAU' ? 'SA' : 'SL';
+}
+
+const CONVOCATORIA_TIPO_REGIMEN: Record<'SA' | 'SL', string> = {
+  SA: 'CONVOCATORIA',
+  SL: 'CONVOCATORIA_SL_NOTIFICACION',
+};
+
+/**
  * DL-4: Selección automática de plantilla de convocatoria por tipo social.
- * SA → CONVOCATORIA (Plantilla 6: BORME + web, derecho información art. 197 LSC)
- * SL → CONVOCATORIA_SL_NOTIFICACION (Plantilla 9: notificación individual art. 173.2 LSC)
+ * SA / SAU → CONVOCATORIA (Plantilla 6: BORME + web, derecho información art. 197 LSC)
+ * SL / SLU → CONVOCATORIA_SL_NOTIFICACION (Plantilla 9: notificación individual art. 173.2 LSC)
  *
- * @param tipoSocial - 'SA' | 'SL'
+ * ITEM-119: ahora cubre los 4 tipos sociales con mapeo de régimen
+ * (SAU→SA, SLU→SL). Único consumidor runtime de la lógica DL-4.
+ *
+ * @param tipoSocial - 'SA' | 'SL' | 'SAU' | 'SLU'
  * @param tipoActaRequerido - tipo original solicitado
  * @returns tipo de plantilla resuelto + flag indicando si hubo auto-selección
  */
 export function resolverPlantillaConvocatoria(
-  tipoSocial: 'SA' | 'SL' | undefined,
+  tipoSocial: TipoSocialConvocatoria | undefined,
   tipoActaRequerido: string
 ): { tipoResuelto: string; autoSeleccionada: boolean; motivo?: string } {
   // Solo aplica a materias de convocatoria
@@ -454,27 +480,50 @@ export function resolverPlantillaConvocatoria(
     return { tipoResuelto: tipoActaRequerido, autoSeleccionada: false };
   }
 
-  if (tipoSocial === 'SA') {
+  const regimen = regimenConvocatoria(tipoSocial);
+  const tipoResuelto = CONVOCATORIA_TIPO_REGIMEN[regimen];
+  const autoSeleccionada = tipoActaRequerido !== tipoResuelto;
+  const sufijoUnipersonal =
+    tipoSocial === 'SAU' || tipoSocial === 'SLU'
+      ? ` (entidad ${tipoSocial}, régimen de convocatoria ${regimen})`
+      : '';
+
+  if (regimen === 'SA') {
     return {
-      tipoResuelto: 'CONVOCATORIA',
-      autoSeleccionada: tipoActaRequerido !== 'CONVOCATORIA',
-      motivo: tipoActaRequerido !== 'CONVOCATORIA'
-        ? 'DL-4: Entidad SA requiere Convocatoria con publicación BORME + web (art. 173.1 LSC)'
+      tipoResuelto,
+      autoSeleccionada,
+      motivo: autoSeleccionada
+        ? `DL-4: Entidad ${tipoSocial} requiere Convocatoria con publicación BORME + web (art. 173.1 LSC)${sufijoUnipersonal}`
         : undefined,
     };
   }
 
-  if (tipoSocial === 'SL') {
-    return {
-      tipoResuelto: 'CONVOCATORIA_SL_NOTIFICACION',
-      autoSeleccionada: tipoActaRequerido !== 'CONVOCATORIA_SL_NOTIFICACION',
-      motivo: tipoActaRequerido !== 'CONVOCATORIA_SL_NOTIFICACION'
-        ? 'DL-4: Entidad SL requiere notificación individual certificada (art. 173.2 LSC)'
-        : undefined,
-    };
-  }
+  return {
+    tipoResuelto,
+    autoSeleccionada,
+    motivo: autoSeleccionada
+      ? `DL-4: Entidad ${tipoSocial} requiere notificación individual certificada (art. 173.2 LSC)${sufijoUnipersonal}`
+      : undefined,
+  };
+}
 
-  return { tipoResuelto: tipoActaRequerido, autoSeleccionada: false };
+/**
+ * ITEM-119: lista ordenada de tipos de plantilla de convocatoria preferida por
+ * tipo social, según el régimen DL-4. El primer elemento es el régimen
+ * preferido (autoritativo); el segundo es la alternativa. Único helper que
+ * encapsula el orden — consumido por la UI (ConvocatoriasStepper) para
+ * seleccionar la plantilla candidata sin reimplementar la lógica DL-4 inline.
+ *
+ * - SA / SAU → ['CONVOCATORIA', 'CONVOCATORIA_SL_NOTIFICACION']
+ * - SL / SLU → ['CONVOCATORIA_SL_NOTIFICACION', 'CONVOCATORIA']
+ */
+export function tiposPlantillaConvocatoriaPreferidos(
+  tipoSocial: TipoSocialConvocatoria | undefined
+): string[] {
+  const regimen = tipoSocial ? regimenConvocatoria(tipoSocial) : 'SA';
+  return regimen === 'SL'
+    ? ['CONVOCATORIA_SL_NOTIFICACION', 'CONVOCATORIA']
+    : ['CONVOCATORIA', 'CONVOCATORIA_SL_NOTIFICACION'];
 }
 
 /**
