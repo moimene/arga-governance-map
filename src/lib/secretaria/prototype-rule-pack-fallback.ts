@@ -8,6 +8,7 @@ import type {
   TipoOrgano,
   TipoSocial,
 } from "@/lib/rules-engine";
+import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 
 export interface MeetingRuleSpec {
   materia: string;
@@ -76,7 +77,7 @@ function relationMatches(
   organoTipo: TipoOrgano,
 ) {
   if (!resolution) return false;
-  const materiaMatches = !resolution.materia || resolution.materia === spec.materia || resolution.packId === spec.materia;
+  const materiaMatches = !resolution.materia || rulePackMateriaMatches(resolution.materia, spec.materia) || resolution.packId === spec.materia;
   const claseMatches = !resolution.clase || resolution.clase === spec.clase;
   const organoMatches = !resolution.organoTipo || resolution.organoTipo === organoTipo;
   return materiaMatches && claseMatches && organoMatches;
