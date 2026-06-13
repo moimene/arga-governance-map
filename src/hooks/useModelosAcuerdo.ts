@@ -26,6 +26,17 @@ export interface ModeloAcuerdo {
   contrato_variables_version: string | null;
 }
 
+// ITEM-081 (cierre residual): grafías equivalentes de órgano para matching robusto.
+// El catálogo de plantillas mezcla CONSEJO / CONSEJO_ADMIN / CONSEJO_ADMINISTRACION
+// para el mismo Consejo de Administración (deuda de taxonomía). Esta tabla permite
+// que la selección de plantilla matchee cualquiera sin mutar los datos en Cloud.
+const CONSEJO_GRAFIAS = ["CONSEJO", "CONSEJO_ADMIN", "CONSEJO_ADMINISTRACION"];
+const ORGANO_GRAFIAS_EQUIVALENTES: Record<string, string[]> = {
+  CONSEJO: CONSEJO_GRAFIAS,
+  CONSEJO_ADMIN: CONSEJO_GRAFIAS,
+  CONSEJO_ADMINISTRACION: CONSEJO_GRAFIAS,
+};
+
 export function useModelosAcuerdo(materia: string, organoTipo?: string, adoptionMode?: string) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -45,8 +56,14 @@ export function useModelosAcuerdo(materia: string, organoTipo?: string, adoption
         .in("estado", [...OPERATIONAL_TEMPLATE_QUERY_STATES])
         .order("version", { ascending: false });
 
+      // ITEM-081 (cierre residual): el catálogo tiene grafías de órgano
+      // fragmentadas (CONSEJO / CONSEJO_ADMIN / CONSEJO_ADMINISTRACION para el mismo
+      // Consejo de Administración). Un `.eq` estricto dejaría fuera las variantes.
+      // Matcheamos contra TODAS las grafías equivalentes para que la selección de
+      // plantilla sea robusta sin depender de normalizar los datos en Cloud.
       if (organoTipo) {
-        q = q.eq("organo_tipo", organoTipo);
+        const grafias = ORGANO_GRAFIAS_EQUIVALENTES[organoTipo.toUpperCase()] ?? [organoTipo];
+        q = grafias.length > 1 ? q.in("organo_tipo", grafias) : q.eq("organo_tipo", organoTipo);
       }
 
       if (adoptionMode) {

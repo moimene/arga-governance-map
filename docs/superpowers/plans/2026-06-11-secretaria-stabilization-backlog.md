@@ -817,6 +817,8 @@
 - **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/lib/secretaria/template-admin/functional-key.ts, /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/supabase/functions/_types/database.ts
 - **Fix sugerido:** Decisión de producto: elegir mecanismo de variante SA/SL (columna tipo_social en plantilla + functional key, o condicionales capa1 sobre ENTIDAD.tipo_social que el resolver ya emite como tipo_social). Documentar la decisión en docs/superpowers/specs y actualizar el Gate PRE.
 
+> **✅ CERRADO 2026-06-13 (funcional).** Materia: alias `MOD_ESTATUTOS→MODIFICACION_ESTATUTOS` en `MATERIA_PACK_ALIASES` (rule-resolution.ts) unifica la resolución; el pack duplicado queda funcionalmente inerte. Órgano: el único caller runtime (`useModelosAcuerdo` desde TramitadorStepper) pasa `organoTipo=undefined` → la fragmentación no se exact-matchea en runtime (cosmética); añadido normalizer defensivo `ORGANO_GRAFIAS_EQUIVALENTES` (`.in([CONSEJO/CONSEJO_ADMIN/CONSEJO_ADMINISTRACION])`) para robustez futura sin mutar Cloud. **Residuos cosméticos en Cloud bloqueados por el guard de auto-mode** (requieren permiso explícito de DELETE/UPDATE en settings): borrado físico de la fila pack MOD_ESTATUTOS (0 consumidores) y normalización de 4 filas `plantillas_protegidas.organo_tipo`→CONSEJO_ADMIN. Sin impacto funcional.
+
 ### ITEM-081 [P2] Taxonomía de claves fragmentada: materias singular/plural, packs duplicados MOD_ESTATUTOS/MODIFICACION_ESTATUTOS, 4 grafías de órgano y agreement_kinds demo sin cobertura
 
 - **Área:** A2 · **Estado:** PENDIENTE
