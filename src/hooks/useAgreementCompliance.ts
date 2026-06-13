@@ -4,6 +4,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
+import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import {
   evaluarAcuerdoCompleto,
   evaluarPuntoOrdenDia,
@@ -401,10 +402,14 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
         .eq("entity_id", a.entity_id)
     : { data: [] };
 
-  // Buscar el rule pack de la materia del acuerdo
+  // Buscar el rule pack de la materia del acuerdo.
+  // Alias-aware (remediación W5): un agreement_kind con grafía legacy
+  // (p.ej. MOD_ESTATUTOS) resuelve contra el pack canónico
+  // (MODIFICACION_ESTATUTOS). Antes era match exacto, lo que dejaba sin reglas
+  // a cualquier acuerdo con grafía aliased.
   const rpRows = (rpVersions ?? []) as unknown as RulePackJoinRow[];
-  const matchingVersion = rpRows.find(
-    (v) => firstJoin(v.rule_packs)?.materia === a.agreement_kind
+  const matchingVersion = rpRows.find((v) =>
+    rulePackMateriaMatches(firstJoin(v.rule_packs)?.materia, a.agreement_kind),
   );
 
   const packs: RulePack[] = matchingVersion

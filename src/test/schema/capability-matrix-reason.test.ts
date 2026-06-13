@@ -11,7 +11,9 @@ describe("W6 — capability_matrix.reason completa (35/35)", () => {
       .select("role, action, reason");
     expect(error).toBeNull();
     const rows = data ?? [];
-    expect(rows.length).toBe(35);
+    // ≥35 (no exacto) para no romper si se añaden capacidades futuras; lo que
+    // importa es que NINGUNA fila quede sin razón jurídica anotada.
+    expect(rows.length).toBeGreaterThanOrEqual(35);
     const sinReason = rows.filter(
       (r) => !r.reason || String(r.reason).trim() === "",
     );

@@ -270,6 +270,24 @@ export function normalizeMateriaForRulePack(materia: string): string {
   return MATERIA_PACK_ALIASES[key] ?? key;
 }
 
+/**
+ * ¿La materia de un rule pack casa con un agreement_kind? Alias-aware: normaliza
+ * ambas grafías a su materia canónica antes de comparar, de modo que un acuerdo
+ * con grafía legacy (p.ej. MOD_ESTATUTOS) resuelva contra el pack canónico
+ * (MODIFICACION_ESTATUTOS) sin depender de que exista un pack con la grafía
+ * legacy. Usado por useAgreementCompliance para el match de pack por materia.
+ */
+export function rulePackMateriaMatches(
+  packMateria: string | null | undefined,
+  agreementKind: string | null | undefined,
+): boolean {
+  if (!packMateria || !agreementKind) return false;
+  return (
+    normalizeMateriaForRulePack(packMateria) ===
+    normalizeMateriaForRulePack(agreementKind)
+  );
+}
+
 export function resolveRulePackForMatter(input: RuleResolutionInput): RuleResolution {
   const now = input.now instanceof Date ? input.now : new Date(input.now ?? Date.now());
   const normalized = input.versions.map(normalizeRulePackVersion);
