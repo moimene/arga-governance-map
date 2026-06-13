@@ -883,3 +883,28 @@ Cero e2e roto, cero flujo perdido.
 **Verificación:** typecheck verde · `bun test src/lib/secretaria/` 701 pass / 0 fail ·
 ningún e2e depende del texto del contador (grep). Detalle del backlog actualizado con la
 corrección factual.
+
+---
+
+## Cierre 2026-06-13 — ITEM-126 (blindaje vías de envío) + 2ª corrección de premisa
+
+Segunda premisa obsoleta consecutiva. La auditoría situaba el writer ficticio (Vía 3,
+`useEnviarNotificacion`) en `useNoSessionExpediente.ts:377-425`; ese archivo entero (480
+líneas, 0 consumidores) **ya había sido eliminado en `e06cd39` como ITEM-150**. La Vía 3
+no existe. Verificado además que ninguna ruta de `src/` promueve un acuerdo sin sesión a
+`NOTIFICADO` (el único `NOTIFICADO` es lectura en useAgreementCompliance) y que la Vía 2
+(`useERDSNotification`) es fail-closed + gated por `erdsProxyAvailable` (ITEM-063).
+
+**Decisión humana:** "Blindaje real + guard". **Fix:** (a) `@deprecated` + nota de
+no-cablear en las 2 mutaciones muertas de useERDSNotification (`updateNotificationStatus`,
+`sendAndTrackNotification`) que escriben no_session_notificaciones directo saltándose el
+pipeline canónico (0 callers prod); (b) nuevo guard `no-session-notificado-guard.test.ts`
+(4 asserts) — el writer ficticio sigue eliminado, nadie escribe `estado:'ENVIADA'` sobre
+no_session_notificaciones, nadie promueve a NOTIFICADO por escritura directa, y el único
+escritor de esa tabla es el hook ERDS (solo columnas `erds_*`).
+
+**No abierto (alcance mayor):** consolidación completa a dispatcher único (Vía 1) y mapeo
+no_session_notificaciones→VIEW siguen diferidos a P2 (migración 20260517141038:1-6).
+
+**Verificación:** typecheck verde · `bun test src/test/schema/` 225 pass / 0 fail (guard
+4/4 + hardcodes ERDS 3/3 incluidos).

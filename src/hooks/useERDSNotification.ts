@@ -168,6 +168,16 @@ Destinatario: ${input.recipientEmail}
   });
 
   // Mutation 2: Update notification status in Supabase
+  //
+  // ITEM-126 (blindaje): esta mutación escribe `no_session_notificaciones`
+  // DIRECTAMENTE, saltándose el pipeline canónico de comunicaciones
+  // (fn_create_communication_atomic → cola communication_recipients →
+  // comms-dispatcher → delivery events WORM). Hoy NO tiene callers en
+  // producción (AcuerdoSinSesionDetalle solo usa sendCertifiedNotification);
+  // se conserva únicamente para el contrato de tipos y los tests de estado
+  // ERDS. No la cablees a un flujo de "notificado": un acuerdo sin sesión
+  // solo debe alcanzar NOTIFICADO a través de una entrega real con evidencia.
+  /** @deprecated ITEM-126 — escribe no_session_notificaciones fuera del pipeline canónico; sin callers de producción. No cablear. */
   const updateNotificationStatus = useMutation<
     NotificationStatusUpdateResult,
     Error,
@@ -217,6 +227,12 @@ Destinatario: ${input.recipientEmail}
   });
 
   // Utility: Combined workflow (send + update in one call)
+  //
+  // ITEM-126 (blindaje): combina sendCertifiedNotification + la mutación
+  // updateNotificationStatus marcada @deprecated. Sin callers de producción
+  // (el test de hardcodes asierta que AcuerdoSinSesionDetalle NO la usa). Se
+  // conserva por contrato de tipos; no cablear a un flujo de "notificado".
+  /** @deprecated ITEM-126 — encadena la escritura directa a no_session_notificaciones; sin callers de producción. No cablear. */
   const sendAndTrackNotification = useMutation<
     { certification: CertifiedNotificationResult; tracking: NotificationStatusUpdateResult },
     Error,
