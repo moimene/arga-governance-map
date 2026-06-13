@@ -42,6 +42,7 @@ import type { AgreementNormativeSnapshot, NormativeFrameworkStatus } from "@/lib
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
+import { AutorizacionesRegulatoriasCard } from "@/components/secretaria/AutorizacionesRegulatoriasCard";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
@@ -587,6 +588,8 @@ export default function ExpedienteAcuerdo() {
           )}
 
           <PactosParasocialesCard agreement={a} />
+
+          <AutorizacionesRegulatoriasCard entityId={a.entity_id} materia={a.agreement_kind} />
 
           <ApprovalWorkflowCard
             agreementId={a.id}
