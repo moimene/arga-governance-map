@@ -44,6 +44,7 @@ import {
   type AuthorityEvidenceDetailRow,
 } from "@/hooks/useAuthorityEvidence";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
+import { buildCertificacionBody } from "@/lib/secretaria/certificacion-body";
 
 export interface EmitirCertificacionButtonProps {
   minuteId: string;
@@ -58,6 +59,9 @@ export interface EmitirCertificacionButtonProps {
     | "PRESIDENTE";
   /** Rol del usuario actual — por ahora hardcodeado SECRETARIO en demo. */
   userRole?: string;
+  /** Nombres para componer el cuerpo canónico de la certificación (W0 #4). */
+  entidadNombre?: string | null;
+  organoNombre?: string | null;
   /** Cuando la certificación termina (o falla), el padre puede hookearse. */
   onEmitted?: (certId: string, uri: string) => void;
   disabledReason?: string | null;
@@ -70,6 +74,8 @@ export function EmitirCertificacionButton({
   agreementIds,
   certificanteRole = "SECRETARIO",
   userRole = "SECRETARIO", // demo default — auth real en sprint futuro
+  entidadNombre,
+  organoNombre,
   onEmitted,
   disabledReason,
 }: EmitirCertificacionButtonProps) {
@@ -172,6 +178,30 @@ export function EmitirCertificacionButton({
       );
       if (e1) throw new Error(`Generar: ${e1.message}`);
       const certificationId = String(certId);
+
+      // W0 #4 — persistir el cuerpo canónico de la certificación (hasta ahora
+      // `content` quedaba NULL). DEBE ir antes de firmar: fn_firmar_certificacion
+      // computa hash_certificacion = SHA-256(gate_hash ‖ content ‖ tsq_token),
+      // así que el contenido tiene que estar presente para que el hash lo cubra.
+      const certBody = buildCertificacionBody({
+        certificanteCargoLabel:
+          CARGO_CERT_LABELS[effectiveCertificanteRole as keyof typeof CARGO_CERT_LABELS] ??
+          effectiveCertificanteRole,
+        certificanteNombre: certificanteAE?.person?.full_name ?? null,
+        vistoBuenoCargoLabel: vistoBuenoAE ? CARGO_CERT_LABELS[vistoBuenoAE.cargo] : null,
+        vistoBuenoNombre:
+          vistoBuenoAE?.person?.full_name ?? presidenteAE?.person?.full_name ?? null,
+        entidadNombre: entidadNombre ?? "la sociedad",
+        organoNombre: organoNombre ?? null,
+        numAcuerdos: agreementIds.length,
+        fechaISO: new Date().toISOString(),
+      });
+      const { error: eContent } = await supabase
+        .from("certifications")
+        .update({ content: certBody })
+        .eq("id", certificationId)
+        .eq("tenant_id", tenantId ?? "");
+      if (eContent) throw new Error(`Cuerpo certificación: ${eContent.message}`);
 
       // Paso 2 — firma QES (stub determinista base64). El pipeline
       // productivo reemplaza este bloque con la llamada al QTSP EAD Trust.

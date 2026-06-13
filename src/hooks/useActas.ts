@@ -253,6 +253,39 @@ export function useAprobarActa(minuteId: string | undefined) {
   });
 }
 
+export interface UpdateActaBorradorResult {
+  minute_id: string;
+  content_hash: string;
+  updated: boolean;
+}
+
+/**
+ * W0 — guarda la edición del contenido de un acta en BORRADOR vía
+ * `fn_actualizar_borrador_acta`. La RPC recalcula `content_hash` con el mismo
+ * algoritmo que `fn_generar_acta` y rechaza el acta firmada/bloqueada. Cierra la
+ * incidencia de la primera pasada de test: hasta ahora no existía ningún camino
+ * para editar y persistir el texto del acta (ActaDetalle era read-only).
+ */
+export function useUpdateActaBorrador(minuteId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (content: string): Promise<UpdateActaBorradorResult> => {
+      if (!minuteId) throw new Error("Acta no disponible.");
+      const { data, error } = await supabase.rpc("fn_actualizar_borrador_acta", {
+        p_minute_id: minuteId,
+        p_content: content,
+      });
+      if (error) throw error;
+      return data as UpdateActaBorradorResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
+    },
+  });
+}
+
 export interface MaterializeMeetingPointAgreementInput {
   meetingId: string;
   bodyId: string | null;

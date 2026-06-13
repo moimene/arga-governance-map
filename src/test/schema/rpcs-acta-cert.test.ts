@@ -57,6 +57,19 @@ describe("ITEM-003 — RPC fn_aprobar_acta (aprobar y firmar acta)", () => {
   });
 });
 
+describe("W0 — RPC fn_actualizar_borrador_acta (editar acta en borrador)", () => {
+  it("existe con la firma (p_minute_id, p_content) y está vetada para anon", async () => {
+    const { error } = await supabase.rpc("fn_actualizar_borrador_acta", {
+      p_minute_id: "00000000-0000-0000-0000-000000000000",
+      p_content: "probe borrador acta",
+    });
+    expect(error?.message ?? "").not.toMatch(/function .* does not exist/i);
+    expect(error?.message ?? "").not.toMatch(/could not find the function/i);
+    // Operación de escritura: REVOKE EXECUTE FROM anon (mismo contrato que fn_aprobar_acta).
+    expect(error?.message ?? "").toMatch(/permission denied/i);
+  });
+});
+
 describe("F8.2 — RPCs firma/emisión", () => {
   it("fn_firmar_certificacion existe y acepta (cert_id, qtsp_token, tsq_token)", async () => {
     const { error } = await supabase.rpc("fn_firmar_certificacion", {
