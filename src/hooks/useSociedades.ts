@@ -80,9 +80,13 @@ export function useSociedades() {
         .select("*")
         .eq("tenant_id", tenantId!)
         .not("person_id", "is", null)
-        // W3: oculta artefactos de E2E/pruebas del listado operativo. El detalle
-        // por id/slug NO filtra (un enlace directo a una TEST sigue abriendo).
-        .neq("data_class", "TEST")
+        // W3: la columna data_class clasifica DEMO/TEST/PRE_RELEASE/PRODUCTION.
+        // El FILTRADO operativo (ocultar TEST) se difiere a propósito: aplicarlo
+        // solo aquí crea inconsistencia (la sociedad TEST seguiría seleccionable
+        // en el scope/wizards vía useEntitiesList) y no es durable (los builders
+        // E2E no setean data_class → artefactos futuros nacen DEMO). El filtrado
+        // consistente en todos los read-paths + el tagging del harness E2E es un
+        // follow-up coordinado (ver IV.4 del informe legal).
         .order("common_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as SociedadRow[];
