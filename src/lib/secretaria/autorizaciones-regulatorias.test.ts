@@ -90,4 +90,31 @@ describe("evaluarAutorizacionesRegulatorias", () => {
     });
     expect(r.required).toContain("DGSFP");
   });
+
+  it("grafías estructurales agregadas (FUSION_ESCISION, VENTA_ACTIVOS_SUSTANCIALES) disparan DGSFP", () => {
+    for (const materia of ["FUSION_ESCISION", "VENTA_ACTIVOS_SUSTANCIALES"]) {
+      const r = evaluarAutorizacionesRegulatorias({
+        materia,
+        esEntidadRegulada: true,
+        sectorRegulado: "SEGUROS",
+        jurisdiccion: "ES",
+        autorizaciones: [],
+        hoyISO: HOY,
+      });
+      expect(r.required, materia).toContain("DGSFP");
+    }
+  });
+
+  it("asegurador NO español (PT) no exige DGSFP (gate específico de ES)", () => {
+    const r = evaluarAutorizacionesRegulatorias({
+      materia: "FUSION",
+      esEntidadRegulada: true,
+      sectorRegulado: "SEGUROS",
+      jurisdiccion: "PT",
+      autorizaciones: [],
+      hoyISO: HOY,
+    });
+    expect(r.required).toEqual([]);
+    expect(r.blocking).toBe(false);
+  });
 });

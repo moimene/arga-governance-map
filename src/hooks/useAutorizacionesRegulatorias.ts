@@ -12,6 +12,7 @@ export interface AutorizacionesRegulatoriasData {
   autorizaciones: AutorizacionRegulatoriaInput[];
   esCotizada: boolean;
   regulatedSector: string | null;
+  jurisdiction: string | null;
 }
 
 export function useAutorizacionesRegulatorias(entityId: string | null | undefined) {
@@ -28,7 +29,7 @@ export function useAutorizacionesRegulatorias(entityId: string | null | undefine
           .eq("sociedad_id", entityId!),
         supabase
           .from("entities")
-          .select("es_cotizada, regulated_sector")
+          .select("es_cotizada, regulated_sector, jurisdiction")
           .eq("id", entityId!)
           .maybeSingle(),
       ]);
@@ -36,6 +37,7 @@ export function useAutorizacionesRegulatorias(entityId: string | null | undefine
       const ent = (entRes.data ?? {}) as {
         es_cotizada?: boolean | null;
         regulated_sector?: string | null;
+        jurisdiction?: string | null;
       };
       const autorizaciones = (
         (autRes.data ?? []) as Array<{
@@ -52,6 +54,7 @@ export function useAutorizacionesRegulatorias(entityId: string | null | undefine
         autorizaciones,
         esCotizada: !!ent.es_cotizada,
         regulatedSector: ent.regulated_sector ?? null,
+        jurisdiction: ent.jurisdiction ?? null,
       };
     },
   });

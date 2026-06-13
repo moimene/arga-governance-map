@@ -26,7 +26,7 @@ export function AutorizacionesRegulatoriasCard({
     materia,
     esEntidadRegulada,
     sectorRegulado: data.regulatedSector,
-    jurisdiccion: "ES",
+    jurisdiccion: data.jurisdiction ?? "ES",
     autorizaciones: data.autorizaciones,
     hoyISO: new Date().toISOString(),
   });

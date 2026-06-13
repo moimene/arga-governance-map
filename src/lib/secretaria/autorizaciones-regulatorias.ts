@@ -54,7 +54,12 @@ const DGSFP_TRIGGER_MATERIAS = new Set<string>([
   "CESION_GLOBAL_ACTIVO",
   "OPERACION_ESTRUCTURAL",
   "AMPLIACION_OBJETO_SOCIAL",
+  // Grafías estructurales agregadas que aparecen como agreement_kind y que el
+  // alias no normaliza (hallazgo /codex W7): cubrir las variantes evita falsos
+  // negativos que ocultarían la exigencia de autorización.
+  "FUSION_ESCISION",
   "VENTA_ACTIVOS_ESENCIALES",
+  "VENTA_ACTIVOS_SUSTANCIALES",
 ]);
 
 function esSeguros(sector?: string | null): boolean {
