@@ -37,6 +37,7 @@ function toEntityOption(entity: EntityWithParent): SecretariaEntityOption {
     legalForm: entity.legal_form || "Sociedad",
     status: entity.entity_status,
     materiality: entity.materiality,
+    tipoSocial: entity.tipo_social ?? null,
   };
 }
 

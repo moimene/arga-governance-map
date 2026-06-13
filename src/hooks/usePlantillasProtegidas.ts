@@ -59,6 +59,8 @@ export interface PlantillaProtegidaRow {
   snapshot_rule_pack_required: boolean;
   adoption_mode: string | null;
   organo_tipo: string | null;
+  // ITEM-080/112: tipo social al que aplica la plantilla (NULL/ausente = todos).
+  tipo_social?: string | null;
   contrato_variables_version: string | null;
   created_at: string;
   materia_acuerdo: string | null;

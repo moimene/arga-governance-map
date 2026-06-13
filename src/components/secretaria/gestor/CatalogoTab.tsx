@@ -160,6 +160,26 @@ function templateAppliesToJurisdiction(
   );
 }
 
+// ITEM-080/112 — DL-4: compatibilidad por tipo social. Una plantilla sin
+// tipo_social (NULL) aplica a cualquier sociedad; si lo declara, solo aplica a
+// sociedades del mismo régimen (SAU comparte régimen SA; SLU comparte régimen SL).
+function regimenTipoSocial(value?: string | null): "SA" | "SL" | null {
+  const v = String(value ?? "").trim().toUpperCase();
+  if (v === "SA" || v === "SAU") return "SA";
+  if (v === "SL" || v === "SLU" || v === "SRL") return "SL";
+  return null;
+}
+
+function templateAppliesToTipoSocial(
+  plantilla: PlantillaProtegidaRow,
+  entityTipoSocial?: string | null,
+) {
+  if (!plantilla.tipo_social) return true; // NULL = aplica a todos
+  const entidad = regimenTipoSocial(entityTipoSocial);
+  if (!entidad) return true; // sin tipo social de entidad conocido, no filtramos
+  return regimenTipoSocial(plantilla.tipo_social) === entidad;
+}
+
 function plantillaSearchText(plantilla: PlantillaProtegidaRow) {
   return [
     plantilla.tipo,
@@ -736,14 +756,18 @@ export function CatalogoTab() {
   const selectedEntityName =
     selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
   const selectedJurisdiction = selectedEntity?.jurisdiction ?? null;
+  // ITEM-080/112: tipo social de la sociedad en scope para compatibilidad DL-4.
+  const selectedTipoSocial = selectedEntity?.tipoSocial ?? null;
 
   const scopedPlantillas = useMemo(() => {
     const rows = withLegalTeamTemplateFixtures(plantillas ?? []);
     if (!isSociedadMode) return rows;
-    return rows.filter((plantilla) =>
-      templateAppliesToJurisdiction(plantilla, selectedJurisdiction),
+    return rows.filter(
+      (plantilla) =>
+        templateAppliesToJurisdiction(plantilla, selectedJurisdiction) &&
+        templateAppliesToTipoSocial(plantilla, selectedTipoSocial),
     );
-  }, [isSociedadMode, plantillas, selectedJurisdiction]);
+  }, [isSociedadMode, plantillas, selectedJurisdiction, selectedTipoSocial]);
 
   const legalReviewRows = useMemo(
     () => buildLegalTemplateReviewRows(scopedPlantillas),

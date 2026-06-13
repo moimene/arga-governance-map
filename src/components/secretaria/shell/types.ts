@@ -13,6 +13,8 @@ export interface SecretariaEntityOption {
   legalForm: string;
   status: string;
   materiality: string;
+  // ITEM-080/112: tipo social (SA/SL/SAU/SLU) para compatibilidad DL-4 de plantillas.
+  tipoSocial?: string | null;
 }
 
 /**

@@ -251,6 +251,11 @@ function makeExplain(regla: string, resultado: EvalSeverity, mensaje: string): E
  * materia sin pack hasta que el Comité Legal apruebe uno propio).
  */
 export const MATERIA_PACK_ALIASES: Record<string, string> = {
+  // ITEM-081: MODIFICACION_ESTATUTOS es la materia canónica (decisión 2026-06-13).
+  // El pack duplicado MOD_ESTATUTOS se retira en Cloud (migración
+  // 2026-06-13, 0 consumidores); este alias garantiza que cualquier código o
+  // dato que aún emita la grafía antigua resuelva contra el pack canónico.
+  MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
   APROBACION_PRESUPUESTOS: "APROBACION_PRESUPUESTO",
   CESION_GLOBAL: "CESION_GLOBAL_ACTIVO",
   REMUNERACION_CONSEJEROS: "RETRIBUCION_ADMIN",
