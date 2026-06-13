@@ -992,3 +992,46 @@ de spec. Genuinos y corregidos ahora:
 explícito en el listado (el detalle ya enlaza). #7 Transmisión — evidence picker + retorno/draft
 desde "crear persona" (núcleo funciona vía RPC). #3 Libros — decisión de producto: ¿alta/
 legalización manual end-to-end o se mantiene como portfolio derivado read-only?
+
+---
+
+## Pasada ULTRACODE 2026-06-13 — triage + cierre del backlog PENDIENTE
+
+Mandato: "completa todo el backlog". Enfoque: triage multi-agente antes de tocar nada
+(el backlog estaba sistemáticamente desfasado, como se confirmó en las pasadas previas).
+
+**Workflow 1 (Triage, 11 agentes read-only)** sobre los 66 ITEM con Estado PENDIENTE,
+verificando cada uno contra el código en HEAD ae7b06b + loop-log:
+- **STALE = 51 (77%)**: ya implementados; backlog desfasado. (Confirma el patrón de toda la
+  estabilización: la inmensa mayoría de "PENDIENTE" ya estaban hechos.)
+- **FIXABLE_NOW = 7**, **NEEDS_DECISION = 8**, **BLOCKED = 0**.
+- ITEM-091 reclasificado a STALE por verificación directa (qa_bodies=0, juntas=1, migr 091×2).
+
+**Workflow 2 (Fix secuencial)** — 6 code-only verificados (commit aa3268c):
+071 (status APPROVED defensivo), 093 (convocatoria-engine puebla warnings — badge ya no
+vacuamente verde), 102 (colisión label registry; datos Cloud ya en ES, sin migración),
+113 (pactos parasociales en flujos sin sesión — PactosCompliancePanel + 4 tests), 119 (DL-4
+resolverPlantillaConvocatoria consolidado SA/SL/SAU/SLU), 132 (4 inline-style→className).
+ITEM-081 sacado del batch tras de-risking (dedup real en Cloud).
+
+**8 decisiones humanas** (2 tandas AskUserQuestion) → **Workflow 3 (5 code-only, commit 7366765)**:
+- 101 corregir copy acta-constancia; 099 representaciones WARNING (art.183/529quáter, +10 tests);
+  097 clonar BORRADOR (?clonarDe alias de ?draft); 117 archivar+documentar dead motor
+  (INDEX.md ACTIVO/SPEC-ONLY/SUPERSEDED + @deprecated ×3); 134 podar contrato variables.
+- **Cloud (commit a0ac2f3, yo con disciplina db:check-target):**
+  - 081 materia: alias MOD_ESTATUTOS→MODIFICACION_ESTATUTOS (red de seguridad). **Eliminación
+    física del pack duplicado BLOQUEADA por el guard de auto-mode** (DELETE en DB viva
+    compartida) → residual pendiente de autorización explícita (el alias lo hace innecesario
+    funcionalmente). **Normalización de grafías de órgano DIFERIDA** (multi-capa: motor usa
+    'CONSEJO' bare, plantillas-engine 'CONSEJO_ADMINISTRACION', datos 'CONSEJO_ADMIN' — refactor
+    con red, no mutación de datos; riesgo producción).
+  - 080/112: migración 20260613113413 ADD COLUMN tipo_social (aditivo, aplicado en gov_OS) +
+    cableado DL-4 null-safe en CatalogoTab (no-op hoy, todas NULL).
+
+**Gates finales:** typecheck verde · bun test 1969 pass/0 fail (+26 desde el inicio de la pasada) ·
+build verde · db:check-target=governance_OS.
+
+**Residuales conscientes (no bloqueantes):** (1) ITEM-081 deleción física del pack MOD_ESTATUTOS
+(requiere autorización de DELETE en Cloud); (2) ITEM-081 normalización de grafías de órgano
+(refactor de taxonomía multi-capa, decisión de diseño pendiente). Backlog detalle: 51 STALE por
+reconciliar en el doc (loop-log es la fuente canónica; reconciliación masiva del .md diferida).
