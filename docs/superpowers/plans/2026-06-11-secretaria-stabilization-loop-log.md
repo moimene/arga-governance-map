@@ -908,3 +908,30 @@ no_session_notificaciones→VIEW siguen diferidos a P2 (migración 2026051714103
 
 **Verificación:** typecheck verde · `bun test src/test/schema/` 225 pass / 0 fail (guard
 4/4 + hardcodes ERDS 3/3 incluidos).
+
+---
+
+## Cierre 2026-06-13 — ITEM-128 (doble pipeline de despacho) + matiz arquitectónico
+
+La decisión original ("Lib → _shared, Edge la importa") asume que la Edge puede importar
+el lib. **No es físicamente posible**: Vite/tsc no importa módulos Deno `https://` y Deno
+no importa el código `@/` del browser. El precedente citado (comms-plazo-engine) NO es una
+fuente compartida sino un **patrón mirror** (copia Deno en `_shared` + diff-gate). Trasladado
+al usuario; decisión revisada: **"Mínimo de daño real + sanear muerto"** (evita rewire de un
+runtime de comms vivo no testeable aquí).
+
+**Fix:** (1) bug LINK_FIRMADO resuelto en la Edge — signed URL por adjunto + inyección en
+cuerpo de los 3 canales, fail-closed si la firma falla; (2) eliminado el código muerto del
+lib (dispatcher + retry-policy + 6 adapters + adapter-registry + 8 tests; 0 consumidores de
+producción), conservando solo `types.ts` (usado por UI + motor de plazos) con cabecera que
+fija la Edge como única fuente de verdad; (3) MAX_RETRIES reconciliado — al borrar
+retry-policy.ts desaparece la constante TS duplicada, el límite queda como literal plpgsql
+único (`v_intento < 3`). Diferido: consolidación mirror completa (rewire del runtime). ITEM-127
+(shortHash) ya estaba en la Edge.
+
+**Verificación:** typecheck verde · `bun test` 1943 pass / 0 fail · lint 0 errores nuevos ·
+build (gate). Ejecución Deno NO verificable aquí; LINK_FIRMADO revisado por lectura.
+
+**Las 3 decisiones de esta sesión (089/126/128) toparon con premisas obsoletas o un matiz
+no contemplado** — patrón a vigilar en los ítems restantes (133/056/146): verificar el
+estado real del código antes de ejecutar la acción descrita en el backlog.

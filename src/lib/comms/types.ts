@@ -1,5 +1,17 @@
 // Comms module — shared types
 // Spec: docs/superpowers/specs/2026-05-17-comunicaciones-portal-miembro-design.md
+//
+// ITEM-128 (2026-06-13): este archivo de tipos es lo ÚNICO que queda del módulo
+// `src/lib/comms`. El dispatcher abstracto, retry-policy y los adapters TS se
+// eliminaron por ser código muerto de producción: nunca se ejecutaban (solo los
+// consumían sus propios tests) y ya divergían del runtime real. La ÚNICA fuente
+// de verdad del despacho es la Edge Function `supabase/functions/comms-dispatcher`
+// (claim/send/retry vía RPCs `fn_claim_recipients_for_dispatch`,
+// `fn_recipient_mark_sent`, `fn_recipient_handle_error`). El límite de reintentos
+// vive como literal único en plpgsql (`v_intento < 3` en
+// `20260517143041_comms_dispatcher_rpcs.sql`); ya no hay constante MAX_RETRIES TS
+// duplicada. Estos tipos los consumen la UI (PasoEnvioMiembros, ConvocatoriasStepper)
+// y el motor de plazos (useCommsPlazoCheck).
 
 export type TipoComunicacion =
   | 'CONVOCATORIA' | 'NOTIFICACION_INDIVIDUAL' | 'PUESTA_DISPOSICION'
