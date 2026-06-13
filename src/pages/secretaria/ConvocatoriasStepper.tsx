@@ -617,7 +617,11 @@ export default function ConvocatoriasStepper() {
   // ITEM-097: `?draft=<id>` permite retomar una convocatoria en estado
   // BORRADOR (p.ej. las creadas por campañas de grupo) para completarla y
   // emitirla, en vez de quedar como dead-end sin ruta de continuación.
-  const requestedDraftId = searchParams.get("draft");
+  // `?clonarDe=<id>` es el alias usado por el botón "Usar como base / Clonar
+  // como nueva" del detalle read-only: reutiliza exactamente el mismo prefill
+  // (órgano, entidad, tipo de sesión, fechas, canales, agenda…) sin copiar
+  // identificadores ni estado del origen.
+  const requestedDraftId = searchParams.get("draft") ?? searchParams.get("clonarDe");
   const isSociedadScoped = Boolean(scopedEntityId);
   const scopedListPath = isSociedadScoped && scopedEntityId
     ? `/secretaria/convocatorias?scope=sociedad&entity=${encodeURIComponent(scopedEntityId)}`

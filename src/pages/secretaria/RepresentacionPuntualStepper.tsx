@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, FileText, Search, ShieldCheck, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
@@ -10,6 +10,7 @@ import {
   useUpsertRepresentacionPuntual,
   type RepresentationScope,
 } from "@/hooks/useRepresentacionesCanonical";
+import { evaluateRepresentacionWarnings } from "@/lib/secretaria/representacion-validations";
 
 type PuntualScope = Extract<RepresentationScope, "JUNTA_PROXY" | "CONSEJO_DELEGACION">;
 
@@ -75,6 +76,25 @@ export default function RepresentacionPuntualStepper() {
   const selectedMeeting = useMemo(
     () => (meetings ?? []).find((meeting) => meeting.id === meetingId) ?? null,
     [meetings, meetingId],
+  );
+
+  // ITEM-099: advertencias legales NO BLOQUEANTES (política DL-2 cotizadas:
+  // evaluar + advertir). El frontend no puede verificar parentesco ni el
+  // carácter concreto de cada consejero, así que pasamos los datos conocidos de
+  // la sociedad y dejamos los flags de consejo en su valor conservador
+  // (desconocido = recordatorio de comprobación). No bloquea el submit.
+  const legalWarnings = useMemo(
+    () =>
+      evaluateRepresentacionWarnings({
+        scope,
+        entityIsCotizada: !!sociedad?.es_cotizada,
+        entityTipoSocial: sociedad?.tipo_social ?? null,
+        representanteEsConsejero: false,
+        representadoEsConsejero: false,
+        representanteEsEjecutivo: false,
+        documentoRefPresente: documentoRef.trim().length > 0,
+      }),
+    [scope, sociedad?.es_cotizada, sociedad?.tipo_social, documentoRef],
   );
 
   const canSubmit =
@@ -236,6 +256,39 @@ export default function RepresentacionPuntualStepper() {
               </label>
             </div>
           </section>
+
+          {legalWarnings.length > 0 ? (
+            <section
+              className="border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] p-4"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              role="status"
+              aria-label="Advertencias legales no bloqueantes"
+            >
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--g-text-primary)]">
+                <AlertTriangle className="h-4 w-4 text-[var(--status-warning)]" />
+                Advertencias legales (no bloqueantes)
+              </h2>
+              <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                Comprueba estos puntos antes de inscribir el poder. No impiden continuar.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {legalWarnings.map((warning) => (
+                  <li
+                    key={warning.code}
+                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <span className="block text-xs font-bold uppercase tracking-wide text-[var(--status-warning)]">
+                      {warning.articulo}
+                    </span>
+                    <span className="mt-1 block text-sm text-[var(--g-text-secondary)]">
+                      {warning.message}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <PersonSelector
             title="Representado"

@@ -1,3 +1,8 @@
+/**
+ * @deprecated ITEM-117 — sin consumidor runtime; SUPERSEDED por
+ * `fn_save_meeting_resolutions` (server-side). SPEC-ONLY: solo lo consumen sus
+ * tests. No borrar (rompería tests/imports). Ver `src/lib/rules-engine/INDEX.md`.
+ */
 import type { EvalSeverity, MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 
 export interface RuleEvaluationResultInsert {
