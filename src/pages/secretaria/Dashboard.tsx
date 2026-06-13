@@ -461,6 +461,7 @@ function useSecretariaAgenda(entityId?: string | null) {
 
 const statusTone: Record<string, { bg: string; text: string }> = {
   CONVOCADA:    { bg: "bg-[var(--status-info)]",    text: "text-[var(--g-text-inverse)]" },
+  EN_CURSO:     { bg: "bg-[var(--status-error)]",   text: "text-[var(--g-text-inverse)]" },
   CELEBRADA:    { bg: "bg-[var(--status-success)]", text: "text-[var(--g-text-inverse)]" },
   CANCELADA:    { bg: "bg-[var(--status-error)]",   text: "text-[var(--g-text-inverse)]" },
   BORRADOR:     { bg: "bg-[var(--g-surface-muted)]", text: "text-[var(--g-text-secondary)]" },

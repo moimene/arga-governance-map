@@ -24,6 +24,7 @@ import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import {
   useBodyMembers,
+  useCloseMeeting,
   useCreateUniversalMeeting,
   useGenerarActa,
   useMeetingAgendaSources,
@@ -56,6 +57,7 @@ import {
   type TipoSocial,
 } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 import {
   AGENDA_ORIGIN_LABELS,
   newSessionAgendaPoint,
@@ -660,7 +662,10 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
     governing_bodies?: { name?: string | null; entities?: { common_name?: string | null } | null } | null;
   };
 
-  const isOpen = m.status === "CELEBRADA";
+  // ITEM-146: la sesión está "abierta" cuando ya se declaró apertura — tanto en
+  // EN_CURSO (en curso) como en CELEBRADA (cerrada con acta). Ambos estados
+  // activan los pasos de asistentes/quórum.
+  const isOpen = m.status === "EN_CURSO" || m.status === "CELEBRADA";
   const bodyName = m.governing_bodies?.name ?? "—";
   const entityName = m.governing_bodies?.entities?.common_name ?? "—";
 
@@ -688,8 +693,8 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
     <div className="space-y-6">
       <p className="text-sm text-[var(--g-text-secondary)]">
         Verifica los datos de la sesión antes de declararla abierta. Al abrir la sesión el estado
-        pasa a <span className="font-medium text-[var(--g-text-primary)]">CELEBRADA</span> y se activan
-        los pasos de asistentes y quórum.
+        pasa a <span className="font-medium text-[var(--g-text-primary)]">EN&nbsp;CURSO</span> y se activan
+        los pasos de asistentes y quórum. Al cerrar (generación del acta) pasa a CELEBRADA.
       </p>
 
       <div
@@ -715,7 +720,7 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
             {isOpen ? <CheckCircle2 className="h-3 w-3" /> : null}
-            {m.status ?? "SCHEDULED"}
+            {m.status ? statusLabel(m.status) : "Programada"}
           </span>
         </div>
       </div>
@@ -3658,6 +3663,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const { data: existingMinute } = useMinuteForMeeting(meetingId);
   const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(meetingId);
   const generarActa = useGenerarActa();
+  const closeMeeting = useCloseMeeting(meetingId);
   const updateQuorumData = useUpdateQuorumData(meetingId);
   const [minuteId, setMinuteId] = useState<string | null>(null);
   const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
@@ -3788,6 +3794,18 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         snapshotType: censoSnapshotType,
       });
       setMinuteId(id);
+      // ITEM-146: la sesión queda CELEBRADA al generar el acta (cierre real),
+      // transicionando desde EN_CURSO. Best-effort: si la transición de estado
+      // falla, el acta ya está creada y no debe perderse — solo se avisa.
+      try {
+        await closeMeeting.mutateAsync();
+      } catch (closeErr) {
+        toast.warning(
+          closeErr instanceof Error
+            ? `Acta generada, pero no se pudo marcar la reunión como celebrada: ${closeErr.message}`
+            : "Acta generada, pero no se pudo marcar la reunión como celebrada.",
+        );
+      }
       toast.success("Acta generada en borrador");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al generar el acta");
@@ -4147,7 +4165,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
 // AcuerdoSinSesión). Cada flag es el canAdvance del paso correspondiente; cuando
 // es false StepperShell bloquea el salto a pasos posteriores.
 interface ReunionStepGates {
-  constitucion?: boolean; // paso 1: sesión abierta (status CELEBRADA)
+  constitucion?: boolean; // paso 1: sesión abierta (status EN_CURSO o CELEBRADA)
   asistentes?: boolean; // paso 2: hay asistentes registrados
   quorum?: boolean; // paso 3: quórum evaluado
   votaciones?: boolean; // paso 5: resultados/acuerdos registrados
@@ -4711,7 +4729,12 @@ function ReunionStepperConnected({ id, backTo }: { id: string; backTo: string })
   const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(id);
   const { data: resolutions = [], isLoading: resolutionsLoading } = useReunionResolutions(id);
 
-  const meetingOpen = (meeting as { status?: string | null } | null)?.status === "CELEBRADA";
+  // ITEM-146: la sesión se considera abierta (apertura declarada) en EN_CURSO y
+  // también en CELEBRADA; deriveReunionInitialStep usa esto para reanudar más
+  // allá del paso 1 cuando ya hay asistentes/quórum/resoluciones.
+  const meetingOpen =
+    (meeting as { status?: string | null } | null)?.status === "EN_CURSO" ||
+    (meeting as { status?: string | null } | null)?.status === "CELEBRADA";
   const quorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data;
   const hasAttendees = attendees.length > 0;
   const hasQuorum = Boolean(quorumData?.quorum);

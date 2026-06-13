@@ -232,13 +232,15 @@ async function ensureMeetingWorkflow(page: Page, client: ServiceClient, meetingI
   }
 
   await clickIfVisibleAndEnabled(page, /Declarar apertura de la sesión/i);
+  // ITEM-146: al declarar apertura el estado pasa a EN_CURSO (sesión abierta),
+  // no a CELEBRADA — CELEBRADA se alcanza al cerrar (generar acta) en el Paso 6.
   await expect
     .poll(async () => {
       const progress = await getMeetingProgress(client, meetingId);
       return progress.meeting?.status;
     }, { timeout: 30_000 })
-    .toBe('CELEBRADA');
-  await expect(page.getByText(/Sesión declarada abierta|CELEBRADA/i).first()).toBeVisible({ timeout: 20_000 });
+    .toBe('EN_CURSO');
+  await expect(page.getByText(/Sesión declarada abierta|En curso|Estado actual/i).first()).toBeVisible({ timeout: 20_000 });
 
   await goStep(page, /Asistentes/, /Paso 2\. Asistentes/);
   await expect(page.getByText(/Clara Rivas Arga Test/i)).toBeVisible({ timeout: 20_000 });

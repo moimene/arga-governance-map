@@ -935,3 +935,33 @@ build (gate). Ejecución Deno NO verificable aquí; LINK_FIRMADO revisado por le
 **Las 3 decisiones de esta sesión (089/126/128) toparon con premisas obsoletas o un matiz
 no contemplado** — patrón a vigilar en los ítems restantes (133/056/146): verificar el
 estado real del código antes de ejecutar la acción descrita en el backlog.
+
+---
+
+## Cierre 2026-06-13 — ITEM-146 (estado EN_CURSO) — premisa válida, alcance mayor
+
+Única de las 4 decisiones cuya premisa se sostuvo (useOpenMeeting→CELEBRADA incondicional,
+confirmado). Pero el alcance resultó mayor del presentado: meetings.status tiene CHECK
+constraint (requiere migración) Y 2 funciones vivas gatean agenda con
+`IN ('CONVOCADA','CELEBRADA')` y se invocan desde el stepper (reclassify) — introducir
+EN_CURSO sin migrarlas habría roto la reclasificación durante sesión abierta. Trasladado al
+usuario; decisión: **"EN_CURSO completo (2 migraciones)"**.
+
+**State machine:** DRAFT→CONVOCADA→EN_CURSO→CELEBRADA. **2 migraciones Cloud (gov_OS,
+verificadas live):** `20260613090054` (CHECK +EN_CURSO), `20260613090131` (recrea
+reclassify_agenda_item_kind + trigger agenda_kind_audit_after_convoked con guard ampliado a
+IN('CONVOCADA','EN_CURSO','CELEBRADA') — leídas con pg_get_functiondef del Cloud vivo, no de
+migraciones supersedidas). **Frontend:** useOpenMeeting→EN_CURSO + nuevo useCloseMeeting→
+CELEBRADA en CierreStep tras acta; isOpen/meetingOpen reconocen ambos; reclassification-matrix
++EN_CURSO (espejo SQL) + OPEN→EN_CURSO; badge con statusLabel; colores/filtros ConvocatoriasList
++Dashboard. **e2e:** post-apertura→EN_CURSO; seeds y finales post-cierre se conservan CELEBRADA.
+
+**Verificación:** db:check-target=gov_OS · CHECK+guards live OK · typecheck · bun test 1943/0 ·
+build. e2e 18 apertura falla **pre-existente** (verificado por stash vs baseline: falla
+idéntico con regex viejo; ni "Estado actual" monta → flujo previo, no el status). Migraciones
+mirror renombradas a las versiones remotas exactas para alineación migration list.
+
+**Recuento sesión 2026-06-13: 089/126/128/146 cerrados (089 contador, 126 blindaje+guard,
+128 LINK_FIRMADO+dead-code, 146 EN_CURSO completo). Patrón confirmado: de las 4 decisiones,
+3 toparon con premisa obsoleta o alcance mayor — verificar SIEMPRE el código real antes de
+ejecutar la acción del backlog.**

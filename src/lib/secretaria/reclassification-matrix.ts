@@ -9,7 +9,8 @@
  * Estados canónicos (español, los que persiste la BD):
  *   - `BORRADOR`   (legacy inglés: `DRAFT`)
  *   - `CONVOCADA`  (legacy inglés: `CONVOKED`)
- *   - `CELEBRADA`  (legacy inglés: `OPEN`)
+ *   - `EN_CURSO`   (legacy inglés: `OPEN`) — sesión abierta (ITEM-146)
+ *   - `CELEBRADA`  — sesión celebrada y cerrada (acta generada)
  *   - `CERRADA`    (legacy inglés: `CLOSED`)
  *
  * `normalizeStatus` mapea ambos vocabularios al canónico español para
@@ -28,7 +29,7 @@
  *    · JUNTA universal → permitido (asume unanimidad por construcción).
  *    · default (sin organType conocido) → permitido (degradación conservadora
  *      a CONSEJO: si no podemos demostrar JUNTA formal, no bloqueamos).
- * - `meeting.status === 'CELEBRADA'`:
+ * - `meeting.status === 'EN_CURSO'` o `'CELEBRADA'` (misma rama):
  *    · CONSEJO + reclassify a DECISORIO → permitido si quórum unánime (la UI
  *      pre-condiciona; la matriz asume "sí" y deja al UI exigir constancia).
  *    · JUNTA universal + unanimidad → permitido.
@@ -47,6 +48,7 @@ import type { AgendaItemKind } from "./agenda-kind";
 export type MeetingStatus =
   | "BORRADOR"
   | "CONVOCADA"
+  | "EN_CURSO"
   | "CELEBRADA"
   | "CERRADA"
   | "DRAFT"
@@ -97,13 +99,18 @@ function normalizeOrganType(value?: OrganType): "CONSEJO" | "JUNTA" | "UNKNOWN" 
 /**
  * Normaliza el estado de la reunión al vocabulario canónico de BD.
  *
- * CHECK constraint real `meetings_status_check` en producción:
- *   ('DRAFT', 'CONVOCADA', 'CELEBRADA', 'CANCELADA')
+ * CHECK constraint real `meetings_status_check` en producción (ITEM-146):
+ *   ('DRAFT', 'CONVOCADA', 'EN_CURSO', 'CELEBRADA', 'CANCELADA')
  *
  * - DRAFT (inglés literal, NO 'BORRADOR') — reunión sin emitir convocatoria
  * - CONVOCADA — convocatoria emitida, antes de la sesión
- * - CELEBRADA — sesión abierta o en desarrollo
- * - CANCELADA — terminal (acta firmada o reunión abortada)
+ * - EN_CURSO — sesión abierta/en desarrollo (apertura declarada, sin acta)
+ * - CELEBRADA — sesión celebrada y cerrada (acta generada)
+ * - CANCELADA — terminal (reunión abortada)
+ *
+ * EN_CURSO y CELEBRADA comparten la misma rama procedimental (junta convocada
+ * formalmente): la protección art. 174 LSC aplica con la sesión abierta o ya
+ * celebrada, igual que el guard plpgsql IN ('CONVOCADA','EN_CURSO','CELEBRADA').
  *
  * Mapea también valores legacy (BORRADOR / CONVOKED / OPEN / CLOSED / CERRADA)
  * que pudieron usarse en código histórico, tests previos o documentación
@@ -111,17 +118,18 @@ function normalizeOrganType(value?: OrganType): "CONSEJO" | "JUNTA" | "UNKNOWN" 
  */
 function normalizeStatus(
   value: MeetingStatus,
-): "DRAFT" | "CONVOCADA" | "CELEBRADA" | "CANCELADA" | "OTHER" {
+): "DRAFT" | "CONVOCADA" | "EN_CURSO" | "CELEBRADA" | "CANCELADA" | "OTHER" {
   const upper = String(value ?? "").toUpperCase().trim();
   // Canónico BD (DRAFT inglés, resto español)
   if (upper === "DRAFT") return "DRAFT";
   if (upper === "CONVOCADA") return "CONVOCADA";
+  if (upper === "EN_CURSO") return "EN_CURSO";
   if (upper === "CELEBRADA") return "CELEBRADA";
   if (upper === "CANCELADA") return "CANCELADA";
   // Legacy → mapeo al canónico
   if (upper === "BORRADOR") return "DRAFT";        // tests/docs en español
   if (upper === "CONVOKED") return "CONVOCADA";    // inglés legacy
-  if (upper === "OPEN") return "CELEBRADA";        // inglés legacy
+  if (upper === "OPEN") return "EN_CURSO";         // inglés legacy: sesión abierta
   if (upper === "CLOSED") return "CANCELADA";      // inglés legacy
   if (upper === "CERRADA") return "CANCELADA";     // español alterno (incorrecto)
   return "OTHER";
@@ -158,8 +166,8 @@ export function checkReclassificationAllowed(
     return { allowed: true };
   }
 
-  // CONVOCADA y CELEBRADA (legacy: CONVOKED / OPEN): depende de órgano
-  if (status === "CONVOCADA" || status === "CELEBRADA") {
+  // CONVOCADA, EN_CURSO y CELEBRADA (legacy: CONVOKED / OPEN): depende de órgano
+  if (status === "CONVOCADA" || status === "EN_CURSO" || status === "CELEBRADA") {
     if (organ === "JUNTA") {
       const isUniversal = input.isUniversal === true;
       if (!isUniversal && newKind === "DECISORIO") {

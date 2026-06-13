@@ -1137,7 +1137,7 @@
 | ITEM-143 | A5 | — | accepted_warnings se sella con accepted_by: 'demo-user' hardcoded en el trace de emisión | HECHO (UI) |
 | ITEM-144 | A6 | — | miembros_presentes se rellena con el peso de votos a favor en el input del motor de votación | ✅ HECHO (ya resuelto ITEM-009/019) |
 | ITEM-145 | A6 | — | Lecturas read-modify-write de quorum_data desde caché en QuorumStep y VotacionesStep (riesgo de pisar debates/snapshots en carreras) | ✅ HECHO (loop) |
-| ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | PENDIENTE |
+| ITEM-146 | A6 | — | Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión | ✅ HECHO EN_CURSO completo (2 migraciones Cloud + frontend + e2e); CELEBRADA reservado para cierre con acta |
 | ITEM-147 | A7 | — | REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir | HECHO (Ola2) |
 | ITEM-148 | A7 | — | Deuda 'userRole hardcodeado' de facto resuelta y CLAUDE.md desactualizado; transiciones post-CERTIFIED del ciclo siguen sin flujo escritor | HECHO (Ola1) |
 | ITEM-149 | A8 | — | 6 bundles SEALED de seed ('EAD Trust demo QTSP') contradicen la postura reference/pending del HOLD 000049 y usan provenance en minúsculas | ✅ HECHO (loop+cloud) |
@@ -1396,11 +1396,10 @@
 
 ### ITEM-146 [P3] Declarar apertura pone meetings.status='CELEBRADA' antes de celebrarse la sesión
 
-- **Área:** A6 · **Estado:** PENDIENTE · **REQUIERE DECISIÓN HUMANA**
-- **Descripción:** useOpenMeeting marca la reunión como CELEBRADA en el paso 1 (Constitución), sin guard de transición. Una sesión abierta y abandonada queda 'CELEBRADA' en listados aunque no tenga asistentes, quórum ni acta, lo que distorsiona KPIs y el lenguaje del estado (statusLabel). Es deuda semántica, no bloqueo: el stepper sigue funcionando.
-- **Evidencia:** src/hooks/useReunionSecretaria.ts:744-761 (update status: 'CELEBRADA' incondicional). src/pages/secretaria/ReunionStepper.tsx:659 (isOpen = status === 'CELEBRADA').
-- **Archivos:** /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map/src/hooks/useReunionSecretaria.ts
-- **Fix sugerido:** Introducir estado intermedio (p. ej. OPEN/EN_CURSO) al declarar apertura y reservar CELEBRADA para el cierre (generación de acta), con mapeo en status-labels.ts.
+- **Área:** A6 · **Estado:** ✅ HECHO — EN_CURSO completo (2026-06-13, decisión humana "EN_CURSO completo (2 migraciones)")
+- **Fix aplicado (2026-06-13):** state machine DRAFT→CONVOCADA→**EN_CURSO**→CELEBRADA. (1) **2 migraciones Cloud** (gov_OS, verificadas live): `20260613090054` extiende el CHECK `meetings_status_check` con 'EN_CURSO'; `20260613090131` recrea las 2 ÚNICAS funciones vivas que gateaban `IN ('CONVOCADA','CELEBRADA')` — `reclassify_agenda_item_kind` (protección art. 174 LSC) y el trigger `agenda_kind_audit_after_convoked` — ampliando el guard a `IN ('CONVOCADA','EN_CURSO','CELEBRADA')`, de modo que la reclasificación de puntos durante la sesión abierta (que ReunionStepper invoca) no se rompe. (2) **Frontend**: `useOpenMeeting`→EN_CURSO (antes CELEBRADA incondicional); nuevo `useCloseMeeting`→CELEBRADA invocado en CierreStep tras generar el acta (best-effort); `isOpen`/`meetingOpen` reconocen EN_CURSO‖CELEBRADA; badge de Constitución usa `statusLabel`; `reclassification-matrix.ts` añade EN_CURSO a la rama procedimental (espejo del guard SQL) + legacy OPEN→EN_CURSO; color/filtro en ConvocatoriasList + Dashboard (ReunionesLista/BPPortada/status-labels ya lo anticipaban). (3) **e2e**: post-apertura polls→EN_CURSO (49, 51 comment), regexes→"En curso" (18, 40); seeds CELEBRADA y aserciones post-cierre (49:326, 51:383, 37/38/39/56) se conservan (CELEBRADA sigue válido = sesión celebrada con acta).
+- **Verificación:** db:check-target=gov_OS · CHECK+ambos guards con EN_CURSO confirmados live vía MCP · typecheck verde · `bun test` 1943 pass/0 fail · build verde. e2e 18 falla en apertura (`:194`) — **verificado pre-existente** vía stash contra baseline (falla idéntico con el regex viejo; ni "Estado actual" monta → problema de flujo previo, no del status). Los arga-tests gated (49/51/56) validan el state machine completo en su run opt-in.
+- **Descripción (histórica):** useOpenMeeting marcaba la reunión como CELEBRADA en el paso 1 (Constitución), sin guard de transición. Una sesión abierta y abandonada quedaba 'CELEBRADA' en listados aunque no tuviera asistentes, quórum ni acta, distorsionando KPIs y el lenguaje del estado. Era deuda semántica, no bloqueo.
 
 ### ITEM-147 [P3] REJECTED_REGISTRY queda fuera del TIMELINE de ExpedienteAcuerdo: timeline vacío, CTA oculto y label sin traducir
 
