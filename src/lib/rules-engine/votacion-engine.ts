@@ -19,6 +19,7 @@ import { evaluarMayoria } from './majority-evaluator';
 import { evaluarProcesoSinSesion } from './no-session-engine';
 import { calcularDenominadorAjustado } from './constitucion-engine';
 import { resolverReglaEfectiva } from './jerarquia-normativa';
+import { rulePackMateriaMatches } from './rule-resolution';
 
 /**
  * evaluarVotacion — 6-Gate Voting Engine with NO_SESSION delegation
@@ -189,7 +190,7 @@ export function evaluarVotacion(
 
     // Find the matching pack for this matter
     const matchedPack = packs.find(p =>
-      input.materias.some(m => p.materia === m || p.clase === input.materiaClase)
+      input.materias.some(m => rulePackMateriaMatches(p.materia, m) || p.clase === input.materiaClase)
     );
 
     if (matchedPack && !matchedPack.modosAdopcionPermitidos.includes('NO_SESSION')) {
@@ -246,7 +247,7 @@ export function evaluarVotacion(
 
   // For MEETING/UNIVERSAL: continue with gates 1-6
   const matchedPacks = packs.filter(p =>
-    input.materias.some(m => p.materia === m || p.clase === input.materiaClase)
+    input.materias.some(m => rulePackMateriaMatches(p.materia, m) || p.clase === input.materiaClase)
   );
 
   if (matchedPacks.length === 0) {
