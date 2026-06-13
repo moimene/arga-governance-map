@@ -554,6 +554,15 @@ export interface ConvocatoriaInput {
    * ausente, se asume 'ES' (default LSC).
    */
   jurisdiction?: string;
+  /**
+   * ITEM-093: fecha real (prevista) de publicación / notificación de la
+   * convocatoria en formato date-only 'YYYY-MM-DD'. Opcional para
+   * retro-compat. Cuando se pasa, el motor compara contra
+   * `fechaLimitePublicacion`: si la publicación es POSTERIOR a la fecha
+   * límite, el plazo de antelación está incumplido y se emite un WARNING
+   * (política del proyecto: advertir, no bloquear).
+   */
+  fechaPublicacion?: string;
 }
 
 export interface ConvocatoriaOutput extends EvaluacionResult {

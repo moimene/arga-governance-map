@@ -59,8 +59,8 @@ export function SodGuard({ userId, proposedRole, onResult }: SodGuardProps) {
   if (violations.length === 0) {
     return (
       <div
-        className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-success)]"
-        style={{ borderRadius: "var(--g-radius-md)", background: "var(--g-sec-100)" }}
+        className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--status-success)] bg-[var(--g-sec-100)]"
+        style={{ borderRadius: "var(--g-radius-md)" }}
       >
         <ShieldCheck className="h-4 w-4" />
         Sin conflictos de segregación de funciones

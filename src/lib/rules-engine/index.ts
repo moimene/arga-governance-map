@@ -85,7 +85,13 @@ export {
   type RuleResolution,
   type RuleResolutionInput,
 } from './rule-resolution';
-export { evaluarPlantillaProtegida, calcularRulesetSnapshotId, GO_LIVE_CONFIG } from './plantillas-engine';
+export {
+  evaluarPlantillaProtegida,
+  calcularRulesetSnapshotId,
+  GO_LIVE_CONFIG,
+  resolverPlantillaConvocatoria,
+  tiposPlantillaConvocatoriaPreferidos,
+} from './plantillas-engine';
 export {
   firmarDocumentoQES,
   notificarCertificado,

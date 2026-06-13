@@ -312,6 +312,54 @@ export function evaluarConvocatoria(
   );
 
   // ================================================================
+  // Rule 6: Plazo de antelación cumplido (ITEM-093)
+  //
+  // Si se proporciona la fecha real de publicación, se comprueba que no
+  // sea POSTERIOR a la fecha límite de publicación (= fechaJunta menos la
+  // antelación requerida). Cuando la publicación llega tarde, el plazo de
+  // antelación está incumplido. Política del proyecto: advertir, no
+  // bloquear (igual que las cotizadas) → se emite WARNING, no BLOCKING.
+  // Esto propaga a `ok`/`severity` automáticamente.
+  // ================================================================
+  if (input.fechaPublicacion) {
+    const fechaPublicacionDate = parseDateOnly(input.fechaPublicacion);
+    const fechaLimiteDate = parseDateOnly(fechaLimitePublicacion);
+    const plazoIncumplido = fechaPublicacionDate.getTime() > fechaLimiteDate.getTime();
+
+    if (plazoIncumplido) {
+      const antelacionDesc = antelacionMensual
+        ? 'un mes (cómputo de fecha a fecha)'
+        : `${antelacionDiasRequerida} días`;
+      const mensaje =
+        `Plazo de antelación incumplido: la publicación (${input.fechaPublicacion}) es ` +
+        `posterior a la fecha límite (${fechaLimitePublicacion}). Se requiere una ` +
+        `antelación de ${antelacionDesc} para ${input.tipoSocial}.`;
+      warnings.push(mensaje);
+      explainNodes.push(
+        createExplainNode(
+          'Antelación cumplida',
+          isJunta ? 'LEY' : 'REGLAMENTO',
+          isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
+          'WARNING',
+          mensaje,
+          antelacionDiasRequerida
+        )
+      );
+    } else {
+      explainNodes.push(
+        createExplainNode(
+          'Antelación cumplida',
+          isJunta ? 'LEY' : 'REGLAMENTO',
+          isJunta ? 'art. 176 LSC' : 'art. 246.2 LSC / reglamento del órgano',
+          'OK',
+          `Plazo de antelación cumplido: publicación (${input.fechaPublicacion}) dentro de la ventana (límite ${fechaLimitePublicacion}).`,
+          antelacionDiasRequerida
+        )
+      );
+    }
+  }
+
+  // ================================================================
   // Final evaluation
   // ================================================================
   const ok = blockingIssues.length === 0;

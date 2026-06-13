@@ -105,8 +105,8 @@ export function EvidenceForenseSection() {
         </div>
       ) : bundles.length === 0 ? (
         <div
-          className="px-4 py-6 text-center text-sm text-[var(--g-text-secondary)]"
-          style={{ borderRadius: "var(--g-radius-md)", background: "var(--g-surface-muted)" }}
+          className="px-4 py-6 text-center text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           No hay evidencias registradas aún
         </div>
@@ -115,8 +115,8 @@ export function EvidenceForenseSection() {
           {bundles.map((b) => (
             <div
               key={b.id}
-              className="border border-[var(--g-border-subtle)] p-4"
-              style={{ borderRadius: "var(--g-radius-md)", background: "var(--g-surface-card)" }}
+              className="border border-[var(--g-border-subtle)] p-4 bg-[var(--g-surface-card)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -141,8 +141,8 @@ export function EvidenceForenseSection() {
               </div>
               {b.hash_sha512 && (
                 <div
-                  className="mt-2 px-3 py-2 font-mono text-[10px] text-[var(--g-text-secondary)] break-all"
-                  style={{ borderRadius: "var(--g-radius-sm)", background: "var(--g-surface-muted)" }}
+                  className="mt-2 px-3 py-2 font-mono text-[10px] text-[var(--g-text-secondary)] break-all bg-[var(--g-surface-muted)]"
+                  style={{ borderRadius: "var(--g-radius-sm)" }}
                 >
                   SHA-512: {b.hash_sha512.slice(0, 32)}...{b.hash_sha512.slice(-16)}
                 </div>

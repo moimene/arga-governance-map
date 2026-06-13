@@ -5,7 +5,7 @@ import {
   ArrowLeft, Check, ChevronDown, ChevronRight, Copy,
   AlertTriangle, FileText, Globe, Plus, Send, ShieldCheck, Trash2, Users,
 } from "lucide-react";
-import { evaluarConvocatoria } from "@/lib/rules-engine";
+import { evaluarConvocatoria, tiposPlantillaConvocatoriaPreferidos } from "@/lib/rules-engine";
 import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
@@ -1106,11 +1106,11 @@ export default function ConvocatoriasStepper() {
   // puede editar el texto antes de emitir; se persiste en
   // `convocatorias.convocatoria_text`.
   const { data: plantillasProtegidas = [] } = usePlantillasProtegidas();
+  // ITEM-119: DL-4 resuelta por el motor (resolverPlantillaConvocatoria /
+  // tiposPlantillaConvocatoriaPreferidos), no reimplementada inline. El motor
+  // mapea régimen (SAU→SA, SLU→SL) y cubre los 4 tipos sociales.
   const convocatoriaTemplateTypes = useMemo(
-    () =>
-      tipoSocial === "SL" || tipoSocial === "SLU"
-        ? ["CONVOCATORIA_SL_NOTIFICACION", "CONVOCATORIA"]
-        : ["CONVOCATORIA", "CONVOCATORIA_SL_NOTIFICACION"],
+    () => tiposPlantillaConvocatoriaPreferidos(tipoSocial),
     [tipoSocial],
   );
   const autoSelectedTemplate = useMemo<PlantillaProtegidaRow | null>(() => {

@@ -24,6 +24,8 @@ import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNo
 import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
 import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
+import { usePactosVigentes } from "@/hooks/usePactosParasociales";
+import { PactosCompliancePanel } from "@/components/secretaria/PactosCompliancePanel";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -200,6 +202,12 @@ export default function AcuerdoSinSesionStepper() {
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
+
+  // ITEM-113: pactos parasociales vigentes. El acuerdo sin sesión antes no
+  // evaluaba pactos; ahora un veto de operación estructural (Fundación ARGA
+  // sobre FUSION/ESCISION/DISOLUCION) dispara su advertencia contractual en el
+  // cierre del proceso.
+  const { data: pactosVigentes = [] } = usePactosVigentes(selectedEntityId ?? undefined);
 
   // ── Step 2 ──
   const [title, setTitle] = useState("");
@@ -991,6 +999,14 @@ export default function AcuerdoSinSesionStepper() {
                   </span>
                 </div>
               </div>
+
+              {/* ITEM-113: pactos parasociales (canal contractual separado) */}
+              <PactosCompliancePanel
+                pactos={pactosVigentes}
+                materia={agreementKind}
+                votosFavor={effectiveVotesFor}
+                votosContra={effectiveVotesAgainst}
+              />
 
               {!resultado?.aprobado && (
                 <div

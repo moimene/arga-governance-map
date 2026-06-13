@@ -841,4 +841,96 @@ describe('orquestador', () => {
       // Para Flow A, no debería haber skip nodes inicialmente
     });
   });
+
+  // ITEM-113 — Los pactos parasociales deben dispararse en TODOS los flujos,
+  // no solo en el Flujo A (reunión). Antes, los flujos sin sesión nunca
+  // pasaban inputs.pactos y las materias estructurales no se normalizaban, por
+  // lo que el veto de Fundación ARGA jamás se activaba en sin sesión /
+  // co-aprobación / solidario.
+  describe('ITEM-113 — pactos parasociales en flujos sin sesión', () => {
+    const pactoVetoFundacion = {
+      id: 'pacto-fundacion-veto',
+      titulo: 'Veto Fundación ARGA',
+      tipo_clausula: 'VETO' as const,
+      firmantes: [{ nombre: 'Fundación ARGA', tipo: 'SOCIO', capital_pct: 69.69 }],
+      // El pacto demo usa DISOLUCION; el catálogo operativo usa otras grafías.
+      materias_aplicables: ['FUSION', 'ESCISION', 'DISOLUCION'],
+      titular_veto: 'Fundación ARGA',
+      estado: 'VIGENTE' as const,
+    };
+
+    const pactosInput = {
+      pactos: [pactoVetoFundacion],
+      evalInput: {
+        materias: ['FUSION'],
+        capitalPresente: 100,
+        capitalTotal: 100,
+        votosFavor: 80,
+        votosContra: 0,
+        consentimientosPrevios: [],
+        vetoRenunciado: [],
+      },
+    };
+
+    it('FUSION en NO_SESSION dispara el veto del pacto (canal contractual)', () => {
+      const result = evaluarAcuerdoCompleto('NO_SESSION', [mockPackOrdinaria], [], {
+        pactos: pactosInput,
+      });
+
+      expect(result.path).toBe('C');
+      expect(result.pactosResult).toBeDefined();
+      expect(result.pactosResult?.pacto_ok).toBe(false);
+      expect(result.pactosResult?.pactos_aplicables).toBe(1);
+      expect(result.pactosResult?.pactos_incumplidos).toBe(1);
+      // El incumplimiento de pacto va en su canal separado (contractual),
+      // NO en los blocking_issues societarios.
+      expect(result.pacto_blocking_issues?.length).toBeGreaterThan(0);
+      expect(result.pacto_blocking_issues?.[0]).toContain('Veto Fundación ARGA');
+    });
+
+    it('materia paraguas OPERACION_ESTRUCTURAL en SOLIDARIO dispara el veto', () => {
+      const result = evaluarAcuerdoCompleto('SOLIDARIO', [mockPackConsejo], [], {
+        pactos: {
+          pactos: [pactoVetoFundacion],
+          evalInput: { ...pactosInput.evalInput, materias: ['OPERACION_ESTRUCTURAL'] },
+        },
+      });
+
+      expect(result.path).toBe('B');
+      expect(result.pactosResult?.pacto_ok).toBe(false);
+      expect(result.pacto_blocking_issues?.length).toBeGreaterThan(0);
+    });
+
+    it('AUMENTO_CAPITAL coincide con cláusula AMPLIACION_CAPITAL (sinónimo) en CO_APROBACION', () => {
+      const result = evaluarAcuerdoCompleto('CO_APROBACION', [mockPackConsejo], [], {
+        pactos: {
+          pactos: [
+            {
+              ...pactoVetoFundacion,
+              id: 'pacto-ampliacion',
+              titulo: 'Veto ampliación capital',
+              materias_aplicables: ['AMPLIACION_CAPITAL'],
+            },
+          ],
+          evalInput: { ...pactosInput.evalInput, materias: ['AUMENTO_CAPITAL'] },
+        },
+      });
+
+      expect(result.pactosResult?.pactos_aplicables).toBe(1);
+      expect(result.pactosResult?.pacto_ok).toBe(false);
+    });
+
+    it('materia no protegida no dispara el veto (no falso positivo)', () => {
+      const result = evaluarAcuerdoCompleto('NO_SESSION', [mockPackOrdinaria], [], {
+        pactos: {
+          pactos: [pactoVetoFundacion],
+          evalInput: { ...pactosInput.evalInput, materias: ['APROBACION_CUENTAS'] },
+        },
+      });
+
+      expect(result.pactosResult?.pactos_aplicables).toBe(0);
+      expect(result.pactosResult?.pacto_ok).toBe(true);
+      expect(result.pacto_blocking_issues ?? []).toHaveLength(0);
+    });
+  });
 });

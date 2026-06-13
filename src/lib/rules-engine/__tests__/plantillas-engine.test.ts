@@ -16,6 +16,7 @@ import {
   evaluarPlantillaProtegida,
   calcularRulesetSnapshotId,
   resolverPlantillaConvocatoria,
+  tiposPlantillaConvocatoriaPreferidos,
   PlantillaEvalInput,
   PlantillaProtegida,
   GO_LIVE_CONFIG,
@@ -454,5 +455,71 @@ describe('resolverPlantillaConvocatoria (DL-4)', () => {
     const result = resolverPlantillaConvocatoria(undefined, 'CONVOCATORIA');
     expect(result.tipoResuelto).toBe('CONVOCATORIA');
     expect(result.autoSeleccionada).toBe(false);
+  });
+
+  // ITEM-119: cobertura de los 4 tipos sociales con mapeo de régimen
+  it('should map SAU to SA regime (CONVOCATORIA con publicación)', () => {
+    const result = resolverPlantillaConvocatoria('SAU', 'CONVOCATORIA_SL_NOTIFICACION');
+    expect(result.tipoResuelto).toBe('CONVOCATORIA');
+    expect(result.autoSeleccionada).toBe(true);
+    expect(result.motivo).toContain('art. 173.1 LSC');
+    expect(result.motivo).toContain('SAU');
+  });
+
+  it('should map SLU to SL regime (CONVOCATORIA_SL_NOTIFICACION)', () => {
+    const result = resolverPlantillaConvocatoria('SLU', 'CONVOCATORIA');
+    expect(result.tipoResuelto).toBe('CONVOCATORIA_SL_NOTIFICACION');
+    expect(result.autoSeleccionada).toBe(true);
+    expect(result.motivo).toContain('art. 173.2 LSC');
+    expect(result.motivo).toContain('SLU');
+  });
+
+  it('should NOT auto-select when SAU already requesting CONVOCATORIA', () => {
+    const result = resolverPlantillaConvocatoria('SAU', 'CONVOCATORIA');
+    expect(result.tipoResuelto).toBe('CONVOCATORIA');
+    expect(result.autoSeleccionada).toBe(false);
+  });
+
+  it('should NOT auto-select when SLU already requesting CONVOCATORIA_SL_NOTIFICACION', () => {
+    const result = resolverPlantillaConvocatoria('SLU', 'CONVOCATORIA_SL_NOTIFICACION');
+    expect(result.tipoResuelto).toBe('CONVOCATORIA_SL_NOTIFICACION');
+    expect(result.autoSeleccionada).toBe(false);
+  });
+});
+
+describe('tiposPlantillaConvocatoriaPreferidos (DL-4 / ITEM-119)', () => {
+  it('SA prefiere CONVOCATORIA primero', () => {
+    expect(tiposPlantillaConvocatoriaPreferidos('SA')).toEqual([
+      'CONVOCATORIA',
+      'CONVOCATORIA_SL_NOTIFICACION',
+    ]);
+  });
+
+  it('SAU mapea a régimen SA (CONVOCATORIA primero)', () => {
+    expect(tiposPlantillaConvocatoriaPreferidos('SAU')).toEqual([
+      'CONVOCATORIA',
+      'CONVOCATORIA_SL_NOTIFICACION',
+    ]);
+  });
+
+  it('SL prefiere CONVOCATORIA_SL_NOTIFICACION primero', () => {
+    expect(tiposPlantillaConvocatoriaPreferidos('SL')).toEqual([
+      'CONVOCATORIA_SL_NOTIFICACION',
+      'CONVOCATORIA',
+    ]);
+  });
+
+  it('SLU mapea a régimen SL (notificación primero)', () => {
+    expect(tiposPlantillaConvocatoriaPreferidos('SLU')).toEqual([
+      'CONVOCATORIA_SL_NOTIFICACION',
+      'CONVOCATORIA',
+    ]);
+  });
+
+  it('undefined cae a régimen SA por defecto', () => {
+    expect(tiposPlantillaConvocatoriaPreferidos(undefined)).toEqual([
+      'CONVOCATORIA',
+      'CONVOCATORIA_SL_NOTIFICACION',
+    ]);
   });
 });
