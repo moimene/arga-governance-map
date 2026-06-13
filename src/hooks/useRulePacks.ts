@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/context/TenantContext';
+import { normalizeMateriaForRulePack } from '@/lib/rules-engine/rule-resolution';
 import {
   mapRulePackJoinRowToVersionRow,
   pickFreshestRulePackVersion,
@@ -134,7 +135,8 @@ export function useRulePackForMateria(materia?: string) {
         .select("*, rule_packs!inner(tenant_id, materia, organo_tipo)")
         .eq("rule_packs.tenant_id", tenantId!)
         .eq("is_active", true)
-        .eq("rule_packs.materia", materia)
+        // alias-aware (remediación W5): resuelve grafías legacy al pack canónico.
+        .eq("rule_packs.materia", normalizeMateriaForRulePack(materia))
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
 

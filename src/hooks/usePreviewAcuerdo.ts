@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { normalizeMateriaForRulePack } from "@/lib/rules-engine/rule-resolution";
 import {
   evaluarAcuerdoCompleto,
   evaluarPuntoOrdenDia,
@@ -88,7 +89,8 @@ export function usePreviewAcuerdo(params: PreviewParams) {
         .from("rule_packs")
         .select("materia, organo_tipo, rule_pack_versions!inner(id, payload, is_active)")
         .eq("tenant_id", tenantId!)
-        .eq("materia", params.materia)
+        // alias-aware (remediación W5): resuelve grafías legacy al pack canónico.
+        .eq("materia", normalizeMateriaForRulePack(params.materia))
         .eq("rule_pack_versions.is_active", true);
 
       if (error || !rulePacks?.length) return null;

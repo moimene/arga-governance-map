@@ -56,6 +56,7 @@ import {
   type TipoOrgano,
   type TipoSocial,
 } from "@/lib/rules-engine";
+import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import {
@@ -1626,7 +1627,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
               </span>
               <span>{spec.clase}</span>
               <span>
-                {ruleResolutions.find((resolution) => resolution.rulePack?.materia === spec.materia)?.rulePack
+                {ruleResolutions.find((resolution) => rulePackMateriaMatches(resolution.rulePack?.materia, spec.materia))?.rulePack
                   ? "pack resuelto"
                   : "pack pendiente"}
               </span>
@@ -2617,7 +2618,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     return ruleResolutions.find((resolution) => {
       const pack = resolution.rulePack;
       if (!pack || !isMeetingRulePackPayload(pack.payload)) return false;
-      const materiaMatches = pack.materia === materia || pack.packId === materia;
+      const materiaMatches = rulePackMateriaMatches(pack.materia, materia) || pack.packId === materia;
       const claseMatches = !pack.clase || pack.clase === clase;
       const organoMatches = !pack.organoTipo || pack.organoTipo === organoTipo;
       return materiaMatches && claseMatches && organoMatches;

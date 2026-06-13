@@ -491,10 +491,71 @@ async function seedRulePacks() {
         },
       },
 
-      // 5. MOD_ESTATUTOS — RETIRADO (remediación W5, 2026-06-13). La materia
-      // canónica es MODIFICACION_ESTATUTOS (sembrada por migraciones); la grafía
-      // legacy MOD_ESTATUTOS se resuelve vía alias (rule-resolution.ts) y ya no
-      // tiene pack propio. No re-sembrar aquí para no resucitar el duplicado.
+      // 5. MOD_ESTATUTOS (Junta, Estatutaria)
+      // NOTA (remediación W5, 2026-06-13): seed-rule-packs.ts es tooling LEGACY
+      // de reset completo (borra todos los rule_packs del tenant y reinserta esta
+      // lista); ha drifteado del estado real construido por migraciones y NO debe
+      // ejecutarse contra el Cloud vivo. Se mantiene esta entrada para que el seed
+      // siga siendo internamente consistente (cubre estatutos vía MOD_ESTATUTOS).
+      // En el Cloud vivo el pack MOD_ESTATUTOS está retirado; los lookups son
+      // alias-aware (rule-resolution.ts) y resuelven a MODIFICACION_ESTATUTOS.
+      {
+        id: 'MOD_ESTATUTOS',
+        materia: 'MOD_ESTATUTOS',
+        organo_tipo: 'JUNTA_GENERAL',
+        payload: {
+          id: 'MOD_ESTATUTOS',
+          materia: 'MOD_ESTATUTOS',
+          clase: 'ESTATUTARIA',
+          organoTipo: 'JUNTA_GENERAL',
+          modosAdopcionPermitidos: ['MEETING', 'UNIVERSAL'],
+          convocatoria: createConvocatoriaStandard(),
+          constitucion: {
+            quorum: {
+              SA_1a: { valor: 50, fuente: 'art. 194 LSC' },
+              SA_2a: { valor: 25, fuente: 'art. 194 LSC' },
+              SL: { valor: 50, fuente: 'art. 197 LSC' },
+            },
+          },
+          votacion: {
+            mayoria: {
+              SA: {
+                formula: '> 1/2 presente en 1ª; >= 2/3 emitidos si < 50% en 2ª',
+                fuente: 'art. 201.2 LSC',
+                dobleCondicional: {
+                  umbral: 50,
+                  mayoriaAlternativa: '2/3 emitidos',
+                },
+              },
+              SL: {
+                formula: '> 1/2 capital',
+                fuente: 'art. 199 LSC',
+              },
+            },
+            abstenciones: 'no_cuentan',
+          },
+          documentacion: {
+            obligatoria: [
+              {
+                id: 'texto_integro',
+                nombre: 'Texto Íntegro de Estatutos Propuestos',
+              },
+              {
+                id: 'informe_admin',
+                nombre: 'Informe del Administrador',
+              },
+            ],
+          },
+          acta: createActaStandard(),
+          noSession: createNoSessionEstatutaria(),
+          plazosMateriales: {},
+          postAcuerdo: {
+            inscribible: true,
+            instrumentoRequerido: 'ESCRITURA',
+            publicacionRequerida: true,
+          },
+        },
+      },
 
       // 6. AUMENTO_CAPITAL (Junta, Estatutaria)
       {

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeMateriaForRulePack, rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 
 export type MatterRegistryResolution =
   | "RESUELTA"
@@ -360,7 +361,7 @@ function isIrreduciblyAmbiguous(query: MatterRegistryResolveQuery, candidates: S
 function selectRulePackContext(rulePacks: MatterRegistryRulePackRow[], materia: string, organoTipo?: string | null) {
   const requestedOrgano = normalizeOrgano(organoTipo);
   const candidates = rulePacks
-    .filter((pack) => pack.materia === materia)
+    .filter((pack) => rulePackMateriaMatches(pack.materia, materia))
     .map((pack) => ({
       pack,
       score: requestedOrgano
@@ -603,7 +604,7 @@ export async function resolveMatterEntry(
       `,
       )
       .eq("tenant_id", query.tenantId)
-      .eq("materia", query.materia)
+      .eq("materia", normalizeMateriaForRulePack(query.materia))
       .eq("rule_pack_versions.is_active", true),
     query.entityId
       ? client
