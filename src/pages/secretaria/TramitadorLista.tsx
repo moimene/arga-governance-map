@@ -147,18 +147,22 @@ export default function TramitadorLista() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                 Estado
               </th>
+              {/* Audit #6: affordance explícito de cross-link al Acuerdo 360 */}
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+                Acuerdo 360
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--g-border-subtle)]">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                <td colSpan={6} className="px-6 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                   Cargando…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={6}>
                   <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                     <FolderOpen className="h-12 w-12 text-[var(--g-text-secondary)]/40 mb-3" />
                     <p className="text-sm font-medium text-[var(--g-text-secondary)]">
@@ -206,6 +210,21 @@ export default function TramitadorLista() {
                     >
                       {statusLabel(f.status)}
                     </span>
+                  </td>
+                  {/* Audit #6: cross-link explícito y estable al Acuerdo 360 origen */}
+                  <td className="px-6 py-4 text-sm">
+                    {f.agreement_id ? (
+                      <Link
+                        to={scope.createScopedTo(`/secretaria/acuerdos/${f.agreement_id}`)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                        data-testid="tramitador-acuerdo-link"
+                      >
+                        Ver Acuerdo 360
+                      </Link>
+                    ) : (
+                      <span className="text-[var(--g-text-secondary)]">—</span>
+                    )}
                   </td>
                 </tr>
                 );
