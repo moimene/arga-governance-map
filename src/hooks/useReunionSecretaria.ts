@@ -752,7 +752,35 @@ export function useBodyMembers(bodyId: string | undefined) {
   });
 }
 
+// ITEM-146: "Declarar apertura" transiciona la reunión a EN_CURSO (sesión
+// abierta), NO a CELEBRADA. CELEBRADA se reserva para el cierre (generación de
+// acta, vía useCloseMeeting). Antes una sesión abierta y abandonada quedaba
+// "Celebrada" sin asistentes/quórum/acta, distorsionando KPIs y el lenguaje de
+// estado. El CHECK de meetings.status y los guards de agenda (reclassify) admiten
+// EN_CURSO desde la migración 20260613120000/120500.
 export function useOpenMeeting(meetingId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!meetingId || !tenantId) return;
+      const { error } = await supabase
+        .from("meetings")
+        .update({ status: "EN_CURSO" })
+        .eq("id", meetingId)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
+    },
+  });
+}
+
+// ITEM-146: cierre de la sesión — transiciona EN_CURSO → CELEBRADA. Se invoca
+// desde CierreStep tras generar el acta, de modo que CELEBRADA representa una
+// sesión efectivamente celebrada (con acta), no una simplemente abierta.
+export function useCloseMeeting(meetingId: string | undefined) {
   const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   return useMutation({

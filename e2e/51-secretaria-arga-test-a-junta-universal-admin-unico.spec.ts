@@ -264,8 +264,9 @@ async function ensureMeetingWorkflow(page: Page, meetingId: string): Promise<str
   if (existingMinute?.id) return existingMinute.id as string;
 
   // Paso 1 — Constitución. El meeting nace en DRAFT para universales y el
-  // estado solo pasa a CELEBRADA cuando se declara apertura. Si el click no
-  // navega el estado, lo retentamos hasta que el motor refleje "CELEBRADA".
+  // estado solo pasa a EN_CURSO cuando se declara apertura (ITEM-146; CELEBRADA
+  // se reserva para el cierre con acta). Si el click no navega el estado, lo
+  // retentamos comprobando el texto "Sesión declarada abierta".
   await selectStep(page, /Constitución/i);
   await page.waitForLoadState('networkidle').catch(() => undefined);
   const openBtn = page.getByRole('button', { name: /Declarar apertura de la sesión/i });

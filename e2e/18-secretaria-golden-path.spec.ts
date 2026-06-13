@@ -190,7 +190,8 @@ test.describe('Secretaría — golden path prototipo legal', () => {
 
     await test.step('reunión, constitución y asistencia', async () => {
       await clickIfVisibleAndEnabled(page, 'Declarar apertura de la sesión');
-      await expect(page.getByText(/Sesión declarada abierta|CELEBRADA|Estado actual/i).first()).toBeVisible({ timeout: 20_000 });
+      // ITEM-146: apertura → EN_CURSO (badge "En curso"); CELEBRADA es post-cierre.
+      await expect(page.getByText(/Sesión declarada abierta|En curso|Estado actual/i).first()).toBeVisible({ timeout: 20_000 });
 
       await goStep(page, /Asistentes/, /Paso 2\. Asistentes/);
       const saveAttendance = page.getByRole('button', { name: 'Guardar asistencia' });

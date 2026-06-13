@@ -9,6 +9,7 @@ const ESTADO_TONE: Record<string, string> = {
   BORRADOR:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   EMITIDA:   "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
   CONVOCADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
+  EN_CURSO:  "bg-[var(--status-error)] text-[var(--g-text-inverse)] animate-pulse",
   CELEBRADA: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
   CANCELADA: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
@@ -104,6 +105,7 @@ export default function ConvocatoriasList() {
           <option value="BORRADOR">Borrador</option>
           <option value="EMITIDA">Emitida</option>
           <option value="CONVOCADA">Convocada</option>
+          <option value="EN_CURSO">En curso</option>
           <option value="CELEBRADA">Celebrada</option>
           <option value="CANCELADA">Cancelada</option>
         </select>

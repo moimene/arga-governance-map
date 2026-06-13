@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, Check, ChevronLeft } from "lucide-react";
+import { AlertTriangle, Building2, ChevronLeft } from "lucide-react";
+import { StepPills } from "./_shared/StepNav";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
@@ -181,6 +182,11 @@ export default function SociedadNuevaStepper() {
   const { data: sociedades = [] } = useSociedades();
   const [draft, dispatch] = useReducer(draftReducer, undefined, () => createEmptySociedadDraft());
   const [step, setStep] = useState(0);
+  // ITEM-061/125: high-watermark del paso alcanzado. Las píldoras solo permiten
+  // saltar a pasos ya visitados (<= maxStepReached), nunca saltar hacia delante
+  // sin pasar las validaciones por paso. Cubre también el step restaurado.
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  useEffect(() => setMaxStepReached((m) => Math.max(m, step)), [step]);
   const [saving, setSaving] = useState(false);
   // Persistencia de borrador en sessionStorage por tenant: recupera el draft al
   // montar y lo conserva ante refresh/navegacion accidental. Se limpia tras crear
@@ -401,31 +407,14 @@ export default function SociedadNuevaStepper() {
         </p>
       </div>
 
-      <ol className="mb-6 flex gap-2 overflow-x-auto pb-1 text-xs">
-        {STEPS.map((label, index) => {
-          const active = index === step;
-          const done = index < step;
-          return (
-            <li key={label} className="shrink-0">
-              <button
-                type="button"
-                onClick={() => setStep(index)}
-                className={`inline-flex min-h-9 items-center gap-2 px-3 py-1.5 font-semibold ${
-                  active
-                    ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                    : done
-                      ? "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
-                      : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                }`}
-                style={{ borderRadius: "var(--g-radius-full)" }}
-              >
-                {done ? <Check className="h-3.5 w-3.5" /> : <span>{index + 1}</span>}
-                <span>{label}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      {/* ITEM-125/061: píldoras compartidas, navegación guardada a pasos ya visitados. */}
+      <StepPills
+        steps={STEPS.map((label, index) => ({ n: index, label }))}
+        current={step}
+        layout="scroll"
+        canNavigateTo={(n) => n <= maxStepReached}
+        onNavigate={setStep}
+      />
 
       {currentIssues.length > 0 && !isLastStep ? (
         <div className="mb-4">

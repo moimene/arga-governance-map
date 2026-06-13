@@ -220,8 +220,40 @@ serve(async (req) => {
       .eq('communication_id', r.communication_id)
       .order('orden', { ascending: true });
 
-    const adjuntos = ((adjs as Adjunto[]) ?? []).filter((a) => a.modo_entrega === 'ADJUNTO')
+    const allAdjs = (adjs as Adjunto[]) ?? [];
+    const adjuntos = allAdjs.filter((a) => a.modo_entrega === 'ADJUNTO')
       .map((a) => ({ filename: a.label, path: a.storage_uri }));
+
+    // ITEM-128: entrega de adjuntos en modo LINK_FIRMADO. Antes el dispatcher
+    // filtraba solo 'ADJUNTO' y descartaba silenciosamente los LINK_FIRMADO, de
+    // modo que el Board Pack distribuido por enlace nunca llegaba al cuerpo del
+    // email. Ahora generamos una signed URL por cada adjunto LINK_FIRMADO (bucket
+    // privado 'matter-documents', misma vía que sign-evidence-url) y la inyectamos
+    // como sección de enlaces. Fail-closed: si la firma de algún enlace falla,
+    // marcamos el destinatario como error RETRIABLE en lugar de enviar un correo
+    // que promete un documento ausente.
+    const linkFirmados = allAdjs.filter((a) => a.modo_entrega === 'LINK_FIRMADO');
+    let linkSectionHtml = '';
+    let linkSigningError: string | null = null;
+    for (const a of linkFirmados) {
+      const storagePath = a.storage_uri.replace(/^evidence-bundle:\/\//, '');
+      const expirySeconds = Math.max(1, Math.round((a.signed_url_expiry_hours ?? 168) * 3600));
+      const { data: signed, error: signErr } = await sb.storage
+        .from('matter-documents')
+        .createSignedUrl(storagePath, expirySeconds);
+      if (signErr || !signed?.signedUrl) {
+        linkSigningError = `LINK_FIRMADO signed URL failed for '${a.label}': ${signErr?.message ?? 'no url returned'}`;
+        break;
+      }
+      linkSectionHtml += `<p style="margin:4px 0"><a href="${signed.signedUrl}">${a.label}</a></p>`;
+    }
+    if (linkSectionHtml) {
+      linkSectionHtml = `<hr/><p style="font-size:13px;margin:8px 0 4px"><strong>Documentos disponibles (enlace firmado, caduca):</strong></p>${linkSectionHtml}`;
+    }
+    // Cuerpo entregado = cuerpo canónico + sección de enlaces. El hash sellado
+    // (cuerpo_hash_sha512) sigue refiriéndose al cuerpo canónico; la sección de
+    // enlaces es presentación, igual que el pie QTSP del canal EMAIL_CERTIFICADO.
+    const cuerpoEntregado = comm.cuerpo_render + linkSectionHtml;
 
     const idempotencyKey = `${r.id}-${comm.cuerpo_hash_sha512}-${r.intento_reenvio_n}`;
     const tags = [
@@ -234,9 +266,13 @@ serve(async (req) => {
       | { ok: true; proveedor: 'RESEND' | 'EAD_TRUST'; eventId: string; evidenceHashSha512?: string }
       | { ok: false; retriable: boolean; error: string };
 
-    if (r.canal_primario === 'EMAIL_NORMAL') {
+    if (linkSigningError) {
+      // ITEM-128 fail-closed: no enviar si un enlace LINK_FIRMADO prometido no se
+      // pudo firmar. Retriable: la siguiente pasada del cron lo reintenta.
+      result = { ok: false, retriable: true, error: linkSigningError };
+    } else if (r.canal_primario === 'EMAIL_NORMAL') {
       const send = await resendSend({
-        destino: r.destino_primario, asunto: comm.asunto, cuerpoHtml: comm.cuerpo_render,
+        destino: r.destino_primario, asunto: comm.asunto, cuerpoHtml: cuerpoEntregado,
         idempotencyKey, tags, metadata, adjuntos,
       });
       result = send.ok ? { ok: true, proveedor: 'RESEND', eventId: send.eventId } : send;
@@ -245,7 +281,7 @@ serve(async (req) => {
       if (!seal.ok) {
         result = seal;
       } else {
-        const enrichedHtml = `${comm.cuerpo_render}<hr/><p style="font-size:11px;color:#666">Sello QTSP EAD Trust: ${seal.evidenceId}<br/>Emitido: ${seal.timestampedAt}</p>`;
+        const enrichedHtml = `${cuerpoEntregado}<hr/><p style="font-size:11px;color:#666">Sello QTSP EAD Trust: ${seal.evidenceId}<br/>Emitido: ${seal.timestampedAt}</p>`;
         const adjuntosCert = [...adjuntos, { filename: 'timestamp.tsr', path: `data:application/timestamp-reply;base64,${seal.tsqTokenBase64}` }];
         const send = await resendSend({
           destino: r.destino_primario, asunto: comm.asunto, cuerpoHtml: enrichedHtml,
@@ -257,7 +293,7 @@ serve(async (req) => {
       }
     } else if (r.canal_primario === 'BUROFAX_ERDS') {
       const erds = await eadTrustErdsSend({
-        recipientId: r.id, cuerpoHtml: comm.cuerpo_render, cuerpoSha512: comm.cuerpo_hash_sha512,
+        recipientId: r.id, cuerpoHtml: cuerpoEntregado, cuerpoSha512: comm.cuerpo_hash_sha512,
         asunto: comm.asunto, destino: r.destino_primario, idempotencyKey, metadata,
       });
       result = erds.ok

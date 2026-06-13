@@ -645,9 +645,10 @@ test.describe('Phase B4 — UI driving destructive con sociedad sintética (v0+v
     await expect(aperturaButton).toBeVisible({ timeout: 10_000 });
     if (await aperturaButton.isEnabled().catch(() => false)) {
       await aperturaButton.click();
-      // Tras el click, el meeting transiciona a CELEBRADA.
+      // ITEM-146: tras el click, el meeting transiciona a EN_CURSO (sesión
+      // abierta); CELEBRADA se alcanza al cerrar con acta.
       await expect(
-        page.getByText(/Sesión declarada abierta|CELEBRADA|Estado actual/i).first(),
+        page.getByText(/Sesión declarada abierta|En curso|Estado actual/i).first(),
       ).toBeVisible({ timeout: 10_000 });
     }
 

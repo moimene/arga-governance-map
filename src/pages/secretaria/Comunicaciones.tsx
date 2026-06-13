@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Send } from 'lucide-react';
 import { useCommunicationsList, type CommunicationsFilters } from '@/hooks/useCommunicationsList';
 import { useCancelCommunication } from '@/hooks/useCommunicationActions';
 
@@ -130,10 +131,27 @@ export default function Comunicaciones() {
         <div className="p-6 text-[var(--g-text-secondary)]">Cargando…</div>
       ) : comms.length === 0 ? (
         <div
-          className="p-6 text-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] text-[var(--g-text-secondary)]"
+          className="p-8 text-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: 'var(--g-radius-md)' }}
         >
-          No hay comunicaciones que coincidan con los filtros.
+          {/* ITEM-065: empty-state con CTA explicando el origen de los envíos. */}
+          <p className="text-sm font-medium text-[var(--g-text-primary)]">
+            No hay comunicaciones registradas todavía.
+          </p>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--g-text-secondary)]">
+            Las comunicaciones a miembros de órganos sociales (convocatorias, puesta a
+            disposición de documentación, notificaciones certificadas) se originan al
+            distribuir un Board Pack o emitir una convocatoria. Desde aquí se consulta su
+            estado de entrega y se gestionan reintentos.
+          </p>
+          <Link
+            to="/secretaria/board-pack"
+            className="mt-4 inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+            style={{ borderRadius: 'var(--g-radius-md)' }}
+          >
+            <Send className="h-4 w-4" />
+            Ir al Board Pack para distribuir
+          </Link>
         </div>
       ) : (
         <div

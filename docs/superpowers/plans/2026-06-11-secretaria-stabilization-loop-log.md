@@ -823,3 +823,145 @@ e implementó lo legal, y se restauró la integridad forense:
 **Backlog FINAL: 144 HECHO, 6 PARCIAL, 4 PENDIENTE (125/126/128/146 = refactors
 arquitectónicos documentados en Anexo II), 0 BLOQUEADO.**
 Gates: typecheck verde, tests 1961 pass/0 fail, build verde, migraciones Cloud alineadas.
+
+---
+
+## Pasada de refactor arquitectónico 2026-06-12 — ITEM-125 (shell común de stepper)
+
+Cierre con diseño previo (no en caliente). Decisiones de producto aprobadas por el usuario:
+3 familias completas (F1+F2+F3), lockBack en F2, directo al código. Rama
+`feature/item125-shell-comun`, 4 commits secuenciales (interdependientes, no fan-out):
+
+- **A** `67cb75d` — `_shared/WizardFields.tsx`: extrae WizardInput/Field/Checkbox (antes
+  copiados byte a byte en AnadirSocio/Transmisión/DesignarAdmin). PersonaNueva conserva su
+  Field (variante con fallback `—`). PersonSelector fuera (un solo consumidor con esa forma).
+- **B** `2fe9873` — `_shared/StepNav.tsx`: StepRail (rail vertical) + StepPills (píldoras),
+  política de navegación inyectable `canNavigateTo(n)`. StepperShell consume StepRail (F1
+  sin cambio de comportamiento).
+- **C** `fabcbf3` — F2 (AcuerdoSinSesión/CoAprobación/Solidario) → StepRail. AcuerdoSinSesión
+  con lockBack `n<current && !(resolutionId && n<4)`: congela pasos 1-3 tras abrir votación
+  (preserva guard ITEM-060).
+- **D** `a6c5a94` — F3 píldoras → StepPills (AnadirSocio/Transmisión/DesignarAdmin display-only;
+  SociedadNueva clicable-guardado con high-watermark `maxStepReached`, cierra el salto ciego
+  residual de ITEM-061). PersonaNueva conserva píldoras en grid (variante de layout).
+
+**Verificación:** gates por commit (typecheck · bun test 1961/0 · build) verdes; lint 0
+problemas nuevos (los 15 errores `any` GRC/AIMS + 2 warnings Convocatorias son
+pre-existentes). e2e cubriendo F1 (05✓, 38✓), F2 (38✓, 42✓), F3 (43✓, 44 steppers✓). Dos
+fallos e2e (18-golden-path `:193` apertura; 44:64 PersonaDetalle heading ambiguo) son
+**pre-existentes** — verificado idéntico contra baseline 72302b5 en worktree temporal de
+solo lectura. **Codex (review adversarial)**: 0 regresiones de navegación, confirma F1-F4
+equivalentes (único cambio: paso 4 de AcuerdoSinSesión pasa de "enabled inerte" a "disabled"
+en algunos estados, sin alterar ningún salto posible — mejora menor).
+
+Deuda relacionada no cerrada por este refactor: ITEM-059 (deriveStep desde meeting.status +
+canAdvance por paso en ReunionStepper.buildSteps) — StepRail ahora centraliza la política,
+dejando el cableado trivial, pero el cambio de reanudación requiere su propio e2e.
+
+**Recuento tras ITEM-125: 145 HECHO, 6 PARCIAL, 3 PENDIENTE (126/128/146), 0 BLOQUEADO.**
+
+---
+
+## Cierre residual 2026-06-13 — ITEM-089 (contador del catálogo) + corrección de premisa
+
+ITEM-089 ya figuraba HECHO en la tabla (un workflow previo añadió `LocalFixtureBadge`,
+status `fixture_bridge`, filtro `LOCAL_FIXTURE` y gating del CTA `!localFixture`), pero el
+detalle seguía PENDIENTE/REQUIERE DECISIÓN y faltaba la pieza del contador.
+
+**Corrección de premisa (Confusion Protocol):** al retomar el ítem para "eliminar los
+fixtures", la inspección en frío contradijo la descripción del backlog. Los 16 fixtures
+**no** son un "dead-end silencioso" ni "desinformación": están etiquetados en 3 superficies,
+su CTA "Usar plantilla" está oculto para fixtures, y 3 e2e (14, 17×2) validan el flujo
+catálogo→tramitador end-to-end. Se revirtió el intento de eliminación y se re-presentó la
+decisión al usuario con los hechos reales.
+
+**Decisión humana:** "Separar el contador" (no eliminar). **Fix:** desglose en
+`CatalogoTab.tsx` — `{filtered} de {total} plantillas · {realCount} reales + {fixtureCount}
+fixtures puente` (desglose solo si `fixtureCount > 0`), vía useMemo sobre `isLocalFixture`.
+Cero e2e roto, cero flujo perdido.
+
+**Verificación:** typecheck verde · `bun test src/lib/secretaria/` 701 pass / 0 fail ·
+ningún e2e depende del texto del contador (grep). Detalle del backlog actualizado con la
+corrección factual.
+
+---
+
+## Cierre 2026-06-13 — ITEM-126 (blindaje vías de envío) + 2ª corrección de premisa
+
+Segunda premisa obsoleta consecutiva. La auditoría situaba el writer ficticio (Vía 3,
+`useEnviarNotificacion`) en `useNoSessionExpediente.ts:377-425`; ese archivo entero (480
+líneas, 0 consumidores) **ya había sido eliminado en `e06cd39` como ITEM-150**. La Vía 3
+no existe. Verificado además que ninguna ruta de `src/` promueve un acuerdo sin sesión a
+`NOTIFICADO` (el único `NOTIFICADO` es lectura en useAgreementCompliance) y que la Vía 2
+(`useERDSNotification`) es fail-closed + gated por `erdsProxyAvailable` (ITEM-063).
+
+**Decisión humana:** "Blindaje real + guard". **Fix:** (a) `@deprecated` + nota de
+no-cablear en las 2 mutaciones muertas de useERDSNotification (`updateNotificationStatus`,
+`sendAndTrackNotification`) que escriben no_session_notificaciones directo saltándose el
+pipeline canónico (0 callers prod); (b) nuevo guard `no-session-notificado-guard.test.ts`
+(4 asserts) — el writer ficticio sigue eliminado, nadie escribe `estado:'ENVIADA'` sobre
+no_session_notificaciones, nadie promueve a NOTIFICADO por escritura directa, y el único
+escritor de esa tabla es el hook ERDS (solo columnas `erds_*`).
+
+**No abierto (alcance mayor):** consolidación completa a dispatcher único (Vía 1) y mapeo
+no_session_notificaciones→VIEW siguen diferidos a P2 (migración 20260517141038:1-6).
+
+**Verificación:** typecheck verde · `bun test src/test/schema/` 225 pass / 0 fail (guard
+4/4 + hardcodes ERDS 3/3 incluidos).
+
+---
+
+## Cierre 2026-06-13 — ITEM-128 (doble pipeline de despacho) + matiz arquitectónico
+
+La decisión original ("Lib → _shared, Edge la importa") asume que la Edge puede importar
+el lib. **No es físicamente posible**: Vite/tsc no importa módulos Deno `https://` y Deno
+no importa el código `@/` del browser. El precedente citado (comms-plazo-engine) NO es una
+fuente compartida sino un **patrón mirror** (copia Deno en `_shared` + diff-gate). Trasladado
+al usuario; decisión revisada: **"Mínimo de daño real + sanear muerto"** (evita rewire de un
+runtime de comms vivo no testeable aquí).
+
+**Fix:** (1) bug LINK_FIRMADO resuelto en la Edge — signed URL por adjunto + inyección en
+cuerpo de los 3 canales, fail-closed si la firma falla; (2) eliminado el código muerto del
+lib (dispatcher + retry-policy + 6 adapters + adapter-registry + 8 tests; 0 consumidores de
+producción), conservando solo `types.ts` (usado por UI + motor de plazos) con cabecera que
+fija la Edge como única fuente de verdad; (3) MAX_RETRIES reconciliado — al borrar
+retry-policy.ts desaparece la constante TS duplicada, el límite queda como literal plpgsql
+único (`v_intento < 3`). Diferido: consolidación mirror completa (rewire del runtime). ITEM-127
+(shortHash) ya estaba en la Edge.
+
+**Verificación:** typecheck verde · `bun test` 1943 pass / 0 fail · lint 0 errores nuevos ·
+build (gate). Ejecución Deno NO verificable aquí; LINK_FIRMADO revisado por lectura.
+
+**Las 3 decisiones de esta sesión (089/126/128) toparon con premisas obsoletas o un matiz
+no contemplado** — patrón a vigilar en los ítems restantes (133/056/146): verificar el
+estado real del código antes de ejecutar la acción descrita en el backlog.
+
+---
+
+## Cierre 2026-06-13 — ITEM-146 (estado EN_CURSO) — premisa válida, alcance mayor
+
+Única de las 4 decisiones cuya premisa se sostuvo (useOpenMeeting→CELEBRADA incondicional,
+confirmado). Pero el alcance resultó mayor del presentado: meetings.status tiene CHECK
+constraint (requiere migración) Y 2 funciones vivas gatean agenda con
+`IN ('CONVOCADA','CELEBRADA')` y se invocan desde el stepper (reclassify) — introducir
+EN_CURSO sin migrarlas habría roto la reclasificación durante sesión abierta. Trasladado al
+usuario; decisión: **"EN_CURSO completo (2 migraciones)"**.
+
+**State machine:** DRAFT→CONVOCADA→EN_CURSO→CELEBRADA. **2 migraciones Cloud (gov_OS,
+verificadas live):** `20260613090054` (CHECK +EN_CURSO), `20260613090131` (recrea
+reclassify_agenda_item_kind + trigger agenda_kind_audit_after_convoked con guard ampliado a
+IN('CONVOCADA','EN_CURSO','CELEBRADA') — leídas con pg_get_functiondef del Cloud vivo, no de
+migraciones supersedidas). **Frontend:** useOpenMeeting→EN_CURSO + nuevo useCloseMeeting→
+CELEBRADA en CierreStep tras acta; isOpen/meetingOpen reconocen ambos; reclassification-matrix
++EN_CURSO (espejo SQL) + OPEN→EN_CURSO; badge con statusLabel; colores/filtros ConvocatoriasList
++Dashboard. **e2e:** post-apertura→EN_CURSO; seeds y finales post-cierre se conservan CELEBRADA.
+
+**Verificación:** db:check-target=gov_OS · CHECK+guards live OK · typecheck · bun test 1943/0 ·
+build. e2e 18 apertura falla **pre-existente** (verificado por stash vs baseline: falla
+idéntico con regex viejo; ni "Estado actual" monta → flujo previo, no el status). Migraciones
+mirror renombradas a las versiones remotas exactas para alineación migration list.
+
+**Recuento sesión 2026-06-13: 089/126/128/146 cerrados (089 contador, 126 blindaje+guard,
+128 LINK_FIRMADO+dead-code, 146 EN_CURSO completo). Patrón confirmado: de las 4 decisiones,
+3 toparon con premisa obsoleta o alcance mayor — verificar SIEMPRE el código real antes de
+ejecutar la acción del backlog.**
