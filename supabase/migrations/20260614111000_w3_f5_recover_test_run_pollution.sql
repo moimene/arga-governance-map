@@ -1,3 +1,10 @@
+-- ⚠️ ONE-SHOT — NO REPLAYABLE en DB limpia. Depende del schema transitorio
+-- `w3_backup_20260614` (snapshot puntual del incidente). En un replay limpio
+-- (supabase db reset / staging desde cero) ese schema NO existe y esta migración
+-- fallaría; NO forma parte de la secuencia lógica de saneamiento W3 (eso es F1-F4,
+-- que no usan backup). Es una recuperación de incidente ya aplicada en Cloud; si se
+-- replaya en otro entorno, OMITIR esta migración y la 20260614110000.
+-- ----------------------------------------------------------------------------
 -- W3-F5 — Recuperación de polución introducida al ejecutar la suite vitest con
 -- credencial admin contra Cloud (2026-06-14). LECCIÓN: el gate canónico es
 -- `bun test` (anon, salta los tests que mutan); vitest con SERVICE_ROLE inserta

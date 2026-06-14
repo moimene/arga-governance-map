@@ -77,8 +77,9 @@ export function useSociedades() {
       // tienen su PJ canónica asociada son "sociedades" bien formadas.
       // Evita mostrar entities legacy pre-modelo-canónico como sociedades.
       // W3 (cerrado 2026-06-14): se OCULTA el dato TEST de forma consistente en
-      // todos los read-paths vía applyVisibleDataClass (opt-in E2E con
-      // tgms.includeTestData=1). El trigger trg_autotag_test_data_class etiqueta
+      // todos los read-paths vía applyVisibleDataClass (null-safe). El opt-in para
+      // ver TEST es SOLO build-time (VITE_E2E=1, dev server de Playwright); no hay
+      // bypass por localStorage/URL. El trigger fn_autotag_*_test_data_class etiqueta
       // automáticamente futuros artefactos E2E como TEST en la BD.
       let q = supabase
         .from("entities")
