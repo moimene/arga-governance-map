@@ -240,3 +240,73 @@ solidario, decisión unipersonal, libros, board pack.
 - Legacy `Cartera ARGA, S.A.` (`517522ab`) duplicado de la SLU canónica; conserva la
   arista Fundación→Cartera. Retirar requiere rewire del parent edge.
 - 6 `evidence_bundles` SEALED con qtsp sandbox (W1, cross-módulo) — fuera de W3.
+
+---
+
+## Adenda — G (gobierno) + H (nutrición filiales) + I (cierre /codex) — 2026-06-14
+
+### G — Las 3 decisiones de gobierno, RESUELTAS
+
+Migración `20260614120000_w3_g_governance_decisions` (replica + orphan-scan + self-verify).
+
+1. **tax_id PJ ARGA**: borrada la PJ huérfana duplicada `2faafc8d` (sin refs) y fijado el
+   tax_id canónico `A-99999903` en la PJ real de ARGA Seguros (`15fab4ff`).
+2. **Legacy Cartera SA**: retirada `Cartera ARGA, S.A.` (`517522ab`, 0 hijos/socios/cargos)
+   + su PJ (`17aa1e03`); rewire de la cadena de grupo → `Cartera ARGA S.L.U.` (`…020`)
+   pasa a tener `parent=Fundación ARGA` (`7b9dd701`).
+3. **Evidence sandbox**: las 6 `evidence_bundles` SEALED de sandbox (qseal+tsq NULL, sin
+   sello cualificado) degradadas a OPEN (trust-boundary; alinea con 000049 HOLD).
+
+### H — Nutrición al máximo de todas las filiales
+
+Migración `20260614121000_w3_h_nutrir_filiales` (one-shot forward-only; salta entidades
+con cargos VIGENTE; excluye las 5 ya Completa). Para cada filial demo sin gobierno:
+órgano CDA + clase de acción ORD + cap table 100% (titular = PJ de la matriz) + SOCIO +
+PRESIDENTE/SECRETARIO en el CDA + (no-uni → 3 CONSEJERO | uni → ADMIN_UNICO) +
+`authority_evidence` autogenerada por trigger. Pool de 12 ejecutivos demo (PF).
+Fundación ARGA recibe Patronato + cargos pero **sin** cap table (no tiene socios).
+
+Estado resultante: **31 entidades**, todas con `entity_capital_profile` VIGENTE +
+`share_class` + cap table 100% (Fundación 0%, correcto) + CDA + cargos + SOCIO/ADMIN.
+`persons` 80→**92** (pool +12). `data_class` TEST = 0. Direcciones de ownership correctas
+(matriz→filial; LATAM→Argentina/Brasil/etc.; España→Asistencia/Salud; RE→Global RE;
+Fundación→Cartera 100%→ARGA 69.69% + free float 30.31%).
+
+### Revisión adversarial /codex + cierre W3-I
+
+`/codex` sobre G+H emitió **ROJO** (3 [major] + 1 [minor]). Verificación empírica vs Cloud:
+
+| Hallazgo codex | Veredicto empírico |
+|---|---|
+| G3 "demueve demasiado" | **Falso**: backup tenía exactamente 6 SEALED, los 6 sin token; demovió solo esos. 0 SEALED legítimos existían. |
+| Fallback de titular en H crea ownership errónea | **Code-path nunca ejecutado**. El único caso real (ARGA RE, parent NULL participada 100% por ARGA) es PRE-EXISTENTE (20M títulos, en backup), no de H. Incoherencia real corregida. |
+| Self-verify de H incompleto | Datos ya correctos (cap_tables_rotas=0, 0 self/ciclos, 0 cargos sin authority). Asserts añadidos como guard permanente. |
+| "idempotente" sobre-afirmado | Corrección de registro: H es one-shot. H se deja byte-idéntica a lo aplicado. |
+
+Migración `20260614130000_w3_i_gh_hardening_asserts` (forward-only, sin replica):
+(1) fija `parent` de ARGA RE → ARGA Seguros (coherente con su holding 100%);
+(2) instala **guards permanentes** que RAISE→rollback ante regresión: SEALED sin token,
+auto-propiedad, ciclos matriz↔filial, raíces inesperadas (solo Fundación + ARGA admisibles),
+cap table no-fundacional ≠ 100, cargos certificantes sin authority_evidence, paridades
+canónicas, CdA ARGA=17, cap ARGA=100, orphan-scan completo. Todos pasan hoy.
+
+### Verificación final post-G+H+I
+
+- 6 paridades canónicas: **todas verdes** (p1..p6 = 0/0/0/0/0/100.00); `cap_tables_rotas=0`.
+- Orphan-scan completo `public`: **0**. `data_class` TEST: **0**.
+- Árbol de grupo: **2 raíces** legítimas (Fundación ápex + ARGA Seguros cotizada).
+- Golden path ARGA Seguros: **CdA=17, cap=100, intacto**.
+- `bun test`: **2064 pass / 152 skip / 0 fail**. `typecheck`: verde. `build`: verde.
+
+### Backup G+H+I
+
+`w3_backup_gh_20260614` (schema): snapshot lógico tomado antes de G+H. Usado en la
+verificación de no-sobre-democión de G3 y para confirmar que ARGA RE es pre-existente.
+
+### Deuda cosmética conocida (no bloqueante)
+
+- `Fundación ARGA.tipo_social='SA'` (debería ser FUNDACION) — no se cambia: `tipo_social`
+  alimenta la selección de plantilla del motor; introducir un valor no soportado rompería
+  lookups. Revisar con el enum del motor antes de tocar.
+- Algunas filiales pre-existentes Completa (Servicios Corporativos, Tecnología Jurídica)
+  tienen cap table multi-titular y 2 órganos — diseño original, fuera de scope W3.
