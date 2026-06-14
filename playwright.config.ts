@@ -36,7 +36,9 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: `bunx --bun vite --host 127.0.0.1 --port ${port} --strictPort`,
+          // VITE_E2E=1 -> shouldIncludeTestData() devuelve true para que los specs
+          // vean el dato data_class='TEST' que crean (W3, 2026-06-14).
+          command: `VITE_E2E=1 bunx --bun vite --host 127.0.0.1 --port ${port} --strictPort`,
           url: baseURL,
           reuseExistingServer,
           timeout: 60_000,

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
 import { useTenantContext } from "@/context/TenantContext";
 import type { Node, Edge } from "@xyflow/react";
 import type { GovNodeData } from "@/components/governance-map/GovNode";
@@ -60,10 +61,12 @@ export function useGovernanceNodes() {
     staleTime: 60_000,
     queryFn: async () => {
       const [entRes, bodyRes, polRes] = await Promise.all([
-        supabase
-          .from("entities")
-          .select("id, common_name, entity_status")
-          .eq("tenant_id", tenantId!),
+        applyVisibleDataClass(
+          supabase
+            .from("entities")
+            .select("id, common_name, entity_status")
+            .eq("tenant_id", tenantId!),
+        ),
         supabase
           .from("governing_bodies")
           .select("id, name, body_type, entity_id")

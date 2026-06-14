@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
+import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
 
 export interface EntityRow {
   id: string;
@@ -115,6 +116,7 @@ export function useEntitiesList(options?: { sociedadesOnly?: boolean }) {
       if (sociedadesOnly) {
         query = query.not("person_id", "is", null);
       }
+      query = applyVisibleDataClass(query); // W3: oculta entities TEST (opt-in E2E)
 
       const { data, error } = await query.order("common_name", { ascending: true });
       if (error) throw error;
@@ -151,12 +153,13 @@ export function useEntityChildren(entityId: string | undefined) {
     enabled: !!entityId && !!tenantId,
     queryKey: ["entities", tenantId, "children", entityId],
     queryFn: async (): Promise<EntityRow[]> => {
-      const { data, error } = await supabase
-        .from("entities")
-        .select("*")
-        .eq("tenant_id", tenantId!)
-        .eq("parent_entity_id", entityId!)
-        .order("common_name", { ascending: true });
+      const { data, error } = await applyVisibleDataClass(
+        supabase
+          .from("entities")
+          .select("*")
+          .eq("tenant_id", tenantId!)
+          .eq("parent_entity_id", entityId!),
+      ).order("common_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as EntityRow[];
     },

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useEntityRules } from "@/hooks/useJurisdiccionRules";
+import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
 
 export interface FilialEntity {
   id: string;
@@ -26,16 +27,17 @@ export function useFilialEntities() {
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<FilialEntity[]> => {
-      const { data, error } = await supabase
-        .from("entities")
-        .select(
-          "id, slug, legal_name, common_name, jurisdiction, legal_form, tipo_social, " +
-          "es_unipersonal, ownership_percentage, entity_status, materiality, parent_entity_id"
-        )
-        .eq("tenant_id", tenantId!)
-        .not("jurisdiction", "eq", "ES")
-        .not("jurisdiction", "is", null)
-        .order("jurisdiction", { ascending: true });
+      const { data, error } = await applyVisibleDataClass(
+        supabase
+          .from("entities")
+          .select(
+            "id, slug, legal_name, common_name, jurisdiction, legal_form, tipo_social, " +
+            "es_unipersonal, ownership_percentage, entity_status, materiality, parent_entity_id"
+          )
+          .eq("tenant_id", tenantId!)
+          .not("jurisdiction", "eq", "ES")
+          .not("jurisdiction", "is", null),
+      ).order("jurisdiction", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as FilialEntity[];
     },

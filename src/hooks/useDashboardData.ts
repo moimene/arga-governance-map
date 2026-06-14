@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
 
 export interface DashboardKpis {
   entidades: number;
@@ -18,7 +19,7 @@ export function useDashboardKpis() {
       const in90Iso = in90.toISOString().slice(0, 10);
 
       const [ent, man, pol, fnd, del] = await Promise.all([
-        supabase.from("entities").select("*", { count: "exact", head: true }).eq("entity_status", "Active"),
+        applyVisibleDataClass(supabase.from("entities").select("*", { count: "exact", head: true }).eq("entity_status", "Active")),
         // ITEM-090: mandatos por vencer leídos de condiciones_persona (fuente
         // canónica). estado VIGENTE == mandato activo; fecha_fin == end_date.
         // mandates queda solo para vistas legacy del shell TGMS.

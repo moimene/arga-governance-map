@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { applyVisibleDataClass } from "@/lib/secretaria/data-class";
 
 export interface SociedadRow {
   id: string;
@@ -75,19 +76,17 @@ export function useSociedades() {
       // G1.2: filtrar entities con `person_id NOT NULL` — sólo las que
       // tienen su PJ canónica asociada son "sociedades" bien formadas.
       // Evita mostrar entities legacy pre-modelo-canónico como sociedades.
-      const { data, error } = await supabase
+      // W3 (cerrado 2026-06-14): se OCULTA el dato TEST de forma consistente en
+      // todos los read-paths vía applyVisibleDataClass (opt-in E2E con
+      // tgms.includeTestData=1). El trigger trg_autotag_test_data_class etiqueta
+      // automáticamente futuros artefactos E2E como TEST en la BD.
+      let q = supabase
         .from("entities")
         .select("*")
         .eq("tenant_id", tenantId!)
-        .not("person_id", "is", null)
-        // W3: la columna data_class clasifica DEMO/TEST/PRE_RELEASE/PRODUCTION.
-        // El FILTRADO operativo (ocultar TEST) se difiere a propósito: aplicarlo
-        // solo aquí crea inconsistencia (la sociedad TEST seguiría seleccionable
-        // en el scope/wizards vía useEntitiesList) y no es durable (los builders
-        // E2E no setean data_class → artefactos futuros nacen DEMO). El filtrado
-        // consistente en todos los read-paths + el tagging del harness E2E es un
-        // follow-up coordinado (ver IV.4 del informe legal).
-        .order("common_name", { ascending: true });
+        .not("person_id", "is", null);
+      q = applyVisibleDataClass(q);
+      const { data, error } = await q.order("common_name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as SociedadRow[];
     },

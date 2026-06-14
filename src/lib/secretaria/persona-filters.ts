@@ -38,6 +38,11 @@ import type { PersonaRow } from "@/hooks/usePersonasCanonical";
  * deliberados para minimizar falsos positivos sobre CIFs reales.
  */
 export function isProductionPerson(p: PersonaRow): boolean {
+  // W3 (2026-06-14): honra la columna `data_class` además de los patrones de
+  // nombre/tax_id. Tras la purga F1 no quedan personas TEST, pero el trigger de
+  // auto-tag marcará futuros artefactos E2E como data_class='TEST' y aquí se ocultan.
+  if ((p as { data_class?: string | null }).data_class === "TEST") return false;
+
   const fullName = p.full_name ?? "";
   if (fullName.startsWith("[E2E REAL]")) return false;
   if (fullName.startsWith("[ARCHIVED]")) return false;
