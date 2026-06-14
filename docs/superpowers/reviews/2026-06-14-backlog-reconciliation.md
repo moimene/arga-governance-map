@@ -66,3 +66,16 @@ Método: 15 verificadores escépticos en paralelo + re-verificación adversarial
 Ya resueltos en código (no requieren acción):
 
 ITEM-003, ITEM-004, ITEM-005, ITEM-007, ITEM-008, ITEM-009, ITEM-010, ITEM-011, ITEM-013, ITEM-014, ITEM-015, ITEM-017, ITEM-023, ITEM-024, ITEM-027, ITEM-028, ITEM-029, ITEM-032, ITEM-033, ITEM-035, ITEM-037, ITEM-038, ITEM-039, ITEM-040, ITEM-042, ITEM-043, ITEM-044, ITEM-046, ITEM-047, ITEM-048, ITEM-049, ITEM-050, ITEM-051, ITEM-052, ITEM-053, ITEM-054, ITEM-055, ITEM-057, ITEM-058, ITEM-059, ITEM-060, ITEM-061, ITEM-062, ITEM-063, ITEM-064, ITEM-065, ITEM-067, ITEM-068, ITEM-069, ITEM-071, ITEM-072, ITEM-073, ITEM-074, ITEM-075, ITEM-076, ITEM-077, ITEM-078, ITEM-079, ITEM-083, ITEM-084, ITEM-085, ITEM-086, ITEM-087, ITEM-088, ITEM-089, ITEM-090, ITEM-091, ITEM-092, ITEM-096, ITEM-098, ITEM-100, ITEM-101, ITEM-103, ITEM-104, ITEM-105, ITEM-106, ITEM-107, ITEM-108, ITEM-109, ITEM-110, ITEM-111, ITEM-115, ITEM-117, ITEM-118, ITEM-120, ITEM-121, ITEM-122, ITEM-123, ITEM-124, ITEM-125, ITEM-126, ITEM-127, ITEM-128, ITEM-130, ITEM-131, ITEM-132, ITEM-133, ITEM-135, ITEM-136, ITEM-137, ITEM-139, ITEM-140, ITEM-141, ITEM-143, ITEM-144, ITEM-145, ITEM-146, ITEM-148, ITEM-150, ITEM-151
+
+---
+
+## Addendum — verificación manual ítem a ítem (cluster "Validez del motor")
+
+Tras la reconciliación automática, cada ítem del cluster se verificó manualmente contra el código antes de tocar. **2 de 4 eran falsos positivos** de la reconciliación (importante: los 39 "accionables" contienen falsos positivos; verificar siempre antes de arreglar).
+
+| ITEM | Verdicto reconciliación | Verificación manual | Acción |
+|---|---|---|---|
+| ITEM-093 | PENDING | **Falso positivo** — ya arreglado: el badge del Paso 2 usa `noticeOk` (= `noticeDoubleEvaluation.effective_ok`) y el aviso de plazo está reactivado (`ConvocatoriasStepper.tsx:2971/3020`, comentarios `ITEM-093`). | Ninguna |
+| ITEM-036 | PARTIAL | **Falso positivo** — denominadores correctos por fórmula: `2/3_total_miembros` usa `total_miembros||0` con guard `===0` (`majority-evaluator.ts:332-336`); `1/2_miembros_presentes` usa concurrentes. No hay `Math.max(censo,presentes)` como denominador (el `censoEfectivo` de votacion-engine:648 es tamaño de admin mancomunada). | Ninguna |
+| ITEM-022 | PARTIAL | **Real** — `evaluarDecisionSocioUnico` no verificaba unipersonalidad (socio al 90% pasaba). | **Arreglado** (commit `9687532`): gate de unipersonalidad (1 socio al 100%); BLOCKING con datos, WARNING sin datos. TDD 4 tests. |
+| ITEM-041 | PENDING | **Real pero multi-capa** — `ConflictoInteres` no tiene asociación a punto del orden del día; la exclusión por conflicto se aplica a todos los puntos (sobre-exclusión vs arts. 190/228.c LSC). | **Diferido**: requiere modelo de datos (conflicto↔punto) + captura UI por-punto + filtro en engine. No es lógica pura. |
