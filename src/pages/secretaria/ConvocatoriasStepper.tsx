@@ -6,6 +6,7 @@ import {
   AlertTriangle, FileText, Globe, Plus, Send, ShieldCheck, Trash2, Users,
 } from "lucide-react";
 import { evaluarConvocatoria, tiposPlantillaConvocatoriaPreferidos } from "@/lib/rules-engine";
+import { segundaConvocatoriaGapIncumplido, gapSegundaConvocatoriaHoras } from "@/lib/secretaria/segunda-convocatoria";
 import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
@@ -772,14 +773,9 @@ export default function ConvocatoriasStepper() {
     organoTipo === "JUNTA_GENERAL" && (tipoSocial === "SA" || tipoSocial === "SAU");
   const segundaConvocatoriaGapWarning = (() => {
     if (!habilitarSegunda || !fechaReunion || !fechaReunion2) return null;
-    const first = new Date(`${fechaReunion}T${horaReunion || "00:00"}:00`);
-    const second = new Date(`${fechaReunion2}T${horaReunion2 || "00:00"}:00`);
-    if (Number.isNaN(first.getTime()) || Number.isNaN(second.getTime())) return null;
-    const gapHours = (second.getTime() - first.getTime()) / 3_600_000;
-    if (gapHours < 24) {
-      return `Entre la primera y la segunda convocatoria debe mediar, por lo menos, un plazo de 24 horas (art. 177.2 LSC). Gap actual: ${gapHours.toFixed(1)} h.`;
-    }
-    return null;
+    if (!segundaConvocatoriaGapIncumplido(fechaReunion, horaReunion, fechaReunion2, horaReunion2)) return null;
+    const gapHours = gapSegundaConvocatoriaHoras(fechaReunion, horaReunion, fechaReunion2, horaReunion2);
+    return `Entre la primera y la segunda convocatoria debe mediar, por lo menos, un plazo de 24 horas (art. 177.2 LSC). Gap actual: ${gapHours?.toFixed(1)} h.`;
   })();
   const lastAutoLugarRef = useRef("");
 
@@ -2162,6 +2158,12 @@ export default function ConvocatoriasStepper() {
   // ── Submit ──
   async function handleEmitir() {
     if (!selectedBodyId || !fechaReunion || createConvocatoria.isPending) return;
+    // ITEM-034: el gap mínimo de 24h entre 1ª y 2ª convocatoria (art. 177.2 LSC)
+    // es un mínimo legal imperativo → bloquea la emisión, no solo advierte.
+    if (segundaConvocatoriaGapWarning) {
+      toast.error(segundaConvocatoriaGapWarning);
+      return;
+    }
     // ITEM-034: la 2ª convocatoria solo se persiste cuando la figura existe
     // (junta SA/SAU, art. 177.1 LSC).
     const fecha2Iso = habilitarSegunda && segundaConvocatoriaDisponible && fechaReunion2
@@ -4327,7 +4329,8 @@ export default function ConvocatoriasStepper() {
                   uploadStatus.inFlight > 0 ||
                   borradorIsStale ||
                   borradorRenderPending ||
-                  borradorCapa3HasMissing
+                  borradorCapa3HasMissing ||
+                  Boolean(segundaConvocatoriaGapWarning)
                 }
                 onClick={handleEmitir}
                 aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorRenderPending}
