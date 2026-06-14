@@ -7,6 +7,7 @@ import {
   buildEditableDocumentDraftPayload,
   computeEditableDocumentDraftKey,
   staticDocumentDraftSchemaGate,
+  toUuidColumn,
 } from "../document-draft-persistence";
 
 const TENANT_ID = "00000000-0000-0000-0000-000000000001";
@@ -76,6 +77,41 @@ describe("document-draft-persistence", () => {
     expect(payload.system_trace_text).toContain("TRAZABILIDAD DOCUMENTAL");
     expect(payload.post_render_validation).toMatchObject({ ok: true });
     expect(payload.content_hash_sha256).toBeNull();
+  });
+
+  it("nunca escribe un id no-uuid en columnas uuid: fixture local -> template_id null + trazabilidad en metadata", async () => {
+    const prepared = await preparedConvocatoria();
+    // sanity: la plantilla es un fixture legal local cuyo id NO es un uuid
+    expect(prepared.template.id).toBe("legal-fixture-convocatoria-consejo-es");
+
+    const payload = await buildEditableDocumentDraftPayload({
+      prepared,
+      renderedBodyText: prepared.renderedBodyText,
+      draftState: "EDITABLE_DRAFT",
+    });
+
+    // La columna template_id es uuid REFERENCES plantillas_protegidas: un fixture
+    // local no puede ir ahí (rompía con "invalid input syntax for type uuid").
+    expect(payload.template_id).toBeNull();
+    // Pero la traza del fixture no se pierde.
+    expect((payload.metadata as Record<string, unknown>).template_ref).toBe(
+      "legal-fixture-convocatoria-consejo-es",
+    );
+  });
+
+  it("toUuidColumn: conserva uuids aceptados por Postgres (incl. seed no-RFC) y descarta lo demas", () => {
+    expect(toUuidColumn("legal-fixture-acta-consejo-es")).toBeNull();
+    expect(toUuidColumn("meeting:abc:point:3")).toBeNull();
+    expect(toUuidColumn(null)).toBeNull();
+    expect(toUuidColumn("")).toBeNull();
+    // seed demo no-RFC (version '0') que Postgres SI acepta -> debe conservarse
+    expect(toUuidColumn("00000000-0000-0000-0000-000000000020")).toBe(
+      "00000000-0000-0000-0000-000000000020",
+    );
+    // uuid v4 real -> se conserva
+    expect(toUuidColumn("6d7ed736-f263-4531-a59d-c6ca0cd41602")).toBe(
+      "6d7ed736-f263-4531-a59d-c6ca0cd41602",
+    );
   });
 
   it("cambia draft_key cuando cambian valores Capa 3", async () => {

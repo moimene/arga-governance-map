@@ -6,6 +6,19 @@ import type { PreparedDocumentComposition } from "./types";
 
 export const DOCUMENT_DRAFTS_TABLE = "secretaria_document_drafts";
 
+// Postgres acepta cualquier uuid con forma 8-4-4-4-12 hex (no exige version/variant
+// RFC), así que NO usamos el `isUuidReference` RFC-estricto: nullaría seeds demo
+// válidos como "00000000-0000-0000-0000-000000000020". Las columnas uuid
+// (template_id, agreement_id) solo pueden recibir esa forma; un fixture legal local
+// ("legal-fixture-…") o una referencia de punto ("meeting:…:point:N") van a NULL
+// (su traza se conserva en metadata) en vez de romper el INSERT con
+// "invalid input syntax for type uuid".
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function toUuidColumn(value: string | null | undefined): string | null {
+  return value && UUID_SHAPE_RE.test(value) ? value : null;
+}
+
 export type EditableDocumentDraftState =
   | "EDITABLE_DRAFT"
   | "DRAFT_CONFIGURED"
@@ -243,14 +256,21 @@ export async function buildEditableDocumentDraftPayload(
   const draftState = input.draftState ?? "EDITABLE_DRAFT";
   const now = new Date().toISOString();
 
+  // Las columnas uuid solo aceptan refs con forma uuid; fixtures locales y refs de
+  // punto se nullan (su traza va a metadata) para no romper el INSERT.
+  const rawTemplateId = input.prepared.template.id ?? null;
+  const rawAgreementId = input.prepared.request.agreement_ids[0] ?? null;
+  const templateId = toUuidColumn(rawTemplateId);
+  const agreementId = toUuidColumn(rawAgreementId);
+
   return {
     tenant_id: input.prepared.request.tenant_id,
     document_request_id: input.prepared.request.request_id,
     draft_key_sha256: await computeEditableDocumentDraftKey(input.prepared),
     request_hash_sha256: input.prepared.request.request_hash_sha256,
     document_type: input.prepared.request.document_type,
-    agreement_id: input.prepared.request.agreement_ids[0] ?? null,
-    template_id: input.prepared.template.id ?? null,
+    agreement_id: agreementId,
+    template_id: templateId,
     template_tipo: input.prepared.template.tipo ?? null,
     template_version: input.prepared.template.version ?? null,
     version: input.version ?? 1,
@@ -268,6 +288,10 @@ export async function buildEditableDocumentDraftPayload(
       source_request_id: input.prepared.request.request_id,
       evidence_status: input.prepared.request.evidence_status,
       generation_lane: input.prepared.request.generation_lane,
+      // Trazabilidad de refs no-uuid que no caben en columnas uuid (fixtures
+      // legales locales, referencias de punto), para no perder el origen.
+      ...(rawTemplateId && !templateId ? { template_ref: rawTemplateId } : {}),
+      ...(rawAgreementId && !agreementId ? { agreement_ref: rawAgreementId } : {}),
     },
   };
 }
