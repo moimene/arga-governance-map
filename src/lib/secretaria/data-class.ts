@@ -22,50 +22,37 @@ export function isVisibleDataClass(
   return dataClass !== TEST_DATA_CLASS;
 }
 
-/** ¿Debe incluirse el dato TEST? Opt-in para E2E/depuración; por defecto false. */
+/**
+ * ¿Debe incluirse el dato TEST? SOLO opt-in en tiempo de build vía `VITE_E2E=1`
+ * (lo activa el dev server de Playwright). NO se ofrece opt-in por localStorage ni
+ * por query param: serían un bypass del lado del cliente en demo/producción (lección
+ * de revisión adversarial /codex, 2026-06-14). En builds desplegados VITE_E2E no se
+ * define, por lo que el dato TEST queda siempre oculto.
+ */
 export function shouldIncludeTestData(): boolean {
-  // El harness E2E arranca el dev server con VITE_E2E=1 para ver el dato TEST que
-  // sus specs crean. Builds de demo/producción no lo definen -> TEST oculto.
   try {
-    if (
+    return (
       typeof import.meta !== "undefined" &&
       (import.meta as { env?: Record<string, unknown> }).env?.VITE_E2E === "1"
-    ) {
-      return true;
-    }
+    );
   } catch {
-    /* import.meta.env no disponible */
+    return false;
   }
-  try {
-    if (typeof localStorage !== "undefined" && localStorage.getItem("tgms.includeTestData") === "1") {
-      return true;
-    }
-  } catch {
-    /* localStorage no disponible (SSR/node) */
-  }
-  try {
-    if (
-      typeof window !== "undefined" &&
-      window.location &&
-      new URLSearchParams(window.location.search).get("includeTest") === "1"
-    ) {
-      return true;
-    }
-  } catch {
-    /* window no disponible */
-  }
-  return false;
 }
 
 /**
  * Aplica el filtro de data_class a una query PostgREST de Supabase sobre una tabla
- * que tiene columna `data_class` (entities, persons). No-op si el opt-in TEST está
- * activo. Tipado laxo a propósito: el builder de supabase-js tiene tipos genéricos
- * muy profundos; tiparlo con genéricos dispara TS2589 al encadenar .order() después.
+ * que tiene columna `data_class` (entities, persons). No-op si el opt-in E2E está
+ * activo. Usa `data_class IS NULL OR data_class <> 'TEST'` para que las filas sin
+ * clasificar (NULL) sigan siendo visibles conforme a la política (P1 /codex).
+ * Tipado laxo a propósito: el builder de supabase-js tiene tipos genéricos muy
+ * profundos; tiparlo con genéricos dispara TS2589 al encadenar .order() después.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyVisibleDataClass(query: any, column = "data_class"): any {
-  return shouldIncludeTestData() ? query : query.neq(column, TEST_DATA_CLASS);
+  return shouldIncludeTestData()
+    ? query
+    : query.or(`${column}.is.null,${column}.neq.${TEST_DATA_CLASS}`);
 }
 
 /** Filtra en cliente una lista de filas por su data_class (para joins donde no se

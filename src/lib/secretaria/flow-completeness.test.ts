@@ -83,13 +83,17 @@ describe("assessFlowCompleteness — reunión sin censo / sin acta", () => {
 });
 
 describe("assessFlowCompleteness — formas de administración", () => {
-  it("SL admin solidarios: solidario aplica y es ready con cimientos", () => {
-    const sl: EntityFlowInput = { ...FOUNDATIONS, tipoOrganoAdmin: "ADMIN_SOLIDARIOS" };
+  it("SL admin solidarios: solidario ready con ≥2 administradores", () => {
+    const sl: EntityFlowInput = { ...FOUNDATIONS, tipoOrganoAdmin: "ADMIN_SOLIDARIOS", activeAdmins: 2 };
     expect(statusOf(sl, "solidario").status).toBe("ready");
     expect(statusOf(sl, "co_aprobacion").status).toBe("unavailable");
   });
-  it("SL admin mancomunados: co-aprobación aplica y es ready", () => {
-    const sl: EntityFlowInput = { ...FOUNDATIONS, tipoOrganoAdmin: "ADMIN_MANCOMUNADOS" };
+  it("SL admin solidarios con <2 admins: solidario partial", () => {
+    const sl: EntityFlowInput = { ...FOUNDATIONS, tipoOrganoAdmin: "ADMIN_SOLIDARIOS", activeAdmins: 1 };
+    expect(statusOf(sl, "solidario").status).toBe("partial");
+  });
+  it("SL admin mancomunados: co-aprobación ready con ≥2 administradores", () => {
+    const sl: EntityFlowInput = { ...FOUNDATIONS, tipoOrganoAdmin: "ADMIN_MANCOMUNADOS", activeAdmins: 2 };
     expect(statusOf(sl, "co_aprobacion").status).toBe("ready");
     expect(statusOf(sl, "solidario").status).toBe("unavailable");
   });

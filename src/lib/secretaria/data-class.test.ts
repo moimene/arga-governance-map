@@ -38,21 +38,21 @@ describe("shouldIncludeTestData", () => {
     // @ts-expect-error restore
     globalThis.localStorage = orig;
   });
-  it("por defecto es false", () => {
+  it("por defecto es false (sin VITE_E2E en vitest)", () => {
     expect(shouldIncludeTestData()).toBe(false);
   });
-  it("true si localStorage tgms.includeTestData=1", () => {
+  it("NO hay bypass por localStorage (cerrado tras revisión /codex)", () => {
     globalThis.localStorage.setItem("tgms.includeTestData", "1");
-    expect(shouldIncludeTestData()).toBe(true);
+    expect(shouldIncludeTestData()).toBe(false);
   });
 });
 
 describe("applyVisibleDataClass (builder)", () => {
-  it("añade .neq('data_class','TEST') cuando no hay opt-in", () => {
-    const calls: Array<[string, string]> = [];
-    const fakeQuery = { neq(col: string, val: string) { calls.push([col, val]); return this; } };
+  it("añade filtro .or null-safe cuando no hay opt-in", () => {
+    const calls: string[] = [];
+    const fakeQuery = { or(expr: string) { calls.push(expr); return this; } };
     applyVisibleDataClass(fakeQuery);
-    expect(calls).toEqual([["data_class", TEST_DATA_CLASS]]);
+    expect(calls).toEqual([`data_class.is.null,data_class.neq.${TEST_DATA_CLASS}`]);
   });
 });
 

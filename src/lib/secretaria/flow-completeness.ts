@@ -28,6 +28,8 @@ export type EntityFlowInput = {
   bodies?: number;
   /** condiciones_persona vigentes (cargos/miembros) */
   activePositions?: number;
+  /** administradores vigentes (para co-aprobación/solidario: se exigen >= 2) */
+  activeAdmins?: number;
   authorityEvidence?: number;
   meetingsCelebradas?: number;
   /** reuniones con censo_snapshot (debe ser >= meetingsCelebradas para flujo completo) */
@@ -51,10 +53,12 @@ export type FlowReadiness = {
 const n = (x?: number) => (typeof x === "number" && x > 0 ? x : 0);
 const admin = (input: EntityFlowInput) => String(input.tipoOrganoAdmin ?? "").toUpperCase();
 
-/** Cimientos mínimos de identidad para cualquier flujo societario. */
+/** Cimientos mínimos de identidad para cualquier flujo societario. El cap table,
+ *  si existe, debe cuadrar al 100% (capTableSumsTo100 !== false). */
 function hasFoundations(input: EntityFlowInput): boolean {
   return (
     !!input.hasVigenteCapitalProfile &&
+    input.capTableSumsTo100 !== false &&
     n(input.bodies) > 0 &&
     n(input.activePositions) > 0
   );
@@ -65,6 +69,7 @@ function assessOne(flow: SecretariaFlow, input: EntityFlowInput): FlowReadiness 
   const foundations = hasFoundations(input);
   if (!foundations) {
     if (!input.hasVigenteCapitalProfile) reasons.push("sin perfil de capital vigente");
+    if (input.capTableSumsTo100 === false) reasons.push("cap table no suma 100%");
     if (n(input.bodies) === 0) reasons.push("sin órganos");
     if (n(input.activePositions) === 0) reasons.push("sin cargos vigentes");
   }
@@ -87,6 +92,7 @@ function assessOne(flow: SecretariaFlow, input: EntityFlowInput): FlowReadiness 
     case "convocatoria_reunion_acta_certificacion": {
       if (!foundations) return partial([]);
       const why: string[] = [];
+      if (n(input.convocatorias) === 0) why.push("sin convocatorias");
       if (n(input.meetingsCelebradas) === 0) why.push("sin reuniones celebradas");
       if (n(input.meetingsWithCenso) < n(input.meetingsCelebradas)) why.push("reuniones celebradas sin censo");
       if (n(input.minutes) === 0) why.push("sin actas");
@@ -105,12 +111,12 @@ function assessOne(flow: SecretariaFlow, input: EntityFlowInput): FlowReadiness 
     case "co_aprobacion":
       if (admin(input) !== "ADMIN_MANCOMUNADOS") return unavailable(["la sociedad no tiene administración mancomunada"]);
       if (!foundations) return partial([]);
-      return ready();
+      return n(input.activeAdmins) >= 2 ? ready() : partial(["requiere ≥2 administradores mancomunados vigentes"]);
 
     case "solidario":
       if (admin(input) !== "ADMIN_SOLIDARIOS") return unavailable(["la sociedad no tiene administración solidaria"]);
       if (!foundations) return partial([]);
-      return ready();
+      return n(input.activeAdmins) >= 2 ? ready() : partial(["requiere ≥2 administradores solidarios vigentes"]);
 
     case "decision_unipersonal":
       if (!input.esUnipersonal) return unavailable(["la sociedad no es unipersonal"]);
