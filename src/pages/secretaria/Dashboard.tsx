@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useAutoScanVacanciasPresidencia } from "@/hooks/useNotifications";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import {
@@ -750,6 +751,10 @@ export default function SecretariaDashboard() {
           />
           {scopeLine}
         </div>
+      </div>
+
+      <div className="mb-5">
+        <AgendaDraftInbox />
       </div>
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.75fr)]">
