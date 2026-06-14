@@ -17,7 +17,7 @@ const ACTION_LABEL: Record<AgendaDraftAction, string> = {
   APROBAR: "Aprobar",
   POSPONER: "Posponer",
   RECHAZAR: "Rechazar",
-  CONVOCAR: "Convocar reunión",
+  CONVOCAR: "Ir a convocar",
 };
 
 export function AgendaDraftInbox() {
@@ -80,25 +80,29 @@ export function AgendaDraftInbox() {
                       disabled={busy}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-60 ${cls}`}
                       style={{ borderRadius: "var(--g-radius-md)" }}
-                      onClick={() =>
+                      onClick={() => {
+                        // CONVOCAR no terminaliza aquí: el borrador queda APROBADO
+                        // (sigue en la bandeja) y navegamos al intake para
+                        // materializar la reunión. La marca CONVOCADO + el enlace a
+                        // la convocatoria los fija la RPC (que exige convocatoria_id)
+                        // cuando el intake materialice (wiring follow-up).
+                        if (isConvocar) {
+                          const ent = d.entity_id
+                            ? `&entity=${encodeURIComponent(d.entity_id)}&scope=sociedad`
+                            : "";
+                          navigate(
+                            `/secretaria/reuniones/nueva?source=agenda&draft=${encodeURIComponent(d.id)}${ent}`,
+                          );
+                          return;
+                        }
                         transicion.mutate(
                           { draftId: d.id, action: a },
                           {
-                            onSuccess: () => {
-                              toast.success(`${ACTION_LABEL[a]} — hecho.`);
-                              if (isConvocar) {
-                                const ent = d.entity_id
-                                  ? `&entity=${encodeURIComponent(d.entity_id)}&scope=sociedad`
-                                  : "";
-                                navigate(
-                                  `/secretaria/reuniones/nueva?source=agenda&draft=${encodeURIComponent(d.id)}${ent}`,
-                                );
-                              }
-                            },
+                            onSuccess: () => toast.success(`${ACTION_LABEL[a]} — hecho.`),
                             onError: onFail,
                           },
-                        )
-                      }
+                        );
+                      }}
                     >
                       {ACTION_LABEL[a]}
                     </button>
