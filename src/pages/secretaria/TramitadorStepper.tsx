@@ -18,6 +18,7 @@ import { capa3ValueHasContent, type Capa3Values } from "@/lib/secretaria/capa3-f
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-matrix";
 import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
+import { registryChannelsForJurisdiction } from "@/lib/secretaria/registry-channels";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { persistRegistryFilingCertificationLink } from "@/lib/secretaria/registry-certification-link";
 import { adoptionModeBusinessLabel, matterClassBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
@@ -1494,14 +1495,16 @@ function TramitadorNuevo() {
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <option value="">Seleccionar canal</option>
-          {/* ITEM-025: BORME es publicación POSTERIOR a la inscripción, no un canal de
-              presentación → se retira del selector. Canales corregidos por jurisdicción
-              (glosas reales: JUCERJA es brasileña, no "Junta Central"). */}
-          <option value="REGISTRO_MERCANTIL">Registro Mercantil (España)</option>
-          <option value="SIGER">SIGER — Sistema Integral de Gestión Registral (México)</option>
-          <option value="PSM">PSM — Portal de Servicios (México)</option>
-          <option value="JUCERJA">JUCERJA — Junta Comercial do Rio de Janeiro (Brasil)</option>
-          <option value="CONSERVATORIA">Conservatória do Registo Comercial (Portugal)</option>
+          {/* ITEM-025: canales filtrados por la jurisdicción de la entidad (un acto
+              ES no se presenta en la JUCERJA brasileña). BORME es publicación
+              posterior a la inscripción, no un canal → no aparece. */}
+          {registryChannelsForJurisdiction(
+            selectedAgreementEntity?.jurisdiction ?? scopedEntity?.jurisdiction ?? "ES",
+          ).map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </div>
 
