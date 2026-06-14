@@ -2179,3 +2179,38 @@ Ejecución autónoma con revisión adversarial `/codex` por fase. Estado verific
 | **W10** Inteligencia jurídica supervisada (IA) | ✅ **Operativo con IA real (verificado en vivo)** | **Corrección de diagnóstico (2026-06-14):** el núcleo NO estaba por construir — ya existía `motor-plantillas@1.0.0-beta` (`src/lib/motor-plantillas/`), copiloto documental gobernado y testeado. `suggestActaDraftPolish()` asiste el **borrador editable** del acta proponiendo reemplazos localizados sobre fragmentos exactos (targets whitelisted: `narrativa.introduccion`, `narrativa.deliberaciones`, `narrativa.incidencias_no_criticas`), con **harness de protección de hechos jurídicos** (sociedad, órgano, asistentes, quórum, capital, votos, texto de acuerdos, pactos, conflictos, fechas, hashes, snapshots, orden del día) que solo aplica si conserva la estructura RRM y pasa `validateRenderedActaAgainstLegalStructure()`. Inferencia **server-side** en la edge function `openai-capa3-document-copilot` (ACTIVE, `verify_jwt:true`, OpenAI Responses API + Structured Outputs `strict`, modelo `gpt-5.5`); cableada en `ProcessDocxButton` (ActaDetalle/GenerarDocumentoStepper/ExpedienteAcuerdo). **Fail-closed:** sin `OPENAI_API_KEY[_2]` cae al fallback local determinista `capa3-local-demo-assistant`. **Key OpenAI provisionada** como secret de `governance_OS` por el usuario (autoriza el *data-egress* a OpenAI). **Bug latente corregido** (commit `e8452ff`): la función enviaba siempre `temperature`, que `gpt-5.5` (razonamiento) rechaza → 502 en toda llamada; ahora los parámetros se gatean por familia de modelo. **Prueba en vivo:** HTTP 200, `gpt-5.5`, propuesta de pulido sobre `narrativa.deliberaciones` con `requiresHumanReview:true`. **Revisión adversarial (5 agentes):** key nunca en navegador ✓, fail-closed ✓, harness de hechos jurídicos enforced ✓, humano-en-el-bucle ✓ (la IA aterriza en estado React, el Secretario revisa y guarda; nunca escribe directa en `minutes.content`); red-team **no halló** camino de auto-persistencia sin revisión. **Limitaciones conocidas (no bloqueantes):** la validación del harness es textual/estructural, no semántica (un pulido narrativo podría matizar el sentido) — mitigado por la **revisión humana obligatoria** de cada propuesta; *follow-up:* log de auditoría por-propuesta (quién aceptó/rechazó) y validación de recuentos en narrativa. |
 
 **Gates del run:** `typecheck` ✓ · `build` ✓ · `bun test` 2020 pass / 0 fail (post-W9) · 11 migraciones Cloud aplicadas y espejadas · edge function `openai-capa3-document-copilot` redesplegada (fix `e8452ff`) · `main` consolidado y pusheado · producción Vercel READY (`7ee293a`). Cada fase pasó revisión adversarial (W5: `/codex` 5 rondas; W9: 2 rondas; **W10: workflow de 5 agentes** — 4 CONFIRMED + 1 PARTIAL, sin camino de auto-persistencia IA). **W10 fue una corrección de diagnóstico:** el núcleo IA (`motor-plantillas`) ya existía construido/testeado/desplegado/cableado; el único código añadido fue el gate de parámetros por familia de modelo en la edge function, tras destapar en vivo que el default `gpt-5.5` rechazaba `temperature`. La IA queda **operativa con modelo real**, verificada de extremo a extremo.
+
+---
+
+# Parte V — Reconciliación del backlog y cierre de depuración (2026-06-14)
+
+Tras el dictamen del Comité Legal sobre el corte de 149 ítems (110 DONE / 39 abiertos), se ejecutó una **reconciliación verificada contra el código** (no contra el backlog). Hallazgo central: **el backlog y las reconciliaciones automáticas sobre-reportan**; la verdad solo se obtiene verificando empíricamente (ejecutar la función, probar el constraint). Detalle: `docs/superpowers/reviews/2026-06-14-backlog-reconciliation.md`.
+
+## Estado real (verificado)
+De los 39 "accionables", ~**24 ya estaban hechos** (falsos positivos de las reconciliaciones) y el resto son mayormente P2/P3 menores + 2 decisiones de producto. Estado real ≈ **134/149 (~90%) hecho**. La tesis de *concentración de riesgo* del Comité Legal se confirma, pero a **menor volumen** del reportado (~6 P1 reales, no 16).
+
+## Reales P1 cerrados en este cierre (TDD + verificación empírica)
+| ITEM | Qué | Verificación |
+|---|---|---|
+| ITEM-022 | Decisión de socio único exige unipersonalidad real (1 socio al 100%) | 4 tests |
+| ITEM-021 | Trigger BD anti-sobreasignación de capital (no solo UI) | RED→GREEN empírico en Cloud |
+| ITEM-034 | Gap 24h entre 1ª/2ª convocatoria **bloqueante** (art. 177.2 LSC) | helper puro + 6 tests |
+| ITEM-025 | Canales de presentación registral filtrados por jurisdicción | helper puro + 7 tests |
+| **ITEM-045** | **Cadena WORM: `chain_valid=false`→`true`** (seq monótono + writer centralizado + advisory lock) | empírico: 3282 entradas válidas + se mantiene tras insert |
+
+→ El **único blocker de trazabilidad (WORM) queda resuelto** — Criterio de release del Comité Legal cumplido en ese frente. Cumple además Criterios 1/3/5 (sin P1 en abierto del cluster, validación en BD no solo UI, test por fix).
+
+## Falsos positivos confirmados (ya estaban hechos)
+ITEM-093 (motor siempre OK → ya usa `noticeOk`), ITEM-036 (denominadores correctos por fórmula), ITEM-113 (pactos sí disparan vía `materia-pacto-mapping`), ITEM-016 (1ª/2ª convocatoria declarada por el Secretario).
+
+## Diseño deliberado (no bug)
+**ITEM-041 conflicto↔punto:** el conflicto se evalúa **por punto** (`votesByPoint`); un conflicto registrado pre-marca conservador y el Secretario decide por punto (arts. 190.1/190.3/228.c LSC). Defendible; el auto-scoping podría infra-excluir (legalmente peor). No se cambia.
+
+## Residuales genuinos pendientes (para decisión)
+- **ITEM-031** transmisión SL: la RPC no exige/registra consentimiento (art. 107 LSC). Requiere **diseño legal** (qué cuenta como consentimiento + excepciones de libre transmisión).
+- **ITEM-030** composición nominal CdA (9 IND/5 EJE/1 DOM): requiere **datos nominales** (metadata de categorías ya hecha).
+- **Decisiones de producto:** ITEM-080 (eje `tipo_social` del catálogo), ITEM-112 (DL-4).
+- **P2/P3 menores no bloqueantes:** ITEM-056/066/070/095/097/114/116/119 (cosméticos, scheduling pg_cron, discoverability de borradores).
+
+## Veredicto de release
+Frente a la valoración inicial (ámbar alto/rojo por 39 abiertos): el volumen real de pendientes es mucho menor y el **blocker crítico de trazabilidad (WORM) está resuelto**. Quedan residuales no bloqueantes + 2 decisiones de producto + ITEM-031 (diseño legal). La fase de cierre disciplinada propuesta por el Comité Legal es viable sobre esta lista real y acotada.

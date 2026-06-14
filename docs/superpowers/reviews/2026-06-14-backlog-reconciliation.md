@@ -79,3 +79,30 @@ Tras la reconciliación automática, cada ítem del cluster se verificó manualm
 | ITEM-036 | PARTIAL | **Falso positivo** — denominadores correctos por fórmula: `2/3_total_miembros` usa `total_miembros||0` con guard `===0` (`majority-evaluator.ts:332-336`); `1/2_miembros_presentes` usa concurrentes. No hay `Math.max(censo,presentes)` como denominador (el `censoEfectivo` de votacion-engine:648 es tamaño de admin mancomunada). | Ninguna |
 | ITEM-022 | PARTIAL | **Real** — `evaluarDecisionSocioUnico` no verificaba unipersonalidad (socio al 90% pasaba). | **Arreglado** (commit `9687532`): gate de unipersonalidad (1 socio al 100%); BLOCKING con datos, WARNING sin datos. TDD 4 tests. |
 | ITEM-041 | PENDING | **Real pero multi-capa** — `ConflictoInteres` no tiene asociación a punto del orden del día; la exclusión por conflicto se aplica a todos los puntos (sobre-exclusión vs arts. 190/228.c LSC). | **Diferido**: requiere modelo de datos (conflicto↔punto) + captura UI por-punto + filtro en engine. No es lógica pura. |
+
+---
+
+## Cierre del carril de depuración (2026-06-14, post re-verificación estricta)
+
+Re-verificación estricta de los 34 restantes: **20 DONE (falsos positivos), 11 PARTIAL, 1 PENDING (P3), 2 DECISION**. Verificación empírica adicional de los 3 ítems release-críticos en disputa entre reconciliaciones reveló que **ninguna reconciliación es fiable en ítems de alto riesgo** (la laxa daba falsos positivos; la estricta dio falsos negativos). Conclusión operativa: **para release hay que verificar empíricamente** (ejecutar la función / probar el constraint).
+
+### Reales arreglados (TDD + verificación empírica)
+| ITEM | Fix | Commit |
+|---|---|---|
+| ITEM-022 unipersonalidad socio único | gate 1 socio al 100% | `9687532` |
+| ITEM-021 sobreasignación capital | trigger BD `fn_capital_holdings_no_overassign` (RED→GREEN empírico) | `fba6c84` |
+| ITEM-034 gap 24h 2ª convocatoria | bloqueante (helper puro + 6 tests) | `51cde92` |
+| ITEM-025 canales registrales | filtro por jurisdicción (helper puro + 7 tests) | `82ef6fd` |
+| **ITEM-045 cadena WORM** | **seq monótono + writer centralizado + advisory lock; `chain_valid=false`→`true` (3282), se mantiene tras insert** | `99a6c15` |
+
+### Verificados como NO accionables
+- **ITEM-093, ITEM-036, ITEM-113, ITEM-016**: falsos positivos (ya resueltos en código).
+- **ITEM-041 conflicto↔punto**: PARTIAL **por diseño** — el conflicto es por punto (`votesByPoint`); un conflicto registrado pre-marca conservador y el Secretario decide por punto (arts. 190.1/190.3/228.c). Defendible; el auto-scoping podría infra-excluir. No se cambia.
+
+### Genuinos residuales (no en scope de este carril; para decidir)
+- **ITEM-031** transmisión SL: la RPC `fn_registrar_transmision_capital` no exige/registra consentimiento (art. 107 LSC). Real, requiere diseño legal (qué cuenta como consentimiento + excepciones libre transmisión).
+- **ITEM-030** composición nominal CdA (9 IND/5 EJE): requiere datos nominales (decisión).
+- 2 DECISION de producto (ITEM-080 eje tipo_social, ITEM-112 DL-4) + P2/P3 menores (ITEM-056/066/070/095/097/114/116/119).
+
+### Veredicto de release
+El **único blocker de trazabilidad (WORM) está resuelto**. Los reales P1 contenidos están cerrados. Quedan residuales P2/P3 menores + 2 decisiones + ITEM-031 (necesita diseño legal). La tesis de riesgo del Comité Legal se confirmó, a menor volumen del reportado.
