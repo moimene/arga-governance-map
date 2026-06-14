@@ -107,10 +107,14 @@ async function checkCapitalProfileVigente(): Promise<Check> {
 }
 
 async function checkMandatesHaveHoldings(): Promise<Check> {
+  // `mandates` es una VIEW del modelo canónico y expone `entity_id` directamente.
+  // Usarlo es correcto y robusto para roles sin órgano (SOCIO, ADMIN_UNICO/SOLIDARIO/
+  // MANCOMUNADO), cuyo body_id es NULL — derivar la entidad vía body_id los marcaba
+  // como huérfanos falsamente (W3, 2026-06-14).
   const [{ data: mandates, error: e1 }, { data: holdings, error: e2 }] = await Promise.all([
     supabase
       .from("mandates")
-      .select("id, person_id, body_id, governing_bodies:body_id(entity_id)")
+      .select("id, person_id, entity_id")
       .not("porcentaje_capital", "is", null),
     supabase.from("capital_holdings").select("entity_id, holder_person_id"),
   ]);
@@ -126,10 +130,9 @@ async function checkMandatesHaveHoldings(): Promise<Check> {
     (holdings as any[] ?? []).map((h) => `${h.holder_person_id}|${h.entity_id}`)
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const missing = (mandates as any[] ?? []).filter((m) => {
-    const entityId = m.governing_bodies?.entity_id;
-    return !hKeys.has(`${m.person_id}|${entityId}`);
-  });
+  const missing = (mandates as any[] ?? []).filter(
+    (m) => !hKeys.has(`${m.person_id}|${m.entity_id}`)
+  );
   const ok = missing.length === 0;
   return {
     name: "mandates con porcentaje_capital tienen capital_holdings",
@@ -139,10 +142,12 @@ async function checkMandatesHaveHoldings(): Promise<Check> {
 }
 
 async function checkMandatesHaveCondiciones(): Promise<Check> {
+  // Igual que checkMandatesHaveHoldings: usar `mandates.entity_id` directo (la VIEW
+  // lo expone). Para roles sin órgano body_id es NULL en ambos lados y casa por clave.
   const [{ data: mandates, error: e1 }, { data: cond, error: e2 }] = await Promise.all([
     supabase
       .from("mandates")
-      .select("id, person_id, body_id, governing_bodies:body_id(entity_id)")
+      .select("id, person_id, entity_id, body_id")
       .not("role", "is", null),
     supabase
       .from("condiciones_persona")
@@ -160,10 +165,9 @@ async function checkMandatesHaveCondiciones(): Promise<Check> {
     (cond as any[] ?? []).map((c) => `${c.person_id}|${c.entity_id}|${c.body_id}`)
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const missing = (mandates as any[] ?? []).filter((m) => {
-    const entityId = m.governing_bodies?.entity_id;
-    return !cKeys.has(`${m.person_id}|${entityId}|${m.body_id}`);
-  });
+  const missing = (mandates as any[] ?? []).filter(
+    (m) => !cKeys.has(`${m.person_id}|${m.entity_id}|${m.body_id}`)
+  );
   const ok = missing.length === 0;
   return {
     name: "mandates con role tienen condiciones_persona",
