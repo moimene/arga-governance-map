@@ -2339,8 +2339,9 @@ export default function ConvocatoriasStepper() {
             Convocatoria emitida
           </h2>
           <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
-            La convocatoria ha quedado registrada. Los destinatarios recibirán la notificación
-            según los canales seleccionados.
+            {/* ITEM-095: copy honesto — TGMS registra los canales, no realiza el envío. */}
+            La convocatoria ha quedado registrada. Los canales de notificación seleccionados quedan
+            registrados; el envío efectivo se gestiona desde Comunicaciones o fuera de TGMS.
           </p>
           {(uploadStatus.ok > 0 || uploadStatus.failed > 0) && (
             <div

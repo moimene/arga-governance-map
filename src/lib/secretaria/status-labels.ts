@@ -48,6 +48,7 @@ export const STATUS_LABEL: Record<string, string> = {
   PENDIENTE:    "Pendiente",
   PRESENTADO:   "Preparado para legalización",
   LEGALIZADO:   "Legalizado",
+  NO_APLICA:    "No aplica",  // ITEM-070: libros sin legalización obligatoria
 
   // Decisiones unipersonales
   FIRMADA:      "Firmada",
