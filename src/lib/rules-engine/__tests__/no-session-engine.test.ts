@@ -704,6 +704,58 @@ describe('Gate 4: Decisión Socio Único', () => {
     const result = evaluarDecisionSocioUnico(input);
     expect(result.ok).toBe(false);
   });
+
+  // ITEM-022: la decisión de socio único (arts. 15-16 LSC) solo procede en
+  // sociedad UNIPERSONAL. El gate debe verificar un único socio al 100%.
+  it('ITEM-022: socio al 90% (no unipersonal) → BLOCKING', () => {
+    const input = createBaseInput({
+      decisionConsignada: true,
+      totalCapitalSocial: 1000,
+      respuestas: [
+        { person_id: '1', capital_participacion: 900, porcentaje_capital: 90, es_consejero: false, sentido: 'CONSENTIMIENTO' },
+      ],
+    });
+    const result = evaluarDecisionSocioUnico(input);
+    expect(result.ok).toBe(false);
+    expect(result.severity).toBe('BLOCKING');
+  });
+
+  it('ITEM-022: dos socios 60/40 que suman 100% (no unipersonal) → BLOCKING', () => {
+    const input = createBaseInput({
+      decisionConsignada: true,
+      totalCapitalSocial: 1000,
+      respuestas: [
+        { person_id: '1', capital_participacion: 600, porcentaje_capital: 60, es_consejero: false, sentido: 'CONSENTIMIENTO' },
+        { person_id: '2', capital_participacion: 400, porcentaje_capital: 40, es_consejero: false, sentido: 'CONSENTIMIENTO' },
+      ],
+    });
+    const result = evaluarDecisionSocioUnico(input);
+    expect(result.ok).toBe(false);
+  });
+
+  it('ITEM-022: socio único al 100% → OK', () => {
+    const input = createBaseInput({
+      decisionConsignada: true,
+      totalCapitalSocial: 1000,
+      respuestas: [
+        { person_id: '1', capital_participacion: 1000, porcentaje_capital: 100, es_consejero: false, sentido: 'CONSENTIMIENTO' },
+      ],
+    });
+    const result = evaluarDecisionSocioUnico(input);
+    expect(result.ok).toBe(true);
+  });
+
+  it('ITEM-022: sin datos de capital → no bloquea (warning, no falso bloqueo)', () => {
+    const input = createBaseInput({
+      decisionConsignada: true,
+      totalCapitalSocial: 0,
+      respuestas: [
+        { person_id: '1', capital_participacion: 0, porcentaje_capital: 0, es_consejero: false, sentido: 'CONSENTIMIENTO' },
+      ],
+    });
+    const result = evaluarDecisionSocioUnico(input);
+    expect(result.ok).toBe(true);
+  });
 });
 
 // ============================================================

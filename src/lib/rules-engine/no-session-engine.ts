@@ -640,6 +640,44 @@ export function evaluarDecisionSocioUnico(input: NoSessionInput): {
     return { ok: false, severity: 'BLOCKING', explain };
   }
 
+  // ITEM-022: la decisión de socio único (arts. 15-16 LSC) solo procede en
+  // sociedad UNIPERSONAL. Verificamos un único socio consintiente que ostente el
+  // 100% del capital. Con datos de capital presentes, un censo no unipersonal
+  // (varios socios, o socio < 100%) bloquea. Sin datos de capital no se puede
+  // verificar → WARNING en el árbol (no se bloquea para no impedir flujos
+  // legítimos sin censo cargado; la verificación dura exige que el caller
+  // propague el capital del socio).
+  const sumaPorcentaje = consentimientos.reduce((s, r) => s + (r.porcentaje_capital ?? 0), 0);
+  const sumaCapital = consentimientos.reduce((s, r) => s + (r.capital_participacion ?? 0), 0);
+  let porcentajeUnipersonal: number | null = null;
+  if (sumaPorcentaje > 0) porcentajeUnipersonal = sumaPorcentaje;
+  else if (input.totalCapitalSocial > 0 && sumaCapital > 0) {
+    porcentajeUnipersonal = (sumaCapital / input.totalCapitalSocial) * 100;
+  }
+
+  if (porcentajeUnipersonal === null) {
+    explain.push({
+      regla: 'Unipersonalidad de la sociedad',
+      fuente: 'LEY',
+      referencia: 'arts. 12-16 LSC (sociedad unipersonal)',
+      resultado: 'WARNING',
+      mensaje:
+        'No se ha podido verificar la unipersonalidad (faltan datos de capital/porcentaje del socio). ' +
+        'La decisión de socio único solo procede en sociedad unipersonal.',
+    });
+  } else if (consentimientos.length !== 1 || Math.abs(porcentajeUnipersonal - 100) >= 0.01) {
+    explain.push({
+      regla: 'Unipersonalidad de la sociedad',
+      fuente: 'LEY',
+      referencia: 'arts. 12-16 LSC (sociedad unipersonal)',
+      resultado: 'BLOCKING',
+      mensaje:
+        'La decisión de socio único exige sociedad unipersonal (un único socio que ostente el 100% del capital). ' +
+        `Detectado: ${consentimientos.length} socio(s) consintiente(s) con ${porcentajeUnipersonal.toFixed(2)}% del capital.`,
+    });
+    return { ok: false, severity: 'BLOCKING', explain };
+  }
+
   explain.push({
     regla: 'Decisión consignada con consentimiento',
     fuente: 'LEY',
