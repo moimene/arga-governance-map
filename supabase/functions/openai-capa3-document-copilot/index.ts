@@ -352,29 +352,43 @@ Deno.serve(async (req) => {
     ? capa3ResponseSchema(payload.allowedNames)
     : actaResponseSchema(payload.allowedTargets, payload.maxProposals);
 
+  // Los modelos de razonamiento (o-series, gpt-5/6+) rechazan `temperature`;
+  // los modelos chat (gpt-4o/4.1) rechazan `reasoning` y `text.verbosity`.
+  // Enviamos cada familia de parámetros solo cuando el modelo la soporta. Sin
+  // este gate, el default documentado `gpt-5.5` fallaba con
+  // "Unsupported parameter: 'temperature'". El determinismo lo da el esfuerzo de
+  // razonamiento bajo + Structured Outputs (json_schema strict), no la temperatura.
+  const isReasoningModel = /^(o\d|gpt-[5-9])/i.test(model);
+  const requestBody: Record<string, unknown> = {
+    model,
+    instructions: buildInstructions(payload.task),
+    input: buildInput(payload),
+    max_output_tokens: payload.task === "CAPA3_FIELDS" ? 1800 : 2200,
+    text: {
+      ...(isReasoningModel ? { verbosity } : {}),
+      format: {
+        type: "json_schema",
+        name: payload.task === "CAPA3_FIELDS" ? "capa3_field_suggestions" : "acta_draft_polish",
+        strict: true,
+        schema,
+      },
+    },
+  };
+  if (isReasoningModel) {
+    requestBody.reasoning = { effort: reasoningEffort };
+  } else {
+    requestBody.temperature = Number.isFinite(temperature)
+      ? Math.max(0, Math.min(0.2, temperature))
+      : DEFAULT_TEMPERATURE;
+  }
+
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      instructions: buildInstructions(payload.task),
-      input: buildInput(payload),
-      temperature: Number.isFinite(temperature) ? Math.max(0, Math.min(0.2, temperature)) : DEFAULT_TEMPERATURE,
-      reasoning: { effort: reasoningEffort },
-      max_output_tokens: payload.task === "CAPA3_FIELDS" ? 1800 : 2200,
-      text: {
-        verbosity,
-        format: {
-          type: "json_schema",
-          name: payload.task === "CAPA3_FIELDS" ? "capa3_field_suggestions" : "acta_draft_polish",
-          strict: true,
-          schema,
-        },
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!openAiResponse.ok) {
