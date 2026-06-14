@@ -182,3 +182,61 @@ antes/después; fila W3 → ✅ en `docs/legal/2026-06-13-referencia-modulo-secr
 | parity #3 (sin cprof VIGENTE) | 20 | 0 |
 | readiness Completa | 4/50 | ≥ varias (ARGA + cadena + 3-4 filiales) |
 | ARGA readiness | Rota (1B/4W) | 0/0 |
+
+---
+
+## 6. RESULTADOS DEL SANEAMIENTO (ejecutado 2026-06-14, F1-F5)
+
+### Antes → Después (verificado en Cloud)
+
+| Métrica | Antes | Después |
+|---|---|---|
+| entities | 50 (32 DEMO / 18 TEST) | **32** (32 DEMO / 0 TEST) |
+| persons | 135 (100 DEMO / 35 TEST) | **82** (82 DEMO / 0 TEST) |
+| agreements | 145 (101 DRAFT, ratio incoherente) | **42** (todos con padre/scope coherente) |
+| acuerdos no-DRAFT sin padre | 16 + be0d8a4a | **0** |
+| drafts con artefactos terminales | (varios) | **0** |
+| meetings / censo_snapshot | 24 / 27 | 17 / 18 |
+| mandatory_books | 552 | 345 |
+| parity #3 (sin capital_profile VIGENTE) | 20 | **0** |
+| 6 paridades modelo canónico | 5/6 (#3 falla) | **6/6 VERDE** ("All checks passed") |
+| readiness (repair script) | Completa 4 · Rota 13 · No usable 27 · 37 BLOCKING | **Completa 5 · Rota 0 · 0 blocking · 0 warnings** |
+| ARGA Seguros (golden path) | **Rota** (1 BLOCKING + 4 WARNING) | **Completa (0/0)** |
+
+### Migraciones aplicadas (Cloud + espejo repo)
+
+`w3_f1_purge_test_contamination`, `w3_f2_demo_saneamiento`, `w3_f3a_agreement_coherence`,
+`w3_f3b_agreement_scope_cleanup`, `w3_f3c_filial_censos`, `w3_f4_autotag_test_data_class`,
+`w3_f5_remediation_codex`, `w3_f5_recover_test_run_pollution`. Registradas en
+`supabase_migrations.schema_migrations` (versiones apply-time vía MCP) y espejadas en
+`supabase/migrations/20260614*.sql`.
+
+### Backup / rollback
+
+`w3_backup_20260614` (schema): snapshot lógico de las 153 tablas base de `public`
+tomado antes de F1. Rollback puntual: `INSERT INTO public.<t> SELECT * FROM
+w3_backup_20260614.<t> WHERE id IN (...)` bajo `session_replication_role=replica`.
+Usado en F5 para restaurar los perfiles de capital de ARGA.
+
+### Lección operativa (registrada)
+
+El gate de tests canónico es `bun test` (runner nativo Bun, credencial anon → SALTA los
+tests que mutan Cloud). Ejecutar la suite vitest con `SUPABASE_SERVICE_ROLE_KEY` contra
+Cloud **muta datos reales** (un test de `entity_capital_profile` borró los perfiles de
+ARGA; otros insertaron fixtures). No correr vitest con admin contra `governance_OS`.
+
+### 5 sociedades demo Completa (cobertura de tipos de flujo)
+
+ARGA Seguros S.A. (SA cotizada, CdA), ARGA Reaseguros S.A. (SA), ARGA Servicios
+Corporativos S.L. (SL admin solidarios), ARGA Tecnología Jurídica S.L. (SL admin
+mancomunados), Cartera ARGA S.L.U. (SLU unipersonal, admin único). Cubren:
+convocatoria→reunión→acta→certificación→tramitador, acuerdos sin sesión, co-aprobación,
+solidario, decisión unipersonal, libros, board pack.
+
+### Pendientes de gobierno (no bloqueantes, documentados)
+
+- Divergencia tax_id PJ de ARGA Seguros: `A-00001001` (en la entidad) vs `A-99999903`
+  (documentado/duplicado huérfano `2faafc8d`). Reconciliar canónico (decisión Comité).
+- Legacy `Cartera ARGA, S.A.` (`517522ab`) duplicado de la SLU canónica; conserva la
+  arista Fundación→Cartera. Retirar requiere rewire del parent edge.
+- 6 `evidence_bundles` SEALED con qtsp sandbox (W1, cross-módulo) — fuera de W3.
