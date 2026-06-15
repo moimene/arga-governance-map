@@ -10,6 +10,7 @@ import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { usePersonasCanonical } from "@/hooks/usePersonasCanonical";
 import { useTenantContext } from "@/context/TenantContext";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
+import { evaluarTransmisionConsentimiento } from "@/lib/secretaria/transmision-consentimiento";
 
 interface Draft {
   source_holding_id: string;
@@ -18,6 +19,12 @@ interface Draft {
   effective_from: string;
   motivo: string;
   support_doc_ref: string;
+  // A.1 (art. 106-107 LSC): régimen de consentimiento de la transmisión.
+  tipo_transmision: "LIBRE" | "ONEROSA" | "";
+  excepcion_libre: "ENTRE_SOCIOS" | "FAMILIAR" | "GRUPO" | "ESTATUTARIA" | "";
+  referencia_estatutaria: string;
+  consentimiento_ref: string;
+  restriccion_estatutaria_sa: boolean;
 }
 
 const STEPS = ["Origen", "Destino", "Soporte", "Confirmar"];
@@ -46,11 +53,37 @@ export default function TransmisionStepper() {
     effective_from: new Date().toISOString().slice(0, 10),
     motivo: "",
     support_doc_ref: "",
+    tipo_transmision: "",
+    excepcion_libre: "",
+    referencia_estatutaria: "",
+    consentimiento_ref: "",
+    restriccion_estatutaria_sa: false,
   });
 
   const sourceHolding = useMemo(() => {
     return (holdings ?? []).find((h) => h.id === draft.source_holding_id);
   }, [holdings, draft.source_holding_id]);
+
+  // A.1 (art. 107 LSC): ¿el adquirente ya es socio? (para la excepción "entre socios").
+  const destinoEsSocio = useMemo(
+    () => (holdings ?? []).some(
+      (h) => h.holder_person_id === draft.destino_person_id && (h.numero_titulos ?? 0) > 0,
+    ),
+    [holdings, draft.destino_person_id],
+  );
+  const consentResult = useMemo(
+    () => evaluarTransmisionConsentimiento({
+      esSL,
+      tipoTransmision: draft.tipo_transmision,
+      excepcionLibre: draft.excepcion_libre || null,
+      referenciaEstatutaria: draft.referencia_estatutaria,
+      consentimientoRef: draft.consentimiento_ref,
+      restriccionEstatutariaSA: draft.restriccion_estatutaria_sa,
+      destinoEsSocio,
+    }),
+    [esSL, draft.tipo_transmision, draft.excepcion_libre, draft.referencia_estatutaria,
+     draft.consentimiento_ref, draft.restriccion_estatutaria_sa, destinoEsSocio],
+  );
 
   const update = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -67,6 +100,12 @@ export default function TransmisionStepper() {
 
   async function guardar() {
     if (!entityId || !sourceHolding) return;
+    // A.1 (art. 107 LSC): bloqueo en cierre si el régimen de consentimiento SL no
+    // consta por ninguna de las tres vías (o la excepción es inconsistente).
+    if (consentResult.blockingAtClose) {
+      toast.error(consentResult.issues[0] ?? "Falta acreditar el régimen de transmisión (art. 107 LSC).");
+      return;
+    }
     setSaving(true);
     try {
       const titulosATransmitir = Number(draft.numero_titulos);
@@ -89,7 +128,13 @@ export default function TransmisionStepper() {
         p_effective_date: today,
         p_agreement_id: null,
         p_support_doc_ref: draft.support_doc_ref.trim(),
-        p_notas: draft.motivo || "transmision_inter_vivos",
+        p_notas: [
+          draft.motivo || "transmision_inter_vivos",
+          draft.tipo_transmision && `regimen:${draft.tipo_transmision}`,
+          draft.excepcion_libre && `excepcion:${draft.excepcion_libre}`,
+          draft.consentimiento_ref && `consentimiento:${draft.consentimiento_ref}`,
+          draft.referencia_estatutaria && `estatutos:${draft.referencia_estatutaria}`,
+        ].filter(Boolean).join(" | "),
       });
       if (rpcError) throw rpcError;
 
@@ -250,6 +295,88 @@ export default function TransmisionStepper() {
               onChange={(v) => update("support_doc_ref", v)}
               placeholder="evidence://ead-trust/ARGA_SEG_TRANSMISION_2026_01 o DOC-SOC-..."
             />
+            {/* A.1 (art. 106-107 LSC): captura del régimen de consentimiento. */}
+            {esSL ? (
+              <div className="grid grid-cols-1 gap-3 rounded-md border border-[var(--g-border-subtle)] p-3">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Régimen de la transmisión (SL) *
+                </label>
+                <select
+                  value={draft.tipo_transmision}
+                  onChange={(e) => update("tipo_transmision", e.target.value as Draft["tipo_transmision"])}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <option value="">Seleccionar régimen…</option>
+                  <option value="ONEROSA">Sujeta a consentimiento de la sociedad (art. 107.2 LSC)</option>
+                  <option value="LIBRE">Libre transmisión (supuesto del art. 107.1 LSC)</option>
+                </select>
+                {draft.tipo_transmision === "ONEROSA" && (
+                  <Input
+                    label="Referencia del acuerdo/consentimiento social"
+                    value={draft.consentimiento_ref}
+                    onChange={(v) => update("consentimiento_ref", v)}
+                    placeholder="ACUERDO-JGE-2026-... o evidence://..."
+                  />
+                )}
+                {draft.tipo_transmision === "LIBRE" && (
+                  <>
+                    <select
+                      value={draft.excepcion_libre}
+                      onChange={(e) => update("excepcion_libre", e.target.value as Draft["excepcion_libre"])}
+                      className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <option value="">Supuesto de libre transmisión…</option>
+                      <option value="ENTRE_SOCIOS">Entre socios</option>
+                      <option value="FAMILIAR">A cónyuge, ascendiente o descendiente</option>
+                      <option value="GRUPO">A sociedad del mismo grupo</option>
+                      <option value="ESTATUTARIA">Prevista en estatutos</option>
+                    </select>
+                    {(draft.excepcion_libre === "ESTATUTARIA" ||
+                      draft.excepcion_libre === "FAMILIAR" ||
+                      draft.excepcion_libre === "GRUPO") && (
+                      <Input
+                        label="Referencia estatutaria / documento de soporte del vínculo"
+                        value={draft.referencia_estatutaria}
+                        onChange={(v) => update("referencia_estatutaria", v)}
+                        placeholder="Art. 9 estatutos / acreditación del vínculo"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                <label className="flex items-center gap-2 text-sm text-[var(--g-text-primary)]">
+                  <input
+                    type="checkbox"
+                    checked={draft.restriccion_estatutaria_sa}
+                    onChange={(e) => update("restriccion_estatutaria_sa", e.target.checked)}
+                  />
+                  Existen restricciones estatutarias a la transmisión (SA, art. 123 LSC)
+                </label>
+                {draft.restriccion_estatutaria_sa && (
+                  <Input
+                    label="Referencia de la restricción estatutaria"
+                    value={draft.referencia_estatutaria}
+                    onChange={(v) => update("referencia_estatutaria", v)}
+                  />
+                )}
+              </div>
+            )}
+            {consentResult.issues.length > 0 && (
+              <div
+                className={`rounded-md border p-3 text-sm bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] ${
+                  consentResult.blockingAtClose ? "border-[var(--status-error)]" : "border-[var(--status-warning)]"
+                }`}
+              >
+                <span className="font-medium text-[var(--g-text-primary)]">
+                  {consentResult.blockingAtClose ? "Bloqueante en cierre" : "Advertencia"} ({consentResult.legalBasis}):
+                </span>{" "}
+                {consentResult.issues[0]}
+              </div>
+            )}
           </div>
         )}
 
