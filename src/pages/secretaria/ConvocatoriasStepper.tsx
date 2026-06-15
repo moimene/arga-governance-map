@@ -761,6 +761,10 @@ export default function ConvocatoriasStepper() {
   // ── Step 2 ──
   const [fechaReunion, setFechaReunion] = useState("");
   const [horaReunion, setHoraReunion] = useState("10:00");
+  // A.2 (art. 176.2 LSC): fecha de remisión del anuncio al último socio cuando la
+  // convocatoria es por comunicación individual y escrita; el motor computa el
+  // "un mes" desde aquí (vía fechaPublicacion). Vacío → desde la convocatoria.
+  const [fechaRemisionUltimoSocio, setFechaRemisionUltimoSocio] = useState("");
   const [lugar, setLugar] = useState("");
   const [formatoReunion, setFormatoReunion] = useState<"PRESENCIAL" | "TELEMATICA" | "MIXTA">("PRESENCIAL");
   const [habilitarSegunda, setHabilitarSegunda] = useState(false);
@@ -831,6 +835,9 @@ export default function ConvocatoriasStepper() {
     // ofrecer (ERDS para ES/PT, CORREO_CERTIFICADO para MX,
     // EMAIL_SIMPLE para BR).
     jurisdiction,
+    // A.2 (art. 176.2 LSC): si se informa la fecha de remisión al último socio, el
+    // motor computa el plazo desde esa fecha (Rule 6 de convocatoria-engine).
+    fechaPublicacion: fechaRemisionUltimoSocio || undefined,
   };
   const evaluacionV2 = evaluarConvocatoria(
     convocatoriaInput,
@@ -2873,6 +2880,24 @@ export default function ConvocatoriasStepper() {
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   />
                 </div>
+              </div>
+              {/* A.2 (art. 176.2 LSC): fecha de remisión al último socio (comunicación individual) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Fecha de remisión a los socios (comunicación individual) — opcional
+                </label>
+                <input
+                  type="date"
+                  value={fechaRemisionUltimoSocio}
+                  onChange={(e) => setFechaRemisionUltimoSocio(e.target.value)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+                <p className="text-[11px] text-[var(--g-text-secondary)]">
+                  Si la convocatoria se hace por comunicación individual y escrita (art. 176.2 LSC),
+                  el plazo de un mes se computa desde la fecha de remisión del último anuncio. Si se
+                  deja vacío, se computa desde la fecha de la convocatoria.
+                </p>
               </div>
 
               <div className="space-y-1.5">
