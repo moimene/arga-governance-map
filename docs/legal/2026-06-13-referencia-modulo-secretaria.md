@@ -2214,3 +2214,22 @@ ITEM-093 (motor siempre OK → ya usa `noticeOk`), ITEM-036 (denominadores corre
 
 ## Veredicto de release
 Frente a la valoración inicial (ámbar alto/rojo por 39 abiertos): el volumen real de pendientes es mucho menor y el **blocker crítico de trazabilidad (WORM) está resuelto**. Quedan residuales no bloqueantes + 2 decisiones de producto + ITEM-031 (diseño legal). La fase de cierre disciplinada propuesta por el Comité Legal es viable sobre esta lista real y acotada.
+
+---
+
+# Parte VI — Respuestas del Comité Legal aplicadas (2026-06-15)
+
+Tras el memo de respuestas del Comité Legal, se implementaron las decisiones jurídicas:
+
+| Decisión | Resultado | Commit |
+|---|---|---|
+| **A.2** Plazo art. 176.2 (cómputo desde remisión al último socio) | Campo `fecha de remisión a los socios` en el Paso 2 → `fechaPublicacion` del motor (Rule 6 ya testeada); vacío = desde la convocatoria | `01e73bf` |
+| **B.1** Composición nominal del CdA | Categorías asignadas: **5 EJE / 1 DOM / 10 IND**. *Nota:* el board demo tiene 16 vocales (Presidente + 15 CONSEJERO), uno más que los 15 del memo → 10 IND, no 9; reducir a 15 exactos cambia el quórum (decisión de estructura diferida; golden path 0/0 intacto) | `babe43e` |
+| **A.1** Transmisión SL: régimen de consentimiento (art. 106-107 LSC) | Gate de 3 vías (libre soportada / consentimiento social / excepción estatutaria) con warning resoluble + **bloqueo en cierre**; check de inconsistencia "entre socios" vs cap table; SA libre + restricción opcional. Helper puro (10 tests) + UI | `4e69818` |
+| **A.3** Actas agnósticas por tipo social | **Confirmado, cerrado** — sin código (las materias candidatas a diferenciación quedan como backlog de plantillas) | — |
+| **A.4** DL-4 (selección por materia en Tramitador) | **Confirmado, cerrado** | — |
+
+**Decisión de gobierno pendiente (B.1):** confirmar si el board demo de **16 vocales** (Presidente como miembro distinto de los 15) es aceptable, o si se reconcilia a 15 exactos (folding del Presidente) — afecta al denominador de quórum.
+
+## Nuevo evolutivo derivado del memo: W11 — Generador de Informes Preceptivos por Materia
+El memo incluye además un **spec nuevo y grande** (no estaba en los 9): un submódulo que determina, genera, vincula, versiona y anexa los informes/documentos preceptivos exigibles por cada materia. Diseño sólido (extiende motor+plantillas+evidencia, no crea sistema paralelo) pero multi-semana, y **bloqueado de entrada** hasta que Legal entregue la **matriz de exigibilidad por materia**. Plan: `docs/superpowers/plans/2026-06-15-w11-generador-informes-preceptivos-plan.md`.
