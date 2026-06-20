@@ -43,6 +43,7 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { AutorizacionesRegulatoriasCard } from "@/components/secretaria/AutorizacionesRegulatoriasCard";
+import { AgreementDocumentRequirementsPanel } from "@/components/secretaria/AgreementDocumentRequirementsPanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
@@ -465,6 +466,8 @@ export default function ExpedienteAcuerdo() {
           </Card>
 
           <NormativeSnapshotCard snapshot={normativeSnapshot} isLoading={normativeLoading} />
+
+          <AgreementDocumentRequirementsPanel agreement={a} />
 
           <FrozenRuleSnapshotCard
             snapshot={frozenSnapshot}

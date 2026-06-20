@@ -4,6 +4,7 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  FileCheck2,
   FileSignature,
   FileSearch,
   FileText,
@@ -57,6 +58,8 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
       { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
       { label: "Actas pendientes", to: "/secretaria/actas?vista=pendientes", icon: FileSignature },
       { label: "Certificaciones vinculadas", to: "/secretaria/actas?vista=certificaciones", icon: FileSignature },
+      { label: "Informes preceptivos", to: "/secretaria/informes", icon: FileText },
+      { label: "Certificaciones autónomas", to: "/secretaria/certificaciones", icon: FileCheck2 },
       // ITEM-065: las rutas /secretaria/comunicaciones existían sin entrada de
       // sidebar (página huérfana). Se añade aquí en Documentación.
       { label: "Comunicaciones", to: "/secretaria/comunicaciones", icon: Send },
@@ -208,6 +211,20 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         label: "Certificaciones vinculadas",
         to: "/secretaria/actas?vista=certificaciones",
         icon: FileSignature,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Informes preceptivos",
+        to: "/secretaria/informes",
+        icon: FileText,
+        requiresEntity: true,
+        visibility: { requiresEntity: true },
+      },
+      {
+        label: "Certificaciones autónomas",
+        to: "/secretaria/certificaciones",
+        icon: FileCheck2,
         requiresEntity: true,
         visibility: { requiresEntity: true },
       },

@@ -90,8 +90,44 @@ export const STATUS_LABEL: Record<string, string> = {
   LEIDO:      "Leído",
   RESPONDIDO: "Respondido",
   REBOTADO:   "Rebotado",
+
+  // Pipeline documental (informes/certificaciones autónomas) — copy validado por el
+  // Comité Legal. Ref: docs/superpowers/reviews/2026-06-20-informe-ux-redesign-copy-legal.md §7.2
+  // y auditoría 2026-06-20-auditoria-brechas-ux-secretaria.md (P1-1). Antes se renderizaban
+  // crudos en inglés vía status.replace(/_/g," ").
+  SOURCE_LOCKED:        "Fuente fijada",
+  GENERATED:            "Documento generado",
+  IN_REVIEW:            "En revisión",
+  EMITTED:              "Emitida",
+  ARCHIVED:             "Archivado",
+  ATTACHED:             "Anexado",
+  SUPERSEDED:           "Sustituido",
+  REVOKED:              "Revocado",
+  FAILED:               "Fallido",
+  WAIVED_WITH_OVERRIDE: "Omitido con autorización",
+  VERIFIED:             "Verificada",
 };
 
 export function statusLabel(status: string): string {
   return STATUS_LABEL[status] ?? status;
+}
+
+/**
+ * Efecto jurídico declarado de una certificación (`standalone_certifications.legal_effect`).
+ * Copy validado por Legal (§7.1 / §6.4.1 del informe UX 2026-06-20): nombrar el efecto,
+ * no exponer el valor crudo del enum.
+ */
+export const LEGAL_EFFECT_LABEL: Record<string, string> = {
+  INTERNO:    "Efecto interno",
+  SOCIO:      "Efecto frente a socio",
+  AUDITOR:    "Efecto frente a auditor",
+  TERCERO:    "Efecto frente a terceros",
+  REGISTRAL:  "Efecto registral",
+  SUPERVISOR: "Efecto frente a supervisor",
+  PROBATORIO: "Efecto probatorio",
+};
+
+export function legalEffectLabel(effect: string | null | undefined): string {
+  if (!effect) return "Efecto no declarado";
+  return LEGAL_EFFECT_LABEL[effect] ?? effect;
 }

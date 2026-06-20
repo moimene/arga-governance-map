@@ -8,6 +8,7 @@
  */
 export const SOURCE_OBJECT_TYPE = {
   AGREEMENT: "AGREEMENT",
+  STANDALONE_CERTIFICATION: "STANDALONE_CERTIFICATION",
 } as const;
 
 export type SourceObjectType = (typeof SOURCE_OBJECT_TYPE)[keyof typeof SOURCE_OBJECT_TYPE];

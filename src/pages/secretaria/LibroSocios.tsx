@@ -3,6 +3,7 @@ import { BookText, TrendingUp, TrendingDown, ArrowLeftRight, FolderOpen, Loader2
 import { useCapitalMovements } from "@/hooks/useCapitalMovements";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { StandaloneCertificationActions } from "@/components/secretaria/StandaloneCertificationActions";
 
 const MOVEMENT_LABEL: Record<string, string> = {
   EMISION:          "Emisión",
@@ -119,6 +120,28 @@ export default function LibroSocios() {
               {netShares.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </span>
           </div>
+        </div>
+      ) : null}
+
+      {isSociedadMode && scopedEntityId ? (
+        <div className="mb-5">
+          <StandaloneCertificationActions
+            title="Certificados del libro de socios"
+            actions={[
+              {
+                kindCode: "CERT_LIBRO_SOCIOS_TITULARIDAD",
+                label: "Titularidad vigente",
+                description: "Certifica socios/acciones vigentes con fuente canónica y hash de corte.",
+                entityId: scopedEntityId,
+              },
+              {
+                kindCode: "CERT_LIBRO_SOCIOS_TRANSMISION",
+                label: "Asiento de transmisión",
+                description: "Prepara certificado de transmisiones registradas en el libro.",
+                entityId: scopedEntityId,
+              },
+            ]}
+          />
         </div>
       ) : null}
 

@@ -5,7 +5,7 @@ import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
-  Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle,
+  Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle, FileCheck2,
   AlertTriangle,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -741,12 +741,14 @@ function SociedadQuickActions({
     { label: "Nueva reunión", icon: CalendarDays, to: "/secretaria/reuniones/nueva" },
     { label: "Acuerdo sin sesión", icon: ScrollText, to: "/secretaria/acuerdos-sin-sesion/nuevo" },
     { label: "Generar documento", icon: FileText, to: "/secretaria/tramitador/nuevo" },
+    { label: "Informes", icon: FileText, to: `/secretaria/informes?entity=${entityId}` },
+    { label: "Certificaciones", icon: FileCheck2, to: `/secretaria/certificaciones?entity=${entityId}` },
     { label: "Materias y reglas", icon: ClipboardList, to: `/secretaria/catalogo-materias?entity=${entityId}` },
     { label: "Activar marco", icon: Scale, to: `/secretaria/sociedades/${entityId}/marco-normativo/activar` },
   ];
 
   return (
-    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4 xl:grid-cols-8">
       {actions.map((action) => {
         const Icon = action.icon;
         return (

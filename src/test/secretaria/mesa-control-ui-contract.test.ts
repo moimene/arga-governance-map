@@ -153,7 +153,11 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
 
     expect(revision).not.toContain("archivados como DEMO_OPERATIVA");
-    expect(revision).toContain("archivados como evidencia operativa");
+    // P0-4 (auditoría UX 2026-06-20): el subcopy ya no presenta la evidencia de entorno
+    // demo como "evidencia operativa". El disclaimer de entorno de validación funcional
+    // vive ahora en EvidenceStatusBadge, no en el encabezado de la bandeja.
+    expect(revision).not.toContain("evidencia operativa");
+    expect(revision).toContain("Revísalos antes de aprobarlos");
     expect(generar).not.toContain("Evidencia demo operativa");
     expect(generar).toContain("Evidencia operativa");
     expect(catalogo).toContain("Trazabilidad preparada para el bloqueo del expediente");

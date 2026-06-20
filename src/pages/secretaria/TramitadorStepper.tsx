@@ -13,6 +13,7 @@ import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
+import { useDocumentAnnexLinks, type DocumentAnnexLinkRow } from "@/hooks/useSecretariaDocumentArtifacts";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { capa3ValueHasContent, type Capa3Values } from "@/lib/secretaria/capa3-fields";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -227,6 +228,72 @@ function formatDetailDate(value?: string | null) {
   return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(value));
 }
 
+function supportHash(row: DocumentAnnexLinkRow) {
+  const hash = row.artifact?.hash_sha512 ?? row.artifact?.content_hash ?? row.artifact?.source_hash;
+  if (!hash) return "Pendiente";
+  return hash.length > 24 ? `${hash.slice(0, 14)}...${hash.slice(-8)}` : hash;
+}
+
+function RegistrySupportDocuments({ agreementId }: { agreementId: string | null | undefined }) {
+  const annexes = useDocumentAnnexLinks({ linkedDomain: "agreement", linkedIds: agreementId ? [agreementId] : [] });
+  const rows = (annexes.data ?? []).filter(
+    (row) =>
+      row.included_in_export ||
+      row.annex_role.includes("REGISTRO") ||
+      row.artifact?.artifact_kind === "DOCUMENTO_REGISTRAL" ||
+      row.artifact?.artifact_kind === "INFORME_DOCUMENTAL_PRE",
+  );
+
+  return (
+    <section
+      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 lg:col-span-2"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Soportes documentales registrales</h2>
+      {annexes.error ? (
+        <p className="mt-3 text-sm text-[var(--status-warning)]">
+          No se pudo consultar la capa documental. Aplica la migración de informes y certificaciones para activar anexos.
+        </p>
+      ) : annexes.isLoading ? (
+        <div className="mt-3 flex items-center gap-2 text-sm text-[var(--g-text-secondary)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Cargando soportes...
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
+          Sin soportes REGISTRO anexados al acuerdo. Los informes documentales PRE y documentos registrales creados desde el expediente aparecerán aquí.
+        </p>
+      ) : (
+        <div className="mt-4 overflow-hidden border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[var(--g-surface-subtle)]">
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[var(--g-text-primary)]">Documento</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[var(--g-text-primary)]">Estado</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[var(--g-text-primary)]">Hash</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--g-border-subtle)]">
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="px-3 py-2 text-sm text-[var(--g-text-primary)]">
+                    <div className="font-medium">{row.artifact?.title ?? row.annex_role}</div>
+                    <div className="text-xs text-[var(--g-text-secondary)]">{row.artifact?.artifact_kind ?? row.annex_role}</div>
+                  </td>
+                  <td className="px-3 py-2 text-sm text-[var(--g-text-secondary)]">
+                    {statusLabel(row.artifact?.status ?? "PENDING")}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-[var(--g-text-secondary)]">{supportHash(row)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TramitacionDetalle({ id }: { id: string }) {
   const { data, isLoading, error } = useTramitacionById(id);
   const filing = data as TramitacionDetalleRow | null | undefined;
@@ -380,6 +447,8 @@ function TramitacionDetalle({ id }: { id: string }) {
                 <p className="mt-3 text-sm text-[var(--g-text-secondary)]">Sin referencias registrales informadas.</p>
               )}
             </section>
+
+            <RegistrySupportDocuments agreementId={filing.agreement_id} />
           </div>
         )}
       </div>

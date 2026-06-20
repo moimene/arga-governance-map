@@ -147,3 +147,25 @@ if (!globalThis.cancelAnimationFrame) {
     value: (id: number) => clearTimeout(id),
   });
 }
+
+if (typeof URL.createObjectURL !== "function") {
+  Object.defineProperty(URL, "createObjectURL", {
+    writable: true,
+    configurable: true,
+    value: () => "blob:tgms-test",
+  });
+}
+
+if (typeof URL.revokeObjectURL !== "function") {
+  Object.defineProperty(URL, "revokeObjectURL", {
+    writable: true,
+    configurable: true,
+    value: () => undefined,
+  });
+}
+
+Object.defineProperty(HTMLAnchorElement.prototype, "click", {
+  writable: true,
+  configurable: true,
+  value: () => undefined,
+});

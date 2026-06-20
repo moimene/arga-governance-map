@@ -63,6 +63,8 @@ export function templateTypesForDocumentType(documentType: SecretariaDocumentTyp
       return ["INFORME_PRECEPTIVO"];
     case "INFORME_DOCUMENTAL_PRE":
       return ["INFORME_DOCUMENTAL_PRE"];
+    case "INFORME_GESTION":
+      return ["INFORME_GESTION", "INFORME_PRECEPTIVO", "INFORME_DOCUMENTAL_PRE"];
     case "ACUERDO_SIN_SESION":
       return ["ACTA_ACUERDO_ESCRITO", "ACTA_DECISION_CONJUNTA", "ACTA_ORGANO_ADMIN"];
     case "DECISION_UNIPERSONAL":
