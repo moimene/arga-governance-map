@@ -25,7 +25,12 @@
 
 | Tarea | Estado | Commit | Gates | Revisor / hallazgos | Strings legales (§ informe) | Notas / decisión |
 |---|---|---|---|---|---|---|
-| Setup (run-log) | HECHA | _este commit_ | n/a | n/a | n/a | Rama + baseline + log |
+| Setup (run-log) | HECHA | `b073a36` | n/a | n/a | n/a | Rama + baseline + log |
+| **T1 · UX-0.D** renombrados sidebar (8/9) | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(15) · build=0 | Codex pendiente (clúster UX-0) | §5.2 (8 labels literales) | 8 renames en **ambas** taxonomías. E2E actualizados: `e2e/12` (4 labels NAV_ITEMS), `e2e/33` (Certificaciones de acuerdos ×2, Presentaciones registrales). **🟡 DEFERIDO:** "Tramitador registral"→"Registro" — conflicto directo con CLAUDE.md 2026-05-12 ("no usar 'Registro' en código/copies para el Registro Mercantil"). Requiere decisión humana. H1 de páginas intacto. |
+
+### 🟡 Decisiones para el humano (acumulado)
+
+- **UX-0.D / "Registro":** §5.2 aprueba renombrar el ítem de sidebar "Tramitador registral"→"Registro", pero CLAUDE.md (decisión 2026-05-12) prohíbe usar "Registro" en copies para referirse al Registro Mercantil. Conflicto entre dos fuentes de verdad. Implementados los otros 8 renames; este queda pendiente de que decidas cuál prevalece. Si se aprueba, el cambio es trivial (2 ítems en `navigation.ts` + `e2e/03:26`, `e2e/12:22`, `e2e/33:61`).
 
 ## Resumen del run
 

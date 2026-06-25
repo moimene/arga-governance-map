@@ -35,7 +35,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
       {
-        label: "Board Pack",
+        label: "Board pack",
         to: "/secretaria/board-pack",
         icon: Briefcase,
         visibility: { requiresCapability: "canCertify" },
@@ -57,13 +57,13 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Actas", to: "/secretaria/actas", icon: FileSignature },
       { label: "Actas pendientes", to: "/secretaria/actas?vista=pendientes", icon: FileSignature },
-      { label: "Certificaciones vinculadas", to: "/secretaria/actas?vista=certificaciones", icon: FileSignature },
-      { label: "Informes preceptivos", to: "/secretaria/informes", icon: FileText },
+      { label: "Certificaciones de acuerdos", to: "/secretaria/actas?vista=certificaciones", icon: FileSignature },
+      { label: "Informes y anexos", to: "/secretaria/informes", icon: FileText },
       { label: "Certificaciones autónomas", to: "/secretaria/certificaciones", icon: FileCheck2 },
       // ITEM-065: las rutas /secretaria/comunicaciones existían sin entrada de
       // sidebar (página huérfana). Se añade aquí en Documentación.
       { label: "Comunicaciones", to: "/secretaria/comunicaciones", icon: Send },
-      { label: "Documentos en revisión", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
+      { label: "Revisión documental", to: "/secretaria/documentos/pendientes-revision", icon: FileSearch },
     ],
   },
   {
@@ -71,7 +71,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel },
       { label: "Subsanaciones", to: "/secretaria/tramitador?estado=SUBSANACION", icon: Gavel },
-      { label: "Presentaciones", to: "/secretaria/tramitador?estado=PRESENTADA", icon: Gavel },
+      { label: "Presentaciones registrales", to: "/secretaria/tramitador?estado=PRESENTADA", icon: Gavel },
     ],
   },
   {
@@ -87,7 +87,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     label: "Sociedades y personas",
     items: [
       { label: "Sociedades", to: "/secretaria/sociedades", icon: Building2 },
-      { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
+      { label: "Personas, cargos y representantes", to: "/secretaria/personas", icon: UserCircle },
     ],
   },
   {
@@ -95,8 +95,8 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Materias y reglas", to: "/secretaria/catalogo-materias", icon: BookOpen },
       { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
-      { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
-      { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
+      { label: "Plantillas documentales", to: "/secretaria/plantillas", icon: FileText },
+      { label: "Gobierno de plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       // ITEM-078: duplicado de "Documentos en revisión" (sección Documentación)
       // hacia la misma ruta con otro label — eliminado.
     ],
@@ -124,7 +124,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
       {
-        label: "Board Pack",
+        label: "Board pack",
         to: "/secretaria/board-pack",
         icon: Briefcase,
         requiresEntity: true,
@@ -208,14 +208,14 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresEntity: true },
       },
       {
-        label: "Certificaciones vinculadas",
+        label: "Certificaciones de acuerdos",
         to: "/secretaria/actas?vista=certificaciones",
         icon: FileSignature,
         requiresEntity: true,
         visibility: { requiresEntity: true },
       },
       {
-        label: "Informes preceptivos",
+        label: "Informes y anexos",
         to: "/secretaria/informes",
         icon: FileText,
         requiresEntity: true,
@@ -237,7 +237,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresEntity: true },
       },
       {
-        label: "Documentos en revisión",
+        label: "Revisión documental",
         to: "/secretaria/documentos/pendientes-revision",
         icon: FileSearch,
       },
@@ -261,7 +261,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresEntity: true },
       },
       {
-        label: "Presentaciones",
+        label: "Presentaciones registrales",
         to: "/secretaria/tramitador?estado=PRESENTADA",
         icon: Gavel,
         requiresEntity: true,
@@ -305,7 +305,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         icon: Building2,
         selectedEntityRoute: true,
       },
-      { label: "Personas y cargos", to: "/secretaria/personas", icon: UserCircle },
+      { label: "Personas, cargos y representantes", to: "/secretaria/personas", icon: UserCircle },
     ],
   },
   {
@@ -313,8 +313,8 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Materias y reglas", to: "/secretaria/catalogo-materias", icon: BookOpen },
       { label: "Catálogo de órganos", to: "/secretaria/catalogo-organos", icon: Landmark },
-      { label: "Plantillas", to: "/secretaria/plantillas", icon: FileText },
-      { label: "Gestor plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
+      { label: "Plantillas documentales", to: "/secretaria/plantillas", icon: FileText },
+      { label: "Gobierno de plantillas", to: "/secretaria/gestor-plantillas", icon: Layers },
       // ITEM-078: duplicado de "Documentos en revisión" (sección Documentación)
       // hacia la misma ruta con otro label — eliminado.
     ],
