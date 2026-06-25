@@ -111,7 +111,7 @@ export default function DocumentosPendientesRevision() {
           <div>
             <p className="font-semibold">Schema documental pendiente</p>
             <p className="mt-1 text-[var(--g-text-secondary)]">
-              Aplica la migración de informes y certificaciones para consultar y revisar documentos.
+              Esta función requiere la migración documental de informes y certificaciones.
             </p>
           </div>
         </div>

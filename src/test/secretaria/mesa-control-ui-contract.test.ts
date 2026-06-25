@@ -151,6 +151,7 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     const revision = read("src/pages/secretaria/DocumentosPendientesRevision.tsx");
     const generar = read("src/pages/secretaria/GenerarDocumentoStepper.tsx");
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const evidenceLabels = read("src/lib/secretaria/evidence-status-labels.ts");
 
     expect(revision).not.toContain("archivados como DEMO_OPERATIVA");
     // P0-4 (auditoría UX 2026-06-20): el subcopy ya no presenta la evidencia de entorno
@@ -165,6 +166,10 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(generar).not.toMatch(/evidencia demo operativa/i);
     expect(generar).not.toContain("Evidencia operativa");
     expect(generar).toContain("EvidenceStatusBadge");
+    // El copy aprobado §7.3 que ve el usuario vive en el descriptor compartido que
+    // consume EvidenceStatusBadge: se verifica aquí que la cadena llega al copy real.
+    expect(evidenceLabels).toContain("Entorno de validación funcional");
+    expect(evidenceLabels).toContain("sin eficacia jurídica cualificada productiva");
     expect(catalogo).toContain("Trazabilidad preparada para el bloqueo del expediente");
   });
 

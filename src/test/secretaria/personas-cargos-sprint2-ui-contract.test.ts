@@ -115,11 +115,11 @@ describe("Personas/Cargos Sprint 2 UI contracts", () => {
     expect(personaDetalle).toMatch(/RmStatusChip/);
     expect(rmStatusChip).toMatch(/Inscrito/);
     // UX-0.E (informe legal §7.1): el chip usa el término aprobado
-    // "Pendiente de referencia registral" en vez de "Pendiente RM", con el
-    // aviso §6.7 ("Puede limitar certificaciones frente a terceros") en tooltip.
+    // "Pendiente de referencia registral" en vez de "Pendiente RM". El aviso §6.7
+    // ("Puede limitar certificaciones frente a terceros") se surfacea como elemento
+    // visible en la sección de autoridad (UX-6.A), no como tooltip title del chip.
     expect(rmStatusChip).toMatch(/Pendiente de referencia registral/);
     expect(rmStatusChip).not.toMatch(/Pendiente RM/);
-    expect(rmStatusChip).toMatch(/Puede limitar certificaciones frente a terceros/);
     expect(rmStatusChip).toMatch(/bg-\[var\(--status-success\)\]/);
     expect(rmStatusChip).toMatch(/bg-\[var\(--status-warning\)\]/);
   });

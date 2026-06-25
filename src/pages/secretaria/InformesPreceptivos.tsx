@@ -77,7 +77,7 @@ export default function InformesPreceptivos() {
             Informes preceptivos
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-            Documentos exigibles por materia, anexables a convocatoria, acta, certificación y registro.
+            Prepara o anexa documentos exigibles por materia y vínculos al expediente correspondiente.
           </p>
         </div>
         <button

@@ -92,7 +92,9 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
 
     await page.locator('[data-sidebar-item="Presentaciones registrales"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/tramitador\?.*estado=PRESENTADA/);
-    await expect(page.getByRole("button", { name: "Presentaciones registrales" })).toHaveAttribute("aria-pressed", "true");
+    // El item de sidebar se renombró a "Presentaciones registrales" (§5.2), pero la
+    // pestaña-filtro de TramitadorLista sigue siendo "Presentaciones" (no es sidebar).
+    await expect(page.getByRole("button", { name: "Presentaciones" })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("item Procesos navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
