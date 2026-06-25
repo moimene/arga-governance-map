@@ -33,7 +33,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Inicio",
     items: [
-      { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
+      { label: "Mesa", to: "/secretaria", icon: LayoutDashboard, end: true },
       {
         label: "Board pack",
         to: "/secretaria/board-pack",
@@ -122,7 +122,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Inicio",
     items: [
-      { label: "Dashboard", to: "/secretaria", icon: LayoutDashboard, end: true },
+      { label: "Mesa", to: "/secretaria", icon: LayoutDashboard, end: true },
       {
         label: "Board pack",
         to: "/secretaria/board-pack",

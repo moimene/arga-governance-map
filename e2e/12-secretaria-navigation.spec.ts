@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/base';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/secretaria', heading: 'Mesa de trabajo del secretario' },
+  { label: 'Mesa', path: '/secretaria', heading: 'Mesa de Secretaría' },
   { label: 'Sociedades', path: '/secretaria/sociedades', heading: 'Sociedades' },
   { label: 'Personas, cargos y representantes', path: '/secretaria/personas', heading: 'Personas' },
   { label: 'Board pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
@@ -40,10 +40,10 @@ test.describe('Secretaría navigation smoke', () => {
   test('dashboard expone contratos sanitizados por flujo', async ({ page }) => {
     await page.goto('/secretaria');
 
-    await expect(page.locator('main').getByRole('heading', { name: 'Mesa de trabajo del secretario', exact: true })).toBeVisible({
+    await expect(page.locator('main').getByRole('heading', { name: 'Mesa de Secretaría', exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText('Prioridad ahora')).toBeVisible();
+    await expect(page.getByText('Requiere tu atención')).toBeVisible();
     await expect(page.getByText('Empezar un flujo')).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva convocatoria/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva reunión/ })).toBeVisible();

@@ -610,7 +610,7 @@ function attentionCount(kpis?: KpiCounts) {
 }
 
 function attentionHeadline(count: number) {
-  if (count === 0) return "Sin bloqueos operativos relevantes";
+  if (count === 0) return "No hay acciones urgentes para esta sociedad.";
   return countLabel(count, "asunto requiere revisión", "asuntos requieren revisión");
 }
 
@@ -733,11 +733,10 @@ export default function SecretariaDashboard() {
             Secretaría Societaria
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-            Mesa de trabajo del secretario
+            Mesa de Secretaría
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Lo importante aparece primero: próximos hitos, documentos pendientes y bloqueos legales.
-            Los contratos técnicos quedan plegados para no competir con la operación diaria.
+            Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario de esta sociedad.
           </p>
         </div>
         <div
@@ -764,7 +763,7 @@ export default function SecretariaDashboard() {
         >
           <div className="px-5 py-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Prioridad ahora
+              Requiere tu atención
             </div>
             <h2 className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">
               {attentionHeadline(openAttention)}
