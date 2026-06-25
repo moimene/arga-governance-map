@@ -18,20 +18,7 @@ import {
 import { useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-
-const REVIEWABLE_STATUSES = new Set(["DRAFT", "SOURCE_LOCKED", "PENDING", "GENERATED", "IN_REVIEW"]);
-
-const KIND_LABEL: Record<string, string> = {
-  INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
-  INFORME_GESTION: "Informe de gestión",
-  CERTIFICACION_AUTONOMA: "Certificación autónoma",
-  CERTIFICACION_ACUERDO: "Certificación de acuerdo",
-  ANEXO_EXTERNO: "Anexo externo",
-  DOCUMENTO_REGISTRAL: "Documento registral",
-  SUBSANACION_REGISTRAL: "Subsanación registral",
-  OTRO_SOPORTE: "Soporte documental",
-};
+import { REVIEWABLE_STATUSES, KIND_LABEL } from "@/lib/secretaria/document-artifact-labels";
 
 function statusTone(status: string) {
   if (status === "APPROVED" || status === "ARCHIVED" || status === "ATTACHED" || status === "SIGNED") {
