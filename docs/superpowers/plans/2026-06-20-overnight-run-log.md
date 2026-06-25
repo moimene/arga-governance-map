@@ -49,7 +49,7 @@
 
 Gates tras fixes: tc=0 · contract 21/0 · test 2100/0 · lint=baseline(15). Commit de fixes: _este commit_.
 
-| **T6 · UX-3.B** Revisión documental copy | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | Codex pendiente | §8.3 (toasts), §9.5 (H1 "Revisión documental"), §6.5 (subcopy/secciones/tooltip), §8.5 (empties 3-partes) | Toasts de trazabilidad por acción (§8.3 APPROVED/ARCHIVED/SUPERSEDED, const `REVIEW_SUCCESS_TOAST`); H1→"Revisión documental"; subcopy §6.5 (contrato `mesa-control-ui-contract:160` actualizado); secciones "Pendientes de revisión"/"Documentos cerrados" (§6.5); empties 3-partes §8.5; tooltip §6.5 en botón "Marcar sustituido" (nuevo prop `title` en `ActionButton`). **Auto-gate cazó regresión**: cambiar la copy de permisos a §8.2 rompió `keeps auditor/compliance flows read-only` (aserta "puede consultar documentos y hashes", con par en la página de certs) → **revertido**; alineación §8.2 de permisos diferida a follow-up consistente (ambas páginas + ambos tests). |
+| **T6 · UX-3.B** Revisión documental copy | HECHA | `fba44e4` (+fixes _este commit_) | tc=0 · test 2100/0 · lint=baseline(17) | Codex ✓ (NO-APTO → corregido) | §8.3 (toasts), §9.5 (H1 "Revisión documental"), §6.5 (subcopy/secciones/tooltip), §8.5 (empties 3-partes) | Toasts de trazabilidad por acción (§8.3 APPROVED/ARCHIVED/SUPERSEDED, const `REVIEW_SUCCESS_TOAST`); H1→"Revisión documental"; subcopy §6.5 (contrato `mesa-control-ui-contract:160` actualizado); secciones "Pendientes de revisión"/"Documentos cerrados" (§6.5); empties 3-partes §8.5; tooltip §6.5 en botón "Marcar sustituido" (nuevo prop `title` en `ActionButton`). **Auto-gate cazó regresión**: cambiar la copy de permisos a §8.2 rompió `keeps auditor/compliance flows read-only` (aserta "puede consultar documentos y hashes", con par en la página de certs) → **revertido**; alineación §8.2 de permisos diferida a follow-up consistente (ambas páginas + ambos tests). |
 
 ### Codex — revisión adversarial clúster Mesa (T5+T4)
 
@@ -66,6 +66,19 @@ Gates tras fixes: tc=0 · contract 21/0 · test 2100/0 · lint=baseline(15). Com
 | 7 | MENOR | Literalidad de tildes (informe sin tildes) | **DESESTIMADO/JUSTIFICADO**: el informe está sin tildes por artefacto de codificación; todo el módulo usa ortografía correcta. Igualar la falta de tildes haría la UI agramatical. |
 
 Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
+
+### Codex — revisión adversarial T6 (UX-3.B)
+
+`codex exec -s read-only` sobre `git diff 172fad9..HEAD`. Veredicto inicial: **NO-APTO**, 4 hallazgos. Resolución:
+
+| # | Sev | Hallazgo | Resolución |
+|---|---|---|---|
+| 1 | BLOQUEANTE | CTAs no literales: "En revisión"/"Aprobar"/"Marcar sustituido" vs §6.5/§9.5 | **CORREGIDO**: "Revisar", "Aprobar documento", "Marcar como sustituido" (literal §6.5). "Archivar" ya coincidía. |
+| 2 | BLOQUEANTE | Toast `IN_REVIEW: "Documento en revisión."` inventado (no en §8.3) | **CORREGIDO**: eliminado del mapa; `IN_REVIEW` cae al toast neutro preexistente "Estado actualizado" (no se inventa copy). |
+| 3 | MAYOR | Contrato poco estricto (solo cambia un substring) | **CORREGIDO/REFORZADO**: el contrato ahora asierta el subcopy completo §6.5 + H1 + secciones + CTAs + toast §8.3 + tooltip §6.5 (7 aserciones nuevas). |
+| 4 | MENOR | `title` nativo no es tooltip ARIA fiable | **JUSTIFICADO-MENOR**: el botón tiene label visible (nombre accesible intacto) y es operable por teclado; §6.5 pide "tooltip" y `title` es el tooltip mínimo convencional. Un tooltip ARIA completo es sobre-ingeniería para una pista supletoria en un botón ya etiquetado. |
+
+Gates tras fixes: tc=0 · test 2100/0 (+7 expects) · lint=baseline(17).
 
 ### 🟡 Decisiones para el humano (acumulado)
 

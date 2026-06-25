@@ -25,7 +25,6 @@ const REVIEW_SUCCESS_TOAST: Record<string, string> = {
   APPROVED: "Documento aprobado documentalmente para su incorporación al expediente.",
   ARCHIVED: "Documento archivado con trazabilidad. Conservamos su huella y versión.",
   SUPERSEDED: "Documento marcado como sustituido. La versión anterior se conserva.",
-  IN_REVIEW: "Documento en revisión.",
 };
 
 function statusTone(status: string) {
@@ -244,13 +243,13 @@ function DocumentTable({
                      {reviewMode ? (
                        <div className="flex flex-wrap justify-end gap-2">
                          <ActionButton
-                           label="En revisión"
+                           label="Revisar"
                            icon={SearchCheck}
                            disabled={!canMutate || isUpdating || artifact.status === "IN_REVIEW"}
                            onClick={() => onSetStatus(artifact, "IN_REVIEW")}
                          />
                          <ActionButton
-                           label="Aprobar"
+                           label="Aprobar documento"
                            icon={CheckCircle2}
                            disabled={!canMutate || isUpdating}
                            onClick={() => onSetStatus(artifact, "APPROVED", true)}
@@ -265,7 +264,7 @@ function DocumentTable({
                       </div>
                     ) : (
                        <ActionButton
-                         label="Marcar sustituido"
+                         label="Marcar como sustituido"
                          icon={RotateCcw}
                          title="Usa esta acción cuando exista una versión posterior o el documento ya no deba utilizarse."
                          disabled={!canMutate || isUpdating || artifact.status === "SUPERSEDED"}
