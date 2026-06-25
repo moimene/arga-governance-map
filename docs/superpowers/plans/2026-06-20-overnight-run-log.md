@@ -89,4 +89,35 @@ Gates tras fixes: tc=0 · test 2100/0 (+7 expects) · lint=baseline(17).
 
 ## Resumen del run
 
-_(se completa al cerrar)_
+**Cierre 2026-06-25.** Rama `feature/ux-refactor-secretaria-overnight`, 11 commits, **sin push** (revisión humana). Todas las tareas en verde; 0 bloqueadas; 3 rondas Codex adversarial (todas NO-APTO inicial → corregidas).
+
+### HECHAS (6)
+| Tarea | Commit(s) | Resumen |
+|---|---|---|
+| T1 · UX-0.D | `1f4d0ae` | 8/9 renombrados sidebar (ambas taxonomías) |
+| T2 · UX-0.E | `479f89c` | artefacto→Documento + RmStatusChip §7.1 |
+| T3 · UX-0.F | `772f198` | evidencia GenerarDocumentoStepper vía EvidenceStatusBadge |
+| Codex UX-0 fixes | `17ec3b7` | 5 hallazgos válidos corregidos |
+| T5 · UX-2.B | `5cc1ac3` | Mesa copy H1/subcopy/empty + sidebar Dashboard→Mesa |
+| T4 · UX-2.A | `6bb9f13` | bloque "Documentos pendientes" + CTA + refactor labels |
+| Codex Mesa fixes | `172fad9` | 5 hallazgos válidos (scope copy, error, helper, foco, reubicación) |
+| T6 · UX-3.B | `fba44e4` | Revisión documental copy (toasts/H1/secciones/empties/tooltip) |
+| Codex T6 fixes | `bbc9594` | CTAs literales §6.5, toast inventado fuera, contrato reforzado |
+
+### Gates en el último commit (`bbc9594`)
+`tsc -b` = 0 · `bun test` = 2100 pass / 0 fail · `bun run lint` = 15 errores (== baseline, 0 nuevos) · `bun run build` = 0.
+
+### PENDIENTES 🟢 (no ejecutadas — siguiente sesión)
+- **T7 · UX-5.A** Expediente: empty states (§9.6) + relegar tecnicismos (`profile_hash`, `snapshot_id`, `agreement_kind`) a detalle avanzado + tarjetas móviles M1.
+- **T8 · UX-6.A** Sociedades/personas: avisos "censo pendiente"/"sin voto computable" + CTA "Revisar autoridad certificante" + **aviso §6.7 visible** (heredado de Codex UX-0 #8: el aviso de RmStatusChip debe surfacearse aquí como elemento visible).
+- **T9 · UX-7.C** Gobierno: avisos "plantilla sin regla"/"decisión legal pendiente" + sub-área nominal "Parámetros normativos".
+- **T10 · UX-7.B** Plantillas: cohortes + "activa con metadatos incompletos" + filtros (datos ya presentes).
+- **T11 · UX-7.A (parcial)** aviso de snapshot normativo desfasado (`profile_hash` congelado vs vigente) — **solo** la parte 🟢; el chip imperativa/dispositiva es 🟡 (campo nuevo = criterio legal).
+- **Follow-up copy permisos §8.2**: alinear "Tu rol puede consultar esta información, pero no ejecutar esta acción." en `DocumentosPendientesRevision` **y** `CertificacionesAutonomas` a la vez, actualizando ambos asserts del contrato `keeps auditor/compliance flows read-only`.
+
+### Cómo revisar
+- **Ver todo el diff:** `git diff main...feature/ux-refactor-secretaria-overnight`
+- **Por commit:** `git log --oneline main..feature/ux-refactor-secretaria-overnight` y `git show --stat <hash>`
+- **Abrir PR:** `gh pr create --base main --head feature/ux-refactor-secretaria-overnight --fill`
+- **Revertir todo el run (sin push):** `git switch main && git branch -D feature/ux-refactor-secretaria-overnight`
+- **Criterios NO verificables automáticamente (validación humana / navegador):** apariencia visual del bloque "Documentos pendientes" y de los empties; comportamiento del tooltip `title` en hover; coherencia de la copy scope-aware sociedad/grupo en la Mesa; render de `EvidenceStatusBadge` en el paso de archivado de `GenerarDocumentoStepper`. **E2E no ejecutados** en este run (sin navegador): specs actualizados a los nuevos selectores/labels — `e2e/12`, `e2e/21`, `e2e/30`, `e2e/33` — deben correrse antes de mergear.
