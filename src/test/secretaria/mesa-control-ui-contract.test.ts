@@ -158,7 +158,7 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     // demo como "evidencia operativa". El disclaimer de entorno de validación funcional
     // vive ahora en EvidenceStatusBadge, no en el encabezado de la bandeja.
     expect(revision).not.toContain("evidencia operativa");
-    expect(revision).toContain("Revísalos antes de aprobarlos");
+    expect(revision).toContain("Revisa documentos generados o anexados antes de aprobarlos");
     // UX-0.F (informe legal §7.3): el stepper rotula la evidencia con el copy aprobado
     // vía EvidenceStatusBadge/evidenceStatusDescriptor ("Entorno de validación funcional"),
     // nunca con la etiqueta ambigua "Evidencia operativa" ni presentando la evidencia demo

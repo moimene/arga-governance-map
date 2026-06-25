@@ -49,6 +49,8 @@
 
 Gates tras fixes: tc=0 · contract 21/0 · test 2100/0 · lint=baseline(15). Commit de fixes: _este commit_.
 
+| **T6 · UX-3.B** Revisión documental copy | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | Codex pendiente | §8.3 (toasts), §9.5 (H1 "Revisión documental"), §6.5 (subcopy/secciones/tooltip), §8.5 (empties 3-partes) | Toasts de trazabilidad por acción (§8.3 APPROVED/ARCHIVED/SUPERSEDED, const `REVIEW_SUCCESS_TOAST`); H1→"Revisión documental"; subcopy §6.5 (contrato `mesa-control-ui-contract:160` actualizado); secciones "Pendientes de revisión"/"Documentos cerrados" (§6.5); empties 3-partes §8.5; tooltip §6.5 en botón "Marcar sustituido" (nuevo prop `title` en `ActionButton`). **Auto-gate cazó regresión**: cambiar la copy de permisos a §8.2 rompió `keeps auditor/compliance flows read-only` (aserta "puede consultar documentos y hashes", con par en la página de certs) → **revertido**; alineación §8.2 de permisos diferida a follow-up consistente (ambas páginas + ambos tests). |
+
 ### Codex — revisión adversarial clúster Mesa (T5+T4)
 
 `codex exec -s read-only` sobre `git diff 17ec3b7..HEAD`. Veredicto inicial: **NO-APTO**, 7 hallazgos. Resolución:

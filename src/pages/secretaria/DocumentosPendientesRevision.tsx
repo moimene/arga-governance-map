@@ -20,6 +20,14 @@ import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { REVIEWABLE_STATUSES, artifactKindLabel } from "@/lib/secretaria/document-artifact-labels";
 
+// Toasts de trazabilidad por acción (informe legal §8.3). Copy aprobado.
+const REVIEW_SUCCESS_TOAST: Record<string, string> = {
+  APPROVED: "Documento aprobado documentalmente para su incorporación al expediente.",
+  ARCHIVED: "Documento archivado con trazabilidad. Conservamos su huella y versión.",
+  SUPERSEDED: "Documento marcado como sustituido. La versión anterior se conserva.",
+  IN_REVIEW: "Documento en revisión.",
+};
+
 function statusTone(status: string) {
   if (status === "APPROVED" || status === "ARCHIVED" || status === "ATTACHED" || status === "SIGNED") {
     return "bg-[var(--status-success)] text-[var(--g-text-inverse)]";
@@ -53,7 +61,7 @@ export default function DocumentosPendientesRevision() {
   async function setStatus(artifact: SecretariaDocumentArtifactRow, status: string, reviewed = false) {
     try {
       await updateStatus.mutateAsync({ artifactId: artifact.id, status, reviewed });
-      toast.success("Estado actualizado", { description: `${artifact.title} · ${statusLabel(status)}` });
+      toast.success(REVIEW_SUCCESS_TOAST[status] ?? "Estado actualizado", { description: artifact.title });
     } catch (e) {
       toast.error("No se pudo actualizar el documento", {
         description: e instanceof Error ? e.message : String(e),
@@ -70,10 +78,10 @@ export default function DocumentosPendientesRevision() {
             Secretaría · Revisión documental
           </div>
           <h1 className="mt-2 text-2xl font-semibold text-[var(--g-text-primary)]">
-            Documentos pendientes de revisión
+            Revisión documental
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-            Bandeja operativa de informes, anexos y certificaciones. Revísalos antes de aprobarlos, archivarlos o marcarlos como sustituidos.
+            Revisa documentos generados o anexados antes de aprobarlos, archivarlos o marcarlos como sustituidos.
           </p>
         </div>
         <button
@@ -121,24 +129,24 @@ export default function DocumentosPendientesRevision() {
       ) : null}
 
       <DocumentTable
-        title="Cola de revisión"
+        title="Pendientes de revisión"
         rows={pendingRows}
         isLoading={artifacts.isLoading}
         isUpdating={updateStatus.isPending}
         onSetStatus={setStatus}
         canMutate={canCertify}
-        empty="No hay documentos pendientes de revisión."
+        empty="No hay documentos pendientes de revisión. Los documentos generados o anexados aparecerán aquí antes de su cierre."
         reviewMode
       />
 
       <DocumentTable
-        title="Últimos documentos cerrados"
+        title="Documentos cerrados"
         rows={closedRows}
         isLoading={artifacts.isLoading}
         isUpdating={updateStatus.isPending}
         onSetStatus={setStatus}
         canMutate={canCertify}
-        empty="No hay documentos cerrados todavía."
+        empty="No hay documentos cerrados todavía. Cuando apruebes, archives o sustituyas un documento, aparecerá aquí con su trazabilidad."
       />
     </div>
   );
@@ -259,6 +267,7 @@ function DocumentTable({
                        <ActionButton
                          label="Marcar sustituido"
                          icon={RotateCcw}
+                         title="Usa esta acción cuando exista una versión posterior o el documento ya no deba utilizarse."
                          disabled={!canMutate || isUpdating || artifact.status === "SUPERSEDED"}
                          onClick={() => onSetStatus(artifact, "SUPERSEDED")}
                        />
@@ -286,12 +295,14 @@ function ActionButton({
   disabled,
   onClick,
   primary = false,
+  title,
 }: {
   label: string;
   icon: React.ElementType;
   disabled: boolean;
   onClick: () => void;
   primary?: boolean;
+  title?: string;
 }) {
   const cls = primary
     ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
@@ -304,6 +315,7 @@ function ActionButton({
       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${cls}`}
       style={{ borderRadius: "var(--g-radius-md)" }}
       aria-busy={disabled}
+      title={title}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
