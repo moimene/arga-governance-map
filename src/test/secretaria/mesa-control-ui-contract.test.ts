@@ -158,8 +158,13 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     // vive ahora en EvidenceStatusBadge, no en el encabezado de la bandeja.
     expect(revision).not.toContain("evidencia operativa");
     expect(revision).toContain("Revísalos antes de aprobarlos");
-    expect(generar).not.toContain("Evidencia demo operativa");
-    expect(generar).toContain("Evidencia operativa");
+    // UX-0.F (informe legal §7.3): el stepper rotula la evidencia con el copy aprobado
+    // vía EvidenceStatusBadge/evidenceStatusDescriptor ("Entorno de validación funcional"),
+    // nunca con la etiqueta ambigua "Evidencia operativa" ni presentando la evidencia demo
+    // como cualificada. La aserción negativa se conserva y se refuerza (case-insensitive).
+    expect(generar).not.toMatch(/evidencia demo operativa/i);
+    expect(generar).not.toContain("Evidencia operativa");
+    expect(generar).toContain("EvidenceStatusBadge");
     expect(catalogo).toContain("Trazabilidad preparada para el bloqueo del expediente");
   });
 

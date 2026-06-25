@@ -73,6 +73,8 @@ import {
   type SaveEditableDocumentDraftResult,
 } from "@/lib/motor-plantillas";
 import { isLegallyReviewedDraft } from "@/lib/doc-gen/template-operability";
+import { EvidenceStatusBadge } from "@/components/secretaria/EvidenceStatusBadge";
+import { evidenceStatusDescriptor } from "@/lib/secretaria/evidence-status-labels";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -110,10 +112,12 @@ function unresolvedVariableNames(variables: unknown): string[] {
   );
 }
 
+// UX-0.F (informe legal §7.3): el estado de evidencia se rotula con el copy
+// aprobado del descriptor compartido (entorno de validación funcional para
+// DEMO_OPERATIVA/sandbox), nunca con etiquetas crudas o ambiguas. Fallback
+// conservador a no-cualificada vía evidenceStatusDescriptor.
 function evidenceStatusLabel(status: string | null | undefined) {
-  if (status === "DEMO_OPERATIVA") return "Evidencia operativa";
-  if (!status) return "Evidencia no informada";
-  return status;
+  return evidenceStatusDescriptor(status).label;
 }
 
 function buildDefaultCapa3Values(
@@ -1574,7 +1578,7 @@ export default function GenerarDocumentoStepper() {
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Documento archivado como evidencia demo operativa</span>
+                    <span className="text-sm font-medium">Documento archivado con trazabilidad. Conservamos su huella y versión.</span>
                   </div>
                   {archiveUrl && (
                     /* ITEM-110: archiveUrl es el sentinel evidence-bundle://<path>,
@@ -1602,13 +1606,8 @@ export default function GenerarDocumentoStepper() {
                       </p>
                     )
                   )}
+                  <EvidenceStatusBadge status={compositionResult?.request.evidence_status} />
                   <div className="flex flex-wrap gap-2">
-                    <span
-                      className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                      style={{ borderRadius: "var(--g-radius-full)" }}
-                    >
-                      Evidencia demo
-                    </span>
                     <span
                       className="inline-block px-2 py-1 text-[10px] font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
                       style={{ borderRadius: "var(--g-radius-full)" }}
