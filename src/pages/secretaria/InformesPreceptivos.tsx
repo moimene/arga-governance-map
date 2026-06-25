@@ -77,7 +77,7 @@ export default function InformesPreceptivos() {
             Informes preceptivos
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-            Artefactos documentales exigibles por materia, anexables a convocatoria, acta, certificación y registro.
+            Documentos exigibles por materia, anexables a convocatoria, acta, certificación y registro.
           </p>
         </div>
         <button

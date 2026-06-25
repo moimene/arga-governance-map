@@ -111,7 +111,7 @@ export default function DocumentosPendientesRevision() {
           <div>
             <p className="font-semibold">Schema documental pendiente</p>
             <p className="mt-1 text-[var(--g-text-secondary)]">
-              Aplica la migración de informes y certificaciones para consultar y revisar artefactos.
+              Aplica la migración de informes y certificaciones para consultar y revisar documentos.
             </p>
           </div>
         </div>
@@ -119,7 +119,7 @@ export default function DocumentosPendientesRevision() {
 
       <section className="grid gap-3 md:grid-cols-4">
         <Metric label="Pendientes" value={pendingRows.length} tone={pendingRows.length ? "warning" : "ok"} />
-        <Metric label="Total artefactos" value={rows.length} tone="neutral" />
+        <Metric label="Total documentos" value={rows.length} tone="neutral" />
         <Metric label="Aprobados" value={rows.filter((row) => row.status === "APPROVED").length} tone="ok" />
         <Metric label="Archivados" value={rows.filter((row) => row.status === "ARCHIVED").length} tone="ok" />
       </section>
@@ -129,7 +129,7 @@ export default function DocumentosPendientesRevision() {
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
-          Tu rol actual puede consultar documentos y hashes, pero no aprobar, archivar ni sustituir artefactos.
+          Tu rol actual puede consultar documentos y hashes, pero no aprobar, archivar ni sustituir documentos.
         </div>
       ) : null}
 

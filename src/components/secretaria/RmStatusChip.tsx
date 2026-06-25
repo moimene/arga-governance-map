@@ -16,8 +16,13 @@ export function RmStatusChip({
         (registered ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]")
       }
       style={{ borderRadius: "var(--g-radius-sm)" }}
+      title={
+        registered
+          ? undefined
+          : "Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros."
+      }
     >
-      {registered ? "Inscrito" : "Pendiente RM"}
+      {registered ? "Inscrito" : "Pendiente de referencia registral"}
     </span>
   );
 }
