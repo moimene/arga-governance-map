@@ -18,7 +18,7 @@ import {
 import { useHasCapability } from "@/hooks/useCapabilityMatrix";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-import { REVIEWABLE_STATUSES, KIND_LABEL } from "@/lib/secretaria/document-artifact-labels";
+import { REVIEWABLE_STATUSES, artifactKindLabel } from "@/lib/secretaria/document-artifact-labels";
 
 function statusTone(status: string) {
   if (status === "APPROVED" || status === "ARCHIVED" || status === "ATTACHED" || status === "SIGNED") {
@@ -216,7 +216,7 @@ function DocumentTable({
                   <td className="px-4 py-3 text-sm text-[var(--g-text-primary)]">
                     <div className="font-semibold">{artifact.title}</div>
                     <div className="text-xs text-[var(--g-text-secondary)]">
-                      {KIND_LABEL[artifact.artifact_kind] ?? artifact.artifact_kind} · v{artifact.version}
+                      {artifactKindLabel(artifact.artifact_kind)} · v{artifact.version}
                     </div>
                   </td>
                   <td className="px-4 py-3">

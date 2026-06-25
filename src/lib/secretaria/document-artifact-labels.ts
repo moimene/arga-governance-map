@@ -21,3 +21,9 @@ export const KIND_LABEL: Record<string, string> = {
   SUBSANACION_REGISTRAL: "Subsanación registral",
   OTRO_SOPORTE: "Soporte documental",
 };
+
+/** Etiqueta legible del tipo de documento. Fallback NO técnico: nunca expone la clave cruda. */
+export function artifactKindLabel(kind: string | null | undefined): string {
+  if (!kind) return "Documento";
+  return KIND_LABEL[kind] ?? "Documento";
+}

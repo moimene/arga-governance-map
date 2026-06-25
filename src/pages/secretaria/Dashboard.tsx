@@ -27,7 +27,7 @@ import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaDocumentArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
-import { REVIEWABLE_STATUSES, KIND_LABEL } from "@/lib/secretaria/document-artifact-labels";
+import { REVIEWABLE_STATUSES, artifactKindLabel } from "@/lib/secretaria/document-artifact-labels";
 import {
   SECRETARIA_SANITIZED_FLOW_CONTRACTS,
   summarizeSecretariaSanitizedFlows,
@@ -612,8 +612,12 @@ function attentionCount(kpis?: KpiCounts) {
   );
 }
 
-function attentionHeadline(count: number) {
-  if (count === 0) return "No hay acciones urgentes para esta sociedad.";
+function attentionHeadline(count: number, isSociedad: boolean) {
+  if (count === 0) {
+    return isSociedad
+      ? "No hay acciones urgentes para esta sociedad."
+      : "No hay acciones urgentes en el grupo.";
+  }
   return countLabel(count, "asunto requiere revisión", "asuntos requieren revisión");
 }
 
@@ -718,7 +722,7 @@ export default function SecretariaDashboard() {
   const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis(scopedEntityId);
   const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda(scopedEntityId);
   const { data: crossModule } = useCrossModuleMetrics(scopedEntityId);
-  const { data: docArtifacts, isLoading: docsLoading } = useSecretariaDocumentArtifacts();
+  const { data: docArtifacts, isLoading: docsLoading, error: docsError } = useSecretariaDocumentArtifacts();
   const pendingDocs = (docArtifacts ?? []).filter((doc) => REVIEWABLE_STATUSES.has(doc.status));
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
   const flowSummary = summarizeSecretariaSanitizedFlows();
@@ -741,7 +745,9 @@ export default function SecretariaDashboard() {
             Mesa de Secretaría
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario de esta sociedad.
+            {scope.mode === "sociedad"
+              ? "Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario de esta sociedad."
+              : "Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario del grupo."}
           </p>
         </div>
         <div
@@ -771,7 +777,7 @@ export default function SecretariaDashboard() {
               Requiere tu atención
             </div>
             <h2 className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">
-              {attentionHeadline(openAttention)}
+              {attentionHeadline(openAttention, scope.mode === "sociedad")}
             </h2>
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
               Esta sección resume dónde conviene entrar primero. Cada fila abre la pantalla responsable.
@@ -943,6 +949,51 @@ export default function SecretariaDashboard() {
       </div>
       </section>
 
+      {/* Documentos pendientes (UX-2.A / informe §6.1) — operativo, sobre el panel técnico plegado */}
+      <section
+        className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--g-border-subtle)] px-5 py-3">
+          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Documentos pendientes</h2>
+          <button
+            type="button"
+            onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
+            className="w-fit text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+          >
+            Revisar documentos
+          </button>
+        </div>
+        <div className="divide-y divide-[var(--g-border-subtle)]">
+          {docsLoading ? (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">Cargando documentos y evidencias.</div>
+          ) : docsError ? (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">
+              Esta función requiere la migración documental de informes y certificaciones.
+            </div>
+          ) : pendingDocs.length > 0 ? (
+            pendingDocs.slice(0, 5).map((doc) => (
+              <button
+                key={doc.id}
+                type="button"
+                onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
+                className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--g-brand-3308)]"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <div className="truncate text-sm font-medium text-[var(--g-text-primary)]">{doc.title}</div>
+                  <div className="text-xs text-[var(--g-text-secondary)]">{artifactKindLabel(doc.artifact_kind)}</div>
+                </div>
+                <StatusChip value={doc.status} />
+              </button>
+            ))
+          ) : (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">
+              No hay documentos pendientes de revisión. Los documentos generados aparecerán aquí antes de su cierre.
+            </div>
+          )}
+        </div>
+      </section>
+
       <details
         className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)" }}
@@ -1064,49 +1115,6 @@ export default function SecretariaDashboard() {
         </div>
       </div>
       </details>
-
-      {/* Documentos pendientes (UX-2.A / informe §6.1) */}
-      <section
-        className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
-        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--g-border-subtle)] px-5 py-3">
-          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Documentos pendientes</h2>
-          <button
-            type="button"
-            onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
-            className="w-fit text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
-          >
-            Revisar documentos
-          </button>
-        </div>
-        <div className="divide-y divide-[var(--g-border-subtle)]">
-          {docsLoading ? (
-            <div className="p-5 text-sm text-[var(--g-text-secondary)]">Cargando documentos y evidencias.</div>
-          ) : pendingDocs.length > 0 ? (
-            pendingDocs.slice(0, 5).map((doc) => (
-              <button
-                key={doc.id}
-                type="button"
-                onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
-                className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50"
-              >
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <div className="truncate text-sm font-medium text-[var(--g-text-primary)]">{doc.title}</div>
-                  <div className="text-xs text-[var(--g-text-secondary)]">
-                    {KIND_LABEL[doc.artifact_kind] ?? doc.artifact_kind}
-                  </div>
-                </div>
-                <StatusChip value={doc.status} />
-              </button>
-            ))
-          ) : (
-            <div className="p-5 text-sm text-[var(--g-text-secondary)]">
-              No hay documentos pendientes de revisión. Los documentos generados aparecerán aquí antes de su cierre.
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Agenda / Actividad reciente */}
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
