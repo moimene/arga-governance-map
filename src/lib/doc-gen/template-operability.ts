@@ -50,7 +50,7 @@ export function templateUsabilityNotice(template: PlantillaProtegidaRow): string
   }
   const status = normalizeTemplateStatus(template.estado);
   if (status === "ARCHIVADA" || status === "DEPRECADA") {
-    return "Plantilla archivada: se conserva por trazabilidad, pero no está disponible para nuevos expedientes.";
+    return "Plantilla archivada o deprecada: se conserva por trazabilidad, pero no está disponible para nuevos expedientes.";
   }
   return "Plantilla en preparación: pendiente de revisión o aprobación legal antes de poder generar documentos.";
 }

@@ -1152,7 +1152,7 @@ export default function Plantillas() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <Play className="h-4 w-4" />
+                    <Play className="h-4 w-4" aria-hidden="true" />
                     {getTemplateUsageTarget(selected).label}
                   </button>
                 )}
@@ -1165,7 +1165,7 @@ export default function Plantillas() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <ShieldCheck className="h-4 w-4" />
+                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                     Vincular como plantilla activa
                   </button>
                 ) : null}

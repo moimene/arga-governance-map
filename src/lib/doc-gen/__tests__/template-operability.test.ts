@@ -41,6 +41,12 @@ describe("templateUsabilityNotice — política 'todas visibles + avisar', verja
     expect(templateUsabilityNotice(t)).toMatch(/archivada/i);
   });
 
+  it("DEPRECADA → avisa (archivada o deprecada) y no genera", () => {
+    const t = make({ estado: "DEPRECADA" });
+    expect(isOperationalTemplate(t)).toBe(false);
+    expect(templateUsabilityNotice(t)).toMatch(/deprecada/i);
+  });
+
   it("borrador sin aprobación legal → avisa (pendiente de revisión/aprobación) y no genera", () => {
     const t = make({ estado: "BORRADOR" });
     expect(isOperationalTemplate(t)).toBe(false);
