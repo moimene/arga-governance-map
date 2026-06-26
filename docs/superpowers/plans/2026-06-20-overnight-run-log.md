@@ -75,6 +75,8 @@ Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 | **Follow-up §8.2** copy de permisos | HECHA | `d75bcea` | tc=0 · test 2100/0 · lint=baseline(17) | Codex ✓ (NO-APTO → desestimado tildes) | §8.2 ("Tu rol puede consultar esta información, pero no ejecutar esta acción.") | Alineadas `CertificacionesAutonomas` y `DocumentosPendientesRevision` al copy §8.2 (consistente, sin "hashes" §7.1); ambos asserts del contrato `secretaria-informes-certificaciones` actualizados. Cierra deuda heredada de Codex UX-0 #6. |
 | **T11 · UX-7.A (aviso desfase)** | **🟡 DIFERIDA** | — | n/a (no codificada) | n/a | n/a | El aviso "el marco normativo ha cambiado…" (§6.9.4) requiere comparar el `profile_hash` congelado vs vigente, pero **no son dos valores comparables ya presentes**: `snapshot.profile_hash` (de `useAgreementNormativeSnapshot`) es el **vigente/live**; el congelado vive en `compliance_snapshot` con **semántica dependiente del origen** — para acuerdos de reunión guarda `payload_hash`/`ruleset_snapshot_id` como `profile_hash` (fallback en `agreement-360.ts:134`), NO el `normativeFingerprint(profile)` canónico. Una comparación ingenua emitiría **falsos avisos de desfase** en acuerdos de origen reunión. Correcto = guardar un hash congelado canónico al adoptar (🔴 datos/RPC) o un extractor consciente del origen (riesgo de corrección). No se finge un criterio legal. |
 
+| **T9 · UX-7.C (parcial)** Parámetros normativos | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | trivial (rename copy §6.8) | §6.8 (H1 "Parámetros normativos") | Card "Mantenimiento gobernado P2"→"Parámetros normativos" en `RuleManagerPage` (quita el tecnicismo "P2", da el nombre nominal §6.8). Subcopy conservado (la card es más amplia que solo parámetros: estatutos/overrides/plantillas/matriz). **🟡 DIFERIDO:** aviso "decisión legal pendiente antes de activar bloqueo" (criterio 11) — requiere una señal real de "decisión pendiente" (status de override); ponerlo always-on sería ruido y "cuando aplique" exige condición; no se finge criterio legal. |
+
 ### Codex — revisión adversarial T6 (UX-3.B)
 
 `codex exec -s read-only` sobre `git diff 172fad9..HEAD`. Veredicto inicial: **NO-APTO**, 4 hallazgos. Resolución:
@@ -108,6 +110,25 @@ Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 - **Cola documental sin scope de entidad (gap de modelo):** `secretaria_document_artifacts` no tiene `entity_id`; la cola de revisión (página y bloque Mesa) es tenant-wide. Para scope por sociedad haría falta añadir `entity_id` o resolver `source_id`→entidad (cambio de esquema/joins = 🔴). Decisión tuya si se prioriza.
 
 ## Resumen del run
+
+### Cierre sesión 2 (2026-06-26) — backlog 🟢 agotado
+
+Rama `feature/ux-refactor-secretaria-overnight`, **17 commits**, **sin push**. Continuación tras el cierre del 2026-06-25: ejecutadas T7, T8, T9 (parcial), T10 (+T9 parcial), el follow-up §8.2, y una **4ª ronda Codex adversarial** (clúster Expediente/Datos, NO-APTO → corregida). Total: **4 rondas Codex**, todas NO-APTO inicial → corregidas.
+
+**HECHAS sesión 2:** T7 (`fa32ff2`), T8 (`7e4957d`), T10+T9-parcial Plantillas (`d827b99`), §8.2 (`d75bcea`), Codex-fixes clúster 2 (`91fc8e9`), T9 Parámetros normativos (_HEAD_).
+
+**🟡 DIFERIDAS con justificación adversarial (decisión humana):**
+- **T11** aviso de snapshot desfasado — el `profile_hash` congelado no es comparable al vigente (semántica dependiente del origen; `agreement-360.ts:134`). Falso-positivo legal evitado.
+- **T9** aviso "decisión legal pendiente antes de activar bloqueo" — requiere señal real de decisión pendiente; no se finge.
+- **T10** estados de cohorte de plantilla + filtros por cohorte — requieren modelo de cohortes.
+- **T9** subcopy §6.8 de "Parámetros normativos" — la card real es más amplia; renombrado el título, conservado el subcopy descriptivo.
+- (Heredadas sesión 1) "Tramitador registral"→"Registro" (conflicto CLAUDE.md); "Procesos"→"Calendario societario"/"Reuniones"→"Sesiones" (validación legal); cola documental sin `entity_id` (gap de modelo); CTA "Revisar autoridad certificante" + aviso "censo pendiente".
+
+**Gates en HEAD:** `tsc -b`=0 · `bun test` 2100 pass / 0 fail · `lint` 15 errores (==baseline, 0 nuevos) · `build`=0.
+
+**Criterio de cierre:** el backlog **🟢 seguro de automatizar** está agotado; lo que queda es 🟡 (requiere decisión legal/dato/condición que no debe fingirse) o 🔴 (esquema/RPC). Conforme a la filosofía del goal spec (calidad > cantidad; ante duda, parar y documentar).
+
+---
 
 **Cierre 2026-06-25.** Rama `feature/ux-refactor-secretaria-overnight`, 11 commits, **sin push** (revisión humana). Todas las tareas en verde; 0 bloqueadas; 3 rondas Codex adversarial (todas NO-APTO inicial → corregidas).
 

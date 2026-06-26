@@ -770,7 +770,7 @@ function GovernedMaintenanceCard({
     overrideDraft.justification.trim().length > 0;
 
   return (
-    <Card title="Mantenimiento gobernado P2" icon={Landmark}>
+    <Card title="Parámetros normativos" icon={Landmark}>
       <div className="space-y-4 text-sm text-[var(--g-text-primary)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <p className="max-w-3xl text-xs leading-5 text-[var(--g-text-secondary)]">
