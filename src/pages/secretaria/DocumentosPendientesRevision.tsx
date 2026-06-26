@@ -123,7 +123,7 @@ export default function DocumentosPendientesRevision() {
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-sm text-[var(--g-text-secondary)]"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
-          Tu rol actual puede consultar documentos y hashes, pero no aprobar, archivar ni sustituir documentos.
+          Tu rol puede consultar esta información, pero no ejecutar esta acción.
         </div>
       ) : null}
 

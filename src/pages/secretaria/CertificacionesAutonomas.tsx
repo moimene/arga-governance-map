@@ -407,7 +407,7 @@ export default function CertificacionesAutonomas() {
         ) : null}
         {!canCertify ? (
           <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
-            Tu rol actual puede consultar certificaciones y hashes, pero no preparar ni emitir certificaciones.
+            Tu rol puede consultar esta información, pero no ejecutar esta acción.
           </p>
         ) : null}
         {prepared ? (

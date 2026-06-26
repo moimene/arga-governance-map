@@ -121,7 +121,9 @@ describe("secretaria informes y certificaciones migration", () => {
       expect(source).toContain("CERTIFICATION");
     });
     expect(standaloneActions).toContain("!canCertify");
-    expect(standalonePage).toContain("puede consultar certificaciones y hashes");
-    expect(documentReviewPage).toContain("puede consultar documentos y hashes");
+    // UX-7/§8.2: ambas páginas usan el copy aprobado de permisos "Sin permisos"
+    // (literal §8.2), consistente entre certificaciones y revisión documental.
+    expect(standalonePage).toContain("Tu rol puede consultar esta información, pero no ejecutar esta acción.");
+    expect(documentReviewPage).toContain("Tu rol puede consultar esta información, pero no ejecutar esta acción.");
   });
 });
