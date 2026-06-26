@@ -23,6 +23,7 @@ import { useReglasAplicables } from "@/hooks/useReglasAplicables";
 import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
 import { buildNormativeMatrixRows, displaySocietyLegalForm } from "@/lib/secretaria/mesa-control-societaria";
 import type { TipoCondicionCargo } from "@/lib/secretaria/cargo-validation";
+import { isAuthorityRole } from "@/lib/secretaria/cargo-validation";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
 type TabId =
@@ -1180,6 +1181,11 @@ function TabSocios({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    {(data ?? []).some((h) => !h.voting_rights && !h.is_treasury) ? (
+      <p className="mt-2 text-xs text-[var(--status-warning)]">
+        Participación registrada sin derechos de voto computables.
+      </p>
+    ) : null}
     </div>
   );
 }
@@ -1271,6 +1277,11 @@ function TabAdmins({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    {(data ?? []).some((c) => isAuthorityRole(c.tipo_condicion) && !c.inscripcion_rm_referencia) ? (
+      <p className="mt-2 text-xs text-[var(--status-warning)]">
+        Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros.
+      </p>
+    ) : null}
     </div>
   );
 }

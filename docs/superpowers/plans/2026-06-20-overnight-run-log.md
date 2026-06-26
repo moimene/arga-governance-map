@@ -69,6 +69,8 @@ Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 
 | **T7 · UX-5.A** Expediente empties + tecnicismos | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | Codex pendiente (clúster Expediente/Datos) | §9.6 (empty certificaciones) | Card "Certificaciones" ya **no se oculta** cuando vacía → empty state §9.6 "Todavía no se han generado certificaciones para este expediente." `profile_hash`/`snapshot_id` crudos del card "Marco normativo del acuerdo" relegados a `<details> Detalle avanzado` (criterio 7). Documentos ya tenían empty (`AgreementDocumentRequirementsPanel:251`). H1 dinámico (proposal_text) conservado; sin label de negocio aprobado para `agreement_kind` → kicker intacto. |
 
+| **T8 · UX-6.A** avisos sociedades/personas | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | Codex pendiente (clúster Expediente/Datos) | §6.7 ("Participación registrada sin derechos de voto computables", "Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros.") | `SociedadDetalle`: aviso bajo la tabla de capital cuando hay holdings `!voting_rights && !is_treasury`; aviso §6.7 bajo la tabla de cargos cuando hay cargo de autoridad sin ref. RM (**resuelve Codex UX-0 #8**: el aviso de `RmStatusChip` ahora es visible). `isAuthorityRole` importado. **Diferido:** CTA "Revisar autoridad certificante" (requiere estructura del tab Autoridad); aviso "censo pendiente" (concepto de expediente, no ficha). |
+
 ### Codex — revisión adversarial T6 (UX-3.B)
 
 `codex exec -s read-only` sobre `git diff 172fad9..HEAD`. Veredicto inicial: **NO-APTO**, 4 hallazgos. Resolución:
