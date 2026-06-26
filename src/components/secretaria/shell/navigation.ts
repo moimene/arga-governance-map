@@ -69,7 +69,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
   {
     label: "Registro público",
     items: [
-      { label: "Tramitador registral", to: "/secretaria/tramitador", icon: Gavel },
+      { label: "Registro", to: "/secretaria/tramitador", icon: Gavel },
       { label: "Subsanaciones", to: "/secretaria/tramitador?estado=SUBSANACION", icon: Gavel },
       { label: "Presentaciones registrales", to: "/secretaria/tramitador?estado=PRESENTADA", icon: Gavel },
     ],
@@ -79,7 +79,7 @@ export const GRUPO_NAV_GROUPS: SecretariaNavGroup[] = [
     items: [
       { label: "Libro de socios", to: "/secretaria/libro-socios", icon: BookOpen },
       { label: "Libros obligatorios", to: "/secretaria/libros", icon: Library },
-      { label: "Procesos", to: "/secretaria/calendario", icon: Calendar },
+      { label: "Calendario societario", to: "/secretaria/calendario", icon: Calendar },
       { label: "Multi-jurisdicción", to: "/secretaria/multi-jurisdiccion", icon: Globe },
     ],
   },
@@ -247,7 +247,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
     label: "Registro público",
     items: [
       {
-        label: "Tramitador registral",
+        label: "Registro",
         to: "/secretaria/tramitador",
         icon: Gavel,
         requiresEntity: true,
@@ -287,7 +287,7 @@ export const SOCIEDAD_NAV_GROUPS: SecretariaNavGroup[] = [
         visibility: { requiresEntity: true },
       },
       {
-        label: "Procesos",
+        label: "Calendario societario",
         to: "/secretaria/calendario",
         icon: Calendar,
         requiresEntity: true,

@@ -104,8 +104,9 @@ Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 
 ### 🟡 Decisiones para el humano (acumulado)
 
-- **UX-0.D / "Registro":** §5.2 aprueba renombrar el ítem de sidebar "Tramitador registral"→"Registro", pero CLAUDE.md (decisión 2026-05-12) prohíbe usar "Registro" en copies para referirse al Registro Mercantil. Conflicto entre dos fuentes de verdad. Implementados los otros 8 renames; este queda pendiente de que decidas cuál prevalece. Si se aprueba, el cambio es trivial (2 ítems en `navigation.ts` + `e2e/03:26`, `e2e/12:22`, `e2e/33:61`).
-- **UX-1.A / "Procesos"→"Calendario societario" y "Reuniones"→"Sesiones":** §5.2 los aprueba pero el plan los marca 🟡 (validación legal + deuda de selector estable `[data-sidebar-item="Procesos"]` y desalineación label/icono/página). No codificados; requieren tu validación legal antes de tocar.
+- **UX-0.D / "Registro":** ✅ **RESUELTO 2026-06-26** — el usuario confirmó "Registro". Aplicado en ambas taxonomías + `e2e/03,12,33`; H1/sección de página sigue "Tramitador registral". CLAUDE.md actualizado (la cautela 2026-05-12 queda superada para el item de sidebar).
+- **UX-1.A / "Procesos"→"Calendario societario":** ✅ **RESUELTO 2026-06-26** (decisión IA, autorizada) — alinea label+icono `Calendar`+página `Calendario` y resuelve la deuda de 3 señales. Selector E2E estable ahora `[data-sidebar-item="Calendario societario"]`.
+- **UX-1.A / "Reuniones"→"Sesiones":** 🟡 **SIGUE PENDIENTE** — §5.2 lo deja a validación legal ("¿es 'sesiones' preferible para órganos colegiados?") y **no hay copy de página aprobado** (solo el label de sidebar), así que renombrar solo el sidebar dejaría un desajuste sidebar/H1. Si confirmas "Sesiones" como término, lo aplico en sidebar + H1 de página de forma consistente.
 - **UX-1.A / "Dashboard"→"Mesa":** HECHO en T5 (sidebar + H1 §9.2).
 - **Cola documental sin scope de entidad (gap de modelo):** `secretaria_document_artifacts` no tiene `entity_id`; la cola de revisión (página y bloque Mesa) es tenant-wide. Para scope por sociedad haría falta añadir `entity_id` o resolver `source_id`→entidad (cambio de esquema/joins = 🔴). Decisión tuya si se prioriza.
 

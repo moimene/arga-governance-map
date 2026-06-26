@@ -19,7 +19,7 @@ const NAV_ITEMS = [
     path: '/secretaria/acuerdos-sin-sesion',
     heading: 'Acuerdos escritos sin sesión',
   },
-  { label: 'Tramitador registral', path: '/secretaria/tramitador', heading: 'Tramitaciones registrales' },
+  { label: 'Registro', path: '/secretaria/tramitador', heading: 'Tramitaciones registrales' },
   {
     label: 'Libro de socios',
     path: '/secretaria/libro-socios',
@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { label: 'Libros obligatorios', path: '/secretaria/libros', heading: 'Libros obligatorios' },
   { label: 'Plantillas documentales', path: '/secretaria/plantillas', heading: 'Plantillas documentales protegidas' },
   { label: 'Gobierno de plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gestor de Plantillas' },
-  { label: 'Procesos', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
+  { label: 'Calendario societario', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
   {
     label: 'Multi-jurisdicción',
     path: '/secretaria/multi-jurisdiccion',

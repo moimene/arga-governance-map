@@ -70,13 +70,18 @@ El Comité Legal revisó un informe de rediseño UX/copy de `/secretaria` (`docs
 
 Tras sucesivos rediseños del menú lateral (`src/lib/secretaria/sidebar-visibility.ts` + `src/components/secretaria/shell/navigation.ts`) la taxonomía vigente de secciones en modo sociedad es **Inicio / Adopción / Documentación / Registro público / Libros y registros sociales / Sociedades y personas / Configuración y reglas**, con item "Procesos" para `/secretaria/calendario` dentro de "Libros y registros sociales". (La taxonomía anterior `CONTEXTO / EXPEDIENTES / REGISTRO / CONFIGURACIÓN Y REGLAS` del 2026-05-12 quedó superada; "Registro público" sustituye a "REGISTRO" y resuelve la colisión con el Registro Mercantil.)
 
+**Actualización 2026-06-26 (confirmada por el usuario):**
+- Item de sidebar **"Tramitador registral" → "Registro"** (§5.2 del informe UX aprobado). El H1/sección de la página de tramitación sigue siendo "Tramitador registral" (`getSecretariaSectionLabel`). Esto **supera** la cautela previa de no usar "Registro" para el item de sidebar.
+- Item **"Procesos" → "Calendario societario"** (§5.2): alinea label + icono `Calendar` + página `Calendario`, resolviendo la deuda de las 3 señales contradictorias.
+- Selectores E2E estables ahora: `[data-sidebar-item="Registro"]` y `[data-sidebar-item="Calendario societario"]`.
+
 Crítica impeccable conocida (no bloqueante, deuda intencional):
 
 - **"REGISTRO" colisiona con Registro Mercantil** en jerga jurídica. Aceptado como decisión de marca interna; revisar si en demo a cliente surge fricción. Alternativas pendientes: "Libros y depósito", "Libros y cumplimiento".
 - **"Procesos" para `/calendario` tiene 3 signos contradictorios** (label "Procesos" / icono `Calendar` / página `Calendario.tsx`). Decisión: dejar el label en sidebar; reconciliar (icono `Workflow` + renombrar página) cuando se aborde el rework de Procesos societarios completo.
 - **"Configuración y reglas"** se mantiene aunque el tono sea SaaS-flavored. Posible refactor a "Reglas y modelos" o "Normativa aplicable" en sprint futuro.
 
-Recordatorio: **no usar "Registro" en código, copies o tests para referirse al Registro Mercantil** mientras esta sección exista — esa función es del Tramitador registral. El item "Procesos" navega a `/secretaria/calendario`; cualquier selector E2E debe usar `[data-sidebar-item="Procesos"]` (atributo estable) en lugar de texto.
+Recordatorio (actualizado 2026-06-26): el **item de sidebar** que navega a la tramitación registral se llama ahora **"Registro"**; su H1/sección de página sigue siendo "Tramitador registral", que es la función registral. El item que navega a `/secretaria/calendario` se llama **"Calendario societario"**. Cualquier selector E2E estable debe usar `[data-sidebar-item="Registro"]` / `[data-sidebar-item="Calendario societario"]` (atributo estable) en lugar de texto.
 
 ### Módulos Garrigues — doble identidad
 

@@ -58,7 +58,7 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
     await expect(page.locator('[data-sidebar-item="Actas"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Actas pendientes"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Certificaciones de acuerdos"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-item="Tramitador registral"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Registro"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Subsanaciones"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Libro de socios"]').first()).toBeVisible();
 
@@ -97,11 +97,11 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
     await expect(page.getByRole("button", { name: "Presentaciones" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("item Procesos navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
+  test("item Calendario societario navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
     await selectArgaSociedad(page);
 
-    await expect(page.locator('[data-sidebar-item="Procesos"]').first()).toBeVisible();
-    await page.locator('[data-sidebar-item="Procesos"]').first().click();
+    await expect(page.locator('[data-sidebar-item="Calendario societario"]').first()).toBeVisible();
+    await page.locator('[data-sidebar-item="Calendario societario"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/calendario/);
     await expect(page.locator("main").getByRole("heading", { name: "Calendario de vencimientos", exact: true })).toBeVisible({
       timeout: 10_000,
