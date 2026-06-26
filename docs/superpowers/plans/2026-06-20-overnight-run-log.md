@@ -122,6 +122,19 @@ Checks Codex sin hallazgos: renames en ambas taxonomías, 0 selectores E2E viejo
 
 ## Resumen del run
 
+### Cierre sesión 4 (2026-06-26) — disponibilidad de plantillas (resuelve cohortes)
+
+Decisión del usuario sobre las "cohortes de plantilla" (que estaban 🟡 por no existir modelo de cohortes): **todas las plantillas visibles + aviso de estado, SIN abrir la verja legal del motor** (Opción A elegida tras explicar el riesgo). Implementado y verificado (auto-review + **6ª ronda Codex**, APTO-CON-CORRECCIONES → corregido; Codex confirmó la verja del motor intacta):
+- Catálogo `Plantillas.tsx`: el CTA "Usar" se gatea ahora por `isOperationalTemplate` (ACTIVA **+ APROBADA + borrador revisado por Legal**, no solo ACTIVA — corrige una inconsistencia previa); las no operativas muestran un **aviso de estado** (`templateUsabilityNotice`: sin contenido / archivada o deprecada / pendiente de revisión) en lugar del botón.
+- **Verja legal intacta:** `isOperationalTemplate` en `composer`/`agreement-template-compatibility`/`useModelosAcuerdo` sin tocar → no se generan documentos desde plantillas vacías, obsoletas o sin revisar.
+- Nuevo helper `templateUsabilityNotice` + `src/lib/doc-gen/__tests__/template-operability.test.ts` (5 casos).
+
+Commits sesión 4: `1355430` (disponibilidad), `f3f09cf` (fixes Codex DEPRECADA + a11y). Gates HEAD verdes (tc=0, test 0 fail, lint=baseline, build=0).
+
+**Nota:** esto resuelve la parte de **disponibilidad/aviso** de las cohortes. La clasificación fina Path A/Path B como badge/filtro propio sigue 🟡 (sin modelo de cohortes), pero ya no bloquea: todas visibles y avisadas.
+
+---
+
 ### Cierre sesión 3 (2026-06-26) — decisiones de marca autorizadas
 
 El usuario autorizó tomar decisiones ("confirmo registro"). Aplicadas y verificadas (auto-review + Codex, APTO-CON-CORRECCIONES → corregido):
