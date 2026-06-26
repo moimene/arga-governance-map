@@ -33,6 +33,7 @@ import {
 } from "@/lib/secretaria/mesa-control-societaria";
 import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
+import { isOperationalTemplate, templateUsabilityNotice } from "@/lib/doc-gen/template-operability";
 import {
   // ITEM-138: labels y transiciones canónicas compartidas (antes copiadas con
   // divergencias en esta página, CatalogoTab y CoberturaLegalTab).
@@ -742,7 +743,7 @@ export default function Plantillas() {
                   <div>
                     <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Acción</dt>
                     <dd className="mt-1 text-[var(--g-text-primary)]">
-                      {plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo"}
+                      {isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo"}
                     </dd>
                   </div>
                 </dl>
@@ -828,7 +829,7 @@ export default function Plantillas() {
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? (plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo")
+                        ? (isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo")
                         : materiaLabel(plantilla.materia)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
@@ -1141,7 +1142,7 @@ export default function Plantillas() {
 
               {/* Detail Footer - Action Buttons */}
               <div className="border-t border-[var(--g-border-subtle)] px-5 py-4 flex flex-col gap-2">
-                {selected.estado === 'ACTIVA' && (
+                {isOperationalTemplate(selected) && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1168,10 +1169,19 @@ export default function Plantillas() {
                     Vincular como plantilla activa
                   </button>
                 ) : null}
-                {selected.estado === "ACTIVA" ? (
+                {isOperationalTemplate(selected) ? (
                   <p className="text-xs text-[var(--g-text-secondary)]">
                     {getTemplateUsageTarget(selected).hint}
                   </p>
+                ) : null}
+                {templateUsabilityNotice(selected) ? (
+                  <div
+                    className="flex items-start gap-2 border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-xs text-[var(--g-text-secondary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" aria-hidden="true" />
+                    <span>{templateUsabilityNotice(selected)}</span>
+                  </div>
                 ) : null}
                 {/* ITEM-084: la gestión de ciclo de vida (revisar/aprobar/activar/
                     archivar) solo se ofrece a ADMIN_TENANT, coherente con el gestor
