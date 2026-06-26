@@ -230,7 +230,7 @@ export default function SociedadDetalle() {
         {tab === "capital"          && <TabCapital entityId={s.id} />}
         {tab === "socios"           && <TabSocios entityId={s.id} />}
         {tab === "organos"          && <TabOrganos entityId={s.id} />}
-        {tab === "admins"           && <TabAdmins entityId={s.id} />}
+        {tab === "admins"           && <TabAdmins entityId={s.id} onReviewAuthority={() => setTab("autoridad")} />}
         {tab === "representaciones" && <TabRepresentaciones entityId={s.id} />}
         {tab === "autoridad"        && <TabAutoridad entityId={s.id} />}
         {tab === "marco"            && <TabMarcoNormativo entityId={s.id} />}
@@ -1226,7 +1226,7 @@ function TabOrganos({ entityId }: { entityId: string }) {
 // ------------------------------------------------------------
 // Tab: Administradores societarios
 // ------------------------------------------------------------
-function TabAdmins({ entityId }: { entityId: string }) {
+function TabAdmins({ entityId, onReviewAuthority }: { entityId: string; onReviewAuthority: () => void }) {
   const { data, isLoading } = useAdministradoresSocietarios(entityId);
   return (
     <div className="space-y-3">
@@ -1278,9 +1278,18 @@ function TabAdmins({ entityId }: { entityId: string }) {
       ))}
     </Table>
     {(data ?? []).some((c) => isAuthorityRole(c.tipo_condicion) && !c.inscripcion_rm_referencia) ? (
-      <p className="mt-2 text-xs text-[var(--status-warning)]">
-        Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros.
-      </p>
+      <div className="mt-2 flex flex-col items-start gap-1.5">
+        <p className="text-xs text-[var(--status-warning)]">
+          Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros.
+        </p>
+        <button
+          type="button"
+          onClick={onReviewAuthority}
+          className="text-xs font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+        >
+          Revisar autoridad certificante
+        </button>
+      </div>
     ) : null}
     </div>
   );
