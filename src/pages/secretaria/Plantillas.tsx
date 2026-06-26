@@ -974,7 +974,8 @@ export default function Plantillas() {
                     <p className="mt-3 text-xs text-[var(--status-warning)]">
                       Esta plantilla existe, pero no está vinculada a una regla aplicable.
                     </p>
-                  ) : selected.estado === "ACTIVA" && !selected.contrato_variables_version ? (
+                  ) : null}
+                  {selected.estado === "ACTIVA" && !selected.contrato_variables_version ? (
                     <p className="mt-3 text-xs text-[var(--status-warning)]">
                       Esta plantilla está activa, pero faltan metadatos de gobierno documental. Revisa
                       versión, binding, jurisdicción y cobertura antes de usarla como base de bloqueo.

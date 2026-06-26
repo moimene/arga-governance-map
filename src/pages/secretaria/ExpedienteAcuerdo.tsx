@@ -250,7 +250,7 @@ export default function ExpedienteAcuerdo() {
   // ITEM-104: cross-link inverso — certificaciones de este acuerdo (por agreement_id
   // directo o por pertenencia al array agreements_certified de una certificación
   // minute-based) y el expediente registral más reciente.
-  const { data: certificaciones = [] } = useQuery({
+  const { data: certificaciones = [], isLoading: certsLoading } = useQuery({
     queryKey: ["agreement_certifications", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -555,7 +555,7 @@ export default function ExpedienteAcuerdo() {
                 })}
               </ul>
             </Card>
-          ) : (
+          ) : certsLoading ? null : (
             <Card icon={<FileSignature className="h-4 w-4" />} title="Certificaciones">
               <p className="text-sm text-[var(--g-text-secondary)]">
                 Todavía no se han generado certificaciones para este expediente.
