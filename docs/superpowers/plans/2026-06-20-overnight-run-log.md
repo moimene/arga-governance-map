@@ -116,7 +116,7 @@ Checks Codex sin hallazgos: renames en ambas taxonomías, 0 selectores E2E viejo
 
 - **UX-0.D / "Registro":** ✅ **RESUELTO 2026-06-26** — el usuario confirmó "Registro". Aplicado en ambas taxonomías + `e2e/03,12,33`; H1/sección de página sigue "Tramitador registral". CLAUDE.md actualizado (la cautela 2026-05-12 queda superada para el item de sidebar).
 - **UX-1.A / "Procesos"→"Calendario societario":** ✅ **RESUELTO 2026-06-26** (decisión IA, autorizada) — alinea label+icono `Calendar`+página `Calendario` y resuelve la deuda de 3 señales. Selector E2E estable ahora `[data-sidebar-item="Calendario societario"]`.
-- **UX-1.A / "Reuniones"→"Sesiones":** 🟡 **SIGUE PENDIENTE** — §5.2 lo deja a validación legal ("¿es 'sesiones' preferible para órganos colegiados?") y **no hay copy de página aprobado** (solo el label de sidebar), así que renombrar solo el sidebar dejaría un desajuste sidebar/H1. Si confirmas "Sesiones" como término, lo aplico en sidebar + H1 de página de forma consistente.
+- **UX-1.A / "Reuniones"→"Sesiones":** ✅ **DECIDIDO 2026-06-26** — el usuario decide **mantener "Reuniones"**. No se renombra. Cerrado (no requiere más acción).
 - **UX-1.A / "Dashboard"→"Mesa":** HECHO en T5 (sidebar + H1 §9.2).
 - **Cola documental sin scope de entidad (gap de modelo):** `secretaria_document_artifacts` no tiene `entity_id`; la cola de revisión (página y bloque Mesa) es tenant-wide. Para scope por sociedad haría falta añadir `entity_id` o resolver `source_id`→entidad (cambio de esquema/joins = 🔴). Decisión tuya si se prioriza.
 
