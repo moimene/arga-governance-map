@@ -67,6 +67,8 @@ Gates tras fixes: tc=0 · contract 21/0 · test 2100/0 · lint=baseline(15). Com
 
 Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 
+| **T7 · UX-5.A** Expediente empties + tecnicismos | HECHA | _este commit_ | tc=0 · test 2100/0 · lint=baseline(17) | Codex pendiente (clúster Expediente/Datos) | §9.6 (empty certificaciones) | Card "Certificaciones" ya **no se oculta** cuando vacía → empty state §9.6 "Todavía no se han generado certificaciones para este expediente." `profile_hash`/`snapshot_id` crudos del card "Marco normativo del acuerdo" relegados a `<details> Detalle avanzado` (criterio 7). Documentos ya tenían empty (`AgreementDocumentRequirementsPanel:251`). H1 dinámico (proposal_text) conservado; sin label de negocio aprobado para `agreement_kind` → kicker intacto. |
+
 ### Codex — revisión adversarial T6 (UX-3.B)
 
 `codex exec -s read-only` sobre `git diff 172fad9..HEAD`. Veredicto inicial: **NO-APTO**, 4 hallazgos. Resolución:

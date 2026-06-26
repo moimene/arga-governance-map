@@ -555,7 +555,13 @@ export default function ExpedienteAcuerdo() {
                 })}
               </ul>
             </Card>
-          ) : null}
+          ) : (
+            <Card icon={<FileSignature className="h-4 w-4" />} title="Certificaciones">
+              <p className="text-sm text-[var(--g-text-secondary)]">
+                Todavía no se han generado certificaciones para este expediente.
+              </p>
+            </Card>
+          )}
 
           {compliance?.publication_required ? (
             <Card icon={<Megaphone className="h-4 w-4" />} title="Publicación">
@@ -964,14 +970,20 @@ function NormativeSnapshotCard({
             >
               {snapshot.framework_status}
             </span>
-            <span className="text-xs text-[var(--g-text-secondary)]">
-              {snapshot.profile_hash}
-            </span>
           </div>
           <p className="mt-2 text-sm leading-6 text-[var(--g-text-secondary)]">
-            Snapshot {snapshot.snapshot_id}. El documento, la revisión y la promoción al expediente
-            conservan esta traza como fuente de control.
+            El documento, la revisión y la promoción al expediente conservan esta traza normativa como
+            fuente de control.
           </p>
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]">
+              Detalle avanzado
+            </summary>
+            <div className="mt-1 space-y-0.5 font-mono text-[10px] text-[var(--g-text-secondary)]">
+              <div>profile_hash: {snapshot.profile_hash}</div>
+              <div>snapshot_id: {snapshot.snapshot_id}</div>
+            </div>
+          </details>
         </div>
         <div className="text-right text-xs text-[var(--g-text-secondary)]">
           <div>Fuentes activas: {activeSources.length}</div>
