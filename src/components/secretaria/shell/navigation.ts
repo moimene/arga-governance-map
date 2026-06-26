@@ -348,7 +348,10 @@ export function getSecretariaSectionLabel(pathname: string, mode: SecretariaMode
   if (/^\/secretaria\/convocatorias\/nueva/.test(pathname)) return "Convocatorias";
   if (/^\/secretaria\/reuniones\/nueva/.test(pathname)) return "Reuniones";
   if (/^\/secretaria\/procesos-grupo/.test(pathname)) return "Campañas de grupo";
-  if (/^\/secretaria\/tramitador\/nuevo/.test(pathname)) return "Tramitador registral";
+  // El item de sidebar es "Registro" (decisión 2026-06-26), pero la sección/H1
+  // contextual de la función registral sigue siendo "Tramitador registral" en
+  // TODAS las rutas del tramitador (lista, alta y detalle), no solo /nuevo.
+  if (/^\/secretaria\/tramitador(\/|$)/.test(pathname)) return "Tramitador registral";
   if (/^\/secretaria\/documentos\/pendientes-revision/.test(pathname)) return "Documentos pendientes de revision";
   if (/^\/secretaria\/acuerdos\/[^/]+\/generar/.test(pathname)) return "Generar documento";
   if (/^\/secretaria\/acuerdos\/[^/]+/.test(pathname)) return "Expediente";

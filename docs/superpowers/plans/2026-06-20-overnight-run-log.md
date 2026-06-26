@@ -102,6 +102,16 @@ Gates tras fixes: tc=0 · test 2100/0 (+7 expects) · lint=baseline(17).
 
 Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 
+### Codex — revisión adversarial sesión 3 (decisiones de marca + CTA autoridad)
+
+`codex exec -s read-only` sobre `git diff fcd716d..HEAD`. Veredicto: **APTO-CON-CORRECCIONES**, 1 hallazgo.
+
+| # | Sev | Hallazgo | Resolución |
+|---|---|---|---|
+| 1 | MAYOR | `getSecretariaSectionLabel` solo conservaba "Tramitador registral" para `/tramitador/nuevo`; la **lista** `/tramitador` caía al label de sidebar renombrado → la sección del shell mostraba "Registro" en vez de "Tramitador registral" (rompía la intención de la decisión: sidebar="Registro", sección="Tramitador registral") | **CORREGIDO**: regex ampliada a `/^\/secretaria\/tramitador(\/\|$)/` → todas las rutas del tramitador devuelven "Tramitador registral" como sección (restaura el comportamiento previo al rename). |
+
+Checks Codex sin hallazgos: renames en ambas taxonomías, 0 selectores E2E viejos, deep-link `/calendario` intacto, CTA literal §6.7 conectada a `setTab("autoridad")` y gateada por cargo sin ref. RM, tokens/focus Garrigues OK. Gates tras fix: tc=0 · test 2100/0 · lint=baseline(17).
+
 ### 🟡 Decisiones para el humano (acumulado)
 
 - **UX-0.D / "Registro":** ✅ **RESUELTO 2026-06-26** — el usuario confirmó "Registro". Aplicado en ambas taxonomías + `e2e/03,12,33`; H1/sección de página sigue "Tramitador registral". CLAUDE.md actualizado (la cautela 2026-05-12 queda superada para el item de sidebar).
@@ -111,6 +121,20 @@ Gates tras fixes: tc=0 · test 2100/0 · lint=baseline(17) · build=0.
 - **Cola documental sin scope de entidad (gap de modelo):** `secretaria_document_artifacts` no tiene `entity_id`; la cola de revisión (página y bloque Mesa) es tenant-wide. Para scope por sociedad haría falta añadir `entity_id` o resolver `source_id`→entidad (cambio de esquema/joins = 🔴). Decisión tuya si se prioriza.
 
 ## Resumen del run
+
+### Cierre sesión 3 (2026-06-26) — decisiones de marca autorizadas
+
+El usuario autorizó tomar decisiones ("confirmo registro"). Aplicadas y verificadas (auto-review + Codex, APTO-CON-CORRECCIONES → corregido):
+- ✅ Sidebar **"Tramitador registral"→"Registro"** (UX-0.D ahora 9/9) + H1/sección de página conservada "Tramitador registral".
+- ✅ Sidebar **"Procesos"→"Calendario societario"** (alinea label+icono+página; resuelve deuda de 3 señales).
+- ✅ CTA §6.7 **"Revisar autoridad certificante"** (contextual al cargo sin ref. RM → tab Autoridad).
+- CLAUDE.md actualizado (la cautela 2026-05-12 sobre "Registro" queda superada para el item de sidebar).
+
+Commits sesión 3: `6019606` (Registro+Calendario), `3668cdd` (CTA), _HEAD_ (fix Codex sección tramitador). **5ª ronda Codex.** Gates HEAD verdes.
+
+**🟡 que SIGUE pendiente (necesita decisión tuya o esquema, no fingible):** "Reuniones"→"Sesiones" (validación legal + falta copy de página); aviso "censo pendiente" y "decisión legal pendiente" (necesitan señal real, riesgo de falso positivo legal); T11 desfase `profile_hash` y cola documental sin `entity_id` (🔴 esquema/RPC); cohortes de plantilla (sin modelo).
+
+---
 
 ### Cierre sesión 2 (2026-06-26) — backlog 🟢 agotado
 
@@ -123,7 +147,7 @@ Rama `feature/ux-refactor-secretaria-overnight`, **17 commits**, **sin push**. C
 - **T9** aviso "decisión legal pendiente antes de activar bloqueo" — requiere señal real de decisión pendiente; no se finge.
 - **T10** estados de cohorte de plantilla + filtros por cohorte — requieren modelo de cohortes.
 - **T9** subcopy §6.8 de "Parámetros normativos" — la card real es más amplia; renombrado el título, conservado el subcopy descriptivo.
-- (Heredadas sesión 1) "Tramitador registral"→"Registro" (conflicto CLAUDE.md); "Procesos"→"Calendario societario"/"Reuniones"→"Sesiones" (validación legal); cola documental sin `entity_id` (gap de modelo); CTA "Revisar autoridad certificante" + aviso "censo pendiente".
+- (Heredadas sesión 1 — **estado sesión 3**): ✅ "Tramitador registral"→"Registro" (confirmado), ✅ "Procesos"→"Calendario societario", ✅ CTA "Revisar autoridad certificante" (§6.7). 🟡 sigue: "Reuniones"→"Sesiones" (validación legal + falta copy de página); cola documental sin `entity_id` (🔴 gap de modelo); aviso "censo pendiente" (necesita señal real de censo congelado por expediente — no se finge, riesgo de falso positivo como T11).
 
 **Gates en HEAD:** `tsc -b`=0 · `bun test` 2100 pass / 0 fail · `lint` 15 errores (==baseline, 0 nuevos) · `build`=0.
 
