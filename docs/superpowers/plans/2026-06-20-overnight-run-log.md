@@ -122,6 +122,22 @@ Checks Codex sin hallazgos: renames en ambas taxonomías, 0 selectores E2E viejo
 
 ## Resumen del run
 
+### ✅ CIERRE DEFINITIVO — sesión 5 (2026-07-02): verificación E2E completada
+
+El único hueco de verificación pendiente del handoff ("E2E no ejecutados, sin navegador") queda cerrado. Ejecutados en Chromium headless (Playwright 1.59.1, `PLAYWRIGHT_PORT=5191`, webServer Vite auto):
+
+```
+e2e/03-secretaria-dashboard + e2e/12-secretaria-navigation + e2e/21-secretaria-responsive
++ e2e/30-secretaria-functional-watchdog + e2e/33-secretaria-sidebar-visibility
+→ 31 passed (52.7s), 0 failed
+```
+
+Cubre explícitamente: los 11 renombrados de sidebar (incl. "Registro" y "Calendario societario" con sus selectores estables), H1 "Mesa de Secretaría", recorrido completo del menú sin errores Supabase, responsive 390/768/1440, y rutas críticas del watchdog. Gates re-verificados el mismo día en HEAD: `tsc -b`=0 · `bun test` 2257/0 · `lint`=baseline(15) · barrido de labels viejos en e2e = 0 residuales.
+
+**El run queda COMPLETO y verificable:** 24 commits (+este), 6 rondas Codex adversarial resueltas, backlog 🟢 agotado, decisiones de usuario aplicadas, E2E verdes. Restan solo los 🟡/🔴 documentados que requieren esquema o señal de dominio (T11 desfase, censo pendiente, decisión legal pendiente, entity_id en cola documental, clasificador Path A/B). Listo para PR: `gh pr create --base main --head feature/ux-refactor-secretaria-overnight --fill`.
+
+---
+
 ### Cierre sesión 4 (2026-06-26) — disponibilidad de plantillas (resuelve cohortes)
 
 Decisión del usuario sobre las "cohortes de plantilla" (que estaban 🟡 por no existir modelo de cohortes): **todas las plantillas visibles + aviso de estado, SIN abrir la verja legal del motor** (Opción A elegida tras explicar el riesgo). Implementado y verificado (auto-review + **6ª ronda Codex**, APTO-CON-CORRECCIONES → corregido; Codex confirmó la verja del motor intacta):
