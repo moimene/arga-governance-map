@@ -710,7 +710,7 @@ function TemplatesStep({
             </div>
             {decision.allowed ? (
               <Link
-                to={`/secretaria/gestor-plantillas?materia=${matter}`}
+                to={`/secretaria/gestor-plantillas?tab=catalogo&materia=${matter}`}
                 className="text-xs font-semibold text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
               >
                 {item.actionLabel}

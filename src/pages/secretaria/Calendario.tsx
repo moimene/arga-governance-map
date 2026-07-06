@@ -44,7 +44,7 @@ type LibroRow = { id: string; book_kind: string | null; legalization_deadline: s
 type AcuerdoSinSesionRow = { id: string; title: string | null; status: string; voting_deadline: string | null };
 // ITEM-090: migrado de mandates a condiciones_persona (fuente canónica).
 // tipo_condicion == "role"; fecha_fin == "end_date"; estado VIGENTE == mandato vigente.
-type MandatoRow = { id: string; tipo_condicion: string | null; fecha_fin: string | null; persons?: MaybeJoin<{ full_name: string | null }> };
+type MandatoRow = { id: string; tipo_condicion: string | null; fecha_fin: string | null; persons?: MaybeJoin<{ id?: string | null; full_name: string | null }> };
 type FilingRow = { id: string; filing_number: string | null; filing_via: string | null; status: string; estimated_resolution: string | null };
 
 function firstJoin<T>(value: MaybeJoin<T>): T | null {
@@ -131,7 +131,7 @@ function useCalendarioDeadlines(entityId?: string | null) {
         if (bodyIds?.length === 0) return [];
         let query = supabase
           .from("condiciones_persona")
-          .select("id, fecha_fin, tipo_condicion, persons(full_name)")
+          .select("id, fecha_fin, tipo_condicion, persons(id, full_name)")
           .eq("tenant_id", tenantId!)
           .eq("estado", "VIGENTE")
           .gte("fecha_fin", today)
@@ -232,7 +232,9 @@ function useCalendarioDeadlines(entityId?: string | null) {
           deadline: m.fecha_fin,
           daysLeft: days,
           urgency: urgencyFor(days),
-          nav_to: "/secretaria",
+          // Antes navegaba a "/secretaria" (dead-end): el vencimiento de mandato
+          // debe llevar a la ficha de la persona afectada.
+          nav_to: person?.id ? `/secretaria/personas/${person.id}` : "/secretaria/personas",
         });
       });
 

@@ -82,11 +82,12 @@ export default function ReunionDetalle() {
       />
 
       <Tabs defaultValue={isCelebrada ? "acta" : "agenda"} className="mt-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-3">
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="participantes">Participantes</TabsTrigger>
           <TabsTrigger value="acta">Acta</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          {/* Pestaña "Timeline" retirada: placeholder "disponible próximamente"
+              (dead-end en demo). Reintroducir con el timeline de auditoría real. */}
         </TabsList>
 
         {/* AGENDA */}
@@ -178,10 +179,6 @@ export default function ReunionDetalle() {
           )}
         </TabsContent>
 
-        {/* TIMELINE */}
-        <TabsContent value="timeline" className="mt-4">
-          <Card className="p-10 text-center text-sm text-muted-foreground">Timeline de auditoría disponible próximamente.</Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

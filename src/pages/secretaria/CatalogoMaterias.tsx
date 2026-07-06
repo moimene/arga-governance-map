@@ -721,7 +721,7 @@ function MateriaTemplatesTab({
           Administrar en Plantillas <Settings2 className="h-4 w-4" aria-hidden="true" />
         </Link>
         <Link
-          to={`/secretaria/gestor-plantillas?materia=${materia.materia}`}
+          to={`/secretaria/gestor-plantillas?tab=catalogo&materia=${materia.materia}`}
           className="inline-flex flex-1 items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
@@ -802,7 +802,7 @@ function TemplateStageCard({
                 Asignar plantilla
               </Link>
               <Link
-                to={`/secretaria/gestor-plantillas?materia=${materia.materia}`}
+                to={`/secretaria/gestor-plantillas?tab=catalogo&materia=${materia.materia}`}
                 className="inline-flex items-center justify-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                 style={{ borderRadius: "var(--g-radius-sm)" }}
               >
@@ -846,7 +846,7 @@ function TemplateBindingItem({
       </div>
       <div className="mt-1">
         <Link
-          to={`/secretaria/gestor-plantillas?plantilla=${binding.template.id}`}
+          to={`/secretaria/gestor-plantillas?tab=catalogo&plantilla=${binding.template.id}`}
           className="font-semibold text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
         >
           Probar fusión

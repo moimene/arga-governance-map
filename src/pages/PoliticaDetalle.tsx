@@ -360,7 +360,9 @@ export default function PoliticaDetalle() {
                         <TableCell className="text-xs">
                           {ag.meeting?.slug ? (
                             <Link
-                              to={`/secretaria/reuniones/${ag.meeting.slug}`}
+                              // ReunionStepper resuelve por UUID, no por slug (con slug:
+                              // PostgREST 22P02 → "Reunión no encontrada").
+                              to={`/secretaria/reuniones/${ag.parent_meeting_id}`}
                               className="text-primary hover:underline"
                             >
                               {ag.meeting.governing_bodies?.name ?? ag.meeting.meeting_type ?? "Reunión"}

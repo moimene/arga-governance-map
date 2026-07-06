@@ -30,8 +30,18 @@ const groups: { title: string; items: Suggestion[] }[] = [
     items: [{ label: "PR-008 — DORA", type: "Política", icon: FileText, to: "/politicas" }],
   },
   {
+    // "Dña. Lucía Paredes Vega" retirada: era una persona dummy ya purgada del
+    // Cloud y su click llevaba a una entidad. Se enlaza el directorio real.
     title: "Personas",
-    items: [{ label: "Dña. Lucía Paredes Vega", type: "Persona", icon: Users, to: "/entidades/arga-seguros" }],
+    items: [{ label: "Personas y cargos (Secretaría)", type: "Directorio", icon: Users, to: "/secretaria/personas" }],
+  },
+  {
+    title: "Secretaría",
+    items: [
+      { label: "Mesa de Secretaría", type: "Módulo", icon: FileText, to: "/secretaria" },
+      { label: "Actas y certificaciones", type: "Módulo", icon: FileText, to: "/secretaria/actas" },
+      { label: "Calendario societario", type: "Módulo", icon: FileText, to: "/secretaria/calendario" },
+    ],
   },
   {
     title: "Delegaciones",

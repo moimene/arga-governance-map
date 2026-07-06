@@ -13,7 +13,7 @@
  * Sprint 1 — Task 5.4 (catálogo).
  */
 import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
@@ -745,12 +745,19 @@ export function CatalogoTab() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
   const { data: plantillas, isLoading } = usePlantillasProtegidas();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Deep-links contextuales (?tab=catalogo&materia=X / &plantilla=Y) desde
+  // CatalogoMaterias/ActivarMarcoNormativo: antes estos params se descartaban y
+  // el CTA aterrizaba en un catálogo sin contexto. materia siembra la búsqueda
+  // (plantillaSearchText incluye la materia raw); plantilla preselecciona ficha.
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => searchParams.get("plantilla") || null,
+  );
   const [filterEstado, setFilterEstado] = useState<string>("ALL");
   const [filterTipo, setFilterTipo] = useState<string>("ALL");
   const [filterReview, setFilterReview] = useState<LegalTemplateReviewFilter>("ALL");
   const [filterP0, setFilterP0] = useState<"ALL" | "ONLY_P0">("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("materia") ?? "");
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
   const selectedEntityName =

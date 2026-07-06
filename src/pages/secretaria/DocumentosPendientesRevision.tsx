@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -236,7 +237,18 @@ function DocumentTable({
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--g-text-secondary)]">
                     <div>{artifact.source_domain ?? "—"}</div>
-                    <div className="font-mono text-[11px]">{artifact.source_id ?? "sin fuente"}</div>
+                    {/* El revisor debe poder VER lo que aprueba: si la fuente es un
+                        acuerdo, enlaza a su expediente en vez de mostrar el uuid crudo. */}
+                    {artifact.source_domain === "agreement" && artifact.source_id ? (
+                      <Link
+                        to={`/secretaria/acuerdos/${artifact.source_id}`}
+                        className="text-[11px] font-medium text-[var(--g-link)] underline-offset-2 hover:text-[var(--g-link-hover)] hover:underline"
+                      >
+                        Ver expediente del acuerdo
+                      </Link>
+                    ) : (
+                      <div className="font-mono text-[11px]">{artifact.source_id ?? "sin fuente"}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-[var(--g-text-secondary)]">{shortHash(artifact)}</td>
                   <td className="px-4 py-3 text-right">

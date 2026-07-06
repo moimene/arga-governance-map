@@ -67,7 +67,9 @@ type ConvocatoriaRow = {
   governing_bodies?: BodyNameJoin;
 };
 type NoSessionRow = { id: string; title?: string; status: string };
-type PolicyRow = { id: string; name: string; status: string };
+// policies usa policy_code + title (NO existe columna name — con name la query
+// devolvía 400 silenciado por Promise.allSettled y Cmd+K nunca listaba políticas).
+type PolicyRow = { id: string; policy_code: string | null; title: string | null; status: string };
 type FindingRow = { id: string; code: string; title: string; severity?: string };
 type AgendaItemJoin = MaybeJoin<{ kind?: string | null; order_number?: number | null; title?: string | null }>;
 type ResolutionRow = {
@@ -191,9 +193,9 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     if (bodyIds?.length === 0) return [];
     let request = supabase
       .from("policies")
-      .select("id, name, status")
+      .select("id, policy_code, title, status")
       .eq("tenant_id", tenantId)
-      .ilike("name", q);
+      .or(`title.ilike.${q},policy_code.ilike.${q}`);
     if (bodyIds) request = request.in("approval_body_id", bodyIds);
     const { data, error } = await request.limit(5);
     if (error) throw error;
@@ -422,7 +424,7 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
     policies.value.forEach((p) => {
       results.push({
         id: p.id,
-        label: p.name,
+        label: [p.policy_code, p.title].filter(Boolean).join(" — ") || "Política",
         sublabel: p.status,
         kind: "policy",
         nav_to: `/politicas/${p.id}`,

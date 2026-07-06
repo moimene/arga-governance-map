@@ -94,12 +94,14 @@ export default function OrganoDetalle() {
       )}
 
       <Tabs defaultValue="composicion" className="mt-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="grid w-full max-w-3xl grid-cols-4">
           <TabsTrigger value="composicion">Composición</TabsTrigger>
           <TabsTrigger value="calendario">Calendario</TabsTrigger>
           <TabsTrigger value="reglamento">Reglamento</TabsTrigger>
           <TabsTrigger value="secretaria">Secretaría</TabsTrigger>
-          <TabsTrigger value="historial">Historial</TabsTrigger>
+          {/* Pestaña "Historial" retirada: su contenido era un placeholder
+              "disponible próximamente" (dead-end en demo). Reintroducir cuando
+              exista el timeline de auditoría real. */}
         </TabsList>
 
         <TabsContent value="composicion" className="mt-4">
@@ -107,7 +109,8 @@ export default function OrganoDetalle() {
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <div className="text-sm font-semibold">Miembros ({members.length})</div>
               <Button size="sm" variant="outline" asChild className="gap-1.5">
-                <Link to={body.entity_id ? `/secretaria/sociedades/${body.entity_id}/administradores/designar?bodyId=${body.id}` : "#"}>
+                {/* Ruta real del stepper: /admin/nuevo (la previa /administradores/designar no existe → 404). */}
+                <Link to={body.entity_id ? `/secretaria/sociedades/${body.entity_id}/admin/nuevo?bodyId=${body.id}` : "#"}>
                   <UserPlus className="h-3.5 w-3.5" />Añadir miembro
                 </Link>
               </Button>
@@ -284,9 +287,6 @@ export default function OrganoDetalle() {
           </div>
         </TabsContent>
 
-        <TabsContent value="historial" className="mt-4">
-          <Card className="p-10 text-center text-sm text-muted-foreground">Historial de auditoría disponible próximamente.</Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
