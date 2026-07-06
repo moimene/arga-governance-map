@@ -10,6 +10,7 @@ import {
   generateEvidence,
   computeSha256,
 } from '@/lib/qtsp/ead-trust-client';
+import { invokeQTSPProxySign } from '@/lib/qtsp/qtsp-proxy-client';
 import { validarPreFirma } from '@/lib/rules-engine';
 import type { QTSPSignRequest } from '@/lib/rules-engine/types';
 
@@ -99,6 +100,34 @@ export function useQTSPSign() {
     mutationFn: async (request: QESSignFlowRequest) => {
       try {
         request.onProgress?.('Iniciando flujo de firma QES…');
+
+        // Camino REAL preferente: Edge Function qtsp-proxy (Okta server-side).
+        // Devuelve null si el proxy no está desplegado/configurado → seguimos
+        // con la semántica previa (browser client → sandbox solo en dev/flag).
+        // Un fallo real del proxy configurado LANZA: no degrada a sandbox.
+        const proxyResult = await invokeQTSPProxySign(
+          {
+            documentName: request.documentName,
+            documentData: request.documentData,
+            signatories: request.signatories,
+            createdBy: request.createdBy,
+            agreementId: request.agreementId,
+          },
+          request.onProgress,
+        );
+        if (proxyResult) {
+          request.onProgress?.('Firma QES completada exitosamente.');
+          return {
+            ok: true,
+            sandbox: false,
+            srId: proxyResult.srId,
+            documentId: proxyResult.documentId,
+            documentHash: proxyResult.documentHash,
+            signatoryIds: proxyResult.signatoryIds,
+            signed_at: new Date().toISOString(),
+            errors: [],
+          };
+        }
 
         // Execute real EAD Trust API flow
         const result = await executeQESSignFlow({
