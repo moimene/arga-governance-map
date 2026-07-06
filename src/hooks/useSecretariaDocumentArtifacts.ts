@@ -23,6 +23,7 @@ export interface SecretariaDocumentArtifactRow {
   evidence_status: string;
   source_domain: string | null;
   source_id: string | null;
+  entity_id: string | null;
   source_hash: string | null;
   source_payload: Record<string, unknown>;
   rule_pack_version_id: string | null;
@@ -135,11 +136,11 @@ function sourceAnnexTargets(sourcePayload?: Record<string, unknown>) {
   return Array.isArray(raw) ? raw.filter((target): target is string => typeof target === "string") : [];
 }
 
-export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sourceDomain?: string | null }) {
+export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sourceDomain?: string | null; entityId?: string | null }) {
   const { tenantId } = useTenantContext();
   return useQuery({
     enabled: !!tenantId,
-    queryKey: ["secretaria_document_artifacts", tenantId, filters?.kinds?.join("|") ?? "all", filters?.sourceDomain ?? "all"],
+    queryKey: ["secretaria_document_artifacts", tenantId, filters?.kinds?.join("|") ?? "all", filters?.sourceDomain ?? "all", filters?.entityId ?? "all"],
     queryFn: async (): Promise<SecretariaDocumentArtifactRow[]> => {
       let query = supabase
         .from("secretaria_document_artifacts")
@@ -148,6 +149,9 @@ export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sou
         .order("updated_at", { ascending: false });
       if (filters?.kinds?.length) query = query.in("artifact_kind", filters.kinds);
       if (filters?.sourceDomain) query = query.eq("source_domain", filters.sourceDomain);
+      // W11: scope opcional por sociedad (entity_id añadido en migración; el hook
+      // solo filtra si se pasa entityId — la cola sigue siendo tenant-wide por defecto).
+      if (filters?.entityId) query = query.eq("entity_id", filters.entityId);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as SecretariaDocumentArtifactRow[];
