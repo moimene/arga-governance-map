@@ -9,6 +9,15 @@ import { evaluarConvocatoria, tiposPlantillaConvocatoriaPreferidos } from "@/lib
 import { segundaConvocatoriaGapIncumplido, gapSegundaConvocatoriaHoras } from "@/lib/secretaria/segunda-convocatoria";
 import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import {
+  AGENDA_MATERIAS,
+  LMV_COTIZADA_ADVERTENCIAS,
+  MATERIAS_LIBRES,
+  agendaMateriaGroups,
+  isMateriaCompatibleWithOrgano,
+  labelMateria,
+  materiaDefaultForOrgano,
+} from "@/lib/secretaria/agenda-materias";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -202,149 +211,6 @@ const DECISION_SUBTYPE_OPTIONS: { value: AgendaDecisionSubtype; label: string; h
   },
 ];
 
-const ALL_ORGANOS: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
-const JUNTA_ONLY: TipoOrgano[] = ["JUNTA_GENERAL"];
-const CONSEJO_SCOPE: TipoOrgano[] = ["CONSEJO", "COMISION_DELEGADA"];
-const JUNTA_AND_CONSEJO: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
-
-// `lmvCotizada=true` marca materias con especialidades aplicables a SA
-// cotizadas (LMV / Código de Buen Gobierno CNMV). NO cambia la clase de
-// materia (sigue siendo ORDINARIA/ESTATUTARIA/ESTRUCTURAL para el motor),
-// pero activa advertencias en la UI si la entidad es cotizada:
-//   - OPERACION_VINCULADA: art. 529 ter.h + 530 LSC → comisión auditoría
-//     + aprobación CdA + comunicación CNMV (>5% balance) o folleto si afecta
-//     al mercado.
-//   - PROGRAMA_RECOMPRA: art. 277 LSC + Reglamento UE 596/2014 (abuso de
-//     mercado) → autorización JGA + notificación CNMV + ventanas trading.
-//   - REMUNERACION_CONSEJEROS: art. 529 novodecies LSC → informe anual
-//     vinculante + voto consultivo cotizadas.
-const AGENDA_MATERIAS = [
-  // Consejo / órgano de administración
-  { value: "APROBACION_PLAN_NEGOCIO", label: "Aprobación del plan de negocio", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "APROBACION_PRESUPUESTOS", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
-  { value: "COMITES_INTERNOS", label: "Constitución o modificación de comités internos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "DISTRIBUCION_CARGOS", label: "Distribución de cargos del consejo", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "POLITICAS_CORPORATIVAS", label: "Aprobación de políticas corporativas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "RATIFICACION_ACTOS", label: "Ratificación de actos previos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "SEGUROS_RESPONSABILIDAD", label: "Seguro de responsabilidad de administradores", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-
-  // Ordinarias (gestión recurrente del órgano)
-  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "APLICACION_RESULTADO", label: "Aplicación del resultado", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "DISTRIBUCION_RESERVAS", label: "Distribución de reservas / dividendo a cuenta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "REELECCION_CONSEJERO", label: "Reelección de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "CESE_CONSEJERO", label: "Cese / separación de consejero", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento / reelección de auditor", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  // Canonical id `REMUNERACION_CONSEJEROS` (materia_catalog 20260424_000033).
-  { value: "REMUNERACION_CONSEJEROS", label: "Política / informe de remuneración de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
-  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
-  // Codex P2 round 9 PR #3: id canonical singular `OPERACION_VINCULADA`
-  // (verificado en supabase/migrations/20260420_000017_seed_rule_packs_v2.sql).
-  // El plural ("OPERACIONES_VINCULADAS") rompía el match con el rule_pack
-  // aprobado → convocatoria perdía payload LMV (comisión auditoría +
-  // CNMV) y caía a warning genérico. Label visible plural por UX.
-  { value: "OPERACION_VINCULADA", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
-  { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
-  { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-
-  // Estatutarias (mayoría reforzada art. 199/201 LSC)
-  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-  // MODIFICACION_REGLAMENTO es ORDINARIA: reglamento del consejo/junta NO
-  // es estatutos (jerarquía LEY → ESTATUTOS → REGLAMENTO). Art. 285-290 LSC
-  // aplica sólo a modificación estatutaria; el reglamento se aprueba por
-  // mayoría legal del órgano competente.
-  { value: "MODIFICACION_REGLAMENTO", label: "Modificación de reglamento del consejo / junta", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-  { value: "REDUCCION_CAPITAL", label: "Reducción de capital", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-  { value: "EMISION_OBLIGACIONES", label: "Emisión de obligaciones / convertibles", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: true },
-  // Canonical ids con sufijo `_SOCIAL` (materia_catalog 20260424_000033).
-  { value: "CAMBIO_DENOMINACION_SOCIAL", label: "Cambio de denominación social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-  { value: "CAMBIO_DOMICILIO_SOCIAL", label: "Cambio de domicilio social", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
-
-  // Estructurales (escritura pública + RM)
-  { value: "TRANSFORMACION", label: "Transformación social", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
-  { value: "FUSION", label: "Fusión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
-  { value: "ESCISION", label: "Escisión", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
-  { value: "DISOLUCION", label: "Disolución", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
-  { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
-  { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false, lmvCotizada: true },
-
-  // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
-  // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
-  // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
-  // tipo correcto y aceptar que no hay rule pack aplicable.
-  { value: "OTROS_LIBRE", label: "Otros — acuerdo libre (sin regla aplicable)", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-] as const;
-
-const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
-  APROBACION_PLAN_NEGOCIO: CONSEJO_SCOPE,
-  APROBACION_PRESUPUESTOS: CONSEJO_SCOPE,
-  FORMULACION_CUENTAS: CONSEJO_SCOPE,
-  FINANCIACION: CONSEJO_SCOPE,
-  CONTRATACION_RELEVANTE: CONSEJO_SCOPE,
-  COMITES_INTERNOS: CONSEJO_SCOPE,
-  DISTRIBUCION_CARGOS: CONSEJO_SCOPE,
-  POLITICAS_CORPORATIVAS: CONSEJO_SCOPE,
-  RATIFICACION_ACTOS: CONSEJO_SCOPE,
-  SEGUROS_RESPONSABILIDAD: CONSEJO_SCOPE,
-  APROBACION_CUENTAS: JUNTA_ONLY,
-  APLICACION_RESULTADO: JUNTA_ONLY,
-  DISTRIBUCION_DIVIDENDOS: JUNTA_ONLY,
-  DISTRIBUCION_RESERVAS: JUNTA_ONLY,
-  NOMBRAMIENTO_CONSEJERO: JUNTA_AND_CONSEJO,
-  REELECCION_CONSEJERO: JUNTA_ONLY,
-  CESE_CONSEJERO: JUNTA_AND_CONSEJO,
-  NOMBRAMIENTO_AUDITOR: JUNTA_ONLY,
-  REMUNERACION_CONSEJEROS: JUNTA_ONLY,
-  DELEGACION_FACULTADES: CONSEJO_SCOPE,
-  OPERACION_VINCULADA: CONSEJO_SCOPE,
-  PROGRAMA_RECOMPRA: JUNTA_ONLY,
-  AUTORIZACION_GARANTIA: CONSEJO_SCOPE,
-  MODIFICACION_ESTATUTOS: JUNTA_ONLY,
-  MODIFICACION_REGLAMENTO: JUNTA_AND_CONSEJO,
-  AUMENTO_CAPITAL: JUNTA_ONLY,
-  REDUCCION_CAPITAL: JUNTA_ONLY,
-  EMISION_OBLIGACIONES: JUNTA_ONLY,
-  CAMBIO_DENOMINACION_SOCIAL: JUNTA_ONLY,
-  CAMBIO_DOMICILIO_SOCIAL: JUNTA_ONLY,
-  TRANSFORMACION: JUNTA_ONLY,
-  FUSION: JUNTA_ONLY,
-  ESCISION: JUNTA_ONLY,
-  DISOLUCION: JUNTA_ONLY,
-  CESION_GLOBAL: JUNTA_ONLY,
-  AUTORIZACION_OPERACION_ESTRUCTURAL: JUNTA_ONLY,
-  OTROS_LIBRE: ALL_ORGANOS,
-};
-
-// LMV cotizada advertencias específicas por materia. Texto enseña al
-// secretario qué especialidad cotizada aplica y dónde está la referencia.
-const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
-  OPERACION_VINCULADA:
-    "SA cotizada: requiere informe de la Comisión de Auditoría (art. 529 ter.h LSC) + aprobación del Consejo. Si la operación supera el 5% del balance debe comunicarse a CNMV (art. 530 LSC).",
-  CONTRATACION_RELEVANTE:
-    "SA cotizada: revisar si el contrato es operación vinculada significativa, afecta a activos esenciales o exige comunicación al mercado por su impacto.",
-  PROGRAMA_RECOMPRA:
-    "SA cotizada: autorización JGA (art. 277 LSC) + notificación CNMV + cumplimiento de ventanas de trading (Reglamento UE 596/2014 sobre abuso de mercado).",
-  REMUNERACION_CONSEJEROS:
-    "SA cotizada: informe anual de remuneraciones vinculante + voto consultivo de la JGA sobre la política de retribución (art. 529 novodecies LSC).",
-  EMISION_OBLIGACIONES:
-    "SA cotizada: posible obligación de folleto informativo CNMV (Reglamento UE 2017/1129) cuando la emisión se ofrezca al público.",
-  FUSION: "SA cotizada: documento de fusión + informe del consejo + posible folleto CNMV si afecta a accionistas minoritarios.",
-  ESCISION: "SA cotizada: documento de escisión + posible folleto CNMV.",
-  CESION_GLOBAL:
-    "SA cotizada: posible hecho relevante a CNMV si afecta a porción significativa del patrimonio social.",
-  AUTORIZACION_OPERACION_ESTRUCTURAL:
-    "SA cotizada: revisar especialidades LMV (informe a CNMV, autorización de la JGA si supera umbrales).",
-};
-
-// Materias que NO se envían al motor V2 (puntos libres sin regla).
-const MATERIAS_LIBRES = new Set<string>(["OTROS_LIBRE"]);
-
 const CHANNEL_LABELS: Record<string, string> = {
   BORME: "BORME",
   WEB_SOCIEDAD: "Web de la sociedad",
@@ -413,19 +279,6 @@ function materiaClaseFromTipo(tipo: AgendaItem["tipo"]) {
   if (tipo === "ESTATUTARIA") return "ESTATUTARIA";
   if (tipo === "ESTRUCTURAL") return "ESTRUCTURAL";
   return "ORDINARIA";
-}
-
-function labelMateria(materia: string) {
-  return AGENDA_MATERIAS.find((m) => m.value === materia)?.label ?? materia;
-}
-
-function isMateriaCompatibleWithOrgano(materia: string, organoTipo: TipoOrgano) {
-  const organos = MATERIA_ORGANOS[materia] ?? ALL_ORGANOS;
-  return organos.includes(organoTipo);
-}
-
-function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
-  return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
 
 function statusLabel(status?: string | null) {
@@ -692,10 +545,6 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
-  const availableAgendaMaterias = useMemo(
-    () => AGENDA_MATERIAS.filter((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)),
-    [organoTipo],
-  );
   const agendaRuleSpecs = agendaItems
     // agenda_item.kind v3.1: solo DECISORIO produce acuerdo y exige reglas LSC.
     // Los puntos no decisorios no se someten a votación → no aplica motor V2.
@@ -3191,13 +3040,13 @@ export default function ConvocatoriasStepper() {
                   const kindHelper =
                     KIND_OPTIONS.find((k) => k.value === itemKind)?.helper ?? "";
                   const materiaCompatible = isMateriaCompatibleWithOrgano(item.materia, organoTipo);
-                  const materiaOptions = materiaCompatible
-                    ? availableAgendaMaterias
-                    : [
-                        AGENDA_MATERIAS.find((m) => m.value === item.materia) ??
-                          { value: item.materia, label: item.materia, tipo: item.tipo, inscribible: item.inscribible, lmvCotizada: false },
-                        ...availableAgendaMaterias,
-                      ];
+                  // Coherencia materia × órgano (2026-07-03): el select se
+                  // estructura en grupos (propias del órgano / transversales /
+                  // punto libre) en vez de lista plana. La materia incompatible
+                  // de un borrador previo se conserva visible en su propio
+                  // grupo para no perder el valor, pero no se ofrece el resto
+                  // del catálogo incompatible.
+                  const materiaGroups = agendaMateriaGroups(organoTipo);
                   return (
                   <div
                     key={item.id}
@@ -3335,10 +3184,19 @@ export default function ConvocatoriasStepper() {
                             className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            {materiaOptions.map((m) => (
-                              <option key={m.value} value={m.value}>
-                                {m.label}{!isMateriaCompatibleWithOrgano(m.value, organoTipo) ? " — incompatible con el órgano" : ""}
-                              </option>
+                            {!materiaCompatible && (
+                              <optgroup label="Materia actual — incompatible con este órgano">
+                                <option value={item.materia}>{labelMateria(item.materia)}</option>
+                              </optgroup>
+                            )}
+                            {materiaGroups.map((group) => (
+                              <optgroup key={group.key} label={group.label}>
+                                {group.materias.map((m) => (
+                                  <option key={m.value} value={m.value}>
+                                    {m.label}
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                           <select
