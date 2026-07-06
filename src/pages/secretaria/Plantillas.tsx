@@ -41,7 +41,13 @@ import {
   tipoLabel,
   estadoLabel,
   jurisdictionLabel,
+  // UX-7.B: modelo de cohortes de plantilla (clasificación pura + filtro).
+  clasificarCohortePlantilla,
+  cohorteLabel,
+  cohorteDescripcion,
+  COHORTE_ORDER,
 } from "@/lib/secretaria/template-admin";
+import { CohorteBadge } from "@/components/secretaria/CohorteBadge";
 import { toast } from "sonner";
 
 // ITEM-138 (d): badge de estado con DEPRECADA (antes omitido). Los colores son
@@ -320,6 +326,8 @@ export default function Plantillas() {
     initialMateriaFilter || initialTipoFilter.toUpperCase().includes("MODELO") ? "modelos" : "proceso",
   );
   const [filterMateria, setFilterMateria] = useState<string>(initialMateriaFilter);
+  // UX-7.B: filtro por cohorte de plantilla (aplica a ambas pestañas).
+  const [filterCohorte, setFilterCohorte] = useState<string>("");
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
@@ -488,12 +496,15 @@ export default function Plantillas() {
 
   const filteredData = useMemo(
     () => {
-      const rows = activeTab === 'modelos' && filterMateria
+      let rows = activeTab === 'modelos' && filterMateria
         ? displayData.filter((p) => (p.materia_acuerdo ?? p.materia) === filterMateria)
         : displayData;
+      if (filterCohorte) {
+        rows = rows.filter((p) => clasificarCohortePlantilla(p) === filterCohorte);
+      }
       return [...rows].sort(templateEngineSort);
     },
-    [activeTab, displayData, filterMateria],
+    [activeTab, displayData, filterMateria, filterCohorte],
   );
 
   useEffect(() => {
@@ -632,28 +643,45 @@ export default function Plantillas() {
         </div>
       )}
 
-      {/* Materia filter (Modelos tab only) */}
-      {activeTab === 'modelos' && (
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia</label>
+      {/* Filtros: materia (solo Modelos) + cohorte (ambas pestañas, UX-7.B) */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+        {activeTab === 'modelos' && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia</label>
+            <select
+              aria-label="Filtrar modelos por materia"
+              value={filterMateria}
+              onChange={(e) => setFilterMateria(e.target.value)}
+              className="min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+              style={{ borderRadius: 'var(--g-radius-md)' }}
+            >
+              <option value="">Todas</option>
+              {materiaOptionsByGroup.map(({ group, options }) => (
+                <optgroup key={group.id} label={group.title}>
+                  {options.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Cohorte</label>
           <select
-            aria-label="Filtrar modelos por materia"
-            value={filterMateria}
-            onChange={(e) => setFilterMateria(e.target.value)}
+            aria-label="Filtrar plantillas por cohorte"
+            value={filterCohorte}
+            onChange={(e) => setFilterCohorte(e.target.value)}
             className="min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
             style={{ borderRadius: 'var(--g-radius-md)' }}
           >
             <option value="">Todas</option>
-            {materiaOptionsByGroup.map(({ group, options }) => (
-              <optgroup key={group.id} label={group.title}>
-                {options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </optgroup>
+            {COHORTE_ORDER.map((c) => (
+              <option key={c} value={c}>{cohorteLabel(c)}</option>
             ))}
           </select>
         </div>
-      )}
+      </div>
 
       {/* Master-Detail Grid */}
       <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -721,15 +749,18 @@ export default function Plantillas() {
                         : materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia)}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 px-2 py-1 text-[11px] font-medium ${
-                      ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
-                      "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                    }`}
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
-                  >
-                    {estadoLabel(plantilla.estado)}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span
+                      className={`px-2 py-1 text-[11px] font-medium ${
+                        ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
+                        "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      {estadoLabel(plantilla.estado)}
+                    </span>
+                    <CohorteBadge plantilla={plantilla} />
+                  </div>
                 </div>
                 <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                   <div>
@@ -839,15 +870,18 @@ export default function Plantillas() {
                       {plantilla.version}
                     </td>
                     <td className="px-5 py-3 text-sm">
-                      <span
-                        className={`inline-block px-2.5 py-1 text-xs font-medium ${
-                          ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
-                          "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                        }`}
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      >
-                        {estadoLabel(plantilla.estado)}
-                      </span>
+                      <div className="flex flex-col items-start gap-1.5">
+                        <span
+                          className={`inline-block px-2.5 py-1 text-xs font-medium ${
+                            ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
+                            "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                          }`}
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          {estadoLabel(plantilla.estado)}
+                        </span>
+                        <CohorteBadge plantilla={plantilla} />
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <ChevronRight className="inline h-4 w-4 text-[var(--g-text-secondary)]" />
@@ -879,6 +913,17 @@ export default function Plantillas() {
                   <div className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
                     {tipoLabel(selected.tipo)}
                   </div>
+                </div>
+
+                {/* Cohorte (UX-7.B) — estado de ciclo de vida + completitud */}
+                <div className="mb-4">
+                  <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Cohorte</div>
+                  <div className="mt-1.5">
+                    <CohorteBadge plantilla={selected} />
+                  </div>
+                  <p className="mt-1.5 text-xs text-[var(--g-text-secondary)]">
+                    {cohorteDescripcion(clasificarCohortePlantilla(selected))}
+                  </p>
                 </div>
 
                 {/* Materia / materia_acuerdo */}

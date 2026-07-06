@@ -21,6 +21,7 @@ export * from "./organo-canonico";
 export * from "./functional-key";
 export * from "./labels";
 export * from "./known-p0";
+export * from "./plantilla-cohorte";
 export * from "./cloud-helpers";
 export * from "./gate-pre";
 export * from "./gate-pre-semantic";
