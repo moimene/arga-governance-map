@@ -43,6 +43,7 @@ import {
   CARGO_CERT_LABELS,
   type AuthorityEvidenceDetailRow,
 } from "@/hooks/useAuthorityEvidence";
+import { useCertificationAnnexGate } from "@/hooks/useSecretariaDocumentArtifacts";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import { buildCertificacionBody } from "@/lib/secretaria/certificacion-body";
 
@@ -93,6 +94,15 @@ export function EmitirCertificacionButton({
   // para certificante.
   const { data: authorityList } = useAuthorityEvidence(entityId ?? undefined);
   const [busy, setBusy] = useState(false);
+  const validAgreementRefs = useMemo(
+    () => agreementIds.filter((agreementId) => isUuidReference(agreementId)),
+    [agreementIds],
+  );
+  const {
+    data: certificationRequirements = [],
+    isLoading: annexGateLoading,
+    error: annexGateError,
+  } = useCertificationAnnexGate(validAgreementRefs);
 
   // L23: dual check de RM solo aplica cuando el flujo es de Secretario
   // (SA + VºBº). Para ADMIN_UNICO/ADMIN_SOLIDARIO la certificación es propia,
@@ -142,13 +152,26 @@ export function EmitirCertificacionButton({
   if (!canCertify) return null;
   if (!entityId) return null;
   const invalidAgreementRefs = agreementIds.filter((agreementId) => !isUuidReference(agreementId));
+  const blockingAnnexRequirements = certificationRequirements.filter(
+    (requirement) =>
+      requirement.status !== "SATISFIED" &&
+      requirement.status !== "WAIVED_WITH_OVERRIDE" &&
+      requirement.status !== "NOT_APPLICABLE" &&
+      requirement.blocking_policy === "BLOCKING" &&
+      (requirement.fase === "CERTIFICACION" || requirement.annex_targets?.includes("CERTIFICACION")),
+  );
+  const annexGateReason = annexGateLoading
+    ? "Comprobando anexos documentales obligatorios."
+    : blockingAnnexRequirements.length > 0
+      ? `Faltan ${blockingAnnexRequirements.length} anexo(s) documental(es) bloqueante(s) para certificar.`
+      : null;
   const effectiveDisabledReason =
     disabledReason ??
     (invalidAgreementRefs.length > 0
       ? "La certificación contiene referencias por punto sin Acuerdo 360 materializado."
       : agreementIds.length === 0
         ? "No hay acuerdos proclamables para certificar."
-        : null);
+        : annexGateReason);
 
   async function handleClick() {
     if (busy) return;
@@ -289,6 +312,31 @@ export function EmitirCertificacionButton({
           </div>
         </div>
       )}
+      {blockingAnnexRequirements.length > 0 ? (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="w-full border border-[var(--status-error)]/40 bg-[var(--status-error)]/10 p-3 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-error)]" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">Anexos obligatorios pendientes</p>
+              <ul className="mt-1 list-disc pl-4 text-[var(--g-text-secondary)]">
+                {blockingAnnexRequirements.slice(0, 4).map((requirement) => (
+                  <li key={requirement.id}>{requirement.title}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {annexGateError ? (
+        <p className="w-full text-right text-xs leading-relaxed text-[var(--status-warning)]">
+          No se pudo comprobar la matriz de anexos; aplica la migración documental para activar este gate.
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={handleClick}

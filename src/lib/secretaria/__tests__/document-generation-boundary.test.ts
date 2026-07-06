@@ -163,18 +163,15 @@ describe("document-generation-boundary — document_type rules (require)", () =>
     );
   });
 
-  it("INFORME_PRECEPTIVO requires convocatoria_id", async () => {
-    const bad = await buildSecretariaDocumentGenerationRequest({
+  it("INFORME_PRECEPTIVO can be generated from agreement context without convocatoria_id", async () => {
+    const ok = await buildSecretariaDocumentGenerationRequest({
       documentType: "INFORME_PRECEPTIVO",
       tenantId: DEMO_TENANT,
       entityId: DEMO_ENTITY,
+      agreementIds: ["agreement-1"],
       templateProfileId: "INF_V1",
     });
-    expectBlocking(
-      await validateSecretariaDocumentGenerationRequest(bad),
-      "MISSING_REQUIRED_REFERENCE",
-      "convocatoria_id",
-    );
+    expect((await validateSecretariaDocumentGenerationRequest(ok)).ok).toBe(true);
   });
 
   it("INFORME_DOCUMENTAL_PRE requires entity_id", async () => {

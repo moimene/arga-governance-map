@@ -33,6 +33,7 @@ import {
 } from "@/lib/secretaria/mesa-control-societaria";
 import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
+import { isOperationalTemplate, templateUsabilityNotice } from "@/lib/doc-gen/template-operability";
 import {
   // ITEM-138: labels y transiciones canónicas compartidas (antes copiadas con
   // divergencias en esta página, CatalogoTab y CoberturaLegalTab).
@@ -742,7 +743,7 @@ export default function Plantillas() {
                   <div>
                     <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Acción</dt>
                     <dd className="mt-1 text-[var(--g-text-primary)]">
-                      {plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo"}
+                      {isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo"}
                     </dd>
                   </div>
                 </dl>
@@ -828,7 +829,7 @@ export default function Plantillas() {
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? (plantilla.estado === "ACTIVA" ? "Lista para usar" : "Pendiente de ciclo")
+                        ? (isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo")
                         : materiaLabel(plantilla.materia)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
@@ -970,6 +971,17 @@ export default function Plantillas() {
                       </dd>
                     </div>
                   </dl>
+                  {selected.estado === "ACTIVA" && !(selected.materia_acuerdo ?? selected.materia) ? (
+                    <p className="mt-3 text-xs text-[var(--status-warning)]">
+                      Esta plantilla existe, pero no está vinculada a una regla aplicable.
+                    </p>
+                  ) : null}
+                  {selected.estado === "ACTIVA" && !selected.contrato_variables_version ? (
+                    <p className="mt-3 text-xs text-[var(--status-warning)]">
+                      Esta plantilla está activa, pero faltan metadatos de gobierno documental. Revisa
+                      versión, binding, jurisdicción y cobertura antes de usarla como base de bloqueo.
+                    </p>
+                  ) : null}
                 </div>
 
                 {/* Referencia Legal */}
@@ -1130,7 +1142,7 @@ export default function Plantillas() {
 
               {/* Detail Footer - Action Buttons */}
               <div className="border-t border-[var(--g-border-subtle)] px-5 py-4 flex flex-col gap-2">
-                {selected.estado === 'ACTIVA' && (
+                {isOperationalTemplate(selected) && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1140,7 +1152,7 @@ export default function Plantillas() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <Play className="h-4 w-4" />
+                    <Play className="h-4 w-4" aria-hidden="true" />
                     {getTemplateUsageTarget(selected).label}
                   </button>
                 )}
@@ -1153,14 +1165,23 @@ export default function Plantillas() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <ShieldCheck className="h-4 w-4" />
+                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                     Vincular como plantilla activa
                   </button>
                 ) : null}
-                {selected.estado === "ACTIVA" ? (
+                {isOperationalTemplate(selected) ? (
                   <p className="text-xs text-[var(--g-text-secondary)]">
                     {getTemplateUsageTarget(selected).hint}
                   </p>
+                ) : null}
+                {templateUsabilityNotice(selected) ? (
+                  <div
+                    className="flex items-start gap-2 border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-xs text-[var(--g-text-secondary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" aria-hidden="true" />
+                    <span>{templateUsabilityNotice(selected)}</span>
+                  </div>
                 ) : null}
                 {/* ITEM-084: la gestión de ciclo de vida (revisar/aprobar/activar/
                     archivar) solo se ofrece a ADMIN_TENANT, coherente con el gestor

@@ -5,7 +5,7 @@ import {
   Building2, ChevronLeft, Coins, Layers, Users, Gavel, UserCheck,
   ShieldCheck, Scroll, UserPlus, ArrowRightLeft, BookOpen,
   Bell, CalendarDays, CheckCircle2, ClipboardList, FileText,
-  Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle,
+  Landmark, Route, ScrollText, Scale, GitBranch, HelpCircle, FileCheck2,
   AlertTriangle,
 } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -23,6 +23,7 @@ import { useReglasAplicables } from "@/hooks/useReglasAplicables";
 import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
 import { buildNormativeMatrixRows, displaySocietyLegalForm } from "@/lib/secretaria/mesa-control-societaria";
 import type { TipoCondicionCargo } from "@/lib/secretaria/cargo-validation";
+import { isAuthorityRole } from "@/lib/secretaria/cargo-validation";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 
 type TabId =
@@ -229,7 +230,7 @@ export default function SociedadDetalle() {
         {tab === "capital"          && <TabCapital entityId={s.id} />}
         {tab === "socios"           && <TabSocios entityId={s.id} />}
         {tab === "organos"          && <TabOrganos entityId={s.id} />}
-        {tab === "admins"           && <TabAdmins entityId={s.id} />}
+        {tab === "admins"           && <TabAdmins entityId={s.id} onReviewAuthority={() => setTab("autoridad")} />}
         {tab === "representaciones" && <TabRepresentaciones entityId={s.id} />}
         {tab === "autoridad"        && <TabAutoridad entityId={s.id} />}
         {tab === "marco"            && <TabMarcoNormativo entityId={s.id} />}
@@ -741,12 +742,14 @@ function SociedadQuickActions({
     { label: "Nueva reunión", icon: CalendarDays, to: "/secretaria/reuniones/nueva" },
     { label: "Acuerdo sin sesión", icon: ScrollText, to: "/secretaria/acuerdos-sin-sesion/nuevo" },
     { label: "Generar documento", icon: FileText, to: "/secretaria/tramitador/nuevo" },
+    { label: "Informes", icon: FileText, to: `/secretaria/informes?entity=${entityId}` },
+    { label: "Certificaciones", icon: FileCheck2, to: `/secretaria/certificaciones?entity=${entityId}` },
     { label: "Materias y reglas", icon: ClipboardList, to: `/secretaria/catalogo-materias?entity=${entityId}` },
     { label: "Activar marco", icon: Scale, to: `/secretaria/sociedades/${entityId}/marco-normativo/activar` },
   ];
 
   return (
-    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4 xl:grid-cols-8">
       {actions.map((action) => {
         const Icon = action.icon;
         return (
@@ -1178,6 +1181,11 @@ function TabSocios({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    {(data ?? []).some((h) => !h.voting_rights && !h.is_treasury) ? (
+      <p className="mt-2 text-xs text-[var(--status-warning)]">
+        Participación registrada sin derechos de voto computables.
+      </p>
+    ) : null}
     </div>
   );
 }
@@ -1218,7 +1226,7 @@ function TabOrganos({ entityId }: { entityId: string }) {
 // ------------------------------------------------------------
 // Tab: Administradores societarios
 // ------------------------------------------------------------
-function TabAdmins({ entityId }: { entityId: string }) {
+function TabAdmins({ entityId, onReviewAuthority }: { entityId: string; onReviewAuthority: () => void }) {
   const { data, isLoading } = useAdministradoresSocietarios(entityId);
   return (
     <div className="space-y-3">
@@ -1269,6 +1277,20 @@ function TabAdmins({ entityId }: { entityId: string }) {
         </tr>
       ))}
     </Table>
+    {(data ?? []).some((c) => isAuthorityRole(c.tipo_condicion) && !c.inscripcion_rm_referencia) ? (
+      <div className="mt-2 flex flex-col items-start gap-1.5">
+        <p className="text-xs text-[var(--status-warning)]">
+          Cargo vigente pendiente de referencia registral. Puede limitar certificaciones frente a terceros.
+        </p>
+        <button
+          type="button"
+          onClick={onReviewAuthority}
+          className="text-xs font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+        >
+          Revisar autoridad certificante
+        </button>
+      </div>
+    ) : null}
     </div>
   );
 }

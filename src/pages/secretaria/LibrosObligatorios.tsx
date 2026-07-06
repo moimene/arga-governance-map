@@ -10,6 +10,7 @@ import {
   type LegalizacionAction,
 } from "@/lib/secretaria/libro-legalizacion";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { StandaloneCertificationActions } from "@/components/secretaria/StandaloneCertificationActions";
 import {
   summarizeBookPortfolio,
   type BookDeadlineState,
@@ -298,6 +299,28 @@ export default function LibrosObligatorios() {
         </div>
       ) : null}
 
+      {isSociedadMode && scopedEntityId ? (
+        <div className="mb-5">
+          <StandaloneCertificationActions
+            title="Certificados de libros"
+            actions={[
+              {
+                kindCode: "CERT_LIBROS_LEGALIZACION",
+                label: "Estado de legalización",
+                description: "Certifica el estado de libros obligatorios y registros auxiliares de la sociedad.",
+                entityId: scopedEntityId,
+              },
+              {
+                kindCode: "CERT_LIBRO_ACTAS_EXTRACTO",
+                label: "Extracto de libro de actas",
+                description: "Prepara extracto certificable desde actas y libros de órganos sociales.",
+                entityId: scopedEntityId,
+              },
+            ]}
+          />
+        </div>
+      ) : null}
+
       <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] xl:items-center">
         <div
           className="flex min-w-0 items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 focus-within:ring-2 focus-within:ring-[var(--g-border-focus)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--g-surface-page)]"
@@ -499,6 +522,19 @@ export default function LibrosObligatorios() {
                   <Icon className="h-3.5 w-3.5" />
                   {route.label}
                 </button>
+                <div className="mt-3">
+                  <StandaloneCertificationActions
+                    compact
+                    actions={[
+                      {
+                        kindCode: "CERT_LIBROS_LEGALIZACION",
+                        label: "Certificar libro",
+                        entityId: b.entity_id,
+                        bookId: b.source_book_id ?? b.id,
+                      },
+                    ]}
+                  />
+                </div>
                 <LibroLegalizacionActions book={b} />
               </article>
             );
@@ -636,15 +672,30 @@ export default function LibrosObligatorios() {
                         const route = getBookContentRoute(b);
                         const Icon = route.icon;
                         return (
-                          <button
-                            type="button"
-                            onClick={() => navigate(scope.createScopedTo(route.path))}
-                            className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
-                            style={{ borderRadius: "var(--g-radius-md)" }}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {route.label}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => navigate(scope.createScopedTo(route.path))}
+                              className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                              style={{ borderRadius: "var(--g-radius-md)" }}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {route.label}
+                            </button>
+                            <div className="mt-2">
+                              <StandaloneCertificationActions
+                                compact
+                                actions={[
+                                  {
+                                    kindCode: "CERT_LIBROS_LEGALIZACION",
+                                    label: "Certificar",
+                                    entityId: b.entity_id,
+                                    bookId: b.source_book_id ?? b.id,
+                                  },
+                                ]}
+                              />
+                            </div>
+                          </>
                         );
                       })()}
                     </td>

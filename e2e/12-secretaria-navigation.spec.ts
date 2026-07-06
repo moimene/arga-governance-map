@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/base';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/secretaria', heading: 'Mesa de trabajo del secretario' },
+  { label: 'Mesa', path: '/secretaria', heading: 'Mesa de Secretaría' },
   { label: 'Sociedades', path: '/secretaria/sociedades', heading: 'Sociedades' },
-  { label: 'Personas y cargos', path: '/secretaria/personas', heading: 'Personas' },
-  { label: 'Board Pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
+  { label: 'Personas, cargos y representantes', path: '/secretaria/personas', heading: 'Personas' },
+  { label: 'Board pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
   { label: 'Campañas de grupo', path: '/secretaria/procesos-grupo', heading: 'Campañas de grupo' },
   { label: 'Convocatorias', path: '/secretaria/convocatorias', heading: 'Convocatorias' },
   { label: 'Reuniones', path: '/secretaria/reuniones', heading: 'Reuniones' },
@@ -19,16 +19,16 @@ const NAV_ITEMS = [
     path: '/secretaria/acuerdos-sin-sesion',
     heading: 'Acuerdos escritos sin sesión',
   },
-  { label: 'Tramitador registral', path: '/secretaria/tramitador', heading: 'Tramitaciones registrales' },
+  { label: 'Registro', path: '/secretaria/tramitador', heading: 'Tramitaciones registrales' },
   {
     label: 'Libro de socios',
     path: '/secretaria/libro-socios',
     heading: 'Libro de socios — Movimientos de capital',
   },
   { label: 'Libros obligatorios', path: '/secretaria/libros', heading: 'Libros obligatorios' },
-  { label: 'Plantillas', path: '/secretaria/plantillas', heading: 'Plantillas documentales protegidas' },
-  { label: 'Gestor plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gestor de Plantillas' },
-  { label: 'Procesos', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
+  { label: 'Plantillas documentales', path: '/secretaria/plantillas', heading: 'Plantillas documentales protegidas' },
+  { label: 'Gobierno de plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gestor de Plantillas' },
+  { label: 'Calendario societario', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
   {
     label: 'Multi-jurisdicción',
     path: '/secretaria/multi-jurisdiccion',
@@ -40,10 +40,10 @@ test.describe('Secretaría navigation smoke', () => {
   test('dashboard expone contratos sanitizados por flujo', async ({ page }) => {
     await page.goto('/secretaria');
 
-    await expect(page.locator('main').getByRole('heading', { name: 'Mesa de trabajo del secretario', exact: true })).toBeVisible({
+    await expect(page.locator('main').getByRole('heading', { name: 'Mesa de Secretaría', exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText('Prioridad ahora')).toBeVisible();
+    await expect(page.getByText('Requiere tu atención')).toBeVisible();
     await expect(page.getByText('Empezar un flujo')).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva convocatoria/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Nueva reunión/ })).toBeVisible();

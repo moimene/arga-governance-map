@@ -41,7 +41,7 @@ test.describe('Secretaría Societaria — responsive 390px', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/secretaria');
 
-    await expect(page.getByText('Mesa de trabajo del secretario')).toBeVisible();
+    await expect(page.getByText('Mesa de Secretaría')).toBeVisible();
 
     await expectNoHorizontalOverflow(page);
 

@@ -17,6 +17,9 @@ export default defineConfig({
     testTimeout: 30_000,
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "bun:test": path.resolve(__dirname, "./src/test/bun-test-shim.ts"),
+    },
   },
 });

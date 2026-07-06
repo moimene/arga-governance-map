@@ -43,6 +43,7 @@ import { statusLabel } from "@/lib/secretaria/status-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { AutorizacionesRegulatoriasCard } from "@/components/secretaria/AutorizacionesRegulatoriasCard";
+import { AgreementDocumentRequirementsPanel } from "@/components/secretaria/AgreementDocumentRequirementsPanel";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
@@ -249,7 +250,7 @@ export default function ExpedienteAcuerdo() {
   // ITEM-104: cross-link inverso — certificaciones de este acuerdo (por agreement_id
   // directo o por pertenencia al array agreements_certified de una certificación
   // minute-based) y el expediente registral más reciente.
-  const { data: certificaciones = [] } = useQuery({
+  const { data: certificaciones = [], isLoading: certsLoading } = useQuery({
     queryKey: ["agreement_certifications", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -466,6 +467,8 @@ export default function ExpedienteAcuerdo() {
 
           <NormativeSnapshotCard snapshot={normativeSnapshot} isLoading={normativeLoading} />
 
+          <AgreementDocumentRequirementsPanel agreement={a} />
+
           <FrozenRuleSnapshotCard
             snapshot={frozenSnapshot}
             isLoading={frozenSnapshotLoading}
@@ -552,7 +555,13 @@ export default function ExpedienteAcuerdo() {
                 })}
               </ul>
             </Card>
-          ) : null}
+          ) : certsLoading ? null : (
+            <Card icon={<FileSignature className="h-4 w-4" />} title="Certificaciones">
+              <p className="text-sm text-[var(--g-text-secondary)]">
+                Todavía no se han generado certificaciones para este expediente.
+              </p>
+            </Card>
+          )}
 
           {compliance?.publication_required ? (
             <Card icon={<Megaphone className="h-4 w-4" />} title="Publicación">
@@ -961,14 +970,20 @@ function NormativeSnapshotCard({
             >
               {snapshot.framework_status}
             </span>
-            <span className="text-xs text-[var(--g-text-secondary)]">
-              {snapshot.profile_hash}
-            </span>
           </div>
           <p className="mt-2 text-sm leading-6 text-[var(--g-text-secondary)]">
-            Snapshot {snapshot.snapshot_id}. El documento, la revisión y la promoción al expediente
-            conservan esta traza como fuente de control.
+            El documento, la revisión y la promoción al expediente conservan esta traza normativa como
+            fuente de control.
           </p>
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]">
+              Detalle avanzado
+            </summary>
+            <div className="mt-1 space-y-0.5 font-mono text-[10px] text-[var(--g-text-secondary)]">
+              <div>profile_hash: {snapshot.profile_hash}</div>
+              <div>snapshot_id: {snapshot.snapshot_id}</div>
+            </div>
+          </details>
         </div>
         <div className="text-right text-xs text-[var(--g-text-secondary)]">
           <div>Fuentes activas: {activeSources.length}</div>

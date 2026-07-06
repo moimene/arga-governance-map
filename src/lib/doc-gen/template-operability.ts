@@ -36,6 +36,25 @@ export function isOperationalTemplate(template: PlantillaProtegidaRow) {
   return false;
 }
 
+/**
+ * Aviso de usabilidad para el catálogo: cuando una plantilla NO es operativa
+ * (no puede generar documentos todavía), devuelve un texto que explica el estado;
+ * null si es operativa. Honra la política "todas visibles + avisar del estado"
+ * (decisión 2026-06-26) SIN abrir la verja legal del motor: la generación sigue
+ * gateada por `isOperationalTemplate`.
+ */
+export function templateUsabilityNotice(template: PlantillaProtegidaRow): string | null {
+  if (isOperationalTemplate(template)) return null;
+  if (!hasCapa1Content(template)) {
+    return "Esta plantilla aún no tiene contenido (Capa 1), por lo que no puede generar documentos.";
+  }
+  const status = normalizeTemplateStatus(template.estado);
+  if (status === "ARCHIVADA" || status === "DEPRECADA") {
+    return "Plantilla archivada o deprecada: se conserva por trazabilidad, pero no está disponible para nuevos expedientes.";
+  }
+  return "Plantilla en preparación: pendiente de revisión o aprobación legal antes de poder generar documentos.";
+}
+
 function operationalStatusRank(template: PlantillaProtegidaRow) {
   const status = normalizeTemplateStatus(template.estado);
   if (status === "ACTIVA") return 0;

@@ -23,6 +23,7 @@ import { useRepresentantesAdminPJByPerson } from "@/hooks/useRepresentantesAdmin
 import { SCOPE_LABELS, useRepresentacionesHistoriaByPerson } from "@/hooks/useRepresentacionesCanonical";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
+import { StandaloneCertificationActions } from "@/components/secretaria/StandaloneCertificationActions";
 import {
   requiresRepresentative,
   type TipoCondicionCargo,
@@ -404,6 +405,21 @@ export default function PersonaDetalle() {
         </section>
       )}
 
+      {holdings && holdings.length > 0 ? (
+        <div className="mb-6">
+          <StandaloneCertificationActions
+            title="Certificados de titularidad"
+            actions={holdings.map((holding) => ({
+              kindCode: "CERT_LIBRO_SOCIOS_TITULARIDAD",
+              label: holding.entity?.common_name ?? holding.entity?.legal_name ?? "Titularidad",
+              description: "Certificado de titularidad vigente en el libro de socios/acciones.",
+              entityId: holding.entity_id,
+              personId: p.id,
+            }))}
+          />
+        </div>
+      ) : null}
+
       {representacionesHistoria && representacionesHistoria.length > 0 ? (
         <section
           className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -513,15 +529,30 @@ export default function PersonaDetalle() {
                       </span>
                     </td>
                     <td className="px-6 py-3 text-right text-sm">
-                      <button
-                        type="button"
-                        onClick={() => setCargoToCesar(c)}
-                        className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                        aria-label={`Cesar cargo ${cargoLabel}`}
-                      >
-                        Cesar
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <StandaloneCertificationActions
+                          compact
+                          actions={[
+                            {
+                              kindCode: "CERT_VIGENCIA_CARGO",
+                              label: "Certificar vigencia",
+                              entityId: c.entity_id,
+                              bodyId: c.body_id,
+                              personId: p.id,
+                              conditionId: c.id,
+                            },
+                          ]}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCargoToCesar(c)}
+                          className="inline-flex items-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
+                          style={{ borderRadius: "var(--g-radius-md)" }}
+                          aria-label={`Cesar cargo ${cargoLabel}`}
+                        >
+                          Cesar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

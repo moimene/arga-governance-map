@@ -4,6 +4,7 @@ import {
   Bell,
   Users,
   FileSignature,
+  FileSearch,
   Gavel,
   Library,
   Database,
@@ -25,6 +26,8 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
 import { getSecretariaScopedIds } from "@/lib/secretaria/scope-filters";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { useSecretariaDocumentArtifacts } from "@/hooks/useSecretariaDocumentArtifacts";
+import { REVIEWABLE_STATUSES, artifactKindLabel } from "@/lib/secretaria/document-artifact-labels";
 import {
   SECRETARIA_SANITIZED_FLOW_CONTRACTS,
   summarizeSecretariaSanitizedFlows,
@@ -609,8 +612,12 @@ function attentionCount(kpis?: KpiCounts) {
   );
 }
 
-function attentionHeadline(count: number) {
-  if (count === 0) return "Sin bloqueos operativos relevantes";
+function attentionHeadline(count: number, isSociedad: boolean) {
+  if (count === 0) {
+    return isSociedad
+      ? "No hay acciones urgentes para esta sociedad."
+      : "No hay acciones urgentes en el grupo.";
+  }
   return countLabel(count, "asunto requiere revisión", "asuntos requieren revisión");
 }
 
@@ -715,6 +722,8 @@ export default function SecretariaDashboard() {
   const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis(scopedEntityId);
   const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda(scopedEntityId);
   const { data: crossModule } = useCrossModuleMetrics(scopedEntityId);
+  const { data: docArtifacts, isLoading: docsLoading, error: docsError } = useSecretariaDocumentArtifacts();
+  const pendingDocs = (docArtifacts ?? []).filter((doc) => REVIEWABLE_STATUSES.has(doc.status));
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
   const flowSummary = summarizeSecretariaSanitizedFlows();
 
@@ -733,11 +742,12 @@ export default function SecretariaDashboard() {
             Secretaría Societaria
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
-            Mesa de trabajo del secretario
+            Mesa de Secretaría
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
-            Lo importante aparece primero: próximos hitos, documentos pendientes y bloqueos legales.
-            Los contratos técnicos quedan plegados para no competir con la operación diaria.
+            {scope.mode === "sociedad"
+              ? "Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario de esta sociedad."
+              : "Revisa primero los hitos, documentos y bloqueos que pueden afectar al ciclo societario del grupo."}
           </p>
         </div>
         <div
@@ -764,10 +774,10 @@ export default function SecretariaDashboard() {
         >
           <div className="px-5 py-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-              Prioridad ahora
+              Requiere tu atención
             </div>
             <h2 className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">
-              {attentionHeadline(openAttention)}
+              {attentionHeadline(openAttention, scope.mode === "sociedad")}
             </h2>
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
               Esta sección resume dónde conviene entrar primero. Cada fila abre la pantalla responsable.
@@ -858,6 +868,12 @@ export default function SecretariaDashboard() {
                 icon: Gavel,
                 path: "/secretaria/tramitador/nuevo",
               },
+              {
+                label: "Revisar documentos",
+                helper: "Revisa documentos generados o anexados antes de aprobarlos, archivarlos o marcarlos como sustituidos.",
+                icon: FileSearch,
+                path: "/secretaria/documentos/pendientes-revision",
+              },
             ].map(({ label, helper, icon, path }) => (
               <QuickAction
                 key={path}
@@ -931,6 +947,51 @@ export default function SecretariaDashboard() {
           onClick={() => navigateSecretaria("/secretaria/plantillas-tracker")}
         />
       </div>
+      </section>
+
+      {/* Documentos pendientes (UX-2.A / informe §6.1) — operativo, sobre el panel técnico plegado */}
+      <section
+        className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--g-border-subtle)] px-5 py-3">
+          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Documentos pendientes</h2>
+          <button
+            type="button"
+            onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
+            className="w-fit text-sm font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+          >
+            Revisar documentos
+          </button>
+        </div>
+        <div className="divide-y divide-[var(--g-border-subtle)]">
+          {docsLoading ? (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">Cargando documentos y evidencias.</div>
+          ) : docsError ? (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">
+              Esta función requiere la migración documental de informes y certificaciones.
+            </div>
+          ) : pendingDocs.length > 0 ? (
+            pendingDocs.slice(0, 5).map((doc) => (
+              <button
+                key={doc.id}
+                type="button"
+                onClick={() => navigateSecretaria("/secretaria/documentos/pendientes-revision")}
+                className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--g-brand-3308)]"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <div className="truncate text-sm font-medium text-[var(--g-text-primary)]">{doc.title}</div>
+                  <div className="text-xs text-[var(--g-text-secondary)]">{artifactKindLabel(doc.artifact_kind)}</div>
+                </div>
+                <StatusChip value={doc.status} />
+              </button>
+            ))
+          ) : (
+            <div className="p-5 text-sm text-[var(--g-text-secondary)]">
+              No hay documentos pendientes de revisión. Los documentos generados aparecerán aquí antes de su cierre.
+            </div>
+          )}
+        </div>
       </section>
 
       <details

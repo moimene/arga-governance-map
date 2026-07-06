@@ -17,7 +17,7 @@ export function RmStatusChip({
       }
       style={{ borderRadius: "var(--g-radius-sm)" }}
     >
-      {registered ? "Inscrito" : "Pendiente RM"}
+      {registered ? "Inscrito" : "Pendiente de referencia registral"}
     </span>
   );
 }

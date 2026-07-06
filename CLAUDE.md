@@ -57,9 +57,23 @@ Reglas:
 - **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
 - **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
 
+### Rediseño UX Secretaría — auditoría + UX-0 (2026-06-20)
+
+El Comité Legal revisó un informe de rediseño UX/copy de `/secretaria` (`docs/superpowers/reviews/2026-06-20-informe-ux-redesign-copy-legal.md`). Trabajo ejecutado:
+
+- **Auditoría de brechas** (propuesta vs código real, con evidencia archivo:línea): `docs/superpowers/reviews/2026-06-20-auditoria-brechas-ux-secretaria.md`. Conclusión: el módulo está más avanzado de lo que el informe asume; la brecha dominante es de **superficie (UI) y copy**, no de motor.
+- **Plan técnico P0→P3** mapeado a fases UX-0…UX-7: `docs/superpowers/plans/2026-06-20-ux-redesign-secretaria-plan.md`.
+- **UX-0.A–C implementado** (riesgo legal de copy): nuevos `src/lib/secretaria/evidence-status-labels.ts` + `src/components/secretaria/EvidenceStatusBadge.tsx` (disclaimer "Entorno de validación funcional — sin eficacia jurídica cualificada productiva", fallback conservador a no-cualificada); 11 claves del pipeline documental + `legalEffectLabel()` en `status-labels.ts`; `CertificacionesAutonomas.tsx` e `InformesPreceptivos.tsx` routean estados por `statusLabel()` y evidencia por `EvidenceStatusBadge`; subcopy de `DocumentosPendientesRevision.tsx` ya no presenta la evidencia demo como "evidencia operativa". Tests: `status-labels.test.ts` (ampliado), `evidence-status-labels.test.ts` (nuevo), `mesa-control-ui-contract.test.ts` (actualizado P0-4). Verificación: `tsc -b` verde, lint limpio en lo tocado, 29/29 tests del dominio.
+- **Pendiente UX-0:** D (renombrados de sidebar en ambas taxonomías), E (términos transversales), F (`GenerarDocumentoStepper` copy de evidencia). Siguiente prioridad del plan: UX-7.A (chip imperativa/dispositiva + "¿Por qué esta regla?") y UX-4 (wizard de certificaciones autónomas).
+
 ### Taxonomía sidebar Secretaría — decisión 2026-05-12
 
 Tras sucesivos rediseños del menú lateral (`src/lib/secretaria/sidebar-visibility.ts` + `src/components/secretaria/shell/navigation.ts`) la taxonomía vigente de secciones en modo sociedad es **Inicio / Adopción / Documentación / Registro público / Libros y registros sociales / Sociedades y personas / Configuración y reglas**, con item "Procesos" para `/secretaria/calendario` dentro de "Libros y registros sociales". (La taxonomía anterior `CONTEXTO / EXPEDIENTES / REGISTRO / CONFIGURACIÓN Y REGLAS` del 2026-05-12 quedó superada; "Registro público" sustituye a "REGISTRO" y resuelve la colisión con el Registro Mercantil.)
+
+**Actualización 2026-06-26 (confirmada por el usuario):**
+- Item de sidebar **"Tramitador registral" → "Registro"** (§5.2 del informe UX aprobado). El H1/sección de la página de tramitación sigue siendo "Tramitador registral" (`getSecretariaSectionLabel`). Esto **supera** la cautela previa de no usar "Registro" para el item de sidebar.
+- Item **"Procesos" → "Calendario societario"** (§5.2): alinea label + icono `Calendar` + página `Calendario`, resolviendo la deuda de las 3 señales contradictorias.
+- Selectores E2E estables ahora: `[data-sidebar-item="Registro"]` y `[data-sidebar-item="Calendario societario"]`.
 
 Crítica impeccable conocida (no bloqueante, deuda intencional):
 
@@ -67,7 +81,7 @@ Crítica impeccable conocida (no bloqueante, deuda intencional):
 - **"Procesos" para `/calendario` tiene 3 signos contradictorios** (label "Procesos" / icono `Calendar` / página `Calendario.tsx`). Decisión: dejar el label en sidebar; reconciliar (icono `Workflow` + renombrar página) cuando se aborde el rework de Procesos societarios completo.
 - **"Configuración y reglas"** se mantiene aunque el tono sea SaaS-flavored. Posible refactor a "Reglas y modelos" o "Normativa aplicable" en sprint futuro.
 
-Recordatorio: **no usar "Registro" en código, copies o tests para referirse al Registro Mercantil** mientras esta sección exista — esa función es del Tramitador registral. El item "Procesos" navega a `/secretaria/calendario`; cualquier selector E2E debe usar `[data-sidebar-item="Procesos"]` (atributo estable) en lugar de texto.
+Recordatorio (actualizado 2026-06-26): el **item de sidebar** que navega a la tramitación registral se llama ahora **"Registro"**; su H1/sección de página sigue siendo "Tramitador registral", que es la función registral. El item que navega a `/secretaria/calendario` se llama **"Calendario societario"**. Cualquier selector E2E estable debe usar `[data-sidebar-item="Registro"]` / `[data-sidebar-item="Calendario societario"]` (atributo estable) en lugar de texto.
 
 ### Módulos Garrigues — doble identidad
 

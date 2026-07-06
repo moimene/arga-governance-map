@@ -151,11 +151,35 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     const revision = read("src/pages/secretaria/DocumentosPendientesRevision.tsx");
     const generar = read("src/pages/secretaria/GenerarDocumentoStepper.tsx");
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const evidenceLabels = read("src/lib/secretaria/evidence-status-labels.ts");
 
     expect(revision).not.toContain("archivados como DEMO_OPERATIVA");
-    expect(revision).toContain("archivados como evidencia operativa");
-    expect(generar).not.toContain("Evidencia demo operativa");
-    expect(generar).toContain("Evidencia operativa");
+    // P0-4 (auditoría UX 2026-06-20): el subcopy ya no presenta la evidencia de entorno
+    // demo como "evidencia operativa". El disclaimer de entorno de validación funcional
+    // vive ahora en EvidenceStatusBadge, no en el encabezado de la bandeja.
+    expect(revision).not.toContain("evidencia operativa");
+    // UX-3.B: copy de Revisión documental aprobado (informe §6.5/§8.3/§8.5/§9.5).
+    expect(revision).toContain("Revisión documental");
+    expect(revision).toContain(
+      "Revisa documentos generados o anexados antes de aprobarlos, archivarlos o marcarlos como sustituidos.",
+    );
+    expect(revision).toContain("Pendientes de revisión");
+    expect(revision).toContain("Documentos cerrados");
+    expect(revision).toContain("Aprobar documento");
+    expect(revision).toContain("Marcar como sustituido");
+    expect(revision).toContain("Documento archivado con trazabilidad. Conservamos su huella y versión.");
+    expect(revision).toContain("Usa esta acción cuando exista una versión posterior o el documento ya no deba utilizarse.");
+    // UX-0.F (informe legal §7.3): el stepper rotula la evidencia con el copy aprobado
+    // vía EvidenceStatusBadge/evidenceStatusDescriptor ("Entorno de validación funcional"),
+    // nunca con la etiqueta ambigua "Evidencia operativa" ni presentando la evidencia demo
+    // como cualificada. La aserción negativa se conserva y se refuerza (case-insensitive).
+    expect(generar).not.toMatch(/evidencia demo operativa/i);
+    expect(generar).not.toContain("Evidencia operativa");
+    expect(generar).toContain("EvidenceStatusBadge");
+    // El copy aprobado §7.3 que ve el usuario vive en el descriptor compartido que
+    // consume EvidenceStatusBadge: se verifica aquí que la cadena llega al copy real.
+    expect(evidenceLabels).toContain("Entorno de validación funcional");
+    expect(evidenceLabels).toContain("sin eficacia jurídica cualificada productiva");
     expect(catalogo).toContain("Trazabilidad preparada para el bloqueo del expediente");
   });
 

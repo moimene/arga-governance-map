@@ -57,8 +57,8 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
     await expect(page.locator('[data-sidebar-item="Acuerdos sin sesión"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Actas"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Actas pendientes"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-item="Certificaciones vinculadas"]').first()).toBeVisible();
-    await expect(page.locator('[data-sidebar-item="Tramitador registral"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Certificaciones de acuerdos"]').first()).toBeVisible();
+    await expect(page.locator('[data-sidebar-item="Registro"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Subsanaciones"]').first()).toBeVisible();
     await expect(page.locator('[data-sidebar-item="Libro de socios"]').first()).toBeVisible();
 
@@ -73,7 +73,7 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
     await expect(page.getByText("Actas pendientes de origen trazable")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Esta bandeja no crea actas libres.")).toBeVisible();
 
-    await page.locator('[data-sidebar-item="Certificaciones vinculadas"]').first().click();
+    await page.locator('[data-sidebar-item="Certificaciones de acuerdos"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/actas\?.*vista=certificaciones/);
     await expect(page.getByRole("heading", { name: "Actas y certificaciones vinculadas" })).toBeVisible();
 
@@ -90,16 +90,18 @@ test.describe("Secretaría sidebar — IA canónica + visibilidad por contexto",
     await expect(page.getByRole("button", { name: "Subsanaciones" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Iniciar desde acuerdo" })).toBeVisible();
 
-    await page.locator('[data-sidebar-item="Presentaciones"]').first().click();
+    await page.locator('[data-sidebar-item="Presentaciones registrales"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/tramitador\?.*estado=PRESENTADA/);
+    // El item de sidebar se renombró a "Presentaciones registrales" (§5.2), pero la
+    // pestaña-filtro de TramitadorLista sigue siendo "Presentaciones" (no es sidebar).
     await expect(page.getByRole("button", { name: "Presentaciones" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("item Procesos navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
+  test("item Calendario societario navega a /secretaria/calendario (deep link legacy intacto)", async ({ page }) => {
     await selectArgaSociedad(page);
 
-    await expect(page.locator('[data-sidebar-item="Procesos"]').first()).toBeVisible();
-    await page.locator('[data-sidebar-item="Procesos"]').first().click();
+    await expect(page.locator('[data-sidebar-item="Calendario societario"]').first()).toBeVisible();
+    await page.locator('[data-sidebar-item="Calendario societario"]').first().click();
     await expect(page).toHaveURL(/\/secretaria\/calendario/);
     await expect(page.locator("main").getByRole("heading", { name: "Calendario de vencimientos", exact: true })).toBeVisible({
       timeout: 10_000,

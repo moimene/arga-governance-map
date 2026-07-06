@@ -23,7 +23,7 @@ test.describe('Secretaría Dashboard', () => {
   test('sidebar muestra los módulos de Secretaría', async ({ page }) => {
     await expect(page.locator('[data-sidebar-item="Convocatorias"]').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-sidebar-item="Reuniones"]').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-sidebar-item="Tramitador registral"]').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-sidebar-item="Registro"]').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('pactos vigentes aparece en cross-module metrics', async ({ page }) => {

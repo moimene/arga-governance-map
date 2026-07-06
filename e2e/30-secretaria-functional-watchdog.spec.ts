@@ -2,7 +2,7 @@ import { expect, test } from './fixtures/base';
 import type { Locator, Page, Route } from '@playwright/test';
 
 const CRITICAL_ROUTES = [
-  { path: '/secretaria', heading: 'Mesa de trabajo del secretario' },
+  { path: '/secretaria', heading: 'Mesa de Secretaría' },
   { path: '/secretaria/acuerdos-sin-sesion', heading: 'Acuerdos escritos sin sesión' },
   { path: '/secretaria/acuerdos-sin-sesion/nuevo', heading: 'Asistente de acuerdo escrito sin sesión' },
   { path: '/secretaria/acuerdos-sin-sesion/co-aprobacion', heading: 'Asistente de acuerdo por co-aprobación (k de n)' },

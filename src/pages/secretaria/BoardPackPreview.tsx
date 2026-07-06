@@ -4,6 +4,7 @@ import { useBoardPackData } from "@/hooks/useBoardPackData";
 import { BPPortada } from "@/components/board-pack/BPPortada";
 import { BPAgenda } from "@/components/board-pack/BPAgenda";
 import { BPAcuerdos } from "@/components/board-pack/BPAcuerdos";
+import { BPDocumentIndex } from "@/components/board-pack/BPDocumentIndex";
 import { BPRiesgos } from "@/components/board-pack/BPRiesgos";
 import { BPObligaciones } from "@/components/board-pack/BPObligaciones";
 import { BPHallazgos } from "@/components/board-pack/BPHallazgos";
@@ -124,28 +125,34 @@ export default function BoardPackPreview() {
         {/* S2: Agenda */}
         <BPAgenda items={data.meeting.agenda_items} />
 
-        {/* S3: Acuerdos */}
+        {/* S3: Índice documental */}
+        <BPDocumentIndex
+          meetingId={data.meeting.id}
+          agreementIds={data.agreements.map((agreement) => agreement.id)}
+        />
+
+        {/* S4: Acuerdos */}
         <BPAcuerdos
           agreements={data.agreements}
           votoCalidadPresidente={data.meeting.body?.quorum_rule?.["voto_calidad_presidente"] === true}
         />
 
-        {/* S4: Riesgos */}
+        {/* S5: Riesgos */}
         <BPRiesgos risks={data.risks} />
 
-        {/* S5: Obligaciones */}
+        {/* S6: Obligaciones */}
         <BPObligaciones obligations={data.obligations} />
 
-        {/* S6: Hallazgos abiertos */}
+        {/* S7: Hallazgos abiertos */}
         <BPHallazgos findings={data.findings} />
 
-        {/* S7: Idoneidad F&P */}
+        {/* S8: Idoneidad F&P */}
         <BPIdoneidad attestations={data.attestations} />
 
-        {/* S8: Delegaciones */}
+        {/* S9: Delegaciones */}
         <BPDelegaciones delegations={data.delegations} />
 
-        {/* S9: Sistemas IA — EU AI Act */}
+        {/* S10: Sistemas IA — EU AI Act */}
         <BPSistemasIA aiSystems={data.aiSystems} />
       </div>
     </div>
