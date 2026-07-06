@@ -60,6 +60,9 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   // CNMV) y caía a warning genérico. Label visible plural por UX.
   { value: "OPERACION_VINCULADA", label: "Operaciones con partes vinculadas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "PROGRAMA_RECOMPRA", label: "Programa de recompra de acciones / autocartera", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
+  // Alta 2026-07-03 (coherencia fase 3): materia de Junta del art. 238 LSC,
+  // registrada también en materia_catalog (migración 20260706131043).
+  { value: "ACCION_SOCIAL_RESPONSABILIDAD", label: "Acción social de responsabilidad", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "AUTORIZACION_GARANTIA", label: "Garantía / aval intragrupo", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
 
   // Estatutarias (mayoría reforzada art. 199/201 LSC)
@@ -114,6 +117,7 @@ export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   DELEGACION_FACULTADES: CONSEJO_SCOPE,
   OPERACION_VINCULADA: CONSEJO_SCOPE,
   PROGRAMA_RECOMPRA: JUNTA_ONLY,
+  ACCION_SOCIAL_RESPONSABILIDAD: JUNTA_ONLY,
   AUTORIZACION_GARANTIA: CONSEJO_SCOPE,
   MODIFICACION_ESTATUTOS: JUNTA_ONLY,
   MODIFICACION_REGLAMENTO: JUNTA_AND_CONSEJO,

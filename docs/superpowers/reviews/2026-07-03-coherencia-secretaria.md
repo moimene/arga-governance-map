@@ -26,9 +26,11 @@ Aplicada en Cloud vía MCP `apply_migration` (drift W3 preexistente impedía `db
 - Métricas ACTIVA: cortas <850 chars **15→3**; sin materia **6→2**; media capa1 **1.869→2.173**.
 - **Contenido pendiente de revisión del Comité Legal** antes de presentarse como definitivo (precedente H1c; workflow del gestor disponible).
 
-### Resto pendiente (fase 3, menor)
-- 3 ACTIVA cortas v1.1.0 con placeholders dotted (`{{ENTIDAD.x}}`): formulación (c90edc8c, además duplica la v1.2.0 dedicada — candidata a ARCHIVADA), delegación (d3e08b42), operación vinculada (64fa1683). Enriquecer con su propio estilo de placeholder o archivar la duplicada.
-- f698a2f2 (acción social de responsabilidad, contenido rico): dar de alta la materia `ACCION_SOCIAL_RESPONSABILIDAD` en el catálogo antes de bindear.
+### Fase 3 HECHA (migración `20260706131043_coherencia_fase3_plantillas_materia`)
+- Delegación (d3e08b42) y operación vinculada (64fa1683) enriquecidas (art. 249/249 bis y arts. 227-230/529 vicies LSC), conservando sus placeholders dotted.
+- Formulación v1.1.0 duplicada (c90edc8c) → ARCHIVADA (existe dedicada v1.2.0).
+- Materia `ACCION_SOCIAL_RESPONSABILIDAD` dada de alta en `materia_catalog` (art. 238 LSC, ORDINARIA/SIMPLE) y en `AGENDA_MATERIAS` (JUNTA_ONLY); plantilla rica f698a2f2 bindeada.
+- **Métricas finales ACTIVA: cortas <850 = 0 · sin materia = 0 · media capa1 = 2.249.** Contenido pendiente de revisión del Comité Legal.
 
 ## Pendiente original (fase 2 — contenido de plantillas)
 
