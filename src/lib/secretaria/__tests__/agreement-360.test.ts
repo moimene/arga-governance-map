@@ -138,6 +138,10 @@ describe("agreement 360 meeting materialization", () => {
 
     expect(payload?.compliance_snapshot).toMatchObject({
       normative_snapshot_id: "ruleset-snapshot-1",
+      // T11: origen reunión congela el payload_hash con kind PAYLOAD → NO comparable
+      // con el fingerprint canónico vivo (evita falsos avisos de desfase normativo).
+      normative_profile_hash: "payload-hash",
+      normative_profile_hash_kind: "PAYLOAD",
       normative_profile: {
         snapshot_id: "ruleset-snapshot-1",
         source_layers: ["LEY", "ESTATUTOS", "PACTO_PARASOCIAL", "SISTEMA"],

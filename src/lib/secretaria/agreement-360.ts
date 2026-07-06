@@ -120,7 +120,8 @@ export function isInscribableAgreementMatter(materia: string, matterClass: strin
 
 function compactNormativeSnapshotForMeeting(input: MeetingAgreementMaterializationInput) {
   const provided = compactAgreementNormativeSnapshot(input.normativeSnapshot);
-  if (provided) return provided;
+  // T11: el snapshot canónico es comparable con el fingerprint vivo → kind CANONICAL.
+  if (provided) return { ...provided, profile_hash_kind: "CANONICAL" as const };
 
   const trace = input.snapshot.rule_trace;
   const inscribable = isInscribableAgreementMatter(input.snapshot.materia, input.snapshot.materia_clase);
@@ -132,6 +133,8 @@ function compactNormativeSnapshotForMeeting(input: MeetingAgreementMaterializati
     profile_id:
       `agreement-360:${input.entityId}:${input.snapshot.voting_context.tipo_social}:${input.snapshot.voting_context.organo_tipo}`,
     profile_hash: trace?.payload_hash ?? trace?.ruleset_snapshot_id ?? input.snapshot.evaluated_at,
+    // T11: fallback de reunión = payload_hash, NO comparable con el fingerprint vivo.
+    profile_hash_kind: "PAYLOAD" as const,
     profile_version: trace?.rule_pack_version ?? "meeting-adoption-snapshot.v2",
     framework_status: input.snapshot.societary_validity.ok ? "COMPLETO" : "CONFLICTO",
     entity_id: input.entityId,
@@ -204,6 +207,7 @@ export function buildMeetingAgreementPayload(input: MeetingAgreementMaterializat
         normative_snapshot_id: normativeSnapshot.snapshot_id,
         normative_profile_id: normativeSnapshot.profile_id,
         normative_profile_hash: normativeSnapshot.profile_hash,
+        normative_profile_hash_kind: (normativeSnapshot as { profile_hash_kind?: string | null }).profile_hash_kind ?? null,
         normative_framework_status: normativeSnapshot.framework_status,
       }
     : input.snapshot;
@@ -279,6 +283,7 @@ export function buildMeetingAgreementDraftResetPayload(input: MeetingAgreementRe
         normative_snapshot_id: normativeSnapshot.snapshot_id,
         normative_profile_id: normativeSnapshot.profile_id,
         normative_profile_hash: normativeSnapshot.profile_hash,
+        normative_profile_hash_kind: (normativeSnapshot as { profile_hash_kind?: string | null }).profile_hash_kind ?? null,
         normative_framework_status: normativeSnapshot.framework_status,
       }
     : input.snapshot;

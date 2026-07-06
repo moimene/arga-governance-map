@@ -40,6 +40,7 @@ import type { PactosEvalInput } from "@/lib/rules-engine/pactos-engine";
 import type { AdoptionMode, MateriaClase } from "@/lib/rules-engine";
 import type { AgreementNormativeSnapshot, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { evaluarDesfaseNormativo } from "@/lib/secretaria/desfase-normativo";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewGatePanel } from "@/components/secretaria/PreviewGatePanel";
 import { AutorizacionesRegulatoriasCard } from "@/components/secretaria/AutorizacionesRegulatoriasCard";
@@ -233,6 +234,22 @@ export default function ExpedienteAcuerdo() {
   const { data: normativeSnapshot, isLoading: normativeLoading } = useAgreementNormativeSnapshot(agreement);
   const { data: frozenSnapshot, isLoading: frozenSnapshotLoading } = useAgreementRuleSnapshot(id);
   const { primaryRole, displayName } = useCurrentUserRole();
+
+  // T11 (run-log UX 2026-06-20 §6.9.4) — aviso de desfase del marco normativo.
+  // Compara el hash congelado al adoptar con el fingerprint vivo; solo avisa si el
+  // congelado es CANÓNICO (los de origen reunión son PAYLOAD, no comparables → sin
+  // falsos positivos). Lógica pura en desfase-normativo.ts.
+  const desfaseNormativo = (() => {
+    const snap = (agreement as { compliance_snapshot?: unknown } | undefined)?.compliance_snapshot as
+      | { normative_profile_hash?: string | null; normative_profile_hash_kind?: string | null }
+      | null
+      | undefined;
+    return evaluarDesfaseNormativo({
+      frozenProfileHash: snap?.normative_profile_hash ?? null,
+      frozenProfileHashKind: snap?.normative_profile_hash_kind ?? null,
+      liveProfileHash: normativeSnapshot?.profile_hash ?? null,
+    });
+  })();
 
   const { data: ruleEvaluations = [] } = useQuery({
     queryKey: ["rule_evaluations", id],
@@ -464,6 +481,22 @@ export default function ExpedienteAcuerdo() {
               </p>
             ) : null}
           </Card>
+
+          {desfaseNormativo.desfase && (
+            <div
+              role="status"
+              className="flex items-start gap-3 border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-4 py-3"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                  Marco normativo posiblemente desfasado
+                </p>
+                <p className="mt-1 text-xs text-[var(--g-text-secondary)]">{desfaseNormativo.mensaje}</p>
+              </div>
+            </div>
+          )}
 
           <NormativeSnapshotCard snapshot={normativeSnapshot} isLoading={normativeLoading} />
 
