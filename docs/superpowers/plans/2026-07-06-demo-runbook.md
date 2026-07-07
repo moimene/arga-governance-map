@@ -55,26 +55,28 @@ Guion operativo para el presentador. Basado en la auditoría multiagente del
 6. No pasear la lista completa de convocatorias antiguas (hay ~35 BORRADOR
    históricas de abril — Decisión 5 si se quieren podar).
 
-## 3. Firma QES real (opcional — Decisión QTSP)
+## 3. Firma QES real — ✅ ACTIVA (verificada 2026-07-07)
 
-La Edge Function `qtsp-proxy` está **desplegada** y devuelve
-`503 QTSP_PROXY_NOT_CONFIGURED` hasta que se provisionen los secretos. Para
-activar firma REAL de EAD Trust (mismos valores que `g-mcp-server/.env`):
+La Edge Function `qtsp-proxy` v2 está desplegada y **configurada contra la EAD
+Enterprise Suite** (`api-eadcustody.eadtrust.gocertius.io`, el mismo backend y
+cuenta que la plataforma de contratación). Secretos `EAD_SUITE_*` provisionados
+y verificados con probe en vivo (login de sesión OK + API viva).
 
-```bash
-supabase secrets set --project-ref hzqwefkwsxopwrmtksbg \
-  EAD_TRUST_OKTA_TOKEN_URL="<OKTA_TOKEN_URL>" \
-  EAD_TRUST_CLIENT_ID="<OKTA_CLIENT_ID>" \
-  EAD_TRUST_CLIENT_SECRET="<OKTA_CLIENT_SECRET>" \
-  EAD_TRUST_SCOPE="token" \
-  EAD_TRUST_SIGNATURE_API_BASE_URL="<SIGNATURE_API_BASE_URL>" \
-  EAD_TRUST_EVIDENCE_API_BASE_URL="<API_BASE_URL>"
-```
-
-Tras esto, "Firmar con QES" en GenerarDocumentoStepper ejecuta el flujo real
-(crear solicitud → subir documento → firmante → activar; el firmante recibe el
-enlace de firma por email). **Usar como firmante una persona cuyo email
-controle el presentador.** Sin secretos, el sandbox sigue funcionando en dev.
+- **"Firmar con QES" en GenerarDocumentoStepper ejecuta ahora una solicitud de
+  firma REAL**: case-file → signature request → documento (DOCX se convierte a
+  PDF) → firmante → activación. **El firmante recibe el enlace de firma por
+  email de verdad** — usar SIEMPRE una persona cuyo email controle el
+  presentador para el momento en vivo.
+- Cada firma en vivo crea artefactos reales (case file + signature request) en
+  la cuenta compartida de EAD Enterprise Suite que también usa la plataforma de
+  contratación. Usar con mesura; se pueden limpiar después desde esa cuenta.
+- Nota histórica: la 1ª versión del proxy apuntaba a la Digital Trust API de
+  Factory (`api.int.gcloudfactory.com`, credenciales Okta de g-mcp-server) —
+  verificado empíricamente que ese host es interno (VPN/allowlist) e
+  inalcanzable desde Supabase Edge; por eso se migró a la Suite pública.
+- Rollback a sandbox: `supabase secrets unset EAD_SUITE_AUTH_EMAIL
+  EAD_SUITE_AUTH_PASSWORD --project-ref hzqwefkwsxopwrmtksbg` (el proxy vuelve
+  a 503 y el front cae al sandbox en dev).
 
 ## 4. Estado de datos post-refresh (2026-07-06)
 

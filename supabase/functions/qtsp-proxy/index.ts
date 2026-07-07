@@ -1,23 +1,28 @@
 // ============================================================
-// qtsp-proxy — Proxy server-side para la Digital Trust API de EAD Trust
+// qtsp-proxy v2 — Proxy server-side para EAD Enterprise Suite (QTSP)
 //
-// El browser NO puede ejecutar Okta client_credentials (el secret no puede
-// vivir en el cliente): src/lib/qtsp/ead-trust-client.ts lanza
-// QTSP_SERVER_PROXY_REQUIRED por diseño. Esta función ejecuta el mismo flujo
-// QES de 6 pasos (crear SR → hash → añadir doc → subir S3 → READY_TO_SIGN →
-// firmantes → activar) con los secretos provisionados en Supabase.
+// v1 apuntaba a la Digital Trust API de Factory (Okta client_credentials,
+// host api.int.gcloudfactory.com). VERIFICADO EMPÍRICAMENTE 2026-07-06: ese
+// host es interno (allowlist/VPN) e inalcanzable desde Supabase Edge y desde
+// Internet público (timeout 15s) — la firma colgaba hasta el IDLE_TIMEOUT.
+// v2 usa la EAD Enterprise Suite (https://api-eadcustody.eadtrust.gocertius.io,
+// pública, 401 en 0.18s), el mismo backend que usa la plataforma de
+// contratación (ADR-001 g_contract_review_platform) vía el MCP oficial
+// @g-digital/mcp-ead-enterprise-suite.
 //
 // Secretos requeridos (supabase secrets set …):
-//   EAD_TRUST_OKTA_TOKEN_URL, EAD_TRUST_CLIENT_ID, EAD_TRUST_CLIENT_SECRET,
-//   EAD_TRUST_SCOPE (default "token"),
-//   EAD_TRUST_EVIDENCE_API_BASE_URL, EAD_TRUST_SIGNATURE_API_BASE_URL
+//   EAD_SUITE_AUTH_EMAIL, EAD_SUITE_AUTH_PASSWORD,
+//   EAD_SUITE_API_BASE_URL (default https://api-eadcustody.eadtrust.gocertius.io)
+// (Los EAD_TRUST_* de v1 quedan ignorados a propósito.)
 //
 // Sin secretos → 503 { code: "QTSP_PROXY_NOT_CONFIGURED" } (el front cae a su
 // semántica actual: sandbox solo en dev/flag). Un fallo REAL del flujo QTSP
 // devuelve 502 con detalle — nunca se convierte en éxito.
 //
-// Referencia del flujo: mismo contrato que g-mcp-server (@g-digital) y que el
-// cliente browser ead-trust-client.ts (paths /api/v1/private/*).
+// Flujo de firma (secuencia probada contra la Suite, skill gocertius-suite-api §5):
+//   case-file → signature-request → document (+PUT S3 con x-amz-checksum-sha256)
+//   → poll READY_TO_SIGN → participant SIGNATORY → signatoryId por documento
+//   → coordinates → activate. El firmante recibe el enlace por email.
 // ============================================================
 
 const CORS_HEADERS = {
@@ -26,10 +31,10 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024; // 15MB tras decodificar
-const POLL_INTERVAL_MS = Number(Deno.env.get("EAD_TRUST_POLL_INTERVAL_MS") ?? 3000);
-const POLL_MAX_ATTEMPTS = Number(Deno.env.get("EAD_TRUST_POLL_MAX_ATTEMPTS") ?? 20);
-const READY_TIMEOUT_MS = 60_000;
+const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 20_000; // lección v1: sin timeout, un upstream colgado = 150s idle
+const READY_TIMEOUT_MS = 90_000; // procesado async del documento (~30s típico)
+const SIGN_DEADLINE_DAYS = 7; // la Suite rechaza deadlines a más de ~10 días
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -40,64 +45,71 @@ function jsonResponse(status: number, body: unknown) {
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-interface EADConfig {
-  oktaTokenUrl: string;
-  clientId: string;
-  clientSecret: string;
-  scope: string;
-  evidenceApiBaseUrl: string;
-  signatureApiBaseUrl: string;
+interface SuiteConfig {
+  baseUrl: string;
+  email: string;
+  password: string;
 }
 
-function readConfig(): EADConfig | null {
-  const oktaTokenUrl = Deno.env.get("EAD_TRUST_OKTA_TOKEN_URL") ?? "";
-  const clientId = Deno.env.get("EAD_TRUST_CLIENT_ID") ?? "";
-  const clientSecret = Deno.env.get("EAD_TRUST_CLIENT_SECRET") ?? "";
-  const signatureApiBaseUrl = Deno.env.get("EAD_TRUST_SIGNATURE_API_BASE_URL") ?? "";
-  const evidenceApiBaseUrl = Deno.env.get("EAD_TRUST_EVIDENCE_API_BASE_URL") ?? "";
-  if (!oktaTokenUrl || !clientId || !clientSecret || !signatureApiBaseUrl) return null;
-  return {
-    oktaTokenUrl,
-    clientId,
-    clientSecret,
-    scope: Deno.env.get("EAD_TRUST_SCOPE") ?? "token",
-    evidenceApiBaseUrl,
-    signatureApiBaseUrl,
-  };
+function readConfig(): SuiteConfig | null {
+  const email = Deno.env.get("EAD_SUITE_AUTH_EMAIL") ?? "";
+  const password = Deno.env.get("EAD_SUITE_AUTH_PASSWORD") ?? "";
+  const baseUrl = (Deno.env.get("EAD_SUITE_API_BASE_URL") ?? "https://api-eadcustody.eadtrust.gocertius.io").replace(/\/$/, "");
+  if (!email || !password) return null;
+  return { baseUrl, email, password };
 }
 
-// ─── Okta token (cache por instancia) ────────────────────────────────────────
+// ─── Sesión (cache por instancia; el JWT dura ~1h) ───────────────────────────
 
-let tokenCache: { accessToken: string; expiresAt: number } | null = null;
-const TOKEN_SAFETY_MARGIN_MS = 60_000;
+let sessionCache: { jwt: string; expiresAt: number } | null = null;
+const SESSION_TTL_MS = 50 * 60 * 1000;
 
-async function getOktaToken(cfg: EADConfig): Promise<string> {
+async function timedFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return await fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
+async function getJwt(cfg: SuiteConfig): Promise<string> {
   const now = Date.now();
-  if (tokenCache && tokenCache.expiresAt > now + TOKEN_SAFETY_MARGIN_MS) {
-    return tokenCache.accessToken;
-  }
-  const params = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: cfg.clientId,
-    client_secret: cfg.clientSecret,
-    scope: cfg.scope,
-  });
-  const response = await fetch(cfg.oktaTokenUrl, {
+  if (sessionCache && sessionCache.expiresAt > now) return sessionCache.jwt;
+
+  const response = await timedFetch(`${cfg.baseUrl}/session`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: cfg.email, password: cfg.password }),
+  });
+  if (response.status === 409) {
+    // Gate de textos legales: la cuenta tiene términos pendientes de aceptar.
+    // No se auto-aceptan términos desde un proxy: acción humana requerida.
+    const text = await response.text();
+    throw new Error(`Suite session 409 (términos legales pendientes de aceptación en la cuenta): ${text.slice(0, 300)}`);
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Suite session failed (${response.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await response.json();
+  if (!data?.jwt) throw new Error("Suite session: respuesta sin jwt");
+  sessionCache = { jwt: data.jwt, expiresAt: now + SESSION_TTL_MS };
+  return data.jwt;
+}
+
+async function suiteFetch(cfg: SuiteConfig, path: string, init: RequestInit, step: string): Promise<Record<string, unknown>> {
+  const jwt = await getJwt(cfg);
+  const response = await timedFetch(`${cfg.baseUrl}${path}`, {
+    ...init,
     headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cache-Control": "no-cache",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+      ...(init.headers ?? {}),
     },
-    body: params.toString(),
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Okta auth failed (${response.status}): ${text.slice(0, 300)}`);
+    throw new Error(`${step} failed (${response.status}): ${text.slice(0, 300)}`);
   }
-  const data = await response.json();
-  tokenCache = { accessToken: data.access_token, expiresAt: now + data.expires_in * 1000 };
-  return tokenCache.accessToken;
+  if (response.status === 204) return {};
+  const text = await response.text();
+  return text ? JSON.parse(text) : {};
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -109,46 +121,47 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function hexToBase64(hex: string): string {
-  const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+async function sha256(data: Uint8Array): Promise<{ hex: string; b64: string }> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer));
+  const hex = Array.from(digest).map((b) => b.toString(16).padStart(2, "0")).join("");
   let binary = "";
-  bytes.forEach((b) => { binary += String.fromCharCode(b); });
-  return btoa(binary);
-}
-
-async function eadFetch(cfg: EADConfig, url: string, init: RequestInit, step: string): Promise<Record<string, unknown>> {
-  const token = await getOktaToken(cfg);
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`${step} failed (${response.status}): ${text.slice(0, 300)}`);
-  }
-  return response.json();
+  digest.forEach((b) => { binary += String.fromCharCode(b); });
+  return { hex, b64: btoa(binary) };
 }
 
 async function uploadToS3(presignedUrl: string, bytes: Uint8Array, sha256Base64: string): Promise<void> {
-  // La URL prefirmada exige el checksum: sin x-amz-checksum-sha256 → 403.
+  // La URL prefirmada está firmada con SignedHeaders=host;x-amz-checksum-sha256:
+  // sin ese header (base64, no hex) → 403 SignatureDoesNotMatch.
   const response = await fetch(presignedUrl, {
     method: "PUT",
     headers: { "x-amz-checksum-sha256": sha256Base64 },
     body: bytes.buffer as ArrayBuffer,
+    signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error(`S3 upload failed (${response.status})`);
 }
 
-// ─── Acción: sign (flujo QES de 6 pasos) ─────────────────────────────────────
+function splitName(full: string, surnames?: string): { firstName: string; lastName: string } {
+  if (surnames?.trim()) return { firstName: full.trim(), lastName: surnames.trim() };
+  const parts = full.trim().split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+/** Resuelve un useCaseId utilizable (evita el use-case personal "PR", que solo
+ *  admite un case file por cuenta). Cache por instancia. */
+let useCaseCache: string | null = null;
+async function resolveUseCaseId(cfg: SuiteConfig): Promise<string> {
+  if (useCaseCache) return useCaseCache;
+  const res = await suiteFetch(cfg, "/use-cases", { method: "GET" }, "listUseCases");
+  const rows = (res.data as Array<{ id?: string; code?: string }> | undefined) ?? [];
+  const general = rows.find((u) => u.code && u.code !== "PR") ?? rows[0];
+  if (!general?.id) throw new Error("Suite: la cuenta no tiene use-cases disponibles");
+  useCaseCache = general.id;
+  return general.id;
+}
+
+// ─── Acción: sign ────────────────────────────────────────────────────────────
 
 interface SignBody {
   documentName?: string;
@@ -158,7 +171,7 @@ interface SignBody {
   agreementId?: string;
 }
 
-async function handleSign(cfg: EADConfig, body: SignBody): Promise<Response> {
+async function handleSign(cfg: SuiteConfig, body: SignBody): Promise<Response> {
   const documentName = (body.documentName ?? "").trim().slice(0, 200);
   const createdBy = (body.createdBy ?? "").trim().slice(0, 120);
   const signatories = (body.signatories ?? []).filter((s) => s?.name && s?.email);
@@ -176,114 +189,158 @@ async function handleSign(cfg: EADConfig, body: SignBody): Promise<Response> {
     return jsonResponse(400, { error: `Tamaño de documento fuera de rango (1B–${MAX_DOCUMENT_BYTES}B)` });
   }
 
-  const base = cfg.signatureApiBaseUrl;
-
-  // 1. Crear Signature Request
-  const sr = await eadFetch(cfg, `${base}/api/v1/private/signature-requests`, {
+  // 0. Case file contenedor (uno por solicitud — trazable por agreementId)
+  const caseFileId = crypto.randomUUID();
+  const useCaseId = await resolveUseCaseId(cfg);
+  await suiteFetch(cfg, "/case-files", {
     method: "POST",
     body: JSON.stringify({
-      name: `Firma QES — ${documentName}`,
-      createdBy,
-      description: body.agreementId ? `Acuerdo ${body.agreementId}` : undefined,
-      notifications: true,
-      language: "ES",
+      id: caseFileId,
+      name: `Firma QES — ${documentName}`.slice(0, 120),
+      // Algunos use-cases exigen description aunque el schema base la marque opcional.
+      description: body.agreementId ? `Acuerdo ${body.agreementId}` : `Documento ${documentName}`,
+      reference: body.agreementId ?? undefined,
+      useCaseId,
+    }),
+  }, "createCaseFile");
+
+  // 1. Signature request (build-then-activate)
+  const srId = crypto.randomUUID();
+  const deadline = new Date(Date.now() + SIGN_DEADLINE_DAYS * 86400000).toISOString();
+  await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests`, {
+    method: "POST",
+    body: JSON.stringify({
+      id: srId,
+      name: `Firma QES — ${documentName}`.slice(0, 120),
+      language: "es_ES",
+      deadline,
+      signatureType: "INTERPOSITION",
+      sequence: "PARALLEL",
+      closeCondition: "ALL_REQUIRED",
+      dashboardUrl: "NONE",
     }),
   }, "createSignatureRequest");
-  const srId = sr.id as string;
 
-  // 2. Hash
-  const hashHex = await sha256Hex(bytes);
-
-  // 3. Añadir documento + subir a S3
-  const doc = await eadFetch(cfg, `${base}/api/v1/private/signature-requests/${srId}/documents`, {
+  // 2. Documento + subida (convertToPdf para DOCX: las coordenadas exigen PDF)
+  const documentId = crypto.randomUUID();
+  const { hex, b64 } = await sha256(bytes);
+  const doc = await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests/${srId}/documents`, {
     method: "POST",
     body: JSON.stringify({
-      filename: documentName,
+      id: documentId,
+      hash: hex,
       title: documentName,
-      hash: hashHex,
-      signatureType: "INTERPOSITION",
-      provider: "EADTRUST",
+      fileName: documentName,
+      convertToPdf: !documentName.toLowerCase().endsWith(".pdf"),
+      fileSize: bytes.length,
     }),
   }, "addDocument");
-  await uploadToS3(doc.url as string, bytes, hexToBase64(hashHex));
+  await uploadToS3(doc.url as string, bytes, b64);
 
-  // 4. Esperar READY_TO_SIGN
-  const deadline = Date.now() + READY_TIMEOUT_MS;
+  // 3. Poll hasta READY_TO_SIGN (procesado async; activar antes falla)
+  const deadlineMs = Date.now() + READY_TIMEOUT_MS;
   let ready = false;
-  while (Date.now() < deadline) {
-    const detail = await eadFetch(cfg, `${base}/api/v1/private/signature-requests/${srId}`, { method: "GET" }, "getSignatureRequest");
-    const docs = (detail.documents as Array<{ status?: string }> | undefined) ?? [];
+  while (Date.now() < deadlineMs) {
+    const list = await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests/${srId}/documents`, { method: "GET" }, "listDocuments");
+    const docs = (list.data as Array<{ status?: string }> | undefined) ?? [];
     if (docs.length > 0 && docs.every((d) => d.status === "READY_TO_SIGN")) { ready = true; break; }
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000));
   }
   if (!ready) throw new Error(`Documento en SR ${srId} no alcanzó READY_TO_SIGN en ${READY_TIMEOUT_MS}ms`);
 
-  // 5. Añadir firmantes
-  const signatoryIds: string[] = [];
+  // 4. Participantes SIGNATORY
   for (const signer of signatories) {
-    const payload: Record<string, unknown> = { name: signer.name, email: signer.email };
-    if (signer.surnames) payload.surnames = signer.surnames;
-    if (signer.sequence !== undefined) payload.sequence = signer.sequence;
-    const result = await eadFetch(
-      cfg,
-      `${base}/api/v1/private/signature-requests/${srId}/documents/${doc.id}/signatories`,
-      { method: "POST", body: JSON.stringify(payload) },
-      "addSignatory",
-    );
-    signatoryIds.push(result.id as string);
+    const { firstName, lastName } = splitName(signer.name!, signer.surnames);
+    await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests/${srId}/participants`, {
+      method: "POST",
+      body: JSON.stringify({
+        id: crypto.randomUUID(),
+        role: "SIGNATORY",
+        firstName,
+        lastName,
+        email: signer.email,
+        linkToAllDocuments: true,
+      }),
+    }, "addParticipant");
   }
 
-  // 6. Activar
-  await eadFetch(cfg, `${base}/api/v1/private/signature-requests/${srId}/activate`, { method: "POST" }, "activateSignatureRequest");
+  // 5. signatoryId por documento (puede diferir del participantId) + coordenadas
+  const sigList = await suiteFetch(
+    cfg,
+    `/case-files/${caseFileId}/signature-requests/${srId}/documents/${documentId}/signatories`,
+    { method: "GET" },
+    "listSignatories",
+  );
+  const signatoryIds = (((sigList.data ?? sigList) as Array<{ id?: string }>) ?? [])
+    .map((s) => s.id)
+    .filter((id): id is string => typeof id === "string");
+  if (signatoryIds.length === 0) throw new Error("Suite: sin signatories tras añadir participantes");
+
+  let offset = 0;
+  for (const signatoryId of signatoryIds) {
+    await suiteFetch(
+      cfg,
+      `/case-files/${caseFileId}/signature-requests/${srId}/documents/${documentId}/signatories/${signatoryId}/coordinates`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ coordinates: [{ page: 1, x: 30, y: 230 + offset }] }),
+      },
+      "setCoordinates",
+    );
+    offset += 60;
+  }
+
+  // 6. Activar (los firmantes reciben el enlace de firma)
+  await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests/${srId}/activate`, { method: "PUT" }, "activateSignatureRequest");
 
   return jsonResponse(200, {
     srId,
     srStatus: "ACTIVE",
-    documentId: doc.id,
-    documentHash: hashHex,
+    caseFileId,
+    documentId,
+    documentHash: hex,
     signatoryIds,
   });
 }
 
-// ─── Acción: status (consulta de una SR para seguimiento) ────────────────────
+// ─── Acción: status ──────────────────────────────────────────────────────────
 
-async function handleStatus(cfg: EADConfig, srId: string): Promise<Response> {
-  if (!srId) return jsonResponse(400, { error: "srId es obligatorio" });
-  const detail = await eadFetch(
+async function handleStatus(cfg: SuiteConfig, caseFileId: string, srId: string): Promise<Response> {
+  if (!caseFileId || !srId) return jsonResponse(400, { error: "caseFileId y srId son obligatorios" });
+  const detail = await suiteFetch(
     cfg,
-    `${cfg.signatureApiBaseUrl}/api/v1/private/signature-requests/${encodeURIComponent(srId)}`,
+    `/case-files/${encodeURIComponent(caseFileId)}/signature-requests/${encodeURIComponent(srId)}`,
     { method: "GET" },
     "getSignatureRequest",
   );
+  const docs = await suiteFetch(
+    cfg,
+    `/case-files/${encodeURIComponent(caseFileId)}/signature-requests/${encodeURIComponent(srId)}/documents`,
+    { method: "GET" },
+    "listDocuments",
+  );
   return jsonResponse(200, {
-    srId: detail.id,
+    srId,
+    caseFileId,
     status: detail.status,
-    documents: ((detail.documents as Array<Record<string, unknown>> | undefined) ?? []).map((d) => ({
-      id: d.id,
-      status: d.status,
-    })),
+    documents: ((docs.data as Array<Record<string, unknown>> | undefined) ?? []).map((d) => ({ id: d.id, status: d.status })),
   });
 }
 
-// ─── Acción: evidence (crear evidencia TSP + subir + poll) ───────────────────
+// ─── Acción: evidence (grupo FILE → evidencia → subida → close → poll) ───────
 
 interface EvidenceBody {
   title?: string;
   fileName?: string;
   documentBase64?: string;
   createdBy?: string;
-  metadata?: Record<string, string>;
 }
 
-async function handleEvidence(cfg: EADConfig, body: EvidenceBody): Promise<Response> {
-  if (!cfg.evidenceApiBaseUrl) {
-    return jsonResponse(503, { code: "QTSP_PROXY_NOT_CONFIGURED", error: "EAD_TRUST_EVIDENCE_API_BASE_URL sin configurar" });
-  }
+async function handleEvidence(cfg: SuiteConfig, body: EvidenceBody): Promise<Response> {
   const title = (body.title ?? "").trim().slice(0, 200);
   const fileName = (body.fileName ?? "").trim().slice(0, 200);
-  const createdBy = (body.createdBy ?? "").trim().slice(0, 120);
-  if (!title || !fileName || !body.documentBase64 || !createdBy) {
-    return jsonResponse(400, { error: "title, fileName, documentBase64 y createdBy son obligatorios" });
+  if (!title || !fileName || !body.documentBase64) {
+    return jsonResponse(400, { error: "title, fileName y documentBase64 son obligatorios" });
   }
   let bytes: Uint8Array;
   try {
@@ -295,45 +352,57 @@ async function handleEvidence(cfg: EADConfig, body: EvidenceBody): Promise<Respo
     return jsonResponse(400, { error: `Tamaño de documento fuera de rango (1B–${MAX_DOCUMENT_BYTES}B)` });
   }
 
+  const caseFileId = crypto.randomUUID();
+  const groupId = crypto.randomUUID();
   const evidenceId = crypto.randomUUID();
-  const hashHex = await sha256Hex(bytes);
+  const useCaseId = await resolveUseCaseId(cfg);
+  const { hex, b64 } = await sha256(bytes);
 
-  const created = await eadFetch(cfg, `${cfg.evidenceApiBaseUrl}/api/v1/private/evidences`, {
+  await suiteFetch(cfg, "/case-files", {
     method: "POST",
-    body: JSON.stringify({
-      evidenceId,
-      hash: hashHex,
-      capturedAt: new Date().toISOString(),
-      custodyType: "INTERNAL",
-      title,
-      fileName,
-      createdBy,
-      fileSize: bytes.length,
-      ...(body.metadata ? { metadata: body.metadata } : {}),
-      testimony: { TSP: { required: true, providers: ["EADTrust"] } },
-    }),
+    body: JSON.stringify({ id: caseFileId, name: `Evidencia — ${title}`.slice(0, 120), description: title, useCaseId }),
+  }, "createCaseFile");
+
+  await suiteFetch(cfg, "/evidence-groups", {
+    method: "POST",
+    body: JSON.stringify({ id: groupId, caseFileId, evidenceType: "FILE", name: title.slice(0, 120) }),
+  }, "createEvidenceGroup");
+
+  await suiteFetch(cfg, "/evidences", {
+    method: "POST",
+    body: JSON.stringify({ id: evidenceId, caseFileId, evidenceGroupId: groupId, hash: hex, title, custodyType: "EXTERNAL", fileName }),
   }, "createEvidence");
 
-  await uploadToS3(created.url as string, bytes, hexToBase64(hashHex));
+  const uploadRes = await suiteFetch(
+    cfg,
+    `/case-files/${caseFileId}/evidence-groups/${groupId}/evidences/${evidenceId}/upload-url`,
+    { method: "POST", body: JSON.stringify({ hash: hex, fileName }) },
+    "getUploadUrl",
+  );
+  await uploadToS3(uploadRes.uploadFileUrl as string, bytes, b64);
 
-  // Poll hasta COMPLETED/ERROR
+  await suiteFetch(cfg, `/case-files/${caseFileId}/evidence-groups/${groupId}/close`, {
+    method: "POST",
+    body: JSON.stringify({ evidencesCount: 1 }),
+  }, "closeEvidenceGroup");
+
+  // Poll hasta COMPLETED (sellado async)
   let finalStatus = "PENDING";
-  for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-    const detail = await eadFetch(
+  const deadlineMs = Date.now() + 60_000;
+  while (Date.now() < deadlineMs) {
+    const detail = await suiteFetch(
       cfg,
-      `${cfg.evidenceApiBaseUrl}/api/v1/private/evidences/${evidenceId}`,
+      `/case-files/${caseFileId}/evidence-groups/${groupId}/evidences/${evidenceId}`,
       { method: "GET" },
       "getEvidence",
     );
-    finalStatus = ((detail.status as { status?: string } | undefined)?.status) ?? "PENDING";
+    finalStatus = typeof detail.status === "string" ? detail.status : ((detail.status as { status?: string } | undefined)?.status ?? "PENDING");
     if (finalStatus === "COMPLETED" || finalStatus === "ERROR") break;
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    await new Promise((r) => setTimeout(r, 3000));
   }
-  if (finalStatus !== "COMPLETED") {
-    throw new Error(`Evidencia ${evidenceId} terminó en estado ${finalStatus}`);
-  }
+  if (finalStatus !== "COMPLETED") throw new Error(`Evidencia ${evidenceId} terminó en estado ${finalStatus}`);
 
-  return jsonResponse(200, { evidenceId, status: finalStatus, hash: hashHex });
+  return jsonResponse(200, { evidenceId, caseFileId, evidenceGroupId: groupId, status: finalStatus, hash: hex });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -346,7 +415,7 @@ Deno.serve(async (req) => {
   if (!cfg) {
     return jsonResponse(503, {
       code: "QTSP_PROXY_NOT_CONFIGURED",
-      error: "Secretos EAD Trust sin provisionar (EAD_TRUST_OKTA_TOKEN_URL/CLIENT_ID/CLIENT_SECRET/SIGNATURE_API_BASE_URL)",
+      error: "Secretos EAD Enterprise Suite sin provisionar (EAD_SUITE_AUTH_EMAIL / EAD_SUITE_AUTH_PASSWORD)",
     });
   }
 
@@ -362,7 +431,7 @@ Deno.serve(async (req) => {
       case "sign":
         return await handleSign(cfg, body as SignBody);
       case "status":
-        return await handleStatus(cfg, (body.srId as string) ?? "");
+        return await handleStatus(cfg, (body.caseFileId as string) ?? "", (body.srId as string) ?? "");
       case "evidence":
         return await handleEvidence(cfg, body as EvidenceBody);
       default:
