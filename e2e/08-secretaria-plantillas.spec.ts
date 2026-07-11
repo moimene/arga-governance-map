@@ -39,17 +39,18 @@ test.describe('Motor de reglas societarias', () => {
     });
     await page.getByRole('button', { name: /Cese de consejero art\. 223 LSC/i }).click();
     await expect(page.getByRole('tab', { name: 'Resumen Cadena completa de decisión' })).toBeVisible();
-    await expect(page.getByText('Cadena de decisión del motor')).toBeVisible();
+    await expect(page.getByText('Cadena de decisión', { exact: true })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Plantillas Gate PRE documental' }).click();
-    await expect(page.getByText('Plantillas vinculadas al motor')).toBeVisible();
-    await expect(page.getByText('Usada por el motor').first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Plantillas Comprobación documental previa' }).click();
+    await expect(page.getByText('Documentos y plantillas de esta materia').first()).toBeVisible();
+    await expect(page.getByText('Vigente para nuevos expedientes').first()).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Simular Resultado antes de iniciar' }).click();
-    await expect(page.getByText('Resultado del motor').first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Verificación Requisitos antes de iniciar' }).click();
+    await expect(page.getByText('Resultado de la verificación').first()).toBeVisible();
     await expect(page.getByText('Plantillas mínimas', { exact: true })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Iniciar expediente' }).click();
+    // El CTA contextual "Iniciar expediente" aparece también en el panel de estado de la materia.
+    await page.getByRole('link', { name: 'Iniciar expediente', exact: true }).first().click();
     await expect(page).toHaveURL(/\/secretaria\/tramitador\/nuevo.*materia=CESE_CONSEJERO/);
     await expect(page).not.toHaveURL('/login');
   });

@@ -10,7 +10,6 @@ import {
   FolderOpen,
   Building2,
   ShieldCheck,
-  Filter,
   Shield,
   type LucideIcon,
 } from "lucide-react";
@@ -29,8 +28,16 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   FUNCTIONAL_MATTER_GROUPS,
   MATTER_GROUP_BY_MATERIA,
+  compareTemplateVersions,
   normativeRoleFromAppRole,
+  organoTipoBusinessLabel,
 } from "@/lib/secretaria/mesa-control-societaria";
+import {
+  buildLegalTemplateReviewRows,
+  matchesLegalTemplateReviewFilter,
+  summarizeLegalTemplateReview,
+  type LegalTemplateReviewFilter,
+} from "@/lib/secretaria/legal-template-review";
 import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
 import { isOperationalTemplate, templateUsabilityNotice } from "@/lib/doc-gen/template-operability";
@@ -133,11 +140,37 @@ function matterGroup(value: string) {
   return FUNCTIONAL_MATTER_GROUPS.find((g) => g.id === groupId) ?? FALLBACK_MATTER_GROUP;
 }
 
-const INFORME_TIPOS = new Set([
-  "INFORME_PRECEPTIVO",
-  "INFORME_DOCUMENTAL_PRE",
-  "INFORME_GESTION",
-]);
+// Segmentación por ciclo de vida (informe UX Plantillas 2026-07-10): la vista
+// por defecto responde a "qué plantilla puedo usar ahora" sin ocultar el
+// histórico (política "todas visibles + avisar", decisión 2026-06-26).
+type CicloSegment = "vigentes" | "preparacion" | "historico" | "todas";
+
+const CICLO_SEGMENTS: Array<{ id: CicloSegment; label: string }> = [
+  { id: "vigentes", label: "Vigentes" },
+  { id: "preparacion", label: "En preparación" },
+  { id: "historico", label: "Histórico" },
+  { id: "todas", label: "Todas" },
+];
+
+function cicloOf(estado?: string | null): Exclude<CicloSegment, "todas"> {
+  const value = (estado ?? "").trim().toUpperCase();
+  if (value === "ACTIVA") return "vigentes";
+  if (value === "ARCHIVADA" || value === "DEPRECADA") return "historico";
+  return "preparacion";
+}
+
+// Identidad funcional para localizar la versión vigente que sustituye a una
+// histórica (misma pieza: tipo + materia efectiva + órgano + adopción + jurisdicción).
+function templateIdentityKey(t: PlantillaProtegidaRow) {
+  return [t.tipo, t.materia_acuerdo ?? t.materia ?? "", t.organo_tipo ?? "", t.adoption_mode ?? "", t.jurisdiccion ?? ""].join("|");
+}
+
+const INCIDENCIA_CHIPS: Array<{ filter: LegalTemplateReviewFilter; label: string; summaryKey: "draftVersion" | "duplicateMatter" | "missingOwner" | "missingReference" }> = [
+  { filter: "DRAFT_VERSION", label: "Versión provisional", summaryKey: "draftVersion" },
+  { filter: "DUPLICATE_MATTER", label: "Variantes por confirmar", summaryKey: "duplicateMatter" },
+  { filter: "MISSING_OWNER", label: "Sin órgano o adopción", summaryKey: "missingOwner" },
+  { filter: "MISSING_REFERENCE", label: "Sin referencia legal", summaryKey: "missingReference" },
+];
 
 function templateEngineSort(a: PlantillaProtegidaRow, b: PlantillaProtegidaRow) {
   const rankA = ESTADO_SORT_RANK[a.estado] ?? 99;
@@ -168,14 +201,10 @@ function adoptionModeLabel(value?: string | null) {
   return labels[value] ?? value.replace(/_/g, " ");
 }
 
+// Etiqueta de negocio de órgano compartida con el catálogo de materias
+// (cubre CONSEJO_ADMIN, SOCIO_UNICO, ADMIN_UNICO, COMISION_DELEGADA, etc.).
 function organoTipoLabel(value?: string | null) {
-  if (!value) return "Cualquier órgano";
-  const labels: Record<string, string> = {
-    JUNTA_GENERAL: "Junta General",
-    CONSEJO: "Consejo de Administración",
-    ANY: "Cualquier órgano",
-  };
-  return labels[value] ?? value.replace(/_/g, " ");
+  return organoTipoBusinessLabel(value);
 }
 
 function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdiction?: string | null) {
@@ -185,6 +214,26 @@ function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdi
     plantilla.jurisdiccion === jurisdiction ||
     plantilla.jurisdiccion === "GLOBAL" ||
     plantilla.jurisdiccion === "MULTI"
+  );
+}
+
+// Advertencia de madurez (informe UX Plantillas): plantilla vigente con versión
+// técnica/preliminar (0.x o sin formato de versión final, predicado
+// isDraftVersion de legal-template-review). Vigente, pero se usa con cautela.
+const MADUREZ_EXPLICACION =
+  "Versión técnica o preliminar (0.x o sin formato de versión final): vigente con advertencia de madurez.";
+
+function MadurezChip() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-primary)]"
+      style={{ borderRadius: "var(--g-radius-full)" }}
+      title={MADUREZ_EXPLICACION}
+    >
+      <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden="true" />
+      Versión provisional
+      <span className="sr-only">. {MADUREZ_EXPLICACION}</span>
+    </span>
   );
 }
 
@@ -328,6 +377,10 @@ export default function Plantillas() {
   const [filterMateria, setFilterMateria] = useState<string>(initialMateriaFilter);
   // UX-7.B: filtro por cohorte de plantilla (aplica a ambas pestañas).
   const [filterCohorte, setFilterCohorte] = useState<string>("");
+  // Informe UX Plantillas: segmento de ciclo (default = qué puedo usar ahora).
+  const [filterCiclo, setFilterCiclo] = useState<CicloSegment>("vigentes");
+  // Filtro de incidencias de calidad documental (reutiliza legal-template-review).
+  const [filterRevision, setFilterRevision] = useState<LegalTemplateReviewFilter | "">("");
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
@@ -339,15 +392,25 @@ export default function Plantillas() {
     return rows.filter((plantilla) => templateAppliesToJurisdiction(plantilla, selectedJurisdiction));
   }, [data, isSociedadMode, selectedJurisdiction]);
 
-  const scopeMetrics = useMemo(() => {
-    const active = scopedData.filter((p) => p.estado === "ACTIVA").length;
-    const modelos = scopedData.filter((p) => p.tipo === "MODELO_ACUERDO").length;
-    const informes = scopedData.filter((p) => INFORME_TIPOS.has(p.tipo)).length;
-    const exactJurisdiction = selectedJurisdiction
-      ? scopedData.filter((p) => p.jurisdiccion === selectedJurisdiction).length
-      : 0;
-    return { active, modelos, informes, exactJurisdiction };
-  }, [scopedData, selectedJurisdiction]);
+  // Salud documental (informe UX Plantillas): agrega los detectores existentes
+  // de legal-template-review sobre las VIGENTES — no crea un sistema nuevo.
+  const vigentesData = useMemo(() => scopedData.filter((p) => cicloOf(p.estado) === "vigentes"), [scopedData]);
+  const reviewRows = useMemo(() => buildLegalTemplateReviewRows(vigentesData), [vigentesData]);
+  const reviewByTemplateId = useMemo(
+    () => new Map(reviewRows.map((row) => [row.templateId, row])),
+    [reviewRows],
+  );
+  const reviewSummary = useMemo(() => summarizeLegalTemplateReview(reviewRows), [reviewRows]);
+  const healthMetrics = useMemo(() => {
+    const historico = scopedData.filter((p) => cicloOf(p.estado) === "historico").length;
+    const modelosVigentes = vigentesData.filter((p) => p.tipo === "MODELO_ACUERDO").length;
+    return {
+      vigentes: vigentesData.length,
+      modelos: modelosVigentes,
+      historico,
+      incidencias: reviewSummary.needsReview,
+    };
+  }, [reviewSummary.needsReview, scopedData, vigentesData]);
 
   const runTransicion = (
     plantilla: PlantillaProtegidaRow,
@@ -494,18 +557,55 @@ export default function Plantillas() {
     };
   });
 
+  const cicloCounts = useMemo(() => {
+    const counts: Record<CicloSegment, number> = { vigentes: 0, preparacion: 0, historico: 0, todas: displayData.length };
+    for (const plantilla of displayData) counts[cicloOf(plantilla.estado)] += 1;
+    return counts;
+  }, [displayData]);
+
+  // Incidencias de la PESTAÑA activa: los chips y su filtro deben coincidir con
+  // lo que la tabla puede mostrar (missingOwner/missingReference solo existen en
+  // modelos; un chip global daría vacíos garantizados en la pestaña proceso).
+  const tabReviewRows = useMemo(
+    () => buildLegalTemplateReviewRows(displayData.filter((p) => cicloOf(p.estado) === "vigentes")),
+    [displayData],
+  );
+  const tabReviewById = useMemo(
+    () => new Map(tabReviewRows.map((row) => [row.templateId, row])),
+    [tabReviewRows],
+  );
+  const tabReviewSummary = useMemo(() => summarizeLegalTemplateReview(tabReviewRows), [tabReviewRows]);
+
   const filteredData = useMemo(
     () => {
       let rows = activeTab === 'modelos' && filterMateria
         ? displayData.filter((p) => (p.materia_acuerdo ?? p.materia) === filterMateria)
         : displayData;
+      if (filterCiclo !== "todas") {
+        rows = rows.filter((p) => cicloOf(p.estado) === filterCiclo);
+      }
+      if (filterRevision) {
+        rows = rows.filter((p) => matchesLegalTemplateReviewFilter(tabReviewById.get(p.id), filterRevision));
+      }
       if (filterCohorte) {
         rows = rows.filter((p) => clasificarCohortePlantilla(p) === filterCohorte);
       }
       return [...rows].sort(templateEngineSort);
     },
-    [activeTab, displayData, filterMateria, filterCohorte],
+    [activeTab, displayData, filterMateria, filterCiclo, filterRevision, tabReviewById, filterCohorte],
   );
+
+  // Sustitución de una histórica: versión vigente de la misma pieza documental.
+  const replacementForSelected = useMemo(() => {
+    if (!selected || cicloOf(selected.estado) !== "historico") return null;
+    const identity = templateIdentityKey(selected);
+    const candidates = scopedData.filter(
+      (p) => cicloOf(p.estado) === "vigentes" && templateIdentityKey(p) === identity,
+    );
+    return (
+      [...candidates].sort((a, b) => compareTemplateVersions(b.version, a.version))[0] ?? null
+    );
+  }, [scopedData, selected]);
 
   useEffect(() => {
     const materia = materiaFilterParam;
@@ -574,36 +674,44 @@ export default function Plantillas() {
               <p className="mt-2 max-w-3xl text-sm text-[var(--g-text-secondary)]">
                 El ámbito de sociedad se conserva para resolver variables, órgano competente y rule pack aplicable. La generación final queda separada en el carril documental; este módulo mantiene la traza societaria y la salida demo/operativa.
               </p>
+              <p className="mt-2 max-w-3xl text-sm font-medium text-[var(--g-text-primary)]">
+                {healthMetrics.incidencias > 0
+                  ? `Biblioteca operativa con advertencias: ${healthMetrics.vigentes} plantillas vigentes, ${healthMetrics.historico} archivadas y ${healthMetrics.incidencias} con incidencias de calidad documental.`
+                  : `Biblioteca operativa: ${healthMetrics.vigentes} plantillas vigentes y ${healthMetrics.historico} archivadas, sin incidencias de calidad documental.`}
+              </p>
             </div>
 
             <dl className="grid min-w-full grid-cols-1 gap-3 text-sm sm:min-w-[480px] sm:grid-cols-4 lg:min-w-[640px]">
               <div className="border-l border-[var(--g-border-subtle)] pl-3">
                 <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  Activas
+                  Vigentes
                 </dt>
-                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.active}</dd>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{healthMetrics.vigentes}</dd>
               </div>
               <div className="border-l border-[var(--g-border-subtle)] pl-3">
                 <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
                   <FileText className="h-3.5 w-3.5" />
-                  Modelos
+                  Modelos vigentes
                 </dt>
-                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.modelos}</dd>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{healthMetrics.modelos}</dd>
               </div>
               <div className="border-l border-[var(--g-border-subtle)] pl-3">
                 <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
                   <Archive className="h-3.5 w-3.5" />
-                  Informes
+                  Histórico
                 </dt>
-                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.informes}</dd>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{healthMetrics.historico}</dd>
               </div>
-              <div className="border-l border-[var(--g-border-subtle)] pl-3">
+              <div
+                className="border-l border-[var(--g-border-subtle)] pl-3"
+                title="Plantillas vigentes que requieren revisión legal: versión provisional, variantes por confirmar, metadatos, referencia o aprobación pendientes."
+              >
                 <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
-                  <Filter className="h-3.5 w-3.5" />
-                  Jurisdicción
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Incidencias
                 </dt>
-                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{scopeMetrics.exactJurisdiction}</dd>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{healthMetrics.incidencias}</dd>
               </div>
             </dl>
           </div>
@@ -643,6 +751,77 @@ export default function Plantillas() {
         </div>
       )}
 
+      {/* Segmentación por ciclo de vida (informe UX 2026-07-10): la vista por
+          defecto muestra lo usable ahora; el histórico queda a un clic. */}
+      <div
+        className="mb-4 inline-flex flex-wrap gap-1 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-1"
+        role="group"
+        aria-label="Filtrar plantillas por ciclo de vida"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        {CICLO_SEGMENTS.map((segment) => {
+          const active = filterCiclo === segment.id;
+          return (
+            <button
+              key={segment.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                // Reconciliar filtros dependientes del estado: cohorte y revisión
+                // se definen sobre subconjuntos del ciclo (evita vacíos garantizados).
+                setFilterCiclo(segment.id);
+                setFilterCohorte("");
+                setFilterRevision("");
+                setSelected(null);
+              }}
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] ${
+                active
+                  ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
+                  : "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-text-primary)]"
+              }`}
+              style={{ borderRadius: "var(--g-radius-sm)" }}
+            >
+              {segment.label} ({cicloCounts[segment.id]})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Incidencias de calidad documental sobre las vigentes (agrega detectores
+          de legal-template-review; cada chip filtra la tabla). */}
+      {INCIDENCIA_CHIPS.some((chip) => tabReviewSummary[chip.summaryKey] > 0) ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Incidencias de calidad documental">
+          <span className="text-xs font-medium text-[var(--g-text-secondary)]">Incidencias:</span>
+          {INCIDENCIA_CHIPS.filter((chip) => tabReviewSummary[chip.summaryKey] > 0).map((chip) => {
+            const active = filterRevision === chip.filter;
+            return (
+              <button
+                key={chip.filter}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  setFilterRevision(active ? "" : chip.filter);
+                  if (!active) {
+                    setFilterCiclo("vigentes");
+                    setFilterCohorte("");
+                  }
+                  setSelected(null);
+                }}
+                className={`inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] ${
+                  active
+                    ? "border-[var(--status-warning)] bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-text-primary)]"
+                    : "border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                }`}
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                <AlertTriangle className="h-3 w-3 text-[var(--status-warning)]" aria-hidden="true" />
+                {chip.label} ({tabReviewSummary[chip.summaryKey]})
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* Filtros: materia (solo Modelos) + cohorte (ambas pestañas, UX-7.B) */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         {activeTab === 'modelos' && (
@@ -676,7 +855,17 @@ export default function Plantillas() {
             style={{ borderRadius: 'var(--g-radius-md)' }}
           >
             <option value="">Todas</option>
-            {COHORTE_ORDER.map((c) => (
+            {/* Solo cohortes compatibles con el segmento de ciclo activo (las demás
+                serían intersección vacía por construcción). */}
+            {COHORTE_ORDER.filter((c) =>
+              filterCiclo === "todas"
+                ? true
+                : filterCiclo === "vigentes"
+                  ? c.startsWith("ACTIVA")
+                  : filterCiclo === "historico"
+                    ? c === "HISTORICO"
+                    : c === "EN_PREPARACION",
+            ).map((c) => (
               <option key={c} value={c}>{cohorteLabel(c)}</option>
             ))}
           </select>
@@ -745,7 +934,7 @@ export default function Plantillas() {
                     </h2>
                     <p className="mt-1 break-words text-xs text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? tipoLabel(plantilla.tipo)
+                        ? `${tipoLabel(plantilla.tipo)} · ${plantilla.adoption_mode ? adoptionModeLabel(plantilla.adoption_mode) : "Adopción no informada"}`
                         : materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia)}
                     </p>
                   </div>
@@ -760,12 +949,21 @@ export default function Plantillas() {
                       {estadoLabel(plantilla.estado)}
                     </span>
                     <CohorteBadge plantilla={plantilla} />
+                    {plantilla.estado === "ACTIVA" && reviewByTemplateId.get(plantilla.id)?.flags.draftVersion ? (
+                      <MadurezChip />
+                    ) : null}
                   </div>
                 </div>
                 <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                   <div>
-                    <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Jurisdicción</dt>
-                    <dd className="mt-1 text-[var(--g-text-primary)]">{jurisdictionLabel(plantilla.jurisdiccion)}</dd>
+                    <dt className="text-xs font-medium text-[var(--g-text-secondary)]">
+                      {activeTab === 'modelos' ? 'Órgano' : 'Jurisdicción'}
+                    </dt>
+                    <dd className="mt-1 text-[var(--g-text-primary)]">
+                      {activeTab === 'modelos'
+                        ? (plantilla.organo_tipo ? organoTipoLabel(plantilla.organo_tipo) : "No informado")
+                        : jurisdictionLabel(plantilla.jurisdiccion)}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Versión</dt>
@@ -785,7 +983,7 @@ export default function Plantillas() {
 
         <div
           data-testid="plantillas-desktop-table"
-          className="hidden overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] lg:block"
+          className="hidden overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] lg:block"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
           <table className="w-full">
@@ -797,9 +995,16 @@ export default function Plantillas() {
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   {activeTab === 'modelos' ? 'Uso' : 'Materia'}
                 </th>
+                {/* En Modelos, el órgano y la adopción son lo que distingue variantes
+                    jurídicas (junta vs consejo); la jurisdicción sigue en el detalle. */}
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                  Jurisdicción
+                  {activeTab === 'modelos' ? 'Órgano' : 'Jurisdicción'}
                 </th>
+                {activeTab === 'modelos' ? (
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+                    Adopción
+                  </th>
+                ) : null}
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   Versión
                 </th>
@@ -812,13 +1017,13 @@ export default function Plantillas() {
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                  <td colSpan={activeTab === 'modelos' ? 7 : 6} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                     Cargando…
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={activeTab === 'modelos' ? 7 : 6}>
                     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                       <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
                       <p className="text-sm font-medium text-[var(--g-text-secondary)]">
@@ -864,8 +1069,18 @@ export default function Plantillas() {
                         : materiaLabel(plantilla.materia)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
-                      {jurisdictionLabel(plantilla.jurisdiccion)}
+                      {/* En modelos, NULL = metadato no informado (mismo criterio que la
+                          incidencia "Sin órgano o adopción"); "Cualquier órgano" queda
+                          reservado al valor explícito ANY. */}
+                      {activeTab === 'modelos'
+                        ? (plantilla.organo_tipo ? organoTipoLabel(plantilla.organo_tipo) : "No informado")
+                        : jurisdictionLabel(plantilla.jurisdiccion)}
                     </td>
+                    {activeTab === 'modelos' ? (
+                      <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
+                        {plantilla.adoption_mode ? adoptionModeLabel(plantilla.adoption_mode) : "No informada"}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {plantilla.version}
                     </td>
@@ -881,6 +1096,9 @@ export default function Plantillas() {
                           {estadoLabel(plantilla.estado)}
                         </span>
                         <CohorteBadge plantilla={plantilla} />
+                        {plantilla.estado === "ACTIVA" && reviewByTemplateId.get(plantilla.id)?.flags.draftVersion ? (
+                          <MadurezChip />
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -1027,7 +1245,44 @@ export default function Plantillas() {
                       versión, binding, jurisdicción y cobertura antes de usarla como base de bloqueo.
                     </p>
                   ) : null}
+                  {selected.estado === "ACTIVA" && reviewByTemplateId.get(selected.id)?.flags.draftVersion ? (
+                    <p className="mt-3 flex items-start gap-1.5 text-xs text-[var(--g-text-secondary)]">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warning)]" aria-hidden="true" />
+                      <span>
+                        <strong className="text-[var(--g-text-primary)]">Vigente con advertencia de madurez:</strong>{" "}
+                        la versión v{selected.version} es técnica o preliminar. Revísala con el Comité
+                        Legal antes de usarla en expedientes sensibles.
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
+
+                {replacementForSelected ? (
+                  <div
+                    className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-3"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Sustituida para nuevos expedientes
+                    </div>
+                    <p className="mt-1 text-sm text-[var(--g-text-primary)]">
+                      La versión vigente de esta pieza documental es v{replacementForSelected.version}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterCiclo("vigentes");
+                        setFilterRevision("");
+                        setFilterCohorte("");
+                        setSelected(replacementForSelected);
+                      }}
+                      className="mt-2 inline-flex items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      Ver versión vigente <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : null}
 
                 {/* Referencia Legal */}
                 {selected.referencia_legal && (

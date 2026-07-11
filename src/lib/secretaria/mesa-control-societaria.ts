@@ -1,6 +1,7 @@
 import type { MateriaCatalogRow } from "@/hooks/useMateriaConfig";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import type { RuleParamOverrideRow } from "@/hooks/useRulePacks";
+import { materiaPactoCoincide } from "@/lib/rules-engine/materia-pacto-mapping";
 import type { TipoSocial } from "@/lib/secretaria/sociedad-onboarding/types";
 
 export type FunctionalMatterGroupId =
@@ -554,7 +555,61 @@ export const MATTER_GROUP_BY_MATERIA: Record<string, FunctionalMatterGroupId> = 
   SEGUIMIENTO_PLAN_NEGOCIO: "INFORMACION_SEGUIMIENTO_CONTROL",
   INFORME_COMITE_AUDITORIA: "INFORMACION_SEGUIMIENTO_CONTROL",
   ESTADO_CUMPLIMIENTO_NORMATIVO: "INFORMACION_SEGUIMIENTO_CONTROL",
+
+  // Materias de materia_catalog (Cloud) que caían en el fallback silencioso
+  // hacia el primer grupo ("Gobierno corporativo y órganos").
+  ACCION_SOCIAL_RESPONSABILIDAD: "GOBIERNO_ORGANOS",
+  DISTRIBUCION_CARGOS: "GOBIERNO_ORGANOS",
+  NOMBRAMIENTO_CESE: "GOBIERNO_ORGANOS",
+  AMPLIACION_CAPITAL: "CAPITAL_FINANCIACION",
+  EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "CAPITAL_FINANCIACION",
+  AUTORIZACION_GARANTIA: "OPERACIONES_ESPECIALES_VINCULADAS",
+  MOD_ESTATUTOS: "ESTATUTOS_NORMATIVA_INTERNA",
+  TRASLADO_DOMICILIO_NACIONAL: "ESTATUTOS_NORMATIVA_INTERNA",
 };
+
+/**
+ * Alias legacy de agreement_kind que coexisten en materia_catalog con su
+ * materia canónica y duplicaban tarjetas en el catálogo. El colapso es SOLO
+ * de presentación: las filas de BD no se tocan (los expedientes históricos
+ * pueden seguir referenciándolas).
+ */
+export const MATERIA_CANONICAL_ALIAS: Record<string, string> = {
+  AMPLIACION_CAPITAL: "AUMENTO_CAPITAL",
+  MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
+  NOMBRAMIENTO_CESE: "NOMBRAMIENTO_CONSEJERO",
+};
+
+export function resolveMateriaAlias(code?: string | null): string {
+  if (!code) return "";
+  return MATERIA_CANONICAL_ALIAS[code] ?? code;
+}
+
+/**
+ * Matching de pacto ↔ materia tolerante a alias/sinónimos (ITEM-113): las
+ * cláusulas Cloud usan vocabulario legacy (p.ej. AMPLIACION_CAPITAL) mientras
+ * el catálogo colapsa a la materia canónica (AUMENTO_CAPITAL). Nunca comparar
+ * con `includes` crudo desde el catálogo.
+ */
+export function pactoApplicaAMateria(
+  pacto: { materias_aplicables?: string[] | null },
+  materia: string,
+): boolean {
+  return materiaPactoCoincide(materia, pacto.materias_aplicables ?? []);
+}
+
+/** Matching de override ↔ materia tolerante a alias legacy. */
+export function overrideApplicaAMateria(
+  override: { materia?: string | null },
+  materia: string,
+): boolean {
+  return resolveMateriaAlias(override.materia) === resolveMateriaAlias(materia);
+}
+
+// Nota: el overlay ortográfico de materia_catalog que vivió aquí (2026-07-10)
+// se retiró el 2026-07-11 tras aplicarse y registrarse en Cloud la migración
+// 20260710103000_materia_catalog_orthography_fix.sql (verificado: 0 labels sin
+// tilde). La fuente de verdad de los labels vuelve a ser exclusivamente la BD.
 
 export const INFORMATIVE_MATTERS: MateriaCatalogRow[] = [
   {
@@ -900,6 +955,14 @@ export function buildMateriaCatalogRows(rows: MateriaCatalogRow[]) {
   for (const row of INFORMATIVE_MATTERS) {
     if (!byMateria.has(row.materia)) byMateria.set(row.materia, row);
   }
+  for (const [alias, canonical] of Object.entries(MATERIA_CANONICAL_ALIAS)) {
+    const aliasRow = byMateria.get(alias);
+    if (!aliasRow) continue;
+    byMateria.delete(alias);
+    if (!byMateria.has(canonical)) {
+      byMateria.set(canonical, { ...aliasRow, materia: canonical });
+    }
+  }
   return Array.from(byMateria.values()).sort((a, b) => {
     const groupA = getMateriaFunctionalGroup(a.materia).title;
     const groupB = getMateriaFunctionalGroup(b.materia).title;
@@ -916,8 +979,8 @@ export function buildNormativeMatrixRows(
   } = {},
 ) {
   return buildMateriaCatalogRows(rows).map((row) => {
-    const overrides = (options.overrides ?? []).filter((override) => override.materia === row.materia);
-    const pactos = (options.pactos ?? []).filter((pacto) => (pacto.materias_aplicables ?? []).includes(row.materia));
+    const overrides = (options.overrides ?? []).filter((override) => overrideApplicaAMateria(override, row.materia));
+    const pactos = (options.pactos ?? []).filter((pacto) => pactoApplicaAMateria(pacto, row.materia));
     const source = [
       "Ley",
       overrides.some((override) => override.fuente === "ESTATUTOS") ? "Estatutos" : null,
@@ -949,8 +1012,8 @@ export function buildSourceChipsForMateria(input: {
   overrides?: RuleParamOverrideRow[];
   pactos?: Array<{ materias_aplicables?: string[] | null; titulo?: string | null; tipo_clausula?: string | null }>;
 }): SourceChipViewModel[] {
-  const overrides = (input.overrides ?? []).filter((override) => override.materia === input.materia);
-  const pactos = (input.pactos ?? []).filter((pacto) => (pacto.materias_aplicables ?? []).includes(input.materia));
+  const overrides = (input.overrides ?? []).filter((override) => overrideApplicaAMateria(override, input.materia));
+  const pactos = (input.pactos ?? []).filter((pacto) => pactoApplicaAMateria(pacto, input.materia));
   const chips: SourceChipViewModel[] = [
     {
       type: "Ley",
@@ -1104,7 +1167,7 @@ export function evaluateTemplateReadiness(bindings: TemplateDocumentBinding[]): 
       stage,
       status,
       blocking: MINIMUM_TEMPLATE_STAGES.includes(stage) && status === "faltante",
-      actionLabel: status === "faltante" ? "Asignar plantilla" : status === "pendiente_revision" ? "Revisar plantilla" : "Probar fusión",
+      actionLabel: status === "faltante" ? "Asignar plantilla" : status === "pendiente_revision" ? "Revisar plantilla" : "Vista previa del documento",
     };
   });
   const missing = items.filter((item) => item.blocking).map((item) => item.stage.toLowerCase());
@@ -1115,6 +1178,299 @@ export function evaluateTemplateReadiness(bindings: TemplateDocumentBinding[]): 
       : null,
     items,
   };
+}
+
+export type MateriaGlobalStatus = "lista" | "advertencia" | "revision_legal" | "bloqueada";
+
+export interface MateriaGlobalStatusResult {
+  status: MateriaGlobalStatus;
+  label: string;
+  explanation: string;
+  ctaLabel: string;
+}
+
+/**
+ * Estado global de una materia para el abogado (informe UX §10): cada estado
+ * lleva explicación y siguiente acción. Precedencia: bloqueada > revisión
+ * legal > advertencia > lista.
+ */
+export function evaluateMateriaGlobalStatus(input: {
+  templateReadiness: TemplateReadinessResult;
+  conflictOfLaws?: ConflictOfLawsResult | null;
+  legalReference?: string | null;
+  applicablePactosCount?: number;
+  /**
+   * Materias de seguimiento/información: el dominio ya las trata como
+   * "constancia en acta" (documentRequirements/formalizationLabel), así que
+   * la falta de plantillas mínimas de expediente no las bloquea.
+   */
+  informativa?: boolean;
+}): MateriaGlobalStatusResult {
+  if (!input.templateReadiness.canStartCase && !input.informativa) {
+    return {
+      status: "bloqueada",
+      label: "Bloqueada por falta de plantilla mínima",
+      explanation:
+        input.templateReadiness.blockingMessage ??
+        "Falta una plantilla mínima para poder abrir el expediente.",
+      ctaLabel: "Resolver bloqueo",
+    };
+  }
+  if (input.conflictOfLaws?.conflict_of_laws_flag) {
+    return {
+      status: "revision_legal",
+      label: "Requiere revisión legal",
+      explanation: "Hay un posible conflicto de ley aplicable que debe justificarse antes de tramitar.",
+      ctaLabel: "Revisar fuentes",
+    };
+  }
+  if (!input.legalReference) {
+    return {
+      status: "revision_legal",
+      label: "Requiere revisión legal",
+      explanation: "La referencia legal de esta materia está pendiente de completar.",
+      ctaLabel: "Revisar fuentes",
+    };
+  }
+  if ((input.applicablePactosCount ?? 0) > 0) {
+    return {
+      status: "advertencia",
+      label: "Advertencia no bloqueante",
+      explanation:
+        "Hay pactos parasociales aplicables: generan obligaciones contractuales, pero no invalidan por sí solos el acuerdo societario.",
+      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar expediente",
+    };
+  }
+  if (input.informativa) {
+    return {
+      status: "lista",
+      label: "Materia informativa",
+      explanation:
+        "Se documenta mediante constancia en acta; no exige las plantillas mínimas de expediente.",
+      ctaLabel: "Ver regla aplicable",
+    };
+  }
+  return {
+    status: "lista",
+    label: "Lista para iniciar expediente",
+    explanation: "Regla aplicable resuelta y documentos mínimos disponibles.",
+    ctaLabel: "Iniciar expediente",
+  };
+}
+
+export const DOCUMENT_TYPE_LABEL: Record<string, string> = {
+  INFORME_PRECEPTIVO: "Informe preceptivo",
+  INFORME_DOCUMENTAL_PRE: "Expediente previo",
+  CONVOCATORIA: "Convocatoria",
+  CONVOCATORIA_SL_NOTIFICACION: "Notificación individual",
+  MODELO_ACUERDO: "Modelo de acuerdo",
+  ACTA_SESION: "Acta de sesión",
+  ACTA_ACUERDO_ESCRITO: "Acta de acuerdo escrito",
+  ACTA_CONSIGNACION: "Acta de consignación",
+  ACTA_DECISION_CONJUNTA: "Acta de decisión conjunta",
+  ACTA_ORGANO_ADMIN: "Acta de órgano de administración",
+  CERTIFICACION: "Certificación",
+  DOCUMENTO_REGISTRAL: "Documento registral",
+  SUBSANACION_REGISTRAL: "Subsanación registral",
+};
+
+export function documentTypeLabel(tipo: string) {
+  return DOCUMENT_TYPE_LABEL[tipo] ?? tipo;
+}
+
+/** Comparación numérica por segmentos ("1.10.0" > "1.9.0"), tolerante a prefijo "v". */
+export function compareTemplateVersions(
+  a?: string | number | null,
+  b?: string | number | null,
+) {
+  const parse = (value: string | number | null | undefined) =>
+    String(value ?? "0")
+      .replace(/^v/i, "")
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+  const left = parse(a);
+  const right = parse(b);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index++) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * Identidad funcional de una plantilla dentro de una fase: dos plantillas con
+ * la misma identidad son versiones (o duplicados) de la misma pieza; con
+ * identidad distinta son piezas diferentes aunque compartan tipo y versión
+ * (caso real: acta de consignación de socio único vs de administrador único).
+ */
+function templateFunctionalIdentity(template: PlantillaProtegidaRow) {
+  return [
+    template.tipo,
+    template.materia_acuerdo ?? template.materia ?? "",
+    template.organo_tipo ?? "",
+    template.adoption_mode ?? "",
+    template.jurisdiccion ?? "",
+    template.tipo_social ?? "",
+  ].join("|");
+}
+
+export interface TemplateStageDisplayGroup {
+  current: TemplateDocumentBinding;
+  older: TemplateDocumentBinding[];
+  duplicates: TemplateDocumentBinding[];
+}
+
+/**
+ * Agrupa bindings de una fase por identidad funcional: `current` es la versión
+ * vigente para nuevos expedientes (mayor versión), `older` son versiones
+ * anteriores (colapsables) y `duplicates` filas indistinguibles de la vigente
+ * (incidencia de datos).
+ */
+export function groupStageBindingsForDisplay(
+  bindings: TemplateDocumentBinding[],
+): TemplateStageDisplayGroup[] {
+  const byIdentity = new Map<string, TemplateDocumentBinding[]>();
+  for (const binding of bindings) {
+    const key = templateFunctionalIdentity(binding.template);
+    const group = byIdentity.get(key) ?? [];
+    group.push(binding);
+    byIdentity.set(key, group);
+  }
+  const normalizeVersion = (value: string | number | null | undefined) =>
+    String(value ?? "").replace(/^v/i, "").trim();
+  return Array.from(byIdentity.values()).map((group) => {
+    const sorted = [...group].sort((a, b) =>
+      compareTemplateVersions(b.template.version, a.template.version),
+    );
+    const current = sorted[0];
+    const rest = sorted.slice(1);
+    // Duplicado exige la MISMA versión literal; empates numéricos con sufijos
+    // distintos ("1.0.0-beta" vs "1.0.0-rc") son versiones diferentes.
+    const isDuplicateOfCurrent = (binding: TemplateDocumentBinding) =>
+      compareTemplateVersions(binding.template.version, current.template.version) === 0 &&
+      normalizeVersion(binding.template.version) === normalizeVersion(current.template.version);
+    return {
+      current,
+      older: rest.filter((binding) => !isDuplicateOfCurrent(binding)),
+      duplicates: rest.filter(isDuplicateOfCurrent),
+    };
+  });
+}
+
+/**
+ * Duplicidades que el usuario puede percibir en la fase (informe UX §4/§12):
+ * (a) duplicados de DATOS — misma identidad funcional y misma versión — y
+ * (b) duplicidades VISIBLES — plantillas vigentes distintas cuya etiqueta
+ * final (tipo · versión · discriminador) resulta idéntica, de modo que el
+ * abogado no puede distinguirlas aunque difieran en metadatos ocultos.
+ */
+export function detectTemplateDataDuplicates(bindings: TemplateDocumentBinding[]) {
+  const groups = groupStageBindingsForDisplay(bindings);
+  const results: Array<{ tipo: string; version: string; ids: string[] }> = [];
+  const seen = new Set<string>();
+
+  for (const group of groups) {
+    if (group.duplicates.length === 0) continue;
+    results.push({
+      tipo: group.current.template.tipo,
+      version: String(group.current.template.version),
+      ids: [group.current.template.id, ...group.duplicates.map((binding) => binding.template.id)],
+    });
+    seen.add(group.current.template.id);
+  }
+
+  const currents = groups.map((group) => group.current);
+  const byLabel = new Map<string, TemplateDocumentBinding[]>();
+  for (const binding of currents) {
+    const label = templateBindingDisplayLabel(binding, currents);
+    const list = byLabel.get(label) ?? [];
+    list.push(binding);
+    byLabel.set(label, list);
+  }
+  for (const list of byLabel.values()) {
+    if (list.length < 2) continue;
+    if (list.every((binding) => seen.has(binding.template.id))) continue;
+    results.push({
+      tipo: list[0].template.tipo,
+      version: String(list[0].template.version),
+      ids: list.map((binding) => binding.template.id),
+    });
+    for (const binding of list) seen.add(binding.template.id);
+  }
+
+  return results;
+}
+
+export function organoTipoBusinessLabel(value?: string | null) {
+  const normalized = normalizeCode(value);
+  if (!normalized || normalized === "ANY") return "Cualquier órgano";
+  const labels: Record<string, string> = {
+    JUNTAGENERAL: "Junta General",
+    JUNTA: "Junta General",
+    CONSEJO: "Consejo de Administración",
+    CONSEJOADMIN: "Consejo de Administración",
+    CONSEJOADMINISTRACION: "Consejo de Administración",
+    COMISIONDELEGADA: "Comisión delegada",
+    SOCIOUNICO: "Socio único",
+    ADMINUNICO: "Administrador único",
+    ADMINSOLIDARIO: "Administradores solidarios",
+    ADMINMANCOMUNADO: "Administradores mancomunados",
+  };
+  return labels[normalized] ?? sanitizeBusinessLabel(value);
+}
+
+/**
+ * Label visible de un binding. Si otro binding visible comparte tipo y versión
+ * (piezas distintas con el mismo nombre aparente), acumula discriminadores en
+ * orden órgano → forma de adopción → materia HASTA que la etiqueta queda única
+ * frente a los ambiguos. (Caso real: nombramiento por Junta art. 214 LSC vs
+ * cooptación por Consejo art. 244 LSC comparten adopción MEETING; solo el
+ * órgano las distingue. Con 3 variantes puede hacer falta más de un atributo.)
+ */
+export function templateBindingDisplayLabel(
+  binding: TemplateDocumentBinding,
+  siblings: TemplateDocumentBinding[] = [],
+) {
+  const base = `${documentTypeLabel(binding.template.tipo)} · v${binding.template.version}`;
+  const ambiguousSiblings = siblings.filter(
+    (other) =>
+      other.template.id !== binding.template.id &&
+      other.template.tipo === binding.template.tipo &&
+      compareTemplateVersions(other.template.version, binding.template.version) === 0,
+  );
+  if (ambiguousSiblings.length === 0) return base;
+
+  const discriminators: Array<(t: PlantillaProtegidaRow) => string | null> = [
+    (t) => (t.organo_tipo ? organoTipoBusinessLabel(t.organo_tipo) : null),
+    (t) => (t.adoption_mode ? adoptionModeBusinessLabel(t.adoption_mode) : null),
+    (t) => {
+      const matter = t.materia_acuerdo ?? t.materia;
+      return matter ? sanitizeBusinessLabel(matter) : null;
+    },
+  ];
+
+  const parts: string[] = [];
+  let clashing = ambiguousSiblings;
+  for (const pick of discriminators) {
+    const mine = pick(binding.template);
+    if (!mine) continue;
+    const still = clashing.filter((other) => (pick(other.template) ?? "") === mine);
+    if (still.length === clashing.length) continue; // este atributo no distingue nada
+    parts.push(mine);
+    clashing = still;
+    if (clashing.length === 0) break;
+  }
+
+  if (parts.length === 0) {
+    // Indistinguibles por atributos visibles (duplicidad de datos): mantener el
+    // discriminador clásico para no ocultar información.
+    if (binding.template.adoption_mode) {
+      return `${base} · ${adoptionModeBusinessLabel(binding.template.adoption_mode)}`;
+    }
+    return base;
+  }
+  return `${base} · ${parts.join(" · ")}`;
 }
 
 export function requirementStateLabel(state: RequirementOperationalState) {

@@ -41,26 +41,71 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(wizard).not.toContain("sin escritura Cloud");
   });
 
-  it("la ficha de materia funciona como workspace del motor de reglas", () => {
+  it("la ficha de materia habla el idioma del abogado (informe UX 2026-07-10, Oleada 1)", () => {
     const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
 
-    expect(catalogo).toContain("Workspace de configuración del motor");
-    expect(catalogo).toContain("Cadena de decisión del motor");
+    // Copy jurídico aprobado
+    expect(catalogo).toContain("Regla aplicable y documentos de la materia");
+    expect(catalogo).toContain("Cadena de decisión");
     expect(catalogo).toContain("Materia");
-    expect(catalogo).toContain("Regla efectiva");
-    expect(catalogo).toContain("Plantillas vinculadas");
-    expect(catalogo).toContain("Preflight");
-    expect(catalogo).toContain("Resultado del motor");
+    expect(catalogo).toContain("Regla aplicable");
+    expect(catalogo).toContain("Verificación previa");
+    expect(catalogo).toContain("Resultado de la verificación");
     expect(catalogo).toContain("Qué exige la ley");
     expect(catalogo).toContain("Qué añaden los estatutos");
     expect(catalogo).toContain("Pactos aplicables");
-    expect(catalogo).toContain("Regla efectiva para esta sociedad");
-    expect(catalogo).toContain("Configuración del motor de reglas");
-    expect(catalogo).toContain("Ver plantillas vinculadas");
-    expect(catalogo).toContain("Plantillas vinculadas al motor");
-    expect(catalogo).toContain("Simular preflight del motor");
+    expect(catalogo).toContain("Regla aplicable para esta sociedad");
+    expect(catalogo).toContain("Reglas aplicables y requisitos para tramitar");
+    expect(catalogo).toContain("Ver documentos y plantillas de esta materia");
+    expect(catalogo).toContain("Documentos y plantillas de esta materia");
+    expect(catalogo).toContain("Verificación previa del expediente");
     expect(catalogo).toContain("Iniciar expediente bloqueado");
     expect(catalogo).toContain("Asignar plantilla");
+
+    // Lenguaje técnico prohibido en la vista abogado (informe §4/§7)
+    expect(catalogo).not.toContain("Gate PRE");
+    expect(catalogo).not.toContain("Simular preflight");
+    expect(catalogo).not.toContain("Usada por el motor");
+    expect(catalogo).not.toContain("Probar fusión");
+    expect(catalogo).not.toContain("Configuración del motor de reglas");
+    expect(catalogo).not.toContain("Estatutos no modelados para esta materia");
+  });
+
+  it("expone estados globales, vigencia de plantillas y duplicidades (Oleada 1)", () => {
+    const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const model = read("src/lib/secretaria/mesa-control-societaria.ts");
+
+    // Estado global por materia con CTA contextual (informe §10)
+    expect(model).toContain("evaluateMateriaGlobalStatus");
+    expect(model).toContain("Lista para iniciar expediente");
+    expect(model).toContain("Bloqueada por falta de plantilla mínima");
+    expect(model).toContain("Requiere revisión legal");
+    expect(model).toContain("Advertencia no bloqueante");
+    expect(catalogo).toContain("MateriaPrimaryCta");
+    expect(catalogo).toContain("Resolver bloqueo");
+    expect(catalogo).toContain("Revisar fuentes");
+    expect(catalogo).toContain("Verificar requisitos antes de iniciar");
+
+    // Leyenda de naturaleza + tooltips (informe §5/§6)
+    expect(catalogo).toContain("Naturaleza de las materias");
+    expect(catalogo).toContain("FORMALIZATION_CHIP_LEGEND");
+
+    // Vigente vs histórica + duplicidades (informe §12)
+    expect(catalogo).toContain("Vigente para nuevos expedientes");
+    expect(catalogo).toContain("Versión anterior");
+    expect(catalogo).toContain("Ver versiones anteriores");
+    expect(catalogo).toContain("Posible duplicidad de plantilla");
+    expect(catalogo).toContain("Vista previa del documento");
+    expect(model).toContain("groupStageBindingsForDisplay");
+    expect(model).toContain("detectTemplateDataDuplicates");
+
+    // Alias legacy colapsados en presentación (la ortografía vive ya en BD:
+    // migración 20260710103000 aplicada el 2026-07-11)
+    expect(model).toContain("MATERIA_CANONICAL_ALIAS");
+
+    // Estatutos sin ambigüedad (informe §6): dos mensajes distintos
+    expect(catalogo).toContain("Estatutos no estructurados en el sistema para esta sociedad");
+    expect(catalogo).toContain("no recogen regla especial para");
   });
 
   it("el perfil de sociedad contiene matriz materia × requisitos", () => {
@@ -145,6 +190,35 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(plantillas).toContain("Vincular como plantilla activa");
     expect(plantillas).toContain("templateSelectionReason");
     expect(plantillas).toContain("Plantilla vinculada a la regla efectiva");
+  });
+
+  it("el catálogo de plantillas es operativo: ciclo segmentado, salud e incidencias (informe UX 2026-07-10)", () => {
+    const plantillas = read("src/pages/secretaria/Plantillas.tsx");
+
+    // Segmentación por ciclo con Vigentes por defecto (histórico a un clic, no oculto)
+    expect(plantillas).toContain('useState<CicloSegment>("vigentes")');
+    expect(plantillas).toContain("Filtrar plantillas por ciclo de vida");
+    expect(plantillas).toContain('{ id: "historico", label: "Histórico" }');
+
+    // Panel de salud con lectura ejecutiva (sustituye la métrica ambigua "Jurisdicción N")
+    expect(plantillas).toContain("Biblioteca operativa con advertencias");
+    expect(plantillas).toContain("Incidencias");
+    expect(plantillas).not.toContain("scopeMetrics.exactJurisdiction");
+
+    // Incidencias agregadas reutilizando legal-template-review (no un 5º sistema)
+    expect(plantillas).toContain("buildLegalTemplateReviewRows");
+    expect(plantillas).toContain("summarizeLegalTemplateReview");
+    expect(plantillas).toContain("matchesLegalTemplateReviewFilter");
+    expect(plantillas).toContain("Versión provisional");
+    expect(plantillas).toContain("Vigente con advertencia de madurez");
+
+    // Variantes jurídicas visibles a nivel de fila (junta vs consejo)
+    expect(plantillas).toContain("'Órgano' : 'Jurisdicción'");
+    expect(plantillas).toContain("Adopción");
+
+    // Histórico accionable: sustitución hacia la versión vigente
+    expect(plantillas).toContain("Sustituida para nuevos expedientes");
+    expect(plantillas).toContain("Ver versión vigente");
   });
 
   it("no filtra metadatos demo en textos visibles de negocio", () => {
