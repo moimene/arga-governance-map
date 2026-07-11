@@ -14,6 +14,7 @@
  */
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useTenantContext } from "@/context/TenantContext";
 
 export type TabId =
   | "dashboard"
@@ -61,7 +62,8 @@ export interface UseTabAccessResult {
 
 export function useTabAccess(): UseTabAccessResult {
   const { user, loading: userLoading } = useCurrentUser();
-  const { roles, isLoading: rolesLoading } = useUserRole(user?.id);
+  const { tenantId, isLoading: tenantLoading } = useTenantContext();
+  const { roles, isPending: rolesPending } = useUserRole(user?.id);
 
   const canAccess = (tab: TabId) =>
     TAB_PERMISSIONS[tab].some((r) => roles.includes(r));
@@ -71,6 +73,12 @@ export function useTabAccess(): UseTabAccessResult {
   return {
     canAccess,
     visibleTabs,
-    isLoading: userLoading || rolesLoading,
+    // isPending cubre la ventana con la query de roles deshabilitada mientras
+    // el tenant se resuelve (sin esto, el shell veía roles=[] con
+    // isLoading=false y reescribía ?tab= a dashboard en deep-links — flaky).
+    // El gate `!!tenantId && !!user` evita el pending PERPETUO cuando
+    // TenantContext terminó y no hay perfil/tenant: en ese caso roles=[] es la
+    // respuesta definitiva y el RBAC debe redirigir, no esperar para siempre.
+    isLoading: userLoading || tenantLoading || (rolesPending && !!user && !!tenantId),
   };
 }

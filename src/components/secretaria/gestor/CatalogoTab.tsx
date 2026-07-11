@@ -12,7 +12,7 @@
  *
  * Sprint 1 — Task 5.4 (catálogo).
  */
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -326,7 +326,22 @@ function TransitionAckDialog({
   );
 }
 
-function EstadoBadge({ estado }: { estado: string }) {
+function EstadoBadge({ estado, localFixture }: { estado: string; localFixture?: boolean }) {
+  // G3 (UX Oleada 1): un fixture local no debe presentarse como "Activa" — es
+  // cobertura puente sin plantilla Cloud aprobada detrás. El badge de estado
+  // pasa a "Cobertura provisional" en tono neutro con borde warning; el resto
+  // de señales de fixture (LocalFixtureBadge, chips, avisos) se conservan.
+  if (localFixture) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--g-text-primary)]"
+        style={{ borderRadius: "var(--g-radius-full)" }}
+      >
+        <FileCode2 className="h-3 w-3" aria-hidden="true" />
+        Cobertura provisional
+      </span>
+    );
+  }
   const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.BORRADOR;
   const Icon = config.icon;
   return (
@@ -565,7 +580,8 @@ function PlantillaDetailPanel({
             ) : null}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <EstadoBadge estado={estado} />
+            {/* G3: en fixtures el badge de estado muestra "Cobertura provisional", no "Activa" */}
+            <EstadoBadge estado={estado} localFixture={localFixture} />
             {/* ITEM-089: distingue fixtures locales del freeze frente a plantillas ACTIVA reales de Cloud */}
             {localFixture ? <LocalFixtureBadge /> : null}
             {isActiveP0 ? <ActiveWithP0Badge /> : null}
@@ -753,7 +769,10 @@ export function CatalogoTab() {
   const [selectedId, setSelectedId] = useState<string | null>(
     () => searchParams.get("plantilla") || null,
   );
-  const [filterEstado, setFilterEstado] = useState<string>("ALL");
+  // G4 (UX Oleada 1): el catálogo abre con las vigentes por defecto ("ACTIVA");
+  // "Todos los estados" y las archivadas/deprecadas quedan a un clic en el
+  // select. Con ello el auto-select abre una ACTIVA, no una ARCHIVADA alfabética.
+  const [filterEstado, setFilterEstado] = useState<string>("ACTIVA");
   const [filterTipo, setFilterTipo] = useState<string>("ALL");
   const [filterReview, setFilterReview] = useState<LegalTemplateReviewFilter>("ALL");
   const [filterP0, setFilterP0] = useState<"ALL" | "ONLY_P0">("ALL");
@@ -803,30 +822,47 @@ export function CatalogoTab() {
     [filterEstado, filterReview, filterTipo, filterP0, legalReviewById, scopedPlantillas, searchQuery],
   );
 
-  // ITEM-089: el contador del catálogo desmezcla el inventario Cloud real de los
-  // fixtures locales puente (LEGAL-FIXTURE-2026-04-28). Antes sumaba ambos como si
-  // fueran plantillas equivalentes ("75"); ahora explicita la composición real
-  // ("59 reales + 16 fixtures puente"). El conteo filtrado (filtered.length) se
+  // ITEM-089 + G3 (UX Oleada 1): el contador del catálogo explicita cuántos
+  // ítems son fixtures locales puente (LEGAL-FIXTURE-2026-04-28), etiquetados
+  // como cobertura provisional. El conteo filtrado (filtered.length) se
   // mantiene íntegro porque el filtro "Fixtures locales" sigue siendo legítimo.
-  const { realCount, fixtureCount } = useMemo(() => {
-    let real = 0;
-    let fixture = 0;
-    for (const p of scopedPlantillas) {
-      if (isLocalFixture(p)) fixture += 1;
-      else real += 1;
-    }
-    return { realCount: real, fixtureCount: fixture };
-  }, [scopedPlantillas]);
+  const fixtureCount = useMemo(
+    () => scopedPlantillas.filter((p) => isLocalFixture(p)).length,
+    [scopedPlantillas],
+  );
 
   const selected = filtered.find((p) => p.id === selectedId) ?? null;
 
+  // G4: el deep-link ?plantilla= puede apuntar a una ARCHIVADA/fixture concreta
+  // que el filtro por defecto "ACTIVA" ocultaría. Cuando la fila se resuelve en
+  // los datos y no pasa el filtro por defecto, se abre el filtro a "ALL" (una
+  // sola vez) y se re-asegura la selección para no romper la navegación
+  // contextual desde CatalogoMaterias/ActivarMarcoNormativo.
+  const deepLinkPlantillaId = searchParams.get("plantilla");
+  const deepLinkResolvedRef = useRef(false);
+  // Deep-link ?plantilla= y auto-select en un ÚNICO efecto: en dos efectos
+  // separados corrían en el mismo flush y, con la cache caliente y un target
+  // no-ACTIVA, el auto-select (closure con `filtered` solo-ACTIVA) pisaba la
+  // selección deep-linkeada mostrando OTRA plantilla en el panel de detalle.
   useEffect(() => {
+    if (deepLinkPlantillaId && !deepLinkResolvedRef.current) {
+      const target = scopedPlantillas.find((p) => p.id === deepLinkPlantillaId);
+      // Datos aún cargando o id no resoluble: no autoseleccionar todavía para
+      // no consumir la selección pedida por la URL.
+      if (!target) return;
+      deepLinkResolvedRef.current = true;
+      if (target.estado !== "ACTIVA") setFilterEstado("ALL");
+      setSelectedId(deepLinkPlantillaId);
+      return;
+    }
     if (selectedId && filtered.some((p) => p.id === selectedId)) return;
     setSelectedId(filtered[0]?.id ?? null);
-  }, [filtered, selectedId]);
+  }, [deepLinkPlantillaId, scopedPlantillas, filtered, selectedId]);
 
   const tipos = [...new Set(scopedPlantillas.map((p) => p.tipo))];
-  const estados = [...new Set(scopedPlantillas.map((p) => p.estado))];
+  // G4: "ACTIVA" se garantiza en la lista para que el select controlado siempre
+  // tenga una option que respalde su valor por defecto, incluso durante la carga.
+  const estados = [...new Set(["ACTIVA", ...scopedPlantillas.map((p) => p.estado)])];
 
   const handleUseTemplate = (plantilla: PlantillaProtegidaRow) => {
     const target = getTemplateUsageTarget(plantilla).to;
@@ -936,9 +972,9 @@ export function CatalogoTab() {
         <span className="pb-2 text-xs text-[var(--g-text-secondary)]">
           {filtered.length} de {scopedPlantillas.length} plantillas
           {fixtureCount > 0
-            ? ` · ${realCount} ${realCount === 1 ? "real" : "reales"} + ${fixtureCount} ${
+            ? ` · ${fixtureCount} ${
                 fixtureCount === 1 ? "fixture puente" : "fixtures puente"
-              }`
+              } (cobertura provisional)`
             : ""}
         </span>
       </div>
@@ -994,7 +1030,7 @@ export function CatalogoTab() {
                       <span className="text-sm font-medium text-[var(--g-text-primary)] truncate">
                         {tipoLabel}
                       </span>
-                      <EstadoBadge estado={p.estado} />
+                      <EstadoBadge estado={p.estado} localFixture={localFixture} />
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
                       {organoLabel ? <span>{organoLabel}</span> : null}

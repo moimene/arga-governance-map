@@ -21,7 +21,7 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
   test("usuario demo (SECRETARIO) ve las 5 pestañas de lectura", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
 
     for (const label of READ_TAB_LABELS) {
@@ -34,7 +34,7 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
   test("clic en tab cambia ?tab y mantiene replace history", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("tab", { name: "Catálogo" }).click();
@@ -55,7 +55,7 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
   test("query param inicial preselecciona la tab", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas?tab=cobertura");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("tab", { name: "Cobertura legal" }),

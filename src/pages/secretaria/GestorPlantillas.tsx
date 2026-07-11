@@ -75,10 +75,10 @@ export default function GestorPlantillas() {
     <main className="p-6 max-w-[1600px] mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-[var(--g-text-primary)]">
-          Gestor de Plantillas
+          Gobierno de plantillas
         </h1>
         <p className="text-sm text-[var(--g-text-secondary)]">
-          Consola operativa de administración legal de plantillas protegidas.
+          Consola de gobierno legal, versión, cobertura y auditoría de plantillas protegidas.
         </p>
       </header>
 

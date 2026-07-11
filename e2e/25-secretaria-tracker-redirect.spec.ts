@@ -7,7 +7,7 @@ test.describe("Gestor de Plantillas — redirect de tracker legacy", () => {
       timeout: 15_000,
     });
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("tab", { name: "Métricas" })).toHaveAttribute(
       "aria-selected",

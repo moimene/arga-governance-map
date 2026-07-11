@@ -25,6 +25,7 @@ export * from "./plantilla-cohorte";
 export * from "./cloud-helpers";
 export * from "./gate-pre";
 export * from "./gate-pre-semantic";
+export * from "./gate-pre-issue-labels";
 export * from "./import-preflight";
 export {
   VARIABLE_PATTERN as VARIABLE_PATTERN_IMPORT,

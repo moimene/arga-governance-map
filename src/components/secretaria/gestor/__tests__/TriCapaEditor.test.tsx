@@ -123,8 +123,35 @@ describe("TriCapaEditor", () => {
     render(<TriCapaEditor plantilla={basePlantilla({ estado: "ACTIVA" })} />);
 
     expect((screen.getByLabelText("Editor de contenido capa 1") as HTMLTextAreaElement).readOnly).toBe(true);
-    expect((screen.getByRole("button", { name: /guardar/i }) as HTMLButtonElement).disabled).toBe(true);
+    // G5 — modo solo lectura honesto: Guardar/Cancelar NO se renderizan y el
+    // banner explica el motivo.
+    expect(screen.queryByRole("button", { name: /guardar/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /cancelar/i })).toBeNull();
+    expect(screen.getByText(/modo solo lectura/i)).toBeTruthy();
     expect(screen.getByText(/solo las plantillas en borrador/i)).toBeTruthy();
+  });
+
+  it("con readOnlyReason oculta Guardar/Cancelar y muestra banner de solo lectura", () => {
+    render(
+      <TriCapaEditor
+        plantilla={basePlantilla()}
+        readOnlyReason="Tu rol no tiene permisos de edición de plantillas."
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /guardar/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /cancelar/i })).toBeNull();
+    expect(screen.getByText(/modo solo lectura/i)).toBeTruthy();
+    expect(screen.getByText(/tu rol permite revisar esta plantilla, no modificarla/i)).toBeTruthy();
+    expect((screen.getByLabelText("Editor de contenido capa 1") as HTMLTextAreaElement).readOnly).toBe(true);
+  });
+
+  it("con permisos de edición el botón Guardar sí se renderiza", () => {
+    render(<TriCapaEditor plantilla={basePlantilla()} />);
+
+    expect(screen.getByRole("button", { name: /guardar/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /cancelar/i })).toBeTruthy();
+    expect(screen.queryByText(/modo solo lectura/i)).toBeNull();
   });
 
   it("muestra diagnóstico local para variables duplicadas", () => {
@@ -139,6 +166,8 @@ describe("TriCapaEditor", () => {
       />,
     );
 
+    // G6 — etiqueta humana como texto principal + código técnico como detalle.
+    expect(screen.getByText(/Variable duplicada en la capa 2/)).toBeTruthy();
     expect(screen.getByText(/CAPA2_DUPLICATE_VARIABLE/)).toBeTruthy();
   });
 });

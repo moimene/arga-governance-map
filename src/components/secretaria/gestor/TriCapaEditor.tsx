@@ -21,6 +21,10 @@ import {
   validateTemplateForActivation,
   VARIABLE_PATTERN,
 } from "@/lib/secretaria/template-admin/gate-pre";
+import {
+  gatePreIssueLabel,
+  gatePreSeverityLabel,
+} from "@/lib/secretaria/template-admin/gate-pre-issue-labels";
 import type {
   GatePreIssue,
   PlantillaCandidate,
@@ -243,6 +247,12 @@ function issueTone(issue: GatePreIssue) {
   return "text-[var(--status-info)]";
 }
 
+// G6 — chips de severidad en castellano ("2 bloqueantes", "1 advertencia").
+function severityChipLabel(severity: string, count: number) {
+  const base = gatePreSeverityLabel(severity).toLowerCase();
+  return count === 1 ? base : `${base}s`;
+}
+
 function optionsToText(options?: string[]) {
   return options?.join(", ") ?? "";
 }
@@ -262,7 +272,21 @@ export function TriCapaEditor({
   readOnlyReason?: string | null;
 }) {
   const updateContenido = useUpdateContenidoPlantilla();
-  const canEdit = plantilla.estado === "BORRADOR" && !readOnlyReason;
+  // G5 — modo solo lectura honesto: un único motivo explica por qué no se
+  // puede editar (permisos vía readOnlyReason, o estado distinto de BORRADOR).
+  const readOnlyMessage =
+    readOnlyReason ??
+    (plantilla.estado !== "BORRADOR"
+      ? "Solo las plantillas en BORRADOR admiten edición tri-capa."
+      : null);
+  const canEdit = !readOnlyMessage;
+  // G5 — tratamiento visual de campos en solo lectura: superficie muted, pero
+  // SIEMPRE con indicador de foco visible (los campos siguen siendo focusables
+  // por teclado para leer/desplazar su contenido; en solo lectura el ring es
+  // neutro en vez de marca).
+  const fieldStateClass = canEdit
+    ? "bg-[var(--g-surface-card)] focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+    : "bg-[var(--g-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--g-border-default)]";
   const initial = useMemo(
     () => ({
       capa1: plantilla.capa1_inmutable ?? "",
@@ -317,53 +341,68 @@ export function TriCapaEditor({
 
   return (
     <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]">
+      {readOnlyMessage ? (
+        <div
+          className="flex items-start gap-3 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-5 py-4"
+          role="note"
+        >
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-brand-3308)]" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Modo solo lectura — {readOnlyMessage}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
+              {readOnlyReason
+                ? "Tu rol permite revisar esta plantilla, no modificarla."
+                : "El contenido se muestra únicamente para consulta."}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--g-border-subtle)] px-5 py-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
             Editor tri-capa
           </h3>
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Edición auditada de borradores con validación Gate PRE.
+            Edición auditada de borradores con validación Gate PRE (comprobación documental previa).
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {dirtyLayers.length > 0 ? (
-            <span
-              className="px-2 py-1 text-xs font-medium bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
-              style={{ borderRadius: "var(--g-radius-full)" }}
+        {canEdit ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {dirtyLayers.length > 0 ? (
+              <span
+                className="px-2 py-1 text-xs font-medium bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-full)" }}
+              >
+                Cambios: {dirtyLayers.join(", ")}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={reset}
+              disabled={dirtyLayers.length === 0 || updateContenido.isPending}
+              className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              Cambios: {dirtyLayers.join(", ")}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={reset}
-            disabled={!canEdit || dirtyLayers.length === 0 || updateContenido.isPending}
-            className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!canEdit || dirtyLayers.length === 0 || diagnostics.blockingForSave > 0 || updateContenido.isPending}
-            className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-            aria-busy={updateContenido.isPending}
-          >
-            <Save className="h-3.5 w-3.5" aria-hidden="true" />
-            {updateContenido.isPending ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={dirtyLayers.length === 0 || diagnostics.blockingForSave > 0 || updateContenido.isPending}
+              className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-1.5 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+              aria-busy={updateContenido.isPending}
+            >
+              <Save className="h-3.5 w-3.5" aria-hidden="true" />
+              {updateContenido.isPending ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        ) : null}
       </div>
-
-      {!canEdit ? (
-        <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)]/50 px-5 py-3 text-xs text-[var(--g-text-secondary)]">
-          {readOnlyReason ?? "Solo las plantillas en BORRADOR admiten edición tri-capa."}
-        </div>
-      ) : null}
 
       <SectionToggle title="Capa 1 — Contenido Handlebars" icon={Lock} defaultOpen={true}>
         <textarea
@@ -371,7 +410,7 @@ export function TriCapaEditor({
           onChange={(e) => setCapa1(e.target.value)}
           readOnly={!canEdit}
           rows={16}
-          className="w-full resize-y border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 font-mono text-[12px] leading-relaxed text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-70"
+          className={`w-full resize-y border border-[var(--g-border-default)] p-3 font-mono text-[12px] leading-relaxed text-[var(--g-text-primary)] focus:outline-none disabled:opacity-70 ${fieldStateClass}`}
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-label="Editor de contenido capa 1"
         />
@@ -417,7 +456,7 @@ export function TriCapaEditor({
                     setCapa2(next);
                   }}
                   readOnly={!canEdit}
-                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 font-mono text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  className={`border border-[var(--g-border-subtle)] px-3 py-2 font-mono text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                   aria-label={`Variable capa 2 ${index + 1}`}
                 />
@@ -432,7 +471,7 @@ export function TriCapaEditor({
                     setCapa2(next);
                   }}
                   readOnly={!canEdit}
-                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  className={`border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                   aria-label={`Fuente capa 2 ${index + 1}`}
                 />
@@ -447,7 +486,7 @@ export function TriCapaEditor({
                     setCapa2(next);
                   }}
                   readOnly={!canEdit}
-                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  className={`border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                   aria-label={`Condición capa 2 ${index + 1}`}
                 />
@@ -496,7 +535,7 @@ export function TriCapaEditor({
                       setCapa3(next);
                     }}
                     readOnly={!canEdit}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 font-mono text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    className={`border border-[var(--g-border-subtle)] px-3 py-2 font-mono text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                     style={{ borderRadius: "var(--g-radius-md)" }}
                     aria-label={`Campo capa 3 ${index + 1}`}
                   />
@@ -511,7 +550,7 @@ export function TriCapaEditor({
                       setCapa3(next);
                     }}
                     disabled={!canEdit}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    className={`border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                     style={{ borderRadius: "var(--g-radius-md)" }}
                     aria-label={`Obligatoriedad capa 3 ${index + 1}`}
                   >
@@ -544,7 +583,7 @@ export function TriCapaEditor({
                   }}
                   readOnly={!canEdit}
                   rows={2}
-                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  className={`w-full border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                   aria-label={`Descripción capa 3 ${index + 1}`}
                 />
@@ -560,7 +599,7 @@ export function TriCapaEditor({
                       setCapa3(next);
                     }}
                     readOnly={!canEdit}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    className={`border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                     style={{ borderRadius: "var(--g-radius-md)" }}
                     aria-label={`Default capa 3 ${index + 1}`}
                   />
@@ -575,7 +614,7 @@ export function TriCapaEditor({
                       setCapa3(next);
                     }}
                     readOnly={!canEdit}
-                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    className={`border border-[var(--g-border-subtle)] px-3 py-2 text-xs font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
                     style={{ borderRadius: "var(--g-radius-md)" }}
                     aria-label={`Opciones capa 3 ${index + 1}`}
                   />
@@ -607,7 +646,7 @@ export function TriCapaEditor({
           onChange={(e) => setNotas(e.target.value)}
           readOnly={!canEdit}
           rows={4}
-          className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+          className={`w-full border border-[var(--g-border-subtle)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none ${fieldStateClass}`}
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-label="Notas legales de la plantilla"
         />
@@ -628,26 +667,29 @@ export function TriCapaEditor({
             ) : (
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
             )}
-            {diagnostics.blocking} blocking
+            {diagnostics.blocking} {severityChipLabel("BLOCKING", diagnostics.blocking)}
           </span>
           <span
             className="px-2 py-1 text-xs font-medium bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
-            {diagnostics.warning} warning
+            {diagnostics.warning} {severityChipLabel("WARNING", diagnostics.warning)}
           </span>
           <span
             className="px-2 py-1 text-xs font-medium bg-[var(--status-info)] text-[var(--g-text-inverse)]"
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
-            {diagnostics.info} info
+            {diagnostics.info} {severityChipLabel("INFO", diagnostics.info)}
           </span>
         </div>
         {diagnostics.issues.length > 0 ? (
           <ul className="mt-3 space-y-1 text-xs">
             {diagnostics.issues.map((issue, index) => (
               <li key={`${issue.code}-${index}`} className={issueTone(issue)}>
-                <span className="font-semibold">{issue.code}</span>: {issue.message}
+                <span className="font-semibold">{gatePreIssueLabel(issue.code)}</span>: {issue.message}{" "}
+                <span className="font-mono text-[10px] text-[var(--g-text-secondary)]" title={issue.code}>
+                  {issue.code}
+                </span>
               </li>
             ))}
           </ul>

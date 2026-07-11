@@ -19,7 +19,7 @@ test.describe("Gestor de Plantillas — RBAC smoke", () => {
   test("la consola carga para el rol del fixture", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("tab", { name: "Dashboard" })).toBeVisible();
   });
@@ -27,7 +27,7 @@ test.describe("Gestor de Plantillas — RBAC smoke", () => {
   test("SECRETARIO no ve tabs de escritura (Importar/Validación)", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
 
     await expect(page.getByRole("tab", { name: "Importar" })).toHaveCount(0);
@@ -37,7 +37,7 @@ test.describe("Gestor de Plantillas — RBAC smoke", () => {
   test("tab inválida en ?tab cae al Dashboard sin romper", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas?tab=no-existe");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("tab", { name: "Dashboard" })).toHaveAttribute(
       "aria-selected",
@@ -48,7 +48,7 @@ test.describe("Gestor de Plantillas — RBAC smoke", () => {
   test("tab sin permisos en ?tab redirige a Dashboard", async ({ page }) => {
     await page.goto("/secretaria/gestor-plantillas?tab=importar");
     await expect(
-      page.getByRole("heading", { name: "Gestor de Plantillas" }),
+      page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\?tab=dashboard$/, { timeout: 10_000 });
   });

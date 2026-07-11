@@ -9,6 +9,8 @@
  */
 import { FileText } from "lucide-react";
 import { usePlantillasMetrics } from "@/hooks/usePlantillasMetrics";
+import { estadoLabel } from "@/lib/secretaria/template-admin";
+import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 import { KpiCard } from "./KpiCard";
 import { AlertBanner } from "./AlertBanner";
 
@@ -17,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
   REVISADA: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   APROBADA: "bg-[var(--g-sec-100)] text-[var(--g-brand-3308)]",
   ACTIVA: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
+  ARCHIVADA: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   DEPRECADA: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
 };
 
@@ -73,8 +76,10 @@ export function MetricasTab() {
           tone={lagging.totalActivas > 0 ? "success" : "neutral"}
           sublabel="Plantillas en producción"
         />
+        {/* tone success solo con los 5 modos core cubiertos: en 4/5 la alerta
+            de cobertura dispara y un KPI verde sería contradictorio */}
         <KpiCard
-          label="Cobertura modos"
+          label="Cobertura de modos (mínimo core)"
           value={
             isLoading
               ? "…"
@@ -82,8 +87,8 @@ export function MetricasTab() {
                 ? `${(leading.coberturaModos * 100).toFixed(0)}%`
                 : "0%"
           }
-          tone={leading.coberturaModos >= 0.8 ? "success" : "warning"}
-          sublabel="MEETING, UNIVERSAL, NO_SESSION…"
+          tone={leading.coberturaModos >= 1 ? "success" : "warning"}
+          sublabel="Sesión formal, junta universal, acuerdo sin sesión, decisión de socio único y de administrador único"
         />
         <KpiCard
           label="Brecha disponibilidad"
@@ -170,11 +175,11 @@ export function MetricasTab() {
                         }`}
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
-                        {p.estado}
+                        {estadoLabel(p.estado)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                      {p.adoption_mode ? p.adoption_mode : "—"}
+                      {p.adoption_mode ? adoptionModeBusinessLabel(p.adoption_mode) : "—"}
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                       {tiempoEnEstado} días

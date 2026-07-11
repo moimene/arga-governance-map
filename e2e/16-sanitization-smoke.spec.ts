@@ -170,7 +170,7 @@ test.describe('Sanitization smoke — Secretaria', () => {
     });
 
     await test.step('gestor documental', async () => {
-      await visitRoute(page, '/secretaria/gestor-plantillas', [/Gestor de Plantillas/i]);
+      await visitRoute(page, '/secretaria/gestor-plantillas', [/Gobierno de plantillas/i]);
     });
   });
 });

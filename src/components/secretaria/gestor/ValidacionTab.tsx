@@ -16,6 +16,8 @@ import { useState } from "react";
 import { ShieldCheck, AlertTriangle, AlertCircle, Info, CheckCircle2 } from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
 import {
+  gatePreIssueLabel,
+  gatePreSeverityLabel,
   loadAllActiveTemplates,
   validateTemplateForActivation,
   type GatePreIssue,
@@ -146,7 +148,7 @@ export function ValidacionTab() {
               style={{ borderRadius: "var(--g-radius-lg)" }}
             >
               <div className="text-xs uppercase tracking-widest text-[var(--g-text-secondary)]">
-                BLOCKING
+                Bloqueantes
               </div>
               <div className="mt-1 text-2xl font-bold text-[var(--status-error)]">
                 {totalBlocking}
@@ -157,7 +159,7 @@ export function ValidacionTab() {
               style={{ borderRadius: "var(--g-radius-lg)" }}
             >
               <div className="text-xs uppercase tracking-widest text-[var(--g-text-secondary)]">
-                WARNING
+                Advertencias
               </div>
               <div className="mt-1 text-2xl font-bold text-[var(--status-warning)]">
                 {totalWarnings}
@@ -168,7 +170,7 @@ export function ValidacionTab() {
               style={{ borderRadius: "var(--g-radius-lg)" }}
             >
               <div className="text-xs uppercase tracking-widest text-[var(--g-text-secondary)]">
-                INFO
+                Informativas
               </div>
               <div className="mt-1 text-2xl font-bold text-[var(--status-info)]">{totalInfo}</div>
             </div>
@@ -202,7 +204,7 @@ export function ValidacionTab() {
                       Severidad
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                      Code
+                      Incidencia
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                       Mensaje
@@ -227,11 +229,14 @@ export function ValidacionTab() {
                           <td className="px-4 py-2 align-top">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${color}`}>
                               <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                              {issue.severity}
+                              {gatePreSeverityLabel(issue.severity)}
                             </span>
                           </td>
                           <td className="px-4 py-2 align-top">
-                            <code className="font-mono text-xs text-[var(--g-text-secondary)]">
+                            <div className="text-xs text-[var(--g-text-primary)]">
+                              {gatePreIssueLabel(issue.code)}
+                            </div>
+                            <code className="font-mono text-[10px] text-[var(--g-text-secondary)]">
                               {issue.code}
                             </code>
                           </td>

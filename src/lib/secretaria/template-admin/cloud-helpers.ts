@@ -77,3 +77,44 @@ export async function countOrphanTemplates(tenantId: string): Promise<number> {
   const withLog = new Set((changelog ?? []).map((c) => c.plantilla_id as string));
   return (plantillas ?? []).filter((p) => !withLog.has(p.id)).length;
 }
+
+export type OrphanTemplateRow = {
+  id: string;
+  tipo: string;
+  estado: string;
+  version: string;
+  materia: string | null;
+};
+
+/**
+ * Lista las plantillas "huérfanas" (sin fila en `plantilla_changelog`) con la
+ * MISMA lógica que `countOrphanTemplates` (ITEM-086: solo estados vivos
+ * ACTIVA/BORRADOR/REVISADA/APROBADA), devolviendo las filas para poder
+ * mostrarlas en la sección "Plantillas sin changelog" de Auditoría.
+ *
+ * `materia` prioriza `materia_acuerdo` sobre `materia` (ambas columnas existen
+ * en `plantillas_protegidas`; ver `usePlantillasProtegidas.ts`).
+ */
+export async function listOrphanTemplates(tenantId: string): Promise<OrphanTemplateRow[]> {
+  const { data: plantillas, error: e1 } = await supabase
+    .from("plantillas_protegidas")
+    .select("id, tipo, estado, version, materia, materia_acuerdo")
+    .eq("tenant_id", tenantId)
+    .in("estado", ["ACTIVA", "BORRADOR", "REVISADA", "APROBADA"]);
+  if (e1) throw e1;
+  const { data: changelog, error: e2 } = await supabase
+    .from("plantilla_changelog")
+    .select("plantilla_id")
+    .eq("tenant_id", tenantId);
+  if (e2) throw e2;
+  const withLog = new Set((changelog ?? []).map((c) => c.plantilla_id as string));
+  return (plantillas ?? [])
+    .filter((p) => !withLog.has(p.id as string))
+    .map((p) => ({
+      id: p.id as string,
+      tipo: p.tipo as string,
+      estado: p.estado as string,
+      version: p.version as string,
+      materia: (p.materia_acuerdo ?? p.materia ?? null) as string | null,
+    }));
+}

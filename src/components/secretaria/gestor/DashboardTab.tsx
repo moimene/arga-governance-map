@@ -27,7 +27,7 @@ import {
 } from "@/lib/secretaria/template-admin";
 import { KpiCard } from "./KpiCard";
 import { AlertBanner } from "./AlertBanner";
-import type { TabId } from "./tab-guards";
+import { useTabAccess, type TabId } from "./tab-guards";
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 
@@ -35,11 +35,14 @@ type DashboardAlert = {
   tipo: "ERROR" | "WARNING" | "INFO";
   mensaje: string;
   tab: TabId;
+  /** Ruta completa a navegar desde el CTA (con query params extra); si falta, se usa `tab`. */
+  to?: string;
 };
 
 export function DashboardTab() {
   const { tenantId } = useTenantContext();
   const navigate = useNavigate();
+  const { canAccess } = useTabAccess();
   const plantillas = usePlantillasProtegidas();
   const changelog = usePlantillaChangelog();
 
@@ -95,6 +98,7 @@ export function DashboardTab() {
       tipo: "WARNING",
       mensaje: `${orphansCount} plantilla(s) sin changelog — revisar Auditoría`,
       tab: "auditoria",
+      to: "/secretaria/gestor-plantillas?tab=auditoria&focus=sin-changelog",
     });
   }
   if (p0Activas.length > 0) {
@@ -113,8 +117,55 @@ export function DashboardTab() {
     });
   }
 
+  const hasAlerts = alerts.length > 0;
+  // La lectura ejecutiva respeta el tipo real de las alertas (una ERROR no se
+  // resume como "advertencias") y no afirma salud completa mientras
+  // cobertura/huérfanas siguen cargando.
+  const healthLoading = plantillas.isLoading || coverage.isLoading || orphans.isLoading;
+  const hasErrorAlert = alerts.some((a) => a.tipo === "ERROR");
+  const healthDot = healthLoading
+    ? "bg-[var(--g-surface-muted)]"
+    : hasErrorAlert
+      ? "bg-[var(--status-error)]"
+      : hasAlerts
+        ? "bg-[var(--status-warning)]"
+        : "bg-[var(--status-success)]";
+  const healthLabel = healthLoading
+    ? "Evaluando"
+    : hasErrorAlert
+      ? "Con incidencias"
+      : hasAlerts
+        ? "Con advertencias"
+        : "Operativo";
+  const healthPhrase = healthLoading
+    ? "Evaluando la salud documental de la biblioteca…"
+    : hasAlerts
+      ? `Gobierno documental operativo ${hasErrorAlert ? "con incidencias" : "con advertencias"}: ${activas.length} plantillas vigentes, cobertura core ${covered}/${CORE_V1_MATERIAS_COUNT} y ${orphansCount} sin changelog.`
+      : `Gobierno documental operativo: ${activas.length} plantillas vigentes, cobertura core completa y trazabilidad al día.`;
+
   return (
     <div className="space-y-6">
+      <section
+        aria-label="Salud documental"
+        className="flex flex-wrap items-center gap-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-5 py-4"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <span
+          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-1 text-xs font-semibold text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-full)" }}
+        >
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 ${healthDot}`}
+            style={{ borderRadius: "var(--g-radius-full)" }}
+          />
+          {healthLabel}
+        </span>
+        <p className="flex-1 min-w-[220px] text-sm text-[var(--g-text-primary)]">
+          {healthPhrase}
+        </p>
+      </section>
+
       {alerts.length > 0 ? (
         <section className="space-y-2" aria-label="Alertas del gestor">
           {alerts.map((a, i) => (
@@ -122,7 +173,10 @@ export function DashboardTab() {
               key={`${a.tab}-${i}`}
               tipo={a.tipo}
               mensaje={a.mensaje}
-              cta={{ label: "Ver", onClick: () => goto(a.tab) }}
+              cta={{
+                label: "Ver",
+                onClick: () => (a.to ? navigate(a.to, { replace: false }) : goto(a.tab)),
+              }}
             />
           ))}
         </section>
@@ -132,8 +186,8 @@ export function DashboardTab() {
         <KpiCard
           label="Total activas"
           value={activas.length}
-          tone={activas.length >= 41 ? "success" : "warning"}
-          sublabel="Plantillas en producción"
+          tone="neutral"
+          sublabel="Volumen, no salud documental"
           onClick={() => goto("catalogo")}
         />
         <KpiCard
@@ -186,14 +240,16 @@ export function DashboardTab() {
           Acciones rápidas
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <button
-            type="button"
-            onClick={() => goto("importar")}
-            className="flex items-center gap-2 px-4 py-3 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" /> Importar plantilla
-          </button>
+          {canAccess("importar") ? (
+            <button
+              type="button"
+              onClick={() => goto("importar")}
+              className="flex items-center gap-2 px-4 py-3 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" /> Importar plantilla
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => goto("cobertura")}
@@ -210,14 +266,16 @@ export function DashboardTab() {
           >
             <FolderOpen className="h-4 w-4" aria-hidden="true" /> Auditoría
           </button>
-          <button
-            type="button"
-            onClick={() => goto("validacion")}
-            className="flex items-center gap-2 px-4 py-3 border border-[var(--g-border-default)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Gate PRE global
-          </button>
+          {canAccess("validacion") ? (
+            <button
+              type="button"
+              onClick={() => goto("validacion")}
+              className="flex items-center gap-2 px-4 py-3 border border-[var(--g-border-default)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Comprobación documental global
+            </button>
+          ) : null}
         </div>
       </section>
     </div>

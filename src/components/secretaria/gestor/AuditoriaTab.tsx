@@ -15,12 +15,19 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, FolderOpen, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { EvidenceForenseSection } from "@/components/EvidenceForenseSection";
 import { usePlantillaChangelog } from "@/hooks/secretaria/usePlantillaChangelog";
-import { countOrphanTemplates } from "@/lib/secretaria/template-admin";
+import {
+  countOrphanTemplates,
+  listOrphanTemplates,
+  tipoLabel,
+  estadoLabel,
+} from "@/lib/secretaria/template-admin";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
 import { AlertBanner } from "./AlertBanner";
 
 const FIVE_MINUTES = 5 * 60 * 1000;
@@ -82,6 +89,8 @@ function useOverridesActivos() {
 
 export function AuditoriaTab() {
   const { tenantId } = useTenantContext();
+  const [searchParams] = useSearchParams();
+  const focusSinChangelog = searchParams.get("focus") === "sin-changelog";
   const overrides = useOverridesActivos();
   const changelog = usePlantillaChangelog();
 
@@ -90,6 +99,13 @@ export function AuditoriaTab() {
     enabled: !!tenantId,
     staleTime: FIVE_MINUTES,
     queryFn: () => countOrphanTemplates(tenantId!),
+  });
+
+  const orphanRows = useQuery({
+    queryKey: ["auditoria_orphan_rows", tenantId],
+    enabled: !!tenantId,
+    staleTime: FIVE_MINUTES,
+    queryFn: () => listOrphanTemplates(tenantId!),
   });
 
   const [filterPlantilla, setFilterPlantilla] = useState<string>("");
@@ -125,6 +141,68 @@ export function AuditoriaTab() {
 
   return (
     <div className="space-y-6">
+      <section
+        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        aria-label="Plantillas sin changelog"
+      >
+        <details open={focusSinChangelog ? true : undefined}>
+          <summary className="cursor-pointer text-base font-semibold text-[var(--g-text-primary)]">
+            Plantillas sin changelog ({orphanRows.data?.length ?? 0})
+          </summary>
+          <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
+            Sin trazabilidad formal de cambios. Si se regulariza a posteriori, el changelog debe
+            marcarse como reconstruido, no como original.
+          </p>
+          {orphanRows.isLoading ? (
+            <p className="mt-3 text-sm text-[var(--g-text-secondary)]">Cargando…</p>
+          ) : orphanRows.isError ? (
+            <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
+              No se pudo comprobar la trazabilidad de changelog. Reintenta más tarde.
+            </p>
+          ) : (orphanRows.data?.length ?? 0) === 0 ? (
+            <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
+              Todas las plantillas en estados vivos tienen al menos una entrada de changelog.
+            </p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm border border-[var(--g-border-subtle)]">
+                <thead className="bg-[var(--g-surface-subtle)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-[var(--g-text-primary)]">Tipo</th>
+                    <th className="px-3 py-2 text-left font-medium text-[var(--g-text-primary)]">Materia</th>
+                    <th className="px-3 py-2 text-left font-medium text-[var(--g-text-primary)]">Versión</th>
+                    <th className="px-3 py-2 text-left font-medium text-[var(--g-text-primary)]">Estado</th>
+                    <th className="px-3 py-2 text-left font-medium text-[var(--g-text-primary)]">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--g-border-subtle)]">
+                  {(orphanRows.data ?? []).map((o) => (
+                    <tr key={o.id}>
+                      <td className="px-3 py-2 text-[var(--g-text-secondary)]">{tipoLabel(o.tipo)}</td>
+                      <td className="px-3 py-2 text-[var(--g-text-secondary)]">
+                        {o.materia ? labelMateria(o.materia) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--g-text-secondary)]">{o.version}</td>
+                      <td className="px-3 py-2 text-[var(--g-text-secondary)]">{estadoLabel(o.estado)}</td>
+                      <td className="px-3 py-2">
+                        <Link
+                          to={`/secretaria/gestor-plantillas?tab=catalogo&plantilla=${o.id}`}
+                          aria-label={`Ver en catálogo: ${tipoLabel(o.tipo)} ${o.materia ? labelMateria(o.materia) : ""} v${o.version}`}
+                          className="text-sm font-medium underline text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                        >
+                          Ver en catálogo
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </details>
+      </section>
+
       {orphansCount > 0 ? (
         <AlertBanner
           tipo="WARNING"

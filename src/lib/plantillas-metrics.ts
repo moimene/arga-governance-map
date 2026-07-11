@@ -102,12 +102,26 @@ export function computePlantillasMetrics(
     tiempoEnEstado[p.id] = days;
   });
 
-  // 5. coberturaModos: % of adoption modes with at least one ACTIVA template
+  // 5. coberturaModos: % of adoption modes with at least one ACTIVA template.
+  // El universo es el mínimo core de 5 modos; el numerador SOLO cuenta modos
+  // presentes que pertenezcan a ese universo (intersección). Modos adicionales
+  // del Motor v2.1 (CO_APROBACION, SOLIDARIO) no inflan la cobertura — sin
+  // esta intersección, 6 modos distintos daban 6/5 = 120% y enmascaraban el
+  // gap real de un modo core sin plantilla ACTIVA.
   const ADOPTION_MODES = ['MEETING', 'UNIVERSAL', 'NO_SESSION', 'UNIPERSONAL_SOCIO', 'UNIPERSONAL_ADMIN'];
+  // Labels de negocio para mensajes al usuario jurídico (módulo puro: mapa
+  // local en lugar de importar mesa-control-societaria).
+  const ADOPTION_MODE_LABELS: Record<string, string> = {
+    MEETING: 'sesión formal',
+    UNIVERSAL: 'junta universal',
+    NO_SESSION: 'acuerdo sin sesión',
+    UNIPERSONAL_SOCIO: 'decisión de socio único',
+    UNIPERSONAL_ADMIN: 'decisión de administrador único',
+  };
   const activeTemplates = plantillas.filter((p) => p.estado === 'ACTIVA');
   const coveredModes = new Set<string>();
   activeTemplates.forEach((p) => {
-    if (p.adoption_mode) {
+    if (p.adoption_mode && ADOPTION_MODES.includes(p.adoption_mode)) {
       coveredModes.add(p.adoption_mode);
     }
   });
@@ -125,11 +139,16 @@ export function computePlantillasMetrics(
   // ALERT GENERATION
   // ============================================================================
 
-  // Alert 1: WARNING if coberturaModos < 80%
-  if (coberturaModos < 0.8) {
+  // Alert 1: WARNING si falta CUALQUIER modo core sin plantilla ACTIVA.
+  // (El umbral anterior <80% no disparaba con 4/5 = 80% exacto, dejando el gap
+  // de un modo core — p.ej. UNIVERSAL — sin ninguna señal.)
+  if (coveredModes.size < ADOPTION_MODES.length) {
+    const missing = ADOPTION_MODES.filter((mode) => !coveredModes.has(mode)).map(
+      (mode) => ADOPTION_MODE_LABELS[mode] ?? mode,
+    );
     alertas.push({
       tipo: 'WARNING',
-      mensaje: `Cobertura de modos de adopción ${Math.round(coberturaModos * 100)}% — inferior al 80%`,
+      mensaje: `Cobertura de modos de adopción ${Math.round(coberturaModos * 100)}% — sin plantilla activa para: ${missing.join(', ')}`,
     });
   }
 

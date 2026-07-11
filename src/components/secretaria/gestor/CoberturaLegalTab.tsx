@@ -25,6 +25,7 @@ import {
 import { useTenantContext } from "@/context/TenantContext";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
 import {
   buildLegalTemplateCoverage,
   type LegalTemplateCoverageState,
@@ -39,6 +40,17 @@ import {
 } from "@/lib/secretaria/template-admin";
 
 const FIVE_MINUTES = 5 * 60 * 1000;
+
+// G2 (UX Oleada 1): la materia del gap core se muestra con label humano, no en
+// clave técnica. labelMateria cubre el catálogo de agenda (FORMULACION_CUENTAS
+// → "Formulación de cuentas"); para códigos fuera de catálogo se sanea el raw
+// (guiones bajos → espacios, frase capitalizada) en vez de exponer la clave.
+function materiaLabel(materia: string) {
+  const label = labelMateria(materia);
+  if (label !== materia) return label;
+  const sanitized = materia.replace(/_/g, " ").toLowerCase();
+  return sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
+}
 
 const COVERAGE_STATE_STYLE: Record<
   LegalTemplateCoverageState,
@@ -154,7 +166,9 @@ export function CoberturaLegalTab() {
                     <td className="px-4 py-2 text-[var(--g-text-primary)]">
                       {ORGANO_LABELS[gap.organo] ?? gap.organo}
                     </td>
-                    <td className="px-4 py-2 text-[var(--g-text-secondary)]">{gap.materia}</td>
+                    <td className="px-4 py-2 text-[var(--g-text-secondary)]">
+                      {materiaLabel(gap.materia)}
+                    </td>
                     <td className="px-4 py-2">
                       <span
                         className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold bg-[var(--status-error)] text-[var(--g-text-inverse)]"
@@ -163,6 +177,14 @@ export function CoberturaLegalTab() {
                         <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                         Sin MODELO_ACUERDO activo
                       </span>
+                      {/* G2: impacto + acción honesta del gap (puede ser artefacto de
+                          tipificación ORGANO_ADMIN vs CONSEJO_ADMIN, no falta de modelo) */}
+                      <p className="mt-1.5 max-w-lg text-xs text-[var(--g-text-secondary)]">
+                        Impacto: la combinación core no puede considerarse cubierta.
+                        Acción: revisar la tipificación de órgano del modelo activo
+                        equivalente o importar una plantilla nueva. Las versiones
+                        archivadas se conservan solo como histórico: no se reactivan.
+                      </p>
                     </td>
                   </tr>
                 ))}
@@ -218,7 +240,16 @@ export function CoberturaLegalTab() {
                   <span className="text-sm font-medium text-[var(--g-text-primary)]">
                     {row.label}
                   </span>
-                  <CoverageStateBadge state={row.state} label={row.sourceLabel} />
+                  {/* G3: los fixtures se etiquetan como cobertura provisional, no
+                      como una fuente equiparable a una plantilla Cloud aprobada */}
+                  <CoverageStateBadge
+                    state={row.state}
+                    label={
+                      row.state === "fixture_pending_load"
+                        ? "Cobertura provisional (fixture local)"
+                        : row.sourceLabel
+                    }
+                  />
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[var(--g-text-secondary)]">
                   <span>{TIPO_LABELS[row.tipo] ?? row.tipo}</span>

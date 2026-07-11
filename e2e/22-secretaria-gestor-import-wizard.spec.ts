@@ -44,9 +44,7 @@ test.describe("Gestor de Plantillas — Wizard de importación", () => {
 
     // Esperar a que cargue el shell.
     await expect(
-      page
-        .getByRole("heading", { name: /Gestor de plantillas/i })
-        .or(page.getByText(/Gestor de plantillas/i).first()),
+      page.getByRole("heading", { name: /Gobierno de plantillas/i }),
     ).toBeVisible({ timeout: 10_000 });
 
     // El wizard NO debe estar visible — la tab está restringida a

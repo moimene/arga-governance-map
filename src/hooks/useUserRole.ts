@@ -38,5 +38,9 @@ export function useUserRole(userId?: string) {
     return permissions.includes(`${resource}:*`);
   };
 
-  return { roles, permissions, hasPermission, isLoading: query.isLoading };
+  // isPending (v5) permanece true mientras no llega el PRIMER dato, incluso con
+  // la query deshabilitada (p.ej. tenantId aún sin resolver). isLoading, en
+  // cambio, es false con la query deshabilitada — consumidores que gateen
+  // decisiones RBAC con isLoading verían roles=[] en esa ventana.
+  return { roles, permissions, hasPermission, isLoading: query.isLoading, isPending: query.isPending };
 }

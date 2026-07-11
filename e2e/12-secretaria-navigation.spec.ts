@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   },
   { label: 'Libros obligatorios', path: '/secretaria/libros', heading: 'Libros obligatorios' },
   { label: 'Plantillas documentales', path: '/secretaria/plantillas', heading: 'Plantillas documentales protegidas' },
-  { label: 'Gobierno de plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gestor de Plantillas' },
+  { label: 'Gobierno de plantillas', path: '/secretaria/gestor-plantillas', heading: 'Gobierno de plantillas' },
   { label: 'Calendario societario', path: '/secretaria/calendario', heading: 'Calendario de vencimientos' },
   {
     label: 'Multi-jurisdicción',

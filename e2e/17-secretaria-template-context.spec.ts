@@ -5,7 +5,7 @@ test.describe('Secretaría — consumo contextual de plantillas', () => {
     const fixtureTemplateId = 'legal-fixture-documento-registral-es';
 
     await page.goto('/secretaria/gestor-plantillas');
-    await expect(page.getByRole('heading', { name: 'Gestor de Plantillas' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Gobierno de plantillas' })).toBeVisible({
       timeout: 10_000,
     });
     await page.getByRole('tab', { name: 'Catálogo' }).click();
@@ -34,7 +34,7 @@ test.describe('Secretaría — consumo contextual de plantillas', () => {
   test('gestor muestra panel de revisión legal sin persistir cambios', async ({ page }) => {
     await page.goto('/secretaria/gestor-plantillas');
 
-    await expect(page.getByRole('heading', { name: 'Gestor de Plantillas' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Gobierno de plantillas' })).toBeVisible({
       timeout: 10_000,
     });
     await page.getByRole('tab', { name: 'Catálogo' }).click();

@@ -320,6 +320,90 @@ describe("plantillas-metrics", () => {
   });
 
   // ============================================================================
+  // Test 9b: Modos extra (CO_APROBACION/SOLIDARIO) no inflan la cobertura
+  // ============================================================================
+  it("5 modos core + CO_APROBACION + SOLIDARIO en ACTIVA → coberturaModos = 100% (no 140%)", () => {
+    const baseDate = new Date("2026-04-01T00:00:00Z").toISOString();
+    const modes = [
+      "MEETING",
+      "UNIVERSAL",
+      "NO_SESSION",
+      "UNIPERSONAL_SOCIO",
+      "UNIPERSONAL_ADMIN",
+      "CO_APROBACION",
+      "SOLIDARIO",
+    ];
+    const plantillas: PlantillaProtegidaRow[] = modes.map((mode, i) => ({
+      id: `p${i + 1}`,
+      tipo: "MODELO_ACUERDO",
+      adoption_mode: mode,
+      estado: "ACTIVA",
+      created_at: baseDate,
+    }));
+
+    const result = computePlantillasMetrics(plantillas);
+
+    // El numerador se intersecta con el universo de 5 modos core: 5/5, no 7/5
+    expect(result.leading.coberturaModos).toBe(1.0);
+    const coberturAlert = result.alertas.find((a) =>
+      a.mensaje.includes("Cobertura de modos")
+    );
+    expect(coberturAlert).toBeUndefined();
+  });
+
+  // ============================================================================
+  // Test 9c: Caso Cloud actual — 6 modos ACTIVA sin UNIVERSAL → 80% + alerta
+  // ============================================================================
+  it("Caso Cloud: 6 modos ACTIVA sin UNIVERSAL → coberturaModos = 80% y WARNING dispara", () => {
+    const baseDate = new Date("2026-04-01T00:00:00Z").toISOString();
+    // Estado real de Cloud: MEETING, NO_SESSION, UNIPERSONAL_SOCIO,
+    // UNIPERSONAL_ADMIN, CO_APROBACION, SOLIDARIO — falta UNIVERSAL.
+    // Sin intersección el bug daba 6/5 = 120% y silenciaba la alerta <80%.
+    const modes = [
+      "MEETING",
+      "NO_SESSION",
+      "UNIPERSONAL_SOCIO",
+      "UNIPERSONAL_ADMIN",
+      "CO_APROBACION",
+      "SOLIDARIO",
+    ];
+    const plantillas: PlantillaProtegidaRow[] = modes.map((mode, i) => ({
+      id: `p${i + 1}`,
+      tipo: "MODELO_ACUERDO",
+      adoption_mode: mode,
+      estado: "ACTIVA",
+      created_at: baseDate,
+    }));
+
+    const result = computePlantillasMetrics(plantillas);
+
+    // 4 de los 5 modos core cubiertos (falta UNIVERSAL) = 80%
+    expect(result.leading.coberturaModos).toBe(4 / 5);
+    // La alerta dispara en cuanto falta CUALQUIER modo core, nombrándolo
+    // (el umbral <80% anterior dejaba el gap de UNIVERSAL sin señal).
+    const coberturAlertAt80 = result.alertas.find((a) =>
+      a.mensaje.includes("Cobertura de modos")
+    );
+    expect(coberturAlertAt80).toBeDefined();
+    expect(coberturAlertAt80?.tipo).toBe("WARNING");
+    expect(coberturAlertAt80?.mensaje).toContain("80%");
+    expect(coberturAlertAt80?.mensaje).toContain("junta universal");
+
+    // Al perder un modo core más (quitamos MEETING), cae a 60% y los nombra a ambos
+    const sinMeeting = plantillas.filter((p) => p.adoption_mode !== "MEETING");
+    const result2 = computePlantillasMetrics(sinMeeting);
+    expect(result2.leading.coberturaModos).toBe(3 / 5);
+    const coberturAlert = result2.alertas.find((a) =>
+      a.mensaje.includes("Cobertura de modos")
+    );
+    expect(coberturAlert).toBeDefined();
+    expect(coberturAlert?.tipo).toBe("WARNING");
+    expect(coberturAlert?.mensaje).toContain("60%");
+    expect(coberturAlert?.mensaje).toContain("sesión formal");
+    expect(coberturAlert?.mensaje).toContain("junta universal");
+  });
+
+  // ============================================================================
   // Test 10: Template with null adoption_mode doesn't break coverage calc
   // ============================================================================
   it("Template with null adoption_mode handled gracefully", () => {
