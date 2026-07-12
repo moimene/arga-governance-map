@@ -48,6 +48,7 @@ export const GATE_PRE_ISSUE_LABEL: Record<string, string> = {
   ENTITY_REF_FORBIDDEN: "Referencia directa a la sociedad no permitida en variables",
   CAPA3_PREFIJO_PROTEGIDO: "Campo editable con prefijo reservado del motor",
   CAPA2_UNUSED_VARIABLE: "Variable declarada que no se usa en el texto",
+  CAPA2_VARIABLE_REQUIRED: "Variable automática sin identificador",
   LEGACY_FUENTE_ENTIDAD: "Fuente de datos antigua: migrar a la fuente actual",
   GEN_IF_COUNT: "Exceso de ramas condicionales: valorar desdoblar la plantilla",
 
@@ -64,6 +65,9 @@ export const GATE_PRE_ISSUE_LABEL: Record<string, string> = {
   // Diagnósticos locales del editor tri-capa (TriCapaEditor.tsx)
   CAPA2_DUPLICATE_VARIABLE: "Variable duplicada en la capa 2",
   CAPA3_DUPLICATE_FIELD: "Campo editable duplicado en la capa 3",
+  CAPA3_FIELD_REQUIRED: "Campo editable sin identificador",
+  CAPA3_PROTECTED_PREFIX: "Campo editable con prefijo reservado",
+  CAPA3_DESCRIPTION_REQUIRED: "Campo editable sin descripción jurídica",
 };
 
 export function gatePreIssueLabel(code?: string | null): string {

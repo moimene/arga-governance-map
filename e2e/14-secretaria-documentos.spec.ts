@@ -150,12 +150,14 @@ test.describe('Secretaría — documentos DOCX', () => {
     await expect(page.getByRole('heading', { name: 'Gobierno de plantillas' })).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole('tab', { name: 'Catálogo' }).click();
+    await page.getByRole('tab', { name: 'Catálogo gobernado' }).click();
     await expect(page.getByText('Catálogo de plantillas protegidas')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('combobox', { name: /Revisi[oó]n legal/i }).selectOption('LOCAL_FIXTURE');
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('Documento registral');
 
     await page.getByRole('button', { name: /Documento registral/ }).first().click();
     await expect(page.getByText('Fixture local no persistido').first()).toBeVisible();
+    await expect(page.getByText('Fixture local · puente de cobertura').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Elegir trámite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Elegir trámite' }).click();

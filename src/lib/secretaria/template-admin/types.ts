@@ -13,6 +13,13 @@ export type EstadoPlantilla =
   | "ARCHIVADA"
   | "DEPRECADA";
 
+export type SemanticTone = "success" | "warning" | "info" | "error" | "neutral";
+
+export type TemplateMetadataPolicy = {
+  organoRequired: true;
+  adoptionModeRequired: boolean;
+};
+
 export type GatePreSeverity = "BLOCKING" | "WARNING" | "INFO";
 
 export type GatePreIssue = {
@@ -40,6 +47,7 @@ export type PlantillaCandidate = Pick<
   | "estado"
   | "organo_tipo"
   | "adoption_mode"
+  | "tipo_social"
   | "aprobada_por"
   | "fecha_aprobacion"
   | "referencia_legal"

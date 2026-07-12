@@ -120,6 +120,22 @@ describe("gate-pre — capas BLOCKING", () => {
     expect(r.issues.some((i) => i.code === "CAPA3_PREFIJO_PROTEGIDO")).toBe(true);
   });
 
+  it("CAPA3_PREFIJO_PROTEGIDO no depende de mayúsculas", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa3_editables: [
+          {
+            campo: "entidad.denominacion",
+            obligatoriedad: "OBLIGATORIO",
+            descripcion: "No editable",
+          } as never,
+        ],
+      }),
+      emptyCtx,
+    );
+    expect(r.issues.some((i) => i.code === "CAPA3_PREFIJO_PROTEGIDO")).toBe(true);
+  });
+
   it("ENTITY_REF_FORBIDDEN bloquea variable usada con prefijo entity_id", () => {
     // Esta regla se aplica al payload del importador (sec 5), pero el motor también lo detecta
     // cuando una variable referencia entity_id directamente
@@ -185,6 +201,62 @@ describe("gate-pre — WARNING e INFO", () => {
       emptyCtx,
     );
     expect(r.issues.some((i) => i.code === "CAPA2_UNUSED_VARIABLE" && i.severity === "INFO")).toBe(true);
+  });
+
+  it("reconoce variables Unicode declaradas y usadas en capa1", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "Ejercicio social {{año_ejercicio}}".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "año_ejercicio", fuente: "secretario_manual", condicion: "SIEMPRE" },
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_UNUSED_VARIABLE")).toBe(false);
+    expect(r.issues.some((i) => i.code === "CAPA2_VAR_NO_CATALOGADA")).toBe(false);
+  });
+
+  it("cuenta variables Unicode usadas solo como argumento de helper", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable:
+          "{{#if año_ejercicio}}Ejercicio disponible{{/if}}".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "año_ejercicio", fuente: "secretario_manual", condicion: "SIEMPRE" },
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_UNUSED_VARIABLE")).toBe(false);
+  });
+
+  it("bloquea un path usado solo en helper si no está declarado", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "{{#if entities.name}}Sociedad informada{{/if}}".padEnd(150, "x"),
+        capa2_variables: [],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_VAR_NO_CATALOGADA")).toBe(true);
+  });
+
+  it("considera usada una declaración wildcard cuando aparece una variable del prefijo", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "Sociedad {{entities.name}}".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "entities.*", fuente: "entities.*", condicion: "SIEMPRE" },
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_UNUSED_VARIABLE")).toBe(false);
   });
 
   it("plantilla limpia produce result.ok = true", () => {

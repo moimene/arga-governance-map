@@ -40,10 +40,21 @@ export interface PlantillaProtegidaRow {
   fecha_aprobacion: string | null;
   contenido_template: string | null;
   capa1_inmutable: string | null;
-  capa2_variables: Array<{ variable: string; fuente: string; condicion: string }> | null;
+  capa2_variables: Array<{
+    variable?: string;
+    fuente?: string;
+    condicion?: string;
+    name?: string;
+    source?: string;
+    display?: string;
+    [key: string]: unknown;
+  }> | null;
   capa3_editables: Array<{
-    campo: string;
-    obligatoriedad: string;
+    campo?: string;
+    obligatoriedad?: string;
+    name?: string;
+    field?: string;
+    hint?: string;
     descripcion?: string;
     default?: unknown;
     opciones?: unknown[];
@@ -64,7 +75,7 @@ export interface PlantillaProtegidaRow {
   contrato_variables_version: string | null;
   created_at: string;
   materia_acuerdo: string | null;
-  approval_checklist: Array<{ check: string; passed: boolean }> | null;
+  approval_checklist: Array<string | { check: string; passed: boolean }> | null;
   version_history: Array<{ from: string; to: string; at: string; by: string }> | null;
 }
 
@@ -218,18 +229,11 @@ export function useUpdateContenidoPlantilla() {
     mutationFn: async (params: {
       id: string;
       capa1_inmutable?: string;
-      capa2_variables?: Array<{ variable: string; fuente: string; condicion: string }>;
-      capa3_editables?: Array<{
-        campo: string;
-        obligatoriedad: string;
-        descripcion?: string;
-        default?: unknown;
-        opciones?: unknown[];
-        tipo?: string;
-        label?: string;
-        requerido?: boolean;
-        [key: string]: unknown;
-      }>;
+      // El inventario Cloud contiene shapes legacy y extensiones jurídicas.
+      // Aceptar el shape de lectura completo evita que el editor lossless tenga
+      // que fingir que todas las filas usan solo las tres claves canónicas.
+      capa2_variables?: NonNullable<PlantillaProtegidaRow["capa2_variables"]>;
+      capa3_editables?: NonNullable<PlantillaProtegidaRow["capa3_editables"]>;
       notas_legal?: string;
       motivo?: string;
       actor?: string;
@@ -280,13 +284,21 @@ export function useUpdateContenidoPlantilla() {
         throw new Error("No hay cambios de contenido para guardar");
       }
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("plantillas_protegidas")
         .update(updates)
         .eq("id", params.id)
-        .eq("tenant_id", tenantId);
+        .eq("tenant_id", tenantId)
+        .eq("estado", "BORRADOR")
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!updated) {
+        throw new Error(
+          "El borrador cambió de estado durante la edición; recarga antes de guardar.",
+        );
+      }
 
       try {
         await appendChangelog({
@@ -304,7 +316,8 @@ export function useUpdateContenidoPlantilla() {
           .from("plantillas_protegidas")
           .update(rollback)
           .eq("id", params.id)
-          .eq("tenant_id", tenantId);
+          .eq("tenant_id", tenantId)
+          .eq("estado", "BORRADOR");
         throw err;
       }
     },

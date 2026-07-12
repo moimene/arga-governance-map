@@ -7,13 +7,13 @@
  * puede ver la tab. Este test cubre dos rutas:
  *
  *  1. **Happy path completo (skipped por defecto)** — sube fixture
- *     `template-import-valid.json`, ejecuta preflight y verifica
+ *     `template-import-valid.json`, ejecuta la comprobación previa y verifica
  *     toast de éxito. Requiere usuario ADMIN_TENANT en Cloud, que
  *     no existe en el seed demo. Se preserva como smoke test para
  *     futuros sprints con RBAC real.
  *
  *  2. **RBAC denial (run by default)** — verifica que SECRETARIO
- *     navegando a `?tab=importar` NO ve el wizard (la tab queda
+ *     navegando a `?tab=importar` NO ve el wizard (la pestaña queda
  *     filtrada por `visibleTabsForRole`). Este path valida que la
  *     puerta RBAC sigue cerrada y el wizard no se expone por error.
  *
@@ -70,7 +70,7 @@ test.describe("Gestor de Plantillas — Wizard de importación", () => {
     await page.getByRole("button", { name: /Saltar a subir/i }).click();
 
     await page.setInputFiles('input[type="file"]', FIXTURE_PATH);
-    await page.getByRole("button", { name: /Ejecutar preflight/i }).click();
+    await page.getByRole("button", { name: /Ejecutar comprobación/i }).click();
 
     await expect(
       page.getByText(/borrador creado correctamente/i),

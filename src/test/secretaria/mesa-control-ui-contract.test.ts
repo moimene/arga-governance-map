@@ -60,7 +60,8 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(catalogo).toContain("Documentos y plantillas de esta materia");
     expect(catalogo).toContain("Verificación previa del expediente");
     expect(catalogo).toContain("Iniciar expediente bloqueado");
-    expect(catalogo).toContain("Asignar plantilla");
+    expect(catalogo).toContain("readiness?.actionLabel");
+    expect(read("src/lib/secretaria/mesa-control-societaria.ts")).toContain("Asignar plantilla");
 
     // Lenguaje técnico prohibido en la vista abogado (informe §4/§7)
     expect(catalogo).not.toContain("Gate PRE");
@@ -68,6 +69,9 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(catalogo).not.toContain("Usada por el motor");
     expect(catalogo).not.toContain("Probar fusión");
     expect(catalogo).not.toContain("Configuración del motor de reglas");
+    expect(catalogo).not.toContain("para que el motor habilite el expediente");
+    expect(catalogo).not.toContain("overrides documentales");
+    expect(catalogo).not.toContain("No hay overrides publicados");
     expect(catalogo).not.toContain("Estatutos no modelados para esta materia");
   });
 
@@ -86,8 +90,8 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(catalogo).toContain("Revisar fuentes");
     expect(catalogo).toContain("Verificar requisitos antes de iniciar");
 
-    // Leyenda de naturaleza + tooltips (informe §5/§6)
-    expect(catalogo).toContain("Naturaleza de las materias");
+    // Glosario accesible de naturaleza y formalización (informe §5/§6)
+    expect(catalogo).toContain("Cómo interpretar el catálogo");
     expect(catalogo).toContain("FORMALIZATION_CHIP_LEGEND");
 
     // Vigente vs histórica + duplicidades (informe §12)
@@ -102,10 +106,51 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     // Alias legacy colapsados en presentación (la ortografía vive ya en BD:
     // migración 20260710103000 aplicada el 2026-07-11)
     expect(model).toContain("MATERIA_CANONICAL_ALIAS");
+    expect(model).toContain("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE");
+    expect(catalogo).toContain("También denominada exclusión del derecho de suscripción preferente");
 
     // Estatutos sin ambigüedad (informe §6): dos mensajes distintos
     expect(catalogo).toContain("Estatutos no estructurados en el sistema para esta sociedad");
     expect(catalogo).toContain("no recogen regla especial para");
+  });
+
+  it("convierte Materias y reglas en un catálogo buscable, comparable y explicable (Fase 2A)", () => {
+    const catalogo = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const model = read("src/lib/secretaria/materia-catalog-ux.ts");
+    const help = read("src/components/secretaria/MateriaCatalogHelp.tsx");
+    const readiness = read("src/lib/secretaria/mesa-control-societaria.ts");
+
+    expect(catalogo).toContain("Materias y reglas");
+    expect(catalogo).toContain("Buscar por materia, artículo o documento");
+    expect(catalogo).toContain('searchParams.get("presentacion")');
+    expect(catalogo).toContain('searchParams.get("mayoria")');
+    expect(catalogo).toContain('searchParams.get("formalizacion")');
+    expect(catalogo).toContain('searchParams.get("estado")');
+    expect(catalogo).toContain("Tabla comparativa");
+    expect(catalogo).toContain("Difiere del mínimo de catálogo");
+    expect(catalogo).toContain("¿Por qué se aplica esta regla?");
+    expect(catalogo).toContain("Fuente determinante");
+    expect(catalogo).toContain("Fuentes revisadas");
+    expect(catalogo).toContain("Nota de uso");
+    expect(catalogo).toContain("Campos obligatorios al generar");
+    expect(catalogo).toContain("Criticidad");
+    expect(catalogo).not.toContain('label="Fuente determinante" value={matrixRow?.fuente');
+
+    expect(model).toContain("extractRulePackDocuments");
+    expect(model).toContain("convocatoria.documentosObligatorios");
+    expect(model).toContain("documentacion.obligatoria");
+    expect(model).toContain("groupActiveRulePacksByOrgano");
+    expect(model).toContain("buildRuleApplicabilityExplanation");
+    expect(model).toContain("MATERIA_USAGE_NOTES");
+
+    expect(help).toContain("Definición");
+    expect(help).toContain("Consecuencia");
+    expect(help).toContain("Qué hacer");
+    expect(help).toContain("<details");
+
+    expect(readiness).toContain('openingStatus: "not_applicable"');
+    expect(readiness).toContain('criticality === "apertura" && status !== "activa"');
+    expect(readiness).toContain("No aplica abrir expediente · dejar constancia en acta");
   });
 
   it("el perfil de sociedad contiene matriz materia × requisitos", () => {
@@ -181,22 +226,25 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
 
   it("conecta bindings de plantillas a la regla efectiva", () => {
     const plantillas = read("src/pages/secretaria/Plantillas.tsx");
+    const libraryUx = read("src/lib/secretaria/template-library-ux.ts");
 
     expect(plantillas).toContain("useAssignTemplateBinding");
     expect(plantillas).toContain("useSearchParams");
-    expect(plantillas).toContain("(p.materia_acuerdo ?? p.materia) === filterMateria");
+    expect(plantillas).toContain("resolveMateriaAlias(p.materia_acuerdo ?? p.materia) === filterMateria");
     expect(plantillas).toContain("templateEngineSort");
-    expect(plantillas).toContain("Configuración del motor");
-    expect(plantillas).toContain("Vincular como plantilla activa");
-    expect(plantillas).toContain("templateSelectionReason");
-    expect(plantillas).toContain("Plantilla vinculada a la regla efectiva");
+    expect(plantillas).toContain("Configuración de uso");
+    expect(plantillas).toContain("Vincular como plantilla vigente");
+    expect(plantillas).toContain("buildTemplateBindingMutationInput");
+    expect(libraryUx).toContain("templateSelectionReason");
+    expect(plantillas).toContain("Plantilla vinculada a la regla aplicable");
+    expect(plantillas).not.toContain("Configuración del motor:");
   });
 
   it("el catálogo de plantillas es operativo: ciclo segmentado, salud e incidencias (informe UX 2026-07-10)", () => {
     const plantillas = read("src/pages/secretaria/Plantillas.tsx");
 
     // Segmentación por ciclo con Vigentes por defecto (histórico a un clic, no oculto)
-    expect(plantillas).toContain('useState<CicloSegment>("vigentes")');
+    expect(plantillas).toContain("isTemplateCycleParam(requested)");
     expect(plantillas).toContain("Filtrar plantillas por ciclo de vida");
     expect(plantillas).toContain('{ id: "historico", label: "Histórico" }');
 
@@ -219,6 +267,176 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     // Histórico accionable: sustitución hacia la versión vigente
     expect(plantillas).toContain("Sustituida para nuevos expedientes");
     expect(plantillas).toContain("Ver versión vigente");
+  });
+
+  it("compara versiones y mantiene tabs, URL, foco y semántica NULL accesibles (Fase 2B)", () => {
+    const plantillas = read("src/pages/secretaria/Plantillas.tsx");
+    const libraryUx = read("src/lib/secretaria/template-library-ux.ts");
+
+    // Linaje seguro y acción histórica exacta; una ausencia no se disfraza de sustitución.
+    expect(plantillas).toContain("buildTemplateVersionComparison");
+    expect(plantillas).toContain("Comparar con vigente");
+    expect(plantillas).toContain("Sin versión vigente comparable");
+    expect(plantillas).toContain("Comparación de versiones");
+    expect(libraryUx).toContain("buildTemplateVersionComparison");
+    expect(libraryUx).toContain("findExactCurrentTemplate");
+
+    // Tabs accesibles y persistentes: Modelos conserva el identificador estable en la URL.
+    expect(plantillas).toContain('role="tablist"');
+    expect(plantillas).toContain('role="tab"');
+    expect(plantillas).toContain("aria-selected");
+    expect(plantillas).toContain("aria-controls");
+    expect(plantillas).toContain('event.key === "ArrowRight"');
+    expect(plantillas).toContain('event.key === "Home"');
+    expect(plantillas).toContain('tab === "modelos" ? "MODELO_ACUERDO" : null');
+
+    // NULL en plantilla significa todos; el foco móvil aterriza en un panel identificable.
+    expect(plantillas).toContain("tipoSocialLabel(selected.tipo_social)");
+    expect(libraryUx).toContain("Todos los tipos sociales");
+    expect(plantillas).toContain("showTipoSocialColumn");
+    expect(plantillas).toContain("Detalle de la plantilla seleccionada");
+    expect(plantillas).toContain("shouldFocusDetailRef");
+    expect(plantillas).toContain("min-h-11");
+
+    // Mutaciones humanas: aprobación completa, actor real y tipo social canónico.
+    expect(plantillas).toContain("TemplateApprovalDialog");
+    expect(plantillas).toContain("aprobadaPor");
+    expect(plantillas).toContain("fechaAprobacion");
+    expect(plantillas).toContain("actor: transitionActor");
+    expect(plantillas).toContain("canonicalBindingTipoSocial(selectedEntity?.tipoSocial)");
+    expect(plantillas).not.toContain('tipoSocial: selectedEntity?.legalForm ?? "ANY"');
+    expect(plantillas).toContain("Ya vinculada a esta regla");
+  });
+
+  it("unifica glosario, NULL tipado, tonos e incidencias en las tres superficies (Fase 1)", () => {
+    const labels = read("src/lib/secretaria/template-admin/labels.ts");
+    const review = read("src/lib/secretaria/legal-template-review.ts");
+    const gestor = read("src/components/secretaria/gestor/CatalogoTab.tsx");
+    const plantillas = read("src/pages/secretaria/Plantillas.tsx");
+    const materias = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const loadError = read("src/components/secretaria/ConfigurationLoadError.tsx");
+    const scopeHook = read("src/components/secretaria/shell/useSecretariaScope.ts");
+    const scopeSwitcher = read("src/components/secretaria/shell/ScopeSwitcher.tsx");
+    const validacion = read("src/components/secretaria/gestor/ValidacionTab.tsx");
+    const triCapa = read("src/components/secretaria/gestor/TriCapaEditor.tsx");
+
+    expect(labels).toContain("Órgano no informado");
+    expect(labels).toContain("Adopción no informada");
+    expect(labels).toContain("No aplica");
+    expect(labels).toContain("Todos los tipos sociales");
+    expect(labels).toContain("Cualquier órgano");
+    expect(labels).toContain("Cualquier forma de adopción");
+    expect(labels).toContain("SEMANTIC_TONE_CLASS");
+    expect(labels).toContain("DEPRECADA: \"neutral\"");
+
+    expect(review).toContain("Plantilla activa equivalente");
+    expect(review).toContain('normalizeCode(template.estado) !== "ACTIVA"');
+    expect(review).not.toContain("Existe mas de una plantilla para la misma materia");
+
+    expect(gestor).toContain("Comprobación documental previa (Gate PRE)");
+    expect(gestor).toContain("Cobertura provisional");
+    expect(gestor).toContain("No se ha encontrado la plantilla solicitada en este ámbito.");
+    expect(gestor).toContain("No aparece en el catálogo de uso porque no es una fila Cloud gobernada.");
+    expect(plantillas).toContain("No se ha encontrado la plantilla solicitada en este ámbito.");
+    expect(plantillas).toContain("statusLabel(selectedEntity.status)");
+    expect(materias).toContain("No se ha encontrado la materia solicitada en este ámbito.");
+    expect(materias).toContain("scope: routeScope");
+    expect(loadError).toContain("No se muestran datos parciales");
+    expect(loadError).toContain('role="alert"');
+    expect(scopeHook).toContain('params.set(SCOPE_PARAM, "grupo")');
+    expect(scopeHook).toContain("params.delete(ENTITY_PARAM)");
+    expect(scopeSwitcher).toContain('params.set("scope", "grupo")');
+    expect(gestor).not.toContain('title="Gate PRE — Configuración"');
+    expect(validacion).toContain("Comprobar todas las plantillas");
+    expect(validacion).not.toContain("Ejecutar Gate PRE global");
+    expect(triCapa).toContain("Capa 2 — Variables automáticas");
+    expect(triCapa).not.toContain("Capa 2 — Variables del motor");
+  });
+
+  it("convierte Gobierno de plantillas en una consola jurídica agrupada y accesible (Fase 2C)", () => {
+    const shell = read("src/pages/secretaria/GestorPlantillas.tsx");
+    const guards = read("src/components/secretaria/gestor/tab-guards.ts");
+    const dashboard = read("src/components/secretaria/gestor/DashboardTab.tsx");
+    const catalogo = read("src/components/secretaria/gestor/CatalogoTab.tsx");
+    const triCapa = read("src/components/secretaria/gestor/TriCapaEditor.tsx");
+    const layerUx = read("src/lib/secretaria/template-layer-ux.ts");
+    const governanceUx = read("src/lib/secretaria/template-governance-ux.ts");
+    const auditoria = read("src/components/secretaria/gestor/AuditoriaTab.tsx");
+    const metricas = read("src/components/secretaria/gestor/MetricasTab.tsx");
+
+    expect(guards).toContain('dashboard: "Salud documental"');
+    expect(guards).toContain('catalogo: "Catálogo gobernado"');
+    expect(guards).toContain('cobertura: "Cobertura por materia y órgano"');
+    expect(guards).toContain('metricas: "Indicadores de ciclo de vida"');
+    expect(guards).toContain('auditoria: "Auditoría y changelog"');
+    expect(guards).toContain('validacion: "Comprobación documental"');
+    expect(guards).toContain('configuracion: "Configuración por sociedad"');
+    expect(guards).toContain("TAB_ORDER.filter(canAccess)");
+
+    expect(shell).toContain("Comprobando acceso a las secciones");
+    expect(shell).toContain("tabIndex={isActive ? 0 : -1}");
+    expect(shell).toContain('event.key === "ArrowRight"');
+    expect(shell).toContain('event.key === "Home"');
+    expect(shell).toContain("min-h-11");
+
+    expect(dashboard).toContain("buildTemplateGovernanceIncidents");
+    expect(dashboard).toContain("Cola de incidencias");
+    expect(dashboard).toContain("Consecuencia");
+    expect(dashboard).toContain("Acción recomendada");
+    expect(dashboard).toContain("cobertura obligatoria");
+
+    expect(catalogo).toContain("groupTemplatesForGovernance");
+    expect(catalogo).toContain("Biblioteca gobernada por tipo, materia, variante jurídica y serie de versiones");
+    expect(catalogo).toContain('searchParams.get("q")');
+    expect(catalogo).toContain('searchParams.get("modo") === "tecnica"');
+    expect(catalogo).toContain("Materia: {labelMateria");
+    expect(catalogo).toContain("Sin versión vigente comparable");
+    expect(governanceUx).toContain("buildFunctionalKey");
+    expect(governanceUx).toContain("family.containsTarget");
+
+    expect(triCapa).toContain("Vista legal del texto protegido");
+    expect(triCapa).toContain("Uso en el texto");
+    expect(triCapa).toContain("Obligatoriedad");
+    expect(triCapa).toContain("aria-invalid");
+    expect(triCapa).not.toContain("dangerouslySetInnerHTML");
+    expect(layerUx).toContain("serializeCapa2Rows");
+    expect(layerUx).toContain("serializeCapa3Rows");
+    expect(layerUx).toContain("field");
+    expect(layerUx).toContain("hint");
+
+    expect(auditoria).toContain("Evidencia forense general");
+    expect(auditoria).toContain("evidenceOpen ?");
+    expect(metricas).toContain("son estimaciones construidas con las fechas disponibles");
+    expect(metricas).toContain("max-h-[36rem]");
+  });
+
+  it("exporta la matriz visible y la auditoría cargada sin exagerar su alcance (Fase 3)", () => {
+    const materias = read("src/pages/secretaria/CatalogoMaterias.tsx");
+    const auditoria = read("src/components/secretaria/gestor/AuditoriaTab.tsx");
+    const csv = read("src/lib/secretaria/csv-export.ts");
+
+    expect(materias).toContain("Exportar matriz CSV");
+    expect(materias).toContain("filteredCatalogItems.map");
+    expect(materias).toContain(
+      "El CSV refleja únicamente las materias visibles y el ámbito seleccionado.",
+    );
+    expect(materias).toContain("Código de materia");
+    expect(materias).toContain("ID de sociedad");
+    expect(materias).toContain("const generatedOn = formatCsvDate()");
+    expect(materias).toContain('setExportStatus("No se ha podido descargar la matriz de materias. Inténtalo de nuevo.")');
+    expect(materias).toContain('role={exportFailed ? "alert" : "status"}');
+
+    expect(auditoria).toContain("Exportar changelog filtrado");
+    expect(auditoria).toContain("Exportar plantillas sin changelog");
+    expect(auditoria).toContain("CSV de trabajo; el historial disponible es incompleto.");
+    expect(auditoria).toContain("hasta 200 entradas recientes");
+    expect(auditoria).toContain("filteredChangelog.map");
+
+    expect(csv).toContain('const UTF8_BOM = "\\uFEFF"');
+    expect(csv).toContain('const DELIMITER = ";"');
+    expect(csv).toContain("protectFormula");
+    expect(csv).toContain("formatCsvDate");
+    expect(csv).toContain("downloadCsv");
   });
 
   it("no filtra metadatos demo en textos visibles de negocio", () => {

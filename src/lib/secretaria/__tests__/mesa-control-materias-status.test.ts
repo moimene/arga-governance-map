@@ -58,6 +58,7 @@ function plantilla(overrides: Partial<PlantillaProtegidaRow>): PlantillaProtegid
     snapshot_rule_pack_required: false,
     adoption_mode: null,
     organo_tipo: null,
+    tipo_social: overrides.tipo_social ?? null,
     contrato_variables_version: null,
     created_at: "2026-01-01T00:00:00Z",
     materia_acuerdo: null,
@@ -67,9 +68,17 @@ function plantilla(overrides: Partial<PlantillaProtegidaRow>): PlantillaProtegid
   } as PlantillaProtegidaRow;
 }
 
-const READY: TemplateReadinessResult = { canStartCase: true, blockingMessage: null, items: [] };
+const READY: TemplateReadinessResult = {
+  canStartCase: true,
+  openingStatus: "ready",
+  openingMessage: "Documentación de apertura lista.",
+  blockingMessage: null,
+  items: [],
+};
 const BLOCKED: TemplateReadinessResult = {
   canStartCase: false,
+  openingStatus: "blocked",
+  openingMessage: "No se puede iniciar expediente porque falta plantilla activa de acta.",
   blockingMessage: "No se puede iniciar expediente porque falta plantilla de acta.",
   items: [],
 };
@@ -79,7 +88,28 @@ describe("alias de materias legacy", () => {
     expect(resolveMateriaAlias("MOD_ESTATUTOS")).toBe("MODIFICACION_ESTATUTOS");
     expect(resolveMateriaAlias("AMPLIACION_CAPITAL")).toBe("AUMENTO_CAPITAL");
     expect(resolveMateriaAlias("NOMBRAMIENTO_CESE")).toBe("NOMBRAMIENTO_CONSEJERO");
+    expect(resolveMateriaAlias("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
+      "SUPRESION_PREFERENTE",
+    );
     expect(resolveMateriaAlias("CESE_CONSEJERO")).toBe("CESE_CONSEJERO");
+  });
+
+  it("colapsa las dos materias del art. 308 con un rótulo jurídico conjunto", () => {
+    const rows = buildMateriaCatalogRows([
+      materiaRow({
+        materia: "SUPRESION_PREFERENTE",
+        materia_label_es: "Supresión del derecho de suscripción preferente",
+      }),
+      materiaRow({
+        materia: "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+        materia_label_es: "Exclusión del derecho de suscripción preferente",
+      }),
+    ]);
+    const art308 = rows.filter((row) => row.materia === "SUPRESION_PREFERENTE");
+    expect(art308).toHaveLength(1);
+    expect(art308[0].materia_label_es).toBe(
+      "Exclusión o supresión del derecho de preferencia",
+    );
   });
 
   it("colapsa la fila alias cuando existe la canónica (sin tarjetas duplicadas)", () => {
@@ -170,7 +200,8 @@ describe("evaluateMateriaGlobalStatus", () => {
       informativa: true,
     });
     expect(result.status).toBe("lista");
-    expect(result.label).toBe("Materia informativa");
+    expect(result.label).toBe("Solo constancia");
+    expect(result.explanation).toContain("No aplica abrir expediente decisorio");
     expect(result.ctaLabel).toBe("Ver regla aplicable");
   });
 
@@ -183,6 +214,19 @@ describe("evaluateMateriaGlobalStatus", () => {
     });
     expect(result.status).toBe("advertencia");
     expect(result.ctaLabel).toBe("Ver regla aplicable");
+  });
+
+  it("materia incompatible con el tipo social queda en No aplica, no bloqueada", () => {
+    const result = evaluateMateriaGlobalStatus({
+      templateReadiness: BLOCKED,
+      legalReference: "art. 244 LSC",
+      notApplicableReason: "No aplica a S.L.; esta materia se limita a S.A.",
+    });
+    expect(result).toMatchObject({
+      status: "lista",
+      label: "No aplica a esta sociedad",
+      ctaLabel: "Ver regla aplicable",
+    });
   });
 
   it("bloqueada cuando falta plantilla mínima (precede a todo)", () => {
@@ -206,6 +250,44 @@ describe("evaluateMateriaGlobalStatus", () => {
     });
     expect(result.status).toBe("revision_legal");
     expect(result.ctaLabel).toBe("Revisar fuentes");
+  });
+
+  it("eleva a revisión un conflicto de órgano y advierte activaciones equivalentes", () => {
+    const conflict = evaluateMateriaGlobalStatus({
+      templateReadiness: READY,
+      legalReference: "art. 15 LSC",
+      ruleWarnings: ["Conflicto de órgano: metadata y contenido no coinciden."],
+    });
+    expect(conflict.status).toBe("revision_legal");
+
+    const duplicate = evaluateMateriaGlobalStatus({
+      templateReadiness: READY,
+      legalReference: "art. 308 LSC",
+      ruleWarnings: ["Existen dos filas activas equivalentes."],
+    });
+    expect(duplicate.status).toBe("advertencia");
+
+    const unresolvedSocialType = evaluateMateriaGlobalStatus({
+      templateReadiness: READY,
+      legalReference: "art. 244 LSC",
+      ruleWarnings: ["No se puede determinar la aplicabilidad sin tipo social."],
+    });
+    expect(unresolvedSocialType.status).toBe("revision_legal");
+  });
+
+  it("ACCION_SOCIAL_RESPONSABILIDAD exige una regla versionada activa", () => {
+    const result = evaluateMateriaGlobalStatus({
+      templateReadiness: READY,
+      legalReference: "art. 238 LSC",
+      ruleVersionAvailable: false,
+    });
+
+    expect(result).toMatchObject({
+      status: "revision_legal",
+      label: "Requiere revisión legal",
+      ctaLabel: "Revisar fuentes",
+    });
+    expect(result.explanation).toContain("Falta regla versionada activa");
   });
 
   it("revisión legal cuando la referencia legal está pendiente", () => {
@@ -246,7 +328,7 @@ describe("versionado y presentación de plantillas", () => {
 
   it("documentTypeLabel traduce tipos conocidos y deja pasar desconocidos", () => {
     expect(documentTypeLabel("ACTA_CONSIGNACION")).toBe("Acta de consignación");
-    expect(documentTypeLabel("TIPO_RARO")).toBe("TIPO_RARO");
+    expect(documentTypeLabel("TIPO_RARO")).toBe("Tipo raro");
   });
 
   it("marca como vigente la mayor versión ACTIVA y colapsa las anteriores", () => {
@@ -334,9 +416,7 @@ describe("versionado y presentación de plantillas", () => {
     expect(groups[0].older).toHaveLength(0);
   });
 
-  it("detecta duplicidad VISIBLE: etiqueta final idéntica aunque difieran metadatos ocultos", () => {
-    // Dos MODELO_ACUERDO idénticos salvo la jurisdicción (ES vs GLOBAL): ambos se
-    // muestran para una sociedad ES y ningún discriminador visible los distingue.
+  it("trata jurisdicciones distintas como variantes legítimas y las hace distinguibles", () => {
     const plantillas = [
       plantilla({
         tipo: "MODELO_ACUERDO",
@@ -360,9 +440,11 @@ describe("versionado y presentación de plantillas", () => {
       jurisdiction: "ES",
     });
     expect(groupStageBindingsForDisplay(bindings)).toHaveLength(2);
+    const labels = bindings.map((binding) => templateBindingDisplayLabel(binding, bindings));
+    expect(labels).toContain("Modelo de acuerdo · v1.1.1 · España");
+    expect(labels).toContain("Modelo de acuerdo · v1.1.1 · Global");
     const duplicates = detectTemplateDataDuplicates(bindings);
-    expect(duplicates).toHaveLength(1);
-    expect(duplicates[0].ids).toHaveLength(2);
+    expect(duplicates).toHaveLength(0);
   });
 
   it("no flagea como duplicidad plantillas cuya etiqueta discrimina (socio vs admin único)", () => {
@@ -416,7 +498,9 @@ describe("versionado y presentación de plantillas", () => {
   it("sin discriminador cuando el label ya es único", () => {
     const plantillas = [plantilla({ tipo: "CERTIFICACION", version: "1.3.0" })];
     const bindings = buildTemplateDocumentBindings(plantillas, { materia: "CESE_CONSEJERO" });
-    expect(templateBindingDisplayLabel(bindings[0], bindings)).toBe("Certificación · v1.3.0");
+    expect(templateBindingDisplayLabel(bindings[0], bindings)).toBe(
+      "Certificación de acuerdos · v1.3.0",
+    );
   });
 
   it("la readiness sigue funcionando con los grupos de display (regresión)", () => {

@@ -5,6 +5,8 @@
  */
 
 import type { FunctionalKey, PlantillaCandidate } from "./types";
+import { resolveMateriaAlias } from "../agenda-materias";
+import { normalizeOrganoTipo } from "./organo-canonico";
 
 export const CORE_V1_MATERIAS: ReadonlyArray<{ organo: string; materia: string }> = [
   { organo: "JUNTA_GENERAL", materia: "APROBACION_CUENTAS" },
@@ -20,24 +22,29 @@ export const CORE_V1_MATERIAS: ReadonlyArray<{ organo: string; materia: string }
   { organo: "CONSEJO_ADMIN", materia: "POLITICAS_CORPORATIVAS" },
   { organo: "CONSEJO_ADMIN", materia: "NOMBRAMIENTO_CONSEJERO" },
   { organo: "CONSEJO_ADMIN", materia: "CESE_CONSEJERO" },
-  { organo: "ORGANO_ADMIN", materia: "FORMULACION_CUENTAS" },
+  { organo: "CONSEJO_ADMIN", materia: "FORMULACION_CUENTAS" },
 ] as const;
 
 export const CORE_V1_MATERIAS_COUNT = CORE_V1_MATERIAS.length;
 
 function resolveMateria(row: PlantillaCandidate): string {
-  return row.materia_acuerdo ?? row.materia ?? "";
+  return resolveMateriaAlias(row.materia_acuerdo ?? row.materia);
+}
+
+function normalizeFunctionalValue(value?: string | null): string {
+  return String(value ?? "").trim().toUpperCase();
 }
 
 export function buildFunctionalKey(row: PlantillaCandidate, tenantId: string): FunctionalKey {
   return {
     tenantId,
-    tipo: row.tipo ?? "",
-    jurisdiccion: row.jurisdiccion ?? "",
+    tipo: normalizeFunctionalValue(row.tipo),
+    jurisdiccion: normalizeFunctionalValue(row.jurisdiccion),
     materia: resolveMateria(row),
-    organoTipo: row.organo_tipo ?? "",
-    adoptionMode: row.adoption_mode ?? "",
-    tipoSocial: null,
+    organoTipo:
+      normalizeOrganoTipo(row.organo_tipo) ?? normalizeFunctionalValue(row.organo_tipo),
+    adoptionMode: normalizeFunctionalValue(row.adoption_mode),
+    tipoSocial: normalizeFunctionalValue(row.tipo_social) || null,
   };
 }
 

@@ -30,8 +30,9 @@ function template(patch: Partial<PlantillaProtegidaRow> & Pick<PlantillaProtegid
     variables: [],
     protecciones: {},
     snapshot_rule_pack_required: true,
-    adoption_mode: null,
-    organo_tipo: null,
+    adoption_mode: "MEETING",
+    organo_tipo: "JUNTA_GENERAL",
+    tipo_social: null,
     contrato_variables_version: null,
     created_at: "2026-04-30T00:00:00.000Z",
     materia_acuerdo: null,
@@ -95,10 +96,30 @@ describe("legal-template-review", () => {
     expect(row.flags.draftVersion).toBe(true);
     expect(row.flags.missingReference).toBe(true);
     expect(row.flags.missingOwner).toBe(true);
-    expect(row.reasons.join(" ")).toContain("STUB");
+    expect(row.reasons.join(" ")).toContain("contenido en borrador o revisión pendiente");
   });
 
-  it("detecta duplicados por materia para que Legal decida variante o consolidacion", () => {
+  it("aplica límites de palabra a las notas de revisión", () => {
+    const [independent, pending] = buildLegalTemplateReviewRows([
+      template({
+        id: "consejero-independiente",
+        tipo: "TIPO_SIN_PLAN",
+        notas_legal: "Modelo para el nombramiento de un consejero independiente.",
+      }),
+      template({
+        id: "pendiente-revision",
+        tipo: "TIPO_SIN_PLAN",
+        notas_legal: "Pendiente de revisión por el equipo jurídico.",
+      }),
+    ]);
+
+    expect(independent.flags.notesRequireReview).toBe(false);
+    expect(independent.requiresLegalReview).toBe(false);
+    expect(pending.flags.notesRequireReview).toBe(true);
+    expect(pending.requiresLegalReview).toBe(true);
+  });
+
+  it("no confunde variantes legítimas por órgano con duplicados", () => {
     const rows = buildLegalTemplateReviewRows([
       template({
         id: "nombramiento-junta",
@@ -116,8 +137,139 @@ describe("legal-template-review", () => {
       }),
     ]);
 
+    expect(rows.every((row) => row.flags.duplicateMatter)).toBe(false);
+    expect(rows.every((row) => matchesLegalTemplateReviewFilter(row, "DUPLICATE_MATTER"))).toBe(false);
+  });
+
+  it("detecta equivalencia activa por identidad funcional completa y conserva variantes sociales", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "duplicado-a",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUMENTO_CAPITAL",
+        version: "1.1.1",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        tipo_social: "SA",
+      }),
+      template({
+        id: "duplicado-b",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AMPLIACION_CAPITAL",
+        version: "1.1.1",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        tipo_social: "SA",
+      }),
+      template({
+        id: "variante-social",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUMENTO_CAPITAL",
+        version: "1.1.1",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        tipo_social: "SL",
+      }),
+    ]);
+
+    expect(rows[0].flags.duplicateMatter).toBe(true);
+    expect(rows[1].flags.duplicateMatter).toBe(true);
+    expect(rows[2].flags.duplicateMatter).toBe(false);
+    expect(rows[0].reasons.join(" ")).toContain("identidad funcional");
+  });
+
+  it("detecta como equivalentes dos versiones distintas simultáneamente ACTIVA", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "convocatoria-v1",
+        tipo: "CONVOCATORIA",
+        materia: "CONVOCATORIA_COMISION_DELEGADA",
+        version: "1.0.0",
+        organo_tipo: "COMISION_DELEGADA",
+        adoption_mode: "MEETING",
+      }),
+      template({
+        id: "convocatoria-v1-1",
+        tipo: "CONVOCATORIA",
+        materia: "CONVOCATORIA_COMISION_DELEGADA",
+        version: "1.1.0",
+        organo_tipo: "COMISION_DELEGADA",
+        adoption_mode: "MEETING",
+      }),
+    ]);
+
     expect(rows.every((row) => row.flags.duplicateMatter)).toBe(true);
-    expect(rows.every((row) => matchesLegalTemplateReviewFilter(row, "DUPLICATE_MATTER"))).toBe(true);
+    expect(rows.every((row) => matchesLegalTemplateReviewFilter(row, "DUPLICATE_MATTER"))).toBe(
+      true,
+    );
+    expect(rows.every((row) => row.status === "needs_review")).toBe(true);
+    expect(rows.every((row) => row.requiresLegalReview)).toBe(true);
+    expect(rows.every((row) => !row.canClaimLegalApproval)).toBe(true);
+    expect(rows[0].reasons.join(" ")).toContain("otra fila vigente");
+    expect(rows[0].duplicateKey).toBe(rows[1].duplicateKey);
+  });
+
+  it("aplica el alias de presentación del art. 308 al detectar duplicados", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "art308-exclusion",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+      }),
+      template({
+        id: "art308-supresion",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "SUPRESION_PREFERENTE",
+      }),
+    ]);
+    expect(rows.every((row) => row.flags.duplicateMatter)).toBe(true);
+  });
+
+  it("no enfrenta una plantilla ACTIVA con su histórico archivado", () => {
+    const rows = buildLegalTemplateReviewRows([
+      template({
+        id: "vigente",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUMENTO_CAPITAL",
+        version: "1.1.1",
+        estado: "ACTIVA",
+      }),
+      template({
+        id: "historica",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "AUMENTO_CAPITAL",
+        version: "1.1.1",
+        estado: "ARCHIVADA",
+      }),
+    ]);
+    expect(rows.every((row) => row.flags.duplicateMatter === false)).toBe(true);
+  });
+
+  it("trata adopción NULL como no aplicable solo en documentos de soporte", () => {
+    const [support, adoptable, missingOrgan] = buildLegalTemplateReviewRows([
+      template({
+        id: "support",
+        tipo: "INFORME_PRECEPTIVO",
+        organo_tipo: "SOPORTE_INTERNO",
+        adoption_mode: null,
+      }),
+      template({
+        id: "adoptable",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "MATERIA_SIN_PLAN",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: null,
+      }),
+      template({
+        id: "missing-organ",
+        tipo: "CERTIFICACION",
+        organo_tipo: null,
+        adoption_mode: null,
+      }),
+    ]);
+    expect(support.flags.missingOwner).toBe(false);
+    expect(adoptable.flags.missingOwner).toBe(true);
+    expect(missingOrgan.flags.missingOwner).toBe(true);
   });
 
   it("aplica el informe legal final como plan de aprobacion", () => {
@@ -149,7 +301,7 @@ describe("legal-template-review", () => {
     expect(garantia.approvalDecision).toBe("APROBADA");
     expect(garantia.proposedVersion).toBe("1.0.0");
     expect(garantia.canClaimLegalApproval).toBe(true);
-    expect(garantia.reasons.join(" ")).toContain("Version tecnica");
+    expect(garantia.reasons.join(" ")).toContain("Versión provisional");
     expect(matchesLegalTemplateReviewFilter(garantia, "LEGAL_REPORT_APPROVED")).toBe(true);
   });
 
@@ -187,6 +339,6 @@ describe("legal-template-review", () => {
     expect(summary.draftVersion).toBe(1);
     expect(summary.missingOwner).toBe(1);
     expect(summary.legalReportApproved).toBe(0);
-    expect(summary.legalReportApprovedWithVariants).toBe(1);
+    expect(summary.legalReportApprovedWithVariants).toBe(2);
   });
 });

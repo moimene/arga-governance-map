@@ -1,28 +1,39 @@
 /**
- * ValidacionTab — Gate PRE global sobre todas las plantillas ACTIVAS.
+ * ValidacionTab — comprobación documental global de plantillas vigentes.
  *
  * Ejecuta `validateTemplateForActivation` para cada plantilla activa del
  * tenant y consolida un informe de issues por severidad (BLOCKING / WARNING /
  * INFO). Útil para detectar regresiones tras una migración masiva o un
  * import batch.
  *
- * Operación on-demand (no auto): el botón "Ejecutar Gate PRE global"
+ * Operación bajo demanda: el botón "Comprobar todas las plantillas"
  * dispara el query manualmente. Resultado mostrado como tabla agrupada
  * por plantilla.
  *
  * Sprint 1 — Task 5.4 (validación).
  */
 import { useState } from "react";
-import { ShieldCheck, AlertTriangle, AlertCircle, Info, CheckCircle2 } from "lucide-react";
+import {
+  ShieldCheck,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  CheckCircle2,
+  RefreshCw,
+} from "lucide-react";
 import { useTenantContext } from "@/context/TenantContext";
 import {
   gatePreIssueLabel,
   gatePreSeverityLabel,
   loadAllActiveTemplates,
+  SEMANTIC_TONE_CLASS,
+  SEMANTIC_TONE_DOT_CLASS,
+  tipoLabel,
   validateTemplateForActivation,
   type GatePreIssue,
   type GatePreResult,
   type PlantillaCandidate,
+  type SemanticTone,
 } from "@/lib/secretaria/template-admin";
 
 type RowResult = {
@@ -42,10 +53,10 @@ function severityIcon(severity: GatePreIssue["severity"]) {
   return Info;
 }
 
-function severityColor(severity: GatePreIssue["severity"]) {
-  if (severity === "BLOCKING") return "text-[var(--status-error)]";
-  if (severity === "WARNING") return "text-[var(--status-warning)]";
-  return "text-[var(--status-info)]";
+function severityTone(severity: GatePreIssue["severity"]): SemanticTone {
+  if (severity === "BLOCKING") return "error";
+  if (severity === "WARNING") return "warning";
+  return "info";
 }
 
 export function ValidacionTab() {
@@ -90,42 +101,54 @@ export function ValidacionTab() {
         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-              Gate PRE global
+              Comprobación documental previa (Gate PRE)
             </div>
             <h2 className="mt-2 text-base font-semibold text-[var(--g-text-primary)]">
-              Validación headless de todas las plantillas ACTIVA
+              Comprobación de todas las plantillas vigentes
             </h2>
             <p className="mt-1 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-              Aplica `validateTemplateForActivation` sobre cada plantilla activa del tenant.
-              Útil tras un import batch o para auditoría periódica. La ejecución es
-              read-only: no escribe en Cloud.
+              Revisa la estructura, los metadatos y las referencias de cada plantilla
+              vigente. Úsala después de una importación o en una revisión periódica. La
+              comprobación es de solo lectura y no modifica datos.
             </p>
           </div>
           <button
             type="button"
             onClick={handleRun}
             disabled={run.status === "loading" || !tenantId}
-            className="flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
+            className="flex min-h-11 items-center gap-2 self-start bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
             aria-busy={run.status === "loading"}
           >
             <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-            {run.status === "loading" ? "Ejecutando…" : "Ejecutar Gate PRE global"}
+            {run.status === "loading" ? "Comprobando…" : "Comprobar todas las plantillas"}
           </button>
         </div>
       </section>
 
       {run.status === "error" ? (
         <div
-          className="bg-[var(--status-error)] flex items-center gap-3 px-4 py-3 text-[var(--g-text-inverse)]"
+          className={`${SEMANTIC_TONE_CLASS.error} flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center`}
           role="alert"
+          style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
-          <span className="text-sm font-medium">No se pudo ejecutar el Gate PRE: {run.message}</span>
+          <span className="min-w-0 flex-1 break-words text-sm font-medium">
+            No se pudo completar la comprobación documental: {run.message}
+          </span>
+          <button
+            type="button"
+            onClick={handleRun}
+            className="inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Reintentar
+          </button>
         </div>
       ) : null}
 
@@ -183,18 +206,21 @@ export function ValidacionTab() {
             >
               <CheckCircle2 className="mx-auto h-10 w-10 text-[var(--status-success)]" aria-hidden="true" />
               <h3 className="mt-3 text-base font-semibold text-[var(--g-text-primary)]">
-                Sin issues
+                Sin incidencias
               </h3>
               <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-                Todas las plantillas activas pasan Gate PRE.
+                Todas las plantillas vigentes superan la comprobación documental previa.
               </p>
             </div>
           ) : (
             <div
-              className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+              className="overflow-x-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
+              role="region"
+              aria-label="Resultado detallado de la comprobación documental"
+              tabIndex={0}
               style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
             >
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="bg-[var(--g-surface-subtle)]">
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
@@ -215,19 +241,24 @@ export function ValidacionTab() {
                   {rowsWithIssues.flatMap((row) =>
                     row.result.issues.map((issue, idx) => {
                       const Icon = severityIcon(issue.severity);
-                      const color = severityColor(issue.severity);
+                      const tone = severityTone(issue.severity);
                       return (
                         <tr key={`${row.template.id}-${idx}`}>
                           <td className="px-4 py-2 align-top">
                             <div className="font-medium text-[var(--g-text-primary)]">
-                              {row.template.tipo}
+                              {tipoLabel(row.template.tipo)}
                             </div>
                             <div className="text-xs text-[var(--g-text-secondary)] font-mono">
                               {row.template.id.slice(0, 8)} · v{row.template.version}
                             </div>
                           </td>
                           <td className="px-4 py-2 align-top">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${color}`}>
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--g-text-primary)]">
+                              <span
+                                className={`h-2 w-2 shrink-0 ${SEMANTIC_TONE_DOT_CLASS[tone]}`}
+                                style={{ borderRadius: "var(--g-radius-full)" }}
+                                aria-hidden="true"
+                              />
                               <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                               {gatePreSeverityLabel(issue.severity)}
                             </span>

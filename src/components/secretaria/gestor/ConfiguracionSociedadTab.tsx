@@ -59,7 +59,7 @@ function SettingRow({
   const errorId = `${inputId}-error`;
   const describedBy = error ? errorId : undefined;
   const fieldClassName =
-    "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]";
+    "min-h-11 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]";
 
   const save = async () => {
     const parsed = parseEntitySettingInput(catalog, draft);
@@ -83,9 +83,9 @@ function SettingRow({
     try {
       await deleteSetting.mutateAsync({ entityId, key: catalog.key });
       setError(null);
-      toast.success("Override eliminado; se usará el default del catálogo");
+      toast.success("Personalización eliminada; se usará el valor base del catálogo");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo restaurar el default";
+      const message = err instanceof Error ? err.message : "No se pudo restaurar el valor base";
       setError(message);
       toast.error(message);
     }
@@ -109,7 +109,7 @@ function SettingRow({
             }`}
             style={{ borderRadius: "var(--g-radius-full)" }}
           >
-            {isOverride ? "Override sociedad" : "Default catálogo"}
+            {isOverride ? "Personalización de sociedad" : "Valor base del catálogo"}
           </span>
           <span
             className="px-2 py-0.5 text-[11px] font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
@@ -196,7 +196,7 @@ function SettingRow({
           type="button"
           onClick={save}
           disabled={!dirty || upsert.isPending || deleteSetting.isPending}
-          className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)] disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50"
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-busy={upsert.isPending}
         >
@@ -207,12 +207,12 @@ function SettingRow({
           type="button"
           onClick={restoreDefault}
           disabled={!isOverride || upsert.isPending || deleteSetting.isPending}
-          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)] disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50"
           style={{ borderRadius: "var(--g-radius-md)" }}
           aria-busy={deleteSetting.isPending}
         >
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          Restaurar default
+          Restaurar valor base
         </button>
       </div>
     </div>
@@ -252,11 +252,11 @@ export function ConfiguracionSociedadTab() {
               </h2>
             </div>
             <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-              Valores ENTIDAD.* para condicionales de capa 1 y firmantes textuales.
+              Datos de la sociedad para condiciones del texto jurídico y firmantes.
             </p>
           </div>
 
-          <label className="flex min-w-[280px] flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+          <label className="flex w-full flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)] lg:w-auto lg:min-w-[280px]">
             Sociedad
             <select
               value={selectedEntityId ?? ""}
@@ -264,7 +264,7 @@ export function ConfiguracionSociedadTab() {
                 if (e.target.value) scope.setEntity(e.target.value);
               }}
               disabled={scope.isLoadingEntities}
-              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]"
+              className="min-h-11 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <option value="">Selecciona sociedad</option>
@@ -283,7 +283,7 @@ export function ConfiguracionSociedadTab() {
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             <SlidersHorizontal className="mt-0.5 h-4 w-4 text-[var(--g-brand-3308)]" aria-hidden="true" />
-            Selecciona una sociedad para pasar el Gestor al contexto societario y editar sus overrides.
+            Selecciona una sociedad para revisar y editar su configuración específica.
           </div>
         ) : null}
       </section>

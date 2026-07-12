@@ -196,9 +196,9 @@ function coverageState(activeCloudCount: number, pendingCloudCount: number, fixt
 }
 
 function sourceLabel(state: LegalTemplateCoverageState) {
-  if (state === "cloud_active") return "Cloud activa";
-  if (state === "cloud_pending") return "Cloud pendiente";
-  if (state === "fixture_pending_load") return "Fixture local";
+  if (state === "cloud_active") return "Vigente para nuevos expedientes";
+  if (state === "cloud_pending") return "En preparación";
+  if (state === "fixture_pending_load") return "Cobertura provisional";
   return "Sin cobertura";
 }
 

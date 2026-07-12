@@ -80,6 +80,7 @@ describe("TriCapaEditor", () => {
     mockMutateAsync.mockResolvedValueOnce(undefined);
     render(
       <TriCapaEditor
+        mode="tecnica"
         plantilla={basePlantilla({
           capa3_editables: [
             {
@@ -108,19 +109,13 @@ describe("TriCapaEditor", () => {
         id: "tpl-1",
         motivo: expect.stringContaining("Editor tri-capa"),
         capa1_inmutable: expect.stringContaining("Texto de acuerdo actualizado"),
-        capa3_editables: [
-          expect.objectContaining({
-            campo: "observaciones",
-            tipo: "textarea",
-            requerido: false,
-          }),
-        ],
       }),
     );
+    expect(mockMutateAsync.mock.calls[0][0]).not.toHaveProperty("capa3_editables");
   });
 
   it("bloquea edición si no es BORRADOR", () => {
-    render(<TriCapaEditor plantilla={basePlantilla({ estado: "ACTIVA" })} />);
+    render(<TriCapaEditor mode="tecnica" plantilla={basePlantilla({ estado: "ACTIVA" })} />);
 
     expect((screen.getByLabelText("Editor de contenido capa 1") as HTMLTextAreaElement).readOnly).toBe(true);
     // G5 — modo solo lectura honesto: Guardar/Cancelar NO se renderizan y el
@@ -134,8 +129,10 @@ describe("TriCapaEditor", () => {
   it("con readOnlyReason oculta Guardar/Cancelar y muestra banner de solo lectura", () => {
     render(
       <TriCapaEditor
+        mode="tecnica"
         plantilla={basePlantilla()}
         readOnlyReason="Tu rol no tiene permisos de edición de plantillas."
+        readOnlyDetail="Tu rol permite revisar esta plantilla, no modificarla."
       />,
     );
 
@@ -147,7 +144,7 @@ describe("TriCapaEditor", () => {
   });
 
   it("con permisos de edición el botón Guardar sí se renderiza", () => {
-    render(<TriCapaEditor plantilla={basePlantilla()} />);
+    render(<TriCapaEditor mode="tecnica" plantilla={basePlantilla()} />);
 
     expect(screen.getByRole("button", { name: /guardar/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /cancelar/i })).toBeTruthy();
@@ -157,6 +154,7 @@ describe("TriCapaEditor", () => {
   it("muestra diagnóstico local para variables duplicadas", () => {
     render(
       <TriCapaEditor
+        mode="tecnica"
         plantilla={basePlantilla({
           capa2_variables: [
             { variable: "entities.name", fuente: "entities.*", condicion: "SIEMPRE" },
@@ -169,5 +167,140 @@ describe("TriCapaEditor", () => {
     // G6 — etiqueta humana como texto principal + código técnico como detalle.
     expect(screen.getByText(/Variable duplicada en la capa 2/)).toBeTruthy();
     expect(screen.getByText(/CAPA2_DUPLICATE_VARIABLE/)).toBeTruthy();
+  });
+
+  it("presenta la vista legal con namespaces, uso, obligatoriedad y validación por campo", () => {
+    render(
+      <TriCapaEditor
+        mode="legal"
+        plantilla={basePlantilla({
+          estado: "ACTIVA",
+          capa1_inmutable: "La sociedad {{ENTIDAD.denominacion_social}} adopta el acuerdo.".padEnd(130, "x"),
+          capa2_variables: [
+            {
+              variable: "ENTIDAD.denominacion_social",
+              fuente: "entities.legal_name",
+              condicion: "SIEMPRE",
+            },
+          ],
+          capa3_editables: [
+            {
+              field: "observaciones",
+              hint: "Motivación jurídica adicional",
+              required: true,
+              type: "textarea",
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText("Vista legal del texto protegido")).toBeTruthy();
+    expect(screen.getByText("Entidad")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Capa 2 — Variables automáticas/ }));
+    expect(screen.getByRole("columnheader", { name: "Uso en el texto" })).toBeTruthy();
+    expect(screen.getByText("Usada una vez")).toBeTruthy();
+    expect(screen.getByText("Siempre")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Capa 3 — Campos editables/ }));
+    expect(screen.getByText("Obligatoria")).toBeTruthy();
+    expect(screen.getByText("Tipo de dato: Texto largo")).toBeTruthy();
+    expect(screen.getByText("Motivación jurídica adicional")).toBeTruthy();
+    expect(screen.queryByLabelText("Editor de contenido capa 1")).toBeNull();
+  });
+
+  it("marca cada identificador duplicado de Capa 2 como inválido y lo describe", () => {
+    render(
+      <TriCapaEditor
+        mode="tecnica"
+        plantilla={basePlantilla({
+          capa2_variables: [
+            { variable: "entities.name", fuente: "entities.name", condicion: "SIEMPRE" },
+            { variable: "entities.name", fuente: "entities.name", condicion: "SIEMPRE" },
+          ],
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Capa 2 — Variables automáticas/ }));
+    const inputs = screen.getAllByLabelText(/Variable capa 2/);
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].getAttribute("aria-invalid")).toBe("true");
+    expect(inputs[1].getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById("capa2-validation-0")?.textContent).toContain(
+      "está duplicada en Capa 2",
+    );
+    expect(document.getElementById("capa2-validation-1")?.textContent).toContain(
+      "está duplicada en Capa 2",
+    );
+  });
+
+  it("conserva en solo lectura defaults y opciones con tipos no textuales", () => {
+    render(
+      <TriCapaEditor
+        mode="tecnica"
+        plantilla={basePlantilla({
+          capa3_editables: [
+            {
+              campo: "umbral",
+              descripcion: "Umbral tipado",
+              obligatoriedad: "OPCIONAL",
+              default: 3,
+              opciones: [1, { code: "alto" }],
+            },
+          ],
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Capa 3 — Campos editables/ }));
+    const defaultInput = screen.getByLabelText("Default capa 3 1") as HTMLInputElement;
+    const optionsInput = screen.getByLabelText("Opciones capa 3 1") as HTMLInputElement;
+    expect(defaultInput.readOnly).toBe(true);
+    expect(defaultInput.value).toBe("3");
+    expect(optionsInput.readOnly).toBe(true);
+    expect(optionsInput.value).toBe('[1,{"code":"alto"}]');
+    expect(screen.getByText(/Valor tipado conservado sin cambios/)).toBeTruthy();
+    expect(screen.getByText(/Opciones tipadas conservadas sin cambios/)).toBeTruthy();
+  });
+
+  it("envía solo la capa modificada para no pisar ediciones concurrentes", async () => {
+    mockMutateAsync.mockResolvedValueOnce(undefined);
+    render(
+      <TriCapaEditor
+        mode="tecnica"
+        plantilla={basePlantilla({
+          capa2_variables: [
+            {
+              name: "denominacion_social",
+              source: "entities.legal_name",
+              condition: "SIEMPRE",
+              fallback: "ARGA",
+              descripcion_juridica: "Denominación registral",
+            },
+          ],
+          capa3_editables: [
+            {
+              field: "observaciones",
+              hint: "Motivación jurídica adicional",
+              required: false,
+              type: "textarea",
+              validacion_recomendada: "max:500",
+            },
+          ],
+        })}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Editor de contenido capa 1"), {
+      target: { value: "Texto actualizado con contenido jurídico suficiente para conservar todas las extensiones legacy.".padEnd(140, "z") },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledOnce());
+    const payload = mockMutateAsync.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.capa1_inmutable).toContain("Texto actualizado");
+    expect(payload).not.toHaveProperty("capa2_variables");
+    expect(payload).not.toHaveProperty("capa3_editables");
+    expect(payload).not.toHaveProperty("notas_legal");
   });
 });

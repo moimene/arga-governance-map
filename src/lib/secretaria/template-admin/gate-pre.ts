@@ -18,8 +18,10 @@ import { evaluateSemanticRules } from "./gate-pre-semantic";
 // META_REF_LEGAL_FORMAT usa la forma laxa: cualquier mención reconocible de
 // fuente legal (acepta "LSC (cuentas anuales)", "Arts. 295 LSC"; rechaza "n/a", "").
 import { SEMVER, REF_LEGAL_PATTERN_LAX as REF_LEGAL_PATTERN } from "./patterns";
+import { listTemplateExpressionVariables } from "./template-expression-vars";
 
-const VARIABLE_PATTERN = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
+const VARIABLE_PATTERN =
+  /\{\{\s*([\p{L}_][\p{L}\p{N}_]*(?:\.[\p{L}\p{N}_]+)*)\s*\}\}/gu;
 const HELPER_ALLOWLIST = new Set(["if", "else", "each", "unless", "with"]);
 const PROTECTED_PREFIXES = ["ENTIDAD.", "ORGANO.", "REUNION.", "EXPEDIENTE.", "SISTEMA.", "QTSP."];
 export type GatePreContext = {
@@ -188,20 +190,7 @@ function isDeclared(variable: string, declared: Set<string>): boolean {
 function collectCapa2Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
   const text = t.capa1_inmutable ?? "";
   const declared = new Set((t.capa2_variables ?? []).map((v) => v.variable));
-  const used = new Set<string>();
-  let m: RegExpExecArray | null;
-  const reset = new RegExp(VARIABLE_PATTERN.source, "g");
-  while ((m = reset.exec(text)) !== null) {
-    const name = m[1];
-    if (
-      !name.startsWith("#") &&
-      !name.startsWith("/") &&
-      !["else", "this"].includes(name) &&
-      !name.startsWith("this.")
-    ) {
-      used.add(name);
-    }
-  }
+  const used = listTemplateExpressionVariables(text);
   for (const v of used) {
     if (!isDeclared(v, declared) && v.includes(".") && !isFrameworkPrefix(v)) {
       issues.push({
@@ -224,7 +213,8 @@ function collectCapa2Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void
 
 function collectCapa3Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
   for (const f of t.capa3_editables ?? []) {
-    if (PROTECTED_PREFIXES.some((p) => f.campo.startsWith(p))) {
+    const normalizedField = f.campo.toLocaleUpperCase("es");
+    if (PROTECTED_PREFIXES.some((p) => normalizedField.startsWith(p))) {
       issues.push({
         severity: "BLOCKING",
         code: "CAPA3_PREFIJO_PROTEGIDO",
@@ -282,14 +272,9 @@ function collectInfoIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void 
 
   // CAPA2_UNUSED_VARIABLE
   const text = t.capa1_inmutable ?? "";
-  const used = new Set<string>();
-  const reset = new RegExp(VARIABLE_PATTERN.source, "g");
-  let m: RegExpExecArray | null;
-  while ((m = reset.exec(text)) !== null) {
-    used.add(m[1]);
-  }
+  const used = listTemplateExpressionVariables(text);
   for (const v of t.capa2_variables ?? []) {
-    if (!used.has(v.variable)) {
+    if (![...used].some((name) => isDeclared(name, new Set([v.variable])))) {
       issues.push({
         severity: "INFO",
         code: "CAPA2_UNUSED_VARIABLE",

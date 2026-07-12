@@ -8,11 +8,33 @@
  * centralizan los supersets y las transiciones se derivan/validan contra la
  * state machine canónica.
  *
- * Las clases de color de los badges de estado NO se centralizan: cada superficie
- * tiene matices visuales legítimos (icono, tono). Solo se comparten las ETIQUETAS.
+ * Los ejes de estado (ciclo, disponibilidad, cobertura y salud) conservan sus
+ * nombres propios, pero comparten un vocabulario de tonos semánticos accesible.
  */
-import type { EstadoPlantilla } from "./types";
+import type {
+  EstadoPlantilla,
+  SemanticTone,
+  TemplateMetadataPolicy,
+} from "./types";
 import { TRANSITION_MATRIX } from "./template-admin-service";
+
+function normalizeLabelCode(value?: string | null): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[.\s/-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function humanizeCode(value?: string | null, emptyLabel = "No informado"): string {
+  const normalized = normalizeLabelCode(value);
+  if (!normalized) return emptyLabel;
+  const words = normalized.toLowerCase().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: "Borrador",
@@ -26,35 +48,66 @@ export const ESTADO_LABEL: Record<string, string> = {
 export const TIPO_LABEL: Record<string, string> = {
   ACTA_SESION: "Acta de sesión",
   ACTA_CONSIGNACION: "Acta de consignación",
-  ACTA_ACUERDO_ESCRITO: "Acta acuerdo escrito sin sesión",
-  ACTA_DECISION_CONJUNTA: "Acta decisión conjunta",
-  ACTA_ORGANO_ADMIN: "Acta órgano de administración",
+  ACTA_ACUERDO_ESCRITO: "Acta de acuerdo escrito sin sesión",
+  ACTA_DECISION_CONJUNTA: "Acta de decisión conjunta",
+  ACTA_ORGANO_ADMIN: "Acta de órgano de administración",
   CERTIFICACION: "Certificación de acuerdos",
+  COMISION_DELEGADA: "Acta de comisión delegada",
   CONVOCATORIA: "Convocatoria",
-  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria SL con notificación",
+  CONVOCATORIA_SL_NOTIFICACION: "Convocatoria de S.L. con notificación individual",
   MODELO_ACUERDO: "Modelo de acuerdo",
   INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Informe documental PRE",
+  INFORME_DOCUMENTAL_PRE: "Informe de comprobación documental previa",
   INFORME_GESTION: "Informe de gestión",
   DOCUMENTO_REGISTRAL: "Documento registral",
   SUBSANACION_REGISTRAL: "Subsanación registral",
 };
 
 export const ORGANO_LABEL: Record<string, string> = {
+  ANY: "Cualquier órgano",
+  JUNTA: "Junta General",
   JUNTA_GENERAL: "Junta General",
+  ASAMBLEA: "Junta General / Asamblea",
+  JUNTA_GENERAL_O_CONSEJO: "Junta General o Consejo de Administración",
+  CDA: "Consejo de Administración",
   CONSEJO: "Consejo de Administración",
   CONSEJO_ADMIN: "Consejo de Administración",
+  CONSEJO_ADMINISTRACION: "Consejo de Administración",
   ORGANO_ADMIN: "Órgano de Administración",
+  SOCIO_UNICO: "Socio único",
+  ADMIN_UNICO: "Administrador único",
+  ADMINISTRADOR_UNICO: "Administrador único",
+  ADMIN_CONJUNTA: "Administradores mancomunados",
+  ADMIN_MANCOMUNADO: "Administradores mancomunados",
+  ADMIN_CONJUNTA_O_COAPROBADORES: "Administradores mancomunados o coaprobadores",
+  ADMINISTRADORES_MANCOMUNADOS: "Administradores mancomunados",
+  ADMIN_SOLIDARIO: "Administradores solidarios",
+  ADMIN_SOLIDARIOS: "Administradores solidarios",
+  ADMINISTRADORES_SOLIDARIOS: "Administradores solidarios",
+  COMISION: "Comisión delegada",
+  COMISION_DELEGADA: "Comisión delegada",
+  SOPORTE_INTERNO: "Soporte interno",
+  DERIVADO_DEL_ACTO: "Derivado del acto societario",
 };
 
 export const MODE_LABEL: Record<string, string> = {
-  MEETING: "Sesión",
-  UNIVERSAL: "Universal",
-  NO_SESSION: "Sin sesión",
-  UNIPERSONAL_SOCIO: "Socio único",
-  UNIPERSONAL_ADMIN: "Admin. único",
-  CO_APROBACION: "Co-aprobación",
-  SOLIDARIO: "Admin. solidario",
+  ANY: "Cualquier forma de adopción",
+  MEETING: "Sesión formal",
+  UNIVERSAL: "Junta universal",
+  NO_SESSION: "Acuerdo sin sesión",
+  UNIPERSONAL_SOCIO: "Decisión de socio único",
+  UNIPERSONAL_ADMIN: "Decisión de administrador único",
+  CO_APROBACION: "Decisión mancomunada",
+  SOLIDARIO: "Decisión de administrador solidario",
+};
+
+export const TIPO_SOCIAL_LABEL: Record<string, string> = {
+  ANY: "Todos los tipos sociales",
+  SA: "S.A.",
+  SAU: "S.A.U.",
+  SL: "S.L.",
+  SLU: "S.L.U.",
+  SRL: "S.L.",
 };
 
 export const JURISDICTION_LABEL: Record<string, string> = {
@@ -66,29 +119,116 @@ export const JURISDICTION_LABEL: Record<string, string> = {
   MULTI: "Multijurisdicción",
 };
 
+/**
+ * Certificaciones, informes y soportes no representan por sí mismos una forma
+ * de adopción. Para cualquier otro tipo el fallback es conservador: la forma de
+ * adopción debe informarse.
+ */
+export const NON_ADOPTABLE_DOCUMENT_TYPES = new Set<string>([
+  "CERTIFICACION",
+  "INFORME_PRECEPTIVO",
+  "INFORME_DOCUMENTAL_PRE",
+  "INFORME_GESTION",
+  "DOCUMENTO_REGISTRAL",
+  "SUBSANACION_REGISTRAL",
+]);
+
+export function isAdoptionMetadataRequired(tipo?: string | null): boolean {
+  const normalized = normalizeLabelCode(tipo);
+  return !normalized || !NON_ADOPTABLE_DOCUMENT_TYPES.has(normalized);
+}
+
+export function templateMetadataPolicy(tipo?: string | null): TemplateMetadataPolicy {
+  return {
+    organoRequired: true,
+    adoptionModeRequired: isAdoptionMetadataRequired(tipo),
+  };
+}
+
+/** `ANY` es válido en bindings, no sustituye metadatos de una plantilla. */
+export function hasSpecificTemplateMetadata(value?: string | null): boolean {
+  const normalized = normalizeLabelCode(value);
+  return Boolean(normalized && normalized !== "ANY");
+}
+
 export function tipoLabel(value?: string | null): string {
-  if (!value) return "—";
-  return TIPO_LABEL[value] ?? value.replace(/_/g, " ");
+  const normalized = normalizeLabelCode(value);
+  if (!normalized) return "Tipo documental no informado";
+  return TIPO_LABEL[normalized] ?? humanizeCode(normalized);
 }
 
 export function organoLabel(value?: string | null): string {
-  if (!value) return "—";
-  return ORGANO_LABEL[value] ?? value;
+  const normalized = normalizeLabelCode(value);
+  if (!normalized) return "Órgano no informado";
+  return ORGANO_LABEL[normalized] ?? humanizeCode(normalized);
 }
 
+export function adoptionModeLabel(
+  value?: string | null,
+  context: { tipo?: string | null } = {},
+): string {
+  const normalized = normalizeLabelCode(value);
+  if (!normalized) {
+    return isAdoptionMetadataRequired(context.tipo) ? "Adopción no informada" : "No aplica";
+  }
+  return MODE_LABEL[normalized] ?? humanizeCode(normalized);
+}
+
+/** Alias público histórico. */
 export function modeLabel(value?: string | null): string {
-  if (!value) return "—";
-  return MODE_LABEL[value] ?? value;
+  return adoptionModeLabel(value);
+}
+
+export function tipoSocialLabel(value?: string | null): string {
+  const normalized = normalizeLabelCode(value);
+  if (!normalized || normalized === "ANY") return "Todos los tipos sociales";
+  return TIPO_SOCIAL_LABEL[normalized] ?? humanizeCode(normalized);
 }
 
 export function estadoLabel(value?: string | null): string {
   if (!value) return "Estado pendiente";
-  return ESTADO_LABEL[value] ?? value.replace(/_/g, " ");
+  const normalized = normalizeLabelCode(value);
+  return ESTADO_LABEL[normalized] ?? humanizeCode(normalized);
 }
 
 export function jurisdictionLabel(code?: string | null): string {
   if (!code) return "Jurisdicción pendiente";
-  return JURISDICTION_LABEL[code] ?? code;
+  const normalized = normalizeLabelCode(code);
+  return JURISDICTION_LABEL[normalized] ?? humanizeCode(normalized);
+}
+
+export const SEMANTIC_TONE_CLASS: Record<SemanticTone, string> = {
+  success:
+    "border border-[var(--status-success)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]",
+  warning:
+    "border border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]",
+  info: "border border-[var(--status-info)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]",
+  error:
+    "border border-[var(--status-error)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)]",
+  neutral:
+    "border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
+};
+
+export const SEMANTIC_TONE_DOT_CLASS: Record<SemanticTone, string> = {
+  success: "bg-[var(--status-success)]",
+  warning: "bg-[var(--status-warning)]",
+  info: "bg-[var(--status-info)]",
+  error: "bg-[var(--status-error)]",
+  neutral: "bg-[var(--g-border-default)]",
+};
+
+export const TEMPLATE_STATE_TONE: Record<EstadoPlantilla, SemanticTone> = {
+  BORRADOR: "info",
+  REVISADA: "info",
+  APROBADA: "info",
+  ACTIVA: "success",
+  ARCHIVADA: "neutral",
+  DEPRECADA: "neutral",
+};
+
+export function templateStateTone(value?: string | null): SemanticTone {
+  const normalized = normalizeLabelCode(value) as EstadoPlantilla;
+  return TEMPLATE_STATE_TONE[normalized] ?? "neutral";
 }
 
 /**
@@ -116,13 +256,14 @@ const PRIMARY_FORWARD: Partial<Record<EstadoPlantilla, PrimaryTransition>> = {
   },
   APROBADA: {
     next: "ACTIVA",
-    label: "Activar en producción",
-    confirm: "¿Activar esta plantilla para uso en producción? Esta acción habilita el Gate PRE.",
+    label: "Marcar como vigente",
+    confirm:
+      "¿Marcar esta plantilla como vigente para nuevos expedientes? La comprobación documental previa la tendrá en cuenta.",
   },
   ACTIVA: {
     next: "ARCHIVADA",
     label: "Archivar",
-    confirm: "¿Archivar esta plantilla? Dejará de seleccionarse como plantilla activa.",
+    confirm: "¿Archivar esta plantilla? Dejará de estar vigente para nuevos expedientes.",
   },
 };
 

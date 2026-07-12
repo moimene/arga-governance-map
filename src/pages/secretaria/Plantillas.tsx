@@ -11,11 +11,16 @@ import {
   Building2,
   ShieldCheck,
   Shield,
+  GitCompare,
+  Minus,
+  Plus,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAssignTemplateBinding } from "@/hooks/useNormativeGovernance";
+import { useAssignTemplateBinding, useTemplateBindings } from "@/hooks/useNormativeGovernance";
+import { useMateriaCatalogoSocietario } from "@/hooks/useMesaControlSocietaria";
 import {
   usePlantillasProtegidas,
   useUpdateEstadoPlantilla,
@@ -28,9 +33,8 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   FUNCTIONAL_MATTER_GROUPS,
   MATTER_GROUP_BY_MATERIA,
-  compareTemplateVersions,
   normativeRoleFromAppRole,
-  organoTipoBusinessLabel,
+  resolveMateriaAlias,
 } from "@/lib/secretaria/mesa-control-societaria";
 import {
   buildLegalTemplateReviewRows,
@@ -38,35 +42,55 @@ import {
   summarizeLegalTemplateReview,
   type LegalTemplateReviewFilter,
 } from "@/lib/secretaria/legal-template-review";
-import { templateSelectionReason } from "@/lib/secretaria/normative-governance";
 import { getTemplateUsageTarget } from "@/lib/secretaria/template-routing";
-import { isOperationalTemplate, templateUsabilityNotice } from "@/lib/doc-gen/template-operability";
+import { templateUsabilityNotice } from "@/lib/doc-gen/template-operability";
 import {
   // ITEM-138: labels y transiciones canónicas compartidas (antes copiadas con
   // divergencias en esta página, CatalogoTab y CoberturaLegalTab).
   TEMPLATE_PRIMARY_TRANSITIONS,
+  SEMANTIC_TONE_CLASS,
+  adoptionModeLabel as canonicalAdoptionModeLabel,
+  buildFunctionalKey,
+  organoLabel,
+  serializeFunctionalKey,
+  templateStateTone,
+  tipoSocialLabel,
   tipoLabel,
   estadoLabel,
   jurisdictionLabel,
   // UX-7.B: modelo de cohortes de plantilla (clasificación pura + filtro).
   clasificarCohortePlantilla,
   cohorteLabel,
-  cohorteDescripcion,
   COHORTE_ORDER,
 } from "@/lib/secretaria/template-admin";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
+import { statusLabel } from "@/lib/secretaria/status-labels";
 import { CohorteBadge } from "@/components/secretaria/CohorteBadge";
+import { ConfigurationLoadError } from "@/components/secretaria/ConfigurationLoadError";
 import { toast } from "sonner";
-
-// ITEM-138 (d): badge de estado con DEPRECADA (antes omitido). Los colores son
-// presentación local; las ETIQUETAS vienen del módulo canónico labels.ts.
-const ESTADO_BADGE = {
-  BORRADOR: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
-  REVISADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
-  APROBADA: "bg-[var(--g-sec-300)] text-[var(--g-brand-3308)]",
-  ACTIVA: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
-  ARCHIVADA: "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
-  DEPRECADA: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
-};
+import {
+  applyTemplateRouteScope,
+  buildMatterCatalogUrl,
+  buildTemplateGovernanceUrl,
+  isTemplateCycleParam,
+  patchSearchParams,
+  templateCycleForEstado,
+} from "@/lib/secretaria/template-configuration-routing";
+import { TemplateApprovalDialog } from "@/components/secretaria/TemplateApprovalDialog";
+import {
+  activeTemplateBindingMatters,
+  buildTemplateBindingMutationInput,
+  buildTemplateTransitionMutationInput,
+  buildTemplateVersionComparison,
+  canonicalBindingTipoSocial,
+  hasEffectiveTemplateBinding,
+  normalizeApprovalChecklist,
+  normalizeTemplateEditableFields,
+  normalizeTemplateVariables,
+  resolveTemplateMatterContext,
+  templateAppliesToSocialType,
+  templateAvailabilityPresentation,
+} from "@/lib/secretaria/template-library-ux";
 
 const ESTADO_SORT_RANK: Record<string, number> = {
   ACTIVA: 0,
@@ -153,23 +177,39 @@ const CICLO_SEGMENTS: Array<{ id: CicloSegment; label: string }> = [
 ];
 
 function cicloOf(estado?: string | null): Exclude<CicloSegment, "todas"> {
-  const value = (estado ?? "").trim().toUpperCase();
-  if (value === "ACTIVA") return "vigentes";
-  if (value === "ARCHIVADA" || value === "DEPRECADA") return "historico";
-  return "preparacion";
+  return templateCycleForEstado(estado);
+}
+
+function templateMatchesTypeParam(plantilla: PlantillaProtegidaRow, requested?: string | null) {
+  if (!requested) return true;
+  const normalized = requested.trim().toUpperCase().replace(/[ -]+/g, "_");
+  if (plantilla.tipo === normalized) return true;
+  if (normalized === "ACTA") return plantilla.tipo.startsWith("ACTA_");
+  if (normalized === "PRE_ACUERDO") {
+    return plantilla.tipo === "INFORME_PRECEPTIVO" || plantilla.tipo === "INFORME_DOCUMENTAL_PRE";
+  }
+  if (normalized === "CONVOCATORIA") return plantilla.tipo.startsWith("CONVOCATORIA");
+  if (normalized === "MODELO_DE_ACUERDO") return plantilla.tipo === "MODELO_ACUERDO";
+  if (normalized === "CERTIFICACIÓN" || normalized === "CERTIFICACION") {
+    return plantilla.tipo === "CERTIFICACION";
+  }
+  if (normalized === "POST_ACUERDO") {
+    return plantilla.tipo === "DOCUMENTO_REGISTRAL" || plantilla.tipo === "SUBSANACION_REGISTRAL";
+  }
+  return false;
 }
 
 // Identidad funcional para localizar la versión vigente que sustituye a una
 // histórica (misma pieza: tipo + materia efectiva + órgano + adopción + jurisdicción).
 function templateIdentityKey(t: PlantillaProtegidaRow) {
-  return [t.tipo, t.materia_acuerdo ?? t.materia ?? "", t.organo_tipo ?? "", t.adoption_mode ?? "", t.jurisdiccion ?? ""].join("|");
+  return serializeFunctionalKey(buildFunctionalKey(t, t.tenant_id));
 }
 
 const INCIDENCIA_CHIPS: Array<{ filter: LegalTemplateReviewFilter; label: string; summaryKey: "draftVersion" | "duplicateMatter" | "missingOwner" | "missingReference" }> = [
   { filter: "DRAFT_VERSION", label: "Versión provisional", summaryKey: "draftVersion" },
-  { filter: "DUPLICATE_MATTER", label: "Variantes por confirmar", summaryKey: "duplicateMatter" },
-  { filter: "MISSING_OWNER", label: "Sin órgano o adopción", summaryKey: "missingOwner" },
-  { filter: "MISSING_REFERENCE", label: "Sin referencia legal", summaryKey: "missingReference" },
+  { filter: "DUPLICATE_MATTER", label: "Plantilla activa equivalente", summaryKey: "duplicateMatter" },
+  { filter: "MISSING_OWNER", label: "Falta órgano o forma de adopción", summaryKey: "missingOwner" },
+  { filter: "MISSING_REFERENCE", label: "Falta referencia legal", summaryKey: "missingReference" },
 ];
 
 function templateEngineSort(a: PlantillaProtegidaRow, b: PlantillaProtegidaRow) {
@@ -183,28 +223,17 @@ function templateEngineSort(a: PlantillaProtegidaRow, b: PlantillaProtegidaRow) 
 }
 
 function materiaLabel(value?: string | null) {
-  return value ? value.replace(/_/g, " ") : "—";
+  return value ? labelMateria(value) : "Materia no informada";
 }
 
-function adoptionModeLabel(value?: string | null) {
-  if (!value) return "Cualquier forma de adopción";
-  const labels: Record<string, string> = {
-    MEETING: "Sesión formal",
-    UNIVERSAL: "Junta universal",
-    NO_SESSION: "Acuerdo sin sesión",
-    UNIPERSONAL_SOCIO: "Decisión de socio único",
-    UNIPERSONAL_ADMIN: "Decisión de administrador único",
-    CO_APROBACION: "Decisión mancomunada",
-    SOLIDARIO: "Administrador solidario",
-    ANY: "Cualquier forma de adopción",
-  };
-  return labels[value] ?? value.replace(/_/g, " ");
+function adoptionModeLabel(value?: string | null, tipo?: string | null) {
+  return canonicalAdoptionModeLabel(value, { tipo });
 }
 
 // Etiqueta de negocio de órgano compartida con el catálogo de materias
 // (cubre CONSEJO_ADMIN, SOCIO_UNICO, ADMIN_UNICO, COMISION_DELEGADA, etc.).
 function organoTipoLabel(value?: string | null) {
-  return organoTipoBusinessLabel(value);
+  return organoLabel(value);
 }
 
 function templateAppliesToJurisdiction(plantilla: PlantillaProtegidaRow, jurisdiction?: string | null) {
@@ -237,11 +266,32 @@ function MadurezChip() {
   );
 }
 
+function ProcessCoverageChips({
+  items,
+}: {
+  items: Array<{ tipo: string; label: string; total: number; activas: number }>;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item.tipo}
+          className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-full)" }}
+        >
+          <span className="font-medium text-[var(--g-text-primary)]">{item.label}</span>
+          <span>{item.activas}/{item.total} vigentes</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ITEM-087: lista accionable de issues del Gate PRE (código + mensaje + hint),
 // con el mismo lenguaje visual que el preflight del TemplateImportWizard.
 function GatePreIssueList({ issues }: { issues: GatePreIssue[] }) {
   return (
-    <div className="space-y-2" aria-label="Incidencias del Gate PRE">
+    <div className="space-y-2" aria-label="Incidencias de la comprobación documental previa">
       {issues.map((i, idx) => (
         <div
           key={`${i.code}-${idx}`}
@@ -272,7 +322,7 @@ function GatePreIssueList({ issues }: { issues: GatePreIssue[] }) {
 // reutilizando el patrón del wizard de importación (motivo ≥20 chars persistido en
 // changelog). Sin esto, una transición APROBADA→ACTIVA con cualquier warning era
 // imposible de completar desde el catálogo de uso.
-function TransitionAckDialog({
+export function TransitionAckDialog({
   issues,
   pending,
   onConfirm,
@@ -285,37 +335,84 @@ function TransitionAckDialog({
 }) {
   const [motivo, setMotivo] = useState("");
   const tooShort = motivo.trim().length < 20;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    textareaRef.current?.focus();
+    return () => previouslyFocused?.focus();
+  }, []);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !pending) {
+      event.preventDefault();
+      onCancel();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-text-primary)]/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Reconocer warnings antes de activar la plantilla"
+      aria-labelledby="ack-plantillas-title"
+      aria-describedby="ack-plantillas-description"
+      onKeyDown={handleKeyDown}
     >
       <div
         className="w-full max-w-lg border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-6"
         style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
       >
-        <h2 className="mb-2 text-lg font-semibold text-[var(--g-text-primary)]">
-          Reconocer warnings del Gate PRE
+        <h2 id="ack-plantillas-title" className="mb-2 text-lg font-semibold text-[var(--g-text-primary)]">
+          Revisar advertencias de la comprobación documental
         </h2>
-        <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
-          La transición detectó warnings no-bloqueantes. Para completarla, escribe un
-          motivo de ≥20 caracteres que se persiste en el changelog como evidencia
-          documental.
+        <p id="ack-plantillas-description" className="mb-4 text-sm text-[var(--g-text-secondary)]">
+          La comprobación detectó advertencias no bloqueantes. Para continuar, escribe
+          un motivo de al menos 20 caracteres; quedará registrado en el historial como
+          evidencia documental.
         </p>
-        <div className="mb-4 max-h-48 overflow-y-auto">
+        <div
+          className="mb-4 max-h-48 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+          role="region"
+          aria-label="Advertencias que requieren reconocimiento"
+          tabIndex={0}
+        >
           <GatePreIssueList issues={issues} />
         </div>
-        <label className="block">
+        <div>
+          <label className="block" htmlFor="ack-plantillas-motivo">
           <span className="mb-1 block text-sm font-medium text-[var(--g-text-primary)]">
             Motivo (≥20 caracteres)
           </span>
+          </label>
           <textarea
+            id="ack-plantillas-motivo"
+            ref={textareaRef}
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            placeholder="P. ej.: Warnings revisadas con Comité Legal; se acepta activar tal cual."
-            className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]/30"
+            disabled={pending}
+            placeholder="P. ej.: Advertencias revisadas con el Comité Legal; se acepta marcar la plantilla como vigente."
+            className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2"
             rows={4}
             aria-describedby="ack-plantillas-help"
             aria-invalid={motivo.length > 0 && tooShort ? "true" : undefined}
@@ -324,13 +421,13 @@ function TransitionAckDialog({
           <p id="ack-plantillas-help" className="mt-1 text-xs text-[var(--g-text-secondary)]">
             {motivo.trim().length}/20 caracteres mínimos
           </p>
-        </label>
+        </div>
         <div className="mt-4 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={pending}
-            className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+            className="min-h-11 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             Cancelar
@@ -340,10 +437,10 @@ function TransitionAckDialog({
             onClick={() => onConfirm(motivo.trim())}
             disabled={tooShort || pending}
             aria-busy={pending}
-            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            {pending ? "Procesando…" : "Reconocer y activar"}
+            {pending ? "Procesando…" : "Confirmar y marcar como vigente"}
           </button>
         </div>
       </div>
@@ -351,15 +448,44 @@ function TransitionAckDialog({
   );
 }
 
+type TransitionRunOptions = {
+  motivo?: string;
+  ackWarnings?: boolean;
+  aprobadaPor?: string;
+  fechaAprobacion?: string;
+  confirmed?: boolean;
+};
+
 export default function Plantillas() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const scope = useSecretariaScope();
-  const { data, isLoading } = usePlantillasProtegidas();
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching: isFetchingTemplates,
+    refetch,
+  } = usePlantillasProtegidas();
+  const {
+    data: templateBindings = [],
+    isError: isBindingsError,
+    isFetching: isFetchingBindings,
+    isPending: isBindingsPending,
+    refetch: refetchBindings,
+  } = useTemplateBindings();
+  const {
+    data: materiaCatalog = [],
+    isError: isMateriaCatalogError,
+    isFetching: isFetchingMateriaCatalog,
+    isPending: isMateriaCatalogPending,
+    refetch: refetchMateriaCatalog,
+  } = useMateriaCatalogoSocietario();
   const updateEstado = useUpdateEstadoPlantilla();
   const assignTemplate = useAssignTemplateBinding();
-  const { primaryRole } = useCurrentUserRole();
+  const { primaryRole, user, displayName } = useCurrentUserRole();
   const normativeRole = normativeRoleFromAppRole(primaryRole);
+  const transitionActor = user?.email ?? displayName;
   // ITEM-084: solo ADMIN_TENANT gestiona el ciclo de vida de plantillas desde el
   // catálogo de uso (paridad con el guard del gestor).
   const canManageLifecycle = primaryRole === "ADMIN_TENANT";
@@ -368,33 +494,65 @@ export default function Plantillas() {
   const [blockingIssues, setBlockingIssues] = useState<GatePreIssue[]>([]);
   const [ackIssues, setAckIssues] = useState<GatePreIssue[] | null>(null);
   const [pendingTransition, setPendingTransition] = useState<PlantillaProtegidaRow | null>(null);
-  const initialMateriaFilter = searchParams.get("materia") ?? "";
+  const [pendingTransitionOptions, setPendingTransitionOptions] = useState<TransitionRunOptions>({});
+  const [approvalTarget, setApprovalTarget] = useState<PlantillaProtegidaRow | null>(null);
+  const [transitionAnnouncement, setTransitionAnnouncement] = useState("");
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [detailFocusRequest, setDetailFocusRequest] = useState(0);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const comparisonRef = useRef<HTMLElement>(null);
+  const comparisonTriggerRef = useRef<HTMLButtonElement>(null);
+  const shouldFocusDetailRef = useRef(false);
+  const shouldFocusComparisonRef = useRef(false);
+  const procesoTabRef = useRef<HTMLButtonElement>(null);
+  const modelosTabRef = useRef<HTMLButtonElement>(null);
+  const initialMateriaFilter = resolveMateriaAlias(searchParams.get("materia"));
   const initialTipoFilter = searchParams.get("tipo") ?? "";
-  const materiaFilterParam = searchParams.get("materia") ?? "";
+  const materiaFilterParam = resolveMateriaAlias(searchParams.get("materia"));
+  const tipoFilterParam = searchParams.get("tipo") ?? "";
+  const plantillaFilterParam = searchParams.get("plantilla") ?? "";
   const [activeTab, setActiveTab] = useState<'proceso' | 'modelos'>(() =>
-    initialMateriaFilter || initialTipoFilter.toUpperCase().includes("MODELO") ? "modelos" : "proceso",
+    initialTipoFilter
+      ? initialTipoFilter.toUpperCase().includes("MODELO")
+        ? "modelos"
+        : "proceso"
+      : initialMateriaFilter
+        ? "modelos"
+        : "proceso",
   );
   const [filterMateria, setFilterMateria] = useState<string>(initialMateriaFilter);
   // UX-7.B: filtro por cohorte de plantilla (aplica a ambas pestañas).
   const [filterCohorte, setFilterCohorte] = useState<string>("");
   // Informe UX Plantillas: segmento de ciclo (default = qué puedo usar ahora).
-  const [filterCiclo, setFilterCiclo] = useState<CicloSegment>("vigentes");
+  const [filterCiclo, setFilterCiclo] = useState<CicloSegment>(() => {
+    const requested = searchParams.get("ciclo");
+    return isTemplateCycleParam(requested) ? requested : "vigentes";
+  });
   // Filtro de incidencias de calidad documental (reutiliza legal-template-review).
   const [filterRevision, setFilterRevision] = useState<LegalTemplateReviewFilter | "">("");
   const isSociedadMode = scope.mode === "sociedad";
   const selectedEntity = scope.selectedEntity;
   const selectedEntityName = selectedEntity?.legalName ?? selectedEntity?.name ?? "Sociedad seleccionada";
   const selectedJurisdiction = selectedEntity?.jurisdiction ?? null;
+  const selectedEntityTipoSocial = selectedEntity?.tipoSocial ?? null;
 
   const scopedData = useMemo(() => {
     const rows = data ?? [];
     if (!isSociedadMode) return rows;
-    return rows.filter((plantilla) => templateAppliesToJurisdiction(plantilla, selectedJurisdiction));
-  }, [data, isSociedadMode, selectedJurisdiction]);
+    return rows.filter(
+      (plantilla) =>
+        templateAppliesToJurisdiction(plantilla, selectedJurisdiction) &&
+        templateAppliesToSocialType(plantilla, selectedEntityTipoSocial),
+    );
+  }, [data, isSociedadMode, selectedEntityTipoSocial, selectedJurisdiction]);
 
   // Salud documental (informe UX Plantillas): agrega los detectores existentes
   // de legal-template-review sobre las VIGENTES — no crea un sistema nuevo.
   const vigentesData = useMemo(() => scopedData.filter((p) => cicloOf(p.estado) === "vigentes"), [scopedData]);
+  const showTipoSocialColumn = useMemo(
+    () => scopedData.some((plantilla) => canonicalBindingTipoSocial(plantilla.tipo_social) !== "ANY"),
+    [scopedData],
+  );
   const reviewRows = useMemo(() => buildLegalTemplateReviewRows(vigentesData), [vigentesData]);
   const reviewByTemplateId = useMemo(
     () => new Map(reviewRows.map((row) => [row.templateId, row])),
@@ -414,14 +572,14 @@ export default function Plantillas() {
 
   const runTransicion = (
     plantilla: PlantillaProtegidaRow,
-    motivo?: string,
-    ackWarnings?: boolean,
+    options: TransitionRunOptions = {},
   ) => {
     const transition = WORKFLOW_TRANSITIONS[plantilla.estado];
     if (!transition) return;
     // ITEM-084: confirmación explícita antes de mutar el ciclo de vida (paridad
     // con el window.confirm del gestor; evita archivar/activar de un solo clic).
     if (
+      !options.confirmed &&
       !window.confirm(
         `¿Confirmar la transición de la plantilla a "${estadoLabel(transition.nextState)}"? Esta acción queda registrada en la auditoría.`,
       )
@@ -430,14 +588,29 @@ export default function Plantillas() {
     }
 
     updateEstado.mutate(
-      { id: plantilla.id, nuevo_estado: transition.nextState, motivo, ackWarnings },
+      buildTemplateTransitionMutationInput({
+        templateId: plantilla.id,
+        nextState: transition.nextState,
+        motivo: options.motivo,
+        ackWarnings: options.ackWarnings,
+        aprobadaPor: options.aprobadaPor,
+        fechaAprobacion: options.fechaAprobacion,
+        actor: transitionActor,
+      }),
       {
         onSuccess: () => {
+          const successMessage = `Plantilla transicionada a ${estadoLabel(transition.nextState)}`;
           setBlockingIssues([]);
           setAckIssues(null);
           setPendingTransition(null);
-          toast.success(`Plantilla transicionada a ${estadoLabel(transition.nextState)}`);
+          setPendingTransitionOptions({});
+          setApprovalTarget(null);
+          setTransitionAnnouncement(successMessage);
+          toast.success(successMessage);
           setSelected(null);
+          window.requestAnimationFrame(() => {
+            (activeTab === "modelos" ? modelosTabRef.current : procesoTabRef.current)?.focus();
+          });
         },
         onError: (error) => {
           // ITEM-075 + ITEM-087: el TransitionResult adjunto al Error ya no se descarta. Los
@@ -448,29 +621,34 @@ export default function Plantillas() {
             setBlockingIssues(result.issues);
             setAckIssues(null);
             setPendingTransition(null);
+            setPendingTransitionOptions({});
             toast.error(
-              `El Gate PRE bloqueó la activación con ${result.issues.length} incidencia(s). Revisa el detalle.`,
+              `La comprobación documental bloqueó la activación con ${result.issues.length} incidencia(s). Revisa el detalle.`,
             );
           } else if (result && result.ok === false && result.reason === "WARNINGS_NEED_ACK") {
             setBlockingIssues([]);
             setAckIssues(result.issues);
             setPendingTransition(plantilla);
+            setPendingTransitionOptions({ ...options, confirmed: true });
           } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
             setBlockingIssues([]);
             setAckIssues(null);
             setPendingTransition(null);
+            setPendingTransitionOptions({});
             toast.error(`Transición no permitida: ${result.from} → ${result.to}.`);
           } else if (result && result.ok === false && result.reason === "MISSING_APPROVAL_DATA") {
             setBlockingIssues([]);
             setAckIssues(null);
             setPendingTransition(null);
+            setPendingTransitionOptions({});
             toast.error(
-              "Faltan datos de aprobación (aprobada_por/fecha) para activar la plantilla.",
+              "Faltan los datos de aprobación formal para aprobar la plantilla.",
             );
           } else {
             setBlockingIssues([]);
             setAckIssues(null);
             setPendingTransition(null);
+            setPendingTransitionOptions({});
             toast.error("Error al actualizar el estado de la plantilla", {
               description: error instanceof Error ? error.message : String(error),
             });
@@ -486,37 +664,41 @@ export default function Plantillas() {
     setBlockingIssues([]);
     setAckIssues(null);
     setPendingTransition(null);
+    setPendingTransitionOptions({});
+    if (transition.nextState === "APROBADA") {
+      setApprovalTarget(plantilla);
+      return;
+    }
     runTransicion(plantilla);
   };
 
-  const handleAssignBinding = (plantilla: PlantillaProtegidaRow) => {
-    const materia = plantilla.materia_acuerdo ?? plantilla.materia ?? filterMateria;
-    if (!materia) {
-      toast.error("No se puede vincular una plantilla sin materia.");
+  const catalogMatterCodes = useMemo(
+    () => [...new Set(materiaCatalog.map((row) => resolveMateriaAlias(row.materia)).filter(Boolean))],
+    [materiaCatalog],
+  );
+
+  const handleAssignBinding = (plantilla: PlantillaProtegidaRow, materia: string) => {
+    const canonicalMatter = resolveMateriaAlias(materia);
+    if (!canonicalMatter || !catalogMatterCodes.includes(canonicalMatter)) {
+      toast.error("Selecciona una materia canónica antes de vincular la plantilla.");
+      return;
+    }
+    const mutationInput = buildTemplateBindingMutationInput({
+      template: plantilla,
+      bindings: templateBindings,
+      materia: canonicalMatter,
+      entityTipoSocial: selectedEntity?.tipoSocial,
+      jurisdiction: selectedEntity?.jurisdiction,
+      userRole: normativeRole,
+    });
+    if (!mutationInput) {
+      toast.info("La plantilla ya está vinculada a esta regla.");
       return;
     }
     assignTemplate.mutate(
+      mutationInput,
       {
-        materia,
-        organoTipo: plantilla.organo_tipo ?? "ANY",
-        tipoSocial: selectedEntity?.legalForm ?? "ANY",
-        jurisdiccion: selectedEntity?.jurisdiction ?? plantilla.jurisdiccion ?? "ES",
-        adoptionMode: plantilla.adoption_mode ?? "ANY",
-        docType: plantilla.tipo,
-        templateId: plantilla.id,
-        priority: 100,
-        selectionReason: templateSelectionReason({
-          materia,
-          docType: plantilla.tipo,
-          jurisdiction: selectedEntity?.jurisdiction ?? plantilla.jurisdiccion,
-          tipoSocial: selectedEntity?.legalForm,
-          organoTipo: plantilla.organo_tipo,
-          adoptionMode: plantilla.adoption_mode,
-        }),
-        userRole: normativeRole,
-      },
-      {
-        onSuccess: () => toast.success("Plantilla vinculada a la regla efectiva."),
+        onSuccess: () => toast.success("Plantilla vinculada a la regla aplicable."),
         onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo vincular la plantilla."),
       },
     );
@@ -535,6 +717,9 @@ export default function Plantillas() {
     for (const plantilla of modelosDatos) {
       const materia = plantilla.materia_acuerdo ?? plantilla.materia;
       if (materia) materias.add(materia);
+      for (const bindingMatter of activeTemplateBindingMatters(templateBindings, plantilla.id)) {
+        materias.add(bindingMatter);
+      }
     }
 
     return FUNCTIONAL_MATTER_GROUPS.map((group) => {
@@ -545,7 +730,7 @@ export default function Plantillas() {
 
       return { group, options };
     }).filter((entry) => entry.options.length > 0);
-  }, [modelosDatos]);
+  }, [modelosDatos, templateBindings]);
   const displayData = activeTab === 'proceso' ? procesoDatos : modelosDatos;
   const procesoCoverage = [...new Set(procesoDatos.map((p) => p.tipo))].map((tipo) => {
     const rows = procesoDatos.filter((p) => p.tipo === tipo);
@@ -579,8 +764,15 @@ export default function Plantillas() {
   const filteredData = useMemo(
     () => {
       let rows = activeTab === 'modelos' && filterMateria
-        ? displayData.filter((p) => (p.materia_acuerdo ?? p.materia) === filterMateria)
+        ? displayData.filter(
+            (p) =>
+              resolveMateriaAlias(p.materia_acuerdo ?? p.materia) === filterMateria ||
+              activeTemplateBindingMatters(templateBindings, p.id).includes(filterMateria),
+          )
         : displayData;
+      if (tipoFilterParam) {
+        rows = rows.filter((p) => templateMatchesTypeParam(p, tipoFilterParam));
+      }
       if (filterCiclo !== "todas") {
         rows = rows.filter((p) => cicloOf(p.estado) === filterCiclo);
       }
@@ -592,40 +784,345 @@ export default function Plantillas() {
       }
       return [...rows].sort(templateEngineSort);
     },
-    [activeTab, displayData, filterMateria, filterCiclo, filterRevision, tabReviewById, filterCohorte],
+    [activeTab, displayData, filterMateria, filterCiclo, filterRevision, tabReviewById, filterCohorte, templateBindings, tipoFilterParam],
   );
 
-  // Sustitución de una histórica: versión vigente de la misma pieza documental.
-  const replacementForSelected = useMemo(() => {
-    if (!selected || cicloOf(selected.estado) !== "historico") return null;
+  // Sustitución segura: solo una ACTIVA con la misma identidad funcional completa.
+  // Si hay cero o varias candidatas no inferimos el linaje desde texto libre.
+  const replacementCandidatesForSelected = useMemo(() => {
+    if (!selected || cicloOf(selected.estado) !== "historico") return [];
     const identity = templateIdentityKey(selected);
-    const candidates = scopedData.filter(
+    return scopedData.filter(
       (p) => cicloOf(p.estado) === "vigentes" && templateIdentityKey(p) === identity,
     );
-    return (
-      [...candidates].sort((a, b) => compareTemplateVersions(b.version, a.version))[0] ?? null
-    );
   }, [scopedData, selected]);
+  const replacementForSelected =
+    replacementCandidatesForSelected.length === 1
+      ? replacementCandidatesForSelected[0]
+      : null;
+  const replacementIsAmbiguous = replacementCandidatesForSelected.length > 1;
+  const versionComparison = useMemo(
+    () =>
+      selected && replacementForSelected
+        ? buildTemplateVersionComparison(selected, replacementForSelected)
+        : null,
+    [replacementForSelected, selected],
+  );
 
-  useEffect(() => {
-    const materia = materiaFilterParam;
-    if (!materia) return;
-    setActiveTab("modelos");
-    setFilterMateria(materia);
+  const missingDeepLinkTarget = Boolean(
+    plantillaFilterParam &&
+      !isLoading &&
+      !scopedData.some((plantilla) => plantilla.id === plantillaFilterParam),
+  );
+
+  const selectedBoundMatterCodes = useMemo(
+    () => activeTemplateBindingMatters(templateBindings, selected?.id),
+    [selected?.id, templateBindings],
+  );
+  const selectedRegisteredBoundMatterCodes = useMemo(
+    () => selectedBoundMatterCodes.filter((materia) => catalogMatterCodes.includes(materia)),
+    [catalogMatterCodes, selectedBoundMatterCodes],
+  );
+  const selectedMatterCodes = useMemo(() => {
+    if (!selected) return [];
+    if (selectedRegisteredBoundMatterCodes.length > 0) return selectedRegisteredBoundMatterCodes;
+    const fallback = resolveMateriaAlias(selected.materia_acuerdo ?? selected.materia);
+    return fallback && catalogMatterCodes.includes(fallback) ? [fallback] : [];
+  }, [catalogMatterCodes, selected, selectedRegisteredBoundMatterCodes]);
+  const selectedAvailability = selected
+    ? templateAvailabilityPresentation(selected)
+    : null;
+  const selectedChecklist = useMemo(
+    () => normalizeApprovalChecklist(selected?.approval_checklist),
+    [selected?.approval_checklist],
+  );
+  const selectedVariables = useMemo(
+    () => normalizeTemplateVariables(selected?.capa2_variables),
+    [selected?.capa2_variables],
+  );
+  const selectedEditableFields = useMemo(
+    () => normalizeTemplateEditableFields(selected?.capa3_editables),
+    [selected?.capa3_editables],
+  );
+  const selectedBindingTipoSocial = canonicalBindingTipoSocial(selectedEntity?.tipoSocial);
+  const selectedEffectiveBindingMatterCodes = useMemo(() => {
+    if (!selected) return [];
+    return selectedRegisteredBoundMatterCodes.filter((materia) =>
+      hasEffectiveTemplateBinding(templateBindings, {
+        template: selected,
+        materia,
+        jurisdiccion: selectedEntity?.jurisdiction ?? selected.jurisdiccion,
+        tipoSocial: selectedBindingTipoSocial,
+      }),
+    );
+  }, [selected, selectedBindingTipoSocial, selectedEntity?.jurisdiction, selectedRegisteredBoundMatterCodes, templateBindings]);
+  const selectedBindingMateria = selected
+    ? resolveTemplateMatterContext({
+        requestedMatter: materiaFilterParam,
+        templateMatter: selected.materia_acuerdo ?? selected.materia,
+        boundMatters: selectedEffectiveBindingMatterCodes,
+        knownMatters: catalogMatterCodes,
+      })
+    : "";
+  const selectedIsAlreadyBound = Boolean(
+    selected &&
+      selectedBindingMateria &&
+      hasEffectiveTemplateBinding(templateBindings, {
+        template: selected,
+        materia: selectedBindingMateria,
+        jurisdiccion: selectedEntity?.jurisdiction ?? selected.jurisdiccion,
+        tipoSocial: selectedBindingTipoSocial,
+      }),
+  );
+  const hasAmbiguousBindingContext = Boolean(
+    selected &&
+      !resolveMateriaAlias(materiaFilterParam) &&
+      selectedEffectiveBindingMatterCodes.length > 1,
+  );
+
+  function updateLibraryParams(patch: Record<string, string | null | undefined>) {
+    setSearchParams(patchSearchParams(searchParams, patch), { replace: true });
+  }
+
+  function selectLibraryTemplate(
+    plantilla: PlantillaProtegidaRow,
+    options: { focusDetail?: boolean } = {},
+  ) {
+    shouldFocusDetailRef.current =
+      Boolean(options.focusDetail) ||
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1023px)").matches;
+    if (shouldFocusDetailRef.current) {
+      setDetailFocusRequest((current) => current + 1);
+    }
+    setComparisonOpen(false);
+    setSelected(plantilla);
+    updateLibraryParams({
+      plantilla: plantilla.id,
+      ciclo: cicloOf(plantilla.estado),
+      tipo: plantilla.tipo === "MODELO_ACUERDO" ? "MODELO_ACUERDO" : null,
+    });
+  }
+
+  function openVersionComparison() {
+    if (!versionComparison) return;
+    shouldFocusComparisonRef.current = true;
+    setComparisonOpen(true);
+  }
+
+  function closeVersionComparison() {
+    setComparisonOpen(false);
+    window.requestAnimationFrame(() => comparisonTriggerRef.current?.focus());
+  }
+
+  function openTemplateGovernance() {
+    if (!selected) return;
+    navigate(
+      scope.createScopedTo(
+        buildTemplateGovernanceUrl({
+          materia: selectedBindingMateria || undefined,
+          plantilla: selected.id,
+          estado: selected.estado,
+          scope: scope.mode,
+          entityId: scope.selectedEntity?.id,
+        }),
+      ),
+    );
+  }
+
+  function openMatter(materia: string) {
+    navigate(
+      scope.createScopedTo(
+        buildMatterCatalogUrl({
+          materia,
+          vista: "plantillas",
+          scope: scope.mode,
+          entityId: scope.selectedEntity?.id,
+        }),
+      ),
+    );
+  }
+
+  function activateLibraryTab(tab: "proceso" | "modelos", moveFocus = false) {
+    setActiveTab(tab);
     setSelected(null);
-  }, [materiaFilterParam]);
+    setComparisonOpen(false);
+    setFilterMateria("");
+    setFilterRevision("");
+    setFilterCohorte("");
+    updateLibraryParams({
+      plantilla: null,
+      materia: null,
+      tipo: tab === "modelos" ? "MODELO_ACUERDO" : null,
+    });
+    if (moveFocus) {
+      window.requestAnimationFrame(() => {
+        (tab === "modelos" ? modelosTabRef.current : procesoTabRef.current)?.focus();
+      });
+    }
+  }
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    current: "proceso" | "modelos",
+  ) {
+    let target: "proceso" | "modelos" | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      target = current === "proceso" ? "modelos" : "proceso";
+    } else if (event.key === "Home") {
+      target = "proceso";
+    } else if (event.key === "End") {
+      target = "modelos";
+    }
+    if (!target) return;
+    event.preventDefault();
+    activateLibraryTab(target, true);
+  }
 
   useEffect(() => {
+    if (!selected || !shouldFocusDetailRef.current) return;
+    shouldFocusDetailRef.current = false;
+    window.requestAnimationFrame(() => {
+      detailRef.current?.focus({ preventScroll: true });
+      detailRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }, [detailFocusRequest, selected]);
+
+  useEffect(() => {
+    if (!comparisonOpen || !shouldFocusComparisonRef.current) return;
+    shouldFocusComparisonRef.current = false;
+    window.requestAnimationFrame(() => {
+      comparisonRef.current?.focus({ preventScroll: true });
+      comparisonRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }, [comparisonOpen]);
+
+  useEffect(() => {
+    if (plantillaFilterParam) {
+      if (isBindingsPending || isMateriaCatalogPending) return;
+      const target = scopedData.find((plantilla) => plantilla.id === plantillaFilterParam);
+      if (!target) {
+        if (!isLoading) setSelected(null);
+        return;
+      }
+
+      const targetTab = target.tipo === "MODELO_ACUERDO" ? "modelos" : "proceso";
+      const targetMatter =
+        targetTab === "modelos"
+          ? resolveTemplateMatterContext({
+              requestedMatter: materiaFilterParam,
+              templateMatter: target.materia_acuerdo ?? target.materia,
+              boundMatters: activeTemplateBindingMatters(templateBindings, target.id),
+              knownMatters: catalogMatterCodes,
+            })
+          : "";
+      const targetCycle = cicloOf(target.estado);
+      setActiveTab(targetTab);
+      setFilterMateria(targetMatter);
+      setFilterCiclo(targetCycle);
+      setFilterRevision("");
+      setFilterCohorte("");
+      setComparisonOpen(false);
+      setSelected(target);
+
+      const next = patchSearchParams(searchParams, {
+        materia: targetMatter || null,
+        tipo: targetTab === "modelos" ? "MODELO_ACUERDO" : null,
+        ciclo: targetCycle,
+      });
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+
+    const requestedCycle = searchParams.get("ciclo");
+    const nextCycle = isTemplateCycleParam(requestedCycle) ? requestedCycle : "vigentes";
+    const nextTab = tipoFilterParam
+      ? tipoFilterParam.toUpperCase().includes("MODELO")
+        ? "modelos"
+        : "proceso"
+      : materiaFilterParam
+        ? "modelos"
+        : activeTab;
+    const canonical = patchSearchParams(searchParams, {
+      ciclo:
+        requestedCycle && !isTemplateCycleParam(requestedCycle)
+          ? "vigentes"
+          : undefined,
+      tipo:
+        nextTab === "modelos" && tipoFilterParam !== "MODELO_ACUERDO"
+          ? "MODELO_ACUERDO"
+          : undefined,
+    });
+    if (canonical.toString() !== searchParams.toString()) {
+      setSearchParams(canonical, { replace: true });
+    }
+    if (filterCiclo !== nextCycle) setFilterCiclo(nextCycle);
+    if (activeTab !== nextTab) setActiveTab(nextTab);
+    const nextMateria = nextTab === "modelos" ? materiaFilterParam : "";
+    if (filterMateria !== nextMateria) setFilterMateria(nextMateria);
+
     setSelected((current) => {
       if (current && filteredData.some((plantilla) => plantilla.id === current.id)) return current;
       return filteredData[0] ?? null;
     });
-  }, [filteredData]);
+  }, [
+    activeTab,
+    filterCiclo,
+    filterMateria,
+    filteredData,
+    catalogMatterCodes,
+    isBindingsPending,
+    isLoading,
+    isMateriaCatalogPending,
+    materiaFilterParam,
+    plantillaFilterParam,
+    scopedData,
+    searchParams,
+    setSearchParams,
+    templateBindings,
+    tipoFilterParam,
+  ]);
+
+  if (isError || isBindingsError || isMateriaCatalogError) {
+    return (
+      <div className="mx-auto max-w-[1440px] space-y-5 p-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+            Secretaría · Plantillas
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
+            Plantillas documentales
+          </h1>
+        </div>
+        <ConfigurationLoadError
+          title={
+            isBindingsError
+              ? "No se han podido cargar el catálogo y sus vinculaciones."
+              : isMateriaCatalogError
+                ? "No se ha podido validar el catálogo canónico de materias."
+              : "No se ha podido cargar el catálogo de plantillas."
+          }
+          onRetry={() => {
+            void refetch();
+            void refetchBindings();
+            void refetchMateriaCatalog();
+          }}
+          retrying={isFetchingTemplates || isFetchingBindings || isFetchingMateriaCatalog}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       {/* Encabezado */}
       <div className="mb-6">
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {transitionAnnouncement}
+        </p>
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
           <FileText className="h-3.5 w-3.5" />
           Secretaría · Plantillas
@@ -636,7 +1133,7 @@ export default function Plantillas() {
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
           {isSociedadMode
             ? `Biblioteca documental filtrada por jurisdicción ${jurisdictionLabel(selectedJurisdiction)}. Las plantillas alimentan documentos demo/operativos o sirven de referencia del proceso; no crean expedientes por sí solas.`
-            : "Ciclo de vida: Borrador → Revisada → Aprobada → Activa → Archivada"}
+            : "Ciclo de vida: Borrador → Revisada → Aprobada → Vigente → Archivada"}
         </p>
         <div
           className="mt-3 inline-flex max-w-4xl items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
@@ -644,11 +1141,43 @@ export default function Plantillas() {
         >
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--g-brand-3308)]" aria-hidden="true" />
           <span>
-            Configuración del motor: cada plantilla activa alimenta Gate PRE, variables automáticas,
-            campos editables y bindings materia × órgano × tipo social × forma de adopción.
+            Configuración de uso: cada plantilla vigente participa en la comprobación documental
+            previa, resuelve variables automáticas y se vincula por materia, órgano, tipo social y
+            forma de adopción.
           </span>
         </div>
       </div>
+
+      {missingDeepLinkTarget ? (
+        <div
+          role="alert"
+          className="mb-5 flex flex-col gap-3 border border-[var(--status-warning)] bg-[var(--g-surface-card)] p-4 sm:flex-row sm:items-center sm:justify-between"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                No se ha encontrado la plantilla solicitada en este ámbito.
+              </p>
+              <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                Puede haber sido archivada, eliminada del origen o no ser aplicable a la sociedad seleccionada.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateLibraryParams({ plantilla: null })}
+            className="shrink-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            Mostrar plantillas disponibles
+          </button>
+        </div>
+      ) : null}
 
       {isSociedadMode && selectedEntity ? (
         <div
@@ -669,10 +1198,10 @@ export default function Plantillas() {
                 <span aria-hidden="true">·</span>
                 <span>{jurisdictionLabel(selectedEntity.jurisdiction)}</span>
                 <span aria-hidden="true">·</span>
-                <span>{selectedEntity.status}</span>
+                <span>{statusLabel(selectedEntity.status)}</span>
               </div>
               <p className="mt-2 max-w-3xl text-sm text-[var(--g-text-secondary)]">
-                El ámbito de sociedad se conserva para resolver variables, órgano competente y rule pack aplicable. La generación final queda separada en el carril documental; este módulo mantiene la traza societaria y la salida demo/operativa.
+                El ámbito de sociedad se conserva para resolver variables, órgano competente y regla aplicable. La generación final queda separada en el carril documental; este módulo mantiene la traza societaria y la salida de validación.
               </p>
               <p className="mt-2 max-w-3xl text-sm font-medium text-[var(--g-text-primary)]">
                 {healthMetrics.incidencias > 0
@@ -719,13 +1248,24 @@ export default function Plantillas() {
       ) : null}
 
       {/* Tab bar */}
-      <div className="mb-5 flex gap-1 border-b border-[var(--g-border-subtle)]">
+      <div
+        className="mb-5 flex gap-1 border-b border-[var(--g-border-subtle)]"
+        role="tablist"
+        aria-label="Biblioteca de plantillas"
+      >
         {(['proceso', 'modelos'] as const).map((tab) => (
           <button
             key={tab}
+            ref={tab === "proceso" ? procesoTabRef : modelosTabRef}
             type="button"
-            onClick={() => { setActiveTab(tab); setSelected(null); setFilterMateria(''); }}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            role="tab"
+            id={`plantillas-tab-${tab}`}
+            aria-selected={activeTab === tab}
+            aria-controls="plantillas-panel"
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => activateLibraryTab(tab)}
+            onKeyDown={(event) => handleTabKeyDown(event, tab)}
+            className={`min-h-11 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 ${
               activeTab === tab
                 ? 'border-b-2 border-[var(--g-brand-3308)] text-[var(--g-brand-3308)]'
                 : 'text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)]'
@@ -736,19 +1276,28 @@ export default function Plantillas() {
         ))}
       </div>
 
+      <div
+        role="tabpanel"
+        id="plantillas-panel"
+        aria-labelledby={`plantillas-tab-${activeTab}`}
+      >
       {activeTab === 'proceso' && procesoCoverage.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {procesoCoverage.map((item) => (
-            <span
-              key={item.tipo}
-              className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs text-[var(--g-text-secondary)]"
-              style={{ borderRadius: "var(--g-radius-full)" }}
-            >
-              <span className="font-medium text-[var(--g-text-primary)]">{item.label}</span>
-              <span>{item.activas}/{item.total} activas</span>
-            </span>
-          ))}
-        </div>
+        <>
+          <details
+            className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 lg:hidden"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
+              Cobertura de plantillas de proceso ({procesoCoverage.length} tipos)
+            </summary>
+            <div className="mt-3">
+              <ProcessCoverageChips items={procesoCoverage} />
+            </div>
+          </details>
+          <div className="mb-4 hidden lg:block">
+            <ProcessCoverageChips items={procesoCoverage} />
+          </div>
+        </>
       )}
 
       {/* Segmentación por ciclo de vida (informe UX 2026-07-10): la vista por
@@ -773,8 +1322,9 @@ export default function Plantillas() {
                 setFilterCohorte("");
                 setFilterRevision("");
                 setSelected(null);
+                updateLibraryParams({ ciclo: segment.id, plantilla: null });
               }}
-              className={`px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] ${
+              className={`min-h-11 px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 ${
                 active
                   ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
                   : "text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] hover:text-[var(--g-text-primary)]"
@@ -806,8 +1356,12 @@ export default function Plantillas() {
                     setFilterCohorte("");
                   }
                   setSelected(null);
+                  updateLibraryParams({
+                    ciclo: active ? undefined : "vigentes",
+                    plantilla: null,
+                  });
                 }}
-                className={`inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] ${
+                className={`inline-flex min-h-11 items-center gap-1.5 border px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 ${
                   active
                     ? "border-[var(--status-warning)] bg-[var(--g-surface-subtle)] font-semibold text-[var(--g-text-primary)]"
                     : "border-[var(--status-warning)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
@@ -826,12 +1380,18 @@ export default function Plantillas() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         {activeTab === 'modelos' && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <label className="text-xs font-medium text-[var(--g-text-secondary)]">Materia</label>
+            <label htmlFor="plantillas-filter-materia" className="text-xs font-medium text-[var(--g-text-secondary)]">Materia</label>
             <select
+              id="plantillas-filter-materia"
               aria-label="Filtrar modelos por materia"
               value={filterMateria}
-              onChange={(e) => setFilterMateria(e.target.value)}
-              className="min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+              onChange={(e) => {
+                const materia = resolveMateriaAlias(e.target.value);
+                setFilterMateria(materia);
+                setSelected(null);
+                updateLibraryParams({ materia: materia || null, plantilla: null });
+              }}
+              className="min-h-11 min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
               style={{ borderRadius: 'var(--g-radius-md)' }}
             >
               <option value="">Todas</option>
@@ -846,12 +1406,17 @@ export default function Plantillas() {
           </div>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <label className="text-xs font-medium text-[var(--g-text-secondary)]">Cohorte</label>
+          <label htmlFor="plantillas-filter-calidad" className="text-xs font-medium text-[var(--g-text-secondary)]">Calidad documental</label>
           <select
-            aria-label="Filtrar plantillas por cohorte"
+            id="plantillas-filter-calidad"
+            aria-label="Filtrar por calidad documental"
             value={filterCohorte}
-            onChange={(e) => setFilterCohorte(e.target.value)}
-            className="min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)]"
+            onChange={(e) => {
+              setFilterCohorte(e.target.value);
+              setSelected(null);
+              updateLibraryParams({ plantilla: null });
+            }}
+            className="min-h-11 min-w-0 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
             style={{ borderRadius: 'var(--g-radius-md)' }}
           >
             <option value="">Todas</option>
@@ -905,8 +1470,19 @@ export default function Plantillas() {
               </p>
               <button
                 type="button"
-                onClick={() => navigate(scope.createScopedTo('/secretaria/gestor-plantillas'))}
-                className="mt-4 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                onClick={() =>
+                  navigate(
+                    scope.createScopedTo(
+                      buildTemplateGovernanceUrl({
+                        materia: filterMateria,
+                        estado: filterCiclo === "vigentes" ? "ACTIVA" : "ALL",
+                        scope: scope.mode,
+                        entityId: scope.selectedEntity?.id,
+                      }),
+                    ),
+                  )
+                }
+                className="mt-4 inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
                 style={{ borderRadius: 'var(--g-radius-md)' }}
               >
                 <FileText className="h-4 w-4" />
@@ -918,9 +1494,9 @@ export default function Plantillas() {
               <button
                 key={plantilla.id}
                 type="button"
-                onClick={() => setSelected(plantilla)}
+                onClick={() => selectLibraryTemplate(plantilla)}
                 aria-pressed={selected?.id === plantilla.id}
-                className={`block w-full border border-[var(--g-border-subtle)] px-4 py-4 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 ${
+                className={`block min-h-11 w-full border border-[var(--g-border-subtle)] px-4 py-4 text-left transition-colors hover:bg-[var(--g-surface-subtle)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 ${
                   selected?.id === plantilla.id ? "bg-[var(--g-surface-subtle)]" : "bg-[var(--g-surface-card)]"
                 }`}
                 style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -934,15 +1510,14 @@ export default function Plantillas() {
                     </h2>
                     <p className="mt-1 break-words text-xs text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? `${tipoLabel(plantilla.tipo)} · ${plantilla.adoption_mode ? adoptionModeLabel(plantilla.adoption_mode) : "Adopción no informada"}`
+                        ? `${tipoLabel(plantilla.tipo)} · ${adoptionModeLabel(plantilla.adoption_mode, plantilla.tipo)}`
                         : materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     <span
                       className={`px-2 py-1 text-[11px] font-medium ${
-                        ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
-                        "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                        SEMANTIC_TONE_CLASS[templateStateTone(plantilla.estado)]
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
@@ -954,14 +1529,18 @@ export default function Plantillas() {
                     ) : null}
                   </div>
                 </div>
-                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                <dl
+                  className={`mt-4 grid grid-cols-1 gap-3 text-sm ${
+                    showTipoSocialColumn ? "sm:grid-cols-4" : "sm:grid-cols-3"
+                  }`}
+                >
                   <div>
                     <dt className="text-xs font-medium text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos' ? 'Órgano' : 'Jurisdicción'}
                     </dt>
                     <dd className="mt-1 text-[var(--g-text-primary)]">
                       {activeTab === 'modelos'
-                        ? (plantilla.organo_tipo ? organoTipoLabel(plantilla.organo_tipo) : "No informado")
+                        ? organoTipoLabel(plantilla.organo_tipo)
                         : jurisdictionLabel(plantilla.jurisdiccion)}
                     </dd>
                   </div>
@@ -972,9 +1551,17 @@ export default function Plantillas() {
                   <div>
                     <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Acción</dt>
                     <dd className="mt-1 text-[var(--g-text-primary)]">
-                      {isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo"}
+                      {templateAvailabilityPresentation(plantilla).label}
                     </dd>
                   </div>
+                  {showTipoSocialColumn ? (
+                    <div>
+                      <dt className="text-xs font-medium text-[var(--g-text-secondary)]">Tipo social</dt>
+                      <dd className="mt-1 text-[var(--g-text-primary)]">
+                        {tipoSocialLabel(plantilla.tipo_social)}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </button>
             ))
@@ -1005,6 +1592,11 @@ export default function Plantillas() {
                     Adopción
                   </th>
                 ) : null}
+                {showTipoSocialColumn ? (
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
+                    Tipo social
+                  </th>
+                ) : null}
                 <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                   Versión
                 </th>
@@ -1017,13 +1609,13 @@ export default function Plantillas() {
             <tbody className="divide-y divide-[var(--g-border-subtle)]">
               {isLoading ? (
                 <tr>
-                  <td colSpan={activeTab === 'modelos' ? 7 : 6} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
+                  <td colSpan={(activeTab === 'modelos' ? 7 : 6) + (showTipoSocialColumn ? 1 : 0)} className="px-5 py-8 text-center text-sm text-[var(--g-text-secondary)]">
                     Cargando…
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={activeTab === 'modelos' ? 7 : 6}>
+                  <td colSpan={(activeTab === 'modelos' ? 7 : 6) + (showTipoSocialColumn ? 1 : 0)}>
                     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                       <FolderOpen className="mb-3 h-10 w-10 text-[var(--g-text-secondary)]/40" />
                       <p className="text-sm font-medium text-[var(--g-text-secondary)]">
@@ -1039,8 +1631,19 @@ export default function Plantillas() {
                       </p>
                       <button
                         type="button"
-                        onClick={() => navigate(scope.createScopedTo('/secretaria/gestor-plantillas'))}
-                        className="mt-4 inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
+                        onClick={() =>
+                          navigate(
+                            scope.createScopedTo(
+                              buildTemplateGovernanceUrl({
+                                materia: filterMateria,
+                                estado: filterCiclo === "vigentes" ? "ACTIVA" : "ALL",
+                                scope: scope.mode,
+                                entityId: scope.selectedEntity?.id,
+                              }),
+                            ),
+                          )
+                        }
+                        className="mt-4 inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
                         style={{ borderRadius: 'var(--g-radius-md)' }}
                       >
                         <FileText className="h-4 w-4" />
@@ -1053,7 +1656,7 @@ export default function Plantillas() {
                 filteredData.map((plantilla) => (
                   <tr
                     key={plantilla.id}
-                    onClick={() => setSelected(plantilla)}
+                    onClick={() => selectLibraryTemplate(plantilla)}
                     className={`cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50 ${
                       selected?.id === plantilla.id ? "bg-[var(--g-surface-subtle)]" : ""
                     }`}
@@ -1065,7 +1668,7 @@ export default function Plantillas() {
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
                       {activeTab === 'modelos'
-                        ? (isOperationalTemplate(plantilla) ? "Lista para usar" : "Pendiente de ciclo")
+                        ? templateAvailabilityPresentation(plantilla).label
                         : materiaLabel(plantilla.materia)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
@@ -1073,12 +1676,17 @@ export default function Plantillas() {
                           incidencia "Sin órgano o adopción"); "Cualquier órgano" queda
                           reservado al valor explícito ANY. */}
                       {activeTab === 'modelos'
-                        ? (plantilla.organo_tipo ? organoTipoLabel(plantilla.organo_tipo) : "No informado")
+                        ? organoTipoLabel(plantilla.organo_tipo)
                         : jurisdictionLabel(plantilla.jurisdiccion)}
                     </td>
                     {activeTab === 'modelos' ? (
                       <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
-                        {plantilla.adoption_mode ? adoptionModeLabel(plantilla.adoption_mode) : "No informada"}
+                        {adoptionModeLabel(plantilla.adoption_mode, plantilla.tipo)}
+                      </td>
+                    ) : null}
+                    {showTipoSocialColumn ? (
+                      <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
+                        {tipoSocialLabel(plantilla.tipo_social)}
                       </td>
                     ) : null}
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">
@@ -1088,8 +1696,7 @@ export default function Plantillas() {
                       <div className="flex flex-col items-start gap-1.5">
                         <span
                           className={`inline-block px-2.5 py-1 text-xs font-medium ${
-                            ESTADO_BADGE[plantilla.estado as keyof typeof ESTADO_BADGE] ||
-                            "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                            SEMANTIC_TONE_CLASS[templateStateTone(plantilla.estado)]
                           }`}
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
@@ -1102,7 +1709,18 @@ export default function Plantillas() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <ChevronRight className="inline h-4 w-4 text-[var(--g-text-secondary)]" />
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          selectLibraryTemplate(plantilla);
+                        }}
+                        aria-label={`Ver detalles de ${tipoLabel(plantilla.tipo)}`}
+                        className="inline-flex h-11 w-11 items-center justify-center text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -1113,7 +1731,11 @@ export default function Plantillas() {
 
         {/* Detail Panel */}
         <div
-          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
+          ref={detailRef}
+          role="complementary"
+          aria-label="Detalle de la plantilla seleccionada"
+          tabIndex={-1}
+          className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2"
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
           {selected ? (
@@ -1133,14 +1755,16 @@ export default function Plantillas() {
                   </div>
                 </div>
 
-                {/* Cohorte (UX-7.B) — estado de ciclo de vida + completitud */}
+                {/* Disponibilidad — distingue ciclo técnico de uso jurídico. */}
                 <div className="mb-4">
-                  <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Cohorte</div>
-                  <div className="mt-1.5">
-                    <CohorteBadge plantilla={selected} />
+                  <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                    Disponibilidad
+                  </div>
+                  <div className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                    {selectedAvailability?.label}
                   </div>
                   <p className="mt-1.5 text-xs text-[var(--g-text-secondary)]">
-                    {cohorteDescripcion(clasificarCohortePlantilla(selected))}
+                    {selectedAvailability?.description}
                   </p>
                 </div>
 
@@ -1157,6 +1781,15 @@ export default function Plantillas() {
                   <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Jurisdicción</div>
                   <div className="mt-1 text-sm text-[var(--g-text-primary)]">
                     {jurisdictionLabel(selected.jurisdiccion)}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                    Tipo social
+                  </div>
+                  <div className="mt-1 text-sm text-[var(--g-text-primary)]">
+                    {tipoSocialLabel(selected.tipo_social)}
                   </div>
                 </div>
 
@@ -1190,8 +1823,7 @@ export default function Plantillas() {
                   <div className="mt-1">
                     <span
                       className={`inline-block px-2.5 py-1 text-xs font-medium ${
-                        ESTADO_BADGE[selected.estado as keyof typeof ESTADO_BADGE] ||
-                        "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                        SEMANTIC_TONE_CLASS[templateStateTone(selected.estado)]
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
@@ -1206,25 +1838,29 @@ export default function Plantillas() {
                 >
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--g-brand-3308)]">
                     <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                    Configuración del motor
+                    Configuración de uso
                   </div>
                   <dl className="mt-2 grid grid-cols-1 gap-2 text-xs text-[var(--g-text-secondary)]">
                     <div className="flex items-start justify-between gap-3">
-                      <dt className="font-medium text-[var(--g-text-primary)]">Binding</dt>
+                      <dt className="font-medium text-[var(--g-text-primary)]">Vinculación</dt>
                       <dd className="text-right">
                         {materiaLabel(selected.materia_acuerdo ?? selected.materia)} · {organoTipoLabel(selected.organo_tipo)}
                       </dd>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <dt className="font-medium text-[var(--g-text-primary)]">Adopción</dt>
-                      <dd className="text-right">{adoptionModeLabel(selected.adoption_mode)}</dd>
+                      <dd className="text-right">{adoptionModeLabel(selected.adoption_mode, selected.tipo)}</dd>
                     </div>
                     <div className="flex items-start justify-between gap-3">
-                      <dt className="font-medium text-[var(--g-text-primary)]">Gate PRE</dt>
+                      <dt className="font-medium text-[var(--g-text-primary)]">Tipo social</dt>
+                      <dd className="text-right">{tipoSocialLabel(selected.tipo_social)}</dd>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="font-medium text-[var(--g-text-primary)]">Comprobación documental previa</dt>
                       <dd className="text-right">
                         {selected.snapshot_rule_pack_required
-                          ? "Exige snapshot de rule pack"
-                          : "Sin snapshot obligatorio configurado"}
+                          ? "Exige fijar la versión de la regla aplicable"
+                          : "No exige fijar una versión de la regla"}
                       </dd>
                     </div>
                     <div className="flex items-start justify-between gap-3">
@@ -1235,14 +1871,14 @@ export default function Plantillas() {
                     </div>
                   </dl>
                   {selected.estado === "ACTIVA" && !(selected.materia_acuerdo ?? selected.materia) ? (
-                    <p className="mt-3 text-xs text-[var(--status-warning)]">
+                    <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
                       Esta plantilla existe, pero no está vinculada a una regla aplicable.
                     </p>
                   ) : null}
                   {selected.estado === "ACTIVA" && !selected.contrato_variables_version ? (
-                    <p className="mt-3 text-xs text-[var(--status-warning)]">
-                      Esta plantilla está activa, pero faltan metadatos de gobierno documental. Revisa
-                      versión, binding, jurisdicción y cobertura antes de usarla como base de bloqueo.
+                    <p className="mt-3 text-xs text-[var(--g-text-secondary)]">
+                      Esta plantilla está vigente, pero faltan metadatos de gobierno documental. Revisa
+                      versión, vinculación, jurisdicción y cobertura antes de usarla como requisito bloqueante.
                     </p>
                   ) : null}
                   {selected.estado === "ACTIVA" && reviewByTemplateId.get(selected.id)?.flags.draftVersion ? (
@@ -1268,19 +1904,48 @@ export default function Plantillas() {
                     <p className="mt-1 text-sm text-[var(--g-text-primary)]">
                       La versión vigente de esta pieza documental es v{replacementForSelected.version}.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFilterCiclo("vigentes");
-                        setFilterRevision("");
-                        setFilterCohorte("");
-                        setSelected(replacementForSelected);
-                      }}
-                      className="mt-2 inline-flex items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-1.5 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                      style={{ borderRadius: "var(--g-radius-sm)" }}
-                    >
-                      Ver versión vigente <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        ref={comparisonTriggerRef}
+                        type="button"
+                        onClick={openVersionComparison}
+                        className="inline-flex min-h-11 items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-xs font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        <GitCompare className="h-3.5 w-3.5" aria-hidden="true" />
+                        Comparar con vigente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterCiclo("vigentes");
+                          setFilterRevision("");
+                          setFilterCohorte("");
+                          selectLibraryTemplate(replacementForSelected, { focusDetail: true });
+                        }}
+                        className="inline-flex min-h-11 items-center gap-1.5 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        Ver versión vigente <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                ) : cicloOf(selected.estado) === "historico" ? (
+                  <div
+                    className="mb-4 border border-[var(--status-info)] bg-[var(--g-surface-card)] px-3 py-3"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
+                      Sin versión vigente comparable
+                    </div>
+                    <p className="mt-1 text-sm text-[var(--g-text-primary)]">
+                      {replacementIsAmbiguous
+                        ? "Hay más de una candidata con la misma identidad documental. No se selecciona una sustituta automáticamente."
+                        : "No existe una plantilla vigente con la misma identidad documental. Puede haber cambiado el tipo, la materia, el órgano o la forma de adopción."}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                      Consulta Gobierno de plantillas para investigar el linaje sin inferirlo desde notas de texto libre.
+                    </p>
                   </div>
                 ) : null}
 
@@ -1299,7 +1964,7 @@ export default function Plantillas() {
                 {/* Capa 1 Inmutable */}
                 {selected.capa1_inmutable && (
                   <details open className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
-                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                    <summary className="flex min-h-11 cursor-pointer items-center py-2 text-sm font-medium text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
                       Texto literal protegido · Capa 1 completa
                     </summary>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--g-text-secondary)]">
@@ -1314,30 +1979,33 @@ export default function Plantillas() {
                       {selected.capa1_inmutable}
                     </pre>
                     <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
-                      Este es el texto base que usa el motor de documentos; las variables se resuelven en Capa 2 y los campos editables se capturan en Capa 3.
+                      Este es el texto base de la generación documental; las variables se resuelven en Capa 2 y los campos editables se capturan en Capa 3.
                     </p>
                   </details>
                 )}
 
                 {/* Capa 2 Variables */}
-                {selected.capa2_variables && Array.isArray(selected.capa2_variables) && selected.capa2_variables.length > 0 && (
+                {selectedVariables.length > 0 && (
                   <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
-                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                    <summary className="flex min-h-11 cursor-pointer items-center py-2 text-sm font-medium text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
                       Variables automáticas
                     </summary>
                     <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
                       Detalle técnico · Capa 2
                     </div>
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
-                      {selected.capa2_variables.map((v, i) => (
+                      {selectedVariables.map((variable, i) => (
                         <div
                           key={i}
                           className="bg-[var(--g-surface-subtle)] px-2 py-1"
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
-                          <span className="font-mono font-medium">{v.variable}</span>
+                          <span className="font-mono font-medium">{variable.name}</span>
                           {" — "}
-                          <span className="text-[10px]">{v.fuente}</span>
+                          <span className="text-[10px]">{variable.source || "Fuente no informada"}</span>
+                          {variable.display ? (
+                            <span className="ml-2 text-[10px]">{variable.display}</span>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -1345,27 +2013,27 @@ export default function Plantillas() {
                 )}
 
                 {/* Capa 3 Editables (Modelos de acuerdo) */}
-                {selected.capa3_editables && selected.capa3_editables.length > 0 && (
+                {selectedEditableFields.length > 0 && (
                   <details className="mb-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2" style={{ borderRadius: "var(--g-radius-md)" }}>
-                    <summary className="cursor-pointer text-sm font-medium text-[var(--g-text-primary)]">
+                    <summary className="flex min-h-11 cursor-pointer items-center py-2 text-sm font-medium text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
                       Campos para completar
                     </summary>
                     <div className="mt-2 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
                       Detalle técnico · Capa 3
                     </div>
                     <div className="mt-2 space-y-1 text-[11px] text-[var(--g-text-secondary)]">
-                      {selected.capa3_editables.map((v, i) => (
+                      {selectedEditableFields.map((field, i) => (
                         <div
                           key={i}
                           className="bg-[var(--g-surface-muted)] px-2 py-1"
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
-                          <span className="font-mono font-medium">{v.campo}</span>
-                          {v.obligatoriedad === 'OBLIGATORIO' && (
-                            <span className="ml-2 text-[var(--status-error)]">*</span>
+                          <span className="font-mono font-medium">{field.name}</span>
+                          {field.required && (
+                            <span className="ml-2 font-semibold text-[var(--g-text-primary)]">*</span>
                           )}
-                          {v.descripcion && (
-                            <span className="ml-2 text-[10px] text-[var(--g-text-secondary)]">{v.descripcion}</span>
+                          {field.description && (
+                            <span className="ml-2 text-[10px] text-[var(--g-text-secondary)]">{field.description}</span>
                           )}
                         </div>
                       ))}
@@ -1397,11 +2065,11 @@ export default function Plantillas() {
                 )}
 
                 {/* Checklist de aprobación */}
-                {selected.approval_checklist && selected.approval_checklist.length > 0 && (
+                {selectedChecklist.length > 0 && (
                   <div className="mb-4">
                     <div className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">Checklist de aprobación</div>
                     <div className="mt-2 space-y-1">
-                      {selected.approval_checklist.map((item, i) => (
+                      {selectedChecklist.map((item, i) => (
                         <div key={i} className="flex items-center gap-2 text-xs">
                           {item.passed ? <CheckCircle className="h-3.5 w-3.5 text-[var(--status-success)]" /> : <AlertCircle className="h-3.5 w-3.5 text-[var(--status-error)]" />}
                           <span className="text-[var(--g-text-primary)]">{item.check}</span>
@@ -1442,36 +2110,89 @@ export default function Plantillas() {
 
               {/* Detail Footer - Action Buttons */}
               <div className="border-t border-[var(--g-border-subtle)] px-5 py-4 flex flex-col gap-2">
-                {isOperationalTemplate(selected) && (
+                {selectedMatterCodes.map((materia) => (
+                  <button
+                    key={materia}
+                    type="button"
+                    onClick={() => openMatter(materia)}
+                    className="flex min-h-11 w-full items-center justify-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-primary)] transition-all hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                    Ver materia y regla: {materiaLabel(materia)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={openTemplateGovernance}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-primary)] transition-all hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Shield className="h-4 w-4" aria-hidden="true" />
+                  Administrar esta plantilla
+                </button>
+                {selectedAvailability?.canUse && (
                   <button
                     type="button"
                     onClick={() => {
                       const target = getTemplateUsageTarget(selected).to;
-                      navigate(scope.createScopedTo(target));
+                      navigate(
+                        applyTemplateRouteScope(target, scope.mode, scope.selectedEntity?.id),
+                      );
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                    className={`flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 ${
+                      selectedAvailability.isCurrent
+                        ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+                        : "border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                    }`}
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <Play className="h-4 w-4" aria-hidden="true" />
                     {getTemplateUsageTarget(selected).label}
+                    {!selectedAvailability.isCurrent ? " · versión de preparación" : ""}
                   </button>
                 )}
                 {selected.estado === "ACTIVA" && isSociedadMode && selectedEntity ? (
-                  <button
-                    type="button"
-                    onClick={() => handleAssignBinding(selected)}
-                    disabled={assignTemplate.isPending}
-                    aria-busy={assignTemplate.isPending}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                    Vincular como plantilla activa
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleAssignBinding(selected, selectedBindingMateria)}
+                      disabled={
+                        assignTemplate.isPending ||
+                        selectedIsAlreadyBound ||
+                        !selectedBindingMateria ||
+                        hasAmbiguousBindingContext
+                      }
+                      aria-busy={assignTemplate.isPending}
+                      className="flex min-h-11 w-full items-center justify-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-primary)] transition-all hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                      {hasAmbiguousBindingContext
+                        ? `Ya vinculada a ${selectedEffectiveBindingMatterCodes.length} reglas`
+                        : selectedIsAlreadyBound
+                          ? "Ya vinculada a esta regla"
+                          : selectedBindingMateria
+                            ? "Vincular como plantilla vigente"
+                            : "Selecciona una regla en Materias"}
+                    </button>
+                    {hasAmbiguousBindingContext ? (
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        Abre una materia concreta para revisar o modificar su asignación; no se creará una vinculación genérica ni compuesta.
+                      </p>
+                    ) : !selectedBindingMateria ? (
+                      <p className="text-xs text-[var(--g-text-secondary)]">
+                        La plantilla no identifica una materia canónica inequívoca. Selecciónala desde Materias y reglas o desde Gobierno de plantillas.
+                      </p>
+                    ) : null}
+                  </>
                 ) : null}
-                {isOperationalTemplate(selected) ? (
+                {selectedAvailability?.canUse ? (
                   <p className="text-xs text-[var(--g-text-secondary)]">
-                    {getTemplateUsageTarget(selected).hint}
+                    {getTemplateUsageTarget(selected).hint}{" "}
+                    {!selectedAvailability.isCurrent
+                      ? "Esta versión es utilizable por la política transitoria, pero todavía no está vigente para nuevos expedientes."
+                      : ""}
                   </p>
                 ) : null}
                 {templateUsabilityNotice(selected) ? (
@@ -1495,9 +2216,11 @@ export default function Plantillas() {
                     const IconComponent = transition.icon;
                     return (
                       <button
+                        type="button"
                         onClick={() => handleTransicion(selected)}
                         disabled={updateEstado.isPending}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-60 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+                        aria-busy={updateEstado.isPending}
+                        className="flex min-h-11 w-full items-center justify-center gap-2 border border-[var(--g-border-default)] bg-[var(--g-surface-card)] px-4 py-2.5 text-sm font-medium text-[var(--g-text-primary)] transition-all hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 disabled:opacity-60"
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       >
                         <IconComponent className="h-4 w-4" />
@@ -1514,9 +2237,9 @@ export default function Plantillas() {
                     className="border border-[var(--status-error)] bg-[var(--status-error)]/5 p-3"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--status-error)]">
-                      <Shield className="h-3.5 w-3.5" aria-hidden="true" />
-                      Gate PRE bloqueó la activación
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--g-text-primary)]">
+                      <Shield className="h-3.5 w-3.5 text-[var(--status-error)]" aria-hidden="true" />
+                      La comprobación documental bloqueó la activación
                     </div>
                     <GatePreIssueList issues={blockingIssues} />
                   </div>
@@ -1536,17 +2259,202 @@ export default function Plantillas() {
         </div>
       </div>
 
+      {comparisonOpen && selected && replacementForSelected && versionComparison ? (
+        <section
+          ref={comparisonRef}
+          role="region"
+          aria-label="Comparación de versiones"
+          tabIndex={-1}
+          className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex flex-col gap-4 border-b border-[var(--g-border-subtle)] p-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
+                <GitCompare className="h-4 w-4" aria-hidden="true" />
+                Comparación de versiones
+              </div>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--g-text-primary)]">
+                Histórica v{selected.version} ↔ Vigente v{replacementForSelected.version}
+              </h2>
+              <p className="mt-1 max-w-4xl text-sm text-[var(--g-text-secondary)]">
+                Comparación segura entre dos versiones con la misma identidad documental. Las notas de texto libre no se usan para inferir el linaje.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeVersionComparison}
+              aria-label="Cerrar comparación de versiones"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-[var(--g-border-default)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="space-y-5 p-5">
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+                <dt className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">Secciones modificadas</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{versionComparison.summary.changedSections}</dd>
+              </div>
+              <div className="border border-[var(--status-success)] bg-[var(--g-surface-card)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+                <dt className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">Líneas añadidas</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{versionComparison.summary.addedLines}</dd>
+              </div>
+              <div className="border border-[var(--status-error)] bg-[var(--g-surface-card)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+                <dt className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">Líneas retiradas</dt>
+                <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{versionComparison.summary.removedLines}</dd>
+              </div>
+            </dl>
+
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Resumen del cambio</h3>
+              {versionComparison.identical ? (
+                <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
+                  No hay cambios de contenido o metadatos entre estas dos versiones.
+                </p>
+              ) : (
+                <ul className="mt-2 flex flex-wrap gap-2" aria-label="Secciones modificadas">
+                  {versionComparison.summary.labels.map((label) => (
+                    <li
+                      key={label}
+                      className="border border-[var(--status-info)] bg-[var(--g-surface-card)] px-2.5 py-1 text-xs text-[var(--g-text-primary)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Cambios en el texto literal protegido</h3>
+              <div
+                role="region"
+                tabIndex={0}
+                className="mt-2 max-h-[520px] overflow-auto border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+                aria-label="Diferencias línea a línea del texto protegido"
+              >
+                {versionComparison.lineDiff.map((line, index) => (
+                  <div
+                    key={`${line.kind}-${line.oldLine ?? "n"}-${line.newLine ?? "n"}-${index}`}
+                    className={`grid grid-cols-[44px_20px_minmax(0,1fr)] gap-2 border-b border-[var(--g-border-subtle)]/60 px-2 py-1.5 last:border-b-0 ${
+                      line.kind === "added"
+                        ? "bg-[var(--status-success)]/10 text-[var(--g-text-primary)]"
+                        : line.kind === "removed"
+                          ? "bg-[var(--status-error)]/10 text-[var(--g-text-primary)]"
+                          : "text-[var(--g-text-secondary)]"
+                    }`}
+                  >
+                    <span className="text-right text-[10px] text-[var(--g-text-secondary)]">
+                      {line.kind === "added" ? line.newLine : line.oldLine}
+                    </span>
+                    <span aria-hidden="true">
+                      {line.kind === "added" ? (
+                        <Plus className="h-3.5 w-3.5 text-[var(--status-success)]" />
+                      ) : line.kind === "removed" ? (
+                        <Minus className="h-3.5 w-3.5 text-[var(--status-error)]" />
+                      ) : null}
+                    </span>
+                    <span className="whitespace-pre-wrap break-words">
+                      <span className="sr-only">
+                        {line.kind === "added"
+                          ? "Línea añadida: "
+                          : line.kind === "removed"
+                            ? "Línea retirada: "
+                            : "Línea sin cambios: "}
+                      </span>
+                      {line.text || " "}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Detalle por sección</h3>
+              {versionComparison.sections.map((section) => (
+                <details
+                  key={section.key}
+                  className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <summary className="flex min-h-11 cursor-pointer items-center py-2 text-sm font-medium text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2">
+                    {section.label} · {section.changed ? "Modificada" : "Sin cambios"}
+                  </summary>
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div>
+                      <div className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+                        Histórica · v{selected.version}
+                      </div>
+                      <pre
+                        className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                        role="region"
+                        aria-label={`${section.label}, versión histórica ${selected.version}`}
+                        tabIndex={0}
+                      >
+                        {section.before.length > 0 ? section.before.join("\n") : "No informado"}
+                      </pre>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium uppercase tracking-wider text-[var(--g-text-secondary)]">
+                        Vigente · v{replacementForSelected.version}
+                      </div>
+                      <pre
+                        className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                        role="region"
+                        aria-label={`${section.label}, versión vigente ${replacementForSelected.version}`}
+                        tabIndex={0}
+                      >
+                        {section.after.length > 0 ? section.after.join("\n") : "No informado"}
+                      </pre>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+      </div>
+
       {/* ITEM-087: diálogo de reconocimiento de warnings. Reintenta la transición
           con ackWarnings:true y el motivo escrito (persistido en changelog). */}
       {ackIssues && pendingTransition ? (
         <TransitionAckDialog
           issues={ackIssues}
           pending={updateEstado.isPending}
-          onConfirm={(motivo) => runTransicion(pendingTransition, motivo, true)}
+          onConfirm={(motivo) =>
+            runTransicion(pendingTransition, {
+              ...pendingTransitionOptions,
+              motivo,
+              ackWarnings: true,
+              confirmed: true,
+            })
+          }
           onCancel={() => {
             setAckIssues(null);
             setPendingTransition(null);
+            setPendingTransitionOptions({});
           }}
+        />
+      ) : null}
+      {approvalTarget ? (
+        <TemplateApprovalDialog
+          pending={updateEstado.isPending}
+          onConfirm={({ aprobadaPor, fechaAprobacion }) =>
+            runTransicion(approvalTarget, {
+              aprobadaPor,
+              fechaAprobacion,
+              confirmed: true,
+            })
+          }
+          onCancel={() => setApprovalTarget(null)}
         />
       ) : null}
     </div>

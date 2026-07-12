@@ -55,22 +55,22 @@ export function clasificarCohortePlantilla(input: PlantillaCohorteInput): Planti
 }
 
 const LABELS: Record<PlantillaCohorte, string> = {
-  ACTIVA_LISTA: "Activa · lista para uso",
-  ACTIVA_SIN_REGLA: "Activa · sin regla aplicable",
-  ACTIVA_METADATOS_INCOMPLETOS: "Activa · metadatos incompletos",
+  ACTIVA_LISTA: "Metadatos completos",
+  ACTIVA_SIN_REGLA: "Sin regla aplicable",
+  ACTIVA_METADATOS_INCOMPLETOS: "Metadatos incompletos",
   EN_PREPARACION: "En preparación",
   HISTORICO: "Histórico",
 };
 
 const DESCRIPCIONES: Record<PlantillaCohorte, string> = {
   ACTIVA_LISTA:
-    "Plantilla activa con binding de materia y contrato de variables. Puede usarse como base de bloqueo documental.",
+    "Plantilla vigente con vinculación de materia y contrato de variables. Puede exigirse en la comprobación documental.",
   ACTIVA_SIN_REGLA:
-    "Plantilla activa que no está vinculada a una regla/materia aplicable. No debe usarse como base de bloqueo hasta asignarle binding.",
+    "Plantilla vigente que no está vinculada a una regla o materia aplicable. No debe exigirse hasta completar la vinculación.",
   ACTIVA_METADATOS_INCOMPLETOS:
-    "Plantilla activa pero sin metadatos de gobierno documental (versión de contrato de variables). Revísalos antes de usarla como base de bloqueo.",
+    "Plantilla vigente sin todos los metadatos de gobierno documental. Revísalos antes de exigirla en un expediente.",
   EN_PREPARACION:
-    "Plantilla en borrador, revisión o aprobación. Aún no está activa para uso operativo.",
+    "Plantilla en borrador, revisión o aprobación. Aún no está vigente para nuevos expedientes.",
   HISTORICO: "Plantilla archivada o deprecada. Se conserva como histórico, no para uso.",
 };
 

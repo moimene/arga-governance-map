@@ -3,6 +3,10 @@ import { Gavel, Plus, FolderOpen } from "lucide-react";
 import { useTramitacionesList, type FilingRow } from "@/hooks/useTramitador";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import {
+  buildUrlWithSearchParams,
+  pickTemplateHandoffSearchParams,
+} from "@/lib/secretaria/template-configuration-routing";
 
 type TramitadorVista = "todas" | "en-tramite" | "subsanaciones" | "presentaciones" | "inscritas";
 
@@ -63,6 +67,12 @@ export default function TramitadorLista() {
     setSearchParams(params, { replace: true });
   }
 
+  function startFromAgreement() {
+    const handoff = pickTemplateHandoffSearchParams(searchParams);
+    const target = buildUrlWithSearchParams("/secretaria/tramitador/nuevo", handoff);
+    navigate(scope.createScopedTo(target));
+  }
+
   return (
     <div className="mx-auto max-w-[1440px] p-6">
       <div className="mb-6 flex items-start justify-between">
@@ -82,7 +92,7 @@ export default function TramitadorLista() {
         </div>
         <button
           type="button"
-          onClick={() => navigate(scope.createScopedTo("/secretaria/tramitador/nuevo"))}
+          onClick={startFromAgreement}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >

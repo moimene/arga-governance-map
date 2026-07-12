@@ -4,6 +4,11 @@ import {
   type LegalTemplateApprovalDecision,
   type LegalTemplateApprovalPlanItem,
 } from "./legal-template-approval-plan";
+import { buildFunctionalKey, serializeFunctionalKey } from "./template-admin/functional-key";
+import {
+  hasSpecificTemplateMetadata,
+  templateMetadataPolicy,
+} from "./template-admin/labels";
 
 export type LegalTemplateReviewStatus =
   | "legally_approved"
@@ -67,7 +72,8 @@ export interface LegalTemplateReviewSummary {
   legalReportApprovedWithVariants: number;
 }
 
-const REVIEW_NOTE_RE = /STUB|PENDIENTE|REVISION|REVISI[OÓ]N|BORRADOR|DRAFT/i;
+const REVIEW_NOTE_RE =
+  /(?:^|[^\p{L}\p{N}_])(?:STUB|PENDIENTE|REVISI[OÓ]N|BORRADOR|DRAFT)(?=$|[^\p{L}\p{N}_])/iu;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
 function normalizeCode(value?: string | null) {
@@ -78,12 +84,12 @@ function hasValue(value?: string | null) {
   return !!value?.trim();
 }
 
-function isLocalFixture(template: PlantillaProtegidaRow) {
+export function isLocalFixture(template: PlantillaProtegidaRow) {
   const protections = template.protecciones as Record<string, unknown> | null;
   return template.tenant_id === "local-legal-fixture" || protections?.source === "legal-team-fixture";
 }
 
-function isDraftVersion(version?: string | null) {
+export function isDraftVersion(version?: string | null) {
   const value = version?.trim();
   if (!value) return true;
   if (value.startsWith("0.")) return true;
@@ -94,23 +100,21 @@ function requiresReference(template: PlantillaProtegidaRow) {
   return normalizeCode(template.tipo) === "MODELO_ACUERDO";
 }
 
-function requiresOwnerMetadata(template: PlantillaProtegidaRow) {
-  return normalizeCode(template.tipo) === "MODELO_ACUERDO";
-}
-
-function buildDuplicateKey(template: PlantillaProtegidaRow) {
+function buildActiveEquivalentKey(template: PlantillaProtegidaRow) {
   const tipo = normalizeCode(template.tipo);
   const matter = normalizeCode(template.materia_acuerdo ?? template.materia);
   if (!tipo || !matter) return null;
-  return `${tipo}:${matter}`;
+  return serializeFunctionalKey(
+    buildFunctionalKey(template, template.tenant_id),
+  );
 }
 
 export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[]): LegalTemplateReviewRow[] {
   const duplicateCounts = new Map<string, number>();
 
   for (const template of templates) {
-    if (isLocalFixture(template)) continue;
-    const key = buildDuplicateKey(template);
+    if (isLocalFixture(template) || normalizeCode(template.estado) !== "ACTIVA") continue;
+    const key = buildActiveEquivalentKey(template);
     if (!key) continue;
     duplicateCounts.set(key, (duplicateCounts.get(key) ?? 0) + 1);
   }
@@ -121,12 +125,19 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     const draftVersion = !localFixture && isDraftVersion(template.version);
     const notesRequireReview = !localFixture && REVIEW_NOTE_RE.test(template.notas_legal ?? "");
     const missingReference = !localFixture && requiresReference(template) && !hasValue(template.referencia_legal);
-    const missingOwner =
+    const metadataPolicy = templateMetadataPolicy(template.tipo);
+    const missingOrgano =
+      metadataPolicy.organoRequired && !hasSpecificTemplateMetadata(template.organo_tipo);
+    const missingAdoption =
+      metadataPolicy.adoptionModeRequired &&
+      !hasSpecificTemplateMetadata(template.adoption_mode);
+    const missingOwner = !localFixture && (missingOrgano || missingAdoption);
+    const duplicateKey = buildActiveEquivalentKey(template);
+    const duplicateMatter =
       !localFixture &&
-      requiresOwnerMetadata(template) &&
-      (!hasValue(template.adoption_mode) || !hasValue(template.organo_tipo));
-    const duplicateKey = buildDuplicateKey(template);
-    const duplicateMatter = !localFixture && !!duplicateKey && (duplicateCounts.get(duplicateKey) ?? 0) > 1;
+      isOperationalActive &&
+      !!duplicateKey &&
+      (duplicateCounts.get(duplicateKey) ?? 0) > 1;
     const approvalPlan = resolveLegalTemplateApprovalPlan(template);
     const legalReportApproved = approvalPlan?.decision === "APROBADA";
     const legalReportApprovedWithVariants = approvalPlan?.decision === "APROBADA_CON_VARIANTES";
@@ -149,37 +160,49 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     };
 
     const reasons: string[] = [];
-    if (localFixture) reasons.push("Fixture local no persistido; no sustituye aprobacion legal Cloud.");
-    if (missingApproval) reasons.push("Falta aprobada_por o fecha_aprobacion.");
+    if (localFixture) reasons.push("Cobertura provisional no persistida; no sustituye una aprobación legal.");
+    if (missingApproval) reasons.push("Falta aprobación formal.");
     if (committeeApproved && (!hasValue(template.aprobada_por) || !hasValue(template.fecha_aprobacion))) {
-      reasons.push("Aprobacion por informe del Comite Legal ARGA; metadata Cloud pendiente de reflejar.");
+      reasons.push("Aprobada por informe del Comité Legal; falta reflejar la aprobación en los metadatos.");
     }
-    if (draftVersion) reasons.push("Version tecnica o no semver final.");
-    if (notesRequireReview) reasons.push("Notas legales indican STUB, borrador o revision pendiente.");
-    if (missingReference) reasons.push("Falta referencia legal explicita.");
-    if (missingOwner) reasons.push("Falta organo competente o AdoptionMode.");
-    if (duplicateMatter) reasons.push("Existe mas de una plantilla para la misma materia; Legal debe confirmar variante o consolidacion.");
+    if (draftVersion) reasons.push("Versión provisional.");
+    if (notesRequireReview) reasons.push("Las notas jurídicas señalan contenido en borrador o revisión pendiente.");
+    if (missingReference) reasons.push("Falta referencia legal.");
+    if (missingOwner) {
+      reasons.push(
+        missingAdoption
+          ? "Falta órgano competente o forma de adopción aplicable."
+          : "Falta órgano competente.",
+      );
+    }
+    if (duplicateMatter) {
+      reasons.push(
+        "Plantilla activa equivalente: existe otra fila vigente con la misma identidad funcional.",
+      );
+    }
 
-    const canClaimLegalApproval = committeeApproved || (!localFixture && isOperationalActive && reasons.length === 0);
+    const canClaimLegalApproval =
+      !duplicateMatter &&
+      (committeeApproved || (!localFixture && isOperationalActive && reasons.length === 0));
     const requiresLegalReview = !canClaimLegalApproval;
 
     let status: LegalTemplateReviewStatus;
     let label: string;
     if (localFixture) {
       status = "fixture_bridge";
-      label = "Fixture local";
+      label = "Cobertura provisional";
     } else if (canClaimLegalApproval) {
       status = "legally_approved";
-      label = "Aprobada legal";
+      label = "Aprobada legalmente";
     } else if (notesRequireReview || draftVersion || missingReference || missingOwner || duplicateMatter) {
       status = "needs_review";
-      label = "Revision legal";
+      label = "Revisión legal";
     } else if (isOperationalActive && missingApproval) {
       status = "operational_unapproved";
-      label = "Activa sin aprobacion";
+      label = "Vigente sin aprobación";
     } else {
       status = "in_workflow";
-      label = "En ciclo";
+      label = "En preparación";
     }
 
     return {

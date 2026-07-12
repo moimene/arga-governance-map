@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     notas_legal: null,
   } as Record<string, unknown> | null,
   updateCalls: [] as Array<Record<string, unknown>>,
+  updatedRow: { id: "tpl-1" } as { id: string } | null,
   changelogInsertError: null as unknown,
   changelogInsertCalls: [] as Array<Record<string, unknown>>,
 }));
@@ -83,6 +84,8 @@ vi.mock("@/integrations/supabase/client", () => {
     const chain = {
       error: null,
       eq: vi.fn(() => chain),
+      select: vi.fn(() => chain),
+      maybeSingle: vi.fn(async () => ({ data: mocks.updatedRow, error: null })),
     };
     return chain;
   }
@@ -141,6 +144,7 @@ describe("useUpdateContenidoPlantilla", () => {
       notas_legal: null,
     };
     mocks.updateCalls = [];
+    mocks.updatedRow = { id: "tpl-1" };
     mocks.changelogInsertCalls = [];
     mocks.changelogInsertError = null;
   });
@@ -195,6 +199,17 @@ describe("useUpdateContenidoPlantilla", () => {
     ).rejects.toThrow(/BORRADOR/);
 
     expect(mocks.updateCalls).toEqual([]);
+    expect(mocks.changelogInsertCalls).toEqual([]);
+  });
+
+  it("rechaza el guardado si el borrador cambia de estado durante la actualización", async () => {
+    mocks.updatedRow = null;
+    const hook = useUpdateContenidoPlantilla();
+
+    await expect(
+      hook.mutateAsync({ id: "tpl-1", capa1_inmutable: "Texto nuevo" }),
+    ).rejects.toThrow(/cambió de estado/);
+
     expect(mocks.changelogInsertCalls).toEqual([]);
   });
 });

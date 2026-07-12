@@ -22,21 +22,22 @@
 
 import { useState } from "react";
 import { Upload, AlertTriangle, CheckCircle2, Loader2, Download } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useImportPlantillaPackage } from "@/hooks/secretaria/useImportPlantillaPackage";
 import { useTemplatePreflight } from "@/hooks/secretaria/useTemplatePreflight";
 import { parseImport } from "@/lib/secretaria/template-admin/template-importer";
 import { mapSchemaIssues, type SchemaIssue } from "@/lib/secretaria/template-admin/schema-issue-mapper";
 import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
+import { mergeUrlSearchParams } from "@/lib/secretaria/template-configuration-routing";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Descargar base",
   2: "Subir JSON",
-  3: "Preflight",
-  4: "Reconocer warnings",
+  3: "Comprobación previa",
+  4: "Revisar advertencias",
   5: "Crear borrador",
 };
 
@@ -48,6 +49,7 @@ export function TemplateImportWizard() {
   const [gatePre, setGatePre] = useState<GatePreResult | null>(null);
   const [ack, setAck] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const preflightMut = useTemplatePreflight();
   const importMut = useImportPlantillaPackage();
 
@@ -106,10 +108,10 @@ export function TemplateImportWizard() {
     if (fail.reason === "PARSE_FAILED") {
       setSchemaIssues(mapSchemaIssues(fail.details));
       setStep(2);
-      toast.error("Error de schema: revisa el JSON");
+      toast.error("Estructura no válida: revisa el archivo JSON");
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
       setGatePre(fail.gatePre);
-      toast.error("Gate PRE bloqueante: corrige los issues antes de continuar");
+      toast.error("Comprobación documental bloqueante: corrige las incidencias antes de continuar");
     } else if (fail.reason === "WARNINGS_NEED_ACK") {
       setGatePre(fail.gatePre);
       setStep(4);
@@ -137,7 +139,12 @@ export function TemplateImportWizard() {
       const ok = result as { ok: true; plantillaId: string; gatePre: GatePreResult };
       setGatePre(ok.gatePre);
       toast.success("Borrador creado correctamente");
-      navigate(`/secretaria/gestor-plantillas?tab=catalogo`);
+      navigate(
+        mergeUrlSearchParams(
+          `/secretaria/gestor-plantillas?tab=catalogo&plantilla=${ok.plantillaId}&estado=BORRADOR`,
+          searchParams,
+        ),
+      );
       return;
     }
 
@@ -149,11 +156,11 @@ export function TemplateImportWizard() {
     if (fail.reason === "PARSE_FAILED") {
       setSchemaIssues(mapSchemaIssues(fail.details));
       setStep(2);
-      toast.error("Error de schema: revisa el JSON");
+      toast.error("Estructura no válida: revisa el archivo JSON");
     } else if (fail.reason === "GATE_PRE_BLOCKING") {
       setGatePre(fail.gatePre);
       setStep(3);
-      toast.error("Gate PRE bloqueante: corrige los issues antes de continuar");
+      toast.error("Comprobación documental bloqueante: corrige las incidencias antes de continuar");
     } else if (fail.reason === "WARNINGS_NEED_ACK") {
       setGatePre(fail.gatePre);
       setStep(4);
@@ -203,13 +210,14 @@ export function TemplateImportWizard() {
           </h2>
           <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
             Empieza con un paquete v1 válido y modifícalo a tu materia. El JSON
-            descargable pasa validación de schema y Gate PRE en un tenant vacío.
+            descargable ya cumple la estructura y la comprobación documental previa
+            en un entorno vacío.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a
               href="/templates/secretaria/plantilla-base-importacion.v1.json"
               download="plantilla-base-importacion.v1.json"
-              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+              className="inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <Download className="h-4 w-4" aria-hidden="true" /> Descargar base v1.json
@@ -217,7 +225,7 @@ export function TemplateImportWizard() {
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="text-sm font-medium text-[var(--g-link)] underline hover:text-[var(--g-link-hover)]"
+              className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-[var(--g-link)] underline hover:text-[var(--g-link-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
             >
               Saltar a subir
             </button>
@@ -234,8 +242,8 @@ export function TemplateImportWizard() {
             2. Subir JSON
           </h2>
           <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
-            Selecciona el fichero JSON con el paquete v1. Se parsea localmente
-            antes de enviarlo a preflight.
+            Selecciona el fichero JSON con el paquete v1. Su estructura se comprueba
+            localmente antes de consultar las reglas documentales.
           </p>
           <label className="block">
             <span className="sr-only">Archivo JSON</span>
@@ -244,7 +252,7 @@ export function TemplateImportWizard() {
               accept="application/json,.json"
               onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
               aria-label="Subir paquete JSON"
-              className="block w-full text-sm text-[var(--g-text-primary)] file:mr-3 file:border-0 file:bg-[var(--g-surface-subtle)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--g-text-primary)] hover:file:bg-[var(--g-sec-100)]"
+              className="block min-h-11 w-full text-sm text-[var(--g-text-primary)] file:mr-3 file:min-h-11 file:cursor-pointer file:border-0 file:bg-[var(--g-surface-subtle)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--g-text-primary)] hover:file:bg-[var(--g-sec-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
             />
           </label>
           {fileName && (
@@ -256,7 +264,7 @@ export function TemplateImportWizard() {
             <div className="mt-4 space-y-2" aria-label="Errores de validación del paquete">
               <p className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
                 {schemaIssues.length}{" "}
-                {schemaIssues.length === 1 ? "error de schema" : "errores de schema"} a corregir
+                {schemaIssues.length === 1 ? "error de estructura" : "errores de estructura"} a corregir
               </p>
               {schemaIssues.map((i, idx) => (
                 <div
@@ -287,18 +295,18 @@ export function TemplateImportWizard() {
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
           <h2 className="mb-3 text-lg font-semibold text-[var(--g-text-primary)]">
-            3. Preflight Gate PRE
+            3. Comprobación documental previa (Gate PRE)
           </h2>
           <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
-            Ejecuta Gate PRE headless: detecta duplicados activos, fuentes no
-            catalogadas, helpers prohibidos. No escribe nada hasta paso 5.
+            Detecta plantillas activas equivalentes, fuentes no registradas y
+            expresiones no permitidas. No modifica datos hasta el paso 5.
           </p>
           {schemaIssues && schemaIssues.length > 0 && (
             <div
-              className="mb-4 border border-[var(--status-error)] bg-[var(--status-error)]/10 p-3 text-sm text-[var(--status-error)]"
+              className="mb-4 border border-[var(--status-error)] bg-[var(--status-error)]/10 p-3 text-sm text-[var(--g-text-primary)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              JSON inválido a nivel schema. Vuelve al paso 2 y corrige los errores
+              La estructura del JSON no es válida. Vuelve al paso 2 y corrige los errores
               antes de continuar.
             </div>
           )}
@@ -306,21 +314,22 @@ export function TemplateImportWizard() {
             type="button"
             onClick={() => runPreflight()}
             disabled={preflightMut.isPending || !!(schemaIssues && schemaIssues.length) || !json}
-            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:cursor-not-allowed disabled:opacity-50"
             style={{ borderRadius: "var(--g-radius-md)" }}
+            aria-busy={preflightMut.isPending}
           >
             {preflightMut.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             )}
-            Ejecutar preflight
+            Ejecutar comprobación
           </button>
           {gatePre && (
-            <div className="mt-5 space-y-2" aria-label="Resultado Gate PRE">
+            <div className="mt-5 space-y-2" aria-label="Resultado de la comprobación documental previa">
               <p className="text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
                 {gatePre.summary.blocking} bloqueantes · {gatePre.summary.warning}{" "}
-                warnings · {gatePre.summary.info} info
+                advertencias · {gatePre.summary.info} informativas
               </p>
               {gatePre.issues.map((i, idx) => (
                 <div
@@ -360,12 +369,12 @@ export function TemplateImportWizard() {
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
         >
           <h2 className="mb-3 text-lg font-semibold text-[var(--g-text-primary)]">
-            4. Reconocer warnings
+            4. Revisar advertencias
           </h2>
           <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
-            Gate PRE detectó warnings no-bloqueantes. Para crear el borrador
-            tienes que reconocerlas escribiendo un motivo de ≥20 caracteres
-            que se persiste en el changelog como evidencia documental.
+            La comprobación detectó advertencias no bloqueantes. Para crear el
+            borrador, confirma su revisión con un motivo de al menos 20 caracteres;
+            quedará registrado en el historial como evidencia documental.
           </p>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-[var(--g-text-primary)]">
@@ -374,8 +383,8 @@ export function TemplateImportWizard() {
             <textarea
               value={ack}
               onChange={(e) => setAck(e.target.value)}
-              placeholder="P. ej.: Warnings revisadas con Comité Legal el 12/05/2026; se acepta importar tal cual."
-              className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]/30"
+              placeholder="P. ej.: Advertencias revisadas con el Comité Legal; se acepta importar sin cambios."
+              className="w-full border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-border-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]"
               rows={4}
               aria-describedby="ack-help"
               aria-invalid={ack.length > 0 && ack.length < 20 ? "true" : undefined}
@@ -388,12 +397,12 @@ export function TemplateImportWizard() {
               {ack.length}/20 caracteres mínimos
             </p>
           </label>
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => setStep(5)}
               disabled={ack.length < 20}
-              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:cursor-not-allowed disabled:opacity-50"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Continuar
@@ -401,10 +410,10 @@ export function TemplateImportWizard() {
             <button
               type="button"
               onClick={() => setStep(3)}
-              className="px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              className="min-h-11 px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
-              Volver al preflight
+              Volver a la comprobación
             </button>
           </div>
         </section>
@@ -419,22 +428,23 @@ export function TemplateImportWizard() {
             5. Crear borrador
           </h2>
           <p className="mb-4 text-sm text-[var(--g-text-secondary)]">
-            El preflight no tiene bloqueantes. Al crear el borrador se
-            re-ejecuta Gate PRE y se registra la importación en auditoría.
+            La comprobación no tiene incidencias bloqueantes. Al crear el borrador
+            se repite la validación y se registra la importación en auditoría.
           </p>
           {gatePre && (
             <p className="mb-4 text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
               {gatePre.summary.blocking} bloqueantes · {gatePre.summary.warning}{" "}
-              warnings · {gatePre.summary.info} info
+              advertencias · {gatePre.summary.info} informativas
             </p>
           )}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={createDraft}
               disabled={importMut.isPending || !json}
-              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:cursor-not-allowed disabled:opacity-50"
               style={{ borderRadius: "var(--g-radius-md)" }}
+              aria-busy={importMut.isPending}
             >
               {importMut.isPending && (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -444,7 +454,7 @@ export function TemplateImportWizard() {
             <button
               type="button"
               onClick={() => setStep(gatePre?.summary.warning ? 4 : 3)}
-              className="px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              className="min-h-11 px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               Volver

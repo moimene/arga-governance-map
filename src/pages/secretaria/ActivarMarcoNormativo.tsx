@@ -93,7 +93,7 @@ export default function ActivarMarcoNormativo() {
         tipoSocial: sociedad?.tipo_social,
       })
     : [];
-  const readiness = evaluateTemplateReadiness(templateBindings);
+  const readiness = evaluateTemplateReadiness(templateBindings, { materia: criticalMatter });
   const conflict = sociedad
     ? detectConflictOfLaws({
         jurisdiction: sociedad.jurisdiction,

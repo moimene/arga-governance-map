@@ -15,12 +15,18 @@ import {
   buildP1PerformanceBudgetContract,
   detectConflictOfLaws,
   displaySocietyLegalForm,
+  resolveSocietySocialTypeForRules,
   buildTemplateDocumentBindings,
   canPerformNormativeAction,
+  documentRequirements,
   evaluateTemplateReadiness,
+  formalizationLabel,
   getMateriaFunctionalGroup,
+  isInformativeMatter,
+  matterComplexityLabel,
   normativeRoleFromAppRole,
   matterClassBusinessLabel,
+  quorumLabel,
   validateNormativeOverrideDraft,
 } from "@/lib/secretaria/mesa-control-societaria";
 import type { MateriaCatalogRow } from "@/hooks/useMateriaConfig";
@@ -74,6 +80,7 @@ function plantilla(partial: Partial<PlantillaProtegidaRow>): PlantillaProtegidaR
     snapshot_rule_pack_required: false,
     adoption_mode: partial.adoption_mode ?? null,
     organo_tipo: partial.organo_tipo ?? null,
+    tipo_social: partial.tipo_social ?? null,
     contrato_variables_version: null,
     created_at: "2026-05-15",
     materia_acuerdo: partial.materia_acuerdo ?? partial.materia ?? null,
@@ -89,6 +96,34 @@ describe("mesa-control-societaria", () => {
     expect(getMateriaFunctionalGroup("APROBACION_CUENTAS").title).toBe("Cuentas anuales, resultado y auditoría");
     expect(getMateriaFunctionalGroup("AUMENTO_CAPITAL").title).toBe("Capital y financiación");
     expect(rows.some((row) => row.materia === "SEGUIMIENTO_PLAN_NEGOCIO")).toBe(true);
+  });
+
+  it.each([
+    "APROBACION_PRESUPUESTO",
+    "APROBACION_PRESUPUESTOS",
+    "ACUERDO_CONVOCATORIA_JUNTA",
+    "APROBACION_PLAN_NEGOCIO",
+  ])("%s sigue siendo decisoria aunque comparta grupo funcional con seguimiento", (materia) => {
+    const row: MateriaCatalogRow = {
+      ...cuentas,
+      materia,
+      materia_label_es: materia,
+    };
+
+    expect(isInformativeMatter(materia)).toBe(false);
+    expect(matterComplexityLabel(row)).not.toBe("Informativa");
+    expect(quorumLabel(row, "SA")).not.toContain("No aplica");
+    expect(documentRequirements(row)).toEqual(["Acta"]);
+    expect(formalizationLabel(row)).toBe("Archivo societario interno");
+    expect(evaluateTemplateReadiness([], { materia: row }).openingStatus).toBe("blocked");
+  });
+
+  it.each([
+    "INFORME_GESTION",
+    "SEGUIMIENTO_PLAN_NEGOCIO",
+    "ESTADO_CUMPLIMIENTO_NORMATIVO",
+  ])("%s conserva la naturaleza informativa explícita", (materia) => {
+    expect(isInformativeMatter(materia)).toBe(true);
   });
 
   it("proyecta matriz materia × requisitos con mayoría, documentos y formalización", () => {
@@ -127,9 +162,20 @@ describe("mesa-control-societaria", () => {
   it("vincula plantillas por fase documental y expone razón de selección", () => {
     const bindings = buildTemplateDocumentBindings(
       [
-        plantilla({ id: "modelo", tipo: "MODELO_ACUERDO", materia: "AUMENTO_CAPITAL" }),
-        plantilla({ id: "acta", tipo: "ACTA_SESION", organo_tipo: "JUNTA_GENERAL" }),
-        plantilla({ id: "cert", tipo: "CERTIFICACION" }),
+        plantilla({
+          id: "modelo",
+          tipo: "MODELO_ACUERDO",
+          materia: "AUMENTO_CAPITAL",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "acta",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+        }),
+        plantilla({ id: "cert", tipo: "CERTIFICACION", organo_tipo: "DERIVADO_DEL_ACTO" }),
       ],
       { materia: "AUMENTO_CAPITAL", jurisdiction: "ES", organoTipo: "JUNTA_GENERAL" },
     );
@@ -138,6 +184,252 @@ describe("mesa-control-societaria", () => {
     expect(bindings.map((binding) => binding.stage)).toContain("Acta");
     expect(bindings.find((binding) => binding.template.id === "modelo")?.selectionReason).toContain("materia compatible");
     expect(bindings.every((binding) => binding.statusLabel.length > 0)).toBe(true);
+  });
+
+  it("conserva los tres meta-órganos transversales sin relajar actas adoptables", () => {
+    const bindings = buildTemplateDocumentBindings(
+      [
+        plantilla({
+          id: "convocatoria-organo-admin",
+          tipo: "CONVOCATORIA",
+          organo_tipo: "ORGANO_ADMIN",
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "informe-soporte",
+          tipo: "INFORME_PRECEPTIVO",
+          organo_tipo: "SOPORTE_INTERNO",
+          adoption_mode: null,
+        }),
+        plantilla({
+          id: "certificacion-derivada",
+          tipo: "CERTIFICACION",
+          organo_tipo: "DERIVADO_DEL_ACTO",
+          adoption_mode: null,
+        }),
+        plantilla({
+          id: "acta-derivada-no-transversal",
+          tipo: "ACTA_SESION",
+          organo_tipo: "DERIVADO_DEL_ACTO",
+          adoption_mode: "MEETING",
+        }),
+      ],
+      {
+        materia: "AUMENTO_CAPITAL",
+        jurisdiction: "ES",
+        organoTipo: "JUNTA_GENERAL",
+        formaAdopcion: "MEETING",
+        tipoSocial: "SA",
+      },
+    );
+
+    expect(bindings.map((binding) => binding.template.id)).toEqual([
+      "informe-soporte",
+      "convocatoria-organo-admin",
+      "certificacion-derivada",
+    ]);
+
+    const consejoBindings = buildTemplateDocumentBindings(
+      [
+        plantilla({
+          id: "convocatoria-organo-admin",
+          tipo: "CONVOCATORIA",
+          organo_tipo: "ORGANO_ADMIN",
+          adoption_mode: "MEETING",
+        }),
+      ],
+      {
+        materia: "FORMULACION_CUENTAS",
+        jurisdiction: "ES",
+        organoTipo: "CONSEJO_ADMIN",
+        formaAdopcion: "MEETING",
+        tipoSocial: "SA",
+      },
+    );
+    expect(consejoBindings).toEqual([]);
+  });
+
+  it("aplica órgano, adopción y tipo social también a plantillas transversales", () => {
+    const bindings = buildTemplateDocumentBindings(
+      [
+        plantilla({
+          id: "modelo-compatible",
+          tipo: "MODELO_ACUERDO",
+          materia: "AUMENTO_CAPITAL",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+          tipo_social: "SA",
+        }),
+        plantilla({
+          id: "modelo-sin-materia",
+          tipo: "MODELO_ACUERDO",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "acta-organo-null",
+          tipo: "ACTA_SESION",
+          organo_tipo: null,
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "acta-organo-derivado",
+          tipo: "ACTA_SESION",
+          organo_tipo: "DERIVADO_DEL_ACTO",
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "acta-adopcion-null",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: null,
+        }),
+        plantilla({
+          id: "acta-adopcion-any",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "ANY",
+        }),
+        plantilla({
+          id: "acta-otro-tipo-social",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+          tipo_social: "SL",
+        }),
+        plantilla({
+          id: "acta-todos",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: "MEETING",
+          tipo_social: null,
+        }),
+        plantilla({
+          id: "cert-adopcion-no-aplica",
+          tipo: "CERTIFICACION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: null,
+        }),
+        plantilla({
+          id: "cert-otro-organo",
+          tipo: "CERTIFICACION",
+          organo_tipo: "CONSEJO_ADMIN",
+          adoption_mode: null,
+        }),
+      ],
+      {
+        materia: "AUMENTO_CAPITAL",
+        jurisdiction: "ES",
+        organoTipo: "JUNTA_GENERAL",
+        formaAdopcion: "MEETING",
+        tipoSocial: "SA",
+      },
+    );
+
+    expect(bindings.map((binding) => binding.template.id)).toEqual([
+      "modelo-compatible",
+      "acta-todos",
+      "cert-adopcion-no-aplica",
+    ]);
+    expect(
+      bindings.find((binding) => binding.template.id === "cert-adopcion-no-aplica")
+        ?.metadataComplete,
+    ).toBe(true);
+    expect(
+      bindings.find((binding) => binding.template.id === "modelo-compatible")
+        ?.metadataComplete,
+    ).toBe(true);
+  });
+
+  it("acepta arrays de órganos y modos sin degradar los criterios escalares", () => {
+    const candidates = [
+      plantilla({
+        id: "junta-meeting",
+        tipo: "MODELO_ACUERDO",
+        materia: "AUMENTO_CAPITAL",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+      }),
+      plantilla({
+        id: "consejo-no-session",
+        tipo: "MODELO_ACUERDO",
+        materia: "AUMENTO_CAPITAL",
+        organo_tipo: "CONSEJO_ADMIN",
+        adoption_mode: "NO_SESSION",
+      }),
+      plantilla({
+        id: "socio-unico",
+        tipo: "MODELO_ACUERDO",
+        materia: "AUMENTO_CAPITAL",
+        organo_tipo: "SOCIO_UNICO",
+        adoption_mode: "UNIPERSONAL_SOCIO",
+      }),
+    ];
+
+    expect(
+      buildTemplateDocumentBindings(candidates, {
+        materia: "AUMENTO_CAPITAL",
+        organoTipo: ["JUNTA_GENERAL", "CONSEJO"],
+        formaAdopcion: ["MEETING", "NO_SESSION"],
+      }).map((binding) => binding.template.id),
+    ).toEqual(["junta-meeting", "consejo-no-session"]);
+    expect(
+      buildTemplateDocumentBindings(candidates, {
+        materia: "AUMENTO_CAPITAL",
+        organoTipo: "JUNTA_GENERAL",
+        formaAdopcion: "MEETING",
+      }).map((binding) => binding.template.id),
+    ).toEqual(["junta-meeting"]);
+  });
+
+  it("vincula modelos aunque catálogo y regla usen alias equivalentes", () => {
+    const bindings = buildTemplateDocumentBindings(
+      [
+        plantilla({
+          id: "presupuesto",
+          tipo: "MODELO_ACUERDO",
+          materia: "APROBACION_PRESUPUESTOS",
+          organo_tipo: "CONSEJO_ADMIN",
+          adoption_mode: "MEETING",
+        }),
+      ],
+      {
+        materia: "APROBACION_PRESUPUESTO",
+        organoTipo: "CONSEJO",
+        formaAdopcion: "MEETING",
+      },
+    );
+    expect(bindings.map((binding) => binding.template.id)).toEqual(["presupuesto"]);
+  });
+
+  it("calcula metadataComplete con la política del tipo documental", () => {
+    const bindings = buildTemplateDocumentBindings(
+      [
+        plantilla({
+          id: "acta-sin-organo",
+          tipo: "ACTA_SESION",
+          organo_tipo: null,
+          adoption_mode: "MEETING",
+        }),
+        plantilla({
+          id: "acta-sin-adopcion",
+          tipo: "ACTA_SESION",
+          organo_tipo: "JUNTA_GENERAL",
+          adoption_mode: null,
+        }),
+        plantilla({
+          id: "cert-completa",
+          tipo: "CERTIFICACION",
+          organo_tipo: "DERIVADO_DEL_ACTO",
+          adoption_mode: null,
+        }),
+      ],
+      { materia: "AUMENTO_CAPITAL" },
+    );
+
+    expect(bindings.find((binding) => binding.template.id === "acta-sin-organo")?.metadataComplete).toBe(false);
+    expect(bindings.find((binding) => binding.template.id === "acta-sin-adopcion")?.metadataComplete).toBe(false);
+    expect(bindings.find((binding) => binding.template.id === "cert-completa")?.metadataComplete).toBe(true);
   });
 
   it("mantiene nomenclatura jurisdiccional y alerta si LSC se aplica a sociedad alemana", () => {
@@ -155,6 +447,30 @@ describe("mesa-control-societaria", () => {
     expect(conflict.appliedLawLabel).toContain("Sociedades de Capital");
   });
 
+  it("no resuelve una rama SA/SL cuando tipo social y forma jurídica españolas se contradicen", () => {
+    const resolution = resolveSocietySocialTypeForRules({
+      jurisdiction: "ES",
+      tipoSocial: "SA",
+      legalForm: "S.L.",
+    });
+    expect(resolution.value).toBeNull();
+    expect(resolution.conflict).toBe(true);
+    expect(resolution.explanation).toContain("familias distintas");
+
+    const conflict = detectConflictOfLaws({
+      jurisdiction: "ES",
+      tipoSocial: "SA",
+      legalForm: "S.L.",
+      appliedReferences: ["art. 86 LSC"],
+    });
+    expect(conflict.conflict_of_laws_flag).toBe(true);
+    expect(conflict.conflict_kind).toBe("social_form");
+
+    expect(
+      resolveSocietySocialTypeForRules({ jurisdiction: "ES", tipoSocial: "SL", legalForm: "S.L." }),
+    ).toMatchObject({ value: "SL", conflict: false });
+  });
+
   it("bloquea inicio de expediente si faltan plantillas mínimas", () => {
     const readiness = evaluateTemplateReadiness(
       buildTemplateDocumentBindings(
@@ -166,6 +482,105 @@ describe("mesa-control-societaria", () => {
     expect(readiness.canStartCase).toBe(false);
     expect(readiness.blockingMessage).toContain("No se puede iniciar expediente");
     expect(readiness.items.some((item) => item.stage === "Acta" && item.blocking)).toBe(true);
+  });
+
+  it("una plantilla candidata no satisface una fase crítica de apertura", () => {
+    const readiness = evaluateTemplateReadiness(
+      buildTemplateDocumentBindings(
+        [
+          plantilla({
+            id: "modelo-candidato",
+            tipo: "MODELO_ACUERDO",
+            materia: "AUMENTO_CAPITAL",
+            estado: "REVISADA",
+          }),
+          plantilla({ id: "acta-activa", tipo: "ACTA_SESION" }),
+          plantilla({ id: "cert-activa", tipo: "CERTIFICACION" }),
+        ],
+        { materia: "AUMENTO_CAPITAL", jurisdiction: "ES" },
+      ),
+      { materia: aumentoCapital },
+    );
+
+    expect(readiness.openingStatus).toBe("blocked");
+    expect(readiness.canStartCase).toBe(false);
+    expect(readiness.items.find((item) => item.stage === "Modelo de acuerdo")).toMatchObject({
+      status: "pendiente_revision",
+      criticality: "apertura",
+      blocking: true,
+    });
+    expect(
+      readiness.items.find((item) => item.stage === "Modelo de acuerdo")?.consequence,
+    ).toContain("candidata");
+  });
+
+  it("una materia informativa no abre expediente y exige constancia de cierre", () => {
+    const readiness = evaluateTemplateReadiness([], {
+      materia: {
+        materia: "SEGUIMIENTO_PLAN_NEGOCIO",
+        requires_notary: false,
+        requires_registry: false,
+        inscribable: false,
+      },
+    });
+
+    expect(readiness).toMatchObject({
+      openingStatus: "not_applicable",
+      canStartCase: false,
+      blockingMessage: null,
+      openingMessage: "No aplica abrir expediente · dejar constancia en acta.",
+    });
+    expect(readiness.items.find((item) => item.stage === "Acta")).toMatchObject({
+      status: "faltante",
+      criticality: "cierre",
+      blocking: false,
+    });
+    expect(readiness.items.find((item) => item.stage === "Modelo de acuerdo")).toMatchObject({
+      status: "no_aplica",
+      criticality: "no_aplica",
+      blocking: false,
+    });
+  });
+
+  it("una restricción de tipo social marca la materia como no aplicable sin habilitar expediente", () => {
+    const reason = "No aplica a S.L.; la regla versionada limita esta materia a S.A.";
+    const readiness = evaluateTemplateReadiness([], {
+      materia: cuentas,
+      notApplicableReason: reason,
+    });
+
+    expect(readiness).toMatchObject({
+      canStartCase: false,
+      openingStatus: "not_applicable",
+      openingMessage: reason,
+    });
+    expect(readiness.items.every((item) => item.criticality === "no_aplica")).toBe(true);
+  });
+
+  it("una materia estructural exige certificación activa para abrir si se formaliza", () => {
+    const fusion: MateriaCatalogRow = {
+      ...aumentoCapital,
+      materia: "FUSION",
+      materia_label_es: "Fusión",
+      matter_class: "ESTRUCTURAL",
+    };
+    const readiness = evaluateTemplateReadiness(
+      buildTemplateDocumentBindings(
+        [
+          plantilla({ id: "modelo-fusion", tipo: "MODELO_ACUERDO", materia: "FUSION" }),
+          plantilla({ id: "acta-fusion", tipo: "ACTA_SESION" }),
+        ],
+        { materia: "FUSION", jurisdiction: "ES" },
+      ),
+      { materia: fusion },
+    );
+
+    expect(readiness.openingStatus).toBe("blocked");
+    expect(readiness.items.find((item) => item.stage === "Certificación")).toMatchObject({
+      status: "faltante",
+      criticality: "apertura",
+      blocking: true,
+    });
   });
 
   it("gobierna permisos operativos por rol sin exponer controles técnicos", () => {

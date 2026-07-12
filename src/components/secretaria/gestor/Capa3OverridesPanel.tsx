@@ -11,14 +11,17 @@ import {
   type Capa3OverrideDraft,
   type ObligatoriedadOverride,
 } from "@/hooks/useCapa3Overrides";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
+import { SEMANTIC_TONE_CLASS, tipoLabel } from "@/lib/secretaria/template-admin";
+import { ConfigurationLoadError } from "@/components/secretaria/ConfigurationLoadError";
 
 const OBLIGATORIEDAD_OPTIONS: ObligatoriedadOverride[] = ["OBLIGATORIO", "RECOMENDADO", "OPCIONAL"];
 const FIELD_CLASS_NAME =
-  "border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)]";
+  "min-h-11 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-normal normal-case tracking-normal text-[var(--g-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]";
 const PRIMARY_BUTTON_CLASS_NAME =
-  "inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)] disabled:opacity-50";
+  "inline-flex min-h-11 items-center gap-1.5 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50";
 const SECONDARY_BUTTON_CLASS_NAME =
-  "inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2 focus:ring-offset-[var(--g-surface-card)] disabled:opacity-50";
+  "inline-flex min-h-11 items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50";
 
 type Capa3Field = NonNullable<PlantillaProtegidaRow["capa3_editables"]>[number];
 
@@ -80,9 +83,9 @@ function OverrideFieldRow({
         ...parsed.payload,
       });
       setError(null);
-      toast.success("Override Capa 3 guardado");
+      toast.success("Ajuste de Capa 3 guardado");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo guardar el override";
+      const message = err instanceof Error ? err.message : "No se pudo guardar el ajuste";
       setError(message);
       toast.error(message);
     }
@@ -93,9 +96,9 @@ function OverrideFieldRow({
     try {
       await deleteOverride.mutateAsync({ entityId, plantillaId: plantilla.id, campo: field.campo });
       setError(null);
-      toast.success("Override Capa 3 eliminado");
+      toast.success("Ajuste de Capa 3 eliminado");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo eliminar el override";
+      const message = err instanceof Error ? err.message : "No se pudo eliminar el ajuste";
       setError(message);
       toast.error(message);
     }
@@ -118,11 +121,11 @@ function OverrideFieldRow({
               }`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              {current ? "Override activo" : "Canónico"}
+              {current ? "Ajuste de sociedad" : "Valor canónico"}
             </span>
             {!compatible ? (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium ${SEMANTIC_TONE_CLASS.warning}`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
                 <AlertTriangle className="h-3 w-3" aria-hidden="true" />
@@ -135,7 +138,7 @@ function OverrideFieldRow({
           </p>
           <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
             Canónico: obligatoriedad {field.obligatoriedad}
-            {field.default !== undefined ? ` · default ${valueText(field.default)}` : ""}
+            {field.default !== undefined ? ` · valor inicial ${valueText(field.default)}` : ""}
             {field.opciones ? ` · opciones ${valueText(field.opciones)}` : ""}
           </p>
         </div>
@@ -143,7 +146,7 @@ function OverrideFieldRow({
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-          Default override
+          Valor inicial específico
           <input
             id={`${rowId}-default`}
             value={draft.defaultValue}
@@ -155,7 +158,7 @@ function OverrideFieldRow({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-          Opciones override
+          Opciones específicas
           <input
             id={`${rowId}-opciones`}
             value={draft.opciones}
@@ -167,7 +170,7 @@ function OverrideFieldRow({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-          Obligatoriedad override
+          Obligatoriedad específica
           <select
             id={`${rowId}-obligatoriedad`}
             value={draft.obligatoriedad}
@@ -207,7 +210,8 @@ function OverrideFieldRow({
       </label>
 
       {error ? (
-        <p id={errorId} className="mt-2 text-xs text-[var(--status-error)]">
+        <p id={errorId} className="mt-2 flex items-start gap-1.5 text-xs text-[var(--g-text-primary)]">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-error)]" aria-hidden="true" />
           {error}
         </p>
       ) : null}
@@ -222,7 +226,7 @@ function OverrideFieldRow({
           aria-busy={upsert.isPending}
         >
           <Save className="h-4 w-4" aria-hidden="true" />
-          Guardar override
+          Guardar ajuste
         </button>
         <button
           type="button"
@@ -287,15 +291,15 @@ export function Capa3OverridesPanel({ entityId }: { entityId: string }) {
           <div className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-[var(--g-brand-3308)]" aria-hidden="true" />
             <h2 className="text-lg font-semibold text-[var(--g-text-primary)]">
-              Overrides Capa 3 por sociedad
+              Ajustes de Capa 3 por sociedad
             </h2>
           </div>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-            Defaults, opciones y obligatoriedad por campo sin modificar la plantilla canónica.
+            Valores iniciales, opciones y obligatoriedad por campo sin modificar la plantilla canónica.
           </p>
         </div>
 
-        <label className="flex min-w-[320px] flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
+        <label className="flex w-full flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--g-text-secondary)] lg:w-auto lg:min-w-[320px]">
           Plantilla activa
           <select
             value={plantillaId}
@@ -307,28 +311,48 @@ export function Capa3OverridesPanel({ entityId }: { entityId: string }) {
             <option value="">Selecciona plantilla</option>
             {activeTemplates.map((plantilla) => (
               <option key={plantilla.id} value={plantilla.id}>
-                {plantilla.tipo} · {plantilla.materia ?? "Sin materia"} · v{plantilla.version}
+                {tipoLabel(plantilla.tipo)} · {(plantilla.materia_acuerdo ?? plantilla.materia) ? labelMateria(plantilla.materia_acuerdo ?? plantilla.materia) : "Sin materia"} · v{plantilla.version}
               </option>
             ))}
           </select>
         </label>
       </div>
 
-      {plantillas.isLoading ? (
+      {plantillas.isError ? (
+        <div className="mt-4">
+          <ConfigurationLoadError
+            title="No se han podido cargar las plantillas con Capa 3."
+            onRetry={() => void plantillas.refetch()}
+            retrying={plantillas.isFetching}
+          />
+        </div>
+      ) : null}
+
+      {!plantillas.isError && plantillas.isLoading ? (
         <p className="mt-4 text-sm text-[var(--g-text-secondary)]">Cargando plantillas activas...</p>
       ) : null}
 
-      {!plantillas.isLoading && activeTemplates.length === 0 ? (
+      {!plantillas.isError && !plantillas.isLoading && activeTemplates.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--g-text-secondary)]">
           No hay plantillas activas con campos Capa 3 para configurar.
         </p>
       ) : null}
 
-      {selected && overrides.isLoading ? (
-        <p className="mt-4 text-sm text-[var(--g-text-secondary)]">Cargando overrides...</p>
+      {selected && overrides.isError ? (
+        <div className="mt-4">
+          <ConfigurationLoadError
+            title="No se han podido cargar los ajustes de Capa 3."
+            onRetry={() => void overrides.refetch()}
+            retrying={overrides.isFetching}
+          />
+        </div>
       ) : null}
 
-      {selected && !overrides.isLoading ? (
+      {selected && !overrides.isError && overrides.isLoading ? (
+        <p className="mt-4 text-sm text-[var(--g-text-secondary)]">Cargando ajustes...</p>
+      ) : null}
+
+      {selected && !overrides.isError && !overrides.isLoading ? (
         <div className="mt-5 space-y-3">
           {(selected.capa3_editables ?? []).map((field) => (
             <OverrideFieldRow

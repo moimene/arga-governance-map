@@ -22,6 +22,7 @@ export const ORGANO_CANONICO = [
 export type OrganoCanonico = (typeof ORGANO_CANONICO)[number];
 
 export const ORGANO_ALIAS: Record<string, OrganoCanonico> = {
+  JUNTA: "JUNTA_GENERAL",
   CONSEJO_ADMINISTRACION: "CONSEJO_ADMIN",
   CONSEJO: "CONSEJO_ADMIN",
   ADMIN_CONJUNTA: "ADMIN_CONJUNTA_O_COAPROBADORES",

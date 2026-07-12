@@ -9,7 +9,7 @@ test.describe("Gestor de Plantillas — redirect de tracker legacy", () => {
     await expect(
       page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("tab", { name: "Métricas" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Indicadores de ciclo de vida" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

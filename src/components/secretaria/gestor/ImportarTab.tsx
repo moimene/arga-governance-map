@@ -15,9 +15,9 @@ export function ImportarTab() {
           Importar plantilla
         </h1>
         <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-          Crea un borrador desde un paquete JSON. La activación pasa por Gate
-          PRE estricto; ningún cambio entra en producción sin firma del Comité
-          Legal.
+          Crea un borrador desde un paquete JSON. La activación exige una
+          comprobación documental previa (Gate PRE); ningún cambio queda vigente
+          para nuevos expedientes sin aprobación del Comité Legal.
         </p>
       </header>
       <TemplateImportWizard />

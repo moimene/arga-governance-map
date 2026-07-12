@@ -133,7 +133,7 @@ test.describe('Secretaría — epic user journeys', () => {
     await expect(page.getByText('Socio único (art. 15 LSC)')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Administrador único (art. 210 LSC)')).toBeVisible();
     await expect(page.getByText(/modo unipersonal sea válido/i)).toBeVisible();
-    await expect(page.locator('nav[aria-label="Pasos"]').getByRole('button', { name: /Registro y documento/ })).toBeDisabled();
+    await expect(page.locator('nav[aria-label="Pasos"]').getByRole('button', { name: /Firma y registro/ })).toBeDisabled();
 
     await page.goto('/secretaria/acuerdos-sin-sesion');
     await expect(page.getByRole('heading', { name: 'Acuerdos escritos sin sesión' })).toBeVisible({ timeout: 10_000 });

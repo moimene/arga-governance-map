@@ -70,7 +70,7 @@ export const ScopeSwitcher = forwardRef<HTMLDivElement, ScopeSwitcherProps>(({ s
     }
 
     const params = new URLSearchParams(location.search);
-    params.delete("scope");
+    params.set("scope", "grupo");
     params.delete("entity");
     const pathname = isSociedadEntityPath(location.pathname)
       ? "/secretaria/sociedades"

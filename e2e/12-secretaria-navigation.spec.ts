@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { label: 'Personas, cargos y representantes', path: '/secretaria/personas', heading: 'Personas' },
   { label: 'Board pack', path: '/secretaria/board-pack', heading: 'Board Pack' },
   { label: 'Campañas de grupo', path: '/secretaria/procesos-grupo', heading: 'Campañas de grupo' },
+  { label: 'Materias y reglas', path: '/secretaria/catalogo-materias', heading: 'Materias y reglas' },
   { label: 'Convocatorias', path: '/secretaria/convocatorias', heading: 'Convocatorias' },
   { label: 'Reuniones', path: '/secretaria/reuniones', heading: 'Reuniones' },
   { label: 'Actas', path: '/secretaria/actas', heading: 'Actas y certificaciones vinculadas' },
@@ -84,7 +85,7 @@ test.describe('Secretaría navigation smoke', () => {
 
     await page.getByRole('button', { name: 'Grupo', exact: true }).click();
     await page.locator('[data-sidebar-item="Campañas de grupo"]').first().click();
-    await expect(page).toHaveURL('/secretaria/procesos-grupo');
+    await expect(page).toHaveURL('/secretaria/procesos-grupo?scope=grupo');
     await expect(page.locator('main').getByRole('heading', { name: 'Campañas de grupo', exact: true })).toBeVisible({
       timeout: 10_000,
     });
@@ -109,7 +110,9 @@ test.describe('Secretaría navigation smoke', () => {
       const failuresBeforeRoute = failedSupabaseResponses.length;
       await page.locator(`[data-sidebar-item="${item.label}"]`).first().click();
 
-      await expect(page).toHaveURL(new RegExp(`${item.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+      await expect(page).toHaveURL(
+        new RegExp(`${item.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\?scope=grupo$`),
+      );
       await expect(
         page.locator('main').getByRole('heading', { name: item.heading, exact: true })
       ).toBeVisible({ timeout: 10_000 });

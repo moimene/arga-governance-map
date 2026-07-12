@@ -19,6 +19,7 @@ const baseRow = (overrides: Partial<PlantillaCandidate> = {}): PlantillaCandidat
   estado: "ACTIVA",
   organo_tipo: "JUNTA_GENERAL",
   adoption_mode: "MEETING",
+  tipo_social: null,
   aprobada_por: "X",
   fecha_aprobacion: "2026-01-01",
   referencia_legal: "Art. 160 LSC",
@@ -70,11 +71,58 @@ describe("functional-key", () => {
     expect(matchesFunctionalKey(a, b, "t1")).toBe(true);
   });
 
+  it("colapsa aliases históricos de materia, incluido el art. 308", () => {
+    expect(
+      matchesFunctionalKey(
+        baseRow({ materia: "AMPLIACION_CAPITAL" }),
+        baseRow({ materia: "AUMENTO_CAPITAL" }),
+        "t1",
+      ),
+    ).toBe(true);
+    expect(
+      matchesFunctionalKey(
+        baseRow({ materia: "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE" }),
+        baseRow({ materia: "SUPRESION_PREFERENTE" }),
+        "t1",
+      ),
+    ).toBe(true);
+  });
+
+  it("normaliza aliases de órgano sin mezclar órganos distintos", () => {
+    expect(
+      matchesFunctionalKey(
+        baseRow({ organo_tipo: "CONSEJO_ADMINISTRACION" }),
+        baseRow({ organo_tipo: "CONSEJO_ADMIN" }),
+        "t1",
+      ),
+    ).toBe(true);
+    expect(
+      matchesFunctionalKey(
+        baseRow({ organo_tipo: "CONSEJO_ADMIN" }),
+        baseRow({ organo_tipo: "JUNTA_GENERAL" }),
+        "t1",
+      ),
+    ).toBe(false);
+  });
+
+  it("incluye tipo_social en la identidad y tipa NULL como todos", () => {
+    const all = buildFunctionalKey(baseRow({ tipo_social: null }), "t1");
+    expect(all.tipoSocial).toBeNull();
+    expect(
+      matchesFunctionalKey(
+        baseRow({ tipo_social: null }),
+        baseRow({ tipo_social: "SA" }),
+        "t1",
+      ),
+    ).toBe(false);
+  });
+
   it("CORE_V1_MATERIAS incluye las 14 combinaciones del spec §3", () => {
     const set = new Set(CORE_V1_MATERIAS.map((m) => `${m.organo}|${m.materia}`));
     expect(set.has("JUNTA_GENERAL|APROBACION_CUENTAS")).toBe(true);
     expect(set.has("CONSEJO_ADMIN|DISTRIBUCION_CARGOS")).toBe(true);
-    expect(set.has("ORGANO_ADMIN|FORMULACION_CUENTAS")).toBe(true);
+    expect(set.has("CONSEJO_ADMIN|FORMULACION_CUENTAS")).toBe(true);
+    expect(set.has("ORGANO_ADMIN|FORMULACION_CUENTAS")).toBe(false);
     expect(set.has("CONSEJO_ADMIN|COMITES_INTERNOS")).toBe(true);
   });
 

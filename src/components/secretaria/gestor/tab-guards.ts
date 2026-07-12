@@ -2,13 +2,14 @@
  * RBAC por tab para la consola unificada del Gestor de Plantillas.
  *
  * - READ_ROLES (SECRETARIO / COMPLIANCE / ADMIN_TENANT) tienen acceso a las
- *   tabs de lectura (Dashboard, Catálogo, Cobertura legal, Métricas,
- *   Auditoría).
+ *   tabs de lectura (Salud documental, Catálogo gobernado, Cobertura por
+ *   materia y órgano, Indicadores de ciclo de vida, Auditoría y changelog).
  * - WRITE_ROLES (ADMIN_TENANT) tienen acceso a las tabs que escriben o
- *   ejecutan procesos sensibles (Importar, Validación, Configuración).
+ *   ejecutan procesos sensibles (Importar, Comprobación documental,
+ *   Configuración por sociedad).
  *
  * Si el usuario no tiene rol asignado todavía (carga inicial), `visibleTabs`
- * está vacío y el shell debe redirigir a Dashboard o mostrar fallback.
+ * está vacío y el shell muestra un estado neutro hasta resolver el acceso.
  *
  * Sprint 1 — Task 5.2.
  */
@@ -20,21 +21,33 @@ export type TabId =
   | "dashboard"
   | "catalogo"
   | "cobertura"
-  | "importar"
   | "metricas"
   | "auditoria"
+  | "importar"
   | "validacion"
   | "configuracion";
 
+/** Orden de navegación estable; los ids siguen siendo parte del contrato URL. */
+export const TAB_ORDER: readonly TabId[] = [
+  "dashboard",
+  "catalogo",
+  "cobertura",
+  "metricas",
+  "auditoria",
+  "importar",
+  "validacion",
+  "configuracion",
+];
+
 export const TAB_LABELS: Record<TabId, string> = {
-  dashboard: "Dashboard",
-  catalogo: "Catálogo",
-  cobertura: "Cobertura legal",
+  dashboard: "Salud documental",
+  catalogo: "Catálogo gobernado",
+  cobertura: "Cobertura por materia y órgano",
+  metricas: "Indicadores de ciclo de vida",
+  auditoria: "Auditoría y changelog",
   importar: "Importar",
-  metricas: "Métricas",
-  auditoria: "Auditoría",
-  validacion: "Validación",
-  configuracion: "Configuración",
+  validacion: "Comprobación documental",
+  configuracion: "Configuración por sociedad",
 };
 
 const READ_ROLES = ["SECRETARIO", "COMPLIANCE", "ADMIN_TENANT"] as const;
@@ -68,7 +81,7 @@ export function useTabAccess(): UseTabAccessResult {
   const canAccess = (tab: TabId) =>
     TAB_PERMISSIONS[tab].some((r) => roles.includes(r));
 
-  const visibleTabs: TabId[] = (Object.keys(TAB_PERMISSIONS) as TabId[]).filter(canAccess);
+  const visibleTabs: TabId[] = TAB_ORDER.filter(canAccess);
 
   return {
     canAccess,

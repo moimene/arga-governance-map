@@ -23,6 +23,10 @@ describe("organo-canonico", () => {
     expect(normalizeOrganoTipo("CONSEJO")).toBe("CONSEJO_ADMIN");
   });
 
+  it("normaliza JUNTA → JUNTA_GENERAL", () => {
+    expect(normalizeOrganoTipo("JUNTA")).toBe("JUNTA_GENERAL");
+  });
+
   it("normaliza ADMIN_CONJUNTA → ADMIN_CONJUNTA_O_COAPROBADORES", () => {
     expect(normalizeOrganoTipo("ADMIN_CONJUNTA")).toBe("ADMIN_CONJUNTA_O_COAPROBADORES");
   });
@@ -46,9 +50,9 @@ describe("organo-canonico", () => {
     expect(isOrganoCanonico("CONSEJO")).toBe(false);
   });
 
-  it("ORGANO_ALIAS contiene exactamente los 4 aliases acordados", () => {
+  it("ORGANO_ALIAS contiene los aliases legacy acordados", () => {
     expect(Object.keys(ORGANO_ALIAS).sort()).toEqual(
-      ["ADMIN_CONJUNTA", "ADMIN_SOLIDARIO", "CONSEJO", "CONSEJO_ADMINISTRACION"].sort(),
+      ["ADMIN_CONJUNTA", "ADMIN_SOLIDARIO", "CONSEJO", "CONSEJO_ADMINISTRACION", "JUNTA"].sort(),
     );
   });
 

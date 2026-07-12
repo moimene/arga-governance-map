@@ -67,3 +67,47 @@ Restricciones no negociables: tokens Garrigues (nunca Tailwind de color nativo n
 ## Criterios de aceptación globales de la conversación
 
 Un abogado puede: buscar y comparar materias, entender por qué aplica una regla y qué falta; encontrar la plantilla vigente con sus variantes explicadas; y en el Gestor leer la salud en un minuto y trabajar por incidencias — con el MISMO vocabulario, los mismos estados y los mismos colores en las tres pantallas, y viajes entre ellas que conservan contexto. Todo verificado en vivo y con reviews adversariales en verde.
+
+## Cierre global ejecutado — 2026-07-11
+
+**Estado: COMPLETADO en el working tree; sin stage ni commit.** Los registros detallados, datos Cloud, gates y reviews viven en los cinco planes de fase `fase1`, `fase2a`, `fase2b`, `fase2c` y `fase3-exportaciones` de esta misma fecha.
+
+### Decisiones D aplicadas
+
+- Art. 308: alias colapsado solo en presentación, con nota de uso y sin renombrar/borrar filas.
+- `FORMULACION_CUENTAS`: binding activo canónico a la v1.2.0 de Consejo; contenido archivado preservado.
+- `NULL`: semántica contextual `ANY` cuando el documento es transversal; ausencia mostrada como no informada cuando la identidad jurídica sí la exige.
+- Duplicados v1.1.1/ACTA: no se archivaron ni mutaron; se distinguieron por identidad funcional y se señalan equivalencias activas reales.
+- Tabs de Gestor: labels jurídicos nuevos con IDs `?tab=` intactos.
+- ITEM-089 y chip de tildes se integraron sin reintroducir los fallos preexistentes ni el overlay retirado.
+
+### Resultado por workstream
+
+- **A — coherencia transversal:** glosario, labels, tonos, `NULL/ANY`, identidad funcional, incidencias y viajes con contexto unificados.
+- **B — Materias:** búsqueda/filtros URL, tarjetas/tabla, ayudas, explicación de procedencia, notas de uso, variantes reales, checklist documental y gate por naturaleza.
+- **B — Plantillas:** ciclo y tabs accesibles, comparación histórica exacta, acciones honestas por estado, tipo social contextual, aprobación/binding seguros y foco responsive.
+- **B — Gobierno:** tabs/RBAC sin FOUC, salud y cola única, catálogo agrupado, editor tri-capa Legal/Técnica lossless, auditoría diferida y métricas honestas.
+- **C selectivo:** exportación local segura de la matriz visible, changelog filtrado cargado y plantillas vivas sin changelog. Se difirieron métricas/reconstrucciones no sostenibles por los datos.
+
+### Cloud y restricciones
+
+- Únicas escrituras de esta conversación, ambas con target comprobado, migración espejo, Management API autorizada y ledger verificado:
+  - `20260711123000_secretaria_formulacion_cuentas_binding.sql`;
+  - `20260711154500_secretaria_entity_social_type_coherence.sql`.
+- No se usó `db push --linked`, repair ni borrado/renombrado de `materia_catalog` o `plantillas_protegidas`.
+- Fases 2B, 2C y 3 no realizaron mutaciones Cloud.
+
+### Evidencia final consolidada
+
+- Cloud/demo: 110 plantillas (74 activas, 36 archivadas), cobertura core 14/14, 48 materias de presentación, 73 plantillas vivas sin changelog y changelog cargado 1/1.
+- Gates del snapshot final: 2350 pass, 152 skip, 0 fail; typecheck, ESLint, diff-check, scan Garrigues y build limpios.
+- E2E de cierre F3 aislados: 17/17 en `e2e/08` y 14/14 en `e2e/21` tabs+responsive. F2C ya había cerrado el set coordinado 08/12/14/16/17/21/22/24/25 con 57 pass, 1 skip ADMIN esperado y 0 fail.
+- Tres reviews adversariales por fase; el snapshot final quedó sin P0/P1/P2 accionables.
+
+### Memoria duradera
+
+- Exportar desde el mismo read model visible, conservando raw+label y declarando límites; no crear una consulta paralela que pueda divergir.
+- En superficies jurídicas, `loading`, `error`, `empty` y `data` son estados distintos: un fallo jamás equivale a cero.
+- `plantilla_changelog.created_at` admite `NULL`; no inventar 1970 y usar fecha civil local de forma coherente con la UI.
+- Ejecutar E2E Cloud de Secretaría aislados de la suite unitaria completa para evitar saturación transitoria de lecturas y falsos estados de carga.
+- Ruflo permitió leer/buscar la memoria, pero sus tres escrituras de cierre fallaron con `database disk image is malformed`; no se intentó repair. Este bloque y los planes de fase son el fallback versionado y no contienen secretos.

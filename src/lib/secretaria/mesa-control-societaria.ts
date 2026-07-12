@@ -2,7 +2,25 @@ import type { MateriaCatalogRow } from "@/hooks/useMateriaConfig";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import type { RuleParamOverrideRow } from "@/hooks/useRulePacks";
 import { materiaPactoCoincide } from "@/lib/rules-engine/materia-pacto-mapping";
+import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import type { TipoSocial } from "@/lib/secretaria/sociedad-onboarding/types";
+import {
+  MATERIA_CANONICAL_ALIAS as CANONICAL_MATERIA_ALIAS,
+  labelMateria,
+  resolveMateriaAlias as resolveCanonicalMateriaAlias,
+} from "./agenda-materias";
+import {
+  TIPO_LABEL,
+  adoptionModeLabel,
+  hasSpecificTemplateMetadata,
+  isAdoptionMetadataRequired,
+  jurisdictionLabel,
+  organoLabel,
+  templateMetadataPolicy,
+  tipoLabel,
+  tipoSocialLabel,
+} from "./template-admin/labels";
+import { normalizeOrganoTipo } from "./template-admin/organo-canonico";
 
 export type FunctionalMatterGroupId =
   | "GOBIERNO_ORGANOS"
@@ -40,20 +58,31 @@ export interface SourceChipViewModel {
 
 export interface ConflictOfLawsResult {
   conflict_of_laws_flag: boolean;
+  conflict_kind?: "law" | "social_form";
   expectedLawLabel: string;
   appliedLawLabel: string;
   explanation: string;
 }
 
+export interface SocietySocialTypeResolution {
+  value: string | null;
+  conflict: boolean;
+  explanation: string | null;
+}
+
 export interface TemplateReadinessItem {
   stage: TemplateDocumentStage;
-  status: "asignada" | "faltante" | "pendiente_revision" | "activa";
+  status: "asignada" | "faltante" | "pendiente_revision" | "activa" | "no_aplica";
+  criticality: TemplateStageCriticality;
   blocking: boolean;
+  consequence: string;
   actionLabel: string;
 }
 
 export interface TemplateReadinessResult {
   canStartCase: boolean;
+  openingStatus: TemplateOpeningStatus;
+  openingMessage: string;
   blockingMessage: string | null;
   items: TemplateReadinessItem[];
 }
@@ -574,15 +603,10 @@ export const MATTER_GROUP_BY_MATERIA: Record<string, FunctionalMatterGroupId> = 
  * de presentación: las filas de BD no se tocan (los expedientes históricos
  * pueden seguir referenciándolas).
  */
-export const MATERIA_CANONICAL_ALIAS: Record<string, string> = {
-  AMPLIACION_CAPITAL: "AUMENTO_CAPITAL",
-  MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
-  NOMBRAMIENTO_CESE: "NOMBRAMIENTO_CONSEJERO",
-};
+export const MATERIA_CANONICAL_ALIAS = CANONICAL_MATERIA_ALIAS;
 
 export function resolveMateriaAlias(code?: string | null): string {
-  if (!code) return "";
-  return MATERIA_CANONICAL_ALIAS[code] ?? code;
+  return resolveCanonicalMateriaAlias(code);
 }
 
 /**
@@ -595,7 +619,10 @@ export function pactoApplicaAMateria(
   pacto: { materias_aplicables?: string[] | null },
   materia: string,
 ): boolean {
-  return materiaPactoCoincide(materia, pacto.materias_aplicables ?? []);
+  return materiaPactoCoincide(
+    resolveMateriaAlias(materia),
+    (pacto.materias_aplicables ?? []).map(resolveMateriaAlias),
+  );
 }
 
 /** Matching de override ↔ materia tolerante a alias legacy. */
@@ -649,6 +676,20 @@ export const INFORMATIVE_MATTERS: MateriaCatalogRow[] = [
     referencia_legal: "Funciones de supervisión y control interno",
   },
 ];
+
+const INFORMATIVE_MATTER_CODES = new Set(
+  INFORMATIVE_MATTERS.map((matter) => resolveMateriaAlias(matter.materia)),
+);
+
+/**
+ * Naturaleza informativa explícita del catálogo. El grupo funcional agrupa
+ * materias afines para navegación, pero no determina si existe o no acuerdo:
+ * presupuesto, plan de negocio y convocatoria de junta viven en el grupo de
+ * seguimiento y siguen siendo materias decisorias.
+ */
+export function isInformativeMatter(materia?: string | null): boolean {
+  return INFORMATIVE_MATTER_CODES.has(resolveMateriaAlias(materia));
+}
 
 export interface LegalBaseline {
   tipoSocial: TipoSocial;
@@ -737,6 +778,67 @@ function normalizeCode(value?: string | null) {
     .toUpperCase();
 }
 
+function spanishSocialTypeFamily(value?: string | null) {
+  const normalized = normalizeCode(value);
+  if (
+    [
+      "SA",
+      "SAU",
+      "SOCIEDADANONIMA",
+      "SOCIEDADANONIMAUNIPERSONAL",
+      "SOCIEDADANONIMACOTIZADA",
+    ].includes(normalized)
+  ) {
+    return "SA";
+  }
+  if (
+    [
+      "SL",
+      "SLU",
+      "SRL",
+      "SOCIEDADLIMITADA",
+      "SOCIEDADLIMITADAUNIPERSONAL",
+      "SOCIEDADDERESPONSABILIDADLIMITADA",
+    ].includes(normalized)
+  ) {
+    return "SL";
+  }
+  return null;
+}
+
+/**
+ * Resuelve el tipo social que puede consumir el motor sin ocultar conflictos
+ * entre `tipo_social` y `legal_form`. En sociedades españolas, dos familias
+ * incompatibles dejan el valor sin resolver: escoger una por precedencia haría
+ * que la UI declarase aplicable una rama distinta de la forma jurídica visible.
+ */
+export function resolveSocietySocialTypeForRules(input: {
+  jurisdiction?: string | null;
+  tipoSocial?: string | null;
+  legalForm?: string | null;
+}): SocietySocialTypeResolution {
+  const jurisdiction = normalizeCode(input.jurisdiction) || "ES";
+  const tipoFamily = spanishSocialTypeFamily(input.tipoSocial);
+  const legalFamily = spanishSocialTypeFamily(input.legalForm);
+  if (jurisdiction === "ES" && tipoFamily && legalFamily && tipoFamily !== legalFamily) {
+    return {
+      value: null,
+      conflict: true,
+      explanation:
+        `El tipo social (${input.tipoSocial}) y la forma jurídica (${input.legalForm}) pertenecen a familias distintas. ` +
+        "Debe corregirse la ficha societaria antes de resolver la rama S.A. o S.L.",
+    };
+  }
+  return {
+    value:
+      jurisdiction === "ES"
+        ? input.tipoSocial ?? input.legalForm ?? null
+        : input.legalForm ?? input.tipoSocial ?? null,
+    conflict: false,
+    explanation: null,
+  };
+}
+
 export function displaySocietyLegalForm(input: {
   jurisdiction?: string | null;
   tipoSocial?: string | null;
@@ -776,13 +878,18 @@ export function detectConflictOfLaws(input: {
   const displayedForm = displaySocietyLegalForm(input);
   const normalizedTipo = normalizeCode(input.tipoSocial);
   const normalizedLegal = normalizeCode(input.legalForm);
+  const socialTypeResolution = resolveSocietySocialTypeForRules(input);
   const spanishFormOnForeignEntity = jurisdiction !== "ES" && ES_FORMS.has(normalizedTipo) && normalizedLegal && normalizedLegal !== normalizedTipo;
-  const conflict = (jurisdiction !== "ES" && appliedMentionsLsc) || spanishFormOnForeignEntity;
+  const lawConflict = (jurisdiction !== "ES" && appliedMentionsLsc) || spanishFormOnForeignEntity;
+  const conflict = lawConflict || socialTypeResolution.conflict;
   return {
     conflict_of_laws_flag: conflict,
+    conflict_kind: socialTypeResolution.conflict ? "social_form" : lawConflict ? "law" : undefined,
     expectedLawLabel,
     appliedLawLabel: appliedMentionsLsc ? "Ley de Sociedades de Capital española" : expectedLawLabel,
-    explanation: conflict
+    explanation: socialTypeResolution.conflict
+      ? socialTypeResolution.explanation!
+      : lawConflict
       ? `La sociedad figura como ${displayedForm}/${jurisdiction}, pero alguna fuente aplicada remite a un marco distinto. Debe justificarse la ley aplicable antes de publicar el marco normativo.`
       : `La forma social ${displayedForm} es coherente con ${expectedLawLabel}.`,
   };
@@ -880,13 +987,13 @@ export function validateNormativeOverrideDraft(input: NormativeOverrideDraftLike
 }
 
 export function getMateriaFunctionalGroup(materia: string | null | undefined): FunctionalMatterGroup {
-  const id = materia ? MATTER_GROUP_BY_MATERIA[materia] : undefined;
+  const canonicalMateria = resolveMateriaAlias(materia);
+  const id = canonicalMateria ? MATTER_GROUP_BY_MATERIA[canonicalMateria] : undefined;
   return FUNCTIONAL_MATTER_GROUPS.find((group) => group.id === id) ?? FUNCTIONAL_MATTER_GROUPS[0];
 }
 
 export function matterComplexityLabel(row: Pick<MateriaCatalogRow, "materia" | "matter_class">) {
-  const group = getMateriaFunctionalGroup(row.materia);
-  if (group.complexity === "informativa") return "Informativa";
+  if (isInformativeMatter(row.materia)) return "Informativa";
   if (row.matter_class === "ESTRUCTURAL") return "Estructural";
   if (row.matter_class === "ESTATUTARIA") return "Reforzada";
   if (row.matter_class === "ESPECIAL") return "Especial";
@@ -914,7 +1021,7 @@ export function competentBodyLabel(materia: string, tipoSocial?: string | null) 
 }
 
 export function quorumLabel(row: MateriaCatalogRow, tipoSocial?: string | null) {
-  if (getMateriaFunctionalGroup(row.materia).complexity === "informativa") return "No aplica como requisito de votación";
+  if (isInformativeMatter(row.materia)) return "No aplica como requisito de votación";
   if (tipoSocial === "SAU" || tipoSocial === "SLU") return "Socio único";
   if (row.matter_class === "ESTATUTARIA" || row.matter_class === "ESTRUCTURAL") {
     return "Quórum reforzado o estatutario si resulta exigible";
@@ -929,12 +1036,12 @@ export function documentRequirements(row: MateriaCatalogRow) {
   if (row.requires_notary) docs.push("Escritura pública");
   if (row.requires_registry || row.inscribable) docs.push("Certificación para Registro Mercantil");
   if (row.publication_required) docs.push("Publicación legal cuando proceda");
-  if (getMateriaFunctionalGroup(row.materia).complexity === "informativa") return ["Constancia en acta"];
+  if (isInformativeMatter(row.materia)) return ["Constancia en acta"];
   return docs;
 }
 
 export function formalizationLabel(row: MateriaCatalogRow) {
-  if (getMateriaFunctionalGroup(row.materia).complexity === "informativa") {
+  if (isInformativeMatter(row.materia)) {
     return "Constancia documental en acta, sin expediente registral propio";
   }
   if (row.requires_notary && row.requires_registry) return "Elevación a público e inscripción registral";
@@ -945,7 +1052,7 @@ export function formalizationLabel(row: MateriaCatalogRow) {
 
 export function plazoLabel(row: MateriaCatalogRow) {
   if (row.plazo_inscripcion_dias) return `${row.plazo_inscripcion_dias} días para tramitación registral`;
-  if (getMateriaFunctionalGroup(row.materia).complexity === "informativa") return "Sin plazo registral propio";
+  if (isInformativeMatter(row.materia)) return "Sin plazo registral propio";
   return "Sin plazo específico configurado";
 }
 
@@ -963,7 +1070,10 @@ export function buildMateriaCatalogRows(rows: MateriaCatalogRow[]) {
       byMateria.set(canonical, { ...aliasRow, materia: canonical });
     }
   }
-  return Array.from(byMateria.values()).sort((a, b) => {
+  return Array.from(byMateria.values()).map((row) => ({
+    ...row,
+    materia_label_es: labelMateria(row.materia, row.materia_label_es),
+  })).sort((a, b) => {
     const groupA = getMateriaFunctionalGroup(a.materia).title;
     const groupB = getMateriaFunctionalGroup(b.materia).title;
     return groupA.localeCompare(groupB) || a.materia_label_es.localeCompare(b.materia_label_es);
@@ -1052,6 +1162,36 @@ export type TemplateDocumentStage =
   | "Certificación"
   | "Post-acuerdo";
 
+export type TemplateOpeningStatus = "ready" | "blocked" | "not_applicable";
+
+export type TemplateStageCriticality = "apertura" | "soporte" | "cierre" | "no_aplica";
+
+export interface TemplateReadinessFormalization {
+  requiresNotary?: boolean;
+  requiresRegistry?: boolean;
+  inscribable?: boolean;
+}
+
+export interface TemplateReadinessPolicy {
+  /**
+   * La fila completa permite decidir si la certificación es requisito de
+   * apertura. Con solo el código se reconoce la naturaleza informativa, pero
+   * se conserva la política estricta para una formalización desconocida.
+   */
+  materia?:
+    | string
+    | Pick<
+        MateriaCatalogRow,
+        "materia" | "requires_notary" | "requires_registry" | "inscribable"
+      >
+    | null;
+  informativa?: boolean;
+  /** Motivo jurídico por el que la materia no aplica a la sociedad seleccionada. */
+  notApplicableReason?: string | null;
+  /** Formalización efectiva del rule pack; prevalece sobre el mínimo de catálogo. */
+  formalization?: TemplateReadinessFormalization | null;
+}
+
 export interface TemplateDocumentBinding {
   stage: TemplateDocumentStage;
   template: PlantillaProtegidaRow;
@@ -1094,6 +1234,48 @@ export const MINIMUM_TEMPLATE_STAGES: TemplateDocumentStage[] = [
   "Certificación",
 ];
 
+function templateStageCriticality(
+  stage: TemplateDocumentStage,
+  input: {
+    informativa: boolean;
+    certificationRequiredAtOpening: boolean;
+  },
+): TemplateStageCriticality {
+  if (input.informativa) return stage === "Acta" ? "cierre" : "no_aplica";
+  if (stage === "Modelo de acuerdo" || stage === "Acta") return "apertura";
+  if (stage === "Certificación") {
+    return input.certificationRequiredAtOpening ? "apertura" : "cierre";
+  }
+  if (stage === "Post-acuerdo") return "cierre";
+  return "soporte";
+}
+
+function templateStageConsequence(
+  stage: TemplateDocumentStage,
+  criticality: TemplateStageCriticality,
+  status: TemplateReadinessItem["status"],
+) {
+  if (criticality === "no_aplica") {
+    return "No aplica a esta materia informativa; no forma parte de un expediente decisorio.";
+  }
+  if (criticality === "apertura") {
+    if (status === "activa") return "La fase está disponible y permite abrir el expediente.";
+    if (status === "pendiente_revision") {
+      return "La plantilla candidata no habilita la apertura hasta quedar activa.";
+    }
+    return `Sin plantilla activa de ${stage.toLowerCase()} no puede abrirse el expediente.`;
+  }
+  if (criticality === "cierre") {
+    if (status === "activa") return "La fase está disponible para completar el cierre documental.";
+    if (stage === "Acta") {
+      return "No bloquea la apertura; debe dejarse constancia en acta antes del cierre.";
+    }
+    return "No bloquea la apertura; debe resolverse antes del cierre o la formalización.";
+  }
+  if (status === "activa") return "La plantilla está disponible como soporte del expediente.";
+  return "No bloquea la apertura; se incorporará como soporte cuando resulte exigible.";
+}
+
 function templateStage(template: PlantillaProtegidaRow): TemplateDocumentStage {
   return TEMPLATE_STAGE_BY_TYPE[template.tipo] ?? "Post-acuerdo";
 }
@@ -1107,7 +1289,144 @@ function templateStatusLabel(template: PlantillaProtegidaRow) {
 
 function hasTemplateMatterMatch(template: PlantillaProtegidaRow, materia: string) {
   const templateMatter = template.materia_acuerdo ?? template.materia;
-  return !templateMatter || templateMatter === materia;
+  return Boolean(
+    templateMatter &&
+      rulePackMateriaMatches(
+        resolveMateriaAlias(templateMatter),
+        resolveMateriaAlias(materia),
+      ),
+  );
+}
+
+type TemplateBindingCriterion = string | string[] | null | undefined;
+
+function criterionValues(value: TemplateBindingCriterion): string[] {
+  return (Array.isArray(value) ? value : [value])
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+}
+
+function normalizeOrganoCriterion(value?: string | null): string {
+  return normalizeOrganoTipo(value) ?? String(value ?? "").trim().toUpperCase();
+}
+
+const COMPOSITE_ORGANO_MATCHES: Record<string, string[]> = {
+  JUNTA_GENERAL_O_CONSEJO: ["JUNTA_GENERAL", "CONSEJO_ADMIN"],
+  ADMIN_CONJUNTA_O_COAPROBADORES: [
+    "ADMIN_CONJUNTA_O_COAPROBADORES",
+    "ADMIN_SOLIDARIOS",
+    "CO_APROBADORES",
+  ],
+};
+
+const TRANSVERSAL_NON_ADOPTABLE_ORGANS = new Set([
+  "DERIVADO_DEL_ACTO",
+  "SOPORTE_INTERNO",
+  "ORGANO_ADMIN",
+]);
+
+const ADMINISTRATION_ORGANS = new Set([
+  "CONSEJO_ADMIN",
+  "ADMIN_UNICO",
+  "ADMIN_CONJUNTA_O_COAPROBADORES",
+  "ADMIN_SOLIDARIOS",
+  "COMISION_DELEGADA",
+]);
+
+const ADMIN_ORIGIN_PROCESS_TYPES = new Set([
+  "CONVOCATORIA",
+  "CONVOCATORIA_SL_NOTIFICACION",
+]);
+
+function organoCriterionMatches(
+  template: PlantillaProtegidaRow,
+  criterion: TemplateBindingCriterion,
+): boolean {
+  const requested = criterionValues(criterion).map(normalizeOrganoCriterion);
+  if (requested.length === 0) return true;
+
+  // La ausencia de órgano nunca equivale a una plantilla transversal/ANY.
+  const templateOrgano = normalizeOrganoCriterion(template.organo_tipo);
+  if (!templateOrgano) return false;
+
+  // Certificaciones e informes de soporte son derivados transversales: el
+  // órgano del acuerdo no debe expulsarlos del checklist. El mismo metadato en
+  // un documento que sí adopta el acuerdo (p. ej. ACTA_SESION) conserva el
+  // matching estricto de abajo.
+  if (
+    TRANSVERSAL_NON_ADOPTABLE_ORGANS.has(templateOrgano) &&
+    !isAdoptionMetadataRequired(template.tipo)
+  ) {
+    return true;
+  }
+
+  if (templateOrgano === "ORGANO_ADMIN") {
+    // La convocatoria la emite el órgano de administración aunque la materia
+    // vaya a ser adoptada por la Junta. Para los demás documentos adoptables,
+    // ORGANO_ADMIN solo agrega las formas reales de administración.
+    if (ADMIN_ORIGIN_PROCESS_TYPES.has(normalizeCode(template.tipo))) {
+      return requested.includes("JUNTA_GENERAL");
+    }
+    if (requested.some((organo) => ADMINISTRATION_ORGANS.has(organo))) return true;
+  }
+
+  return requested.some(
+    (organo) =>
+      organo === templateOrgano ||
+      COMPOSITE_ORGANO_MATCHES[templateOrgano]?.includes(organo) ||
+      COMPOSITE_ORGANO_MATCHES[organo]?.includes(templateOrgano),
+  );
+}
+
+function adoptionCriterionMatches(
+  template: PlantillaProtegidaRow,
+  criterion: TemplateBindingCriterion,
+): boolean {
+  const requested = criterionValues(criterion).map(normalizeCode);
+  if (requested.length === 0) return true;
+
+  const templateMode = normalizeCode(template.adoption_mode);
+  if (!templateMode) {
+    // NULL solo significa «no aplica» en documentos que no adoptan acuerdos.
+    return !isAdoptionMetadataRequired(template.tipo);
+  }
+  // ANY es válido en bindings gobernados, pero no sustituye el metadato
+  // específico exigido a una fila de plantilla.
+  return requested.includes(templateMode);
+}
+
+function tipoSocialCriterionMatches(
+  template: PlantillaProtegidaRow,
+  criterion?: string | null,
+): boolean {
+  const requested = normalizeCode(criterion);
+  if (!requested || requested === "ANY") return true;
+
+  // Contrato confirmado: NULL/ausente equivale a Todos, igual que ANY.
+  const templateTipoSocial = normalizeCode(template.tipo_social);
+  if (!templateTipoSocial || templateTipoSocial === "ANY") return true;
+  const canonical = (value: string) => (value === "SRL" ? "SL" : value);
+  return canonical(templateTipoSocial) === canonical(requested);
+}
+
+function templateMetadataComplete(template: PlantillaProtegidaRow): boolean {
+  const policy = templateMetadataPolicy(template.tipo);
+  const matterComplete =
+    template.tipo !== "MODELO_ACUERDO" ||
+    Boolean(template.materia_acuerdo ?? template.materia);
+  const organoComplete =
+    !policy.organoRequired || hasSpecificTemplateMetadata(template.organo_tipo);
+  const adoptionComplete =
+    !policy.adoptionModeRequired ||
+    hasSpecificTemplateMetadata(template.adoption_mode);
+
+  return Boolean(
+    template.tipo &&
+      template.jurisdiccion &&
+      matterComplete &&
+      organoComplete &&
+      adoptionComplete,
+  );
 }
 
 export function buildTemplateDocumentBindings(
@@ -1116,24 +1435,43 @@ export function buildTemplateDocumentBindings(
     materia: string;
     jurisdiction?: string | null;
     tipoSocial?: string | null;
-    organoTipo?: string | null;
-    formaAdopcion?: string | null;
+    organoTipo?: string | string[] | null;
+    formaAdopcion?: string | string[] | null;
   },
 ): TemplateDocumentBinding[] {
   return plantillas
     .filter((template) => template.estado !== "ARCHIVADA")
     .filter((template) => hasTemplateMatterMatch(template, criteria.materia) || template.tipo !== "MODELO_ACUERDO")
-    .filter((template) => !criteria.jurisdiction || !template.jurisdiccion || template.jurisdiccion === criteria.jurisdiction || template.jurisdiccion === "GLOBAL")
+    .filter((template) =>
+      !criteria.jurisdiction ||
+      !template.jurisdiccion ||
+      normalizeCode(template.jurisdiccion) === normalizeCode(criteria.jurisdiction) ||
+      normalizeCode(template.jurisdiccion) === "GLOBAL",
+    )
+    .filter((template) => organoCriterionMatches(template, criteria.organoTipo))
+    .filter((template) => adoptionCriterionMatches(template, criteria.formaAdopcion))
+    .filter((template) => tipoSocialCriterionMatches(template, criteria.tipoSocial))
     .map((template) => {
-      const metadataComplete = Boolean(template.tipo && template.jurisdiccion && (template.tipo !== "MODELO_ACUERDO" || (template.materia_acuerdo ?? template.materia)));
+      const metadataComplete = templateMetadataComplete(template);
       const automaticVariablesValid = (template.capa2_variables ?? []).every((variable) => Boolean(variable.variable && variable.fuente));
       const editableFieldsPending = (template.capa3_editables ?? []).filter((field) => field.obligatoriedad === "OBLIGATORIO" || field.requerido).length;
       const reasons = [
         `fase ${templateStage(template).toLowerCase()}`,
         criteria.jurisdiction && template.jurisdiccion === criteria.jurisdiction ? "jurisdicción exacta" : null,
         hasTemplateMatterMatch(template, criteria.materia) ? "materia compatible" : "transversal",
-        template.organo_tipo ? "órgano informado" : null,
-        template.adoption_mode ? "forma de adopción informada" : null,
+        criterionValues(criteria.organoTipo).length > 0 ? "órgano compatible" : template.organo_tipo ? "órgano informado" : null,
+        criterionValues(criteria.formaAdopcion).length > 0
+          ? isAdoptionMetadataRequired(template.tipo)
+            ? "forma de adopción compatible"
+            : "forma de adopción no aplicable"
+          : template.adoption_mode
+            ? "forma de adopción informada"
+            : null,
+        criteria.tipoSocial
+          ? template.tipo_social
+            ? "tipo social compatible"
+            : "todos los tipos sociales"
+          : null,
       ].filter(Boolean);
       return {
         stage: templateStage(template),
@@ -1153,29 +1491,94 @@ export function buildTemplateDocumentBindings(
     );
 }
 
-export function evaluateTemplateReadiness(bindings: TemplateDocumentBinding[]): TemplateReadinessResult {
+export function evaluateTemplateReadiness(
+  bindings: TemplateDocumentBinding[],
+  policy?: TemplateReadinessPolicy,
+): TemplateReadinessResult {
+  const matterRow =
+    policy?.materia && typeof policy.materia !== "string" ? policy.materia : null;
+  const matterCode =
+    typeof policy?.materia === "string" ? policy.materia : matterRow?.materia;
+  const informativa =
+    policy?.informativa ??
+    isInformativeMatter(matterCode);
+  const notApplicableReason = policy?.notApplicableReason?.trim() || null;
+  const openingNotApplicable = informativa || Boolean(notApplicableReason);
+  const formalization = policy?.formalization;
+  const hasExplicitFormalization = Boolean(
+    formalization ||
+      (matterRow &&
+        [matterRow.requires_notary, matterRow.requires_registry, matterRow.inscribable].some(
+          (value) => typeof value === "boolean",
+        )),
+  );
+  const certificationRequiredAtOpening = hasExplicitFormalization
+    ? Boolean(
+        formalization?.requiresNotary ?? matterRow?.requires_notary ?? false,
+      ) ||
+      Boolean(
+        formalization?.requiresRegistry ?? matterRow?.requires_registry ?? false,
+      ) ||
+      Boolean(formalization?.inscribable ?? matterRow?.inscribable ?? false)
+    : true;
+
   const items = TEMPLATE_DOCUMENT_STAGES.map((stage): TemplateReadinessItem => {
     const stageBindings = bindings.filter((binding) => binding.stage === stage);
     const active = stageBindings.some((binding) => binding.template.estado === "ACTIVA");
-    const pending = stageBindings.some((binding) => binding.template.estado === "REVISADA" || binding.template.estado === "APROBADA");
-    const status: TemplateReadinessItem["status"] = active
-      ? "activa"
-      : stageBindings.length > 0 || pending
-        ? "pendiente_revision"
-        : "faltante";
+    const criticality = notApplicableReason
+      ? "no_aplica"
+      : templateStageCriticality(stage, {
+          informativa,
+          certificationRequiredAtOpening,
+        });
+    const status: TemplateReadinessItem["status"] = criticality === "no_aplica"
+      ? "no_aplica"
+      : active
+        ? "activa"
+        : stageBindings.length > 0
+          ? "pendiente_revision"
+          : "faltante";
+    const blocking = criticality === "apertura" && status !== "activa";
     return {
       stage,
       status,
-      blocking: MINIMUM_TEMPLATE_STAGES.includes(stage) && status === "faltante",
-      actionLabel: status === "faltante" ? "Asignar plantilla" : status === "pendiente_revision" ? "Revisar plantilla" : "Vista previa del documento",
+      criticality,
+      blocking,
+      consequence:
+        criticality === "no_aplica" && notApplicableReason
+          ? notApplicableReason
+          : templateStageConsequence(stage, criticality, status),
+      actionLabel: status === "no_aplica"
+        ? "No requiere acción"
+        : status === "faltante"
+          ? "Asignar plantilla"
+          : status === "pendiente_revision"
+            ? "Revisar plantilla"
+            : "Vista previa del documento",
     };
   });
-  const missing = items.filter((item) => item.blocking).map((item) => item.stage.toLowerCase());
+  if (openingNotApplicable) {
+    return {
+      canStartCase: false,
+      openingStatus: "not_applicable",
+      openingMessage:
+        notApplicableReason ?? "No aplica abrir expediente · dejar constancia en acta.",
+      blockingMessage: null,
+      items,
+    };
+  }
+  const missing = items
+    .filter((item) => item.blocking)
+    .map((item) => item.stage.toLowerCase());
+  const openingStatus: TemplateOpeningStatus = missing.length > 0 ? "blocked" : "ready";
+  const blockingMessage = missing.length > 0
+    ? `No se puede iniciar expediente porque falta plantilla activa de ${missing.join(", ")}.`
+    : null;
   return {
-    canStartCase: missing.length === 0,
-    blockingMessage: missing.length > 0
-      ? `No se puede iniciar expediente porque falta plantilla de ${missing.join(", ")}.`
-      : null,
+    canStartCase: openingStatus === "ready",
+    openingStatus,
+    openingMessage: blockingMessage ?? "Documentación de apertura lista.",
+    blockingMessage,
     items,
   };
 }
@@ -1198,6 +1601,11 @@ export function evaluateMateriaGlobalStatus(input: {
   templateReadiness: TemplateReadinessResult;
   conflictOfLaws?: ConflictOfLawsResult | null;
   legalReference?: string | null;
+  /** Existe al menos una versión activa del rule pack aplicable. */
+  ruleVersionAvailable?: boolean;
+  /** Conflictos o activaciones equivalentes detectados al resolver la regla. */
+  ruleWarnings?: string[];
+  notApplicableReason?: string | null;
   applicablePactosCount?: number;
   /**
    * Materias de seguimiento/información: el dominio ya las trata como
@@ -1206,6 +1614,14 @@ export function evaluateMateriaGlobalStatus(input: {
    */
   informativa?: boolean;
 }): MateriaGlobalStatusResult {
+  if (input.notApplicableReason) {
+    return {
+      status: "lista",
+      label: "No aplica a esta sociedad",
+      explanation: input.notApplicableReason,
+      ctaLabel: "Ver regla aplicable",
+    };
+  }
   if (!input.templateReadiness.canStartCase && !input.informativa) {
     return {
       status: "bloqueada",
@@ -1216,11 +1632,22 @@ export function evaluateMateriaGlobalStatus(input: {
       ctaLabel: "Resolver bloqueo",
     };
   }
+  if (input.ruleVersionAvailable === false && !input.informativa) {
+    return {
+      status: "revision_legal",
+      label: "Requiere revisión legal",
+      explanation:
+        "Falta regla versionada activa para esta materia; debe publicarse o vincularse antes de tramitar.",
+      ctaLabel: "Revisar fuentes",
+    };
+  }
   if (input.conflictOfLaws?.conflict_of_laws_flag) {
     return {
       status: "revision_legal",
       label: "Requiere revisión legal",
-      explanation: "Hay un posible conflicto de ley aplicable que debe justificarse antes de tramitar.",
+      explanation:
+        input.conflictOfLaws.explanation ||
+        "Hay un posible conflicto de ley aplicable que debe justificarse antes de tramitar.",
       ctaLabel: "Revisar fuentes",
     };
   }
@@ -1229,6 +1656,21 @@ export function evaluateMateriaGlobalStatus(input: {
       status: "revision_legal",
       label: "Requiere revisión legal",
       explanation: "La referencia legal de esta materia está pendiente de completar.",
+      ctaLabel: "Revisar fuentes",
+    };
+  }
+  const ruleWarnings = (input.ruleWarnings ?? []).filter(Boolean);
+  if (
+    ruleWarnings.some(
+      (warning) =>
+        warning.startsWith("Conflicto de órgano:") ||
+        warning.startsWith("No se puede determinar la aplicabilidad"),
+    )
+  ) {
+    return {
+      status: "revision_legal",
+      label: "Requiere revisión legal",
+      explanation: ruleWarnings.join(" "),
       ctaLabel: "Revisar fuentes",
     };
   }
@@ -1241,12 +1683,20 @@ export function evaluateMateriaGlobalStatus(input: {
       ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar expediente",
     };
   }
+  if (ruleWarnings.length > 0) {
+    return {
+      status: "advertencia",
+      label: "Advertencia no bloqueante",
+      explanation: ruleWarnings.join(" "),
+      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar expediente",
+    };
+  }
   if (input.informativa) {
     return {
       status: "lista",
-      label: "Materia informativa",
+      label: "Solo constancia",
       explanation:
-        "Se documenta mediante constancia en acta; no exige las plantillas mínimas de expediente.",
+        "No aplica abrir expediente decisorio; dejar constancia en acta.",
       ctaLabel: "Ver regla aplicable",
     };
   }
@@ -1258,24 +1708,10 @@ export function evaluateMateriaGlobalStatus(input: {
   };
 }
 
-export const DOCUMENT_TYPE_LABEL: Record<string, string> = {
-  INFORME_PRECEPTIVO: "Informe preceptivo",
-  INFORME_DOCUMENTAL_PRE: "Expediente previo",
-  CONVOCATORIA: "Convocatoria",
-  CONVOCATORIA_SL_NOTIFICACION: "Notificación individual",
-  MODELO_ACUERDO: "Modelo de acuerdo",
-  ACTA_SESION: "Acta de sesión",
-  ACTA_ACUERDO_ESCRITO: "Acta de acuerdo escrito",
-  ACTA_CONSIGNACION: "Acta de consignación",
-  ACTA_DECISION_CONJUNTA: "Acta de decisión conjunta",
-  ACTA_ORGANO_ADMIN: "Acta de órgano de administración",
-  CERTIFICACION: "Certificación",
-  DOCUMENTO_REGISTRAL: "Documento registral",
-  SUBSANACION_REGISTRAL: "Subsanación registral",
-};
+export const DOCUMENT_TYPE_LABEL = TIPO_LABEL;
 
 export function documentTypeLabel(tipo: string) {
-  return DOCUMENT_TYPE_LABEL[tipo] ?? tipo;
+  return tipoLabel(tipo);
 }
 
 /** Comparación numérica por segmentos ("1.10.0" > "1.9.0"), tolerante a prefijo "v". */
@@ -1305,13 +1741,15 @@ export function compareTemplateVersions(
  * (caso real: acta de consignación de socio único vs de administrador único).
  */
 function templateFunctionalIdentity(template: PlantillaProtegidaRow) {
+  const normalizeIdentityCode = (value?: string | null) =>
+    String(value ?? "").trim().toUpperCase();
   return [
-    template.tipo,
-    template.materia_acuerdo ?? template.materia ?? "",
-    template.organo_tipo ?? "",
-    template.adoption_mode ?? "",
-    template.jurisdiccion ?? "",
-    template.tipo_social ?? "",
+    normalizeIdentityCode(template.tipo),
+    resolveMateriaAlias(template.materia_acuerdo ?? template.materia),
+    normalizeOrganoTipo(template.organo_tipo) ?? normalizeIdentityCode(template.organo_tipo),
+    normalizeIdentityCode(template.adoption_mode),
+    normalizeIdentityCode(template.jurisdiccion),
+    normalizeIdentityCode(template.tipo_social),
   ].join("|");
 }
 
@@ -1359,16 +1797,13 @@ export function groupStageBindingsForDisplay(
 }
 
 /**
- * Duplicidades que el usuario puede percibir en la fase (informe UX §4/§12):
- * (a) duplicados de DATOS — misma identidad funcional y misma versión — y
- * (b) duplicidades VISIBLES — plantillas vigentes distintas cuya etiqueta
- * final (tipo · versión · discriminador) resulta idéntica, de modo que el
- * abogado no puede distinguirlas aunque difieran en metadatos ocultos.
+ * Duplicados de DATOS: misma identidad funcional completa y misma versión.
+ * Las variantes por órgano, forma de adopción, jurisdicción o tipo social son
+ * piezas legítimas y no deben sanearse como duplicados.
  */
 export function detectTemplateDataDuplicates(bindings: TemplateDocumentBinding[]) {
   const groups = groupStageBindingsForDisplay(bindings);
   const results: Array<{ tipo: string; version: string; ids: string[] }> = [];
-  const seen = new Set<string>();
 
   for (const group of groups) {
     if (group.duplicates.length === 0) continue;
@@ -1377,47 +1812,13 @@ export function detectTemplateDataDuplicates(bindings: TemplateDocumentBinding[]
       version: String(group.current.template.version),
       ids: [group.current.template.id, ...group.duplicates.map((binding) => binding.template.id)],
     });
-    seen.add(group.current.template.id);
-  }
-
-  const currents = groups.map((group) => group.current);
-  const byLabel = new Map<string, TemplateDocumentBinding[]>();
-  for (const binding of currents) {
-    const label = templateBindingDisplayLabel(binding, currents);
-    const list = byLabel.get(label) ?? [];
-    list.push(binding);
-    byLabel.set(label, list);
-  }
-  for (const list of byLabel.values()) {
-    if (list.length < 2) continue;
-    if (list.every((binding) => seen.has(binding.template.id))) continue;
-    results.push({
-      tipo: list[0].template.tipo,
-      version: String(list[0].template.version),
-      ids: list.map((binding) => binding.template.id),
-    });
-    for (const binding of list) seen.add(binding.template.id);
   }
 
   return results;
 }
 
 export function organoTipoBusinessLabel(value?: string | null) {
-  const normalized = normalizeCode(value);
-  if (!normalized || normalized === "ANY") return "Cualquier órgano";
-  const labels: Record<string, string> = {
-    JUNTAGENERAL: "Junta General",
-    JUNTA: "Junta General",
-    CONSEJO: "Consejo de Administración",
-    CONSEJOADMIN: "Consejo de Administración",
-    CONSEJOADMINISTRACION: "Consejo de Administración",
-    COMISIONDELEGADA: "Comisión delegada",
-    SOCIOUNICO: "Socio único",
-    ADMINUNICO: "Administrador único",
-    ADMINSOLIDARIO: "Administradores solidarios",
-    ADMINMANCOMUNADO: "Administradores mancomunados",
-  };
-  return labels[normalized] ?? sanitizeBusinessLabel(value);
+  return organoLabel(value);
 }
 
 /**
@@ -1442,12 +1843,14 @@ export function templateBindingDisplayLabel(
   if (ambiguousSiblings.length === 0) return base;
 
   const discriminators: Array<(t: PlantillaProtegidaRow) => string | null> = [
-    (t) => (t.organo_tipo ? organoTipoBusinessLabel(t.organo_tipo) : null),
-    (t) => (t.adoption_mode ? adoptionModeBusinessLabel(t.adoption_mode) : null),
+    (t) => organoTipoBusinessLabel(t.organo_tipo),
+    (t) => adoptionModeLabel(t.adoption_mode, { tipo: t.tipo }),
     (t) => {
       const matter = t.materia_acuerdo ?? t.materia;
-      return matter ? sanitizeBusinessLabel(matter) : null;
+      return matter ? labelMateria(matter) : null;
     },
+    (t) => jurisdictionLabel(t.jurisdiccion),
+    (t) => tipoSocialLabel(t.tipo_social),
   ];
 
   const parts: string[] = [];
@@ -1481,17 +1884,7 @@ export function requirementStateLabel(state: RequirementOperationalState) {
 }
 
 export function adoptionModeBusinessLabel(value?: string | null) {
-  const normalized = normalizeCode(value);
-  const labels: Record<string, string> = {
-    MEETING: "Sesión formal",
-    UNIVERSAL: "Junta universal",
-    NOSESSION: "Acuerdo sin sesión",
-    UNIPERSONALSOCIO: "Decisión de socio único",
-    UNIPERSONALADMIN: "Decisión de administrador único",
-    COAPROBACION: "Decisión mancomunada",
-    SOLIDARIO: "Decisión de administrador solidario",
-  };
-  return labels[normalized] ?? "Sesión formal";
+  return adoptionModeLabel(value);
 }
 
 export function matterClassBusinessLabel(value?: string | null) {

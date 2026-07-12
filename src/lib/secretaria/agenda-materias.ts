@@ -159,8 +159,65 @@ export const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
     "SA cotizada: revisar especialidades LMV (informe a CNMV, autorización de la JGA si supera umbrales).",
 };
 
+/**
+ * Alias históricos que siguen existiendo en datos Cloud. El colapso es solo
+ * de presentación/identidad funcional: nunca implica renombrar ni borrar las
+ * filas de `materia_catalog` o de `plantillas`.
+ */
+export const MATERIA_CANONICAL_ALIAS: Readonly<Record<string, string>> = {
+  AMPLIACION_CAPITAL: "AUMENTO_CAPITAL",
+  MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
+  NOMBRAMIENTO_CESE: "NOMBRAMIENTO_CONSEJERO",
+  EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "SUPRESION_PREFERENTE",
+};
+
+const ART_308_MATERIA = "SUPRESION_PREFERENTE";
+const ART_308_LABEL = "Exclusión o supresión del derecho de preferencia";
+
+const PROCESS_MATERIA_LABELS: Readonly<Record<string, string>> = {
+  ACUERDO_SIN_SESION: "Acuerdo sin sesión",
+  ACTA_COMISION_DELEGADA: "Acta de comisión delegada",
+  ACTAS_ORGANOS_DELEGADOS: "Actas de órganos delegados",
+  ADMIN_SOLIDARIO: "Decisión de administrador solidario",
+  CERTIFICACION_ACUERDOS: "Certificación de acuerdos",
+  CO_APROBACION: "Coaprobación de administradores mancomunados",
+  CONSEJO_ADMIN: "Consejo de Administración",
+  CONVOCATORIA_CDA: "Convocatoria del Consejo de Administración",
+  CONVOCATORIA_COMISION_DELEGADA: "Convocatoria de comisión delegada",
+  CONVOCATORIA_JUNTA: "Convocatoria de Junta General",
+  CONVOCATORIA_PRE: "Comprobación previa de convocatoria",
+  DECISION_ADMIN_UNICO: "Decisión del administrador único",
+  DECISION_SOCIO_UNICO: "Decisión del socio único",
+  EXPEDIENTE_PRE: "Comprobación documental previa",
+  GESTION_SOCIEDAD: "Gestión de la sociedad",
+  JUNTA_GENERAL: "Junta General",
+  NOTIFICACION_CONVOCATORIA_SL: "Notificación individual de convocatoria de S.L.",
+};
+
+function normalizeMateriaCode(value?: string | null): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[.\s/-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function humanizeMateriaCode(value: string): string {
+  if (!value) return "Materia no informada";
+  const words = value.toLowerCase().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function resolveMateriaAlias(materia?: string | null): string {
+  const normalized = normalizeMateriaCode(materia);
+  return MATERIA_CANONICAL_ALIAS[normalized] ?? normalized;
+}
+
 export function isMateriaCompatibleWithOrgano(materia: string, organoTipo: TipoOrgano) {
-  const organos = MATERIA_ORGANOS[materia] ?? ALL_ORGANOS;
+  const organos = MATERIA_ORGANOS[resolveMateriaAlias(materia)] ?? ALL_ORGANOS;
   return organos.includes(organoTipo);
 }
 
@@ -168,8 +225,12 @@ export function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
   return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
 
-export function labelMateria(materia: string) {
-  return AGENDA_MATERIAS.find((m) => m.value === materia)?.label ?? materia;
+export function labelMateria(materia?: string | null, sourceLabel?: string | null) {
+  const canonical = resolveMateriaAlias(materia);
+  if (canonical === ART_308_MATERIA) return ART_308_LABEL;
+  if (PROCESS_MATERIA_LABELS[canonical]) return PROCESS_MATERIA_LABELS[canonical];
+  if (sourceLabel?.trim()) return sourceLabel.trim();
+  return AGENDA_MATERIAS.find((m) => m.value === canonical)?.label ?? humanizeMateriaCode(canonical);
 }
 
 export interface AgendaMateriaGroup {

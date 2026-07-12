@@ -15,7 +15,7 @@ export async function loadAllActiveTemplates(tenantId: string): Promise<Plantill
   const { data, error } = await supabase
     .from("plantillas_protegidas")
     .select(
-      "id, tipo, materia, materia_acuerdo, jurisdiccion, version, estado, organo_tipo, adoption_mode, aprobada_por, fecha_aprobacion, referencia_legal, capa1_inmutable, capa2_variables, capa3_editables",
+      "id, tipo, materia, materia_acuerdo, jurisdiccion, version, estado, organo_tipo, adoption_mode, tipo_social, aprobada_por, fecha_aprobacion, referencia_legal, capa1_inmutable, capa2_variables, capa3_editables",
     )
     .eq("tenant_id", tenantId)
     .eq("estado", "ACTIVA");

@@ -26,6 +26,13 @@ describe('ITEM-113 normalizeMateriaPacto', () => {
     expect(normalizeMateriaPacto('VENTA_ACTIVOS_ESENCIALES')).toEqual(['VENTA_ACTIVOS_ESENCIALES']);
   });
 
+  it('colapsa supresión y exclusión del derecho de preferencia a la clave del pacto', () => {
+    expect(normalizeMateriaPacto('SUPRESION_PREFERENTE')).toEqual(['EXCLUSION_PREFERENTE']);
+    expect(normalizeMateriaPacto('EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE')).toEqual([
+      'EXCLUSION_PREFERENTE',
+    ]);
+  });
+
   it('preserva las materias estructurales puras', () => {
     expect(normalizeMateriaPacto('FUSION')).toEqual(['FUSION']);
     expect(normalizeMateriaPacto('ESCISION')).toEqual(['ESCISION']);
@@ -67,6 +74,17 @@ describe('ITEM-113 materiaPactoCoincide', () => {
 
   it('hace match entre DISOLUCION del pacto y LIQUIDACION operativa', () => {
     expect(materiaPactoCoincide('LIQUIDACION', ['DISOLUCION'])).toBe(true);
+  });
+
+  it('hace match del art. 308 desde la materia canónica y el alias legacy', () => {
+    const materiasCloud = ['EXCLUSION_PREFERENTE'];
+    expect(materiaPactoCoincide('SUPRESION_PREFERENTE', materiasCloud)).toBe(true);
+    expect(
+      materiaPactoCoincide(
+        'EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE',
+        materiasCloud,
+      ),
+    ).toBe(true);
   });
 
   it('OPERACION_ESTRUCTURAL operativa hace match con FUSION del pacto', () => {

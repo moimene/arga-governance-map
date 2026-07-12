@@ -138,11 +138,6 @@ export function useSecretariaScope(): SecretariaScopeController {
 
   const createScopedTo = useCallback(
     (to: string) => {
-      if (mode !== "sociedad") return to;
-
-      const entityId = selectedEntity?.id ?? selectedEntityId;
-      if (!entityId) return to;
-
       // Codex P2 round 11: hash-aware splitting.
       // Antes: `to.split("?")` solo separaba query, dejando `#hash` dentro
       // del pathname → al re-appendar `?params`, el resultado era
@@ -154,8 +149,15 @@ export function useSecretariaScope(): SecretariaScopeController {
       const [pathAndSearch, hash = ""] = to.split("#");
       const [pathname, existingSearch = ""] = pathAndSearch.split("?");
       const params = new URLSearchParams(existingSearch);
-      params.set(SCOPE_PARAM, "sociedad");
-      params.set(ENTITY_PARAM, entityId);
+      if (mode === "grupo") {
+        params.set(SCOPE_PARAM, "grupo");
+        params.delete(ENTITY_PARAM);
+      } else {
+        const entityId = selectedEntity?.id ?? selectedEntityId;
+        if (!entityId) return to;
+        params.set(SCOPE_PARAM, "sociedad");
+        params.set(ENTITY_PARAM, entityId);
+      }
       const search = `?${params.toString()}`;
       const hashSuffix = hash ? `#${hash}` : "";
       return `${pathname}${search}${hashSuffix}`;

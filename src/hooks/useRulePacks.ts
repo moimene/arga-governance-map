@@ -53,6 +53,30 @@ export function useRulePacks() {
 }
 
 /**
+ * Load only the rule parameter overrides for one tenant entity.
+ * Enabled only when both tenantId and entityId are available.
+ * staleTime: 60 seconds
+ */
+export function useRuleParamOverrides(entityId?: string) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["ruleParamOverrides", tenantId ?? "none", entityId ?? "none"],
+    staleTime: 60_000,
+    enabled: !!tenantId && !!entityId,
+    queryFn: async (): Promise<RuleParamOverrideRow[]> => {
+      const { data, error } = await supabase
+        .from("rule_param_overrides")
+        .select("*")
+        .eq("tenant_id", tenantId!)
+        .eq("entity_id", entityId!);
+
+      if (error) throw error;
+      return (data ?? []) as RuleParamOverrideRow[];
+    },
+  });
+}
+
+/**
  * Load active rule pack versions for tenant + parameter overrides for a given entity
  * Returns { packs, overrides }
  * Enabled only when entityId is truthy
