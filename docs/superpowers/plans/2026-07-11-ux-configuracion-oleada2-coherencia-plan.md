@@ -111,3 +111,14 @@ Un abogado puede: buscar y comparar materias, entender por qué aplica una regla
 - `plantilla_changelog.created_at` admite `NULL`; no inventar 1970 y usar fecha civil local de forma coherente con la UI.
 - Ejecutar E2E Cloud de Secretaría aislados de la suite unitaria completa para evitar saturación transitoria de lecturas y falsos estados de carga.
 - Ruflo permitió leer/buscar la memoria, pero sus tres escrituras de cierre fallaron con `database disk image is malformed`; no se intentó repair. Este bloque y los planes de fase son el fallback versionado y no contienen secretos.
+
+## Cierre adicional — Oleada 3A de integridad de activación (2026-07-12)
+
+**Estado: COMPLETADA en código y Cloud; pendiente de confirmación para stage/commit/push.** Evidencia completa en `2026-07-12-ux-configuracion-oleada3a-integridad-activacion-plan.md`.
+
+- La única equivalencia activa real quedó saneada sin borrar ni renombrar filas: v1.0.0 histórica y v1.1.0 canónica activa, con los catorce hashes de contenido intactos.
+- La activación es ahora atómica e idempotente: CAS, locks, predecesora exacta, movimiento de bindings, doble changelog WORM e índice único parcial.
+- La revisión adversarial descubrió y cerró un bypass transversal de autoasignación `ADMIN_TENANT`; `authenticated` conserva solo lectura RBAC y el demo sigue siendo `SECRETARIO`.
+- Cloud final: 110 plantillas, 73 activas, 37 archivadas, cero duplicados funcionales activos, cero bindings activos inválidos y cobertura core 14/14.
+- Gates finales: 2393 pass / 152 skip / 0 fail; build, typecheck, lint, diff y tokens limpios; 50 E2E de producto pass y 1 skip admin esperado en ejecución aislada.
+- Tres reviews finales: cero P0/P1/P2.

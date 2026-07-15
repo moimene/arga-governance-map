@@ -4,6 +4,8 @@ import {
   CORE_V1_MATERIAS_COUNT,
   buildFunctionalKey,
   detectFunctionalDuplicate,
+  findFunctionalDuplicates,
+  normalizeFunctionalSocialType,
   serializeFunctionalKey,
   matchesFunctionalKey,
 } from "../functional-key";
@@ -42,6 +44,24 @@ describe("functional-key", () => {
     expect(k2.materia).toBe("X");
   });
 
+  it("trata materia_acuerdo vacía como ausencia, igual que la clave SQL", () => {
+    const key = buildFunctionalKey(
+      baseRow({ materia: "AUMENTO_CAPITAL", materia_acuerdo: "   " }),
+      "tenant1",
+    );
+
+    expect(key.materia).toBe("AUMENTO_CAPITAL");
+  });
+
+  it("no aplica normalizaciones de presentación que la clave SQL no comparte", () => {
+    const canonical = buildFunctionalKey(baseRow({ materia: "AUMENTO_CAPITAL" }), "tenant1");
+    const humanized = buildFunctionalKey(baseRow({ materia: "ampliación-capital" }), "tenant1");
+
+    expect(canonical.materia).toBe("AUMENTO_CAPITAL");
+    expect(humanized.materia).toBe("AMPLIACIÓN-CAPITAL");
+    expect(serializeFunctionalKey(canonical)).not.toBe(serializeFunctionalKey(humanized));
+  });
+
   it("buildFunctionalKey rellena tenantId del argumento", () => {
     const k = buildFunctionalKey(baseRow(), "tenant42");
     expect(k.tenantId).toBe("tenant42");
@@ -51,6 +71,28 @@ describe("functional-key", () => {
     const k1 = buildFunctionalKey(baseRow(), "t1");
     const k2 = buildFunctionalKey(baseRow(), "t1");
     expect(serializeFunctionalKey(k1)).toBe(serializeFunctionalKey(k2));
+    expect(JSON.parse(serializeFunctionalKey(k1))).toHaveLength(7);
+  });
+
+  it("el separador de identidad no colisiona con pipes de datos libres", () => {
+    const withPipeInType = buildFunctionalKey(baseRow({ tipo: "MODELO|ACUERDO" }), "t1");
+    const withPipeInJurisdiction = buildFunctionalKey(
+      baseRow({ tipo: "MODELO", jurisdiccion: "ACUERDO|ES" }),
+      "t1",
+    );
+
+    expect(serializeFunctionalKey(withPipeInType)).not.toBe(
+      serializeFunctionalKey(withPipeInJurisdiction),
+    );
+  });
+
+  it("recorta espacios ASCII como btrim sin colapsar otros separadores", () => {
+    expect(buildFunctionalKey(baseRow({ materia: "  aumento_capital  " }), "t1").materia).toBe(
+      "AUMENTO_CAPITAL",
+    );
+    expect(buildFunctionalKey(baseRow({ materia: "\taumento_capital\t" }), "t1").materia).toBe(
+      "\tAUMENTO_CAPITAL\t",
+    );
   });
 
   it("matchesFunctionalKey ignora id y otros campos no funcionales", () => {
@@ -105,9 +147,47 @@ describe("functional-key", () => {
     ).toBe(false);
   });
 
-  it("incluye tipo_social en la identidad y tipa NULL como todos", () => {
+  it("aplica btrim ASCII también al órgano y no colapsa tabs que SQL conserva", () => {
+    expect(
+      matchesFunctionalKey(
+        baseRow({ organo_tipo: "  consejo  " }),
+        baseRow({ organo_tipo: "CONSEJO_ADMIN" }),
+        "t1",
+      ),
+    ).toBe(true);
+    expect(buildFunctionalKey(baseRow({ organo_tipo: "\tCONSEJO\t" }), "t1").organoTipo).toBe(
+      "\tCONSEJO\t",
+    );
+    expect(
+      matchesFunctionalKey(
+        baseRow({ organo_tipo: "\tCONSEJO\t" }),
+        baseRow({ organo_tipo: "CONSEJO_ADMIN" }),
+        "t1",
+      ),
+    ).toBe(false);
+  });
+
+  it("normaliza NULL, vacío y ANY como todos los tipos sociales", () => {
     const all = buildFunctionalKey(baseRow({ tipo_social: null }), "t1");
-    expect(all.tipoSocial).toBeNull();
+    expect(all.tipoSocial).toBe("ANY");
+    expect(normalizeFunctionalSocialType("")).toBe("ANY");
+    expect(
+      matchesFunctionalKey(
+        baseRow({ tipo_social: null }),
+        baseRow({ tipo_social: "ANY" }),
+        "t1",
+      ),
+    ).toBe(true);
+    expect(
+      matchesFunctionalKey(
+        baseRow({ tipo_social: "   " }),
+        baseRow({ tipo_social: "any" }),
+        "t1",
+      ),
+    ).toBe(true);
+  });
+
+  it("mantiene las variantes sociales específicas fuera de la identidad ANY", () => {
     expect(
       matchesFunctionalKey(
         baseRow({ tipo_social: null }),
@@ -146,5 +226,20 @@ describe("functional-key", () => {
         states: ["BORRADOR", "REVISADA", "APROBADA", "ACTIVA"],
       }),
     ).toBeNull();
+  });
+
+  it("findFunctionalDuplicates devuelve todas las activas equivalentes", () => {
+    const candidate = baseRow({ id: "candidate", estado: "APROBADA" });
+    const duplicates = [
+      baseRow({ id: "active-a", estado: "ACTIVA", tipo_social: null }),
+      baseRow({ id: "active-b", estado: "ACTIVA", tipo_social: "ANY" }),
+      baseRow({ id: "variant-sa", estado: "ACTIVA", tipo_social: "SA" }),
+    ];
+
+    expect(
+      findFunctionalDuplicates(candidate, duplicates, "t1", { states: ["ACTIVA"] }).map(
+        (row) => row.id,
+      ),
+    ).toEqual(["active-a", "active-b"]);
   });
 });

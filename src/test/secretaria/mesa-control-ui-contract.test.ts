@@ -339,6 +339,33 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(gestor).toContain("No aparece en el catálogo de uso porque no es una fila Cloud gobernada.");
     expect(plantillas).toContain("No se ha encontrado la plantilla solicitada en este ámbito.");
     expect(plantillas).toContain("statusLabel(selectedEntity.status)");
+    for (const surface of [gestor, plantillas]) {
+      expect(surface).toContain("operationId");
+      expect(surface).toContain("expectedFrom");
+      expect(surface).toContain("expectedPredecessorId");
+      expect(surface).toContain(
+        "La plantilla cambió en otra sesión. Estamos actualizando los datos; revisa su estado antes de volver a intentarlo.",
+      );
+      expect(surface).toContain(
+        "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+      );
+      expect(surface).toContain("ACTIVE_BINDINGS_REQUIRE_REPLACEMENT");
+      expect(surface).toContain(
+        "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
+      );
+    }
+    expect(gestor).toContain("actor: transitionActor");
+    expect(gestor).toContain('transition.next === "APROBADA"');
+    expect(gestor).not.toContain('aprobada_por: user?.email');
+    expect(plantillas).toMatch(
+      /reason === "STALE_STATE"[\s\S]{0,500}setApprovalTarget\(null\)/,
+    );
+    expect(plantillas).toMatch(
+      /reason === "STALE_PREDECESSOR"[\s\S]{0,500}setApprovalTarget\(null\)/,
+    );
+    expect(plantillas).toMatch(
+      /reason === "INVALID_TRANSITION"[\s\S]{0,400}setApprovalTarget\(null\)/,
+    );
     expect(materias).toContain("No se ha encontrado la materia solicitada en este ámbito.");
     expect(materias).toContain("scope: routeScope");
     expect(loadError).toContain("No se muestran datos parciales");

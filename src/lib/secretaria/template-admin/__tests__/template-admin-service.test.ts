@@ -27,6 +27,9 @@ describe("template-admin-service — state machine", () => {
   it("APROBADA → BORRADOR permitido (volver atrás)", () => {
     expect(isTransitionAllowed("APROBADA", "BORRADOR")).toBe(true);
   });
+  it("DEPRECADA se conserva como estado histórico terminal", () => {
+    expect(isTransitionAllowed("DEPRECADA", "ARCHIVADA")).toBe(false);
+  });
 
   it("matriz completa 6×6 coincide con el contrato del workflow", () => {
     const estados: EstadoPlantilla[] = [
@@ -47,7 +50,6 @@ describe("template-admin-service — state machine", () => {
       "APROBADA->BORRADOR",
       "APROBADA->ARCHIVADA",
       "ACTIVA->ARCHIVADA",
-      "DEPRECADA->ARCHIVADA",
     ]);
 
     for (const from of estados) {

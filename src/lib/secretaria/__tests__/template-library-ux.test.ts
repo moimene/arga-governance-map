@@ -344,6 +344,25 @@ describe("template-library-ux", () => {
     });
   });
 
+  it("conserva el contexto exacto de la transición reconocida", () => {
+    expect(
+      buildTemplateTransitionMutationInput({
+        templateId: "template",
+        nextState: "ACTIVA",
+        actor: "admin@arga-seguros.com",
+        motivo: "sustitución revisada por el Comité Legal",
+        ackWarnings: true,
+        operationId: "00000000-0000-4000-8000-000000000777",
+        expectedFrom: "APROBADA",
+        expectedPredecessorId: "predecessora-vigente",
+      }),
+    ).toMatchObject({
+      operationId: "00000000-0000-4000-8000-000000000777",
+      expectedFrom: "APROBADA",
+      expectedPredecessorId: "predecessora-vigente",
+    });
+  });
+
   it("ensambla binding SA canónico y devuelve null si ya es efectivo", () => {
     const selected = template({ id: "binding-template" });
     const input = {

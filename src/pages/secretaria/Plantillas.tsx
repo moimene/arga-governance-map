@@ -26,6 +26,7 @@ import {
   useUpdateEstadoPlantilla,
   extractTransitionResult,
   PlantillaProtegidaRow,
+  type TransitionAttemptContext,
 } from "@/hooks/usePlantillasProtegidas";
 import type { GatePreIssue } from "@/lib/secretaria/template-admin/types";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
@@ -448,7 +449,7 @@ export function TransitionAckDialog({
   );
 }
 
-type TransitionRunOptions = {
+type TransitionRunOptions = Partial<TransitionAttemptContext> & {
   motivo?: string;
   ackWarnings?: boolean;
   aprobadaPor?: string;
@@ -596,6 +597,9 @@ export default function Plantillas() {
         aprobadaPor: options.aprobadaPor,
         fechaAprobacion: options.fechaAprobacion,
         actor: transitionActor,
+        operationId: options.operationId,
+        expectedFrom: options.expectedFrom,
+        expectedPredecessorId: options.expectedPredecessorId,
       }),
       {
         onSuccess: () => {
@@ -629,12 +633,49 @@ export default function Plantillas() {
             setBlockingIssues([]);
             setAckIssues(result.issues);
             setPendingTransition(plantilla);
-            setPendingTransitionOptions({ ...options, confirmed: true });
+            setPendingTransitionOptions({
+              ...options,
+              operationId: result.operationId,
+              expectedFrom: result.expectedFrom,
+              expectedPredecessorId: result.expectedPredecessorId,
+              confirmed: true,
+            });
+          } else if (result && result.ok === false && result.reason === "STALE_STATE") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            setPendingTransitionOptions({});
+            setApprovalTarget(null);
+            setSelected(null);
+            void refetch().finally(() => {
+              window.requestAnimationFrame(() => {
+                (activeTab === "modelos" ? modelosTabRef.current : procesoTabRef.current)?.focus();
+              });
+            });
+            toast.error(
+              "La plantilla cambió en otra sesión. Estamos actualizando los datos; revisa su estado antes de volver a intentarlo.",
+            );
+          } else if (result && result.ok === false && result.reason === "STALE_PREDECESSOR") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            setPendingTransitionOptions({});
+            setApprovalTarget(null);
+            setSelected(null);
+            void refetch().finally(() => {
+              window.requestAnimationFrame(() => {
+                (activeTab === "modelos" ? modelosTabRef.current : procesoTabRef.current)?.focus();
+              });
+            });
+            toast.error(
+              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+            );
           } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
             setBlockingIssues([]);
             setAckIssues(null);
             setPendingTransition(null);
             setPendingTransitionOptions({});
+            setApprovalTarget(null);
             toast.error(`Transición no permitida: ${result.from} → ${result.to}.`);
           } else if (result && result.ok === false && result.reason === "MISSING_APPROVAL_DATA") {
             setBlockingIssues([]);
@@ -643,6 +684,18 @@ export default function Plantillas() {
             setPendingTransitionOptions({});
             toast.error(
               "Faltan los datos de aprobación formal para aprobar la plantilla.",
+            );
+          } else if (
+            result &&
+            result.ok === false &&
+            result.reason === "ACTIVE_BINDINGS_REQUIRE_REPLACEMENT"
+          ) {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setPendingTransition(null);
+            setPendingTransitionOptions({});
+            toast.error(
+              "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
             );
           } else {
             setBlockingIssues([]);

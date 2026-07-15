@@ -161,7 +161,11 @@ describe("gate-pre — duplicado funcional", () => {
       tenantId: "t",
       existingActiveTemplates: existing,
     });
-    expect(r.issues.some((i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY")).toBe(true);
+    expect(
+      r.issues.some(
+        (i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY" && i.severity === "BLOCKING",
+      ),
+    ).toBe(true);
   });
 
   it("no marca duplicado si la misma plantilla está en el array (mismo id)", () => {
@@ -172,6 +176,54 @@ describe("gate-pre — duplicado funcional", () => {
       existingActiveTemplates: existing,
     });
     expect(r.issues.some((i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY")).toBe(false);
+  });
+
+  it("una predecesora exacta es WARNING en modo de sustitución atómica", () => {
+    const existing = [baseTemplate({ id: "active-v1", estado: "ACTIVA" })];
+    const r = validateTemplateForActivation(baseTemplate({ id: "candidate" }), {
+      tenantId: "t",
+      existingActiveTemplates: existing,
+      atomicReplacement: { expectedPredecessorId: "active-v1" },
+    });
+
+    expect(r.summary.blocking).toBe(0);
+    expect(
+      r.issues.some(
+        (i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY" && i.severity === "WARNING",
+      ),
+    ).toBe(true);
+  });
+
+  it("predecesora esperada distinta sigue siendo BLOCKING", () => {
+    const existing = [baseTemplate({ id: "active-v1", estado: "ACTIVA" })];
+    const r = validateTemplateForActivation(baseTemplate({ id: "candidate" }), {
+      tenantId: "t",
+      existingActiveTemplates: existing,
+      atomicReplacement: { expectedPredecessorId: "stale-active" },
+    });
+
+    expect(
+      r.issues.some(
+        (i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY" && i.severity === "BLOCKING",
+      ),
+    ).toBe(true);
+  });
+
+  it("más de una activa equivalente nunca se degrada a sustitución atómica", () => {
+    const existing = [
+      baseTemplate({ id: "active-v1", estado: "ACTIVA" }),
+      baseTemplate({ id: "active-v2", estado: "ACTIVA", tipo_social: "ANY" }),
+    ];
+    const r = validateTemplateForActivation(baseTemplate({ id: "candidate" }), {
+      tenantId: "t",
+      existingActiveTemplates: existing,
+      atomicReplacement: { expectedPredecessorId: "active-v1" },
+    });
+
+    expect(r.summary.blocking).toBe(1);
+    expect(r.issues.find((i) => i.code === "DUP_ACTIVE_FUNCTIONAL_KEY")?.message).toContain(
+      "2 plantillas activas",
+    );
   });
 });
 

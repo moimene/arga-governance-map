@@ -21,11 +21,30 @@ export function useTransitionPlantillaState() {
   return useMutation({
     mutationFn: async (input: TransitionInput) => {
       if (!tenantId) throw new Error("tenantId requerido");
-      return transitionTemplateState(input, { tenantId });
+      const result = await transitionTemplateState(input, { tenantId });
+      if (result.ok === false) {
+        const error = new Error(`Transición rechazada: ${result.reason}`);
+        (error as Error & { result?: typeof result }).result = result;
+        throw error;
+      }
+      return result;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plantillas_protegidas"] });
       qc.invalidateQueries({ queryKey: ["plantilla_changelog"] });
+      qc.invalidateQueries({ queryKey: ["materia_template_binding"] });
+    },
+    onError: async (error) => {
+      const result =
+        error && typeof error === "object" && "result" in error
+          ? (error as { result?: { reason?: string } }).result
+          : undefined;
+      if (result?.reason !== "STALE_STATE" && result?.reason !== "STALE_PREDECESSOR") return;
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["plantillas_protegidas"] }),
+        qc.invalidateQueries({ queryKey: ["plantilla_changelog"] }),
+        qc.invalidateQueries({ queryKey: ["materia_template_binding"] }),
+      ]);
     },
   });
 }

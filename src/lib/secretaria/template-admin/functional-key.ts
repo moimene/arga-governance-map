@@ -5,8 +5,8 @@
  */
 
 import type { FunctionalKey, PlantillaCandidate } from "./types";
-import { resolveMateriaAlias } from "../agenda-materias";
-import { normalizeOrganoTipo } from "./organo-canonico";
+import { MATERIA_CANONICAL_ALIAS } from "../agenda-materias";
+import { ORGANO_ALIAS } from "./organo-canonico";
 
 export const CORE_V1_MATERIAS: ReadonlyArray<{ organo: string; materia: string }> = [
   { organo: "JUNTA_GENERAL", materia: "APROBACION_CUENTAS" },
@@ -28,11 +28,31 @@ export const CORE_V1_MATERIAS: ReadonlyArray<{ organo: string; materia: string }
 export const CORE_V1_MATERIAS_COUNT = CORE_V1_MATERIAS.length;
 
 function resolveMateria(row: PlantillaCandidate): string {
-  return resolveMateriaAlias(row.materia_acuerdo ?? row.materia);
+  const materiaAcuerdo = normalizeFunctionalValue(row.materia_acuerdo);
+  const normalized = materiaAcuerdo || normalizeFunctionalValue(row.materia);
+  return MATERIA_CANONICAL_ALIAS[normalized] ?? normalized;
 }
 
 function normalizeFunctionalValue(value?: string | null): string {
-  return String(value ?? "").trim().toUpperCase();
+  // PostgreSQL btrim(text) elimina espacios ASCII por defecto, no todo el
+  // whitespace Unicode que String.trim() considera. Mantener la misma regla
+  // evita predecesoras distintas entre el Gate cliente y el índice Cloud.
+  return String(value ?? "").replace(/^ +| +$/g, "").toUpperCase();
+}
+
+/**
+ * En la identidad funcional de plantillas, la ausencia de tipo social significa
+ * que el documento aplica a cualquier forma social. Cloud contiene tanto NULL
+ * como el literal legacy ANY, por lo que ambos deben producir la misma clave.
+ */
+export function normalizeFunctionalSocialType(value?: string | null): string {
+  const normalized = normalizeFunctionalValue(value);
+  return !normalized || normalized === "ANY" ? "ANY" : normalized;
+}
+
+function normalizeFunctionalOrganoType(value?: string | null): string {
+  const normalized = normalizeFunctionalValue(value);
+  return ORGANO_ALIAS[normalized] ?? normalized;
 }
 
 export function buildFunctionalKey(row: PlantillaCandidate, tenantId: string): FunctionalKey {
@@ -41,23 +61,22 @@ export function buildFunctionalKey(row: PlantillaCandidate, tenantId: string): F
     tipo: normalizeFunctionalValue(row.tipo),
     jurisdiccion: normalizeFunctionalValue(row.jurisdiccion),
     materia: resolveMateria(row),
-    organoTipo:
-      normalizeOrganoTipo(row.organo_tipo) ?? normalizeFunctionalValue(row.organo_tipo),
+    organoTipo: normalizeFunctionalOrganoType(row.organo_tipo),
     adoptionMode: normalizeFunctionalValue(row.adoption_mode),
-    tipoSocial: normalizeFunctionalValue(row.tipo_social) || null,
+    tipoSocial: normalizeFunctionalSocialType(row.tipo_social),
   };
 }
 
 export function serializeFunctionalKey(k: FunctionalKey): string {
-  return [
+  return JSON.stringify([
     k.tenantId,
     k.tipo,
     k.jurisdiccion,
     k.materia,
     k.organoTipo,
     k.adoptionMode,
-    k.tipoSocial ?? "",
-  ].join("|");
+    normalizeFunctionalSocialType(k.tipoSocial),
+  ]);
 }
 
 export function matchesFunctionalKey(
@@ -79,20 +98,26 @@ export function detectActiveDuplicate(
   });
 }
 
+export function findFunctionalDuplicates(
+  candidate: PlantillaCandidate,
+  existingTemplates: PlantillaCandidate[],
+  tenantId: string,
+  options: { states?: string[] } = {},
+): PlantillaCandidate[] {
+  const states = options.states ? new Set(options.states) : null;
+  const candidateKey = serializeFunctionalKey(buildFunctionalKey(candidate, tenantId));
+  return existingTemplates.filter((other) => {
+    if (other.id === candidate.id) return false;
+    if (states && !states.has(other.estado)) return false;
+    return serializeFunctionalKey(buildFunctionalKey(other, tenantId)) === candidateKey;
+  });
+}
+
 export function detectFunctionalDuplicate(
   candidate: PlantillaCandidate,
   existingTemplates: PlantillaCandidate[],
   tenantId: string,
   options: { states?: string[] } = {},
 ): PlantillaCandidate | null {
-  const states = options.states ? new Set(options.states) : null;
-  const candidateKey = serializeFunctionalKey(buildFunctionalKey(candidate, tenantId));
-  for (const other of existingTemplates) {
-    if (other.id === candidate.id) continue;
-    if (states && !states.has(other.estado)) continue;
-    if (serializeFunctionalKey(buildFunctionalKey(other, tenantId)) === candidateKey) {
-      return other;
-    }
-  }
-  return null;
+  return findFunctionalDuplicates(candidate, existingTemplates, tenantId, options)[0] ?? null;
 }

@@ -132,6 +132,39 @@ test.describe('Plantillas', () => {
     ).toBeFocused();
   });
 
+  test('Oleada 3A conserva v1.1 vigente y v1.0 como histórico único de la familia', async ({ page }) => {
+    const historicalId = '92ee684b-8a34-4e8c-b3ca-c1827f7fa05f';
+    const currentId = '52e7f727-125b-4d26-a46f-bf9a912df56e';
+
+    await page.goto(
+      `/secretaria/plantillas?scope=grupo&ciclo=vigentes&plantilla=${currentId}`,
+    );
+    const currentDetail = page.getByRole('complementary', {
+      name: 'Detalle de la plantilla seleccionada',
+    });
+    await expect(currentDetail).toBeVisible({ timeout: 10_000 });
+    await expect(currentDetail.getByText('v1.1.0', { exact: true })).toBeVisible();
+    await expect(currentDetail.getByText('Activa', { exact: true })).toBeVisible();
+
+    await page.goto(
+      `/secretaria/plantillas?scope=grupo&ciclo=historico&plantilla=${historicalId}`,
+    );
+    const historicalDetail = page.getByRole('complementary', {
+      name: 'Detalle de la plantilla seleccionada',
+    });
+    await expect(historicalDetail).toBeVisible({ timeout: 10_000 });
+    await expect(historicalDetail.getByText('v1.0.0', { exact: true })).toBeVisible();
+    await expect(historicalDetail.getByText('Solo consulta histórica', { exact: true })).toBeVisible();
+
+    await page.goto(
+      `/secretaria/gestor-plantillas?tab=catalogo&plantilla=${currentId}&estado=ACTIVA&scope=grupo`,
+    );
+    await expect(page.getByRole('heading', { name: /Gobierno de plantillas/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/Incidencia: 2 versiones vigentes equivalentes/i)).toHaveCount(0);
+  });
+
   test('un modelo multi-materia conserva la regla canónica del handoff', async ({ page }) => {
     const multiMatterTemplateId = 'e3697ad9-e0c2-4baf-9144-c80a11808c07';
     await page.goto(

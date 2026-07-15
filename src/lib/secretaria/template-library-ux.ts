@@ -8,6 +8,7 @@ import {
   serializeFunctionalKey,
 } from "@/lib/secretaria/template-admin/functional-key";
 import { normalizeOrganoTipo } from "@/lib/secretaria/template-admin/organo-canonico";
+import type { EstadoPlantilla } from "@/lib/secretaria/template-admin/types";
 
 export type TemplateAvailabilityTone =
   | "current"
@@ -115,6 +116,9 @@ export interface TemplateTransitionMutationInput {
   ackWarnings?: boolean;
   aprobadaPor?: string;
   fechaAprobacion?: string;
+  operationId?: string;
+  expectedFrom?: EstadoPlantilla;
+  expectedPredecessorId?: string | null;
 }
 
 export interface TemplateBindingMutationInput {
@@ -604,6 +608,9 @@ export function buildTemplateTransitionMutationInput({
   ackWarnings,
   aprobadaPor,
   fechaAprobacion,
+  operationId,
+  expectedFrom,
+  expectedPredecessorId,
 }: TemplateTransitionMutationInput) {
   return {
     id: templateId,
@@ -613,6 +620,9 @@ export function buildTemplateTransitionMutationInput({
     aprobadaPor,
     fechaAprobacion,
     actor,
+    ...(operationId ? { operationId } : {}),
+    ...(expectedFrom ? { expectedFrom } : {}),
+    ...(expectedPredecessorId !== undefined ? { expectedPredecessorId } : {}),
   };
 }
 

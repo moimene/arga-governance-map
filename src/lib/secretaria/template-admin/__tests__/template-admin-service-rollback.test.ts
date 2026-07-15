@@ -1,21 +1,20 @@
 import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
 import * as __realModule0 from "@/integrations/supabase/client";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TemplateAdminError, type PlantillaCandidate } from "../types";
 
 const mockState = {
   current: null as PlantillaCandidate | null,
+  activeTemplates: [] as PlantillaCandidate[],
   plantillaInsertError: null as unknown,
   plantillaInsertId: "tpl-new",
   changelogInsertError: null as unknown,
-  rollbackError: null as unknown,
-  updateCalls: [] as Array<Record<string, unknown>>,
+  rpcData: null as Record<string, unknown> | null,
+  rpcError: null as unknown,
+  rpcCalls: [] as Array<Record<string, unknown>>,
   deleteIds: [] as string[],
 };
 
-// Captura eager de los módulos reales ANTES de registrar los mocks:
-// mock.module de bun es global al proceso de test y se fuga a los archivos
-// posteriores, así que cada mock se restaura al terminar este archivo.
 const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
   ["@/integrations/supabase/client", { ...__realModule0 }],
 ];
@@ -27,20 +26,14 @@ __afterAllRestore(() => {
 });
 
 vi.mock("@/integrations/supabase/client", () => {
-  function selectCurrentChain() {
+  function selectCurrentOrActiveChain() {
     const chain = {
       eq: vi.fn(() => chain),
       maybeSingle: vi.fn(async () => ({ data: mockState.current, error: null })),
-    };
-    return chain;
-  }
-
-  function updateChain(payload: Record<string, unknown>) {
-    mockState.updateCalls.push(payload);
-    const isRollback = payload.estado === mockState.current?.estado;
-    const chain = {
-      error: isRollback ? mockState.rollbackError : null,
-      eq: vi.fn(() => chain),
+      then: (
+        resolve: (value: { data: PlantillaCandidate[]; error: null }) => unknown,
+        reject?: (reason: unknown) => unknown,
+      ) => Promise.resolve({ data: mockState.activeTemplates, error: null }).then(resolve, reject),
     };
     return chain;
   }
@@ -91,8 +84,7 @@ vi.mock("@/integrations/supabase/client", () => {
       from: vi.fn((table: string) => {
         if (table === "plantillas_protegidas") {
           return {
-            select: vi.fn(() => selectCurrentChain()),
-            update: vi.fn((payload: Record<string, unknown>) => updateChain(payload)),
+            select: vi.fn(() => selectCurrentOrActiveChain()),
             insert: vi.fn(() => insertPlantillaChain()),
             delete: vi.fn(() => deleteChain()),
           };
@@ -105,14 +97,15 @@ vi.mock("@/integrations/supabase/client", () => {
         }
         throw new Error(`Unexpected table ${table}`);
       }),
+      rpc: vi.fn(async (_name: string, params: Record<string, unknown>) => {
+        mockState.rpcCalls.push(params);
+        return { data: mockState.rpcData, error: mockState.rpcError };
+      }),
     },
   };
 });
 
-import {
-  createDraftFromImport,
-  transitionTemplateState,
-} from "../template-admin-service";
+import { createDraftFromImport, transitionTemplateState } from "../template-admin-service";
 
 const baseTemplate = (overrides: Partial<PlantillaCandidate> = {}): PlantillaCandidate => ({
   id: "tpl-1",
@@ -124,6 +117,7 @@ const baseTemplate = (overrides: Partial<PlantillaCandidate> = {}): PlantillaCan
   estado: "BORRADOR",
   organo_tipo: "JUNTA_GENERAL",
   adoption_mode: "MEETING",
+  tipo_social: null,
   aprobada_por: null,
   fecha_aprobacion: null,
   referencia_legal: "Art. 160 LSC",
@@ -133,19 +127,50 @@ const baseTemplate = (overrides: Partial<PlantillaCandidate> = {}): PlantillaCan
   ...overrides,
 });
 
-describe("template-admin-service — rollback compensatorio", () => {
+describe("template-admin-service — atomicidad servidor", () => {
   beforeEach(() => {
     mockState.current = baseTemplate();
+    mockState.activeTemplates = [];
     mockState.plantillaInsertError = null;
     mockState.plantillaInsertId = "tpl-new";
     mockState.changelogInsertError = null;
-    mockState.rollbackError = null;
-    mockState.updateCalls = [];
+    mockState.rpcData = {
+      ok: true,
+      plantilla_id: "tpl-1",
+      from: "BORRADOR",
+      to: "REVISADA",
+      changelog_id: "log-transition",
+      operation_id: "00000000-0000-4000-8000-000000000001",
+      replayed: false,
+      bindings_moved: 0,
+    };
+    mockState.rpcError = null;
+    mockState.rpcCalls = [];
     mockState.deleteIds = [];
   });
 
-  it("transitionTemplateState revierte estado si falla el changelog", async () => {
-    mockState.changelogInsertError = { message: "insert log failed" };
+  it("devuelve STALE_STATE sin intentar un UPDATE ni rollback cliente", async () => {
+    mockState.rpcData = null;
+    mockState.rpcError = { message: "STALE_STATE: expected BORRADOR, actual REVISADA" };
+
+    const result = await transitionTemplateState(
+      {
+        plantillaId: "tpl-1",
+        to: "REVISADA",
+        motivo: "revisión legal",
+        actor: "legal@arga-seguros.com",
+        operationId: "00000000-0000-4000-8000-000000000001",
+      },
+      { tenantId: "tenant-1" },
+    );
+
+    expect(result).toMatchObject({ reason: "STALE_STATE", expected: "BORRADOR" });
+    expect(mockState.rpcCalls).toHaveLength(1);
+  });
+
+  it("un fallo transaccional genérico se devuelve sin rollback compensatorio", async () => {
+    mockState.rpcData = null;
+    mockState.rpcError = { message: "insert changelog failed; transaction rolled back" };
 
     const result = await transitionTemplateState(
       {
@@ -157,33 +182,165 @@ describe("template-admin-service — rollback compensatorio", () => {
       { tenantId: "tenant-1" },
     );
 
-    expect(result.ok).toBe(false);
-    expect(result).toMatchObject({ reason: "CHANGELOG_FAILED", rolledBack: true });
-    expect(mockState.updateCalls).toEqual([
-      { estado: "REVISADA" },
-      { estado: "BORRADOR", aprobada_por: null, fecha_aprobacion: null },
-    ]);
+    expect(result).toMatchObject({ reason: "RPC_FAILED" });
+    expect(result).not.toHaveProperty("rolledBack");
+    expect(mockState.rpcCalls).toHaveLength(1);
   });
 
-  it("transitionTemplateState reporta rolledBack=false si falla el revert", async () => {
-    mockState.changelogInsertError = { message: "insert log failed" };
-    mockState.rollbackError = { message: "rollback failed" };
+  it("la activación exige ack y envía la predecesora exacta a la RPC", async () => {
+    mockState.current = baseTemplate({
+      id: "candidate",
+      version: "1.1.0",
+      estado: "APROBADA",
+      aprobada_por: "Comité Legal Garrigues",
+      fecha_aprobacion: "2026-07-12",
+    });
+    mockState.activeTemplates = [
+      baseTemplate({
+        id: "active-v1",
+        estado: "ACTIVA",
+        version: "1.0.0",
+        aprobada_por: "Comité Legal Garrigues",
+        fecha_aprobacion: "2026-07-01",
+      }),
+    ];
+    mockState.rpcData = {
+      ok: true,
+      plantilla_id: "candidate",
+      from: "APROBADA",
+      to: "ACTIVA",
+      changelog_id: "log-active",
+      archived_template_id: "active-v1",
+      archived_changelog_id: "log-archive",
+      operation_id: "00000000-0000-4000-8000-000000000001",
+      replayed: false,
+      bindings_moved: 2,
+    };
 
-    const result = await transitionTemplateState(
+    const first = await transitionTemplateState(
       {
-        plantillaId: "tpl-1",
-        to: "REVISADA",
-        motivo: "revisión legal",
+        plantillaId: "candidate",
+        to: "ACTIVA",
+        motivo: "sustitución controlada",
         actor: "legal@arga-seguros.com",
       },
       { tenantId: "tenant-1" },
     );
+    expect(first).toMatchObject({
+      reason: "WARNINGS_NEED_ACK",
+      expectedFrom: "APROBADA",
+      expectedPredecessorId: "active-v1",
+    });
+    expect(mockState.rpcCalls).toEqual([]);
+    if (first.ok || first.reason !== "WARNINGS_NEED_ACK") {
+      throw new Error("Expected warning context");
+    }
 
-    expect(result.ok).toBe(false);
-    expect(result).toMatchObject({ reason: "CHANGELOG_FAILED", rolledBack: false });
+    const confirmed = await transitionTemplateState(
+      {
+        plantillaId: "candidate",
+        to: "ACTIVA",
+        motivo: "sustitución controlada",
+        actor: "legal@arga-seguros.com",
+        ackWarnings: true,
+        operationId: first.operationId,
+        expectedFrom: first.expectedFrom,
+        expectedPredecessorId: first.expectedPredecessorId,
+      },
+      { tenantId: "tenant-1" },
+    );
+
+    expect(confirmed).toMatchObject({
+      ok: true,
+      archivedTemplateId: "active-v1",
+      archivedChangelogId: "log-archive",
+      bindingsMoved: 2,
+    });
+    expect(mockState.rpcCalls[0].p_expected_predecessor_id).toBe("active-v1");
+    expect(mockState.rpcCalls[0].p_ack_warnings).toBe(true);
   });
 
-  it("createDraftFromImport elimina el borrador si falla el changelog", async () => {
+  it("no sustituye una predecesora distinta de la que el usuario reconoció", async () => {
+    mockState.current = baseTemplate({
+      id: "candidate",
+      version: "1.1.0",
+      estado: "APROBADA",
+      aprobada_por: "Comité Legal Garrigues",
+      fecha_aprobacion: "2026-07-12",
+    });
+    mockState.activeTemplates = [
+      baseTemplate({ id: "active-v1", estado: "ACTIVA", version: "1.0.0" }),
+    ];
+
+    const first = await transitionTemplateState(
+      {
+        plantillaId: "candidate",
+        to: "ACTIVA",
+        motivo: "sustitución controlada",
+        actor: "legal@arga-seguros.com",
+      },
+      { tenantId: "tenant-1" },
+    );
+    if (first.ok || first.reason !== "WARNINGS_NEED_ACK") {
+      throw new Error("Expected warning context");
+    }
+
+    mockState.activeTemplates = [
+      baseTemplate({ id: "active-v2", estado: "ACTIVA", version: "1.0.1" }),
+    ];
+    const confirmed = await transitionTemplateState(
+      {
+        plantillaId: "candidate",
+        to: "ACTIVA",
+        motivo: "sustitución controlada",
+        actor: "legal@arga-seguros.com",
+        ackWarnings: true,
+        operationId: first.operationId,
+        expectedFrom: first.expectedFrom,
+        expectedPredecessorId: first.expectedPredecessorId,
+      },
+      { tenantId: "tenant-1" },
+    );
+
+    expect(confirmed).toEqual({
+      ok: false,
+      reason: "STALE_PREDECESSOR",
+      expected: "active-v1",
+    });
+    expect(mockState.rpcCalls).toEqual([]);
+  });
+
+  it("un ack sin predecesora fijada devuelve contexto y no sustituye en silencio", async () => {
+    mockState.current = baseTemplate({
+      id: "candidate",
+      estado: "APROBADA",
+      aprobada_por: "Comité Legal Garrigues",
+      fecha_aprobacion: "2026-07-12",
+    });
+    mockState.activeTemplates = [
+      baseTemplate({ id: "active-v1", estado: "ACTIVA" }),
+    ];
+
+    const result = await transitionTemplateState(
+      {
+        plantillaId: "candidate",
+        to: "ACTIVA",
+        motivo: "sustitución controlada",
+        actor: "legal@arga-seguros.com",
+        ackWarnings: true,
+      },
+      { tenantId: "tenant-1" },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "WARNINGS_NEED_ACK",
+      expectedPredecessorId: "active-v1",
+    });
+    expect(mockState.rpcCalls).toEqual([]);
+  });
+
+  it("createDraftFromImport conserva su rollback local porque no cambia estado", async () => {
     mockState.changelogInsertError = { message: "insert log failed" };
 
     await expect(

@@ -11,7 +11,7 @@ import type {
   PlantillaCandidate,
 } from "./types";
 import { isOrganoCanonico, normalizeOrganoTipo } from "./organo-canonico";
-import { detectActiveDuplicate } from "./functional-key";
+import { findFunctionalDuplicates } from "./functional-key";
 import { evaluateSemanticRules } from "./gate-pre-semantic";
 // ITEM-138: SEMVER y la lista de fuentes legales se centralizan en patterns.ts
 // (compartido con template-import-schema) para que gate e importer no diverjan.
@@ -28,6 +28,12 @@ export type GatePreContext = {
   tenantId: string;
   existingActiveTemplates: PlantillaCandidate[];
   targetEstado?: EstadoPlantilla;
+  /**
+   * Una transición ejecutable puede sustituir una única vigente equivalente en
+   * la RPC atómica. Las auditorías y preflights que no activan este modo siguen
+   * tratando cualquier equivalencia activa como bloqueo.
+   */
+  atomicReplacement?: { expectedPredecessorId: string | null };
 };
 
 export function validateTemplateForActivation(
@@ -230,15 +236,43 @@ function collectDuplicateIssue(
   ctx: GatePreContext,
   issues: GatePreIssue[],
 ): void {
-  const dup = detectActiveDuplicate(t, ctx.existingActiveTemplates, ctx.tenantId);
-  if (dup) {
+  const duplicates = findFunctionalDuplicates(
+    t,
+    ctx.existingActiveTemplates,
+    ctx.tenantId,
+    { states: ["ACTIVA"] },
+  );
+  if (duplicates.length === 0) return;
+
+  const expectedPredecessorId = ctx.atomicReplacement?.expectedPredecessorId;
+  const isExactAtomicReplacement =
+    duplicates.length === 1 &&
+    expectedPredecessorId != null &&
+    duplicates[0].id === expectedPredecessorId;
+
+  if (isExactAtomicReplacement) {
     issues.push({
-      severity: "BLOCKING",
+      severity: "WARNING",
       code: "DUP_ACTIVE_FUNCTIONAL_KEY",
-      message: `duplicado activo: plantilla ${dup.id} ya cubre esta clave funcional`,
-      hint: `archivar ${dup.id} antes de activar esta`,
+      message: `la plantilla vigente ${duplicates[0].id} será sustituida de forma atómica`,
+      hint:
+        "Al confirmar, la versión vigente se archivará y esta versión quedará activa en una sola operación trazable.",
     });
+    return;
   }
+
+  issues.push({
+    severity: "BLOCKING",
+    code: "DUP_ACTIVE_FUNCTIONAL_KEY",
+    message:
+      duplicates.length === 1
+        ? `duplicado activo: plantilla ${duplicates[0].id} ya cubre esta clave funcional`
+        : `${duplicates.length} plantillas activas cubren esta clave funcional`,
+    hint:
+      duplicates.length === 1
+        ? `resolver la vigente ${duplicates[0].id} antes de activar esta plantilla`
+        : "La sustitución atómica exige una única predecesora exacta; sanea primero la familia.",
+  });
 }
 
 function collectSemanticIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void {

@@ -11,7 +11,10 @@ import {
 // ITEM-087: re-exportamos TransitionResult para que los consumidores de las
 // transiciones (CatalogoTab, Plantillas) puedan tipar el `result` adjunto al
 // Error sin alcanzar el módulo template-admin-service directamente.
-export type { TransitionResult } from "@/lib/secretaria/template-admin/template-admin-service";
+export type {
+  TransitionAttemptContext,
+  TransitionResult,
+} from "@/lib/secretaria/template-admin/template-admin-service";
 
 /**
  * ITEM-087: extrae el `TransitionResult` adjunto al Error lanzado por
@@ -117,9 +120,8 @@ export function usePlantillaProtegida(id?: string) {
 /**
  * Estado al que se puede transicionar una plantilla desde el hook.
  *
- * Incluye DEPRECADA por coherencia con `EstadoPlantilla` del módulo
- * template-admin, aunque las transiciones desde/hacia DEPRECADA no son
- * habituales en el flujo del Gestor (Sprint 1).
+ * Incluye DEPRECADA para leer y mostrar filas históricas. Es un estado terminal:
+ * no existe una transición ejecutable desde o hacia él.
  */
 export type EstadoPlantillaInput =
   | "BORRADOR"
@@ -138,7 +140,7 @@ export type EstadoPlantillaInput =
  *    (`Plantillas.tsx`, `GestorPlantillas.tsx`) antes de Commit 5.
  *
  * Internamente todo se delega a `transitionTemplateState`, que aplica el state
- * machine + Gate PRE (si destino es ACTIVA) + changelog con rollback.
+ * machine + Gate PRE y ejecuta estado + changelog en la RPC atómica.
  */
 export type UpdateEstadoPlantillaInput = {
   id: string;
@@ -155,6 +157,9 @@ export type UpdateEstadoPlantillaInput = {
   /** Alias legacy DB-style para callers que trabajan con columnas Cloud. */
   fecha_aprobacion?: string;
   ackWarnings?: boolean;
+  operationId?: string;
+  expectedFrom?: EstadoPlantillaInput;
+  expectedPredecessorId?: string | null;
 };
 
 const VALID_ESTADOS: ReadonlySet<EstadoPlantillaInput> = new Set([
@@ -202,6 +207,9 @@ export function useUpdateEstadoPlantilla() {
           aprobadaPor,
           fechaAprobacion,
           ackWarnings: input.ackWarnings,
+          operationId: input.operationId,
+          expectedFrom: input.expectedFrom,
+          expectedPredecessorId: input.expectedPredecessorId,
         },
         { tenantId },
       );
@@ -216,6 +224,23 @@ export function useUpdateEstadoPlantilla() {
       queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] });
       queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] });
       queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] });
+      queryClient.invalidateQueries({ queryKey: ["materia_template_binding"] });
+    },
+    onError: async (error) => {
+      const result = extractTransitionResult(error);
+      if (
+        !result ||
+        result.ok !== false ||
+        (result.reason !== "STALE_STATE" && result.reason !== "STALE_PREDECESSOR")
+      ) {
+        return;
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] }),
+        queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] }),
+        queryClient.invalidateQueries({ queryKey: ["materia_template_binding"] }),
+      ]);
     },
   });
 }

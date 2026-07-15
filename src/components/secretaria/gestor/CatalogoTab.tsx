@@ -42,6 +42,7 @@ import {
   useUpdateEstadoPlantilla,
   extractTransitionResult,
   type PlantillaProtegidaRow,
+  type TransitionAttemptContext,
 } from "@/hooks/usePlantillasProtegidas";
 import type { GatePreIssue } from "@/lib/secretaria/template-admin/types";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -516,21 +517,40 @@ function PlantillaDetailPanel({
   // reintenta con ackWarnings:true.
   const [blockingIssues, setBlockingIssues] = useState<GatePreIssue[]>([]);
   const [ackIssues, setAckIssues] = useState<GatePreIssue[] | null>(null);
+  const [ackContext, setAckContext] = useState<TransitionAttemptContext | null>(null);
 
-  const runTransition = (motivo?: string, ackWarnings?: boolean) => {
+  const runTransition = ({
+    motivo,
+    ackWarnings,
+    operationId,
+    expectedFrom,
+    expectedPredecessorId,
+  }: {
+    motivo?: string;
+    ackWarnings?: boolean;
+    operationId?: string;
+    expectedFrom?: TransitionAttemptContext["expectedFrom"];
+    expectedPredecessorId?: string | null;
+  } = {}) => {
     if (!transition) return;
+    const transitionActor = user?.email ?? "Comité Legal TGMS";
     updateEstado.mutate(
       {
         id: plantilla.id,
         nuevo_estado: transition.next,
-        aprobada_por: user?.email ?? "Comité Legal TGMS",
+        actor: transitionActor,
+        ...(transition.next === "APROBADA" ? { aprobada_por: transitionActor } : {}),
         motivo,
         ackWarnings,
+        operationId,
+        expectedFrom,
+        expectedPredecessorId,
       },
       {
         onSuccess: () => {
           setBlockingIssues([]);
           setAckIssues(null);
+          setAckContext(null);
           toast.success(
             `Plantilla actualizada a ${estadoLabel(transition.next)}`,
           );
@@ -542,6 +562,7 @@ function PlantillaDetailPanel({
             // activarla. Se listan los issues (código + mensaje) en el panel.
             setBlockingIssues(result.issues);
             setAckIssues(null);
+            setAckContext(null);
             toast.error(
               `La comprobación documental bloqueó la activación con ${result.issues.length} incidencia(s). Revisa el detalle.`,
             );
@@ -549,19 +570,52 @@ function PlantillaDetailPanel({
             // Warnings no-bloqueantes: se abre el diálogo de reconocimiento.
             setBlockingIssues([]);
             setAckIssues(result.issues);
+            setAckContext({
+              operationId: result.operationId,
+              expectedFrom: result.expectedFrom,
+              expectedPredecessorId: result.expectedPredecessorId,
+            });
+          } else if (result && result.ok === false && result.reason === "STALE_STATE") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setAckContext(null);
+            toast.error(
+              "La plantilla cambió en otra sesión. Estamos actualizando los datos; revisa su estado antes de volver a intentarlo.",
+            );
+          } else if (result && result.ok === false && result.reason === "STALE_PREDECESSOR") {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setAckContext(null);
+            toast.error(
+              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+            );
           } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
             setBlockingIssues([]);
             setAckIssues(null);
+            setAckContext(null);
             toast.error(`Transición no permitida: ${result.from} → ${result.to}.`);
           } else if (result && result.ok === false && result.reason === "MISSING_APPROVAL_DATA") {
             setBlockingIssues([]);
             setAckIssues(null);
+            setAckContext(null);
             toast.error(
               "Faltan los datos de aprobación formal para marcar la plantilla como vigente.",
+            );
+          } else if (
+            result &&
+            result.ok === false &&
+            result.reason === "ACTIVE_BINDINGS_REQUIRE_REPLACEMENT"
+          ) {
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setAckContext(null);
+            toast.error(
+              "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
             );
           } else {
             setBlockingIssues([]);
             setAckIssues(null);
+            setAckContext(null);
             toast.error("No se pudo actualizar el estado de la plantilla", {
               description: error instanceof Error ? error.message : String(error),
             });
@@ -576,6 +630,7 @@ function PlantillaDetailPanel({
     if (!window.confirm(transition.confirm)) return;
     setBlockingIssues([]);
     setAckIssues(null);
+    setAckContext(null);
     runTransition();
   };
 
@@ -833,12 +888,21 @@ function PlantillaDetailPanel({
 
       {/* ITEM-087: diálogo de reconocimiento de warnings. Reintenta la transición
           con ackWarnings:true y el motivo escrito (persistido en changelog). */}
-      {ackIssues ? (
+      {ackIssues && ackContext ? (
         <TransitionAckDialog
           issues={ackIssues}
           pending={updateEstado.isPending}
-          onConfirm={(motivo) => runTransition(motivo, true)}
-          onCancel={() => setAckIssues(null)}
+          onConfirm={(motivo) =>
+            runTransition({
+              motivo,
+              ackWarnings: true,
+              ...ackContext,
+            })
+          }
+          onCancel={() => {
+            setAckIssues(null);
+            setAckContext(null);
+          }}
         />
       ) : null}
     </div>
