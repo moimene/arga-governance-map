@@ -32,6 +32,7 @@ import {
 import { normalizeOrganoTipo } from "./organo-canonico";
 import type { PlantillaCandidate } from "./types";
 import { TemplateAdminError } from "./types";
+import { resolveMateriaAlias } from "../agenda-materias";
 
 export type ParseResultOk = { ok: true; payload: TemplateImportPayload };
 export type ParseResultFail = { ok: false; error: z.ZodError };
@@ -85,8 +86,14 @@ export function buildDraftRow(
   return {
     tenant_id: ctx.tenantId,
     tipo: payload.template.tipo,
-    materia: payload.template.materia,
-    materia_acuerdo: payload.template.materia_acuerdo ?? null,
+    // Codex adversarial (P2): el esquema acepta alias legacy (p.ej. el plural
+    // APROBACION_PRESUPUESTOS). Si se persistieran tal cual, la plantilla no
+    // aparecería al pedir la materia canónica y reintroduciría el duplicado que
+    // el saneamiento de alias acaba de cerrar.
+    materia: resolveMateriaAlias(payload.template.materia),
+    materia_acuerdo: payload.template.materia_acuerdo
+      ? resolveMateriaAlias(payload.template.materia_acuerdo)
+      : null,
     jurisdiccion: payload.template.jurisdiccion,
     version: payload.template.version,
     estado: "BORRADOR",

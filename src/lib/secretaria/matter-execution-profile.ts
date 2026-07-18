@@ -1018,7 +1018,7 @@ export function buildMatterExecutionProfile(context: BuildMatterExecutionProfile
       blockers: [],
     },
     constitucion: {
-      quorum_rule: String(ruleParamValue<string | number>(quorumRule) ?? "Segun ley, estatutos y perfil normativo"),
+      quorum_rule: String(ruleParamValue<string | number>(quorumRule) ?? "Según ley, estatutos y perfil normativo"),
       quorum_threshold: numericValue(ruleParamValue<number>(quorumRule)) ?? undefined,
       fuente: ruleParamReference(quorumRule),
       blockers: [],

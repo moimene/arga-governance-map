@@ -42,7 +42,12 @@ export function Capa3CaptureDialog({
   onSubmit,
 }: Capa3CaptureDialogProps) {
   if (!open) return null;
-  const normalizedValues = normalizeCapa3Draft(fields, values).values;
+  const normalizedDraft = normalizeCapa3Draft(fields, values);
+  const normalizedValues = normalizedDraft.values;
+  // Codex adversarial (P1): un valor persistido que no está entre las opciones
+  // del campo se descarta para no bloquear la generación, pero el usuario debe
+  // enterarse — antes desaparecía sin rastro y el documento salía sin el dato.
+  const discardedEntries = Object.entries(normalizedDraft.discardedValues);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--g-brand-3308)]/40 p-4">
@@ -78,6 +83,30 @@ export function Capa3CaptureDialog({
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+          {discardedEntries.length > 0 ? (
+            <div
+              className="mb-4 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-3 py-3 text-sm text-[var(--g-text-primary)]"
+              role="status"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="font-medium">Valores no admitidos por el campo</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-[var(--g-text-secondary)]">
+                {discardedEntries.map(([campo, valor]) => {
+                  const field = fields.find((candidate) => candidate.campo === campo);
+                  return (
+                    <li key={campo}>
+                      <span className="font-medium text-[var(--g-text-primary)]">
+                        {field?.descripcion || campo}
+                      </span>
+                      : el valor «{valor}» no está entre las opciones disponibles. Elige una
+                      opción para que conste en el documento.
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
           {onDraftAssist ? (
             <div
               className="mb-4 flex flex-col gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-3 text-sm text-[var(--g-text-primary)] sm:flex-row sm:items-center sm:justify-between"

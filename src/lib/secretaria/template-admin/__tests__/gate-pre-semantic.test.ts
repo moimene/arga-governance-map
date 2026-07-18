@@ -1,6 +1,5 @@
-import { detectOrphanNamespaces } from "../gate-pre-semantic";
 import { describe, it, expect } from "vitest";
-import { evaluateSemanticRules , detectOrphanNamespaces } from "../gate-pre-semantic";
+import { evaluateSemanticRules, detectOrphanNamespaces } from "../gate-pre-semantic";
 import type { PlantillaCandidate } from "../types";
 
 const template = (over: Partial<PlantillaCandidate>): PlantillaCandidate => ({
@@ -155,6 +154,46 @@ describe("gate-pre-semantic", () => {
       }),
     );
     expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
+
+  // Regresión (Codex adversarial 2026-07-18): la exención de referencia legal
+  // por soporte interno no puede convertirse en un escape universal — en Cloud
+  // existe 1 MODELO_ACUERDO clasificado con organo_tipo SOPORTE_INTERNO.
+  it("SOPORTE_INTERNO no exime de referencia legal a un MODELO_ACUERDO", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "MODELO_ACUERDO",
+        estado: "ACTIVA",
+        organo_tipo: "SOPORTE_INTERNO",
+        adoption_mode: "NO_SESSION",
+        referencia_legal: null as never,
+        materia: "SEPARACION_SOCIO",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(true);
+  });
+
+  // Regresión (Codex adversarial 2026-07-18): en la activación gobernada el
+  // candidato llega todavía APROBADA. Sin propagar el estado destino, la regla
+  // no se evaluaba nunca y podía activarse una plantilla sin forma de adopción.
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: evalúa el estado DESTINO en la activación (candidato APROBADA)", () => {
+    const candidato = template({
+      tipo: "MODELO_ACUERDO",
+      estado: "APROBADA",
+      organo_tipo: "JUNTA_GENERAL",
+      adoption_mode: null as never,
+      referencia_legal: "art. 296 LSC",
+    });
+    // Sin estado destino: la fila APROBADA no es "vigente" todavía.
+    expect(
+      evaluateSemanticRules(candidato).some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS"),
+    ).toBe(false);
+    // Con destino ACTIVA: la regla debe bloquear la activación.
+    expect(
+      evaluateSemanticRules(candidato, "ACTIVA").some(
+        (i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS",
+      ),
+    ).toBe(true);
   });
 
   it("SEM_ACTIVA_CAMPOS_REQUERIDOS: estado BORRADOR no dispara la regla aunque falten campos", () => {

@@ -476,6 +476,10 @@ export default function CatalogoMaterias() {
             // (ANY es comodín). Sin este filtro, un binding de otra
             // jurisdicción o tipo social se presentaría como vinculación
             // explícita de esta sociedad.
+            // Codex adversarial (P2): el ámbito del binding incluye también
+            // órgano y forma de adopción. Sin comprobarlos, una vinculación
+            // hecha para acuerdo sin sesión se presentaba como explícita en un
+            // contexto de sesión formal.
             explicitTemplateIds: explicitTemplateBindings
               .filter((binding) => {
                 if (resolveMateriaAlias(binding.materia) !== resolveMateriaAlias(materia.materia)) {
@@ -487,9 +491,44 @@ export default function CatalogoMaterias() {
                   const context = String(contextValue ?? "").trim().toUpperCase();
                   return !context || normalized === context;
                 };
+                const scopeMatchesAny = (
+                  bindingValue: string | null | undefined,
+                  contextValues: string[],
+                ) => {
+                  const normalized = String(bindingValue ?? "").trim().toUpperCase();
+                  if (!normalized || normalized === "ANY" || normalized === "GLOBAL") return true;
+                  // Codex adversarial (P2 residual): sin contexto conocido NO se
+                  // acepta un binding específico — antes se colaba cualquiera.
+                  if (contextValues.length === 0) return false;
+                  return contextValues.includes(normalized);
+                };
+                // El binding apunta a un tipo documental concreto: si no coincide
+                // con el de la plantilla, no es una vinculación de esta fase.
+                const boundTemplate = plantillas.find(
+                  (plantilla) => plantilla.id === binding.template_id,
+                );
+                const bindingDocType = String(binding.doc_type ?? "").trim().toUpperCase();
+                if (
+                  bindingDocType &&
+                  bindingDocType !== "ANY" &&
+                  boundTemplate &&
+                  String(boundTemplate.tipo ?? "").trim().toUpperCase() !== bindingDocType
+                ) {
+                  return false;
+                }
                 return (
                   scopeMatches(binding.jurisdiccion, selectedSociedad?.jurisdiction) &&
-                  scopeMatches(binding.tipo_social, selectedTipoSocialForRules)
+                  scopeMatches(binding.tipo_social, selectedTipoSocialForRules) &&
+                  scopeMatchesAny(
+                    binding.organo_tipo,
+                    applicableVariants.map((variant) => variant.organoCode.toUpperCase()),
+                  ) &&
+                  scopeMatchesAny(
+                    binding.adoption_mode,
+                    applicableVariants.flatMap((variant) =>
+                      variant.adoptionModes.map((mode) => mode.code.toUpperCase()),
+                    ),
+                  )
                 );
               })
               .map((binding) => binding.template_id),

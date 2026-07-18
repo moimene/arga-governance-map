@@ -22,7 +22,16 @@ const IDENTIFICACION_FIELDS = [
 // con tipo MODELO_ACUERDO/ACTA/DECISION exige que organo_tipo, adoption_mode
 // y referencia_legal estén poblados. La fuente de verdad pasa de docs a motor.
 
-export function evaluateSemanticRules(t: PlantillaCandidate): GatePreIssue[] {
+/**
+ * @param targetEstado estado al que se pretende transicionar. En la activación
+ * gobernada (APROBADA→ACTIVA) el candidato llega todavía como APROBADA: sin
+ * este parámetro las reglas de "plantilla vigente" no se evaluaban nunca en el
+ * único momento en que importan.
+ */
+export function evaluateSemanticRules(
+  t: PlantillaCandidate,
+  targetEstado?: string | null,
+): GatePreIssue[] {
   const issues: GatePreIssue[] = [];
   const materia = t.materia_acuerdo ?? t.materia ?? "";
 
@@ -62,7 +71,7 @@ export function evaluateSemanticRules(t: PlantillaCandidate): GatePreIssue[] {
   // compartida (templateMetadataPolicy/NON_ADOPTABLE_DOCUMENT_TYPES y
   // requiresLegalReference), no de una lista de tipos que no cubría los
   // tipos reales de acta (ACTA_SESION, ACTA_CONSIGNACION, ...).
-  if (t.estado === "ACTIVA") {
+  if ((targetEstado ?? t.estado) === "ACTIVA") {
     const missing: string[] = [];
     if (!t.organo_tipo || String(t.organo_tipo).trim() === "") missing.push("organo_tipo");
     if (

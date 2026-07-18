@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/hooks/useAgreementsList";
 import { useEntitiesList } from "@/hooks/useEntities";
+import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
 import { useCertificationRegistryIntake, useTramitacionById, useAgreementHasCertification } from "@/hooks/useTramitador";
@@ -588,8 +589,17 @@ function TramitadorNuevo() {
   );
   const [deedCertificationOverride, setDeedCertificationOverride] = useState(false);
 
+  // Codex adversarial (P1): sin el órgano, una materia con packs de Junta y de
+  // Consejo resolvía a la primera fila cronológica — el análisis registral y el
+  // panel podían mostrar las reglas del órgano equivocado.
+  const { data: agreementBodies = [] } = useBodiesByEntity(
+    selectedAgreement?.entity_id ?? undefined,
+  );
+  const selectedAgreementOrganoTipo =
+    agreementBodies.find((body) => body.id === selectedAgreement?.body_id)?.body_type ?? null;
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
-    selectedAgreement?.agreement_kind
+    selectedAgreement?.agreement_kind,
+    selectedAgreementOrganoTipo,
   );
   const registryRulePackData = rulePackData ?? (
     selectedAgreement && !rulesLoading
@@ -1437,6 +1447,7 @@ function TramitadorNuevo() {
       <MatterExecutionProfilePanel
         materia={selectedAgreement?.agreement_kind}
         adoptionMode={selectedAgreement?.adoption_mode}
+        organoTipo={selectedAgreementOrganoTipo}
         entity={entities.find((e) => e.id === selectedAgreement?.entity_id) ?? null}
         rulePack={rulePackData ?? null}
       />

@@ -50,13 +50,36 @@ export function templateMetadataPolicy(tipo?: string | null): TemplateMetadataPo
 }
 
 /**
+ * Tipos documentales cuya cita legal puede eximirse cuando el documento es
+ * soporte interno del expediente (informes de trabajo que no citan norma).
+ *
+ * Codex adversarial (P1): la exención NO puede depender solo del órgano. Un
+ * documento que materializa o instrumenta el acuerdo (modelo, acta,
+ * certificación, convocatoria, documento registral) cita norma siempre — si la
+ * exención mirase únicamente `organo_tipo`, bastaría clasificarlo como soporte
+ * interno para eludir tanto `META_REF_LEGAL_FORMAT` como `missingReference`.
+ */
+const LEGAL_REFERENCE_EXEMPTIBLE_TYPES = new Set<string>([
+  "INFORME_PRECEPTIVO",
+  "INFORME_DOCUMENTAL_PRE",
+  "INFORME_GESTION",
+]);
+
+/**
  * Criterio único de referencia legal (Lote 2 coherencia): exigible salvo para
- * plantillas de soporte interno. Lo comparten la revisión legal (comprueba
+ * informes de soporte interno. Lo comparten la revisión legal (comprueba
  * no-vacía) y el Gate PRE (comprueba formato de fuente legal); un solo
  * predicado evita que las tres pantallas de configuración cuenten cosas
  * distintas para el mismo dato.
  */
-export function requiresLegalReference(input: { organo_tipo?: string | null }): boolean {
+export function requiresLegalReference(input: {
+  tipo?: string | null;
+  organo_tipo?: string | null;
+}): boolean {
+  const tipo = normalizeMetadataCode(input.tipo);
+  // Solo los informes de trabajo admiten la exención; el resto cita norma
+  // aunque estén marcados como soporte interno.
+  if (tipo && !LEGAL_REFERENCE_EXEMPTIBLE_TYPES.has(tipo)) return true;
   return normalizeMetadataCode(input.organo_tipo) !== "SOPORTE_INTERNO";
 }
 

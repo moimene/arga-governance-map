@@ -115,12 +115,14 @@ describe("capa3-fields", () => {
       emptyKeys: [],
       ignoredKeys: [],
       legacyKeyMap: {},
+      discardedValues: {},
     });
     expect(normalizeCapa3Draft(fields, ["valor"] as unknown as Record<string, unknown>)).toEqual({
       values: {},
       emptyKeys: [],
       ignoredKeys: [],
       legacyKeyMap: {},
+      discardedValues: {},
     });
   });
 
@@ -291,5 +293,39 @@ describe("capa3-fields", () => {
         },
       ]);
     });
+  });
+});
+
+// Regresión (Codex adversarial 2026-07-18): el filtro por `opciones` desbloquea
+// la generación, pero no puede hacer desaparecer datos legítimos en silencio.
+describe("capa3 — valores descartados por lista cerrada", () => {
+  const fields = normalizeCapa3Fields([
+    {
+      campo: "modalidad_sesion",
+      obligatoriedad: "OBLIGATORIO",
+      descripcion: "Modalidad de la sesión",
+      tipo: "enum",
+      opciones: ["PRESENCIAL", "TELEMATICA", "MIXTA"],
+    },
+  ]);
+
+  it("descarta el valor fuera de lista pero lo reporta para poder avisar", () => {
+    const draft = normalizeCapa3Draft(fields, { modalidad_sesion: "HIBRIDA" });
+    // No se cuela en los valores (bloquearía la validación en silencio)...
+    expect(draft.values.modalidad_sesion).toBeUndefined();
+    // ...pero tampoco se pierde: queda registrado para la UI.
+    expect(draft.discardedValues.modalidad_sesion).toBe("HIBRIDA");
+  });
+
+  it("un valor válido no se reporta como descartado", () => {
+    const draft = normalizeCapa3Draft(fields, { modalidad_sesion: "TELEMATICA" });
+    expect(draft.values.modalidad_sesion).toBe("TELEMATICA");
+    expect(draft.discardedValues).toEqual({});
+  });
+
+  it("un campo simplemente vacío no cuenta como descartado", () => {
+    const draft = normalizeCapa3Draft(fields, { modalidad_sesion: "" });
+    expect(draft.discardedValues).toEqual({});
+    expect(draft.emptyKeys).toContain("modalidad_sesion");
   });
 });

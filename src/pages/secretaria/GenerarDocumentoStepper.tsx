@@ -338,9 +338,17 @@ export default function GenerarDocumentoStepper() {
     () => normalizeCapa3Fields(effectivePlantilla?.capa3_editables),
     [effectivePlantilla?.capa3_editables],
   );
-  const normalizedCapa3Values = useMemo(
-    () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values).values,
+  const normalizedCapa3Draft = useMemo(
+    () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values),
     [capa3Values, normalizedCapa3Fields],
+  );
+  const normalizedCapa3Values = normalizedCapa3Draft.values;
+  // Codex adversarial (P1): un valor persistido fuera de la lista cerrada del
+  // campo se descarta para no bloquear la generación — pero el usuario debe
+  // verlo antes de firmar, no perderlo en silencio.
+  const capa3DiscardedEntries = useMemo(
+    () => Object.entries(normalizedCapa3Draft.discardedValues),
+    [normalizedCapa3Draft],
   );
   const editableDraftLength = useMemo(
     () => editableDraftText.trim().length,
@@ -1081,6 +1089,32 @@ export default function GenerarDocumentoStepper() {
                   reactivarlos, actualice <code className="font-mono text-xs">compatible_with_canonical_version</code> a{" "}
                   <code className="font-mono text-xs">{selectedPlantilla.version}</code>.
                 </p>
+              </div>
+            ) : null}
+
+            {capa3DiscardedEntries.length > 0 ? (
+              <div
+                role="alert"
+                className="border border-[var(--status-warning)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <p className="font-medium">Valores no admitidos por el campo</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-[var(--g-text-secondary)]">
+                  {capa3DiscardedEntries.map(([campo, valor]) => {
+                    const field = normalizedCapa3Fields.find(
+                      (candidate) => candidate.campo === campo,
+                    );
+                    return (
+                      <li key={campo}>
+                        <span className="font-medium text-[var(--g-text-primary)]">
+                          {field?.descripcion || campo}
+                        </span>
+                        : el valor «{valor}» no está entre las opciones disponibles y no se
+                        incorporará al documento. Elige una opción válida.
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ) : null}
 

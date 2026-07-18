@@ -35,6 +35,31 @@ describe("MatterExecutionProfilePanel — contrato de fase 1 informativa", () =>
     expect(panel).toContain("if (!profile) return null;");
   });
 
+  // Codex adversarial (P1): ningún dato jurídico puede salir de un valor por
+  // defecto, y la regla resuelta debe ser la del órgano del acuerdo.
+  it("exige contexto real completo: sin tipo social, órgano o forma de adopción calla", () => {
+    const panel = read(PANEL);
+    expect(panel).toContain("const tipoSocial = entity?.tipo_social?.trim();");
+    expect(panel).toContain("if (!tipoSocial) return null;");
+    expect(panel).toContain("if (!packOrgano || !organoTipo) return null;");
+    expect(panel).toContain("if (!adoptionMode?.trim()) return null;");
+    // Sin defaults fabricados en la construcción del perfil.
+    expect(panel).not.toContain('?? "JUNTA_GENERAL"');
+    expect(panel).not.toContain('?? "SA"');
+    expect(panel).not.toContain('?? "MEETING"');
+  });
+
+  it("calla si la regla versionada resuelta no es la del órgano del acuerdo", () => {
+    const panel = read(PANEL);
+    expect(panel).toContain("!organoMatchesPack(packOrgano, organoTipo)");
+    // Sin bucket comodín: COMISION/COMITE/SOCIO_UNICO no pueden casar entre sí.
+    expect(panel).not.toContain('return "OTRO";');
+    // Y el tramitador resuelve el órgano real del acuerdo para el rule pack.
+    const tramitador = read(TRAMITADOR);
+    expect(tramitador).toContain("selectedAgreementOrganoTipo");
+    expect(tramitador).toContain("organoTipo={selectedAgreementOrganoTipo}");
+  });
+
   it("no presenta el plazo del art. 176 LSC como mínimo de órganos de administración", () => {
     const panel = read(PANEL);
     expect(panel).toContain("isJuntaOrgano(profile.organo_tipo)");

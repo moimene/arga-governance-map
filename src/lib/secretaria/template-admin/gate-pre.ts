@@ -48,7 +48,7 @@ export function validateTemplateForActivation(
   collectCapa2Issues(template, issues);
   collectCapa3Issues(template, issues);
   collectDuplicateIssue(template, ctx, issues);
-  collectSemanticIssues(template, issues);
+  collectSemanticIssues(template, issues, target);
   collectInfoIssues(template, issues);
   return summarize(issues);
 }
@@ -275,8 +275,12 @@ function collectDuplicateIssue(
   });
 }
 
-function collectSemanticIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
-  for (const i of evaluateSemanticRules(t)) issues.push(i);
+function collectSemanticIssues(
+  t: PlantillaCandidate,
+  issues: GatePreIssue[],
+  targetEstado: EstadoPlantilla,
+): void {
+  for (const i of evaluateSemanticRules(t, targetEstado)) issues.push(i);
 }
 
 function collectInfoIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void {

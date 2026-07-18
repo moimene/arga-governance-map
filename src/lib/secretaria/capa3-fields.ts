@@ -43,6 +43,12 @@ export interface NormalizedCapa3Draft {
   emptyKeys: string[];
   ignoredKeys: string[];
   legacyKeyMap: Record<string, string>;
+  /**
+   * Valores que llegaron informados pero quedaron fuera por no estar entre las
+   * `opciones` del campo. Se conservan para poder avisar al usuario en vez de
+   * perderlos en silencio (Codex adversarial P1).
+   */
+  discardedValues: Record<string, string>;
 }
 
 interface RawCapa3Field {
@@ -423,6 +429,7 @@ export function normalizeCapa3Draft(
   const emptyKeys = new Set<string>();
   const ignoredKeys = new Set<string>();
   const legacyKeyMap: Record<string, string> = {};
+  const discardedValues: Record<string, string> = {};
   const exactFields = new Set(fields.map((field) => field.campo));
   const canonicalFields = fields.reduce<Record<string, string>>((acc, field) => {
     const canonical = normalizeDraftKey(field.campo);
@@ -432,7 +439,7 @@ export function normalizeCapa3Draft(
   const sourcePriority: Record<string, "exact" | "legacy"> = {};
 
   if (!draftValues || typeof draftValues !== "object" || Array.isArray(draftValues)) {
-    return { values, emptyKeys: [], ignoredKeys: [], legacyKeyMap };
+    return { values, emptyKeys: [], ignoredKeys: [], legacyKeyMap, discardedValues: {} };
   }
 
   for (const [rawKey, rawValue] of Object.entries(draftValues)) {
@@ -452,6 +459,25 @@ export function normalizeCapa3Draft(
     const normalizedValue = normalizeCapa3Value(field, rawValue);
 
     if (!capa3ValueHasContent(normalizedValue)) {
+      // Codex adversarial (P1): distinguir "vino vacío" de "traía un valor que
+      // la lista cerrada rechaza". Sin esta distinción, un valor persistido
+      // legítimo (borrador guardado, override de sociedad, sugerencia del
+      // asistente) desaparecía en silencio y el documento se generaba sin él.
+      if (isArrayCapa3Field(field)) {
+        // Un array que llega con contenido pero se vacía al normalizar (filas
+        // sin ninguna clave del esquema) también debe avisarse.
+        const hadContent = Array.isArray(rawValue)
+          ? rawValue.length > 0
+          : Boolean(normalizeDraftValue(rawValue));
+        if (hadContent) {
+          discardedValues[target] = Array.isArray(rawValue)
+            ? `${rawValue.length} fila(s) no compatibles con el formato del campo`
+            : String(normalizeDraftValue(rawValue));
+        }
+      } else {
+        const discarded = normalizeDraftValue(rawValue);
+        if (discarded) discardedValues[target] = discarded;
+      }
       emptyKeys.add(target);
       continue;
     }
@@ -467,6 +493,7 @@ export function normalizeCapa3Draft(
     emptyKeys: Array.from(emptyKeys).sort(),
     ignoredKeys: Array.from(ignoredKeys).sort(),
     legacyKeyMap,
+    discardedValues,
   };
 }
 
