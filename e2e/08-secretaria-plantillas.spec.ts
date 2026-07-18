@@ -233,8 +233,11 @@ test.describe('Motor de reglas societarias', () => {
     await expect(page.getByText('Plantillas mínimas', { exact: true })).toBeVisible();
 
     // El CTA contextual "Iniciar expediente" aparece también en el panel de estado de la materia.
+    // Lote 1 coherencia (A1): el CTA abre el PROCESO DE ADOPCIÓN (convocatoria
+    // del órgano competente con la materia pre-sembrada), no la fase registral.
     await page.getByRole('link', { name: 'Iniciar expediente', exact: true }).first().click();
-    await expect(page).toHaveURL(/\/secretaria\/tramitador\/nuevo.*materia=DIVIDENDO_A_CUENTA/);
+    await expect(page).toHaveURL(/\/secretaria\/convocatorias\/nueva.*materia=DIVIDENDO_A_CUENTA/);
+    await expect(page.getByText('Materia recibida para la adopción del acuerdo')).toBeVisible({ timeout: 10_000 });
     await expect(page).not.toHaveURL('/login');
   });
 
@@ -532,5 +535,33 @@ test.describe('Libros Obligatorios', () => {
     await expect(
       page.getByText('Libro').or(page.getByText('legaliz').or(page.getByText('alerta'))).first()
     ).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+// Lote 1 coherencia — flujo de adopción vs tramitador (A2/A3).
+test.describe('Flujo de adopción — intakes y rescate', () => {
+  test('tramitador sin acuerdos de la materia ofrece iniciar la adopción y no degrada en silencio', async ({ page }) => {
+    await page.goto('/secretaria/tramitador/nuevo?materia=FUSION_ESCISION&scope=grupo');
+
+    await expect(page.getByText('Entrada desde Materias y reglas')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.getByText(/La tramitación registral llega después de la adopción/),
+    ).toBeVisible();
+    const rescate = page.getByRole('link', { name: 'Iniciar adopción de esta materia' });
+    await expect(rescate).toBeVisible();
+    await expect(rescate).toHaveAttribute(
+      'href',
+      /\/secretaria\/(convocatorias\/nueva|acuerdos-sin-sesion|decisiones-unipersonales)\S*materia=FUSION_ESCISION/,
+    );
+    // La lista completa solo aparece bajo acción explícita.
+    await expect(page.getByText('Se muestran el resto de acuerdos tramitables')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Ver otros acuerdos tramitables' }).click();
+    await expect(page.getByText('Se muestran el resto de acuerdos tramitables')).toBeVisible();
+  });
+
+  test('co-aprobación pre-selecciona la clase de materia desde ?materia=', async ({ page }) => {
+    await page.goto('/secretaria/acuerdos-sin-sesion/co-aprobacion?materia=MODIFICACION_ESTATUTOS&scope=grupo');
+
+    await expect(page.locator('#coaprobacion-materia')).toHaveValue('MOD_ESTATUTOS', { timeout: 10_000 });
   });
 });

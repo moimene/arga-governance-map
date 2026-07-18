@@ -33,6 +33,7 @@ import {
   type MateriaHelpSection,
 } from "@/components/secretaria/MateriaCatalogHelp";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { resolveAdoptionRoute } from "@/lib/secretaria/adoption-routing";
 import {
   FUNCTIONAL_MATTER_GROUPS,
   TEMPLATE_DOCUMENT_STAGES,
@@ -286,14 +287,27 @@ function isEngineWorkspaceTab(value: string | null): value is EngineWorkspaceTab
   return ENGINE_WORKSPACE_TABS.some((tab) => tab.id === value);
 }
 
-function tramitadorNuevoUrl(input: {
+// El CTA "Iniciar expediente" abre el PROCESO DE ADOPCIÓN del acuerdo
+// (convocatoria, sin sesión o decisión unipersonal según los modos admitidos
+// por la regla aplicable). La fase registral (/secretaria/tramitador) llega
+// después de adoptar y certificar, nunca como punto de entrada de la materia.
+function adopcionNuevaUrl(input: {
   materia: string;
   scope: TemplateRouteScope;
   entityId?: string | null;
+  ruleVariants?: MatterRuleVariant[];
 }) {
-  const params = new URLSearchParams({ materia: input.materia, scope: input.scope });
-  if (input.scope === "sociedad" && input.entityId) params.set("entity", input.entityId);
-  return buildUrlWithSearchParams("/secretaria/tramitador/nuevo", params);
+  // En ámbito sociedad solo cuentan los modos de las variantes aplicables al
+  // tipo social (mismo criterio que templateConfigurationByMateria).
+  const applicableVariants = (input.ruleVariants ?? []).filter(
+    (variant) => input.scope !== "sociedad" || variant.socialTypeApplicability !== "not_applicable",
+  );
+  return resolveAdoptionRoute({
+    materia: input.materia,
+    adoptionModes: applicableVariants.flatMap((variant) => variant.adoptionModes),
+    scope: input.scope,
+    entityId: input.entityId,
+  }).to;
 }
 
 export default function CatalogoMaterias() {
@@ -1539,6 +1553,7 @@ function MateriaDetail({
               <MateriaPrimaryCta
                 status={globalStatus}
                 materia={materia}
+                ruleVariants={ruleVariants}
                 entityId={entityId}
                 routeScope={routeScope}
                 onTabChange={onTabChange}
@@ -1888,6 +1903,7 @@ function MateriaSummaryTab({
           <MateriaPrimaryCta
             status={globalStatus}
             materia={materia}
+            ruleVariants={ruleVariants}
             entityId={entityId}
             routeScope={routeScope}
             onTabChange={onTabChange}
@@ -1915,12 +1931,14 @@ function MateriaSummaryTab({
 function MateriaPrimaryCta({
   status,
   materia,
+  ruleVariants,
   entityId,
   routeScope,
   onTabChange,
 }: {
   status: MateriaGlobalStatusResult;
   materia: MateriaCatalogRow;
+  ruleVariants: MatterRuleVariant[];
   entityId: string;
   routeScope: TemplateRouteScope;
   onTabChange: (tab: EngineWorkspaceTab) => void;
@@ -1965,7 +1983,7 @@ function MateriaPrimaryCta({
   }
   return (
     <Link
-      to={tramitadorNuevoUrl({ materia: materia.materia, scope: routeScope, entityId })}
+      to={adopcionNuevaUrl({ materia: materia.materia, scope: routeScope, entityId, ruleVariants })}
       className={primaryClass}
       style={{ borderRadius: "var(--g-radius-md)" }}
     >
@@ -2724,7 +2742,7 @@ function MateriaSimulationTab({
       <div className="flex flex-col gap-2 sm:flex-row">
         {templateReadiness.openingStatus === "ready" && !legalGateBlocked && !societyNotApplicable ? (
           <Link
-            to={tramitadorNuevoUrl({ materia: materia.materia, scope: routeScope, entityId })}
+            to={adopcionNuevaUrl({ materia: materia.materia, scope: routeScope, entityId, ruleVariants })}
             className="inline-flex flex-1 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >

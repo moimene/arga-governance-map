@@ -34,7 +34,10 @@ function template(patch: Partial<PlantillaProtegidaRow> & Pick<PlantillaProtegid
 }
 
 describe("template-routing", () => {
-  it("dirige modelos de acuerdo al tramitador con la materia canonica", () => {
+  // Lote 1 coherencia (A2): un MODELO_ACUERDO alimenta la ADOPCIÓN del
+  // acuerdo, no la fase registral. La ruta se resuelve por adoption_mode y
+  // cae a convocatoria (sesión formal) cuando el modo no está informado.
+  it("dirige modelos de acuerdo al proceso de adopción con la materia canonica", () => {
     const target = getTemplateUsageTarget(
       template({
         id: "modelo-cuentas",
@@ -43,8 +46,23 @@ describe("template-routing", () => {
       }),
     );
 
-    expect(target.to).toBe("/secretaria/tramitador/nuevo?materia=APROBACION_CUENTAS&plantilla=modelo-cuentas");
-    expect(target.label).toBe("Usar en tramitador");
+    expect(target.to).toBe("/secretaria/convocatorias/nueva?materia=APROBACION_CUENTAS&plantilla=modelo-cuentas");
+    expect(target.label).toBe("Iniciar adopción");
+    expect(target.hint).toContain("propuesta de acuerdo");
+  });
+
+  it("dirige modelos de acuerdo sin sesión a su stepper de adopción", () => {
+    const target = getTemplateUsageTarget(
+      template({
+        id: "modelo-vinculada",
+        tipo: "MODELO_ACUERDO",
+        materia_acuerdo: "OPERACION_VINCULADA",
+        adoption_mode: "NO_SESSION",
+      }),
+    );
+
+    expect(target.to).toBe("/secretaria/acuerdos-sin-sesion/nuevo?materia=OPERACION_VINCULADA&plantilla=modelo-vinculada");
+    expect(target.label).toBe("Iniciar adopción");
   });
 
   it("dirige convocatorias al asistente de nueva convocatoria", () => {

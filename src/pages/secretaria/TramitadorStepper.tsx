@@ -23,6 +23,9 @@ import { registryChannelsForJurisdiction } from "@/lib/secretaria/registry-chann
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { persistRegistryFilingCertificationLink } from "@/lib/secretaria/registry-certification-link";
 import { adoptionModeBusinessLabel, matterClassBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
+import { resolveAdoptionRoute } from "@/lib/secretaria/adoption-routing";
+import { extractRulePackAdoptionModes } from "@/lib/secretaria/materia-catalog-ux";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
 
 const STEPS: StepDef[] = [
   {
@@ -489,14 +492,52 @@ function TramitadorNuevo() {
       : [],
     [requestedMateria, visibleAgreements],
   );
-  const baseDisplayedAgreements = useMemo(
-    () => requestedMateria && materiaMatchedAgreements.length > 0
-      ? materiaMatchedAgreements
-      : visibleAgreements,
-    [materiaMatchedAgreements, requestedMateria, visibleAgreements],
-  );
+  // Lote 1 coherencia (A3): si la materia solicitada no tiene acuerdos
+  // tramitables, NO se degrada en silencio a la lista completa — el rescate es
+  // iniciar la ADOPCIÓN de la materia; la lista completa solo se muestra si el
+  // usuario la pide explícitamente.
+  const [showAllTramitables, setShowAllTramitables] = useState(false);
   const requestedMateriaWithoutAgreement = Boolean(
     requestedMateria && !agreementsLoading && materiaMatchedAgreements.length === 0,
+  );
+  // El rescate hacia la adopción solo aplica a la entrada por materia pura:
+  // con ?agreement= o ?certificacion= el intake ya trae su propio contexto de
+  // acuerdo (pre-selección por defaultAgreementId) y ocultar la lista dejaría
+  // una selección válida invisible bajo un panel de "no hay acuerdos".
+  const materiaRescueActive =
+    requestedMateriaWithoutAgreement && !requestedAgreementId && !requestedCertificationId;
+  const baseDisplayedAgreements = useMemo(() => {
+    if (requestedMateria && materiaMatchedAgreements.length > 0) return materiaMatchedAgreements;
+    if (materiaRescueActive && !showAllTramitables) return [];
+    return visibleAgreements;
+  }, [
+    materiaMatchedAgreements,
+    materiaRescueActive,
+    requestedMateria,
+    showAllTramitables,
+    visibleAgreements,
+  ]);
+  const { data: requestedMateriaRulePack } = useRulePackForMateria(
+    materiaRescueActive ? requestedMateria : undefined,
+  );
+  const adoptionRescueTarget = useMemo(
+    () =>
+      resolveAdoptionRoute({
+        materia: requestedMateria,
+        adoptionModes: extractRulePackAdoptionModes(requestedMateriaRulePack?.version.payload).map(
+          (mode) => mode.code,
+        ),
+        // Si se llegó con un MODELO_ACUERDO, el rescate conserva el modelo:
+        // los steppers de adopción lo consumen vía ?plantilla=.
+        plantillaId: requestedTemplateType === "MODELO_ACUERDO" ? requestedPlantillaId : null,
+        scope: searchParams.get("scope") === "sociedad"
+          ? "sociedad"
+          : searchParams.get("scope") === "grupo"
+            ? "grupo"
+            : null,
+        entityId: scopedEntityId,
+      }),
+    [requestedMateria, requestedMateriaRulePack?.version.payload, requestedPlantillaId, requestedTemplateType, scopedEntityId, searchParams],
   );
   const {
     data: certificationIntake,
@@ -1181,7 +1222,8 @@ function TramitadorNuevo() {
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
-          Entrada desde plantilla
+          {/* Lote 1 coherencia (A4): el origen sin plantilla es Materias y reglas. */}
+          {requestedPlantillaId ? "Entrada desde plantilla" : "Entrada desde Materias y reglas"}
           {requestedMateria ? (
             <>
               {" "}para materia <span className="font-semibold">{requestedMateria}</span>
@@ -1200,7 +1242,41 @@ function TramitadorNuevo() {
           ) : null}
         </div>
       )}
-      {requestedMateriaWithoutAgreement && (
+      {materiaRescueActive && !showAllTramitables && (
+        <div
+          className="space-y-3 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
+            <span>
+              <strong className="text-[var(--g-text-primary)]">
+                No hay acuerdos de la materia {labelMateria(requestedMateria)} certificados o adoptados en el ámbito actual.
+              </strong>{" "}
+              La tramitación registral llega después de la adopción: primero se adopta el acuerdo en el
+              órgano competente y, una vez certificado, se tramita aquí.
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              to={adoptionRescueTarget.to}
+              className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Iniciar adopción de esta materia
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowAllTramitables(true)}
+              className="inline-flex items-center justify-center gap-2 border border-[var(--g-border-subtle)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Ver otros acuerdos tramitables
+            </button>
+          </div>
+        </div>
+      )}
+      {requestedMateriaWithoutAgreement && (showAllTramitables || !materiaRescueActive) && (
         <div
           className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1215,6 +1291,7 @@ function TramitadorNuevo() {
           Cargando acuerdos...
         </div>
       ) : displayedAgreements.length === 0 ? (
+        materiaRescueActive && !showAllTramitables ? null : (
         <div
           className="flex items-start gap-2 px-4 py-3 text-sm text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1232,6 +1309,7 @@ function TramitadorNuevo() {
                     : "No hay acuerdos certificados o adoptados disponibles"}
           </span>
         </div>
+        )
       ) : (
         <div className="space-y-2">
           {displayedAgreements.map((agreement) => {

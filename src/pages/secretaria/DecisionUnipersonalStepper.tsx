@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { CheckCircle2, AlertTriangle, Loader2, UserCheck } from "lucide-react";
 import { StepperShell, type StepDef } from "./_shared/StepperShell";
@@ -13,6 +13,7 @@ import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
+import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
 
 type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
 
@@ -345,6 +346,31 @@ export default function DecisionUnipersonalStepper() {
   const [fundamentoLegal, setFundamentoLegal] = useState("");
   const [createdDecisionId, setCreatedDecisionId] = useState<string | null>(null);
   const isSociedadScoped = scope.mode === "sociedad";
+  // Lote 1 coherencia (A2): `?materia=` pre-selecciona la materia cuando el
+  // código canónico existe en el catálogo de materias del tenant, y
+  // `?decisor=` (emitido por resolveAdoptionRoute para las vías
+  // UNIPERSONAL_*) pre-selecciona socio único vs administrador único.
+  const [searchParams] = useSearchParams();
+  const requestedMateriaParam = searchParams.get("materia");
+  const requestedDecisorParam = searchParams.get("decisor");
+  const [appliedDecisorParam, setAppliedDecisorParam] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requestedDecisorParam || appliedDecisorParam === requestedDecisorParam) return;
+    if (requestedDecisorParam === "SOCIO_UNICO" || requestedDecisorParam === "ADMINISTRADOR_UNICO") {
+      setTipo(requestedDecisorParam);
+    }
+    setAppliedDecisorParam(requestedDecisorParam);
+  }, [appliedDecisorParam, requestedDecisorParam]);
+  const [appliedMateriaParam, setAppliedMateriaParam] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requestedMateriaParam || appliedMateriaParam === requestedMateriaParam) return;
+    if (materias.length === 0) return;
+    const canonical = resolveMateriaAlias(requestedMateriaParam);
+    if (materias.some((item) => item.materia === canonical)) {
+      setMateria((current) => current || canonical);
+    }
+    setAppliedMateriaParam(requestedMateriaParam);
+  }, [appliedMateriaParam, materias, requestedMateriaParam]);
   const selectedMateria = materias.find((item) => item.materia === materia) ?? null;
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";

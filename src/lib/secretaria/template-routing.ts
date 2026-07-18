@@ -1,4 +1,5 @@
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
+import { resolveAdoptionRoute } from "./adoption-routing";
 import { selectTemplateProcessEntry } from "./template-process-matrix";
 
 export interface TemplateUsageTarget {
@@ -19,11 +20,18 @@ export function getTemplateUsageTarget(plantilla: PlantillaProtegidaRow): Templa
   const entry = selectTemplateProcessEntry(plantilla);
 
   if (entry?.processId === "tramitador_acuerdo") {
-    const materia = encodeURIComponent(plantilla.materia_acuerdo ?? "");
+    // Un MODELO_ACUERDO alimenta la ADOPCIÓN del acuerdo (convocatoria, sin
+    // sesión o decisión unipersonal según su forma de adopción), no la fase
+    // registral: el tramitador exige un acuerdo ya adoptado o certificado.
+    const target = resolveAdoptionRoute({
+      materia: plantilla.materia_acuerdo ?? plantilla.materia ?? "",
+      adoptionModes: plantilla.adoption_mode ? [plantilla.adoption_mode] : null,
+      plantillaId: plantilla.id,
+    });
     return {
-      to: `/secretaria/tramitador/nuevo?materia=${materia}&${templateParam}`,
-      label: "Usar en tramitador",
-      hint: "Crea una tramitación sobre un acuerdo compatible con esta materia.",
+      to: target.to,
+      label: "Iniciar adopción",
+      hint: `${target.hint} El modelo se aplicará como propuesta de acuerdo.`,
     };
   }
 

@@ -10,6 +10,7 @@ import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useAdministradores } from "@/hooks/useCargos";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
+import { coarseAdoptionMateria } from "@/lib/secretaria/adoption-routing";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
@@ -483,7 +484,11 @@ export default function CoAprobacionStepper() {
   // Step 1 state
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(scopedEntityId);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
-  const [materia, setMateria] = useState("");
+  // Lote 1 coherencia (A2): `?materia=` pre-selecciona la clase de materia
+  // cuando el código canónico tiene correspondencia con el selector agregado.
+  const [materia, setMateria] = useState(
+    () => coarseAdoptionMateria(searchParams.get("materia")) ?? "",
+  );
   const [texto, setTexto] = useState("");
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);

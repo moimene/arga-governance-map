@@ -10,6 +10,7 @@ import { StepRail } from "./_shared/StepNav";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useBodyMandates } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
+import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
 import {
   useCreateNoSessionResolution,
   useAdoptNoSessionAgreement,
@@ -194,6 +195,24 @@ export default function AcuerdoSinSesionStepper() {
     setSelectedBodyId(null);
     setAgreementKind("");
   }, [scopedEntityId]);
+
+  // Lote 1 coherencia (A2): `?materia=` pre-selecciona clase y materia cuando
+  // el código canónico existe en el catálogo del stepper. Declarado después
+  // del efecto de ámbito para que la pre-selección sobreviva al montaje.
+  const requestedMateriaParam = searchParams.get("materia");
+  const [appliedMateriaParam, setAppliedMateriaParam] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requestedMateriaParam || appliedMateriaParam === requestedMateriaParam) return;
+    const canonical = resolveMateriaAlias(requestedMateriaParam);
+    const matchedClass = (Object.keys(AGREEMENT_KINDS) as Array<keyof typeof AGREEMENT_KINDS>).find(
+      (matter) => AGREEMENT_KINDS[matter].includes(canonical),
+    );
+    if (matchedClass) {
+      setMatterClass(matchedClass as "ORDINARIA" | "ESTATUTARIA" | "ESTRUCTURAL");
+      setAgreementKind(canonical);
+    }
+    setAppliedMateriaParam(requestedMateriaParam);
+  }, [appliedMateriaParam, requestedMateriaParam]);
 
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);

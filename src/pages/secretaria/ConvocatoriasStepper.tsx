@@ -17,8 +17,10 @@ import {
   isMateriaCompatibleWithOrgano,
   labelMateria,
   materiaDefaultForOrgano,
+  resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
+import { useMateriaCatalog } from "@/hooks/useMateriaConfig";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -468,6 +470,11 @@ export default function ConvocatoriasStepper() {
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const requestedPlantillaId = searchParams.get("plantilla");
+  // Lote 1 coherencia (A2): `?materia=<code>` es el intake del proceso de
+  // adopción desde Materias y reglas / Tramitador — pre-siembra el primer
+  // punto del orden del día con la materia canónica.
+  const requestedMateriaParam = searchParams.get("materia");
+  const requestedMateria = requestedMateriaParam ? resolveMateriaAlias(requestedMateriaParam) : null;
   // ITEM-097: `?draft=<id>` permite retomar una convocatoria en estado
   // BORRADOR (p.ej. las creadas por campañas de grupo) para completarla y
   // emitirla, en vez de quedar como dead-end sin ruta de continuación.
@@ -888,9 +895,14 @@ export default function ConvocatoriasStepper() {
     [requestedPlantilla, templateMatrixContext],
   );
   const isRequestedConvocatoriaTemplate = requestedTemplateMatrix?.processId === "convocatoria";
+  // Lote 1 coherencia (A2): un MODELO_ACUERDO también es intake válido — la
+  // convocatoria es la apertura de su proceso de adopción y el modelo siembra
+  // el punto DECISORIO del orden del día.
+  const isRequestedModeloTemplate = requestedPlantilla?.tipo === "MODELO_ACUERDO";
   const isRequestedTemplateFlowCompatible =
     requestedTemplateMatrix?.processId === "convocatoria" ||
-    requestedTemplateMatrix?.processId === "informe_pre";
+    requestedTemplateMatrix?.processId === "informe_pre" ||
+    isRequestedModeloTemplate;
   const requestedTemplateCapa3Fields = requestedTemplateMatrix?.capa3Fields ?? [];
   const requestedTemplatePendingCapa3 = requestedTemplateCapa3Fields.filter(
     (field) => isRequiredCapa3Field(field) && !capa3ValueToText(templateCapa3Values[field.campo]),
@@ -900,23 +912,47 @@ export default function ConvocatoriasStepper() {
     [requestedPlantilla, requestedTemplateMatrix],
   );
 
+  // Lote 1 coherencia (A2): catálogo societario para resolver el label
+  // jurídico y la clase LSC de materias que no existen en AGENDA_MATERIAS
+  // (p.ej. DIVIDENDO_A_CUENTA, ADQUISICION_PROPIA). Solo clases compatibles
+  // con `agreements` (ORDINARIA/ESTATUTARIA/ESTRUCTURAL).
+  const { data: materiaCatalogRows = [], isLoading: materiaCatalogLoading } = useMateriaCatalog();
+  const findCatalogMateria = useCallback(
+    (canonical: string | null) =>
+      canonical
+        ? materiaCatalogRows.find((row) => resolveMateriaAlias(row.materia) === canonical) ?? null
+        : null,
+    [materiaCatalogRows],
+  );
+
   useEffect(() => {
     if (!requestedPlantillaId || !requestedPlantilla || appliedPlantillaId === requestedPlantillaId) return;
-    if (!isRequestedConvocatoriaTemplate) return;
+    if (!isRequestedConvocatoriaTemplate && !isRequestedModeloTemplate) return;
 
-    const materiaMeta = requestedTemplateMateria
-      ? AGENDA_MATERIAS.find((materia) => materia.value === requestedTemplateMateria)
+    const canonicalTemplateMateria = requestedTemplateMateria
+      ? resolveMateriaAlias(requestedTemplateMateria)
       : null;
+    const materiaMeta = canonicalTemplateMateria
+      ? AGENDA_MATERIAS.find((materia) => materia.value === canonicalTemplateMateria)
+      : null;
+    // Si la materia no está en la agenda, espera al catálogo para derivar
+    // label y clase LSC reales en vez de heredar los del punto placeholder.
+    if (canonicalTemplateMateria && !materiaMeta && materiaCatalogLoading) return;
+    const catalogRow = materiaMeta ? null : findCatalogMateria(canonicalTemplateMateria);
 
-    if (requestedTemplateMateria || materiaMeta) {
+    if (canonicalTemplateMateria || materiaMeta) {
       setAgendaItems((prev) => {
         const first = prev[0] ?? newAgendaItem();
         return [
           {
             ...first,
-            titulo: first.titulo.trim() || materiaMeta?.label || requestedTemplateMateria || first.titulo,
-            materia: materiaMeta?.value ?? requestedTemplateMateria ?? first.materia,
-            tipo: (materiaMeta?.tipo ?? first.tipo) as AgendaItem["tipo"],
+            titulo:
+              first.titulo.trim() ||
+              materiaMeta?.label ||
+              catalogRow?.materia_label_es ||
+              labelMateria(canonicalTemplateMateria),
+            materia: materiaMeta?.value ?? canonicalTemplateMateria ?? first.materia,
+            tipo: (materiaMeta?.tipo ?? catalogRow?.matter_class ?? first.tipo) as AgendaItem["tipo"],
             inscribible: materiaMeta?.inscribible ?? first.inscribible,
             // agenda_item.kind v3.1: si llega una plantilla MODELO_ACUERDO,
             // el punto se trata como DECISORIO (se va a votar). Las plantillas
@@ -933,7 +969,37 @@ export default function ConvocatoriasStepper() {
     }
 
     setAppliedPlantillaId(requestedPlantillaId);
-  }, [appliedPlantillaId, isRequestedConvocatoriaTemplate, requestedPlantilla, requestedPlantillaId, requestedTemplateMateria]);
+  }, [appliedPlantillaId, findCatalogMateria, isRequestedConvocatoriaTemplate, isRequestedModeloTemplate, materiaCatalogLoading, requestedPlantilla, requestedPlantillaId, requestedTemplateMateria]);
+
+  // Lote 1 coherencia (A2): intake por materia sin plantilla — incorpora la
+  // materia canónica como primer punto DECISORIO del orden del día.
+  const [appliedMateriaParam, setAppliedMateriaParam] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requestedMateria || requestedPlantillaId || requestedDraftId) return;
+    if (appliedMateriaParam === requestedMateria) return;
+    const materiaMeta = AGENDA_MATERIAS.find((materia) => materia.value === requestedMateria) ?? null;
+    if (!materiaMeta && materiaCatalogLoading) return;
+    const catalogRow = materiaMeta ? null : findCatalogMateria(requestedMateria);
+    setAgendaItems((prev) => {
+      const first = prev[0] ?? newAgendaItem();
+      return [
+        {
+          ...first,
+          titulo:
+            first.titulo.trim() ||
+            materiaMeta?.label ||
+            catalogRow?.materia_label_es ||
+            labelMateria(requestedMateria),
+          materia: materiaMeta?.value ?? requestedMateria,
+          tipo: (materiaMeta?.tipo ?? catalogRow?.matter_class ?? first.tipo) as AgendaItem["tipo"],
+          inscribible: materiaMeta?.inscribible ?? first.inscribible,
+          kind: "DECISORIO",
+        },
+        ...prev.slice(1),
+      ];
+    });
+    setAppliedMateriaParam(requestedMateria);
+  }, [appliedMateriaParam, findCatalogMateria, materiaCatalogLoading, requestedDraftId, requestedMateria, requestedPlantillaId]);
 
   function openTemplateCapa3Capture() {
     if (requestedTemplateCapa3Fields.length === 0) return;
@@ -2354,6 +2420,11 @@ export default function ConvocatoriasStepper() {
                   · se sugiere ERDS como canal certificado
                 </span>
               ) : null}
+              {isRequestedModeloTemplate ? (
+                <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
+                  · el modelo incorpora la propuesta de acuerdo al orden del día
+                </span>
+              ) : null}
               {localRequestedPlantilla ? (
                 <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
                   · fixture local no persistido
@@ -2366,6 +2437,23 @@ export default function ConvocatoriasStepper() {
               <span className="ml-1 font-mono text-xs">{requestedPlantillaId.slice(0, 8)}</span>
             </>
           )}
+        </div>
+      ) : null}
+
+      {!requestedPlantillaId && requestedMateria ? (
+        <div
+          className="mb-6 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          {/* Copy neutral: a esta URL se llega desde Materias y reglas, pero
+              también desde el rescate del Tramitador registral. */}
+          Materia recibida para la adopción del acuerdo:{" "}
+          <span className="font-semibold">
+            {findCatalogMateria(requestedMateria)?.materia_label_es ?? labelMateria(requestedMateria)}
+          </span>
+          <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
+            · incorporada como primer punto del orden del día
+          </span>
         </div>
       ) : null}
 
@@ -3047,6 +3135,14 @@ export default function ConvocatoriasStepper() {
                   // grupo para no perder el valor, pero no se ofrece el resto
                   // del catálogo incompatible.
                   const materiaGroups = agendaMateriaGroups(organoTipo);
+                  // Lote 1 coherencia (A2): las materias del catálogo societario
+                  // que no existen en AGENDA_MATERIAS (p.ej. DIVIDENDO_A_CUENTA)
+                  // también necesitan su opción propia — sin ella el select
+                  // controlado queda en blanco y tocar el select pierde la
+                  // materia recibida por intake sin vía de recuperación.
+                  const materiaEnAgenda = materiaGroups.some((group) =>
+                    group.materias.some((m) => m.value === item.materia),
+                  );
                   return (
                   <div
                     key={item.id}
@@ -3184,8 +3280,14 @@ export default function ConvocatoriasStepper() {
                             className="min-w-[220px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)] focus:outline-none"
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            {!materiaCompatible && (
-                              <optgroup label="Materia actual — incompatible con este órgano">
+                            {(!materiaCompatible || !materiaEnAgenda) && (
+                              <optgroup
+                                label={
+                                  !materiaCompatible
+                                    ? "Materia actual — incompatible con este órgano"
+                                    : "Materia actual — del catálogo de materias"
+                                }
+                              >
                                 <option value={item.materia}>{labelMateria(item.materia)}</option>
                               </optgroup>
                             )}
