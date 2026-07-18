@@ -26,6 +26,7 @@ import { adoptionModeBusinessLabel, matterClassBusinessLabel } from "@/lib/secre
 import { resolveAdoptionRoute } from "@/lib/secretaria/adoption-routing";
 import { extractRulePackAdoptionModes } from "@/lib/secretaria/materia-catalog-ux";
 import { labelMateria } from "@/lib/secretaria/agenda-materias";
+import { MatterExecutionProfilePanel } from "@/components/secretaria/MatterExecutionProfilePanel";
 
 const STEPS: StepDef[] = [
   {
@@ -1430,6 +1431,15 @@ function TramitadorNuevo() {
             : registryRulePackData.payload.plazoInscripcion.dias} días
         </div>
       )}
+
+      {/* Lote 1-bis (fase 1): perfil de ejecución formal — panel informativo
+          no disruptivo autorizado en el dossier (2026-07-18). No bloquea. */}
+      <MatterExecutionProfilePanel
+        materia={selectedAgreement?.agreement_kind}
+        adoptionMode={selectedAgreement?.adoption_mode}
+        entity={entities.find((e) => e.id === selectedAgreement?.entity_id) ?? null}
+        rulePack={rulePackData ?? null}
+      />
 
       {/* Modelo de acuerdo */}
       <div className="border border-[var(--g-border-subtle)] p-4 space-y-3"

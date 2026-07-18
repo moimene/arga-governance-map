@@ -4,7 +4,11 @@ Fecha: 2026-05-17
 Commit tecnico revisado: `08eb9b6 feat(secretaria): add matter execution profile`
 Modulo: `src/lib/secretaria/matter-execution-profile.ts`
 Suite de contrato: `src/lib/secretaria/__tests__/matter-execution-profile.test.ts`
-Estado: pendiente de validacion legal Garrigues antes de conectar UX o TramitadorStepper.
+Estado: criterio legal P1-P14 recibido y aplicado (2026-05-18, ver
+`2026-05-18-criterio-garrigues-legal-matter-execution-profile.md` y commits
+f851f73/03aea48/d932361). Fase 1 (panel informativo no disruptivo en
+TramitadorStepper) AUTORIZADA y conectada el 2026-07-18 — ver checklist §9.
+Los checkpoints operativos (fase 2+) siguen requiriendo decision expresa.
 
 ## 0. Proposito del dossier
 
@@ -321,8 +325,12 @@ No conectar todavia a `TramitadorStepper` como checkpoint operativo. La secuenci
 - [ ] Criterio `VIA_ALTERNATIVA` vs `DESVIACION_CON_RIESGO` aprobado.
 - [ ] Riesgos `IMPUGNABILIDAD`, `CALIFICACION_REGISTRAL`, `NULIDAD`, `TRAZABILIDAD_PARCIAL` validados.
 - [ ] Materias con incertidumbre priorizadas.
-- [ ] Preguntas cerradas P1-P14 respondidas.
+- [x] Preguntas cerradas P1-P14 respondidas. (2026-05-18, criterio Garrigues-Legal aplicado al contrato en f851f73/03aea48/d932361)
 - [ ] Decision sobre mini-dossier `DISOLUCION` / `LIQUIDACION` tomada.
 - [ ] Casos legales de prueba entregados en formato determinista.
 - [ ] Rule packs prioritarios validados por gate x tipo social.
-- [ ] Autorizacion para conectar panel informativo en TramitadorStepper.
+- [x] Autorizacion para conectar panel informativo en TramitadorStepper.
+      (2026-07-18, autorizada por el product owner en la conversacion de
+      coherencia de configuracion de Secretaria — solo fase 1 informativa,
+      sin gates bloqueantes; implementada en
+      src/components/secretaria/MatterExecutionProfilePanel.tsx)

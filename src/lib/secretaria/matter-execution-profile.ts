@@ -437,7 +437,7 @@ function resolveNoticeDays(
         gate: "CONVOCATORIA",
         code: "STATUTORY_NOTICE_BELOW_LEGAL_MINIMUM",
         severity: "INFO",
-        message: `Override estatutario de ${statutoryDays} dias inferior al minimo legal de ${legalMinimum} dias. Se aplica el minimo legal.`,
+        message: `Override estatutario de ${statutoryDays} días inferior al mínimo legal de ${legalMinimum} días. Se aplica el mínimo legal.`,
         fuente: "Art. 176 LSC",
         overridable: false,
       }),
@@ -453,7 +453,7 @@ function resolveNoticeDays(
           gate: "CONVOCATORIA",
           code: "RULE_PACK_NOTICE_BELOW_LEGAL_MINIMUM",
           severity: "INFO",
-          message: `Rule pack indica ${rulePackDays} dias, inferior al minimo legal de ${legalMinimum} dias. Se aplica el minimo legal.`,
+          message: `La regla versionada indica ${rulePackDays} días, inferior al mínimo legal de ${legalMinimum} días. Se aplica el mínimo legal.`,
           fuente: "Art. 176 LSC",
           overridable: false,
         }),
@@ -499,7 +499,7 @@ function resolveConvocationChannels(context: BuildMatterExecutionProfileContext)
         gate: "CONVOCATORIA",
         code: "SL_CONVOCATION_FORM_STATUTORY_SOURCE_NOT_MODELED",
         severity: "INFO",
-        message: "La forma de convocatoria de SL/SLU depende de estatutos. Se usa el canal del rule pack hasta parametrizar el override estatutario.",
+        message: "La forma de convocatoria de S.L./S.L.U. depende de los estatutos. Se usa el canal de la regla aplicable hasta parametrizar la previsión estatutaria.",
         fuente: "Art. 173 LSC",
       }),
     };
@@ -515,7 +515,7 @@ function secondCallInfoGap(context: BuildMatterExecutionProfileContext) {
       gate: "CONVOCATORIA",
       code: "SL_SECOND_CALL_REQUIRES_STATUTORY_OVERRIDE",
       severity: "INFO",
-      message: "La SL/SLU no tiene segunda convocatoria salvo prevision estatutaria. Se aplica false por defecto.",
+      message: "La S.L./S.L.U. no tiene segunda convocatoria salvo previsión estatutaria. Se asume que no procede.",
       fuente: "Art. 195 LSC y autonomia estatutaria",
     });
   }
@@ -524,7 +524,7 @@ function secondCallInfoGap(context: BuildMatterExecutionProfileContext) {
 
 function regulatoryCommunicationInfo(context: BuildMatterExecutionProfileContext) {
   if (!context.is_supervised_entity) return [];
-  return ["Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV."];
+  return ["Entidad supervisada: verificar si esta materia requiere comunicación o autorización previa a la DGSFP o la CNMV."];
 }
 
 function regulatoryCommunicationGap(context: BuildMatterExecutionProfileContext) {
@@ -533,7 +533,7 @@ function regulatoryCommunicationGap(context: BuildMatterExecutionProfileContext)
     gate: "POST_ACUERDO",
     code: "SUPERVISED_ENTITY_REGULATORY_CHECK",
     severity: "INFO",
-    message: "Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV.",
+    message: "Entidad supervisada: verificar si esta materia requiere comunicación o autorización previa a la DGSFP o la CNMV.",
     fuente: "Solvencia II / LOSSEAR / normativa CNMV segun materia",
   });
 }
@@ -621,7 +621,7 @@ function resolveMajorityRule(
           gate: "VOTACION",
           code: "SL_MAJORITY_CLASSIFICATION_PENDING",
           severity: "WARNING",
-          message: "La materia SL no esta clasificada en el baseline art. 198/199/200 LSC. Requiere validacion legal antes de usarla como gate automatico.",
+          message: "La materia de S.L. no está clasificada conforme a los arts. 198/199/200 LSC. Requiere revisión legal antes de usarla como comprobación automática.",
           fuente: "Arts. 198-200 LSC",
         }),
       };
@@ -864,7 +864,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       gate: "VOTACION",
       code: "ARTICLE_249_BIS_INDELEGABLE_MATTER",
       severity: "WARNING",
-      message: "Materia potencialmente indelegable del art. 249 bis LSC. Revisar competencia del Consejo pleno antes de tramitar por organo delegado.",
+      message: "Materia potencialmente indelegable del art. 249 bis LSC. Revisar la competencia del Consejo en pleno antes de tramitarla por órgano delegado.",
       fuente: "Art. 249 bis LSC",
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "IMPUGNABILIDAD",
@@ -892,7 +892,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
         gate: "VOTACION",
         code: "CESE_CONSEJO_SUBTIPO_REQUIRED",
         severity: "BLOCKING",
-        message: "El cese por Consejo requiere subtipo: RENUNCIA, CESE_AUTOMATICO o PROPUESTA_CESE_A_JUNTA.",
+        message: "El cese acordado por el Consejo requiere precisar el supuesto: renuncia, cese automático o propuesta de cese a la Junta.",
         fuente: "Art. 223.1 LSC",
         override_tipo: "DESVIACION_CON_RIESGO",
         risk_flag: "IMPUGNABILIDAD",
@@ -902,7 +902,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
         gate: "VOTACION",
         code: "CESE_AD_NUTUM_COMPETENCIA_JUNTA",
         severity: "BLOCKING",
-        message: "El Consejo no puede cesar ad nutum a un consejero; la separacion libre corresponde a la Junta General.",
+        message: "El Consejo no puede cesar ad nutum a un consejero; la separación libre corresponde a la Junta General.",
         fuente: "Art. 223.1 LSC",
         override_tipo: "DESVIACION_CON_RIESGO",
         risk_flag: "IMPUGNABILIDAD",
@@ -915,7 +915,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       gate: "DOCUMENTACION",
       code: "SUBTIPO_MODIFICACION_ESTRUCTURAL_PENDIENTE",
       severity: "BLOCKING",
-      message: "La modificacion estructural requiere subtipo operacional para cerrar informes, publicidad y canje aplicables.",
+      message: "La modificación estructural requiere precisar la operación para cerrar informes, publicidad y canje aplicables.",
       fuente: "RDL 5/2023",
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "TRAZABILIDAD_PARCIAL",
@@ -927,7 +927,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       gate: "DOCUMENTACION",
       code: "SUBTIPO_DISOLUCION_PENDIENTE",
       severity: "BLOCKING",
-      message: "La disolucion requiere subtipo: VOLUNTARIA, CAUSA_LEGAL_PERDIDAS o REDUCCION_SIN_REMEDIO.",
+      message: "La disolución requiere precisar la causa: voluntaria, causa legal por pérdidas o reducción por debajo del mínimo sin remedio.",
       fuente: "Arts. 360-368 LSC",
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "TRAZABILIDAD_PARCIAL",
@@ -939,7 +939,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       gate: "DOCUMENTACION",
       code: "SUBTIPO_EMISION_OBLIGACIONES_PENDIENTE",
       severity: "WARNING",
-      message: "La emision debe identificar subtipo SIMPLE, CONVERTIBLE o CANJEABLE para cerrar informes condicionales.",
+      message: "La emisión debe identificar si es simple, convertible o canjeable para cerrar los informes condicionales.",
       fuente: "Arts. 401, 414 y 415 LSC",
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "TRAZABILIDAD_PARCIAL",
@@ -956,7 +956,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
         gate: "VOTACION",
         code: "GARANTIA_CONSEJO_ESCALA_JUNTA",
         severity: "BLOCKING",
-        message: "La garantia supera el umbral de Consejo o afecta a administrador/parte vinculada. Debe tramitarse por Junta General.",
+        message: "La garantía supera el umbral del Consejo o afecta a un administrador o parte vinculada. Debe acordarse en Junta General.",
         fuente: "Arts. 160.f y 162 LSC",
         override_tipo: "DESVIACION_CON_RIESGO",
         risk_flag: "IMPUGNABILIDAD",
@@ -969,7 +969,7 @@ function profileIntrinsicGaps(context: BuildMatterExecutionProfileContext) {
       gate: "VOTACION",
       code: "TRASLADO_DOMICILIO_RESERVA_ESTATUTARIA",
       severity: "BLOCKING",
-      message: "Los estatutos reservan a la Junta el traslado de domicilio; no procede tramitarlo por Consejo.",
+      message: "Los estatutos reservan a la Junta el traslado de domicilio; no procede acordarlo en Consejo.",
       fuente: "Art. 285.2 LSC / Estatutos",
       override_tipo: "DESVIACION_CON_RIESGO",
       risk_flag: "IMPUGNABILIDAD",
@@ -1214,7 +1214,7 @@ export function evaluateFormalGate(
         gate: "CONVOCATORIA",
         code: "NOTICE_PERIOD_SHORT",
         severity: "BLOCKING",
-        message: `Plazo de convocatoria ${noticeDays} dias inferior al minimo ${profile.convocatoria.plazo_minimo_dias}.`,
+        message: `Plazo de convocatoria de ${noticeDays} días, inferior al mínimo de ${profile.convocatoria.plazo_minimo_dias} días.`,
         fuente: profile.convocatoria.fuente,
         overridable: false,
         override_tipo: "DESVIACION_CON_RIESGO",
@@ -1237,7 +1237,7 @@ export function evaluateFormalGate(
           gate: "DOCUMENTACION",
           code: "AUDITOR_DURATION_OUT_OF_RANGE",
           severity: "BLOCKING",
-          message: "La duracion del nombramiento de auditor debe estar entre 3 y 9 anos.",
+          message: "La duración del nombramiento de auditor debe estar entre 3 y 9 años.",
           fuente: "Art. 264 LSC",
           overridable: false,
           override_tipo: "DESVIACION_CON_RIESGO",
@@ -1258,7 +1258,7 @@ export function evaluateFormalGate(
           gate: "DOCUMENTACION",
           code: "CONSEJERO_MANDATE_EXCEEDS_SA_MAX",
           severity: "BLOCKING",
-          message: "La duracion del cargo de consejero en SA no puede exceder de 6 anos.",
+          message: "La duración del cargo de consejero en S.A. no puede exceder de 6 años.",
           fuente: "Art. 221.1 LSC",
           overridable: false,
           override_tipo: "DESVIACION_CON_RIESGO",

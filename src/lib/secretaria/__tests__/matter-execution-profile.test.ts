@@ -524,7 +524,7 @@ describe("MatterExecutionProfile", () => {
     }));
 
     expect(profile.post_acuerdo.comunicacion_regulador).toEqual([
-      "Entidad supervisada: verificar si esta materia requiere comunicacion o autorizacion previa DGSFP/CNMV.",
+      "Entidad supervisada: verificar si esta materia requiere comunicación o autorización previa a la DGSFP o la CNMV.",
     ]);
     expect(profile.gaps).toContainEqual(expect.objectContaining({
       code: "SUPERVISED_ENTITY_REGULATORY_CHECK",
