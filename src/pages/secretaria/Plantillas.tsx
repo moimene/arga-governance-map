@@ -29,6 +29,7 @@ import {
   type TransitionAttemptContext,
 } from "@/hooks/usePlantillasProtegidas";
 import type { GatePreIssue } from "@/lib/secretaria/template-admin/types";
+import { gatePreIssueLabel } from "@/lib/secretaria/template-admin/gate-pre-issue-labels";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
@@ -125,7 +126,6 @@ const MATERIAS_ACUERDO = [
   'APLICACION_RESULTADO',
   'APROBACION_CUENTAS',
   'APROBACION_PRESUPUESTO',
-  'APROBACION_PRESUPUESTOS',
   'DISTRIBUCION_DIVIDENDOS',
   'DIVIDENDO_A_CUENTA',
   'NOMBRAMIENTO_CONSEJERO',
@@ -208,7 +208,7 @@ function templateIdentityKey(t: PlantillaProtegidaRow) {
 
 const INCIDENCIA_CHIPS: Array<{ filter: LegalTemplateReviewFilter; label: string; summaryKey: "draftVersion" | "duplicateMatter" | "missingOwner" | "missingReference" }> = [
   { filter: "DRAFT_VERSION", label: "Versión provisional", summaryKey: "draftVersion" },
-  { filter: "DUPLICATE_MATTER", label: "Plantilla activa equivalente", summaryKey: "duplicateMatter" },
+  { filter: "DUPLICATE_MATTER", label: "Duplicidad de plantilla vigente", summaryKey: "duplicateMatter" },
   { filter: "MISSING_OWNER", label: "Falta órgano o forma de adopción", summaryKey: "missingOwner" },
   { filter: "MISSING_REFERENCE", label: "Falta referencia legal", summaryKey: "missingReference" },
 ];
@@ -307,8 +307,11 @@ function GatePreIssueList({ issues }: { issues: GatePreIssue[] }) {
         >
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <strong className="text-[var(--g-text-primary)]">{i.code}</strong>{" "}
-            <span className="text-[var(--g-text-secondary)]">— {i.message}</span>
+            <strong className="text-[var(--g-text-primary)]">{gatePreIssueLabel(i.code)}</strong>
+            <span className="text-[var(--g-text-secondary)]"> — {i.message}</span>
+            <span className="ml-1 font-mono text-[10px] text-[var(--g-text-secondary)]" title={i.code}>
+              {i.code}
+            </span>
             {i.hint ? (
               <p className="mt-1 text-xs text-[var(--g-text-secondary)]">{i.hint}</p>
             ) : null}
@@ -668,7 +671,7 @@ export default function Plantillas() {
               });
             });
             toast.error(
-              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la identidad documental antes de confirmar de nuevo.",
             );
           } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
             setBlockingIssues([]);
@@ -695,7 +698,7 @@ export default function Plantillas() {
             setPendingTransition(null);
             setPendingTransitionOptions({});
             toast.error(
-              "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
+              "Esta plantilla tiene vinculaciones activas. Activa primero una plantilla sustituta de la misma identidad documental; las vinculaciones se moverán automáticamente antes de archivar la vigente.",
             );
           } else {
             setBlockingIssues([]);
@@ -766,12 +769,15 @@ export default function Plantillas() {
     [scopedData],
   );
   const materiaOptionsByGroup = useMemo(() => {
-    const materias = new Set<string>(MATERIAS_ACUERDO);
+    // B7 Lote 3: dedupe por código canónico — sin él, un alias legacy presente
+    // en datos históricos (p.ej. APROBACION_PRESUPUESTOS archivada) duplicaba
+    // la opción con el mismo label jurídico.
+    const materias = new Set<string>(MATERIAS_ACUERDO.map((materia) => resolveMateriaAlias(materia)));
     for (const plantilla of modelosDatos) {
       const materia = plantilla.materia_acuerdo ?? plantilla.materia;
-      if (materia) materias.add(materia);
+      if (materia) materias.add(resolveMateriaAlias(materia));
       for (const bindingMatter of activeTemplateBindingMatters(templateBindings, plantilla.id)) {
-        materias.add(bindingMatter);
+        materias.add(resolveMateriaAlias(bindingMatter));
       }
     }
 
@@ -1258,8 +1264,8 @@ export default function Plantillas() {
               </p>
               <p className="mt-2 max-w-3xl text-sm font-medium text-[var(--g-text-primary)]">
                 {healthMetrics.incidencias > 0
-                  ? `Biblioteca operativa con advertencias: ${healthMetrics.vigentes} plantillas vigentes, ${healthMetrics.historico} archivadas y ${healthMetrics.incidencias} con incidencias de calidad documental.`
-                  : `Biblioteca operativa: ${healthMetrics.vigentes} plantillas vigentes y ${healthMetrics.historico} archivadas, sin incidencias de calidad documental.`}
+                  ? `Biblioteca operativa con advertencias: ${healthMetrics.vigentes} plantillas vigentes, ${healthMetrics.historico} archivadas y ${healthMetrics.incidencias} con revisión legal pendiente.`
+                  : `Biblioteca operativa: ${healthMetrics.vigentes} plantillas vigentes y ${healthMetrics.historico} archivadas, sin revisión legal pendiente.`}
               </p>
             </div>
 
@@ -1291,7 +1297,10 @@ export default function Plantillas() {
               >
                 <dt className="flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)]">
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  Incidencias
+                  {/* Lote 2 coherencia (glosario): este KPI agrega revisión legal
+                      pendiente (WARNING+ERROR), no "incidencias" en el sentido
+                      del Gestor (solo ERROR). */}
+                  Revisión legal pendiente
                 </dt>
                 <dd className="mt-1 text-lg font-semibold text-[var(--g-text-primary)]">{healthMetrics.incidencias}</dd>
               </div>
@@ -1393,8 +1402,8 @@ export default function Plantillas() {
       {/* Incidencias de calidad documental sobre las vigentes (agrega detectores
           de legal-template-review; cada chip filtra la tabla). */}
       {INCIDENCIA_CHIPS.some((chip) => tabReviewSummary[chip.summaryKey] > 0) ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Incidencias de calidad documental">
-          <span className="text-xs font-medium text-[var(--g-text-secondary)]">Incidencias:</span>
+        <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Revisión legal pendiente por tipo de hallazgo">
+          <span className="text-xs font-medium text-[var(--g-text-secondary)]">Revisión legal pendiente:</span>
           {INCIDENCIA_CHIPS.filter((chip) => tabReviewSummary[chip.summaryKey] > 0).map((chip) => {
             const active = filterRevision === chip.filter;
             return (
@@ -1429,6 +1438,29 @@ export default function Plantillas() {
         </div>
       ) : null}
 
+      {/* B11 Lote 4: en la pestaña proceso el ?materia= de los enlaces por fase
+          de Materias y reglas no filtra (las plantillas de proceso no son
+          materia-específicas) — se muestra como contexto explícito y
+          descartable en vez de quedar como parámetro huérfano en la URL. */}
+      {activeTab === 'proceso' && materiaFilterParam ? (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-2 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
+          style={{ borderRadius: 'var(--g-radius-md)' }}
+        >
+          <span>
+            Contexto desde Materias y reglas:{' '}
+            <span className="font-semibold">{materiaLabel(materiaFilterParam)}</span> · esta pestaña
+            muestra todas las plantillas de proceso del tipo seleccionado.
+          </span>
+          <button
+            type="button"
+            onClick={() => updateLibraryParams({ materia: null })}
+            className="font-semibold text-[var(--g-link)] underline-offset-2 hover:underline"
+          >
+            Quitar contexto
+          </button>
+        </div>
+      ) : null}
       {/* Filtros: materia (solo Modelos) + cohorte (ambas pestañas, UX-7.B) */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         {activeTab === 'modelos' && (
@@ -1459,10 +1491,10 @@ export default function Plantillas() {
           </div>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <label htmlFor="plantillas-filter-calidad" className="text-xs font-medium text-[var(--g-text-secondary)]">Calidad documental</label>
+          <label htmlFor="plantillas-filter-calidad" className="text-xs font-medium text-[var(--g-text-secondary)]">Completitud de metadatos</label>
           <select
             id="plantillas-filter-calidad"
-            aria-label="Filtrar por calidad documental"
+            aria-label="Filtrar por completitud de metadatos"
             value={filterCohorte}
             onChange={(e) => {
               setFilterCohorte(e.target.value);
@@ -1527,6 +1559,10 @@ export default function Plantillas() {
                   navigate(
                     scope.createScopedTo(
                       buildTemplateGovernanceUrl({
+                        // B12 Lote 4: la creación vive en el tab Importar
+                        // (ADMIN_TENANT); para el resto el destino veraz es el
+                        // catálogo gobernado de consulta.
+                        tab: canManageLifecycle ? "importar" : "catalogo",
                         materia: filterMateria,
                         estado: filterCiclo === "vigentes" ? "ACTIVA" : "ALL",
                         scope: scope.mode,
@@ -1539,7 +1575,7 @@ export default function Plantillas() {
                 style={{ borderRadius: 'var(--g-radius-md)' }}
               >
                 <FileText className="h-4 w-4" />
-                Crear nueva plantilla
+                {canManageLifecycle ? "Crear nueva plantilla" : "Revisar en Gobierno de plantillas"}
               </button>
             </div>
           ) : (
@@ -1558,7 +1594,7 @@ export default function Plantillas() {
                   <div className="min-w-0">
                     <h2 className="break-words text-sm font-semibold text-[var(--g-text-primary)]">
                       {activeTab === 'modelos'
-                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.tipo)
+                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia ?? plantilla.tipo)
                         : tipoLabel(plantilla.tipo)}
                     </h2>
                     <p className="mt-1 break-words text-xs text-[var(--g-text-secondary)]">
@@ -1688,6 +1724,7 @@ export default function Plantillas() {
                           navigate(
                             scope.createScopedTo(
                               buildTemplateGovernanceUrl({
+                                tab: canManageLifecycle ? "importar" : "catalogo",
                                 materia: filterMateria,
                                 estado: filterCiclo === "vigentes" ? "ACTIVA" : "ALL",
                                 scope: scope.mode,
@@ -1700,7 +1737,7 @@ export default function Plantillas() {
                         style={{ borderRadius: 'var(--g-radius-md)' }}
                       >
                         <FileText className="h-4 w-4" />
-                        Crear nueva plantilla
+                        {canManageLifecycle ? "Crear nueva plantilla" : "Revisar en Gobierno de plantillas"}
                       </button>
                     </div>
                   </td>
@@ -1716,7 +1753,7 @@ export default function Plantillas() {
                   >
                     <td className="px-5 py-3 text-sm font-medium text-[var(--g-text-primary)]">
                       {activeTab === 'modelos'
-                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.tipo)
+                        ? materiaLabel(plantilla.materia_acuerdo ?? plantilla.materia ?? plantilla.tipo)
                         : tipoLabel(plantilla.tipo)}
                     </td>
                     <td className="px-5 py-3 text-sm text-[var(--g-text-secondary)]">

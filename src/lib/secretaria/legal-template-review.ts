@@ -7,6 +7,7 @@ import {
 import { buildFunctionalKey, serializeFunctionalKey } from "./template-admin/functional-key";
 import {
   hasSpecificTemplateMetadata,
+  requiresLegalReference,
   templateMetadataPolicy,
 } from "./template-admin/labels";
 
@@ -97,7 +98,8 @@ export function isDraftVersion(version?: string | null) {
 }
 
 function requiresReference(template: PlantillaProtegidaRow) {
-  return normalizeCode(template.tipo) === "MODELO_ACUERDO";
+  // Lote 2 coherencia: mismo predicado que el Gate PRE (META_REF_LEGAL_FORMAT).
+  return requiresLegalReference(template);
 }
 
 function buildActiveEquivalentKey(template: PlantillaProtegidaRow) {
@@ -177,7 +179,7 @@ export function buildLegalTemplateReviewRows(templates: PlantillaProtegidaRow[])
     }
     if (duplicateMatter) {
       reasons.push(
-        "Plantilla activa equivalente: existe otra fila vigente con la misma identidad funcional.",
+        "Duplicidad de plantilla vigente: existe otra plantilla vigente con la misma identidad documental.",
       );
     }
 

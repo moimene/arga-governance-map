@@ -4,6 +4,7 @@
  */
 
 import type { GatePreIssue, PlantillaCandidate } from "./types";
+import { isAdoptionMetadataRequired, requiresLegalReference } from "./metadata-policy";
 
 const FUSION_CONDITIONAL_RE = /\{\{\s*#if\s+(requiere_experto|requiereExperto|aplica_experto)\b/i;
 
@@ -20,7 +21,6 @@ const IDENTIFICACION_FIELDS = [
 // G5 — Sustituye el probe §6.2 del prompt de auditoría. Una plantilla ACTIVA
 // con tipo MODELO_ACUERDO/ACTA/DECISION exige que organo_tipo, adoption_mode
 // y referencia_legal estén poblados. La fuente de verdad pasa de docs a motor.
-const ACTIVA_REQUIRED_TYPES = ["MODELO_ACUERDO", "ACTA", "DECISION"] as const;
 
 export function evaluateSemanticRules(t: PlantillaCandidate): GatePreIssue[] {
   const issues: GatePreIssue[] = [];
@@ -58,14 +58,23 @@ export function evaluateSemanticRules(t: PlantillaCandidate): GatePreIssue[] {
     }
   }
 
-  if (
-    t.estado === "ACTIVA" &&
-    (ACTIVA_REQUIRED_TYPES as readonly string[]).includes(t.tipo)
-  ) {
+  // Lote 2 coherencia: el requisito se deriva de la política de metadatos
+  // compartida (templateMetadataPolicy/NON_ADOPTABLE_DOCUMENT_TYPES y
+  // requiresLegalReference), no de una lista de tipos que no cubría los
+  // tipos reales de acta (ACTA_SESION, ACTA_CONSIGNACION, ...).
+  if (t.estado === "ACTIVA") {
     const missing: string[] = [];
     if (!t.organo_tipo || String(t.organo_tipo).trim() === "") missing.push("organo_tipo");
-    if (!t.adoption_mode || String(t.adoption_mode).trim() === "") missing.push("adoption_mode");
-    if (!t.referencia_legal || String(t.referencia_legal).trim() === "") {
+    if (
+      isAdoptionMetadataRequired(t.tipo) &&
+      (!t.adoption_mode || String(t.adoption_mode).trim() === "")
+    ) {
+      missing.push("adoption_mode");
+    }
+    if (
+      requiresLegalReference(t) &&
+      (!t.referencia_legal || String(t.referencia_legal).trim() === "")
+    ) {
       missing.push("referencia_legal");
     }
     if (missing.length > 0) {

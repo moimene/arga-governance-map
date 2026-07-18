@@ -29,6 +29,7 @@ import { useTemplatePreflight } from "@/hooks/secretaria/useTemplatePreflight";
 import { parseImport } from "@/lib/secretaria/template-admin/template-importer";
 import { mapSchemaIssues, type SchemaIssue } from "@/lib/secretaria/template-admin/schema-issue-mapper";
 import type { GatePreResult } from "@/lib/secretaria/template-admin/types";
+import { gatePreIssueLabel } from "@/lib/secretaria/template-admin/gate-pre-issue-labels";
 import { mergeUrlSearchParams } from "@/lib/secretaria/template-configuration-routing";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -348,8 +349,11 @@ export function TemplateImportWizard() {
                     aria-hidden="true"
                   />
                   <div className="flex-1">
-                    <strong className="text-[var(--g-text-primary)]">{i.code}</strong>{" "}
-                    <span className="text-[var(--g-text-secondary)]">— {i.message}</span>
+                    <strong className="text-[var(--g-text-primary)]">{gatePreIssueLabel(i.code)}</strong>
+                    <span className="text-[var(--g-text-secondary)]"> — {i.message}</span>
+                    <span className="ml-1 font-mono text-[10px] text-[var(--g-text-secondary)]" title={i.code}>
+                      {i.code}
+                    </span>
                     {i.hint && (
                       <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
                         {i.hint}

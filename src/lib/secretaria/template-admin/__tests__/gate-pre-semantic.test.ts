@@ -116,12 +116,40 @@ describe("gate-pre-semantic", () => {
     expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
   });
 
-  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: tipo no en (MODELO_ACUERDO|ACTA|DECISION) → regla no aplica", () => {
+  // Lote 2 coherencia: la regla se deriva de la política de metadatos
+  // compartida con la revisión legal, no de una lista de tipos.
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: cubre los tipos reales — CONVOCATORIA sin metadatos dispara", () => {
     const r = evaluateSemanticRules(
       template({
         tipo: "CONVOCATORIA" as never,
         estado: "ACTIVA",
         organo_tipo: null as never,
+        adoption_mode: null as never,
+        referencia_legal: null as never,
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(true);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: tipo no adoptable (CERTIFICACION) no exige adoption_mode", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "CERTIFICACION" as never,
+        estado: "ACTIVA",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: null as never,
+        referencia_legal: "Arts. 108-109 RRM",
+      }),
+    );
+    expect(r.some((i) => i.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS")).toBe(false);
+  });
+
+  it("SEM_ACTIVA_CAMPOS_REQUERIDOS: soporte interno no exige referencia legal", () => {
+    const r = evaluateSemanticRules(
+      template({
+        tipo: "INFORME_PRECEPTIVO" as never,
+        estado: "ACTIVA",
+        organo_tipo: "SOPORTE_INTERNO",
         adoption_mode: null as never,
         referencia_legal: null as never,
       }),

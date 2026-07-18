@@ -30,12 +30,21 @@ export async function computeCoreCoverage(tenantId: string): Promise<{
   const active = await loadAllActiveTemplates(tenantId);
   const gaps: Array<{ organo: string; materia: string }> = [];
   let covered = 0;
+  // Lote 2 coherencia: el matching usa la MISMA normalización que la identidad
+  // funcional (alias de materia/órgano, trim/upper) — antes comparaba en crudo
+  // y divergía del resto de detectores ante aliases legacy.
+  // El OR sobre ambas columnas se conserva (materia y materia_acuerdo pueden
+  // divergir en filas legacy); lo que se normaliza es la comparación.
+  const activeKeys = active.map((t) => ({
+    base: buildFunctionalKey(t, tenantId),
+    materiaAlt: buildFunctionalKey({ ...t, materia_acuerdo: null }, tenantId).materia,
+  }));
   for (const target of CORE_V1_MATERIAS) {
-    const found = active.some(
-      (t) =>
-        t.tipo === "MODELO_ACUERDO" &&
-        t.organo_tipo === target.organo &&
-        (t.materia === target.materia || t.materia_acuerdo === target.materia),
+    const found = activeKeys.some(
+      ({ base, materiaAlt }) =>
+        base.tipo === "MODELO_ACUERDO" &&
+        base.organoTipo === target.organo &&
+        (base.materia === target.materia || materiaAlt === target.materia),
     );
     if (found) covered += 1;
     else gaps.push(target);

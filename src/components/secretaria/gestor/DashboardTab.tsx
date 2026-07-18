@@ -105,7 +105,6 @@ export function DashboardTab() {
   const rows = useMemo(() => plantillas.data ?? [], [plantillas.data]);
   const activas = rows.filter((r) => r.estado === "ACTIVA");
   const borradores = rows.filter((r) => r.estado === "BORRADOR");
-  const p0Activas = activas.filter((r) => KNOWN_P0_TEMPLATE_IDS.has(r.id));
   const lastEntry = changelog.data?.[0];
 
   const activeGateCandidates = useMemo(
@@ -245,7 +244,7 @@ export function DashboardTab() {
   const healthPhrase = healthLoading
     ? "Evaluando la salud documental de la biblioteca…"
     : hasErrors || hasWarnings
-      ? `La biblioteca requiere atención: ${countLabel(errorCount, "incidencia", "incidencias")}, ${countLabel(warningCount, "advertencia", "advertencias")}, cobertura obligatoria ${covered}/${CORE_V1_MATERIAS_COUNT} y ${countLabel(orphansCount, "plantilla sin changelog", "plantillas sin changelog")}.`
+      ? `La biblioteca requiere atención: ${countLabel(errorCount, "incidencia", "incidencias")}, ${countLabel(warningCount, "advertencia", "advertencias")}, cobertura obligatoria ${covered}/${CORE_V1_MATERIAS_COUNT} y ${countLabel(orphansCount, "plantilla sin historial de cambios", "plantillas sin historial de cambios")}.`
       : `Gobierno documental operativo: ${activas.length} plantillas vigentes, cobertura obligatoria completa y trazabilidad al día.`;
 
   return (
@@ -376,11 +375,14 @@ export function DashboardTab() {
           sublabel="Combinaciones órgano · materia"
           onClick={() => goto("cobertura")}
         />
+        {/* Lote 2 coherencia (glosario): Incidencia = severidad ERROR de los
+            detectores vivos — antes contaba la allowlist KNOWN_P0 (vacía),
+            clavando el KPI a 0 mientras la cabecera decía "Con incidencias". */}
         <KpiCard
-          label="Incidencias críticas"
-          value={p0Activas.length}
-          tone={p0Activas.length > 0 ? "warning" : "success"}
-          sublabel="Plantillas activas afectadas"
+          label="Incidencias"
+          value={errorCount}
+          tone={errorCount > 0 ? "warning" : "success"}
+          sublabel="Grupos con severidad de incidencia"
           onClick={() => goto("catalogo")}
         />
         <KpiCard
@@ -391,7 +393,7 @@ export function DashboardTab() {
           onClick={() => goto("catalogo")}
         />
         <KpiCard
-          label="Sin changelog"
+          label="Sin historial de cambios"
           value={orphansCount}
           tone={orphansCount > 0 ? "warning" : "success"}
           sublabel="Plantillas huérfanas"
@@ -439,7 +441,7 @@ export function DashboardTab() {
             className="flex min-h-11 items-center gap-2 border border-[var(--g-border-default)] px-4 py-3 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            <FolderOpen className="h-4 w-4" aria-hidden="true" /> Auditoría y changelog
+            <FolderOpen className="h-4 w-4" aria-hidden="true" /> Auditoría e historial de cambios
           </button>
           {canAccess("validacion") ? (
             <button

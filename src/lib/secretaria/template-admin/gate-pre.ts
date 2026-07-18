@@ -11,6 +11,7 @@ import type {
   PlantillaCandidate,
 } from "./types";
 import { isOrganoCanonico, normalizeOrganoTipo } from "./organo-canonico";
+import { requiresLegalReference } from "./metadata-policy";
 import { findFunctionalDuplicates } from "./functional-key";
 import { evaluateSemanticRules } from "./gate-pre-semantic";
 // ITEM-138: SEMVER y la lista de fuentes legales se centralizan en patterns.ts
@@ -85,10 +86,9 @@ function collectMetadataIssues(
       field: "version",
     });
   }
-  // META_REF_LEGAL_FORMAT: se exime a plantillas SOPORTE_INTERNO (informes
-  // preceptivos/documentales internos) que no requieren cita legal explícita.
-  const isSoporteInterno = t.organo_tipo === "SOPORTE_INTERNO";
-  if (!isSoporteInterno && (!t.referencia_legal || !REF_LEGAL_PATTERN.test(t.referencia_legal))) {
+  // META_REF_LEGAL_FORMAT: criterio único compartido con la revisión legal
+  // (requiresLegalReference) — se exime solo a plantillas de soporte interno.
+  if (requiresLegalReference(t) && (!t.referencia_legal || !REF_LEGAL_PATTERN.test(t.referencia_legal))) {
     issues.push({
       severity: "BLOCKING",
       code: "META_REF_LEGAL_FORMAT",

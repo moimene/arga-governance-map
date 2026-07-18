@@ -40,7 +40,7 @@ export const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: "Borrador",
   REVISADA: "Revisada",
   APROBADA: "Aprobada",
-  ACTIVA: "Activa",
+  ACTIVA: "Vigente",
   ARCHIVADA: "Archivada",
   DEPRECADA: "Deprecada",
 };
@@ -119,37 +119,18 @@ export const JURISDICTION_LABEL: Record<string, string> = {
   MULTI: "Multijurisdicción",
 };
 
-/**
- * Certificaciones, informes y soportes no representan por sí mismos una forma
- * de adopción. Para cualquier otro tipo el fallback es conservador: la forma de
- * adopción debe informarse.
- */
-export const NON_ADOPTABLE_DOCUMENT_TYPES = new Set<string>([
-  "CERTIFICACION",
-  "INFORME_PRECEPTIVO",
-  "INFORME_DOCUMENTAL_PRE",
-  "INFORME_GESTION",
-  "DOCUMENTO_REGISTRAL",
-  "SUBSANACION_REGISTRAL",
-]);
-
-export function isAdoptionMetadataRequired(tipo?: string | null): boolean {
-  const normalized = normalizeLabelCode(tipo);
-  return !normalized || !NON_ADOPTABLE_DOCUMENT_TYPES.has(normalized);
-}
-
-export function templateMetadataPolicy(tipo?: string | null): TemplateMetadataPolicy {
-  return {
-    organoRequired: true,
-    adoptionModeRequired: isAdoptionMetadataRequired(tipo),
-  };
-}
-
-/** `ANY` es válido en bindings, no sustituye metadatos de una plantilla. */
-export function hasSpecificTemplateMetadata(value?: string | null): boolean {
-  const normalized = normalizeLabelCode(value);
-  return Boolean(normalized && normalized !== "ANY");
-}
+// Política de metadatos: vive en el módulo HOJA metadata-policy.ts (los gates
+// la importan directamente; importar labels.ts desde el Gate PRE crearía un
+// ciclo con TDZ vía TRANSITION_MATRIX). Se re-exporta para los consumidores
+// existentes de labels.
+export {
+  NON_ADOPTABLE_DOCUMENT_TYPES,
+  hasSpecificTemplateMetadata,
+  isAdoptionMetadataRequired,
+  requiresLegalReference,
+  templateMetadataPolicy,
+} from "./metadata-policy";
+import { isAdoptionMetadataRequired } from "./metadata-policy";
 
 export function tipoLabel(value?: string | null): string {
   const normalized = normalizeLabelCode(value);

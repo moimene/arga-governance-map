@@ -37,6 +37,7 @@ import {
   Shield,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TemplateApprovalDialog } from "@/components/secretaria/TemplateApprovalDialog";
 import {
   usePlantillasProtegidas,
   useUpdateEstadoPlantilla,
@@ -144,7 +145,7 @@ const LEGAL_REVIEW_FILTER_LABELS: Record<LegalTemplateReviewFilter, string> = {
   DRAFT_VERSION: "Versión provisional",
   MISSING_REFERENCE: "Falta referencia legal",
   MISSING_OWNER: "Falta órgano o forma de adopción",
-  DUPLICATE_MATTER: "Plantilla activa equivalente",
+  DUPLICATE_MATTER: "Duplicidad de plantilla vigente",
   LOCAL_FIXTURE: "Cobertura provisional",
 };
 
@@ -421,7 +422,7 @@ function LocalFixtureBadge() {
       style={{ borderRadius: "var(--g-radius-full)" }}
     >
       <FileCode2 className="h-3 w-3" aria-hidden="true" />
-      Fixture local · puente de cobertura
+      Cobertura provisional · pendiente de aprobación
     </span>
   );
 }
@@ -518,6 +519,10 @@ function PlantillaDetailPanel({
   const [blockingIssues, setBlockingIssues] = useState<GatePreIssue[]>([]);
   const [ackIssues, setAckIssues] = useState<GatePreIssue[] | null>(null);
   const [ackContext, setAckContext] = useState<TransitionAttemptContext | null>(null);
+  // Lote 2 coherencia (B14): la aprobación formal exige los mismos datos
+  // (aprobador + fecha) que el catálogo de uso — nada de autoaprobación
+  // silenciosa con el email de sesión vía window.confirm.
+  const [approvalOpen, setApprovalOpen] = useState(false);
 
   const runTransition = ({
     motivo,
@@ -525,12 +530,16 @@ function PlantillaDetailPanel({
     operationId,
     expectedFrom,
     expectedPredecessorId,
+    aprobadaPor,
+    fechaAprobacion,
   }: {
     motivo?: string;
     ackWarnings?: boolean;
     operationId?: string;
     expectedFrom?: TransitionAttemptContext["expectedFrom"];
     expectedPredecessorId?: string | null;
+    aprobadaPor?: string;
+    fechaAprobacion?: string;
   } = {}) => {
     if (!transition) return;
     const transitionActor = user?.email ?? "Comité Legal TGMS";
@@ -539,7 +548,12 @@ function PlantillaDetailPanel({
         id: plantilla.id,
         nuevo_estado: transition.next,
         actor: transitionActor,
-        ...(transition.next === "APROBADA" ? { aprobada_por: transitionActor } : {}),
+        ...(transition.next === "APROBADA"
+          ? {
+              aprobada_por: aprobadaPor ?? transitionActor,
+              ...(fechaAprobacion ? { fecha_aprobacion: fechaAprobacion } : {}),
+            }
+          : {}),
         motivo,
         ackWarnings,
         operationId,
@@ -587,7 +601,7 @@ function PlantillaDetailPanel({
             setAckIssues(null);
             setAckContext(null);
             toast.error(
-              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+              "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la identidad documental antes de confirmar de nuevo.",
             );
           } else if (result && result.ok === false && result.reason === "INVALID_TRANSITION") {
             setBlockingIssues([]);
@@ -610,7 +624,7 @@ function PlantillaDetailPanel({
             setAckIssues(null);
             setAckContext(null);
             toast.error(
-              "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
+              "Esta plantilla tiene vinculaciones activas. Activa primero una plantilla sustituta de la misma identidad documental; las vinculaciones se moverán automáticamente antes de archivar la vigente.",
             );
           } else {
             setBlockingIssues([]);
@@ -627,6 +641,10 @@ function PlantillaDetailPanel({
 
   const handleTransition = () => {
     if (!transition) return;
+    if (transition.next === "APROBADA") {
+      setApprovalOpen(true);
+      return;
+    }
     if (!window.confirm(transition.confirm)) return;
     setBlockingIssues([]);
     setAckIssues(null);
@@ -635,7 +653,7 @@ function PlantillaDetailPanel({
   };
 
   const editorReadOnlyReason = localFixture
-    ? "Fixture local no persistido: no admite edición tri-capa."
+    ? "Cobertura provisional pendiente de aprobación: no admite edición tri-capa."
     : !canManageTemplates
       ? "Rol sin permisos de escritura sobre plantillas."
       : estado !== "BORRADOR"
@@ -673,7 +691,7 @@ function PlantillaDetailPanel({
                   className="bg-[var(--g-sec-100)] px-2 py-0.5 font-semibold text-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-sm)" }}
                 >
-                  Fixture local
+                  Cobertura provisional
                 </span>
               ) : null}
               <span>v{plantilla.version}</span>
@@ -860,7 +878,7 @@ function PlantillaDetailPanel({
           mode={audienceMode}
         />
 
-        <SectionToggle title="Comprobación documental previa (Gate PRE)" icon={Shield} defaultOpen>
+        <SectionToggle title="Comprobación documental previa" icon={Shield} defaultOpen>
           <div className="space-y-2 text-xs text-[var(--g-text-secondary)]">
             <p>
               Esta configuración determina si la plantilla puede utilizarse en la
@@ -888,6 +906,19 @@ function PlantillaDetailPanel({
 
       {/* ITEM-087: diálogo de reconocimiento de warnings. Reintenta la transición
           con ackWarnings:true y el motivo escrito (persistido en changelog). */}
+      {approvalOpen ? (
+        <TemplateApprovalDialog
+          pending={updateEstado.isPending}
+          onConfirm={({ aprobadaPor, fechaAprobacion }) => {
+            setApprovalOpen(false);
+            setBlockingIssues([]);
+            setAckIssues(null);
+            setAckContext(null);
+            runTransition({ aprobadaPor, fechaAprobacion });
+          }}
+          onCancel={() => setApprovalOpen(false)}
+        />
+      ) : null}
       {ackIssues && ackContext ? (
         <TransitionAckDialog
           issues={ackIssues}
@@ -964,7 +995,7 @@ function GovernedVersionRow({
         <LegalReviewBadge review={review} />
         {localFixture ? (
           <span className="flex items-center gap-1 text-[10px] font-semibold text-[var(--g-brand-3308)]">
-            <FileCode2 className="h-3 w-3" aria-hidden="true" /> Fixture local
+            <FileCode2 className="h-3 w-3" aria-hidden="true" /> Cobertura provisional
           </span>
         ) : null}
         <span className="flex items-center gap-1 text-[10px] text-[var(--g-text-secondary)]">

@@ -46,7 +46,7 @@ export const GATE_PRE_ISSUE_LABEL: Record<string, string> = {
   CAPA2_HELPER_PROHIBIDO: "El texto usa una instrucción de plantilla no permitida",
   CAPA2_VAR_NO_CATALOGADA: "El texto usa una variable no declarada",
   ENTITY_REF_FORBIDDEN: "Referencia directa a la sociedad no permitida en variables",
-  CAPA3_PREFIJO_PROTEGIDO: "Campo editable con prefijo reservado del motor",
+  CAPA3_PREFIJO_PROTEGIDO: "Campo editable con prefijo reservado del sistema",
   CAPA2_UNUSED_VARIABLE: "Variable declarada que no se usa en el texto",
   CAPA2_VARIABLE_REQUIRED: "Variable automática sin identificador",
   LEGACY_FUENTE_ENTIDAD: "Fuente de datos antigua: migrar a la fuente actual",

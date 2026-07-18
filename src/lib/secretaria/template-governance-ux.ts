@@ -388,7 +388,7 @@ function coverageIncidentConfig(state: LegalTemplateCoverageState) {
       concept: "extended-coverage-provisional",
       severity: "WARNING" as const,
       title: "Cobertura documental provisional",
-      consequence: "La cobertura depende de fixtures locales y no de una plantilla gobernada en Cloud.",
+      consequence: "La cobertura depende de plantillas provisionales locales y no de una plantilla gobernada en Cloud.",
       action: "Cargar, revisar y aprobar la cobertura provisional.",
       technicalCode: "COVERAGE_PROVISIONAL",
     };
@@ -460,7 +460,7 @@ export function buildTemplateGovernanceIncidents(
       id: `legal-duplicate:${duplicateKey}`,
       concept: "active-functional-duplicate",
       severity: "ERROR",
-      title: "Más de una plantilla vigente para la misma función",
+      title: "Duplicidad de plantilla vigente",
       affected: group.templateIds.size,
       consequence: "La selección automática no tiene una única versión vigente inequívoca.",
       action: "Revisar la familia y decidir qué versión debe permanecer vigente.",
@@ -547,7 +547,7 @@ export function buildTemplateGovernanceIncidents(
       title: "Trazabilidad formal pendiente",
       affected: input.orphanCount,
       consequence: "No puede presentarse el ciclo de cambios completo de todas las plantillas vivas.",
-      action: "Revisar las plantillas sin changelog y documentar el origen de su versión vigente.",
+      action: "Revisar las plantillas sin historial de cambios y documentar el origen de su versión vigente.",
       destination: "/secretaria/gestor-plantillas?tab=auditoria&focus=sin-changelog",
       technicalCodes: ["WITHOUT_CHANGELOG"],
       firstTemplateId: null,
@@ -577,7 +577,14 @@ export function buildTemplateGovernanceIncidents(
   for (const [templateId, issues] of gateEntries(input.gateIssuesByTemplate)) {
     if (!activeById.has(templateId)) continue;
     for (const issue of issues) {
-      if (issue.code.startsWith("META_") || issue.code === "DUP_ACTIVE_FUNCTIONAL_KEY") continue;
+      // SEM_ACTIVA_CAMPOS_REQUERIDOS duplica huecos que la revisión legal ya
+      // reporta (órgano/adopción/referencia) — sin excluirlo, la cola contaba
+      // el mismo hueco dos veces con severidades contradictorias.
+      if (
+        issue.code.startsWith("META_") ||
+        issue.code === "DUP_ACTIVE_FUNCTIONAL_KEY" ||
+        issue.code === "SEM_ACTIVA_CAMPOS_REQUERIDOS"
+      ) continue;
       const severity = gateSeverity(issue.severity);
       const group = gateGroups.get(issue.code) ?? {
         templateIds: new Set<string>(),

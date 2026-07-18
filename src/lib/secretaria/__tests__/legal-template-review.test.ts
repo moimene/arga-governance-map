@@ -175,7 +175,7 @@ describe("legal-template-review", () => {
     expect(rows[0].flags.duplicateMatter).toBe(true);
     expect(rows[1].flags.duplicateMatter).toBe(true);
     expect(rows[2].flags.duplicateMatter).toBe(false);
-    expect(rows[0].reasons.join(" ")).toContain("identidad funcional");
+    expect(rows[0].reasons.join(" ")).toContain("identidad documental");
   });
 
   it("detecta como equivalentes dos versiones distintas simultáneamente ACTIVA", () => {
@@ -205,7 +205,7 @@ describe("legal-template-review", () => {
     expect(rows.every((row) => row.status === "needs_review")).toBe(true);
     expect(rows.every((row) => row.requiresLegalReview)).toBe(true);
     expect(rows.every((row) => !row.canClaimLegalApproval)).toBe(true);
-    expect(rows[0].reasons.join(" ")).toContain("otra fila vigente");
+    expect(rows[0].reasons.join(" ")).toContain("otra plantilla vigente");
     expect(rows[0].duplicateKey).toBe(rows[1].duplicateKey);
   });
 

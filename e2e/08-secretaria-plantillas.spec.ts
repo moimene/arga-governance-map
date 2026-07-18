@@ -24,7 +24,7 @@ test.describe('Plantillas', () => {
     await expect(proceso).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('tabpanel', { name: 'Plantillas de proceso' })).toBeVisible();
     await expect(
-      page.getByTestId('plantillas-desktop-table').getByText('Activa', { exact: true }).first(),
+      page.getByTestId('plantillas-desktop-table').getByText('Vigente', { exact: true }).first(),
     ).toBeVisible();
 
     await proceso.focus();
@@ -144,7 +144,7 @@ test.describe('Plantillas', () => {
     });
     await expect(currentDetail).toBeVisible({ timeout: 10_000 });
     await expect(currentDetail.getByText('v1.1.0', { exact: true })).toBeVisible();
-    await expect(currentDetail.getByText('Activa', { exact: true })).toBeVisible();
+    await expect(currentDetail.getByText('Vigente', { exact: true })).toBeVisible();
 
     await page.goto(
       `/secretaria/plantillas?scope=grupo&ciclo=historico&plantilla=${historicalId}`,
@@ -215,7 +215,7 @@ test.describe('Motor de reglas societarias', () => {
     await expect(detail.getByRole('heading', { name: 'Política de remuneración de consejeros' })).toBeVisible();
     await expect(detail.getByText('Expediente bloqueado.')).toBeVisible();
     await expect(detail.getByText(/falta plantilla activa de modelo de acuerdo/i).first()).toBeVisible();
-    await expect(detail.getByRole('link', { name: 'Iniciar expediente', exact: true })).toHaveCount(0);
+    await expect(detail.getByRole('link', { name: 'Iniciar adopción', exact: true })).toHaveCount(0);
 
     await page.goto(
       `/secretaria/catalogo-materias?scope=sociedad&entity=${entityId}&materia=DIVIDENDO_A_CUENTA`,
@@ -232,10 +232,10 @@ test.describe('Motor de reglas societarias', () => {
     await expect(page.getByText('Resultado de la verificación').first()).toBeVisible();
     await expect(page.getByText('Plantillas mínimas', { exact: true })).toBeVisible();
 
-    // El CTA contextual "Iniciar expediente" aparece también en el panel de estado de la materia.
+    // El CTA contextual "Iniciar adopción" aparece también en el panel de estado de la materia.
     // Lote 1 coherencia (A1): el CTA abre el PROCESO DE ADOPCIÓN (convocatoria
     // del órgano competente con la materia pre-sembrada), no la fase registral.
-    await page.getByRole('link', { name: 'Iniciar expediente', exact: true }).first().click();
+    await page.getByRole('link', { name: 'Iniciar adopción', exact: true }).first().click();
     await expect(page).toHaveURL(/\/secretaria\/convocatorias\/nueva.*materia=DIVIDENDO_A_CUENTA/);
     await expect(page.getByText('Materia recibida para la adopción del acuerdo')).toBeVisible({ timeout: 10_000 });
     await expect(page).not.toHaveURL('/login');
@@ -445,8 +445,14 @@ test.describe('Motor de reglas societarias', () => {
     const certificationStage = detail.locator('article').filter({
       has: page.getByRole('heading', { name: 'Certificación', exact: true }),
     });
-    await expect(preAgreementStage.getByText('Activa', { exact: true })).toBeVisible();
-    await expect(certificationStage.getByText('Activa', { exact: true })).toBeVisible();
+    // B8 Lote 3: el estado en la ficha de materia separa vigencia y aprobación
+    // formal ("Vigente · aprobación formal registrada/pendiente").
+    await expect(
+      preAgreementStage.getByText(/Vigente · aprobación formal (registrada|pendiente)/).first(),
+    ).toBeVisible();
+    await expect(
+      certificationStage.getByText(/Vigente · aprobación formal (registrada|pendiente)/).first(),
+    ).toBeVisible();
     expect(await preAgreementStage.getByText('Vigente para nuevos expedientes').count()).toBeGreaterThan(0);
     expect(await certificationStage.getByText('Vigente para nuevos expedientes').count()).toBeGreaterThan(0);
   });
@@ -459,7 +465,7 @@ test.describe('Motor de reglas societarias', () => {
     await expect(detail.getByText('No aplica abrir expediente', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
     await expect(detail.getByText('Solo constancia', { exact: true }).first()).toBeVisible();
     await expect(detail.getByText(/dejar constancia en acta/i).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Iniciar expediente', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Iniciar adopción', exact: true })).toHaveCount(0);
 
     const helpHeading = page.getByRole('heading', { name: 'Cómo interpretar el catálogo' });
     const helpDisclosure = page.locator('details').filter({ has: helpHeading });
@@ -510,7 +516,7 @@ test.describe('Motor de reglas societarias', () => {
     await expect(
       segurosDetail.getByText('No aplica a esta sociedad', { exact: true }).first(),
     ).toBeVisible();
-    await expect(segurosDetail.getByRole('link', { name: 'Iniciar expediente', exact: true })).toHaveCount(0);
+    await expect(segurosDetail.getByRole('link', { name: 'Iniciar adopción', exact: true })).toHaveCount(0);
 
     await page.goto(
       `/secretaria/catalogo-materias?scope=sociedad&entity=${argaDigitalId}&materia=${materia}&vista=regla`,

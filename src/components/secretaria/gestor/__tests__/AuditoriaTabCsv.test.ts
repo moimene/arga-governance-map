@@ -130,7 +130,7 @@ describe("AuditoriaTab — datasets CSV", () => {
       "Aprobación de cuentas",
       "1.2.0",
       "ACTIVA",
-      "Activa",
+      "Vigente",
     ]]);
   });
 });
