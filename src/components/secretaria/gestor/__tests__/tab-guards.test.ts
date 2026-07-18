@@ -25,7 +25,7 @@ describe("contrato de navegación del Gestor de plantillas", () => {
       "Catálogo gobernado",
       "Cobertura por materia y órgano",
       "Indicadores de ciclo de vida",
-      "Auditoría y changelog",
+      "Auditoría e historial de cambios",
       "Importar",
       "Comprobación documental",
       "Configuración por sociedad",

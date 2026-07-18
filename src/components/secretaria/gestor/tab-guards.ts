@@ -44,7 +44,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   catalogo: "Catálogo gobernado",
   cobertura: "Cobertura por materia y órgano",
   metricas: "Indicadores de ciclo de vida",
-  auditoria: "Auditoría y changelog",
+  auditoria: "Auditoría e historial de cambios",
   importar: "Importar",
   validacion: "Comprobación documental",
   configuracion: "Configuración por sociedad",

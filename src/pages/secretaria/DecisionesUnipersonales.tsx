@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, Plus, FolderOpen, Loader2, AlertTriangle } from "lucide-react";
 import { useDecisionesUnipersList } from "@/hooks/useDecisionesUnipers";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { tipoLabel } from "@/lib/secretaria/template-admin/labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 
 const STATUS_TONE: Record<string, string> = {
@@ -26,9 +27,25 @@ const SELECT_CLASS =
 
 export default function DecisionesUnipersonales() {
   const navigate = useNavigate();
+  // B13 Lote 4: el deep-link "Elegir decisión" de Plantillas/Gestor emite
+  // ?plantilla=&tipo= — se muestra como contexto y se propaga al crear una
+  // decisión nueva (mismo patrón que ActasLista).
+  const [searchParams] = useSearchParams();
+  const requestedPlantillaId = searchParams.get("plantilla");
+  const requestedTemplateType = searchParams.get("tipo");
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useDecisionesUnipersList(scopedEntityId);
+
+  function nuevaDecisionPath() {
+    const params = new URLSearchParams();
+    if (requestedPlantillaId) params.set("plantilla", requestedPlantillaId);
+    if (requestedTemplateType) params.set("tipo", requestedTemplateType);
+    const suffix = params.toString();
+    return scope.createScopedTo(
+      `/secretaria/decisiones-unipersonales/nueva${suffix ? `?${suffix}` : ""}`,
+    );
+  }
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
@@ -39,6 +56,23 @@ export default function DecisionesUnipersonales() {
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
+      {requestedPlantillaId ? (
+        <div
+          className="mb-4 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Plantilla indicada para la próxima decisión:{" "}
+          <span className="font-mono text-xs">{requestedPlantillaId.slice(0, 8)}</span>
+          {requestedTemplateType ? (
+            <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
+              · {tipoLabel(requestedTemplateType)}
+            </span>
+          ) : null}
+          <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
+            — elige la decisión sobre la que aplicarla o crea una nueva.
+          </span>
+        </div>
+      ) : null}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
@@ -54,7 +88,7 @@ export default function DecisionesUnipersonales() {
         </div>
         <button
           type="button"
-          onClick={() => navigate(scope.createScopedTo("/secretaria/decisiones-unipersonales/nueva"))}
+          onClick={() => navigate(nuevaDecisionPath())}
           className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >

@@ -34,6 +34,7 @@ import {
 } from "@/components/secretaria/MateriaCatalogHelp";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { resolveAdoptionRoute } from "@/lib/secretaria/adoption-routing";
+import { useTemplateBindings } from "@/hooks/useNormativeGovernance";
 import {
   FUNCTIONAL_MATTER_GROUPS,
   TEMPLATE_DOCUMENT_STAGES,
@@ -104,9 +105,11 @@ import {
 } from "@/lib/secretaria/csv-export";
 
 const COMPLEXITY_CLASS: Record<string, string> = {
+  // Lote 5: los tonos de severidad (error) se reservan para estado/bloqueo;
+  // la naturaleza de la materia es una categoría, no un fallo.
   Ordinaria: SEMANTIC_TONE_CLASS.success,
   Reforzada: SEMANTIC_TONE_CLASS.warning,
-  Estructural: SEMANTIC_TONE_CLASS.error,
+  Estructural: SEMANTIC_TONE_CLASS.info,
   Especial: SEMANTIC_TONE_CLASS.info,
   Informativa: SEMANTIC_TONE_CLASS.neutral,
 };
@@ -241,8 +244,16 @@ const CATALOG_HELP_SECTIONS: MateriaHelpSection[] = [
         id: "lista",
         label: "Lista",
         definition: "La regla y las plantillas críticas permiten continuar.",
-        consequence: "Puede iniciarse el expediente decisorio cuando la materia lo admite.",
-        action: "Inicia el expediente o revisa la regla antes de continuar.",
+        consequence: "Puede iniciarse la adopción del acuerdo cuando la materia lo admite.",
+        action: "Inicia la adopción o revisa la regla antes de continuar.",
+      },
+      {
+        id: "no-aplica",
+        label: "No aplica / Solo constancia",
+        definition:
+          "La materia no aplica a la sociedad seleccionada o es informativa: se documenta por constancia en acta.",
+        consequence: "No se abre expediente decisorio; el indicador es informativo.",
+        action: "Cambia de sociedad o consulta la regla si esperabas otro resultado.",
       },
       {
         id: "advertencia",
@@ -263,7 +274,7 @@ const CATALOG_HELP_SECTIONS: MateriaHelpSection[] = [
         label: "Bloqueada",
         definition: "Falta una plantilla activa de una fase crítica de apertura.",
         consequence: "El sistema no habilita el expediente hasta corregir la cobertura.",
-        action: "Activa o asigna la plantilla indicada en el checklist.",
+        action: "Activa o vincula la plantilla indicada en el checklist.",
       },
     ],
   },
@@ -344,6 +355,14 @@ export default function CatalogoMaterias() {
   const pactos = useMemo(() => pactosQuery.data ?? [], [pactosQuery.data]);
   const plantillasQuery = usePlantillasProtegidas();
   const plantillas = useMemo(() => plantillasQuery.data ?? [], [plantillasQuery.data]);
+  // B15 Lote 4: las asignaciones explícitas de materia_template_binding
+  // (escritas por "Vincular como plantilla vigente" en Plantillas) prevalecen
+  // sobre el matching de metadatos en la ficha de materia.
+  const templateBindingsQuery = useTemplateBindings();
+  const explicitTemplateBindings = useMemo(
+    () => templateBindingsQuery.data ?? [],
+    [templateBindingsQuery.data],
+  );
   const { primaryRole } = useCurrentUserRole();
   const normativeRole = normativeRoleFromAppRole(primaryRole);
 
@@ -453,6 +472,27 @@ export default function CatalogoMaterias() {
             materia: materia.materia,
             jurisdiction: selectedSociedad?.jurisdiction,
             tipoSocial: selectedTipoSocialForRules,
+            // B15: el binding es válido si su ámbito coincide con el contexto
+            // (ANY es comodín). Sin este filtro, un binding de otra
+            // jurisdicción o tipo social se presentaría como vinculación
+            // explícita de esta sociedad.
+            explicitTemplateIds: explicitTemplateBindings
+              .filter((binding) => {
+                if (resolveMateriaAlias(binding.materia) !== resolveMateriaAlias(materia.materia)) {
+                  return false;
+                }
+                const scopeMatches = (bindingValue?: string | null, contextValue?: string | null) => {
+                  const normalized = String(bindingValue ?? "").trim().toUpperCase();
+                  if (!normalized || normalized === "ANY" || normalized === "GLOBAL") return true;
+                  const context = String(contextValue ?? "").trim().toUpperCase();
+                  return !context || normalized === context;
+                };
+                return (
+                  scopeMatches(binding.jurisdiccion, selectedSociedad?.jurisdiction) &&
+                  scopeMatches(binding.tipo_social, selectedTipoSocialForRules)
+                );
+              })
+              .map((binding) => binding.template_id),
             organoTipo: Array.from(new Set(applicableVariants.map((variant) => variant.organoCode))),
             formaAdopcion: Array.from(
               new Set(
@@ -480,7 +520,7 @@ export default function CatalogoMaterias() {
       });
     }
     return map;
-  }, [materias, plantillas, selectedSociedad, selectedTipoSocialForRules, variantsByMateria]);
+  }, [explicitTemplateBindings, materias, plantillas, selectedSociedad, selectedTipoSocialForRules, variantsByMateria]);
   const templateBindings = selectedMatter
     ? templateConfigurationByMateria.get(selectedMatter.materia)?.bindings ?? []
     : [];
@@ -1539,13 +1579,20 @@ function MateriaDetail({
               <span className="text-sm font-semibold text-[var(--g-text-primary)]">{globalStatus.label}</span>
               <StatusPill
                 label={matterStatusIndicator(materia.materia, globalStatus).shortLabel}
-                tone={
-                  globalStatus.status === "bloqueada"
+                tone={(() => {
+                  // Lote 5: mismo origen tonal que el dot de lista/tabla — los
+                  // presentacionales "No aplica"/"Solo constancia" son info,
+                  // no éxito verde.
+                  const indicator = matterStatusIndicator(materia.materia, globalStatus);
+                  if (indicator.shortLabel === "No aplica" || indicator.shortLabel === "Solo constancia") {
+                    return "info";
+                  }
+                  return globalStatus.status === "bloqueada"
                     ? "block"
                     : globalStatus.status === "lista"
                       ? "ok"
-                      : "warn"
-                }
+                      : "warn";
+                })()}
               />
             </div>
             <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">{globalStatus.explanation}</p>
@@ -1835,7 +1882,7 @@ function MateriaSummaryTab({
             title="Expediente"
             detail={
               templateReadiness.openingStatus === "ready"
-                ? "Listo para iniciar expediente"
+                ? "Listo para iniciar la adopción"
                 : templateReadiness.openingStatus === "not_applicable"
                   ? "No aplica expediente decisorio; la materia se documenta por constancia"
                   : "Salida bloqueada hasta completar la configuración"
@@ -1987,7 +2034,7 @@ function MateriaPrimaryCta({
       className={primaryClass}
       style={{ borderRadius: "var(--g-radius-md)" }}
     >
-      Iniciar expediente <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      Iniciar adopción <ArrowRight className="h-4 w-4" aria-hidden="true" />
     </Link>
   );
 }
@@ -2250,7 +2297,7 @@ function TemplateStageRow({
         ? "Pendiente revisión"
         : readiness?.status === "no_aplica"
           ? "No aplica"
-          : "Activa";
+          : "Vigente";
   const actionTarget = buildTemplateLibraryUrl({
     tipo: stage,
     materia: materia.materia,
@@ -2301,7 +2348,7 @@ function TemplateStageRow({
             role="note"
             style={{ borderRadius: "var(--g-radius-sm)" }}
           >
-            <strong className="text-[var(--g-text-primary)]">Posible duplicidad de plantilla:</strong>{" "}
+            <strong className="text-[var(--g-text-primary)]">Duplicidad de plantilla vigente:</strong>{" "}
             {dataDuplicates
               .map((duplicate) => `${documentTypeLabel(duplicate.tipo)} · v${duplicate.version} (${duplicate.ids.length} copias)`)
               .join("; ")}
@@ -2400,7 +2447,7 @@ function TemplateStageRow({
                 className="inline-flex min-h-10 items-center justify-center border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] focus:ring-offset-2"
                 style={{ borderRadius: "var(--g-radius-sm)" }}
               >
-                Crear desde modelo
+                Revisar en Gobierno de plantillas
               </Link>
             ) : null}
           </div>
@@ -2432,7 +2479,17 @@ function TemplateBindingItem({
           <div className="font-semibold text-[var(--g-text-primary)]">
             {templateBindingDisplayLabel(binding, siblings)}
           </div>
-          <div>{binding.statusLabel} · {binding.selectionReason}</div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {binding.explicitAssignment ? (
+              <span
+                className="bg-[var(--g-sec-100)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-sm)" }}
+              >
+                Vinculada por regla aplicable
+              </span>
+            ) : null}
+            <span>{binding.statusLabel} · {binding.selectionReason}</span>
+          </div>
           <div>
             Variables automáticas {binding.automaticVariablesValid ? "válidas" : "pendientes"} · Campos obligatorios al generar: {binding.editableFieldsPending}
           </div>
@@ -2637,7 +2694,7 @@ function MateriaSimulationTab({
           tone: "warn" as const,
         }
       : {
-          label: "Listo para iniciar expediente",
+          label: "Listo para iniciar la adopción",
           detail: "Los requisitos y documentos mínimos están cubiertos.",
           tone: "ok" as const,
         };
@@ -2746,7 +2803,7 @@ function MateriaSimulationTab({
             className="inline-flex flex-1 items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
-            Iniciar expediente <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            Iniciar adopción <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         ) : (
           <span
@@ -2756,7 +2813,7 @@ function MateriaSimulationTab({
                 ? "No aplica abrir un expediente para esta materia en la sociedad seleccionada"
                 : templateReadiness.openingStatus === "not_applicable"
                 ? "No aplica abrir un expediente decisorio para esta materia informativa"
-                : "No se puede iniciar expediente porque la verificación previa requiere revisión"
+                : "No se puede iniciar la adopción porque la verificación previa requiere revisión"
             }
             className="inline-flex flex-1 items-center justify-center gap-2 bg-[var(--g-surface-muted)] px-3 py-2 text-sm font-semibold text-[var(--g-text-secondary)]"
             style={{ borderRadius: "var(--g-radius-md)" }}
@@ -2765,7 +2822,7 @@ function MateriaSimulationTab({
               ? "No aplica a esta sociedad"
               : templateReadiness.openingStatus === "not_applicable"
               ? "No aplica abrir expediente"
-              : "Iniciar expediente bloqueado"}
+              : "No se puede iniciar la adopción"}
           </span>
         )}
         <button
@@ -2947,7 +3004,7 @@ function EngineConfigSummary({
           value={
             selectedStatus?.label ??
             (templateReadiness?.openingStatus === "ready"
-              ? "Listo para iniciar expediente"
+              ? "Listo para iniciar la adopción"
               : templateReadiness?.openingStatus === "not_applicable"
                 ? "No aplica abrir expediente"
                 : "Bloqueado")

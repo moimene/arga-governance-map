@@ -2427,7 +2427,7 @@ export default function ConvocatoriasStepper() {
               ) : null}
               {localRequestedPlantilla ? (
                 <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
-                  · fixture local no persistido
+                  · cobertura provisional pendiente de aprobación
                 </span>
               ) : null}
             </>

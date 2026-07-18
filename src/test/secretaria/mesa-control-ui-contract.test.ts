@@ -59,9 +59,9 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(catalogo).toContain("Ver documentos y plantillas de esta materia");
     expect(catalogo).toContain("Documentos y plantillas de esta materia");
     expect(catalogo).toContain("Verificación previa del expediente");
-    expect(catalogo).toContain("Iniciar expediente bloqueado");
+    expect(catalogo).toContain("No se puede iniciar la adopción");
     expect(catalogo).toContain("readiness?.actionLabel");
-    expect(read("src/lib/secretaria/mesa-control-societaria.ts")).toContain("Asignar plantilla");
+    expect(read("src/lib/secretaria/mesa-control-societaria.ts")).toContain("Vincular plantilla");
 
     // Lenguaje técnico prohibido en la vista abogado (informe §4/§7)
     expect(catalogo).not.toContain("Gate PRE");
@@ -81,7 +81,7 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
 
     // Estado global por materia con CTA contextual (informe §10)
     expect(model).toContain("evaluateMateriaGlobalStatus");
-    expect(model).toContain("Lista para iniciar expediente");
+    expect(model).toContain("Lista para iniciar la adopción");
     expect(model).toContain("Bloqueada por falta de plantilla mínima");
     expect(model).toContain("Requiere revisión legal");
     expect(model).toContain("Advertencia no bloqueante");
@@ -98,7 +98,7 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(catalogo).toContain("Vigente para nuevos expedientes");
     expect(catalogo).toContain("Versión anterior");
     expect(catalogo).toContain("Ver versiones anteriores");
-    expect(catalogo).toContain("Posible duplicidad de plantilla");
+    expect(catalogo).toContain("Duplicidad de plantilla vigente");
     expect(catalogo).toContain("Vista previa del documento");
     expect(model).toContain("groupStageBindingsForDisplay");
     expect(model).toContain("detectTemplateDataDuplicates");
@@ -300,6 +300,14 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
 
     // Mutaciones humanas: aprobación completa, actor real y tipo social canónico.
     expect(plantillas).toContain("TemplateApprovalDialog");
+    // B14 Lote 2: la aprobación formal exige los mismos datos en el gestor —
+    // nada de autoaprobación silenciosa con el email de sesión vía confirm.
+    expect(read("src/components/secretaria/gestor/CatalogoTab.tsx")).toContain(
+      "TemplateApprovalDialog",
+    );
+    expect(read("src/components/secretaria/gestor/CatalogoTab.tsx")).toContain(
+      "setApprovalOpen(true)",
+    );
     expect(plantillas).toContain("aprobadaPor");
     expect(plantillas).toContain("fechaAprobacion");
     expect(plantillas).toContain("actor: transitionActor");
@@ -329,11 +337,12 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(labels).toContain("SEMANTIC_TONE_CLASS");
     expect(labels).toContain("DEPRECADA: \"neutral\"");
 
-    expect(review).toContain("Plantilla activa equivalente");
+    expect(review).toContain("Duplicidad de plantilla vigente");
     expect(review).toContain('normalizeCode(template.estado) !== "ACTIVA"');
     expect(review).not.toContain("Existe mas de una plantilla para la misma materia");
 
-    expect(gestor).toContain("Comprobación documental previa (Gate PRE)");
+    expect(gestor).toContain("Comprobación documental previa");
+    expect(gestor).not.toContain("(Gate PRE)");
     expect(gestor).toContain("Cobertura provisional");
     expect(gestor).toContain("No se ha encontrado la plantilla solicitada en este ámbito.");
     expect(gestor).toContain("No aparece en el catálogo de uso porque no es una fila Cloud gobernada.");
@@ -347,11 +356,11 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
         "La plantilla cambió en otra sesión. Estamos actualizando los datos; revisa su estado antes de volver a intentarlo.",
       );
       expect(surface).toContain(
-        "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la familia antes de confirmar de nuevo.",
+        "La plantilla vigente que iba a sustituirse ha cambiado. Estamos actualizando los datos; revisa la identidad documental antes de confirmar de nuevo.",
       );
       expect(surface).toContain("ACTIVE_BINDINGS_REQUIRE_REPLACEMENT");
       expect(surface).toContain(
-        "Esta plantilla tiene asignaciones activas. Activa primero una plantilla sustituta de la misma familia; las asignaciones se moverán automáticamente antes de archivar la vigente.",
+        "Esta plantilla tiene vinculaciones activas. Activa primero una plantilla sustituta de la misma identidad documental; las vinculaciones se moverán automáticamente antes de archivar la vigente.",
       );
     }
     expect(gestor).toContain("actor: transitionActor");
@@ -395,7 +404,7 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(guards).toContain('catalogo: "Catálogo gobernado"');
     expect(guards).toContain('cobertura: "Cobertura por materia y órgano"');
     expect(guards).toContain('metricas: "Indicadores de ciclo de vida"');
-    expect(guards).toContain('auditoria: "Auditoría y changelog"');
+    expect(guards).toContain('auditoria: "Auditoría e historial de cambios"');
     expect(guards).toContain('validacion: "Comprobación documental"');
     expect(guards).toContain('configuracion: "Configuración por sociedad"');
     expect(guards).toContain("TAB_ORDER.filter(canAccess)");
@@ -453,8 +462,8 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(materias).toContain('setExportStatus("No se ha podido descargar la matriz de materias. Inténtalo de nuevo.")');
     expect(materias).toContain('role={exportFailed ? "alert" : "status"}');
 
-    expect(auditoria).toContain("Exportar changelog filtrado");
-    expect(auditoria).toContain("Exportar plantillas sin changelog");
+    expect(auditoria).toContain("Exportar historial de cambios filtrado");
+    expect(auditoria).toContain("Exportar plantillas sin historial");
     expect(auditoria).toContain("CSV de trabajo; el historial disponible es incompleto.");
     expect(auditoria).toContain("hasta 200 entradas recientes");
     expect(auditoria).toContain("filteredChangelog.map");

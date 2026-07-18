@@ -1075,11 +1075,13 @@ function FrozenRuleSnapshotCard({
     );
   }
 
-  // Acuerdo legacy: card compacta con deep-link al simulador.
+  // Acuerdo legacy: deep-link a la pestaña de Verificación de Materias y
+  // reglas. C-viajes Lote 4: `vista=simular` abre la pestaña correcta y se
+  // deja de emitir `?adoption=`, que ningún destino leía (param huérfano).
   if (!snapshot) {
     const ruleManagerLink =
-      agreementEntityId && agreementMatter && agreementAdoptionMode
-        ? `/secretaria/catalogo-materias?entity=${agreementEntityId}&materia=${encodeURIComponent(agreementMatter)}&adoption=${encodeURIComponent(agreementAdoptionMode)}`
+      agreementEntityId && agreementMatter
+        ? `/secretaria/catalogo-materias?entity=${agreementEntityId}&materia=${encodeURIComponent(agreementMatter)}&vista=simular`
         : "/secretaria/catalogo-materias";
     return (
       <Card icon={<Lock className="h-4 w-4" />} title="Regla efectiva congelada">
@@ -1091,7 +1093,7 @@ function FrozenRuleSnapshotCard({
             to={ruleManagerLink}
             className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)]"
           >
-            Ver mantenimiento →
+            Verificar regla aplicable →
           </Link>
         </div>
       </Card>

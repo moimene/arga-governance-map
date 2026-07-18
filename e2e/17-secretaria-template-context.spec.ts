@@ -17,8 +17,8 @@ test.describe('Secretaría — consumo contextual de plantillas', () => {
 
     const useTemplateButton = page.getByRole('button', { name: /Elegir tr[aá]mite/i });
     await expect(useTemplateButton).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/Fixture local no persistido/i).first()).toBeVisible();
-    await expect(page.getByText('Fixture local · puente de cobertura').first()).toBeVisible();
+    await expect(page.getByText(/Cobertura provisional pendiente de aprobación/i).first()).toBeVisible();
+    await expect(page.getByText('Cobertura provisional · pendiente de aprobación').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ver en catálogo de uso' })).toHaveCount(0);
     await expect(page.getByText(/No aparece en el catálogo de uso/i)).toBeVisible();
 
@@ -49,7 +49,7 @@ test.describe('Secretaría — consumo contextual de plantillas', () => {
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('Documento registral');
     await page.getByRole('button', { name: /Documento registral/i }).first().click();
 
-    await expect(page.getByText(/Fixture local no persistido/i).first()).toBeVisible();
+    await expect(page.getByText(/Cobertura provisional pendiente de aprobación/i).first()).toBeVisible();
     await expect(page.getByText(/Revisi[oó]n legal/i).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Vista legal' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: /Capa 1.*Texto jur[ií]dico y variables/i })).toBeVisible();

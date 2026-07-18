@@ -250,7 +250,7 @@ const VARIABLE_NAMESPACE: Record<string, TemplateNamespacePresentation> = {
   EXPEDIENTE: { code: "EXPEDIENTE", label: "Expediente", family: "case" },
   QTSP: { code: "QTSP", label: "Servicios de confianza", family: "trust" },
   SISTEMA: { code: "SISTEMA", label: "Sistema", family: "system" },
-  MOTOR: { code: "MOTOR", label: "Motor normativo", family: "system" },
+  MOTOR: { code: "MOTOR", label: "Regla aplicable", family: "system" },
   USUARIO: { code: "USUARIO", label: "Usuario", family: "system" },
   REGISTRO: { code: "REGISTRO", label: "Registro", family: "case" },
   CUENTAS: { code: "CUENTAS", label: "Cuentas", family: "case" },

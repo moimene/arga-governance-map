@@ -222,9 +222,14 @@ export function useUpdateEstadoPlantilla() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] });
-      queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] });
+      // Lote 5: la clave real de métricas es ["plantillas", tenantId, "metrics"]
+      // — el prefijo ["plantillas"] la alcanza; y los derivados de cobertura y
+      // huérfanas del Gestor (staleTime 5min) también deben refrescarse.
+      queryClient.invalidateQueries({ queryKey: ["plantillas"] });
       queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] });
       queryClient.invalidateQueries({ queryKey: ["materia_template_binding"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["cobertura"] });
     },
     onError: async (error) => {
       const result = extractTransitionResult(error);
@@ -237,9 +242,11 @@ export function useUpdateEstadoPlantilla() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] }),
-        queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["plantillas"] }),
         queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] }),
         queryClient.invalidateQueries({ queryKey: ["materia_template_binding"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["cobertura"] }),
       ]);
     },
   });
@@ -348,7 +355,7 @@ export function useUpdateContenidoPlantilla() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plantillas_protegidas"] });
-      queryClient.invalidateQueries({ queryKey: ["plantillas", "metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["plantillas"] });
       queryClient.invalidateQueries({ queryKey: ["plantilla_changelog"] });
     },
   });

@@ -16,7 +16,7 @@ const READ_TAB_LABELS = [
   "Catálogo gobernado",
   "Cobertura por materia y órgano",
   "Indicadores de ciclo de vida",
-  "Auditoría y changelog",
+  "Auditoría e historial de cambios",
 ];
 
 test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
@@ -46,9 +46,9 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
       "true",
     );
 
-    await page.getByRole("tab", { name: "Auditoría y changelog" }).click();
+    await page.getByRole("tab", { name: "Auditoría e historial de cambios" }).click();
     await expect(page).toHaveURL(/\?tab=auditoria$/);
-    await expect(page.getByRole("tab", { name: "Auditoría y changelog" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Auditoría e historial de cambios" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -68,7 +68,7 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
     await page.goto("/secretaria/gestor-plantillas?tab=dashboard");
     const salud = page.getByRole("tab", { name: "Salud documental" });
     const catalogo = page.getByRole("tab", { name: "Catálogo gobernado" });
-    const auditoria = page.getByRole("tab", { name: "Auditoría y changelog" });
+    const auditoria = page.getByRole("tab", { name: "Auditoría e historial de cambios" });
 
     await salud.focus();
     await page.keyboard.press("ArrowRight");
@@ -90,7 +90,7 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
     await expect(
       page.getByRole("heading", { name: "Gobierno de plantillas" }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("tab", { name: "Auditoría y changelog" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Auditoría e historial de cambios" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -98,12 +98,12 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
       page.getByText("CSV de trabajo; el historial disponible es incompleto.").first(),
     ).toBeVisible();
 
-    const orphanRegion = page.getByRole("region", { name: "Plantillas sin changelog" });
+    const orphanRegion = page.getByRole("region", { name: "Plantillas sin historial de cambios" });
     const orphanHeading = orphanRegion.getByRole("heading", {
-      name: /Plantillas sin changelog \(\d+\)/,
+      name: /Plantillas sin historial de cambios \(\d+\)/,
     });
     const orphanButton = orphanRegion.getByRole("button", {
-      name: "Exportar plantillas sin changelog",
+      name: "Exportar plantillas sin historial",
     });
     await expect(orphanButton).toBeEnabled({ timeout: 15_000 });
     const orphanHeadingText = await orphanHeading.textContent();
@@ -138,25 +138,25 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
     );
     expect(orphanIds).toHaveLength(orphanCount);
     await expect(orphanRegion).toContainText(
-      `Se han exportado ${orphanCount} plantillas sin changelog.`,
+      `Se han exportado ${orphanCount} plantillas sin historial de cambios.`,
     );
 
     const changelogHeading = page.getByRole("heading", {
-      name: /Changelog reciente \(\d+ de \d+\)/,
+      name: /Historial de cambios reciente \(\d+ de \d+\)/,
     });
     const changelogButton = page.getByRole("button", {
-      name: "Exportar changelog filtrado",
+      name: "Exportar historial de cambios filtrado",
     });
     await expect(changelogButton).toBeEnabled({ timeout: 15_000 });
     const changelogRegion = page.getByRole("region", {
-      name: "Entradas del changelog de plantillas",
+      name: "Entradas del historial de cambios de plantillas",
     });
     const visibleIdPrefix = (
       await changelogRegion.getByRole("row").nth(1).getByRole("cell").first().textContent()
     )?.trim();
     expect(visibleIdPrefix).toMatch(/^[0-9a-f]{8}$/);
     await page.getByLabel("Plantilla (id parcial)").fill(visibleIdPrefix!);
-    await expect(changelogHeading).toHaveText(/Changelog reciente \(1 de \d+\)/);
+    await expect(changelogHeading).toHaveText(/Historial de cambios reciente \(1 de \d+\)/);
     const changelogHeadingText = await changelogHeading.textContent();
     const changelogCount = Number(changelogHeadingText?.match(/\((\d+) de/)?.[1] ?? "0");
     expect(changelogCount).toBeGreaterThan(0);
@@ -182,8 +182,8 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
     expect(changelogIds.every((id) => id.startsWith(visibleIdPrefix!))).toBe(true);
     await expect(page.locator("body")).toContainText(
       changelogCount === 1
-        ? "Se ha exportado 1 entrada del changelog filtrado."
-        : `Se han exportado ${changelogCount} entradas del changelog filtrado.`,
+        ? "Se ha exportado 1 entrada del historial de cambios filtrado."
+        : `Se han exportado ${changelogCount} entradas del historial de cambios filtrado.`,
     );
     expect(restWrites).toEqual([]);
   });
@@ -204,8 +204,8 @@ test.describe("Gestor de Plantillas — consola unificada (tabs)", () => {
 
     await page.goto("/secretaria/gestor-plantillas?tab=auditoria");
     const exportButtons = [
-      page.getByRole("button", { name: "Exportar plantillas sin changelog" }),
-      page.getByRole("button", { name: "Exportar changelog filtrado" }),
+      page.getByRole("button", { name: "Exportar plantillas sin historial" }),
+      page.getByRole("button", { name: "Exportar historial de cambios filtrado" }),
     ];
     for (const button of exportButtons) {
       await expect(button).toBeVisible({ timeout: 15_000 });

@@ -144,7 +144,7 @@ test.describe('Secretaría Societaria — responsive 390px', () => {
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
-    const qualityFilter = page.getByRole('combobox', { name: 'Filtrar por calidad documental' });
+    const qualityFilter = page.getByRole('combobox', { name: 'Filtrar por completitud de metadatos' });
     const qualityBox = await qualityFilter.boundingBox();
     expect(qualityBox).not.toBeNull();
     expect(qualityBox!.height).toBeGreaterThanOrEqual(44);

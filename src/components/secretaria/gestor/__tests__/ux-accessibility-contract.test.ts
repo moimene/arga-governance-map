@@ -28,7 +28,7 @@ describe("Gobierno de plantillas — contrato de accesibilidad transversal", () 
 
     expect(metricas).toContain('aria-label="Detalle de indicadores por plantilla"');
     expect(auditoria).toContain('aria-label="Plantillas sin trazabilidad de cambios"');
-    expect(auditoria).toContain('aria-label="Entradas del changelog de plantillas"');
+    expect(auditoria).toContain('aria-label="Entradas del historial de cambios de plantillas"');
     expect(auditoria).toContain('aria-label="Ajustes de Capa 3 activos por sociedad"');
     expect(validacion).toContain(
       'aria-label="Resultado detallado de la comprobación documental"',
@@ -53,8 +53,8 @@ describe("Gobierno de plantillas — contrato de accesibilidad transversal", () 
   it("expone exportaciones de auditoría honestas, accesibles y basadas en las filas cargadas", () => {
     const auditoria = read("src/components/secretaria/gestor/AuditoriaTab.tsx");
 
-    expect(auditoria).toContain("Exportar changelog filtrado");
-    expect(auditoria).toContain("Exportar plantillas sin changelog");
+    expect(auditoria).toContain("Exportar historial de cambios filtrado");
+    expect(auditoria).toContain("Exportar plantillas sin historial");
     expect(auditoria).toContain("CSV de trabajo; el historial disponible es incompleto.");
     expect(auditoria).toContain("hasta 200 entradas recientes ya cargadas");
     expect(auditoria).toContain("buildChangelogCsvRows(filteredChangelog)");
@@ -63,8 +63,8 @@ describe("Gobierno de plantillas — contrato de accesibilidad transversal", () 
     expect(auditoria).toContain('role={changelogExportFailed ? "alert" : "status"}');
     expect(auditoria).toContain('role={orphanExportFailed ? "alert" : "status"}');
     expect(auditoria).toContain('aria-atomic="true"');
-    expect(auditoria).toContain("No se pudo cargar el changelog. El recuento no está disponible");
-    expect(auditoria).toContain("No se pudo comprobar la trazabilidad de changelog");
+    expect(auditoria).toContain("No se pudo cargar el historial de cambios. El recuento no está disponible");
+    expect(auditoria).toContain("No se pudo comprobar la trazabilidad del historial de cambios");
     expect(auditoria).toContain("Reintentar comprobación");
     expect(auditoria).toContain("No se pudieron cargar los ajustes de Capa 3");
     expect(auditoria).toContain("Reintentar ajustes");

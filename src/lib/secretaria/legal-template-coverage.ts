@@ -211,7 +211,11 @@ export function buildLegalTemplateCoverage(
       templateMatchesRequirement(template, requirement, options.jurisdiction)
     );
     const activeCloud = cloudMatches.filter((template) => template.estado === "ACTIVA");
-    const pendingCloud = cloudMatches.filter((template) => template.estado !== "ACTIVA");
+    // Lote 5: una versión archivada/deprecada es histórico, no "En preparación"
+    // — el propio tab afirma que las archivadas no se reactivan.
+    const pendingCloud = cloudMatches.filter(
+      (template) => !["ACTIVA", "ARCHIVADA", "DEPRECADA"].includes(template.estado),
+    );
     const fixture = requirement.fixtureId
       ? LEGAL_TEAM_TEMPLATE_FIXTURES.find((template) => template.id === requirement.fixtureId) ?? null
       : null;

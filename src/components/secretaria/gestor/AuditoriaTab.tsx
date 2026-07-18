@@ -141,13 +141,13 @@ export function AuditoriaTab() {
       announceExportStatus(
         setChangelogExportStatus,
         count === 1
-          ? "Se ha exportado 1 entrada del changelog filtrado."
-          : `Se han exportado ${count} entradas del changelog filtrado.`,
+          ? "Se ha exportado 1 entrada del historial de cambios filtrado."
+          : `Se han exportado ${count} entradas del historial de cambios filtrado.`,
       );
     } catch {
       announceExportStatus(
         setChangelogExportStatus,
-        "No se ha podido descargar el changelog filtrado. Inténtalo de nuevo.",
+        "No se ha podido descargar el historial de cambios filtrado. Inténtalo de nuevo.",
       );
     }
   };
@@ -164,13 +164,13 @@ export function AuditoriaTab() {
       announceExportStatus(
         setOrphanExportStatus,
         count === 1
-          ? "Se ha exportado 1 plantilla sin changelog."
-          : `Se han exportado ${count} plantillas sin changelog.`,
+          ? "Se ha exportado 1 plantilla sin historial de cambios."
+          : `Se han exportado ${count} plantillas sin historial de cambios.`,
       );
     } catch {
       announceExportStatus(
         setOrphanExportStatus,
-        "No se ha podido descargar la lista de plantillas sin changelog. Inténtalo de nuevo.",
+        "No se ha podido descargar la lista de plantillas sin historial de cambios. Inténtalo de nuevo.",
       );
     }
   };
@@ -198,11 +198,11 @@ export function AuditoriaTab() {
       <section
         className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-        aria-label="Plantillas sin changelog"
+        aria-label="Plantillas sin historial de cambios"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-            Plantillas sin changelog ({orphanCountLabel})
+            Plantillas sin historial de cambios ({orphanCountLabel})
           </h2>
           <button
             type="button"
@@ -219,7 +219,7 @@ export function AuditoriaTab() {
             aria-describedby="orphan-csv-note"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
-            Exportar plantillas sin changelog
+            Exportar plantillas sin historial
           </button>
         </div>
         <p id="orphan-csv-note" className="mt-2 text-sm text-[var(--g-text-secondary)]">
@@ -241,7 +241,7 @@ export function AuditoriaTab() {
             style={{ borderRadius: "var(--g-radius-md)" }}
           >
             <p className="text-sm text-[var(--g-text-primary)]">
-              No se pudo comprobar la trazabilidad de changelog. El recuento no está disponible.
+              No se pudo comprobar la trazabilidad del historial de cambios. El recuento no está disponible.
             </p>
             <button
               type="button"
@@ -257,17 +257,17 @@ export function AuditoriaTab() {
         ) : (
           <details open={focusSinChangelog ? true : undefined}>
           <summary className="mt-2 flex min-h-11 cursor-pointer items-center text-sm font-medium text-[var(--g-link)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]">
-            Ver detalle de plantillas sin changelog
+            Ver detalle de plantillas sin historial de cambios
           </summary>
           <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
-            Sin trazabilidad formal de cambios. Si se regulariza a posteriori, el changelog debe
+            Sin trazabilidad formal de cambios. Si se regulariza a posteriori, el historial debe
             marcarse como reconstruido, no como original.
           </p>
           {orphanRows.isLoading ? (
             <p className="mt-3 text-sm text-[var(--g-text-secondary)]">Cargando…</p>
           ) : (orphanRows.data?.length ?? 0) === 0 ? (
             <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
-              Todas las plantillas en estados vivos tienen al menos una entrada de changelog.
+              Todas las plantillas en estados vivos tienen al menos una entrada de historial de cambios.
             </p>
           ) : (
             <div
@@ -324,7 +324,7 @@ export function AuditoriaTab() {
       >
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <h2 className="text-base font-semibold text-[var(--g-text-primary)]">
-            Changelog reciente ({changelogCountLabel})
+            Historial de cambios reciente ({changelogCountLabel})
           </h2>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <button
@@ -342,7 +342,7 @@ export function AuditoriaTab() {
               aria-describedby="changelog-csv-note"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
-              Exportar changelog filtrado
+              Exportar historial de cambios filtrado
             </button>
             <button
               type="button"
@@ -354,7 +354,7 @@ export function AuditoriaTab() {
               className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)] disabled:opacity-50 sm:w-auto"
               style={{ borderRadius: "var(--g-radius-md)" }}
               aria-busy={changelog.isFetching}
-              aria-label="Recargar changelog"
+              aria-label="Recargar historial de cambios"
             >
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Recargar
@@ -448,7 +448,7 @@ export function AuditoriaTab() {
           <p className="text-sm text-[var(--g-text-secondary)]">Cargando…</p>
         ) : changelog.isError ? (
           <p className="text-sm text-[var(--status-error)]" role="alert">
-            No se pudo cargar el changelog. El recuento no está disponible; usa Recargar para reintentar.
+            No se pudo cargar el historial de cambios. El recuento no está disponible; usa Recargar para reintentar.
           </p>
         ) : filteredChangelog.length === 0 ? (
           <div className="flex flex-col items-center px-5 py-10 text-center">
@@ -461,7 +461,7 @@ export function AuditoriaTab() {
           <div
             className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
             role="region"
-            aria-label="Entradas del changelog de plantillas"
+            aria-label="Entradas del historial de cambios de plantillas"
             tabIndex={0}
           >
             <table className="w-full text-sm border border-[var(--g-border-subtle)]">
