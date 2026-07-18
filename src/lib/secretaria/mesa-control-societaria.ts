@@ -263,7 +263,7 @@ function actionLabel(action: NormativeMaintenanceAction) {
   if (action === "publish_statutes") return "Publicar estatutos";
   if (action === "map_clause") return "Mapear cláusula";
   if (action === "change_organ") return "Cambiar órgano";
-  if (action === "assign_template") return "Asignar plantilla";
+  if (action === "assign_template") return "Vincular plantilla";
   if (action === "resolve_conflict") return "Cerrar conflicto";
   if (action === "revert_version") return "Revertir versión";
   return "Ver fuente";
@@ -748,6 +748,7 @@ const LEGAL_FORM_LABELS_BY_JURISDICTION: Record<string, Record<string, string>> 
     SAU: "S.A.U.",
     SL: "S.L.",
     SLU: "S.L.U.",
+    SRL: "S.L.",
   },
   DE: {
     AG: "AG",
@@ -1201,6 +1202,8 @@ export interface TemplateDocumentBinding {
   editableFieldsPending: number;
   upgradeAvailable: boolean;
   selectionReason: string;
+  /** B15 Lote 4: la plantilla tiene asignación explícita en materia_template_binding. */
+  explicitAssignment?: boolean;
 }
 
 const TEMPLATE_STAGE_BY_TYPE: Record<string, TemplateDocumentStage> = {
@@ -1281,8 +1284,15 @@ function templateStage(template: PlantillaProtegidaRow): TemplateDocumentStage {
 }
 
 function templateStatusLabel(template: PlantillaProtegidaRow) {
-  if (template.estado === "ACTIVA" && template.aprobada_por) return "Firmada por Comité Legal";
-  if (template.estado === "ACTIVA" || template.estado === "APROBADA") return "Aprobada";
+  // Lote 3 (B8): vigencia y aprobación son ejes distintos. No se rotula
+  // "Firmada"/"Aprobada" cuando faltan los datos formales de aprobación —
+  // exactamente el caso que la revisión legal marca missingApproval.
+  if (template.estado === "ACTIVA") {
+    return template.aprobada_por && template.fecha_aprobacion
+      ? "Vigente · aprobación formal registrada"
+      : "Vigente · aprobación formal pendiente";
+  }
+  if (template.estado === "APROBADA") return "Aprobada (pendiente de marcar como vigente)";
   if (template.estado === "REVISADA") return "Pendiente de aprobación";
   return "Sin aprobar";
 }
@@ -1437,8 +1447,15 @@ export function buildTemplateDocumentBindings(
     tipoSocial?: string | null;
     organoTipo?: string | string[] | null;
     formaAdopcion?: string | string[] | null;
+    /**
+     * B15 Lote 4: ids de plantilla con asignación explícita y activa en
+     * materia_template_binding para esta materia. La asignación explícita del
+     * usuario prevalece sobre el matching de metadatos en la ordenación.
+     */
+    explicitTemplateIds?: ReadonlyArray<string> | null;
   },
 ): TemplateDocumentBinding[] {
+  const explicitSet = new Set(criteria.explicitTemplateIds ?? []);
   return plantillas
     .filter((template) => template.estado !== "ARCHIVADA")
     .filter((template) => hasTemplateMatterMatch(template, criteria.materia) || template.tipo !== "MODELO_ACUERDO")
@@ -1455,7 +1472,9 @@ export function buildTemplateDocumentBindings(
       const metadataComplete = templateMetadataComplete(template);
       const automaticVariablesValid = (template.capa2_variables ?? []).every((variable) => Boolean(variable.variable && variable.fuente));
       const editableFieldsPending = (template.capa3_editables ?? []).filter((field) => field.obligatoriedad === "OBLIGATORIO" || field.requerido).length;
+      const explicitAssignment = explicitSet.has(template.id);
       const reasons = [
+        explicitAssignment ? "vinculación explícita por regla aplicable" : null,
         `fase ${templateStage(template).toLowerCase()}`,
         criteria.jurisdiction && template.jurisdiccion === criteria.jurisdiction ? "jurisdicción exacta" : null,
         hasTemplateMatterMatch(template, criteria.materia) ? "materia compatible" : "transversal",
@@ -1482,10 +1501,12 @@ export function buildTemplateDocumentBindings(
         editableFieldsPending,
         upgradeAvailable: template.estado === "REVISADA",
         selectionReason: reasons.join(" · "),
+        explicitAssignment,
       };
     })
     .sort((a, b) =>
       TEMPLATE_DOCUMENT_STAGES.indexOf(a.stage) - TEMPLATE_DOCUMENT_STAGES.indexOf(b.stage) ||
+      Number(Boolean(b.explicitAssignment)) - Number(Boolean(a.explicitAssignment)) ||
       a.template.tipo.localeCompare(b.template.tipo) ||
       String(b.template.version).localeCompare(String(a.template.version)),
     );
@@ -1551,7 +1572,7 @@ export function evaluateTemplateReadiness(
       actionLabel: status === "no_aplica"
         ? "No requiere acción"
         : status === "faltante"
-          ? "Asignar plantilla"
+          ? "Vincular plantilla"
           : status === "pendiente_revision"
             ? "Revisar plantilla"
             : "Vista previa del documento",
@@ -1572,7 +1593,7 @@ export function evaluateTemplateReadiness(
     .map((item) => item.stage.toLowerCase());
   const openingStatus: TemplateOpeningStatus = missing.length > 0 ? "blocked" : "ready";
   const blockingMessage = missing.length > 0
-    ? `No se puede iniciar expediente porque falta plantilla activa de ${missing.join(", ")}.`
+    ? `No se puede iniciar la adopción porque falta plantilla activa de ${missing.join(", ")}.`
     : null;
   return {
     canStartCase: openingStatus === "ready",
@@ -1680,7 +1701,7 @@ export function evaluateMateriaGlobalStatus(input: {
       label: "Advertencia no bloqueante",
       explanation:
         "Hay pactos parasociales aplicables: generan obligaciones contractuales, pero no invalidan por sí solos el acuerdo societario.",
-      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar expediente",
+      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar adopción",
     };
   }
   if (ruleWarnings.length > 0) {
@@ -1688,7 +1709,7 @@ export function evaluateMateriaGlobalStatus(input: {
       status: "advertencia",
       label: "Advertencia no bloqueante",
       explanation: ruleWarnings.join(" "),
-      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar expediente",
+      ctaLabel: input.informativa ? "Ver regla aplicable" : "Iniciar adopción",
     };
   }
   if (input.informativa) {
@@ -1702,9 +1723,9 @@ export function evaluateMateriaGlobalStatus(input: {
   }
   return {
     status: "lista",
-    label: "Lista para iniciar expediente",
+    label: "Lista para iniciar la adopción",
     explanation: "Regla aplicable resuelta y documentos mínimos disponibles.",
-    ctaLabel: "Iniciar expediente",
+    ctaLabel: "Iniciar adopción",
   };
 }
 

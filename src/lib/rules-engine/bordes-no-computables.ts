@@ -81,6 +81,7 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
     const materiasOperacionesVinculadas = [
       'AUTORIZACION_TRANSACCION',
       'APROBACION_PRESUPUESTOS',
+      'APROBACION_PRESUPUESTO',
       'REPARTO_DIVIDENDOS',
     ];
     if (input.materias.some((m) => materiasOperacionesVinculadas.includes(m))) {
@@ -187,6 +188,9 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
     'NOMBRAMIENTO_CESE_ADMIN',
     'AUTORIZACION_TRANSACCION',
     'APROBACION_PRESUPUESTOS',
+    // B7 Lote 3: el código canónico es el singular; el plural se conserva
+    // porque sigue existiendo en datos Cloud históricos.
+    'APROBACION_PRESUPUESTO',
   ];
 
   const tieneMateriasIndelegables = input.materias.some((m) =>

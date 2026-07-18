@@ -186,6 +186,45 @@ describe("mesa-control-societaria", () => {
     expect(bindings.every((binding) => binding.statusLabel.length > 0)).toBe(true);
   });
 
+  // B15 Lote 4: la vinculación explícita del usuario (materia_template_binding)
+  // prevalece sobre el matching de metadatos y se etiqueta como tal.
+  it("prioriza la vinculación explícita y la señala en la razón de selección", () => {
+    const plantillas = [
+      plantilla({
+        id: "modelo-metadatos",
+        tipo: "MODELO_ACUERDO",
+        materia: "AUMENTO_CAPITAL",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        version: "2.0.0",
+      }),
+      plantilla({
+        id: "modelo-vinculado",
+        tipo: "MODELO_ACUERDO",
+        materia: "AUMENTO_CAPITAL",
+        organo_tipo: "JUNTA_GENERAL",
+        adoption_mode: "MEETING",
+        version: "1.0.0",
+      }),
+    ];
+    const criteria = { materia: "AUMENTO_CAPITAL", jurisdiction: "ES", organoTipo: "JUNTA_GENERAL" };
+
+    const sinVinculacion = buildTemplateDocumentBindings(plantillas, criteria);
+    const modelosSinVinculacion = sinVinculacion.filter((b) => b.stage === "Modelo de acuerdo");
+    expect(modelosSinVinculacion[0]?.template.id).toBe("modelo-metadatos");
+    expect(modelosSinVinculacion.every((b) => !b.explicitAssignment)).toBe(true);
+
+    const conVinculacion = buildTemplateDocumentBindings(plantillas, {
+      ...criteria,
+      explicitTemplateIds: ["modelo-vinculado"],
+    });
+    const modelosConVinculacion = conVinculacion.filter((b) => b.stage === "Modelo de acuerdo");
+    expect(modelosConVinculacion[0]?.template.id).toBe("modelo-vinculado");
+    expect(modelosConVinculacion[0]?.explicitAssignment).toBe(true);
+    expect(modelosConVinculacion[0]?.selectionReason).toContain("vinculación explícita");
+    expect(modelosConVinculacion[1]?.explicitAssignment).toBe(false);
+  });
+
   it("conserva los tres meta-órganos transversales sin relajar actas adoptables", () => {
     const bindings = buildTemplateDocumentBindings(
       [
@@ -480,7 +519,7 @@ describe("mesa-control-societaria", () => {
     );
 
     expect(readiness.canStartCase).toBe(false);
-    expect(readiness.blockingMessage).toContain("No se puede iniciar expediente");
+    expect(readiness.blockingMessage).toContain("No se puede iniciar la adopción");
     expect(readiness.items.some((item) => item.stage === "Acta" && item.blocking)).toBe(true);
   });
 

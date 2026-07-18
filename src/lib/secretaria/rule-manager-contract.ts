@@ -235,10 +235,10 @@ const ADOPTION_NEEDS_QUORUM = new Set([
 
 /** Etiquetas humanas por modo de adopción. */
 const ADOPTION_LABELS: Record<string, string> = {
-  MEETING: "Acuerdo en sesión",
+  MEETING: "Sesión formal",
   UNIVERSAL: "Junta universal",
   NO_SESSION: "Acuerdo sin sesión",
-  CO_APROBACION: "Co-aprobación de administradores",
+  CO_APROBACION: "Decisión mancomunada",
   SOLIDARIO: "Decisión de administrador solidario",
   UNIPERSONAL_SOCIO: "Decisión del socio único",
   UNIPERSONAL_ADMIN: "Decisión del administrador único",

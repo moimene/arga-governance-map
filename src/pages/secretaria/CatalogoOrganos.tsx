@@ -24,23 +24,14 @@ import {
   normativeRoleFromAppRole,
   sanitizeBusinessLabel,
 } from "@/lib/secretaria/mesa-control-societaria";
-
-const BODY_TYPE_LABEL: Record<string, string> = {
-  JUNTA: "Junta General",
-  CDA: "Consejo de Administración",
-  CONSEJO: "Consejo de Administración",
-  COMISION: "Comisión delegada",
-  COMITE: "Comité",
-};
+// Lote 3 (C-labels): label canónico de tipo de órgano — antes había un mapa
+// local duplicado con cobertura y fallback distintos del compartido.
+import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
 
 function normalize(value?: string | null) {
   return String(value ?? "").trim().toUpperCase();
 }
 
-function bodyTypeLabel(type?: string | null) {
-  const normalized = normalize(type);
-  return BODY_TYPE_LABEL[normalized] ?? sanitizeBusinessLabel(type);
-}
 
 function organStatus(body: BodySlim): "activo" | "incompleto" | "sin_reglamento" {
   if (!body.regulation_id && normalize(body.body_type) !== "JUNTA") return "sin_reglamento";

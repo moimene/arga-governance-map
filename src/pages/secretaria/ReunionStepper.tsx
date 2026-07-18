@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
+// B7 Lote 3: los datos legacy de agenda pueden traer alias de materia; el
+// select solo ofrece códigos canónicos, así que hay que resolverlos al leer.
+import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -191,7 +194,7 @@ function formatMeetingVoterName(voter: MeetingVoterRow) {
 
 const AGENDA_MATERIAS = [
   { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA" },
-  { value: "APROBACION_PRESUPUESTOS", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA" },
+  { value: "APROBACION_PRESUPUESTO", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA" },
   { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA" },
   { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA" },
   { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA" },
@@ -2054,7 +2057,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                     Materia o ámbito
                   </label>
                   <select
-                    value={d.materia ?? "APROBACION_CUENTAS"}
+                    value={resolveMateriaAlias(d.materia ?? "APROBACION_CUENTAS")}
                     onChange={(e) => updatePunto(idx, "materia", e.target.value)}
                     className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
@@ -2071,7 +2074,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                     Clase de acuerdo
                   </label>
                   <select
-                    value={d.tipo ?? materiaClaseFromMateria(d.materia ?? "APROBACION_CUENTAS")}
+                    value={d.tipo ?? materiaClaseFromMateria(resolveMateriaAlias(d.materia ?? "APROBACION_CUENTAS"))}
                     onChange={(e) => updatePunto(idx, "tipo", e.target.value)}
                     className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}

@@ -29,7 +29,7 @@ const AGENDA = {
   ceoProposal:
     'Nombrar a Dña. Clara Rivas Arga Test como Consejera Delegada de Arga test A, SL, con delegación permanente de facultades ejecutivas en los términos del acuerdo.',
   budgetTitle: 'Aprobación del presupuesto anual 2026',
-  budgetMateria: 'APROBACION_PRESUPUESTOS',
+  budgetMateria: 'APROBACION_PRESUPUESTO',
   budgetProposal:
     'Aprobar el presupuesto anual 2026 de Arga test A, SL por importe de 1.250.000 EUR, autorizando a la Consejera Delegada a ejecutar sus partidas ordinarias.',
 };

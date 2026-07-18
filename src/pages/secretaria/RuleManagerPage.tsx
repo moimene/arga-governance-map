@@ -107,10 +107,10 @@ function mergeMattersWithRulePacks(
 }
 
 const ADOPTION_MODES: Array<{ value: string; label: string }> = [
-  { value: "MEETING", label: "Acuerdo en sesión" },
+  { value: "MEETING", label: "Sesión formal" },
   { value: "UNIVERSAL", label: "Junta universal" },
   { value: "NO_SESSION", label: "Acuerdo sin sesión" },
-  { value: "CO_APROBACION", label: "Co-aprobación de administradores" },
+  { value: "CO_APROBACION", label: "Decisión mancomunada" },
   { value: "SOLIDARIO", label: "Decisión de administrador solidario" },
   { value: "UNIPERSONAL_SOCIO", label: "Decisión de socio único" },
   { value: "UNIPERSONAL_ADMIN", label: "Decisión de administrador único" },

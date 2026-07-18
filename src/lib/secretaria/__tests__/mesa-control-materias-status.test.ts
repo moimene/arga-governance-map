@@ -88,6 +88,7 @@ describe("alias de materias legacy", () => {
     expect(resolveMateriaAlias("MOD_ESTATUTOS")).toBe("MODIFICACION_ESTATUTOS");
     expect(resolveMateriaAlias("AMPLIACION_CAPITAL")).toBe("AUMENTO_CAPITAL");
     expect(resolveMateriaAlias("NOMBRAMIENTO_CESE")).toBe("NOMBRAMIENTO_CONSEJERO");
+    expect(resolveMateriaAlias("APROBACION_PRESUPUESTOS")).toBe("APROBACION_PRESUPUESTO");
     expect(resolveMateriaAlias("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
       "SUPRESION_PREFERENTE",
     );
@@ -304,7 +305,7 @@ describe("evaluateMateriaGlobalStatus", () => {
     });
     expect(result.status).toBe("advertencia");
     expect(result.label).toBe("Advertencia no bloqueante");
-    expect(result.ctaLabel).toBe("Iniciar expediente");
+    expect(result.ctaLabel).toBe("Iniciar adopción");
   });
 
   it("lista cuando regla y documentos están resueltos", () => {
@@ -314,8 +315,8 @@ describe("evaluateMateriaGlobalStatus", () => {
       applicablePactosCount: 0,
     });
     expect(result.status).toBe("lista");
-    expect(result.label).toBe("Lista para iniciar expediente");
-    expect(result.ctaLabel).toBe("Iniciar expediente");
+    expect(result.label).toBe("Lista para iniciar la adopción");
+    expect(result.ctaLabel).toBe("Iniciar adopción");
   });
 });
 

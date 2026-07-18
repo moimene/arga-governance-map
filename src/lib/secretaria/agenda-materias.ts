@@ -31,7 +31,7 @@ export const JUNTA_AND_CONSEJO: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COM
 export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   // Consejo / órgano de administración
   { value: "APROBACION_PLAN_NEGOCIO", label: "Aprobación del plan de negocio", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
-  { value: "APROBACION_PRESUPUESTOS", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  { value: "APROBACION_PRESUPUESTO", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
@@ -96,7 +96,7 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
 
 export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   APROBACION_PLAN_NEGOCIO: CONSEJO_SCOPE,
-  APROBACION_PRESUPUESTOS: CONSEJO_SCOPE,
+  APROBACION_PRESUPUESTO: CONSEJO_SCOPE,
   FORMULACION_CUENTAS: CONSEJO_SCOPE,
   FINANCIACION: CONSEJO_SCOPE,
   CONTRATACION_RELEVANTE: CONSEJO_SCOPE,
@@ -169,6 +169,10 @@ export const MATERIA_CANONICAL_ALIAS: Readonly<Record<string, string>> = {
   MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
   NOMBRAMIENTO_CESE: "NOMBRAMIENTO_CONSEJERO",
   EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "SUPRESION_PREFERENTE",
+  // B7 Lote 3 (2026-07-18): el plural convive en datos Cloud legacy; el
+  // singular es el canónico de materia_catalog. Espejado en
+  // fn_secretaria_template_functional_key (migración 20260718090000).
+  APROBACION_PRESUPUESTOS: "APROBACION_PRESUPUESTO",
 };
 
 const ART_308_MATERIA = "SUPRESION_PREFERENTE";
@@ -192,6 +196,36 @@ const PROCESS_MATERIA_LABELS: Readonly<Record<string, string>> = {
   GESTION_SOCIEDAD: "Gestión de la sociedad",
   JUNTA_GENERAL: "Junta General",
   NOTIFICACION_CONVOCATORIA_SL: "Notificación individual de convocatoria de S.L.",
+};
+
+
+/**
+ * Espejo de presentación de `materia_catalog.materia_label_es` para códigos
+ * del catálogo societario que no existen en AGENDA_MATERIAS (B6 Lote 3,
+ * extraído de Cloud el 2026-07-18). Solo presentación: la fuente de verdad
+ * sigue siendo la BD; si un label cambia en materia_catalog, actualizar aquí.
+ */
+const CATALOG_MATERIA_LABELS: Readonly<Record<string, string>> = {
+  ACUERDO_CONVOCATORIA_JUNTA: "Acuerdo del órgano de administración por el que se convoca la Junta",
+  ADQUISICION_PROPIA: "Adquisición de acciones/participaciones propias",
+  AMPLIACION_OBJETO_SOCIAL: "Ampliación del objeto social",
+  APROBACION_REGLAMENTO_CONSEJO: "Aprobación o modificación del Reglamento del Consejo",
+  CONTRATOS_SOCIO_UNICO_SOCIEDAD: "Contratos entre socio único y sociedad",
+  CUENTAS_CONSOLIDADAS: "Formulación de cuentas consolidadas",
+  DELEGACION_CAPITAL: "Delegación en el órgano de administración para aumentar capital",
+  DIVIDENDO_A_CUENTA: "Distribución de dividendo a cuenta",
+  EJECUCION_AUMENTO_DELEGADO: "Ejecución de aumento de capital delegado",
+  EMISION_DEUDA_CONVERTIBLE: "Emisión de deuda convertible",
+  EXCLUSION_SOCIO: "Exclusión de socio",
+  LIQUIDACION: "Liquidación de la sociedad",
+  PACTO_PARASOCIAL: "Adhesión o modificación de pacto parasocial",
+  PODER_REPRESENTACION: "Otorgamiento o modificación de poderes de representación",
+  PRESTACIONES_ACCESORIAS: "Creación, modificación o supresión de prestaciones accesorias",
+  PRORROGA_SOCIEDAD: "Prórroga de la duración de la sociedad",
+  SEPARACION_SOCIO: "Ejercicio del derecho de separación de socio",
+  TRANSMISION_PARTICIPACIONES: "Autorización de transmisión de participaciones sociales",
+  TRASLADO_DOMICILIO_NACIONAL: "Traslado de domicilio social dentro de España",
+  VENTA_ACTIVOS_ESENCIALES: "Enajenación de activos esenciales",
 };
 
 function normalizeMateriaCode(value?: string | null): string {
@@ -230,7 +264,11 @@ export function labelMateria(materia?: string | null, sourceLabel?: string | nul
   if (canonical === ART_308_MATERIA) return ART_308_LABEL;
   if (PROCESS_MATERIA_LABELS[canonical]) return PROCESS_MATERIA_LABELS[canonical];
   if (sourceLabel?.trim()) return sourceLabel.trim();
-  return AGENDA_MATERIAS.find((m) => m.value === canonical)?.label ?? humanizeMateriaCode(canonical);
+  return (
+    AGENDA_MATERIAS.find((m) => m.value === canonical)?.label ??
+    CATALOG_MATERIA_LABELS[canonical] ??
+    humanizeMateriaCode(canonical)
+  );
 }
 
 export interface AgendaMateriaGroup {

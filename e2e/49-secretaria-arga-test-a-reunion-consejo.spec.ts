@@ -31,7 +31,7 @@ const AGENDA = {
   ceoTitle: 'Nombramiento de consejera delegada',
   ceoMateria: 'DELEGACION_FACULTADES',
   budgetTitle: 'Aprobación del presupuesto anual 2026',
-  budgetMateria: 'APROBACION_PRESUPUESTOS',
+  budgetMateria: 'APROBACION_PRESUPUESTO',
 };
 
 type ServiceClient = SupabaseClient;
