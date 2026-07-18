@@ -29,6 +29,7 @@ async function expectDocxDownload(page, buttonName: string | RegExp, filenamePat
   await button.click();
 
   const capa3Dialog = page.getByRole('dialog', { name: 'Completar campos editables' });
+  await capa3Dialog.waitFor({ state: 'visible', timeout: 2_000 }).catch(() => {});
   if (await capa3Dialog.isVisible().catch(() => false)) {
     const textboxes = capa3Dialog.getByRole('textbox');
     const count = await textboxes.count();
@@ -36,6 +37,17 @@ async function expectDocxDownload(page, buttonName: string | RegExp, filenamePat
       const textbox = textboxes.nth(index);
       if (!(await textbox.inputValue())) {
         await textbox.fill(`Dato demo documental ${index + 1}`);
+        await page.waitForTimeout(50);
+      }
+    }
+    // Capa 3 renderiza <select> para campos con lista cerrada (`opciones`);
+    // hay que elegir una opción real igual que lo haría el usuario.
+    const comboboxes = capa3Dialog.getByRole('combobox');
+    const comboCount = await comboboxes.count();
+    for (let index = 0; index < comboCount; index += 1) {
+      const combobox = comboboxes.nth(index);
+      if (!(await combobox.inputValue())) {
+        await combobox.selectOption({ index: 1 });
         await page.waitForTimeout(50);
       }
     }
@@ -156,8 +168,8 @@ test.describe('Secretaría — documentos DOCX', () => {
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('Documento registral');
 
     await page.getByRole('button', { name: /Documento registral/ }).first().click();
-    await expect(page.getByText('Fixture local no persistido').first()).toBeVisible();
-    await expect(page.getByText('Fixture local · puente de cobertura').first()).toBeVisible();
+    await expect(page.getByText('Cobertura provisional pendiente de aprobación').first()).toBeVisible();
+    await expect(page.getByText('Cobertura provisional · pendiente de aprobación').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Elegir trámite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Elegir trámite' }).click();

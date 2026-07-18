@@ -198,6 +198,45 @@ describe("capa3-fields", () => {
       ]);
       expect(fields[0].opciones).toBeUndefined();
     });
+
+    it("descarta valores de draft fuera de opciones (lista cerrada)", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "cargo_convocante",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Cargo del convocante",
+          opciones: ["PRESIDENTE", "CONSEJERO_DESIGNADO"],
+        },
+      ]);
+
+      // Valor sembrado por expansión de alias legales (firma_organo_administracion
+      // → cargo_convocante): fuera de la lista cerrada, debe descartarse para no
+      // dejar un <select> "sin seleccionar" con estado inválido invisible.
+      const poisoned = normalizeCapa3Draft(fields, {
+        cargo_convocante: "Secretaría del órgano convocante",
+      });
+      expect(poisoned.values.cargo_convocante).toBeUndefined();
+      expect(poisoned.emptyKeys).toEqual(["cargo_convocante"]);
+
+      const valid = normalizeCapa3Draft(fields, { cargo_convocante: "PRESIDENTE" });
+      expect(valid.values.cargo_convocante).toBe("PRESIDENTE");
+    });
+
+    it("buildInitialCapa3Values no siembra valores fuera de la lista cerrada", () => {
+      const fields = normalizeCapa3Fields([
+        {
+          campo: "modalidad_sesion",
+          obligatoriedad: "OBLIGATORIO",
+          descripcion: "Modalidad de la sesión",
+          opciones: ["PRESENCIAL", "TELEMATICA", "MIXTA"],
+        },
+      ]);
+
+      expect(
+        buildInitialCapa3Values(fields, { modalidad_sesion: "TELEMATICA" }),
+      ).toEqual({ modalidad_sesion: "TELEMATICA" });
+      expect(buildInitialCapa3Values(fields, { modalidad_sesion: "—" })).toEqual({});
+    });
   });
 
   describe("array repeatable", () => {

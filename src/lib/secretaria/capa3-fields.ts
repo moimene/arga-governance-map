@@ -334,7 +334,23 @@ function normalizeArrayDraftValue(
 
 function normalizeCapa3Value(field: NormalizedCapa3Field, value: unknown): Capa3Value {
   if (isArrayCapa3Field(field)) return normalizeArrayDraftValue(field, value);
-  return normalizeDraftValue(value);
+  const normalized = normalizeDraftValue(value);
+  // Contrato `opciones` (lista cerrada): los valores fuera de la lista quedan
+  // descartados también al normalizar drafts/seeds, no solo en `default`.
+  // Sin este filtro, la expansión de alias legales (p.ej.
+  // firma_organo_administracion → cargo_convocante en legal-template-normalizer)
+  // siembra un valor inválido que el <select> no puede mostrar (renderiza como
+  // "sin seleccionar") pero que validateCapa3 rechaza con "valor fuera de las
+  // opciones permitidas" — un bloqueo invisible para el usuario.
+  if (
+    normalized &&
+    field.opciones &&
+    field.opciones.length > 0 &&
+    !field.opciones.includes(normalized)
+  ) {
+    return "";
+  }
+  return normalized;
 }
 
 export function normalizeCapa3Fields(value: unknown): NormalizedCapa3Field[] {

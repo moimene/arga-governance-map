@@ -130,6 +130,12 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     lugar_junta: conv.lugar ?? "domicilio social",
     ciudad: conv.lugar ?? "Madrid",
     modalidad: conv.modalidad ?? "—",
+    // Semilla Capa 3: la plantilla CONVOCATORIA pide `modalidad_sesion` como
+    // lista cerrada (PRESENCIAL/TELEMATICA/MIXTA). El dato ya existe en la
+    // convocatoria; sin esta clave el diálogo lo pediría vacío pese a mostrarlo
+    // en "Datos de la convocatoria". Valores fuera de la lista se descartan en
+    // normalizeCapa3Value, no ensucian el select.
+    modalidad_sesion: conv.modalidad ?? "",
     destinatarios: "Personas legitimadas conforme a la ley, estatutos y, en su caso, pactos aplicables.",
     orden_dia: agenda.map((item, index) => ({
       ordinal: String(index + 1),
