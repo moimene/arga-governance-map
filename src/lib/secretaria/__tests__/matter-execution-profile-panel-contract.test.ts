@@ -54,6 +54,11 @@ describe("MatterExecutionProfilePanel — contrato de fase 1 informativa", () =>
     expect(panel).toContain("!organoMatchesPack(packOrgano, organoTipo)");
     // Sin bucket comodín: COMISION/COMITE/SOCIO_UNICO no pueden casar entre sí.
     expect(panel).not.toContain('return "OTRO";');
+    // Un pack híbrido no acredita órgano: el panel calla.
+    expect(panel).toContain('raw === "JUNTA_GENERAL_O_CONSEJO"');
+    // El órgano del acuerdo lo resuelve el módulo canónico del proyecto.
+    const tramitador2 = read(TRAMITADOR);
+    expect(tramitador2).toContain("resolveOrganoTipo(selectedAgreementBody)");
     // Y el tramitador resuelve el órgano real del acuerdo para el rule pack.
     const tramitador = read(TRAMITADOR);
     expect(tramitador).toContain("selectedAgreementOrganoTipo");

@@ -21,7 +21,7 @@ import { buildEntityNormativeProfile } from "@/lib/secretaria/normative-framewor
 import type { RulePackData } from "@/hooks/useRulePackForMateria";
 import { labelMateria } from "@/lib/secretaria/agenda-materias";
 import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
-import { normalizeOrganoTipo } from "@/lib/secretaria/template-admin/organo-canonico";
+import type { TipoOrgano } from "@/lib/rules-engine";
 
 const SEVERITY_CHIP: Record<string, string> = {
   BLOCKING: "border border-[var(--status-error)] text-[var(--g-text-primary)]",
@@ -30,51 +30,36 @@ const SEVERITY_CHIP: Record<string, string> = {
 };
 
 /**
- * `governing_bodies.body_type` usa un vocabulario propio (CDA, JUNTA, COMISION,
- * COMITE) distinto del `organo_tipo` canónico de plantillas y rule packs. La
- * traducción vive aquí y NO en `ORGANO_ALIAS`: ese mapa está espejado en la
- * función de identidad funcional del servidor y en el índice único de Cloud;
- * tocarlo cambiaría la identidad de las plantillas.
+ * Familia de órgano del motor a partir del `organo_tipo` de un rule pack.
  *
- * `COMITE` se deja fuera a propósito: un comité no es necesariamente una
- * comisión delegada con reglas propias de quórum, y ante la duda el panel calla.
+ * El acuerdo ya llega resuelto por `organo-resolver` (el módulo canónico del
+ * proyecto, que conoce que CDA es umbrella y que COMITE sigue la convención de
+ * comisión delegada). Aquí solo hay que traducir el vocabulario del pack.
+ *
+ * `JUNTA_GENERAL_O_CONSEJO` es deliberadamente ambiguo en el catálogo y NO se
+ * resuelve: un pack híbrido no acredita a qué órgano corresponden sus quórums,
+ * así que el panel calla.
  */
-const BODY_TYPE_TO_ORGANO_CANONICO: Readonly<Record<string, string>> = {
-  JUNTA: "JUNTA_GENERAL",
-  JUNTA_GENERAL: "JUNTA_GENERAL",
-  CDA: "CONSEJO_ADMIN",
-  CONSEJO: "CONSEJO_ADMIN",
-  CONSEJO_ADMIN: "CONSEJO_ADMIN",
-  COMISION: "COMISION_DELEGADA",
-  COMISION_DELEGADA: "COMISION_DELEGADA",
-};
-
-function organoCanonicoFromBodyType(value?: string | null): string | null {
-  const normalized = String(value ?? "").trim().toUpperCase();
-  if (!normalized) return null;
-  return BODY_TYPE_TO_ORGANO_CANONICO[normalized] ?? normalizeOrganoTipo(normalized);
+function packOrganoFamily(value?: string | null): TipoOrgano | null {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (!raw || raw === "JUNTA_GENERAL_O_CONSEJO") return null;
+  if (raw.includes("COMISION") || raw.includes("COMIT")) return "COMISION_DELEGADA";
+  if (raw.includes("JUNTA") || raw === "SOCIO_UNICO") return "JUNTA_GENERAL";
+  if (raw.includes("CONSEJO") || raw.includes("ADMIN") || raw === "CDA") return "CONSEJO";
+  return null;
 }
 
 /**
- * ¿La regla versionada resuelta pertenece al órgano del acuerdo?
- *
- * Se compara por código canónico y, además, se aceptan como equivalentes las
- * grafías de una misma familia (CDA/CONSEJO_ADMIN, JUNTA/JUNTA_GENERAL). NO
- * existe un bucket "otros" comodín: agrupar COMISION, COMITE, SOCIO_UNICO y
- * SOPORTE_INTERNO en una misma clase haría casar un acuerdo de comisión
- * delegada con un rule pack de socio único. Ante cualquier duda, no coincide y
- * el panel calla.
+ * ¿La regla versionada resuelta pertenece al órgano del acuerdo? Sin comodines:
+ * ante cualquier duda no coincide y el panel calla.
  */
-function organoMatchesPack(packOrgano?: string | null, agreementOrgano?: string | null): boolean {
-  const pack = organoCanonicoFromBodyType(packOrgano);
-  const agreement = organoCanonicoFromBodyType(agreementOrgano);
-  if (!pack || !agreement) return false;
-  if (pack === agreement) return true;
-  const familia = (value: string) =>
-    value.includes("CONSEJO") ? "CONSEJO" : value.includes("JUNTA") ? "JUNTA" : null;
-  const packFamilia = familia(pack);
-  const agreementFamilia = familia(agreement);
-  return Boolean(packFamilia && agreementFamilia && packFamilia === agreementFamilia);
+function organoMatchesPack(
+  packOrgano: string | null | undefined,
+  agreementOrgano: TipoOrgano | null,
+): boolean {
+  if (!agreementOrgano) return false;
+  const pack = packOrganoFamily(packOrgano);
+  return Boolean(pack && pack === agreementOrgano);
 }
 
 /**
@@ -117,17 +102,14 @@ function readableRule(value?: string | null): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
   if (/^(NA|N\/A|NO_APLICA|-|—|NULL|NINGUNO)$/i.test(raw)) return null;
+  // SOLO se traduce el código EXACTO y conocido. Nunca se reescribe una
+  // fórmula: Codex adversarial detectó que humanizar
+  // "favor > presentes_mitad_no_vinculados" producía "mayoría de los
+  // presentes" — y mitad no es lo mismo que mayoría. Una regla de mayoría mal
+  // parafraseada es peor que el código crudo, así que ante cualquier
+  // expresión no reconocida se muestra literal.
   const known = RULE_CODE_LABELS[raw.toUpperCase()];
-  if (known) return known;
-  // Los payloads traen códigos en snake_case, a veces dentro de una expresión
-  // ("favor > presentes_mitad_no_vinculados"). En vista de abogado se presentan
-  // como texto, no como identificadores de configuración.
-  const humanized = raw.replace(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/gi, (token) => {
-    const mapped = RULE_CODE_LABELS[token.toUpperCase()];
-    if (mapped) return mapped.toLowerCase();
-    return token.replace(/_/g, " ").toLowerCase();
-  });
-  return humanized.charAt(0).toUpperCase() + humanized.slice(1);
+  return known ?? raw;
 }
 
 interface PanelEntity {
@@ -148,7 +130,7 @@ export function MatterExecutionProfilePanel({
 }: {
   materia?: string | null;
   adoptionMode?: string | null;
-  organoTipo?: string | null;
+  organoTipo?: TipoOrgano | null;
   entity?: PanelEntity | null;
   rulePack?: RulePackData | null;
 }) {
@@ -167,8 +149,7 @@ export function MatterExecutionProfilePanel({
     // Codex adversarial (P1 nuevo): el motor solo reconoce códigos canónicos.
     // Pasarle el `body_type` crudo (CDA) hacía que eligiera las reglas de Junta
     // para un acuerdo de Consejo — el mismo error, un paso más adentro.
-    const organoCanonico = organoCanonicoFromBodyType(organoTipo);
-    if (!organoCanonico) return null;
+
     // Codex adversarial (P1): si el pack resuelto no es el del órgano del
     // acuerdo, callar. Mostrar reglas de Junta en un acuerdo de Consejo es
     // exactamente el error que la fase 1 informativa debía evitar.
@@ -190,7 +171,7 @@ export function MatterExecutionProfilePanel({
       });
       return buildMatterExecutionProfile({
         materia,
-        organo_tipo: organoCanonico,
+        organo_tipo: organoTipo,
         tipo_social: tipoSocial,
         adoption_mode: adoptionMode,
         jurisdiccion,

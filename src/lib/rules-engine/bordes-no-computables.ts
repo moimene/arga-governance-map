@@ -78,14 +78,18 @@ export function evaluarBordesNoComputables(input: BordeInput): ReglaNoComputable
     });
 
     // Operaciones vinculadas — solo si hay materias que lo impliquen
-    // Codex adversarial (P2): la aprobación del presupuesto anual no es una
-    // operación con parte vinculada (art. 231 LSC) — disparaba el aviso de
-    // conflicto e informe de la Comisión de Auditoría en toda aprobación
-    // ordinaria de presupuesto de una cotizada. Se retira de esta lista; el
-    // presupuesto sigue evaluado como materia potencialmente indelegable.
-    // PENDIENTE de confirmación del Comité Legal.
+    // PROPUESTA PENDIENTE DEL COMITÉ LEGAL (no aplicada):
+    // La revisión adversarial señaló que la aprobación del presupuesto anual no
+    // es una operación con parte vinculada (art. 231 LSC), por lo que el aviso
+    // de conflicto e informe de la Comisión de Auditoría se emite en toda
+    // aprobación ordinaria de presupuesto de una cotizada. Retirarla de esta
+    // lista es un cambio de CRITERIO JURÍDICO: no se aplica sin decisión
+    // expresa del Comité Legal. Hasta entonces se conserva el comportamiento
+    // vigente, incluidas ambas grafías de la materia.
     const materiasOperacionesVinculadas = [
       'AUTORIZACION_TRANSACCION',
+      'APROBACION_PRESUPUESTOS',
+      'APROBACION_PRESUPUESTO',
       'REPARTO_DIVIDENDOS',
     ];
     if (input.materias.some((m) => materiasOperacionesVinculadas.includes(m))) {

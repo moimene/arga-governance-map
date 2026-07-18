@@ -7,6 +7,7 @@ import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/hooks/useAgreementsList";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
+import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
 import { useCertificationRegistryIntake, useTramitacionById, useAgreementHasCertification } from "@/hooks/useTramitador";
@@ -595,8 +596,15 @@ function TramitadorNuevo() {
   const { data: agreementBodies = [] } = useBodiesByEntity(
     selectedAgreement?.entity_id ?? undefined,
   );
-  const selectedAgreementOrganoTipo =
-    agreementBodies.find((body) => body.id === selectedAgreement?.body_id)?.body_type ?? null;
+  // Se usa el resolver canónico del proyecto (organo-resolver), que ya conoce
+  // que CDA es umbrella diferenciada por config.organo_tipo y que COMITE sigue
+  // la convención de comisión delegada. Un mapa ad-hoc aquí volvería a la
+  // duplicación con criterios distintos que ese módulo vino a corregir.
+  const selectedAgreementBody =
+    agreementBodies.find((body) => body.id === selectedAgreement?.body_id) ?? null;
+  const selectedAgreementOrganoTipo = selectedAgreementBody
+    ? resolveOrganoTipo(selectedAgreementBody)
+    : null;
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
     selectedAgreement?.agreement_kind,
     selectedAgreementOrganoTipo,

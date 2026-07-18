@@ -29,9 +29,12 @@ describe("guard de metadatos en la activación — paridad cliente/servidor", ()
       "CREATE OR REPLACE FUNCTION public.fn_secretaria_guard_template_state_transition",
     );
     expect(executableSql).toContain("ACTIVATION_METADATA_MISSING");
-    expect(executableSql).toContain(
-      "IF NEW.estado = 'ACTIVA' AND OLD.estado IS DISTINCT FROM 'ACTIVA' THEN",
-    );
+    // Codex adversarial (2ª pasada): la comprobación cubre TODA fila que quede
+    // vigente — un UPDATE ACTIVA→ACTIVA podía vaciar los metadatos, y un
+    // INSERT autorizado por GUC podía nacer vigente sin ellos.
+    expect(executableSql).toContain("IF NEW.estado = 'ACTIVA' THEN");
+    expect(executableSql).toContain("no puede nacer vigente sin");
+    expect(executableSql).toContain("no puede quedar vigente sin");
   });
 
   it("conserva los guards previos de transición gobernada y tenant inmutable", () => {

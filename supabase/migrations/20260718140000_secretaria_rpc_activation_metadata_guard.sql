@@ -77,6 +77,17 @@ BEGIN
       RAISE EXCEPTION 'template state must be initialized through governed workflow'
         USING ERRCODE = '42501';
     END IF;
+    -- Un INSERT autorizado por GUC tampoco puede nacer vigente sin metadatos.
+    IF NEW.estado = 'ACTIVA' THEN
+      v_missing := public.fn_secretaria_template_activation_metadata_ok(
+        NEW.tipo, NEW.organo_tipo, NEW.adoption_mode, NEW.referencia_legal
+      );
+      IF v_missing IS NOT NULL THEN
+        RAISE EXCEPTION
+          'ACTIVATION_METADATA_MISSING: la plantilla no puede nacer vigente sin %', v_missing
+          USING ERRCODE = '23514';
+      END IF;
+    END IF;
     RETURN NEW;
   END IF;
 
@@ -91,10 +102,14 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Codex adversarial (P1-1): metadatos mínimos para quedar vigente. Espeja
+  -- Codex adversarial (P1-1): metadatos mínimos para estar vigente. Espeja
   -- template-admin/metadata-policy.ts; sin esto la RPC podía activar una
   -- plantilla sin forma de adopción.
-  IF NEW.estado = 'ACTIVA' AND OLD.estado IS DISTINCT FROM 'ACTIVA' THEN
+  --
+  -- Se comprueba en TODA fila que quede ACTIVA, no solo al entrar en ese
+  -- estado: un UPDATE ACTIVA→ACTIVA podía vaciar `adoption_mode` y dejar
+  -- vigente una plantilla sin forma de adopción sin pasar por la transición.
+  IF NEW.estado = 'ACTIVA' THEN
     v_missing := public.fn_secretaria_template_activation_metadata_ok(
       NEW.tipo,
       NEW.organo_tipo,
