@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveOrganoTipo, type GoverningBodyShape } from "../organo-resolver";
+import {
+  resolveOrganoTipo,
+  resolveOrganoTipoStrict,
+  type GoverningBodyShape,
+} from "../organo-resolver";
 
 const body = (overrides: Partial<GoverningBodyShape> = {}): GoverningBodyShape => ({
   body_type: null,
@@ -158,5 +162,38 @@ describe("resolveOrganoTipo — anti-bug useAgreementCompliance:216", () => {
   it("anti-bug: body_type=CDA NO cae a JUNTA_GENERAL", () => {
     expect(resolveOrganoTipo(body({ body_type: "CDA" }))).not.toBe("JUNTA_GENERAL");
     expect(resolveOrganoTipo(body({ body_type: "CDA" }))).toBe("CONSEJO");
+  });
+});
+
+describe("resolveOrganoTipoStrict — variante para superficies informativas", () => {
+  // Codex adversarial (2026-07-18): el fallback a Junta del resolver es el
+  // criterio correcto para calcular quórums (ante la duda, el régimen más
+  // exigente), pero MOSTRARLO afirma un órgano que nadie ha acreditado.
+
+  it("coincide con el resolver en todos los órganos reales de Cloud", () => {
+    const reales: Array<[Partial<GoverningBodyShape>, string]> = [
+      [{ body_type: "CDA" }, "CONSEJO"],
+      [{ body_type: "CDA", config: { organo_tipo: "CONSEJO_ADMIN" } }, "CONSEJO"],
+      [{ body_type: "CDA", config: { organo_tipo: "ADMIN_UNICO" } }, "CONSEJO"],
+      [{ body_type: "CDA", config: { organo_tipo: "ADMIN_SOLIDARIOS" } }, "CONSEJO"],
+      [{ body_type: "CDA", config: { organo_tipo: "ADMIN_CONJUNTA" } }, "CONSEJO"],
+      [{ body_type: "JUNTA" }, "JUNTA_GENERAL"],
+      [{ body_type: "JUNTA", config: { organo_tipo: "JUNTA_GENERAL" } }, "JUNTA_GENERAL"],
+      [{ body_type: "JUNTA", config: { organo_tipo: "SOCIO_UNICO" } }, "JUNTA_GENERAL"],
+      [{ body_type: "COMISION", config: { organo_tipo: "COMISION_DELEGADA" } }, "COMISION_DELEGADA"],
+      [{ body_type: "COMITE", config: { organo_tipo: "COMISION_DELEGADA" } }, "COMISION_DELEGADA"],
+      [{ body_type: "COMITE" }, "COMISION_DELEGADA"],
+    ];
+    for (const [shape, esperado] of reales) {
+      expect(resolveOrganoTipoStrict(body(shape))).toBe(esperado);
+      expect(resolveOrganoTipoStrict(body(shape))).toBe(resolveOrganoTipo(body(shape)));
+    }
+  });
+
+  it("devuelve null en vez de adivinar Junta ante un órgano irreconocible", () => {
+    expect(resolveOrganoTipo(body({ body_type: "ORGANO_RARO" }))).toBe("JUNTA_GENERAL");
+    expect(resolveOrganoTipoStrict(body({ body_type: "ORGANO_RARO" }))).toBeNull();
+    expect(resolveOrganoTipoStrict(body())).toBeNull();
+    expect(resolveOrganoTipoStrict(null)).toBeNull();
   });
 });

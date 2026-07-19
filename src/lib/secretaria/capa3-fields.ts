@@ -458,21 +458,30 @@ export function normalizeCapa3Draft(
     }
     const normalizedValue = normalizeCapa3Value(field, rawValue);
 
+    // Codex adversarial (2ª pasada): la poda PARCIAL de un array también es
+    // pérdida de datos. Antes solo se avisaba cuando el array se vaciaba por
+    // completo, de modo que "10 filas entran, 3 sobreviven" pasaba en silencio
+    // y el documento se generaba con siete filas menos sin que nadie lo supiera.
+    if (isArrayCapa3Field(field) && Array.isArray(normalizedValue)) {
+      const incoming = parseArrayDraftValue(rawValue).length;
+      const dropped = incoming - normalizedValue.length;
+      if (dropped > 0) {
+        discardedValues[target] =
+          `${dropped} de ${incoming} fila(s) no compatibles con el formato del campo`;
+      }
+    }
+
     if (!capa3ValueHasContent(normalizedValue)) {
       // Codex adversarial (P1): distinguir "vino vacío" de "traía un valor que
       // la lista cerrada rechaza". Sin esta distinción, un valor persistido
       // legítimo (borrador guardado, override de sociedad, sugerencia del
       // asistente) desaparecía en silencio y el documento se generaba sin él.
       if (isArrayCapa3Field(field)) {
-        // Un array que llega con contenido pero se vacía al normalizar (filas
-        // sin ninguna clave del esquema) también debe avisarse.
-        const hadContent = Array.isArray(rawValue)
-          ? rawValue.length > 0
-          : Boolean(normalizeDraftValue(rawValue));
-        if (hadContent) {
-          discardedValues[target] = Array.isArray(rawValue)
-            ? `${rawValue.length} fila(s) no compatibles con el formato del campo`
-            : String(normalizeDraftValue(rawValue));
+        // Un array que llega como texto no parseable no pasa por el conteo de
+        // filas de arriba; se avisa aquí con el valor literal.
+        if (!Array.isArray(normalizedValue) || parseArrayDraftValue(rawValue).length === 0) {
+          const discarded = normalizeDraftValue(rawValue);
+          if (discarded) discardedValues[target] = discarded;
         }
       } else {
         const discarded = normalizeDraftValue(rawValue);

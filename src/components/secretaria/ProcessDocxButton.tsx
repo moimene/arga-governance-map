@@ -353,7 +353,13 @@ export function ProcessDocxButton({
     if (capa3Fields.length > 0) {
       const initialValues = matrixResolution?.initialCapa3Values ?? {};
       const errors = validateCapa3(capa3Fields, initialValues);
-      if (Object.keys(errors).length === 0) {
+      // Codex adversarial (2ª pasada): si la siembra descartó algún valor, el
+      // atajo de generación automática saltaba el diálogo — que es el único
+      // sitio donde se avisa del descarte. El documento salía sin ese dato y
+      // sin que nadie lo supiera. Con descartes, siempre se abre el diálogo.
+      const hasDiscarded =
+        Object.keys(matrixResolution?.capa3Draft?.discardedValues ?? {}).length > 0;
+      if (Object.keys(errors).length === 0 && !hasDiscarded) {
         await runGenerate(initialValues);
         return;
       }

@@ -22,6 +22,7 @@ import type { RulePackData } from "@/hooks/useRulePackForMateria";
 import { labelMateria } from "@/lib/secretaria/agenda-materias";
 import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 import type { TipoOrgano } from "@/lib/rules-engine";
+import { rulePackOrganoFamily } from "@/lib/secretaria/rule-pack-organo";
 
 const SEVERITY_CHIP: Record<string, string> = {
   BLOCKING: "border border-[var(--status-error)] text-[var(--g-text-primary)]",
@@ -30,22 +31,27 @@ const SEVERITY_CHIP: Record<string, string> = {
 };
 
 /**
- * Familia de órgano del motor a partir del `organo_tipo` de un rule pack.
- *
- * El acuerdo ya llega resuelto por `organo-resolver` (el módulo canónico del
+ * Familia de órgano del motor a partir del `organo_tipo` de un rule pack. El
+ * acuerdo ya llega resuelto por `organo-resolver` (el módulo canónico del
  * proyecto, que conoce que CDA es umbrella y que COMITE sigue la convención de
- * comisión delegada). Aquí solo hay que traducir el vocabulario del pack.
+ * comisión delegada); aquí solo se traduce el vocabulario del pack.
  *
- * `JUNTA_GENERAL_O_CONSEJO` es deliberadamente ambiguo en el catálogo y NO se
- * resuelve: un pack híbrido no acredita a qué órgano corresponden sus quórums,
- * así que el panel calla.
+ * Criterio de familia: lista blanca compartida (`rule-pack-organo`),
+ * NO coincidencia por substring. Con `includes()`, un código como
+ * `NO_ADMINISTRACION` se leía como órgano de administración y el panel mostraba
+ * quórums ajenos. Un código desconocido devuelve null y el panel calla, que es
+ * la única respuesta honesta.
+ *
+ * `SOCIO_UNICO`, `SOPORTE_INTERNO` y el híbrido `JUNTA_GENERAL_O_CONSEJO` no
+ * casan con ningún órgano del motor: el primero porque equipararlo a la Junta
+ * (art. 15 LSC) es criterio pendiente del Comité Legal, el segundo porque no es
+ * un órgano social y el tercero porque es ambiguo por diseño en el catálogo.
  */
 function packOrganoFamily(value?: string | null): TipoOrgano | null {
-  const raw = String(value ?? "").trim().toUpperCase();
-  if (!raw || raw === "JUNTA_GENERAL_O_CONSEJO") return null;
-  if (raw.includes("COMISION") || raw.includes("COMIT")) return "COMISION_DELEGADA";
-  if (raw.includes("JUNTA") || raw === "SOCIO_UNICO") return "JUNTA_GENERAL";
-  if (raw.includes("CONSEJO") || raw.includes("ADMIN") || raw === "CDA") return "CONSEJO";
+  const family = rulePackOrganoFamily(value);
+  if (family === "JUNTA_GENERAL" || family === "CONSEJO" || family === "COMISION_DELEGADA") {
+    return family;
+  }
   return null;
 }
 
@@ -108,8 +114,44 @@ function readableRule(value?: string | null): string | null {
   // presentes" — y mitad no es lo mismo que mayoría. Una regla de mayoría mal
   // parafraseada es peor que el código crudo, así que ante cualquier
   // expresión no reconocida se muestra literal.
+  // Un "0" no es una regla: es la ausencia de umbral. Presentarlo como
+  // contenido —y peor, citando un artículo junto a él— afirma un "quórum cero"
+  // que la norma no establece.
+  if (/^0([.,]0+)?$/.test(raw)) return null;
   const known = RULE_CODE_LABELS[raw.toUpperCase()];
   return known ?? raw;
+}
+
+/**
+ * Vías de adopción sin sesión: no hay reunión que constituir, de modo que la
+ * ausencia de quórum de constitución es lo esperado y no una laguna del pack.
+ * La junta universal queda FUERA a propósito: no requiere convocatoria, pero sí
+ * hay sesión y sí se constituye.
+ */
+const SIN_SESION_MODES = new Set([
+  "NO_SESSION",
+  "CO_APROBACION",
+  "SOLIDARIO",
+  "UNIPERSONAL_SOCIO",
+  "UNIPERSONAL_ADMIN",
+]);
+
+/**
+ * El umbral numérico solo se muestra cuando AÑADE información. Si la regla ya
+ * expresa la proporción ("1/3 capital social total"), repetirla como
+ * `> 0.3333333333333333` no aclara nada y además introduce una cifra distinta
+ * —redondeada— junto a la fracción exacta. Cuando sí se muestra, va en
+ * porcentaje, que es como se lee un umbral societario.
+ */
+function readableThreshold(
+  rule: string | null,
+  comparator?: string | null,
+  threshold?: number | null,
+): string | null {
+  if (typeof threshold !== "number" || !Number.isFinite(threshold)) return null;
+  if (rule && /[0-9%]/.test(rule)) return null;
+  const pct = Math.round(threshold * 10000) / 100;
+  return `${comparator ?? ">"} ${String(pct).replace(".", ",")} %`;
 }
 
 interface PanelEntity {
@@ -241,16 +283,23 @@ export function MatterExecutionProfilePanel({
                       ? ` · ${readableSource(profile.constitucion.fuente)}`
                       : ""
                   }`
-                : "Sin quórum de constitución aplicable a este órgano"}
+                : SIN_SESION_MODES.has(profile.adoption_mode?.toUpperCase() ?? "")
+                  ? "No aplica: no hay sesión que constituir"
+                  : "Sin quórum de constitución aplicable a este órgano"}
           </dd>
         </div>
         <div>
           <dt className="font-medium text-[var(--g-text-primary)]">Votación</dt>
           <dd className="text-[var(--g-text-secondary)]">
             {readableRule(profile.votacion.majority_rule) ?? "Según ley y estatutos"}
-            {typeof profile.votacion.majority_threshold === "number"
-              ? ` (${profile.votacion.majority_comparator ?? ">"} ${profile.votacion.majority_threshold})`
-              : ""}
+            {(() => {
+              const umbral = readableThreshold(
+                readableRule(profile.votacion.majority_rule),
+                profile.votacion.majority_comparator,
+                profile.votacion.majority_threshold,
+              );
+              return umbral ? ` (${umbral})` : "";
+            })()}
             {readableSource(profile.votacion.fuente) ? ` · ${readableSource(profile.votacion.fuente)}` : ""}
           </dd>
         </div>

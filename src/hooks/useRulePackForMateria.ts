@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { normalizeMateriaForRulePack } from "@/lib/rules-engine";
+import { rulePackOrganoFamily } from "@/lib/secretaria/rule-pack-organo";
+import {
+  selectRulePackForOrgano,
+  type RulePackSelectionReason,
+} from "@/lib/secretaria/rule-pack-selection";
 
 export interface PostAcuerdoPayload {
   inscribible: boolean;
@@ -58,6 +63,12 @@ type RulePackWithVersions = {
 };
 
 export interface RulePackData {
+  /**
+   * Por qué se eligió este pack. `FALLBACK_ORGANO_DISTINTO` significa que la
+   * regla es de otro órgano que el que adopta el acuerdo — la UI debe
+   * advertirlo. Ver `rule-pack-selection`.
+   */
+  selectionReason?: RulePackSelectionReason | null;
   pack: RulePackRow;
   version: RulePackVersionRow;
   payload: PostAcuerdoPayload;
@@ -77,24 +88,17 @@ export interface RulePackData {
  *     const { inscribible, instrumentoRequerido } = data.payload;
  *   }
  */
-// ITEM-133: familia de órgano canónica para desempatar packs que comparten
-// materia entre Junta y Consejo (p. ej. AUTORIZACION_GARANTIA tiene un pack por
-// órgano). CONSEJO/CONSEJO_ADMIN/CONSEJO_ADMINISTRACION → 'CONSEJO';
-// JGA/JUNTA_GENERAL/JUNTA → 'JUNTA'.
-function organoFamily(value?: string | null): "CONSEJO" | "JUNTA" | null {
-  if (!value) return null;
-  const v = value.toUpperCase();
-  if (v.includes("CONSEJO") || v === "CDA") return "CONSEJO";
-  if (v.includes("JUNTA") || v === "JGA" || v === "JGE") return "JUNTA";
-  return null;
-}
-
+// ITEM-133: el desempate por órgano entre packs que comparten materia (p. ej.
+// AUTORIZACION_GARANTIA tiene uno de Junta y otro de Consejo) vive ahora en
+// `rule-pack-organo` (criterio) y `rule-pack-selection` (elección), compartidos
+// y con tests. La versión anterior comparaba por substring, no reconocía
+// SOCIO_UNICO ni COMISION_DELEGADA, y no la cubría ningún test.
 export function useRulePackForMateria(materiaInput: string | undefined, organoTipo?: string | null) {
   const { tenantId } = useTenantContext();
   // ITEM-006: el catálogo UI y los packs sembrados divergen en grafías —
   // normalizamos al id canónico del pack antes de consultar Cloud.
   const materiaCla = materiaInput ? normalizeMateriaForRulePack(materiaInput) : materiaInput;
-  const organo = organoFamily(organoTipo);
+  const organo = rulePackOrganoFamily(organoTipo);
   return useQuery<RulePackData | null, Error>({
     enabled: !!materiaCla && !!tenantId,
     queryKey: ["rule_packs", tenantId, "byMateria", materiaCla, organo ?? "any"],
@@ -134,8 +138,8 @@ export function useRulePackForMateria(materiaInput: string | undefined, organoTi
       if (error) throw error;
 
       const rows = (data ?? []) as unknown as RulePackWithVersions[];
-      const first =
-        (organo ? rows.find((r) => organoFamily(r.organo_tipo) === organo) : undefined) ?? rows[0];
+      const selection = selectRulePackForOrgano(rows, organoTipo);
+      const first = selection.pack;
       if (!first) return null;
 
       const versions = first.rule_pack_versions ?? [];
@@ -155,6 +159,9 @@ export function useRulePackForMateria(materiaInput: string | undefined, organoTi
       };
 
       return {
+        // Motivo de la elección: permite a la UI advertir de que la regla
+        // servida no es la del órgano que adopta el acuerdo. No bloquea nada.
+        selectionReason: selection.reason,
         pack,
         version: {
           id: version.id,

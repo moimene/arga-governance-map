@@ -7,7 +7,12 @@ import { StepperShell, type StepDef } from "./_shared/StepperShell";
 import { useAgreementsList, useAgreementById, type AgreementListRow } from "@/hooks/useAgreementsList";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { useBodiesByEntity } from "@/hooks/useBodies";
-import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
+import { resolveOrganoTipoStrict } from "@/lib/secretaria/organo-resolver";
+import { isUnreliableRulePackSelection } from "@/lib/secretaria/rule-pack-selection";
+import {
+  RegistryRuleProvenanceNotice,
+  type RegistryRuleProvenance,
+} from "@/components/secretaria/RegistryRuleProvenanceNotice";
 import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
 import { useCertificationRegistryIntake, useTramitacionById, useAgreementHasCertification } from "@/hooks/useTramitador";
@@ -602,8 +607,11 @@ function TramitadorNuevo() {
   // duplicación con criterios distintos que ese módulo vino a corregir.
   const selectedAgreementBody =
     agreementBodies.find((body) => body.id === selectedAgreement?.body_id) ?? null;
+  // Variante estricta: para MOSTRAR el régimen aplicable no vale el fallback a
+  // Junta del resolver. Un órgano irreconocible debe dejar el panel mudo, no
+  // presentarlo como Junta General.
   const selectedAgreementOrganoTipo = selectedAgreementBody
-    ? resolveOrganoTipo(selectedAgreementBody)
+    ? resolveOrganoTipoStrict(selectedAgreementBody)
     : null;
   const { data: rulePackData, isLoading: rulesLoading } = useRulePackForMateria(
     selectedAgreement?.agreement_kind,
@@ -615,6 +623,15 @@ function TramitadorNuevo() {
       : null
   );
   const usingPrototypeRegistryRuleFallback = Boolean(selectedAgreement && !rulesLoading && !rulePackData);
+
+  // Procedencia de la regla que se está aplicando, para poder advertirlo allí
+  // donde se decide y no solo en el paso 2. `FALLBACK_ORGANO_DISTINTO` significa
+  // que hay regla activa para la materia pero no del órgano que adopta.
+  const registryRuleProvenance: RegistryRuleProvenance = usingPrototypeRegistryRuleFallback
+    ? "PROTOTIPO"
+    : isUnreliableRulePackSelection(rulePackData?.selectionReason)
+      ? "OTRO_ORGANO"
+      : null;
 
   const [selectedModeloId, setSelectedModeloId] = useState<string | null>(null);
   const [modeloCapa3Open, setModeloCapa3Open] = useState(false);
@@ -1383,18 +1400,13 @@ function TramitadorNuevo() {
   // Step 2: Inscription analysis
   const step2Body = selectedAgreement && registryRulePackData ? (
     <div className="space-y-4">
-      {usingPrototypeRegistryRuleFallback ? (
-        <div
-          className="flex items-start gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-4 py-3 text-sm text-[var(--g-text-secondary)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
-          <span>
-            Tramitación con criterio conservador de prototipo. Cloud no aporta regla registral activa para esta materia;
-            no constituye validación legal productiva.
-          </span>
-        </div>
-      ) : null}
+      <RegistryRuleProvenanceNotice
+        provenance={registryRuleProvenance}
+        packOrgano={rulePackData?.pack.organo_tipo}
+        agreementOrgano={selectedAgreementOrganoTipo ?? selectedAgreementBody?.body_type}
+      />
+      {/* Nota: el mismo aviso se repite junto al botón que eleva a escritura
+          (paso 5), porque es allí donde se persiste en `registry_filings`. */}
       <div
         className="border border-[var(--g-border-subtle)] rounded-lg p-4 bg-[var(--g-surface-subtle)]"
       >
@@ -1763,6 +1775,16 @@ function TramitadorNuevo() {
                 </div>
               </div>
             )}
+
+            {/* El aviso de procedencia se repite aquí, junto al botón: es este
+                paso —y no el 2, donde también aparece— el que persiste la
+                elevación en `registry_filings`. Advierte, no bloquea. */}
+            <RegistryRuleProvenanceNotice
+              provenance={registryRuleProvenance}
+              packOrgano={rulePackData?.pack.organo_tipo}
+              agreementOrgano={selectedAgreementOrganoTipo ?? selectedAgreementBody?.body_type}
+              className="mb-3"
+            />
 
             {deedSaved ? (
               <div className="inline-flex items-center gap-2 rounded-full bg-[var(--g-sec-100)] px-3 py-1 text-xs font-semibold text-[var(--g-brand-3308)]">

@@ -115,7 +115,13 @@ export function useAgreementRulePreview(input: AgreementRulePreviewInput): Agree
   const ruleSetsQuery = useEntityRules(sociedad?.jurisdiction ?? undefined, ruleSetCompanyForm);
   const rulePacksQuery = useRulePacksForEntity(input.entityId ?? undefined);
   const pactosQuery = usePactosVigentes(input.entityId ?? undefined);
-  const rulePackQuery = useRulePackForMateria(input.matter);
+  // El órgano ya viaja en el input (se usa más abajo como `body_type` del
+  // acuerdo); pasarlo aquí evita derivar la mayoría legal de un pack de otro
+  // órgano. Si el llamador no lo conoce —hoy el simulador de reglas no tiene
+  // selector de órgano— el hook se niega a elegir entre packs de órganos
+  // distintos y `legal_majority` queda sin suministrar, con lo que el contrato
+  // degrada a una inferencia etiquetada como tal.
+  const rulePackQuery = useRulePackForMateria(input.matter, input.bodyType);
 
   const enabled = !!input.entityId && !!input.matter && !!input.adoptionMode && !!tenantId;
 

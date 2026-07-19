@@ -91,3 +91,46 @@ export function resolveOrganoTipo(body: GoverningBodyShape | null | undefined): 
   // general (semántica más restrictiva en términos de quorum).
   return "JUNTA_GENERAL";
 }
+
+/**
+ * Igual que `resolveOrganoTipo`, pero devuelve `null` en vez de recurrir al
+ * fallback a Junta cuando el órgano no se puede clasificar.
+ *
+ * Codex adversarial (2026-07-18): el fallback conservador es correcto para
+ * decidir quórums —ante la duda, el régimen más exigente—, pero es engañoso
+ * para MOSTRAR información jurídica: un órgano irreconocible aparecería en
+ * pantalla como Junta General, afirmando algo que nadie ha acreditado. Las
+ * superficies informativas deben usar esta variante y callar ante la duda.
+ *
+ * Cloud 2026-07-18: los 52 órganos existentes son CDA/JUNTA/COMISION/COMITE, de
+ * modo que hoy ninguna fila cae en el `null`; esto cierra la trampa latente.
+ */
+export function resolveOrganoTipoStrict(
+  body: GoverningBodyShape | null | undefined,
+): TipoOrgano | null {
+  const bodyType = readBodyType(body);
+  const organoTipo = readOrganoTipoFromConfig(body?.config);
+  if (!bodyType && !organoTipo) return null;
+
+  const KNOWN_BODY_TYPES = new Set([
+    "JUNTA",
+    "COMISION",
+    "COMITE",
+    "COMISION_DELEGADA",
+    "CDA",
+    "CONSEJO",
+    "CONSEJO_ADMINISTRACION",
+  ]);
+  const KNOWN_CONFIG_TIPOS = new Set([
+    "JUNTA_GENERAL",
+    "SOCIO_UNICO",
+    "COMISION_DELEGADA",
+    "CONSEJO_ADMIN",
+    "ADMIN_UNICO",
+    "ADMIN_SOLIDARIOS",
+    "ADMIN_CONJUNTA",
+  ]);
+  if (!KNOWN_BODY_TYPES.has(bodyType) && !KNOWN_CONFIG_TIPOS.has(organoTipo)) return null;
+
+  return resolveOrganoTipo(body);
+}

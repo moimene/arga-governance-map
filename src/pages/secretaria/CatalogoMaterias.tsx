@@ -504,14 +504,23 @@ export default function CatalogoMaterias() {
                 };
                 // El binding apunta a un tipo documental concreto: si no coincide
                 // con el de la plantilla, no es una vinculación de esta fase.
+                //
+                // Codex adversarial (2ª pasada): aquí NO hay comodín. A
+                // diferencia de jurisdicción, tipo social, órgano y adopción
+                // —donde ANY significa "vale para todos"—, el tipo documental
+                // identifica QUÉ documento se vincula: en blanco o "ANY" no
+                // acredita nada, y aceptarlo dejaba pasar cualquier binding.
+                // Es el mismo criterio estricto que ya usa la biblioteca de
+                // plantillas (template-library-ux). Comprobado contra Cloud: las
+                // 49 vinculaciones existentes llevan tipo concreto y coincidente,
+                // así que endurecerlo no oculta ninguna vinculación legítima.
                 const boundTemplate = plantillas.find(
                   (plantilla) => plantilla.id === binding.template_id,
                 );
                 const bindingDocType = String(binding.doc_type ?? "").trim().toUpperCase();
                 if (
-                  bindingDocType &&
-                  bindingDocType !== "ANY" &&
-                  boundTemplate &&
+                  !bindingDocType ||
+                  !boundTemplate ||
                   String(boundTemplate.tipo ?? "").trim().toUpperCase() !== bindingDocType
                 ) {
                   return false;

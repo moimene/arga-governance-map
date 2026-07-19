@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantContext } from '@/context/TenantContext';
+import { rulePackOrganoFamily } from "@/lib/secretaria/rule-pack-organo";
 import { normalizeMateriaForRulePack } from '@/lib/rules-engine/rule-resolution';
 import {
   mapRulePackJoinRowToVersionRow,
@@ -147,10 +148,11 @@ export function useRulePacksForEntity(entityId?: string) {
  *   still returns the correct row, and tests cover the decision directly.
  *   See `src/lib/secretaria/rule-pack-params.ts` and its tests.
  */
-export function useRulePackForMateria(materia?: string) {
+export function useRulePackForMateria(materia?: string, organoTipo?: string | null) {
   const { tenantId } = useTenantContext();
+  const organo = rulePackOrganoFamily(organoTipo);
   return useQuery({
-    queryKey: ["rulePacks", tenantId, "materia", materia ?? "none"],
+    queryKey: ["rulePacks", tenantId, "materia", materia ?? "none", organo ?? "sin-organo"],
     staleTime: 60_000,
     enabled: !!materia && !!tenantId,
     queryFn: async () => {
@@ -167,7 +169,30 @@ export function useRulePackForMateria(materia?: string) {
       if (error) throw error;
 
       const rows = (data ?? []) as RulePackJoinRow[];
-      const row = pickFreshestRulePackVersion(rows);
+
+      // Cuando se conoce el órgano se prefieren sus packs, con el mismo
+      // desempate de siempre ("la activación más reciente gana").
+      //
+      // Si ninguno es de ese órgano NO se devuelve null: eso sería fail-closed
+      // por discrepancia de órgano, que es la opción C — post-demo y pendiente
+      // del Comité Legal. Aquí solo se prefiere, nunca se deja de servir.
+      const delOrgano = organo
+        ? rows.filter((r) => rulePackOrganoFamily(r.rule_packs?.organo_tipo) === organo)
+        : [];
+      const candidatos = delOrgano.length > 0 ? delOrgano : rows;
+
+      // Sin órgano conocido y con varios packs de la misma materia, cualquier
+      // elección es arbitraria. El único consumidor de este hook deriva de aquí
+      // la MAYORÍA LEGAL que se muestra como "regla efectiva", y la de la Junta
+      // no es la del Consejo: servir una al azar es afirmar ante el abogado algo
+      // que nadie ha determinado. Se devuelve null y el contrato degrada a una
+      // inferencia explícitamente etiquetada como tal.
+      const distintosOrganos = new Set(
+        rows.map((r) => rulePackOrganoFamily(r.rule_packs?.organo_tipo) ?? "SIN_ORGANO"),
+      );
+      if (!organo && distintosOrganos.size > 1) return null;
+
+      const row = pickFreshestRulePackVersion(candidatos);
       if (!row) return null;
 
       return mapRulePackJoinRowToVersionRow(row, tenantId!);

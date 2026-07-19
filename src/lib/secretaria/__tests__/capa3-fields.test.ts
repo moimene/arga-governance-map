@@ -329,3 +329,49 @@ describe("capa3 — valores descartados por lista cerrada", () => {
     expect(draft.emptyKeys).toContain("modalidad_sesion");
   });
 });
+
+describe("Codex adversarial 2ª pasada: la poda parcial de un array también se avisa", () => {
+  const fields = normalizeCapa3Fields([
+    {
+      campo: "asistentes",
+      tipo: "array",
+      item_schema: { nombre: { tipo: "text" }, cargo: { tipo: "text" } },
+    },
+  ]);
+
+  it("avisa cuando sobreviven menos filas de las que entraron", () => {
+    const draft = normalizeCapa3Draft(fields, {
+      asistentes: [
+        { nombre: "Ana Ruiz", cargo: "Presidenta" },
+        { otro: "campo ajeno al esquema" },
+        {},
+      ],
+    });
+    // Las filas válidas se conservan...
+    expect(draft.values.asistentes).toEqual([{ nombre: "Ana Ruiz", cargo: "Presidenta" }]);
+    // ...y la pérdida de las otras dos NO pasa en silencio.
+    expect(draft.discardedValues.asistentes).toBe(
+      "2 de 3 fila(s) no compatibles con el formato del campo",
+    );
+  });
+
+  it("no avisa cuando el array llega íntegro", () => {
+    const draft = normalizeCapa3Draft(fields, {
+      asistentes: [{ nombre: "Ana Ruiz", cargo: "Presidenta" }],
+    });
+    expect(draft.discardedValues).toEqual({});
+  });
+
+  it("un array que se vacía por completo sigue avisando", () => {
+    const draft = normalizeCapa3Draft(fields, { asistentes: [{}, {}] });
+    expect(draft.values.asistentes).toBeUndefined();
+    expect(draft.discardedValues.asistentes).toBe(
+      "2 de 2 fila(s) no compatibles con el formato del campo",
+    );
+  });
+
+  it("un texto que no es un array se reporta literal", () => {
+    const draft = normalizeCapa3Draft(fields, { asistentes: "Ana, Pedro" });
+    expect(draft.discardedValues.asistentes).toBe("Ana, Pedro");
+  });
+});
