@@ -303,6 +303,7 @@ export default function PenalAnticorrupcion() {
         legalHold: false,
         status: "SEALED",
         sandbox: signRes.sandbox,
+        srStatus: signRes.srStatus,
         signedBy: `${auditorName} (${auditorEmail})`
       });
 
@@ -339,7 +340,7 @@ export default function PenalAnticorrupcion() {
           </div>
           <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
             Supervisión interactiva del Modelo de Prevención de Delitos (Art. 31 bis CP) y Antisoborno (ISO 37001). 
-            Vincule riesgos y controles mitigantes, y emita evidencias inmutables selladas mediante firma cualificada QES.
+            Vincule riesgos y controles mitigantes, y emita evidencias inmutables selladas mediante firma electrónica.
           </p>
         </div>
         <Link

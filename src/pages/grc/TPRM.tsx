@@ -166,6 +166,7 @@ export default function TPRM() {
         legalHold: selected.legal_hold,
         status: "SEALED",
         sandbox: signRes.sandbox,
+        srStatus: signRes.srStatus,
         signedBy: `${signatoryName} (${signatoryEmail})`
       });
 
@@ -403,7 +404,7 @@ export default function TPRM() {
                 {[
                   { id: "general", label: "Ficha General" },
                   { id: "cifa", label: "Evaluación CIFA DORA" },
-                  { id: "exit", label: "Plan de Contingencia / QES" }
+                  { id: "exit", label: "Plan de Contingencia / Firma" }
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -608,7 +609,7 @@ export default function TPRM() {
                       >
                         <div className="flex items-center gap-2 text-[var(--status-success)] font-bold text-xs">
                           <CheckCircle2 className="h-4 w-4 shrink-0" />
-                          <span>PLAN DE SALIDA SELLADO EN LEDGER WORM (QES FIRMADA)</span>
+                          <span>PLAN DE SALIDA SELLADO EN LEDGER WORM (FIRMA ELECTRÓNICA)</span>
                         </div>
                         <div className="text-xs text-[var(--g-text-secondary)] space-y-1 font-mono">
                           <div><strong>Firmante:</strong> {selected.payload.exit_plan_signed_by}</div>
@@ -626,7 +627,7 @@ export default function TPRM() {
                             }}
                             className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
                           >
-                            Verificar Firma QES <ExternalLink className="h-3 w-3" />
+                            Verificar firma <ExternalLink className="h-3 w-3" />
                           </a>
                         </div>
                       </div>
@@ -681,7 +682,7 @@ export default function TPRM() {
                                 style={{ borderRadius: "var(--g-radius-md)" }}
                               >
                                 <PenTool className="h-4 w-4" />
-                                Firmar y Sellar Exit Plan (QES)
+                                Firmar y Sellar Exit Plan
                               </button>
                             </div>
                           </div>

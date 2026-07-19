@@ -19,6 +19,17 @@
 export interface EvidencePersistenceInput {
   /** true si el resultado de firma/notificación proviene del adaptador sandbox de demo. */
   sandbox?: boolean;
+  /**
+   * Estado de la solicitud de firma en el QTSP (`DRAFT`/`ACTIVE`/
+   * `PARTIALLY_SIGNED`/`COMPLETED`…).
+   *
+   * Este gate nació mirando solo `sandbox`, y esa era la mitad del problema: el
+   * camino REAL termina en `activate` y devuelve `ACTIVE`, que significa que los
+   * firmantes han recibido el enlace y **nadie ha firmado todavía**. Como
+   * `sandbox` era false, la evidencia se sellaba afirmando una firma que no
+   * existía. Sin este dato el gate no puede distinguir "firmado" de "solicitado".
+   */
+  srStatus?: string | null;
   /** status solicitado por el caller (por defecto SEALED para evidencia real). */
   status?: string;
   /** manifest de la evidencia (se le añade el marcador sandbox cuando aplica). */
@@ -30,7 +41,16 @@ export interface EvidencePersistenceResolution {
   manifest: Record<string, unknown>;
 }
 
+import {
+  isSignatureProduced,
+  resolveSignatureOutcome,
+} from "@/lib/qtsp/signature-completion";
+
 export const SANDBOX_EVIDENCE_STATUS = "OPEN" as const;
+/** Firma real solicitada pero no producida: evidencia abierta, nunca sellada. */
+export const PENDING_SIGNATURE_EVIDENCE_STATUS = "OPEN" as const;
+export const PENDING_SIGNATURE_EVIDENCE_REASON =
+  "Solicitud de firma activa en el QTSP: los firmantes han sido notificados pero la firma aun no se ha producido. La evidencia no puede sellarse hasta que la solicitud se complete.";
 export const SANDBOX_EVIDENCE_REASON =
   "Firma/notificacion QTSP en modo sandbox de demo; evidencia NO sellada (no es una transaccion EAD Trust real).";
 
@@ -62,6 +82,24 @@ export function resolveSandboxSafeEvidencePersistence(
       },
     };
   }
+
+  // Firma real pero AÚN NO PRODUCIDA: `activate` deja la solicitud en `ACTIVE`,
+  // con los firmantes notificados y el documento sin firmar. Sellar aquí sería
+  // afirmar un hecho que no ha ocurrido, así que la evidencia queda abierta y el
+  // manifest deja constancia del estado real en el proveedor.
+  if (input.srStatus !== undefined && !isSignatureProduced(input.srStatus)) {
+    const outcome = resolveSignatureOutcome(input.srStatus);
+    return {
+      status: PENDING_SIGNATURE_EVIDENCE_STATUS,
+      manifest: {
+        ...input.manifest,
+        signature_outcome: outcome,
+        signature_provider_status: String(input.srStatus ?? "").toUpperCase() || null,
+        pending_signature_reason: PENDING_SIGNATURE_EVIDENCE_REASON,
+      },
+    };
+  }
+
   return {
     status: input.status ?? "SEALED",
     manifest: input.manifest,

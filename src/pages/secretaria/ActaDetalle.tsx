@@ -913,7 +913,7 @@ export default function ActaDetalle() {
                         </div>
                         <div className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
                           {c.agreements_certified?.length ?? 0} acuerdo(s) certificados ·
-                          {c.requires_qualified_signature ? " firma QES demo" : " firma simple"}
+                          {c.requires_qualified_signature ? " firma reforzada (demo)" : " firma simple"}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">

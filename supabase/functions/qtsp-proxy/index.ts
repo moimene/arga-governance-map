@@ -290,17 +290,71 @@ async function handleSign(cfg: SuiteConfig, body: SignBody): Promise<Response> {
     offset += 60;
   }
 
-  // 6. Activar (los firmantes reciben el enlace de firma)
-  await suiteFetch(cfg, `/case-files/${caseFileId}/signature-requests/${srId}/activate`, { method: "PUT" }, "activateSignatureRequest");
+  // 6. Activar (los firmantes reciben el enlace de firma).
+  //
+  // EAD pagina el documento subido de forma ASINCRONA y valida las coordenadas
+  // contra esa paginacion. Desde un host rapido la activacion llega antes de que
+  // termine y falla con un generico {"code":"Unknow"}. Ademas la activacion a
+  // veces triunfa en servidor y falla en el transporte, asi que se SONDEA antes
+  // de reintentar: reactivar a ciegas duplicaria trabajo.
+  const srStatus = await activateWithRetry(cfg, caseFileId, srId);
 
   return jsonResponse(200, {
     srId,
-    srStatus: "ACTIVE",
+    // Estado REAL devuelto por el proveedor. `ACTIVE` significa que los firmantes
+    // han recibido el enlace y NADIE ha firmado todavia; solo `COMPLETED`
+    // acredita firma. El cliente decide en funcion de esto, no de la ausencia de
+    // error.
+    srStatus,
     caseFileId,
     documentId,
     documentHash: hex,
     signatoryIds,
   });
+}
+
+const ACTIVATE_RETRY_DELAYS_MS = [0, 2000, 5000, 10000];
+
+async function readSignatureRequestStatus(
+  cfg: SuiteConfig,
+  caseFileId: string,
+  srId: string,
+): Promise<string | null> {
+  try {
+    const detail = await suiteFetch(
+      cfg,
+      `/case-files/${caseFileId}/signature-requests/${srId}`,
+      { method: "GET" },
+      "getSignatureRequest",
+    );
+    const status = detail?.status;
+    return typeof status === "string" ? status.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function activateWithRetry(cfg: SuiteConfig, caseFileId: string, srId: string): Promise<string> {
+  let lastError: unknown = null;
+  for (const delay of ACTIVATE_RETRY_DELAYS_MS) {
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+    try {
+      await suiteFetch(
+        cfg,
+        `/case-files/${caseFileId}/signature-requests/${srId}/activate`,
+        { method: "PUT" },
+        "activateSignatureRequest",
+      );
+      return (await readSignatureRequestStatus(cfg, caseFileId, srId)) ?? "ACTIVE";
+    } catch (err) {
+      lastError = err;
+      // ¿Se activo pese al error de transporte? Si ya no esta en DRAFT, la
+      // solicitud esta viva y reintentar solo duplicaria.
+      const status = await readSignatureRequestStatus(cfg, caseFileId, srId);
+      if (status && status !== "DRAFT") return status;
+    }
+  }
+  throw lastError ?? new Error("activateSignatureRequest agoto los reintentos");
 }
 
 // ─── Acción: status ──────────────────────────────────────────────────────────
@@ -324,6 +378,72 @@ async function handleStatus(cfg: SuiteConfig, caseFileId: string, srId: string):
     caseFileId,
     status: detail.status,
     documents: ((docs.data as Array<Record<string, unknown>> | undefined) ?? []).map((d) => ({ id: d.id, status: d.status })),
+  });
+}
+
+// ─── Acción: artifacts (documento firmado + certificado) ────────────────────
+//
+// Una firma completada produce DOS PDF distintos y hay que capturar los dos:
+//
+//   · El DOCUMENTO FIRMADO: el acuerdo con los sellos visibles de cada firmante.
+//     Es el que el abogado espera ver.
+//   · El CERTIFICADO de finalizacion (hoja de firmas): un informe que acredita
+//     el proceso —firmantes, evidencias, hashes— y que NO contiene el texto del
+//     acuerdo.
+//
+// Guardar solo el certificado y llamarlo "contrato firmado" es un defecto legal
+// y de UX. Se devuelven ambas URLs por separado, cada una no fatal respecto de
+// la otra: que falte el certificado no debe impedir recuperar el documento.
+//
+// Ambos endpoints exigen que el documento este SIGNED; antes devuelven error.
+
+async function handleArtifacts(
+  cfg: SuiteConfig,
+  caseFileId: string,
+  srId: string,
+  documentId: string,
+): Promise<Response> {
+  if (!caseFileId || !srId || !documentId) {
+    return jsonResponse(400, { error: "caseFileId, srId y documentId son obligatorios" });
+  }
+
+  const base = `/case-files/${encodeURIComponent(caseFileId)}/signature-requests/${encodeURIComponent(srId)}/documents/${encodeURIComponent(documentId)}`;
+
+  const pick = (payload: Record<string, unknown> | null, ...keys: string[]): string | null => {
+    if (!payload) return null;
+    for (const k of keys) {
+      const v = payload[k];
+      if (typeof v === "string" && v) return v;
+    }
+    return null;
+  };
+
+  const tryFetch = async (path: string, label: string) => {
+    try {
+      const r = await suiteFetch(cfg, path, { method: "GET" }, label);
+      return { ok: true as const, data: r as Record<string, unknown> };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const [signed, cert, pkg] = await Promise.all([
+    tryFetch(`${base}/signed-document-url`, "getSignedDocumentUrl"),
+    tryFetch(`${base}/certificates/document-url`, "getCertificateUrl"),
+    tryFetch(`${base}/certificates/package-url`, "getCertificatePackageUrl"),
+  ]);
+
+  // El nombre del campo cambia segun el endpoint: signedDocumentUrl / documentUrl
+  // / packageUrl. No se puede asumir uno solo.
+  return jsonResponse(200, {
+    caseFileId,
+    srId,
+    documentId,
+    signedDocumentUrl: signed.ok ? pick(signed.data, "signedDocumentUrl", "url") : null,
+    signedDocumentError: signed.ok ? null : signed.error,
+    certificateUrl: cert.ok ? pick(cert.data, "documentUrl", "url") : null,
+    certificateError: cert.ok ? null : cert.error,
+    certificatePackageUrl: pkg.ok ? pick(pkg.data, "packageUrl", "url") : null,
   });
 }
 
@@ -432,10 +552,17 @@ Deno.serve(async (req) => {
         return await handleSign(cfg, body as SignBody);
       case "status":
         return await handleStatus(cfg, (body.caseFileId as string) ?? "", (body.srId as string) ?? "");
+      case "artifacts":
+        return await handleArtifacts(
+          cfg,
+          (body.caseFileId as string) ?? "",
+          (body.srId as string) ?? "",
+          (body.documentId as string) ?? "",
+        );
       case "evidence":
         return await handleEvidence(cfg, body as EvidenceBody);
       default:
-        return jsonResponse(400, { error: 'action debe ser "sign", "status" o "evidence"' });
+        return jsonResponse(400, { error: 'action debe ser "sign", "status", "artifacts" o "evidence"' });
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

@@ -13,6 +13,11 @@ import {
 import { invokeQTSPProxySign } from '@/lib/qtsp/qtsp-proxy-client';
 import { validarPreFirma } from '@/lib/rules-engine';
 import type { QTSPSignRequest } from '@/lib/rules-engine/types';
+import {
+  isSignatureProduced,
+  resolveSignatureOutcome,
+  signatureOutcomeLabel,
+} from "@/lib/qtsp/signature-completion";
 
 // ============================================================
 // Result types — match EAD Trust API response shapes
@@ -25,10 +30,21 @@ export interface QESSignResult {
    *  con sandbox=true como evidencia SEALED/QES/WORM final. */
   sandbox?: boolean;
   srId: string;
+  /** Expediente EAD. Sin él no se puede consultar el estado ni recuperar el firmado. */
+  caseFileId?: string;
+  /** Estado en el proveedor: `ACTIVE` significa solicitada, NO firmada. */
+  srStatus?: string;
+  /**
+   * ¿La firma se ha producido de verdad? Solo `COMPLETED` la acredita. Los
+   * callers deben mirar esto —y no la mera ausencia de error— antes de sellar
+   * evidencia o de afirmar en pantalla que algo está firmado.
+   */
+  signatureProduced?: boolean;
   documentId: string;
   documentHash: string;
   signatoryIds: string[];
-  signed_at: string;
+  /** Solo se rellena cuando la firma está completada; nunca se fabrica. */
+  signed_at: string | null;
   signedDocumentData?: ArrayBuffer;
   errors: string[];
 }
@@ -116,15 +132,26 @@ export function useQTSPSign() {
           request.onProgress,
         );
         if (proxyResult) {
-          request.onProgress?.('Firma QES completada exitosamente.');
+          // El flujo termina en `activate`: los firmantes reciben el enlace y la
+          // solicitud queda ACTIVE. NADIE ha firmado todavía. Antes se anunciaba
+          // "firma completada" y se fabricaba `signed_at`, de modo que el gate de
+          // evidencia sellaba WORM una firma inexistente. Ahora se dice lo que
+          // ha pasado y `signed_at` solo se rellena cuando la firma se completa.
+          const producida = isSignatureProduced(proxyResult.srStatus);
+          request.onProgress?.(
+            signatureOutcomeLabel(resolveSignatureOutcome(proxyResult.srStatus)) + '.',
+          );
           return {
             ok: true,
             sandbox: false,
             srId: proxyResult.srId,
+            caseFileId: proxyResult.caseFileId,
+            srStatus: proxyResult.srStatus,
+            signatureProduced: producida,
             documentId: proxyResult.documentId,
             documentHash: proxyResult.documentHash,
             signatoryIds: proxyResult.signatoryIds,
-            signed_at: new Date().toISOString(),
+            signed_at: producida ? new Date().toISOString() : null,
             errors: [],
           };
         }

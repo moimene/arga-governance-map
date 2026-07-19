@@ -210,13 +210,14 @@ export default function IncidenteDetalle() {
         legalHold: false,
         status: "SEALED",
         sandbox: signRes.sandbox,
+        srStatus: signRes.srStatus,
         signedBy: `${signatoryName} (${signatoryEmail})`
       });
 
       toast.success(
         signRes.sandbox
           ? "Acta de Cierre firmada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
-          : "Acta de Cierre Forense firmada con QES y sellada en ledger WORM"
+          : "Acta de Cierre Forense firmada electrónicamente y sellada en ledger WORM"
       );
       setShowSignModal(false);
       refetchDeclarations();
@@ -565,7 +566,7 @@ export default function IncidenteDetalle() {
             </div>
             
             <p className="text-xs text-[var(--g-text-secondary)] mb-4 leading-relaxed">
-              De acuerdo con DORA y la política corporativa de ARGA, los incidentes mayores o críticos requieren un Acta de Cierre Forense firmada con QES y archivada de forma inmutable.
+              De acuerdo con DORA y la política corporativa de ARGA, los incidentes mayores o críticos requieren un Acta de Cierre Forense firmada electrónicamente y archivada de forma inmutable.
             </p>
 
             {/* Evidence bundles / closures status */}
@@ -580,12 +581,12 @@ export default function IncidenteDetalle() {
               <div className={`h-2.5 w-2.5 rounded-full ${finalDeclarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
               <div className="flex-1">
                 <span className="block text-xs font-semibold text-[var(--g-text-primary)]">
-                  {finalDeclarations.length > 0 ? "Cierre Forense Certificado QES" : "Cierre Forense Pendiente"}
+                  {finalDeclarations.length > 0 ? "Cierre Forense Certificado" : "Cierre Forense Pendiente"}
                 </span>
                 <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
                   {finalDeclarations.length > 0 
                     ? `Archivado en ledger WORM (${finalDeclarations.length} actas)` 
-                    : "Requiere firma cualificada por Apoderado / Compliance Officer"}
+                    : "Requiere firma electrónica del Apoderado / Compliance Officer"}
                 </span>
               </div>
             </div>
@@ -656,7 +657,7 @@ export default function IncidenteDetalle() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <PenTool className="h-3.5 w-3.5" />
-                Firmar Cierre Forense (QES)
+                Firmar Cierre Forense
               </button>
             )}
           </div>
@@ -772,7 +773,7 @@ export default function IncidenteDetalle() {
               <div className="flex items-center gap-2">
                 <PenTool className="h-5 w-5 text-[var(--g-brand-3308)]" />
                 <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                  Firma Cualificada QES (EAD Trust)
+                  Firma electrónica (EAD Trust)
                 </h3>
               </div>
               <button 
@@ -791,7 +792,7 @@ export default function IncidenteDetalle() {
                   <ShieldCheck className="h-4 w-4" />
                   Garrigues Digital & EAD Trust Ecosystem
                 </div>
-                Esta operación invoca a la API cualificada del QTSP para generar una firma cualificada de un solo uso (One-Time QES) que vincula en firme al Compliance Officer.
+                Esta operación solicita al QTSP (EAD Trust) una firma electrónica que vincula al Compliance Officer. El proveedor emite firma simple o avanzada; el enlace se envía al firmante y la firma no se produce hasta que este la completa.
               </div>
 
               {signProgress ? (
@@ -848,7 +849,7 @@ export default function IncidenteDetalle() {
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       <PenTool className="h-3.5 w-3.5" />
-                      Emitir Firma QES
+                      Solicitar firma
                     </button>
                   </div>
                 </div>

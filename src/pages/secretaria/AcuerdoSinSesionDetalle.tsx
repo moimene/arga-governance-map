@@ -510,8 +510,8 @@ export default function AcuerdoSinSesionDetalle() {
                   queda deshabilitado con explicación accionable cuando no hay proxy QTSP configurado. */}
               <p className="mb-4 text-xs text-[var(--g-text-secondary)]">
                 {erdsProxyAvailable
-                  ? "Envíe una notificación certificada (ERDS) a los destinatarios del acuerdo con evidencia electrónica cualificada vía EAD Trust."
-                  : "El envío certificado ERDS (evidencia cualificada vía EAD Trust) se ejecuta server-side desde el módulo de Comunicaciones. Este entorno no expone el proxy QTSP en el navegador, por lo que el envío directo desde esta pantalla no está habilitado."}
+                  ? "Envíe una notificación certificada (ERDS) a los destinatarios del acuerdo con evidencia electrónica de entrega vía EAD Trust."
+                  : "El envío certificado ERDS (evidencia de entrega vía EAD Trust) se ejecuta server-side desde el módulo de Comunicaciones. Este entorno no expone el proxy QTSP en el navegador, por lo que el envío directo desde esta pantalla no está habilitado."}
               </p>
               <button
                 type="button"

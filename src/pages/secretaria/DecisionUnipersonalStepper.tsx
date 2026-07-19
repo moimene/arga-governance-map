@@ -284,7 +284,7 @@ function FirmaArchivoStep({
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
         La plataforma registrará la decisión, creará el expediente de acuerdo vinculado y dejará
-        preparado el documento final para firma QES y evidencia documental.
+        preparado el documento final para firma electrónica y evidencia documental.
       </p>
 
       <div
@@ -302,7 +302,7 @@ function FirmaArchivoStep({
           </li>
           <li className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
-            Firma QES y verificación EAD Trust: pendientes — se ejecutan al generar el documento desde el detalle (postura sandbox/reference)
+            Firma electrónica y verificación EAD Trust: pendientes — se ejecutan al generar el documento desde el detalle (postura sandbox/reference)
           </li>
           <li className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />

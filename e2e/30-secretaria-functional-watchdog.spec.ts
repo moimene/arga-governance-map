@@ -899,8 +899,10 @@ test.describe('Secretaría functional watchdog', () => {
     await configureDraft.click();
 
     await expect(main.getByText('Borrador configurado correctamente')).toBeVisible({ timeout: 15_000 });
-    await expect(main.getByText('Firma Cualificada (QES)')).toBeVisible();
-    await expect(main.getByText(/QTSP EAD Trust/)).toBeVisible();
+    // El proveedor no emite firma cualificada: su techo es avanzada y nosotros
+    // emitimos simple, asi que ninguna superficie puede rotular QES.
+    await expect(main.getByText('Firma electrónica (EAD Trust)')).toBeVisible();
+    await expect(main.getByText(/QTSP \(EAD Trust\)/)).toBeVisible();
     await expect(main.getByRole('button', { name: 'Archivar documento' })).toBeVisible();
   });
 

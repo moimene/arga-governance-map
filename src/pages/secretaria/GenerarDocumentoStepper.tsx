@@ -25,8 +25,7 @@ import {
   Lock,
   Sparkles,
   Save,
-  CloudOff,
-} from "lucide-react";
+  CloudOff, Clock,} from "lucide-react";
 import { useAgreement, type AgreementFull } from "@/hooks/useAgreementCompliance";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
@@ -75,6 +74,7 @@ import {
 import { isLegallyReviewedDraft } from "@/lib/doc-gen/template-operability";
 import { EvidenceStatusBadge } from "@/components/secretaria/EvidenceStatusBadge";
 import { evidenceStatusDescriptor } from "@/lib/secretaria/evidence-status-labels";
+import { generatePdf } from "@/lib/doc-gen/pdf-generator";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -247,7 +247,7 @@ export default function GenerarDocumentoStepper() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [contentHash, setContentHash] = useState<string>("");
-  const [signingStatus, setSigningStatus] = useState<"idle" | "pending" | "signed" | "error">(
+  const [signingStatus, setSigningStatus] = useState<"idle" | "pending" | "requested" | "signed" | "error">(
     "idle"
   );
   const [signingError, setSigningError] = useState<string | null>(null);
@@ -602,15 +602,36 @@ export default function GenerarDocumentoStepper() {
       return;
     }
     if (!personId || !signer?.full_name || !signer.email) {
-      setSigningError("No hay firmante vigente con nombre y email para solicitar QES.");
+      setSigningError("No hay firmante vigente con nombre y email para solicitar la firma.");
       return;
     }
     setSigningStatus("pending");
     setSigningError(null);
     try {
+      // Se firma un PDF generado AQUI, no el DOCX.
+      //
+      // Antes se enviaba el DOCX y el proveedor lo convertia por su cuenta: se
+      // hasheaba un documento y se firmaba otro, de modo que el hash registrado
+      // como evidencia no correspondia al artefacto firmado. Ademas las
+      // coordenadas de firma son un concepto del espacio PDF. Generando el PDF
+      // antes, lo hasheado, lo archivado y lo firmado son el mismo documento.
+      const pdf = await generatePdf({
+        renderedText: compositionResult.document.renderedText,
+        title: compositionResult.title,
+        subtitle: agreementEntityName,
+        templateTipo: selectedPlantilla.tipo,
+        templateVersion: selectedPlantilla.version,
+        contentHash: compositionResult.document.contentHash,
+        generatedAt: compositionResult.document.generatedAt,
+      });
+      const pdfBuffer = pdf.bytes.buffer.slice(
+        pdf.bytes.byteOffset,
+        pdf.bytes.byteOffset + pdf.bytes.byteLength,
+      ) as ArrayBuffer;
+
       const result = await signMutation.mutateAsync({
-        documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.docx`,
-        documentData: docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer,
+        documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.pdf`,
+        documentData: pdfBuffer,
         signatories: [{ name: signer.full_name, email: signer.email, sequence: 1 }],
         createdBy: personId,
         agreementId: agreement.id,
@@ -620,7 +641,10 @@ export default function GenerarDocumentoStepper() {
       if (result.signedDocumentData) {
         setDocxBuffer(new Uint8Array(result.signedDocumentData));
       }
-      setSigningStatus("signed");
+      // `signed` solo cuando el proveedor acredita la firma. Al activar, la
+      // solicitud queda ACTIVE: los firmantes tienen el enlace y nadie ha
+      // firmado. Decirlo de otro modo seria afirmar un hecho que no ha ocurrido.
+      setSigningStatus(result.signatureProduced ? "signed" : "requested");
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : "Error desconocido al firmar";
       setSigningError(errorMsg);
@@ -1483,13 +1507,13 @@ export default function GenerarDocumentoStepper() {
             >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                Firma Cualificada (QES)
+                Firma electrónica (EAD Trust)
               </h3>
 
               {signingStatus === "idle" && (
                 <>
                   <p className="text-xs text-[var(--g-text-secondary)] mb-4">
-                    El documento se ha generado exitosamente. Puede firmarlo ahora con certificado cualificado (QES) a través del QTSP EAD Trust.
+                    El documento se ha generado. Puede solicitar su firma electrónica al QTSP (EAD Trust): se enviará el enlace de firma a los firmantes sobre el PDF generado.
                   </p>
                   <button
                     type="button"
@@ -1500,7 +1524,7 @@ export default function GenerarDocumentoStepper() {
                     aria-busy={signMutation.isPending}
                   >
                     <Lock className="h-4 w-4" />
-                    Firmar con QES
+                    Solicitar firma
                   </button>
                 </>
               )}
@@ -1512,14 +1536,29 @@ export default function GenerarDocumentoStepper() {
                 </div>
               )}
 
-              {signingStatus === "signed" && (
+              {(signingStatus === "signed" || signingStatus === "requested") && (
                 <div className="space-y-2">
+                  {/* Se distingue solicitar de firmar. Activar la solicitud solo
+                      envia el enlace a los firmantes; hasta que el proveedor
+                      reporte la firma, decir "firmado" seria falso. */}
                   <div
-                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-success)]/10 text-[var(--status-success)]"
+                    className={`flex items-center gap-2 px-3 py-2 ${
+                      signingStatus === "signed"
+                        ? "bg-[var(--status-success)]/10 text-[var(--status-success)]"
+                        : "bg-[var(--status-info)]/10 text-[var(--status-info)]"
+                    }`}
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Solicitud QES activada correctamente</span>
+                    {signingStatus === "signed" ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Clock className="h-4 w-4" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {signingStatus === "signed"
+                        ? "Documento firmado por todos los firmantes"
+                        : "Solicitud de firma enviada — pendiente de firma"}
+                    </span>
                   </div>
                   {/* ITEM-109: distinguir la firma sandbox de demo de una transacción
                       EAD Trust real. En sandbox el buffer NO va firmado y el manifest
@@ -1537,9 +1576,9 @@ export default function GenerarDocumentoStepper() {
                     </div>
                   ) : (
                     <p className="text-xs text-[var(--g-text-secondary)]">
-                      EAD Trust ha registrado la solicitud de firma. El archivo se archivará con los
-                      identificadores QTSP y, si el proveedor entrega un artefacto firmado, se archivará
-                      ese binario firmado.
+                      EAD Trust ha registrado la solicitud sobre el PDF generado. Los firmantes han
+                      recibido el enlace; el documento aún no está firmado. Cuando el proveedor
+                      complete la firma se recuperarán el documento firmado y su certificado.
                     </p>
                   )}
                   {qesResult ? (

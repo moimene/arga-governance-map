@@ -81,11 +81,18 @@ export function useCreateEvidenceBundle() {
       /** true si la firma/notificación QTSP fue sandbox de demo (no EAD Trust real).
        *  El gate degrada el bundle a OPEN y lo marca; nunca SEALED. (Codex review #2) */
       sandbox?: boolean;
+      /**
+       * Estado de la solicitud de firma en el QTSP. `ACTIVE` significa
+       * solicitada, no firmada: el gate degrada a OPEN. Sin este dato, una
+       * firma real todavia no producida se sellaba como evidencia final.
+       */
+      srStatus?: string | null;
     }) => {
       // Codex review #2: un resultado sandbox NUNCA se sella como evidencia WORM final.
       const { status: effectiveStatus, manifest: effectiveManifest } =
         resolveSandboxSafeEvidencePersistence({
           sandbox: payload.sandbox,
+          srStatus: payload.srStatus,
           status: payload.status,
           manifest: payload.manifest,
         });

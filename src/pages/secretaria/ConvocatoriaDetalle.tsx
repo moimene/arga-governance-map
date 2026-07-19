@@ -167,7 +167,7 @@ function buildConvocatoriaVariables(conv: ConvocatoriaDocContext) {
     cargo_firmante: "Secretaría del órgano",
     firma_organo_administracion: "Secretaría del órgano convocante",
     firma: "Secretaría Societaria",
-    firma_qes_ref: "Pendiente de QES productiva EAD Trust",
+    firma_qes_ref: "Pendiente de firma electrónica productiva EAD Trust",
   };
 }
 

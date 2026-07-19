@@ -1687,7 +1687,7 @@ function makeDefaultSteps(): ApprovalStep[] {
     { id: "SECRETARIO",   label: "Revisión Secretaría",         role: "SECRETARIO",   approvedAt: null, approvedBy: null },
     { id: "COMITE_LEGAL", label: "Validación comité legal",     role: "COMITE_LEGAL", approvedAt: null, approvedBy: null },
     { id: "PRESIDENTE",   label: "Aprobación Presidente",        role: "PRESIDENTE",   approvedAt: null, approvedBy: null },
-    { id: "QES_FIRMA",    label: "Firma QES cualificada",        role: "QES_FIRMA",    approvedAt: null, approvedBy: null },
+    { id: "QES_FIRMA",    label: "Firma electrónica",        role: "QES_FIRMA",    approvedAt: null, approvedBy: null },
   ];
 }
 
@@ -1858,7 +1858,7 @@ function ApprovalWorkflowCard({
                       {step.id === "QES_FIRMA" ? (
                         <>
                           <Lock className="h-3 w-3" />
-                          Firmar con QES
+                          Solicitar firma
                         </>
                       ) : (
                         <>

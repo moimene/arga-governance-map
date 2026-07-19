@@ -182,13 +182,14 @@ export default function SistemaDetalle() {
         legalHold: false,
         status: "SEALED",
         sandbox: signRes.sandbox,
+        srStatus: signRes.srStatus,
         signedBy: `${signatoryName} (${signatoryEmail})`
       });
 
       toast.success(
         signRes.sandbox
           ? "Declaración firmada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
-          : "Declaración de conformidad firmada con QES y sellada en ledger WORM"
+          : "Declaración de conformidad firmada electrónicamente y sellada en ledger WORM"
       );
       setShowSignModal(false);
       refetchDeclarations();
@@ -488,12 +489,12 @@ export default function SistemaDetalle() {
               <div className={`h-2.5 w-2.5 rounded-full ${finalDeclarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
               <div className="flex-1">
                 <span className="block text-xs font-semibold text-[var(--g-text-primary)]">
-                  {finalDeclarations.length > 0 ? "Conformidad Certificada QES" : "Declaración Pendiente"}
+                  {finalDeclarations.length > 0 ? "Conformidad Certificada" : "Declaración Pendiente"}
                 </span>
                 <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
                   {finalDeclarations.length > 0 
                     ? `Firma forense inmutable de QTSP (${finalDeclarations.length} registrada)` 
-                    : "Requiere firma cualificada por Compliance Officer"}
+                    : "Requiere firma electrónica del Compliance Officer"}
                 </span>
               </div>
             </div>
@@ -556,7 +557,7 @@ export default function SistemaDetalle() {
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <PenTool className="h-3.5 w-3.5" />
-              Firmar Conformidad (QES)
+              Firmar Conformidad
             </button>
           </div>
 
@@ -631,7 +632,7 @@ export default function SistemaDetalle() {
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[var(--g-border-subtle)]">
               <ShieldCheck className="h-5 w-5 text-[var(--status-success)]" />
               <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                Firma Digital Cualificada (QES)
+                Firma electrónica (EAD Trust)
               </h3>
             </div>
 
@@ -692,7 +693,7 @@ export default function SistemaDetalle() {
                     className="px-4 py-2 bg-[var(--status-success)] text-[var(--g-text-inverse)] text-xs font-semibold hover:bg-[var(--status-success)]/90"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    Confirmar y Firmar QES
+                    Confirmar y Firmar
                   </button>
                 </div>
               </div>

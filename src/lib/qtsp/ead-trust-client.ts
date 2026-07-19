@@ -560,6 +560,8 @@ export interface QESSignFlowInput {
 
 export interface QESSignFlowResult {
   srId: string;
+  /** Expediente EAD: obligatorio para consultar estado y recuperar el firmado. */
+  caseFileId?: string;
   srStatus: string;
   documentId: string;
   documentHash: string;
