@@ -145,3 +145,34 @@ describe("generatePdf — produce un PDF real y firmable", () => {
     expect(a.signatureAnchor).toEqual(b.signatureAnchor);
   });
 });
+
+describe("bordes del renderizado", () => {
+  it("un texto vacío no rompe: produce un PDF con la cabecera", async () => {
+    // El acuerdo puede llegar sin cuerpo si la composición falla aguas arriba.
+    // Debe salir un PDF válido, no una excepción a mitad del flujo de firma.
+    const { bytes, pageCount } = await generatePdf({ renderedText: "", title: "ACTA" });
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+    expect(pageCount).toBe(1);
+  });
+
+  it("solo espacios en blanco tampoco rompe", async () => {
+    const { pageCount } = await generatePdf({ renderedText: "\n\n   \n\t\n", title: "ACTA" });
+    expect(pageCount).toBe(1);
+  });
+
+  it("una línea larguísima sin espacios se trocea y no desborda", async () => {
+    const { bytes } = await generatePdf({ renderedText: "x".repeat(5000), title: "ACTA" });
+    expect(bytes.length).toBeGreaterThan(500);
+  });
+
+  it("el ancla de firma sigue siendo válida en un documento de una sola página", async () => {
+    const { pageCount, signatureAnchor } = await generatePdf({ renderedText: "Breve.", title: "A" });
+    expect(pageCount).toBe(1);
+    expect(signatureAnchor.page).toBe(1);
+  });
+
+  it("sin título no se cae", async () => {
+    const { bytes } = await generatePdf({ renderedText: "Cuerpo.", title: "" });
+    expect(bytes.length).toBeGreaterThan(500);
+  });
+});

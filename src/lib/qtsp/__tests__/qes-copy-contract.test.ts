@@ -30,23 +30,32 @@ function ficheros(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-/** Solo literales de cadena y texto JSX: los identificadores de código no los lee nadie. */
+/**
+ * Solo literales de cadena y texto JSX: los identificadores de código no los lee
+ * nadie.
+ *
+ * El extractor recorre el fuente COMPLETO, no línea a línea. Con el enfoque por
+ * líneas se escapaba el texto JSX repartido en varias —que es justo como se
+ * escribe el copy largo— y una afirmación de firma cualificada pasó el filtro.
+ */
 function textoVisible(src: string): string[] {
+  const sinComentarios = src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
   const salida: string[] = [];
-  for (const linea of src.split("\n")) {
-    const sinComentario = linea.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
-    if (!sinComentario.trim()) continue;
-    for (const m of sinComentario.matchAll(/"([^"]{4,})"|'([^']{4,})'|>([^<>{}]{4,})</g)) {
-      salida.push(m[1] ?? m[2] ?? m[3] ?? "");
-    }
+  for (const m of sinComentarios.matchAll(/"([^"]{3,})"|'([^']{3,})'|>([^<>{}]{3,})</g)) {
+    salida.push((m[1] ?? m[2] ?? m[3] ?? "").replace(/\s+/g, " ").trim());
   }
   return salida;
 }
 
 describe("ninguna superficie afirma firma cualificada", () => {
+  // Codex adversarial: el copy visible también sale de hooks y librerías
+  // (mensajes de progreso, etiquetas), no solo de páginas y componentes.
   const paginasYComponentes = [
     ...ficheros(join(RAIZ, "pages")),
     ...ficheros(join(RAIZ, "components")),
+    ...ficheros(join(RAIZ, "hooks")),
   ];
 
   it("no queda 'QES' ni 'firma cualificada' en texto que lea el usuario", () => {
@@ -54,6 +63,10 @@ describe("ninguna superficie afirma firma cualificada", () => {
     for (const f of paginasYComponentes) {
       const src = readFileSync(f, "utf8");
       for (const t of textoVisible(src)) {
+        // Vocabulario de DATOS del proveedor, no prosa: el conjunto de tipos de
+        // artefacto que un manifest puede traer etiquetados. Un token suelto no
+        // afirma nada ante el usuario; lo que se persigue son las afirmaciones.
+        if (/^(QES|QSEAL|TSQ|NOTIFICATION)$/.test(t.trim())) continue;
         // El disclaimer que NIEGA eficacia cualificada es correcto y debe quedarse.
         if (/sin eficacia jur[ií]dica cualificada/i.test(t)) continue;
         // "mayoría cualificada" es un concepto societario, nada que ver con firma.

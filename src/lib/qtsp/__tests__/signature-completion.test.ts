@@ -115,3 +115,71 @@ describe("gate de evidencia — no se sella lo que no está firmado", () => {
     expect(r.status).toBe("SEALED");
   });
 });
+
+describe("gate de evidencia — bordes que deciden si se sella o no", () => {
+  const manifest = { doc: "acta" };
+
+  it("srStatus AUSENTE conserva el comportamiento previo; srStatus NULL no sella", () => {
+    // Distinción deliberada y fácil de romper sin querer:
+    //  · ausente  = el caller no informa → no se cambia su conducta;
+    //  · null     = el caller informa que NO hay estado → no se puede acreditar.
+    const ausente = resolveSandboxSafeEvidencePersistence({ status: "SEALED", manifest });
+    expect(ausente.status).toBe("SEALED");
+
+    const nulo = resolveSandboxSafeEvidencePersistence({ srStatus: null, status: "SEALED", manifest });
+    expect(nulo.status).toBe("OPEN");
+    expect(nulo.manifest.signature_outcome).toBe("NO_SOLICITADA");
+  });
+
+  it("una firma parcial no sella: faltan firmantes", () => {
+    const r = resolveSandboxSafeEvidencePersistence({
+      srStatus: "PARTIALLY_SIGNED",
+      status: "SEALED",
+      manifest,
+    });
+    expect(r.status).toBe("OPEN");
+    expect(r.manifest.signature_outcome).toBe("PARCIAL");
+  });
+
+  it("una solicitud anulada o caducada no sella", () => {
+    for (const estado of ["CANCELLED", "EXPIRED"]) {
+      const r = resolveSandboxSafeEvidencePersistence({ srStatus: estado, status: "SEALED", manifest });
+      expect(r.status).toBe("OPEN");
+      expect(r.manifest.signature_outcome).toBe("SIN_EFECTO");
+    }
+  });
+
+  it("un estado desconocido del proveedor NUNCA sella (falla cerrado)", () => {
+    // Si EAD introdujera un estado nuevo, el defecto debe ser no acreditar.
+    const r = resolveSandboxSafeEvidencePersistence({
+      srStatus: "ALGO_NUEVO_DEL_PROVEEDOR",
+      status: "SEALED",
+      manifest,
+    });
+    expect(r.status).toBe("OPEN");
+  });
+
+  it("el sandbox manda sobre el estado de firma", () => {
+    // Aunque el proveedor dijera COMPLETED, un resultado sandbox no es real.
+    const r = resolveSandboxSafeEvidencePersistence({
+      sandbox: true,
+      srStatus: "COMPLETED",
+      status: "SEALED",
+      manifest,
+    });
+    expect(r.status).toBe("OPEN");
+    expect(r.manifest.sandbox).toBe(true);
+  });
+
+  it("no pisa el manifest original al añadir la traza", () => {
+    const original = { doc: "acta", cadena: ["a"] };
+    const r = resolveSandboxSafeEvidencePersistence({
+      srStatus: "ACTIVE",
+      status: "SEALED",
+      manifest: original,
+    });
+    expect(r.manifest.doc).toBe("acta");
+    expect(r.manifest.cadena).toEqual(["a"]);
+    expect(original).not.toHaveProperty("signature_outcome");
+  });
+});

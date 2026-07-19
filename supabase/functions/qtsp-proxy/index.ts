@@ -190,6 +190,11 @@ async function handleSign(cfg: SuiteConfig, body: SignBody): Promise<Response> {
   }
 
   // 0. Case file contenedor (uno por solicitud — trazable por agreementId)
+  // Ancla de firma calculada por el generador de PDF sobre el documento real.
+  // Espacio PDF, origen inferior izquierdo, pagina 1-based.
+  const signaturePage = Math.max(1, Math.trunc(Number(body.signaturePage) || 1));
+  const signatureX = Number.isFinite(Number(body.signatureX)) ? Number(body.signatureX) : 70;
+  const signatureY = Number.isFinite(Number(body.signatureY)) ? Number(body.signatureY) : 110;
   const caseFileId = crypto.randomUUID();
   const useCaseId = await resolveUseCaseId(cfg);
   await suiteFetch(cfg, "/case-files", {
@@ -283,7 +288,12 @@ async function handleSign(cfg: SuiteConfig, body: SignBody): Promise<Response> {
       `/case-files/${caseFileId}/signature-requests/${srId}/documents/${documentId}/signatories/${signatoryId}/coordinates`,
       {
         method: "PUT",
-        body: JSON.stringify({ coordinates: [{ page: 1, x: 30, y: 230 + offset }] }),
+        // La pagina la decide quien genera el PDF: el sello va en la ultima,
+        // que es donde el firmante lo espera. Fijar 1 a ciegas colocaba la
+        // firma sobre el cuerpo del acuerdo en documentos de varias paginas.
+        body: JSON.stringify({
+          coordinates: [{ page: signaturePage, x: signatureX, y: signatureY + offset }],
+        }),
       },
       "setCoordinates",
     );
@@ -345,7 +355,10 @@ async function activateWithRetry(cfg: SuiteConfig, caseFileId: string, srId: str
         { method: "PUT" },
         "activateSignatureRequest",
       );
-      return (await readSignatureRequestStatus(cfg, caseFileId, srId)) ?? "ACTIVE";
+      // Si la activacion fue bien pero la consulta posterior falla, NO se
+      // inventa "ACTIVE": se declara desconocido. Solo COMPLETED acredita
+      // firma, asi que un estado desconocido nunca puede sellar evidencia.
+      return (await readSignatureRequestStatus(cfg, caseFileId, srId)) ?? "UNKNOWN";
     } catch (err) {
       lastError = err;
       // ¿Se activo pese al error de transporte? Si ya no esta en DRAFT, la

@@ -247,6 +247,7 @@ export default function GenerarDocumentoStepper() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [contentHash, setContentHash] = useState<string>("");
+  const [signedPdfBuffer, setSignedPdfBuffer] = useState<ArrayBuffer | null>(null);
   const [signingStatus, setSigningStatus] = useState<"idle" | "pending" | "requested" | "signed" | "error">(
     "idle"
   );
@@ -635,9 +636,16 @@ export default function GenerarDocumentoStepper() {
         signatories: [{ name: signer.full_name, email: signer.email, sequence: 1 }],
         createdBy: personId,
         agreementId: agreement.id,
+        // El sello va en la última página del PDF real, no en la primera.
+        signatureAnchor: pdf.signatureAnchor,
         onProgress: () => {},
       });
       setQesResult(result);
+      // Se conserva el PDF EXACTO que se mandó a firmar: es el que hay que
+      // archivar. Archivar el DOCX dejaría la evidencia apuntando a un
+      // artefacto distinto del firmado, que es justo el defecto que este
+      // camino vino a corregir.
+      setSignedPdfBuffer(pdfBuffer);
       if (result.signedDocumentData) {
         setDocxBuffer(new Uint8Array(result.signedDocumentData));
       }
@@ -665,10 +673,15 @@ export default function GenerarDocumentoStepper() {
       const filename = (
         compositionResult?.document.filename ??
         `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}.docx`
-      ).replace(/\.docx$/i, "");
+      ).replace(/\.docx$/i, "") + (qesResult?.signedDocumentData || signedPdfBuffer ? ".pdf" : "");
+      // Orden de preferencia: el binario firmado que devuelva el proveedor, el
+      // PDF que se le envió a firmar, y solo si no hubo firma, el DOCX de
+      // trabajo. Lo archivado debe ser lo firmado.
       const archiveBuffer = qesResult?.signedDocumentData
         ? qesResult.signedDocumentData
-        : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
+        : signedPdfBuffer
+          ? signedPdfBuffer
+          : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
       const result = await archiveDocxToStorage(archiveBuffer, agreement.id, filename, tenantId ?? "", {
         processKind: compositionResult?.request.document_type ?? inferDocumentTypeForComposer(
           selectedPlantilla,
@@ -1571,7 +1584,7 @@ export default function GenerarDocumentoStepper() {
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <span className="text-xs">
                         Firma sandbox de demo — NO es una transacción EAD Trust real. El documento se
-                        archiva sin firma cualificada y la evidencia queda marcada como sandbox (no sellada).
+                        archiva SIN firma electrónica alguna y la evidencia queda marcada como sandbox (no sellada).
                       </span>
                     </div>
                   ) : (

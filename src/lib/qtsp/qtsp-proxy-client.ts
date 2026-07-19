@@ -34,6 +34,8 @@ export interface ProxySignInput {
   signatories: Array<{ name: string; email: string; surnames?: string; sequence?: number }>;
   createdBy: string;
   agreementId?: string;
+  /** Ancla de firma calculada sobre el PDF real (espacio PDF, origen abajo-izq). */
+  signatureAnchor?: { page: number; x: number; y: number };
 }
 
 export function buildProxySignPayload(input: ProxySignInput) {
@@ -44,6 +46,9 @@ export function buildProxySignPayload(input: ProxySignInput) {
     signatories: input.signatories,
     createdBy: input.createdBy,
     agreementId: input.agreementId,
+    signaturePage: input.signatureAnchor?.page,
+    signatureX: input.signatureAnchor?.x,
+    signatureY: input.signatureAnchor?.y,
   };
 }
 
@@ -72,10 +77,31 @@ export function normalizeProxySignResult(data: unknown): QESSignFlowResult | nul
  *          (el caller decide el fallback). Lanza si el proxy SÍ está configurado
  *          pero el flujo QTSP falla — un fallo real no debe degradar a sandbox.
  */
+/**
+ * ¿Está prohibido llamar al QTSP real en este entorno?
+ *
+ * Bajo e2e SÍ. Las pruebas apuntan al Supabase de Cloud, donde el proxy está
+ * desplegado y con credenciales, de modo que cada ejecución creaba solicitudes
+ * de firma REALES en EAD Trust —con expediente y aviso al firmante— por el mero
+ * hecho de pasar un test. Una batería de pruebas no puede tener efectos
+ * jurídicos en un proveedor externo.
+ *
+ * Sin proxy real, el flujo cae al adaptador sandbox, que es lo que una prueba
+ * automática debe ejercitar.
+ */
+export function isRealQTSPForbidden(): boolean {
+  const env = (import.meta as { env?: Record<string, unknown> }).env ?? {};
+  return env.VITE_E2E === "1" || env.VITE_E2E === true;
+}
+
 export async function invokeQTSPProxySign(
   input: ProxySignInput,
   onProgress?: (step: string) => void,
 ): Promise<QESSignFlowResult | null> {
+  if (isRealQTSPForbidden()) {
+    onProgress?.("Entorno de pruebas: no se contacta con el QTSP real.");
+    return null;
+  }
   onProgress?.("Contactando proxy QTSP (EAD Trust)…");
   let data: unknown;
   let error: { message?: string; context?: { status?: number } } | null;
@@ -136,6 +162,7 @@ export interface ProxySignatureArtifacts {
 }
 
 async function invokeProxy<T>(body: Record<string, unknown>): Promise<T | null> {
+  if (isRealQTSPForbidden()) return null;
   let data: unknown;
   let error: { message?: string; context?: { status?: number } } | null;
   try {

@@ -44,7 +44,8 @@ test.describe('GRC Compass DORA & Penal E2E Flow', () => {
     await expect(page.getByText('PROVEEDOR CRÍTICO DORA').first()).toBeVisible({ timeout: 5000 });
 
     // 5. Document and WORM seal the Exit Plan
-    await page.getByRole('button', { name: 'Plan de Contingencia / QES' }).click();
+    // El proveedor no emite firma cualificada, así que el rótulo ya no dice QES.
+    await page.getByRole('button', { name: 'Plan de Contingencia / Firma' }).click();
     
     // Document some plan strategy
     const exitTextarea = page.locator('#exit-strategy-text');
@@ -58,7 +59,7 @@ test.describe('GRC Compass DORA & Penal E2E Flow', () => {
     await emailInput.fill('lucia@arga-seguros.com');
 
     // Click seal exit plan button
-    const signBtn = page.getByRole('button', { name: 'Firmar y Sellar Exit Plan (QES)' });
+    const signBtn = page.getByRole('button', { name: 'Firmar y Sellar Exit Plan' });
     await expect(signBtn).toBeVisible();
     await signBtn.click();
 

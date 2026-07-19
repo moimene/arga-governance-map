@@ -78,13 +78,31 @@ export function useQTSPReconcile() {
 
       const artifacts = await fetchQTSPSignatureArtifacts(caseFileId, srId, documentId);
       const avisos: string[] = [];
-      if (artifacts?.signedDocumentError) {
+
+      // Codex adversarial: avisar solo cuando el proveedor devuelve un *Error*
+      // dejaba pasar en silencio los dos casos peores — que no haya respuesta, y
+      // que la respuesta venga sin URLs. En ambos la firma consta completada y
+      // el documento no está: eso no puede quedar mudo.
+      if (!artifacts) {
+        avisos.push(
+          "Firma completada pero no se pudieron recuperar los artefactos: el proxy QTSP no respondió.",
+        );
+        return { ...base, artifacts: null, avisos };
+      }
+
+      if (artifacts.signedDocumentError) {
         avisos.push(`Documento firmado no recuperado: ${artifacts.signedDocumentError}`);
+      } else if (!artifacts.signedDocumentUrl) {
+        avisos.push("Firma completada pero el proveedor no devolvió el documento firmado.");
       }
-      if (artifacts?.certificateError) {
+
+      if (artifacts.certificateError) {
         avisos.push(`Certificado no recuperado: ${artifacts.certificateError}`);
+      } else if (!artifacts.certificateUrl) {
+        avisos.push("Firma completada pero el proveedor no devolvió el certificado.");
       }
-      return { ...base, artifacts: artifacts ?? null, avisos };
+
+      return { ...base, artifacts, avisos };
     },
   });
 }

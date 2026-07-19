@@ -77,6 +77,7 @@ export interface QESSignFlowRequest {
   }>;
   createdBy: string;
   agreementId?: string;
+  signatureAnchor?: { page: number; x: number; y: number };
   onProgress?: (step: string) => void;
 }
 
@@ -115,7 +116,7 @@ export function useQTSPSign() {
   const signMutation = useMutation<QESSignResult, Error, QESSignFlowRequest>({
     mutationFn: async (request: QESSignFlowRequest) => {
       try {
-        request.onProgress?.('Iniciando flujo de firma QES…');
+        request.onProgress?.('Iniciando solicitud de firma electrónica…');
 
         // Camino REAL preferente: Edge Function qtsp-proxy (Okta server-side).
         // Devuelve null si el proxy no está desplegado/configurado → seguimos
@@ -128,6 +129,7 @@ export function useQTSPSign() {
             signatories: request.signatories,
             createdBy: request.createdBy,
             agreementId: request.agreementId,
+            signatureAnchor: request.signatureAnchor,
           },
           request.onProgress,
         );
@@ -151,7 +153,10 @@ export function useQTSPSign() {
             documentId: proxyResult.documentId,
             documentHash: proxyResult.documentHash,
             signatoryIds: proxyResult.signatoryIds,
-            signed_at: producida ? new Date().toISOString() : null,
+            // NUNCA se fabrica: el reloj local no acredita cuando se firmo, y el
+            // proveedor no devuelve fecha al activar. La fecha real llega al
+            // reconciliar; hasta entonces es null aunque el estado sea COMPLETED.
+            signed_at: null,
             errors: [],
           };
         }
@@ -166,16 +171,23 @@ export function useQTSPSign() {
           onProgress: request.onProgress,
         });
 
-        request.onProgress?.('Firma QES completada exitosamente.');
+        // Mismo criterio que el camino proxy: activar no es firmar.
+        const producidaDirecta = isSignatureProduced(result.srStatus);
+        request.onProgress?.(
+          signatureOutcomeLabel(resolveSignatureOutcome(result.srStatus)) + '.',
+        );
 
         return {
           ok: true,
           sandbox: false,
           srId: result.srId,
+          caseFileId: result.caseFileId,
+          srStatus: result.srStatus,
+          signatureProduced: producidaDirecta,
           documentId: result.documentId,
           documentHash: result.documentHash,
           signatoryIds: result.signatoryIds,
-          signed_at: new Date().toISOString(),
+          signed_at: null,
           signedDocumentData: result.signedDocumentData,
           errors: [],
         };
@@ -190,11 +202,11 @@ export function useQTSPSign() {
           const allowSandbox =
             import.meta.env.VITE_QTSP_ALLOW_SANDBOX === 'true' || import.meta.env.DEV === true;
           if (!allowSandbox) {
-            throw new Error(`Firma QES no disponible (proxy/credenciales QTSP) y sandbox deshabilitado: ${msg}`);
+            throw new Error(`Firma electrónica no disponible (proxy/credenciales QTSP) y sandbox deshabilitado: ${msg}`);
           }
-          console.warn("QTSP Proxy not configured or running in browser. Falling back to high-fidelity QES sandbox adapter.");
+          console.warn("QTSP Proxy not configured or running in browser. Falling back to sandbox adapter (no real signature).");
 
-          request.onProgress?.('Iniciando simulador de firma sandbox cualificada...');
+          request.onProgress?.('Iniciando simulador de firma sandbox...');
           await new Promise(resolve => setTimeout(resolve, 800));
           request.onProgress?.('Calculando hash criptográfico SHA-512 local...');
           
@@ -202,10 +214,10 @@ export function useQTSPSign() {
           const hashArray = Array.from(new Uint8Array(hashBuffer));
           const docHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
           
-          request.onProgress?.('Generando sellado de tiempo y certificado QES (EAD Trust Sandbox)...');
+          request.onProgress?.('Generando sellado de tiempo y certificado simulado (Sandbox)...');
           await new Promise(resolve => setTimeout(resolve, 600));
           
-          request.onProgress?.('Firma QES completada exitosamente (Sandbox).');
+          request.onProgress?.('Firma simulada completada (Sandbox) — no es una firma real.');
           
           return {
             ok: true,
@@ -214,13 +226,19 @@ export function useQTSPSign() {
             documentId: `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
             documentHash: docHash,
             signatoryIds: request.signatories.map((_, i) => `SIGN-SANDBOX-${i + 1}`),
+            // El sandbox SIMULA una firma completada, y como tal debe declararse:
+            // si no, los consumidores lo leen como "no firmado" y el flujo de
+            // demo se queda a medias. Que no sea evidencia real lo garantiza
+            // `sandbox: true`, que el gate degrada a OPEN pase lo que pase.
+            srStatus: "COMPLETED",
+            signatureProduced: true,
             signed_at: new Date().toISOString(),
             signedDocumentData: request.documentData,
             errors: [],
           };
         }
 
-        throw new Error(`Firma QES fallida: ${msg}`);
+        throw new Error(`Firma electrónica fallida: ${msg}`);
       }
     },
   });
