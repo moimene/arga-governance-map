@@ -192,7 +192,29 @@ Detalle canónico: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-e
 - Memory key: `patterns/ruflo_supervised_handoffs_demo_complete_2026_05_02`.
 - Memory key: `patterns/aims_grc_reactivation_forms_penal_no_schema_2026_05_02`.
 
-### Verificación última conocida (2026-07-15, post-Oleada 3A)
+### Procedencia de la regla registral — avisos landed (2026-07-19, `79a8cee`)
+
+El tramitador servía la regla de otro órgano sin decirlo. Verificado contra Cloud: **8 de 37 acuerdos** reciben hoy un rule pack de un órgano distinto al que adopta (6 de Consejo con pack de Junta; 2 de comisión delegada, para la que **no existe ningún pack**). De ahí salen inscribibilidad, instrumento y plazo, y el instrumento habilita `handleRegisterDeed`, que persiste en `registry_filings`.
+
+Landed (opciones A+B del análisis; **la opción C —fail-closed— queda fuera a propósito**, es post-demo y exige Comité Legal):
+
+- `src/lib/secretaria/rule-pack-organo.ts` — criterio **único** de familia de órgano por lista blanca. Sustituye al `organoFamily` por substring (leía `NO_ADMINISTRACION` como órgano de administración) y al mapa duplicado del panel. `SOCIO_UNICO` y `SOPORTE_INTERNO` con familia propia: equipararlos a Junta (art. 15 LSC) es criterio **pendiente del Comité Legal**.
+- `src/lib/secretaria/rule-pack-selection.ts` — `selectRulePackForOrgano` pura. **Conserva el fallback `rows[0]`** y añade el motivo (`ORGANO_COINCIDE` / `UNICO_PACK_SIN_ORGANO_CONOCIDO` / `FALLBACK_ORGANO_DISTINTO` / `FALLBACK_AMBIGUO`).
+- `RegistryRuleProvenanceNotice.tsx` — aviso en el paso 2 **y junto al botón "Registrar escritura"** del paso 5, que es donde se persiste. Describe la procedencia y remite al abogado; **no dictamina y no bloquea**.
+- `useRulePacks.ts:150` acepta órgano y no elige entre packs de órganos distintos cuando no lo conoce. **GOTCHA:** es defensa en profundidad, no arregla un daño observado — `extractMajorityFromRulePackParams` (`rule-pack-params.ts:136`) solo lee claves de **primer nivel** y los **57 packs** guardan la mayoría bajo `votacion.mayoria`, así que esa mayoría nunca se derivaba. Corregir el extractor mostraría mayorías reales donde hoy hay inferencia etiquetada: **no tocar sin Comité Legal**.
+- `resolveOrganoTipoStrict` (`organo-resolver.ts`) — variante que devuelve `null` en vez de caer a Junta. El fallback conservador vale para calcular quórums, no para **afirmar en pantalla** un órgano no acreditado.
+
+Deuda declarada y verificada sin impacto hoy: el rescate por materia (`TramitadorStepper.tsx`) resuelve el pack sin órgano, pero los dos packs de `AUTORIZACION_GARANTIA` enrutan ambos a MEETING. Contenido legal dudoso en el dato vivo (pendiente Comité): `NOMBRAMIENTO_CONSEJERO` cita `plazoInscripcion 30 días, art. 17 RRM` — el art. 17 RRM es competencia territorial, y el seed de cooptación no aplicado (`scripts/seed-nombramiento-consejero-rule-pack.ts`) arrastra la misma cita.
+
+### Verificación última conocida (2026-07-19, post-procedencia registral)
+
+- `bun run db:check-target`: pass contra `governance_OS`. Head remoto = `20260718170000`; migraciones de julio en paridad repo/Cloud.
+- `bun test`: pass, **2463 pass / 152 skipped / 0 fail** (8871 aserciones).
+- e2e: 47 pass (`06`, `08`, `14`, `17`, `30`).
+- Árbol git: `main` == `origin/main` en `79a8cee`, working tree limpio. Sin ramas ni stashes con trabajo pendiente de llevar a principal (ver inventario 2026-07-19 abajo).
+
+<details>
+<summary>Histórico (2026-07-15, post-Oleada 3A)</summary>
 
 - `bun run db:check-target`: pass contra `governance_OS`.
 - `bun test`: pass, **2393 pass / 152 skipped / 0 fail** (8624 aserciones).
@@ -202,6 +224,18 @@ Detalle canónico: `docs/superpowers/specs/2026-05-17-governance-os-active-dev-e
 - e2e config Secretaría: 08/12/14/16/17/21/22/24/25 pass en lotes aislados (50 journeys; 1 skip ADMIN_TENANT esperado). Nota: una ejecución conjunta larga pierde la sesión Playwright tras ~10 casos — correr en lotes con login renovado.
 - Árbol git: `main` == `origin/main`, working tree limpio.
 - Histórico previo (2026-05-02): 582 pass / 66 skipped; e2e 39/39 con `05`,`10`,`11`,`12`,`14`,`16`,`17`,`18`,`19-cross-module-handoffs`.
+
+</details>
+
+### Inventario de trabajo sin llevar a principal (2026-07-19) — nada pendiente
+
+Revisado a petición expresa. **No queda nada por llevar a `main`:**
+
+- **Worktrees:** los 5 commits distintos de los worktrees (`1634638`, `8e49fc7`, `cdd1551`, `6b7627e`, `93428ae`) **ya son ancestros de `main`**.
+- **Rama `feature/secretaria-informes-certificaciones-ux0`** (2026-06-20): superada. Su commit entró en `main` como `8a03486` y `main` ha evolucionado desde entonces (p. ej. `d75bcea`). Aparece como no-mergeada por el rebase, no por contener trabajo vivo.
+- **8 stashes** (2026-05-02 y 2026-05-12): todos superados. `stash@{6}` y `stash@{7}` están etiquetados como *hold*/*excluded* deliberados sobre `database.ts`. `stash@{5}` referencia `DemoBackupSecretaria.tsx`, que **no existe** (ruta muerta), y su fix de key duplicada ya está resuelto mejor en `main` (claves compuestas `${group.label}-${item.to}-${item.label}`). `stash@{4}` propone un grupo de sidebar "Flujos" que **contradice la taxonomía decidida** el 2026-05-12/06-26.
+
+⚠️ **No aplicar estos stashes.** Revertirían dos meses de evolución en ficheros vivos (`TramitadorStepper.tsx`, `ReunionStepper.tsx`). Se conservan como histórico; purgarlos exige decisión expresa.
 
 ---
 
