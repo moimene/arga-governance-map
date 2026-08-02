@@ -67,9 +67,9 @@ Cargar los socios reales nombrados en fuentes públicas (~80–90 SOCIO únicos 
 
 Cada fase: plan propio (writing-plans) → implementación → gates (`db:check-target`, `bun test`, lint, typecheck, build) → verificación viva → review adversarial → commit. Esfuerzo S/M/L.
 
-### Carril B — históricos BORME por sociedad (M, paralelo desde el arranque)
+### Carril B — históricos BORME por sociedad (M, **diferido a las fases finales**)
 
-Carril de adquisición de dato público, independiente del código de producto y ejecutable en paralelo a G0 (scripts + dataset en este repo; sin worktree nuevo):
+Carril de adquisición de dato público, independiente del código de producto (scripts + dataset en este repo; sin worktree nuevo). **Decisión 2026-08-02: no se lanza aún** — G1/G2 no dependen de él (se alimentan del inventario y de la página de gobierno corporativo); se activa hacia el final del programa (típicamente junto a G8) para nutrir históricos. **Condición de diseño derivada:** los seeds de G1/G2 deben ser aditivos e idempotentes, de modo que los históricos BORME se inyecten después sin re-sembrar.
 
 - **Fuente:** BORME vía datos abiertos del BOE (digital desde 2009). Por cada sociedad española del perímetro: constitución, nombramientos y ceses, ampliaciones, transformaciones, cambios de domicilio, declaraciones de unipersonalidad, delegaciones de facultades.
 - **Pipeline:** búsqueda por denominación → parseo de actos → normalización al modelo (datos registrales de `entities`, mandatos históricos, `registry_filings`, expedientes históricos) → carga idempotente.
