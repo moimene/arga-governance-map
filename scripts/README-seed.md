@@ -1,5 +1,10 @@
 # Demo Data Seed Script — TGMS Motor de Reglas LSC
 
+> **Compatibilidad legacy (2026-07-21):** `firma_qes_ref` es solo un nombre de
+> campo histórico en fixtures demo. No acredita ni habilita QES, firma personal,
+> ERDS, envío o entrega. Las nuevas capturas usan EAD Trust únicamente para
+> interposición, mensajería básica y custodia/e-archiving.
+
 ## Overview
 
 **File:** `scripts/seed-demo-data.ts`  
@@ -229,7 +234,7 @@ After seeding, you can:
 - **DEMO_TENANT scope:** All data filtered by `tenant_id = DEMO_TENANT`, multi-tenant ready
 - **WORM-aware:** Notifications + respuestas use insert-with-skip on duplicates (no DELETE)
 - **Error handling:** Try-catch per section, graceful degradation (logs + continues)
-- **Realistic data:** Capital distribution sums to 100%, dates are coherent, firma_qes_ref mocks real QES references
+- **Realistic data:** Capital distribution sums to 100% and dates are coherent; `firma_qes_ref` is a legacy placeholder with no operational trust-service meaning
 - **Comments sparse:** Code is self-documenting; logic is clear from variable names
 
 ## Troubleshooting
@@ -278,3 +283,18 @@ Then rerun script.
 **Author:** AI Agent (Claude Opus)  
 **Phase:** T3 + T3e + T3f + T3h (complete)  
 **Status:** Ready for integration test
+
+---
+
+## seed-garrigues-tenant.ts (G0 — 2026-08-02)
+
+Tenant Garrigues (`00000000-0000-0000-0000-000000000002`) + branding + 2 usuarios
+demo (`demo@garrigues-demo.dev` SECRETARIO, `admin@garrigues-demo.dev` ADMIN_TENANT,
+password demo TGMS). Service-role, dry-run por defecto, idempotente. Requiere
+`SUPABASE_SERVICE_ROLE_KEY`. Verificado contra Cloud: `rbac_roles` usa `role_code`
+(no `code`), ARGA `tenant_type='group'`.
+
+```bash
+bun run scripts/seed-garrigues-tenant.ts            # dry-run
+bun run scripts/seed-garrigues-tenant.ts --commit   # ejecuta
+```
