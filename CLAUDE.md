@@ -49,13 +49,39 @@ Reglas:
 ### Decisiones legales motor LSC — todas resueltas (2026-04-19)
 6 decisiones resueltas. Las de mayor urgencia: DL-2 (cotizadas: evaluar + advertir, no bloquear) y DL-4 (selección automática plantilla SA/SL). Detalle: `docs/superpowers/specs/2026-04-19-decisiones-legales-motor-lsc-resueltas.md`.
 
-### EAD Trust — QTSP y empresa tecnológica de Garrigues
-**EAD Trust es el propietario de la operación como QTSP** (Qualified Trust Service Provider) y también es la **empresa tecnológica del grupo Garrigues** (g-digital). Proporciona firma electrónica cualificada (QES), sellos electrónicos (QSeal), timestamps cualificados y notificación certificada (ERDS) a través de su Digital Trust API. Nunca referenciar proveedores de firma competidores — EAD Trust es el único QTSP del ecosistema.
+### EAD Trust — política vigente de interposición (2026-07-21)
+**EAD Trust es el propietario de la operación como QTSP** (Qualified Trust Service Provider) y también es la **empresa tecnológica del grupo Garrigues** (g-digital). En el alcance vigente del prototipo se usa exclusivamente como capa de **interposición, mensajería básica y custodia/e-archiving**. Las nuevas capturas no pueden afirmar QES, firma avanzada, firma simple, ERDS, envío, entrega ni interacción real con el proveedor sin evidencia contractual y técnica separada. Los códigos QES/ERDS existentes son legacy de solo lectura y no autorizan nuevas operaciones. Nunca referenciar proveedores competidores: EAD Trust sigue siendo el único QTSP del ecosistema.
 
 ### Decisiones técnicas confirmadas
 - **SIEM:** Microsoft Sentinel (feed OTel vía Edge Function)
-- **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
+- **QTSP:** EAD Trust Digital Trust API (interposición, mensajería básica y custodia/e-archiving; sin firma personal ni ERDS en nuevas capturas)
 - **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
+
+### Convocatoria integral ARGA — captura canónica UAT cerrada (2026-07-21)
+
+Caso verificado en vivo sobre `governance_OS`, no solo mediante fixtures:
+
+- **Convocatoria canónica UAT:** `ef574517-448c-4a39-83e2-fed804bf9ce8`, Consejo de Administración de ARGA Seguros, S.A., 9 de agosto de 2026 a las 10:00, presencial. El UUID sirve solo para trazabilidad y no debe convertirse en constante ni seed.
+- **Reunión materializada:** `ac961a00-0a5d-4439-a8d4-618a0dd804b2`, estado `CONVOCADA`; la UI impide correctamente abrirla antes de la fecha prevista.
+- **Cobertura del stepper:** 8/8 pasos, 15 destinatarios, 6/6 requisitos PRE y set exacto de 9/9 anexos WORM verificados.
+- **Documento final:** DOCX renderizado exclusivamente en servidor desde el manifiesto inmutable con contrato `2026-07-21.1`; 13 páginas revisadas visualmente y artefacto final archivado como inmutable.
+- **Cloud:** migración `20260720149000_secretaria_supporting_attachment_intent_binding.sql` aplicada; `convocation-artifact-register` v5 y `convocation-supporting-artifact-register` v1 activas.
+- **Gates del cierre:** `bun test` 3110 pass / 152 skip / 0 fail; lint, typecheck y build verdes; integridad OOXML correcta.
+- **Rectificación preservada:** `78057c36-e150-47b8-aba1-5566c8e6c3b6` quedó rectificada y su reunión cancelada. Es evidencia histórica, no el entregable canónico.
+- **Informe canónico:** `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`.
+
+Regla de continuidad: un expediente emitido o rectificado es inmutable. Cualquier corrección debe crear una nueva captura con intención previa de cada anexo, coincidencia exacta del set y generación server-side. No describir el caso como productivo: es DEMO sin efecto jurídico, sin envío o entrega real y sin firma atribuida a EAD Trust.
+
+### Tenant Garrigues — G0 fundación (2026-08-02)
+
+Segundo tenant activo en `governance_OS`: `00000000-0000-0000-0000-000000000002` (spec `docs/superpowers/specs/2026-08-02-garrigues-tenant-gobernanza-design.md`, plan `docs/superpowers/plans/2026-08-02-g0-tenant-garrigues-fundacion.md`). **ARGA (`…0001`) intacta.** Primera vez que el proyecto opera con dos tenants reales.
+
+- **Theming por tenant:** columna `tenants.branding jsonb` (migración `20260802120000`, aplicada vía MCP `execute_sql` + registro manual en `schema_migrations` por el drift de junio; **no `db push`**). `TenantBrandProvider` (`src/context/TenantBrandContext.tsx`) resuelve el branding tras el login y aplica ~31 tokens CSS (`--t-*`, `--primary`, `--sidebar-*`) sobre `document.documentElement`. `branding` NULL = defaults del producto (`src/lib/tenant-brand-labels.ts`, contrato **"cero cambio visual ARGA"** verificado en vivo: login ARGA pixel-idéntico).
+- **Login por tenant:** `/login?tenant=garrigues` (mapa estático pre-auth `src/lib/login-brands.ts`, con guard `hasOwnProperty` anti prototype-pollution). GOTCHA cosmético conocido (fuera de alcance G0): en la pantalla de login (pre-auth, sin provider) el panel es verde pero los botones CTA siguen en `--primary` rojo. En el **shell post-auth el theming es completo y correcto** (sidebar verde `#004438`, "GARRIGUES GOBERNANZA", "Grupo Garrigues", botones verdes — confirmado por CSS computado).
+- **Usuarios demo:** `demo@garrigues-demo.dev` (SECRETARIO) y `admin@garrigues-demo.dev` (ADMIN_TENANT), password demo TGMS, dominio ficticio `garrigues-demo.dev` (nunca el real). Seed idempotente service-role `scripts/seed-garrigues-tenant.ts` (dry-run por defecto; resuelve `role_code` — no `code` — y varios nombres de service-role). Datos de personas: fuente pública (web + BORME); lo no publicado se simula y etiqueta.
+- **Aislamiento RLS bidireccional:** `src/test/schema/tenant-isolation.test.ts` (gate de salida de G0, ejecutado con logins reales: 12/12, 30 expects, sin warns). GOTCHA: un write cross-tenant filtrado por RLS devuelve **0 filas sin error**, no `42501`. Nota de secuenciación: la dirección ARGA→Garrigues es hoy vacua (Garrigues sin dato de dominio hasta G1); la dirección de riesgo real (Garrigues no ve el dato de ARGA) sí queda probada.
+- **Sonda SII para G6:** `sii.cases` y `sii_cases_view` tienen `tenant_id`; `sii.evidences`/`sii.audit_log`/vistas hijas no (heredan scoping vía `case_id`). → G6 puede tener casos demo propios de Garrigues sin tocar el schema `sii.*`.
+- **Deuda anotada (no G0):** `src/lib/demo-operable/runner.ts:136` hardcodea `ARGA_TENANT_ID` (acoplamiento single-tenant pre-existente en demo-operable, relevante solo si Garrigues usa escenarios demo-operables); placeholders `@arga-seguros.com` en varios steppers/GRC/AI (contenido cosmético pre-existente, no theming).
 
 ### Rediseño UX Secretaría — auditoría + UX-0 (2026-06-20)
 
@@ -64,7 +90,7 @@ El Comité Legal revisó un informe de rediseño UX/copy de `/secretaria` (`docs
 - **Auditoría de brechas** (propuesta vs código real, con evidencia archivo:línea): `docs/superpowers/reviews/2026-06-20-auditoria-brechas-ux-secretaria.md`. Conclusión: el módulo está más avanzado de lo que el informe asume; la brecha dominante es de **superficie (UI) y copy**, no de motor.
 - **Plan técnico P0→P3** mapeado a fases UX-0…UX-7: `docs/superpowers/plans/2026-06-20-ux-redesign-secretaria-plan.md`.
 - **UX-0.A–C implementado** (riesgo legal de copy): nuevos `src/lib/secretaria/evidence-status-labels.ts` + `src/components/secretaria/EvidenceStatusBadge.tsx` (disclaimer "Entorno de validación funcional — sin eficacia jurídica cualificada productiva", fallback conservador a no-cualificada); 11 claves del pipeline documental + `legalEffectLabel()` en `status-labels.ts`; `CertificacionesAutonomas.tsx` e `InformesPreceptivos.tsx` routean estados por `statusLabel()` y evidencia por `EvidenceStatusBadge`; subcopy de `DocumentosPendientesRevision.tsx` ya no presenta la evidencia demo como "evidencia operativa". Tests: `status-labels.test.ts` (ampliado), `evidence-status-labels.test.ts` (nuevo), `mesa-control-ui-contract.test.ts` (actualizado P0-4). Verificación: `tsc -b` verde, lint limpio en lo tocado, 29/29 tests del dominio.
-- **Estado 2026-07-06 (auditoría pre-demo, 28 agentes con verificación adversarial):** UX-0 A–F COMPLETO; T11 (aviso desfase normativo, `157d5ca`) y UX-7.B (cohortes de plantilla + filtro, `8d79720`) CERRADOS. Residual real post-demo: UX-4 (wizard certificaciones autónomas — hoy pide UUIDs a mano, usar deep-links), UX-3.A (informes por fuente canónica — input libre de hash), UX-1.B (índice de expedientes — `/secretaria/acuerdos/:id` solo alcanzable por cross-links), UX-7.A (chip imperativa/dispositiva — BLOQUEADO por matriz del Comité Legal, no fabricar criterio). Runbook de demo: `docs/superpowers/plans/2026-07-06-demo-runbook.md`. QTSP: Edge Function `qtsp-proxy` desplegada (`sign`/`status`/`artifacts`/`evidence`). **Las credenciales YA están provisionadas** y autentican contra EAD Enterprise Suite: los secretos son `EAD_SUITE_AUTH_EMAIL`/`EAD_SUITE_AUTH_PASSWORD`/`EAD_SUITE_API_BASE_URL` — **no** `EAD_TRUST_*`, que el código ignora. Verificado 2026-07-19: `status` con UUID inexistente devuelve 502 con `getSignatureRequest failed (404)`, es decir la sesión obtiene JWT y llega a la API. **GOTCHA:** EAD **no emite webhooks** (integración de consulta) y el MCP **no** entrega el documento firmado — exige REST `signed-document-url`. Una firma completada produce DOS artefactos: el documento firmado (el acuerdo con los sellos) y el certificado (hoja de firmas, que NO contiene el acuerdo). El proveedor **no expone tipo cualificado**: techo `ADVANCED` (art. 26 eIDAS); emitimos `INTERPOSITION` (simple, art. 25.1), así que ninguna superficie puede rotular QES — pinado en `qes-copy-contract.test.ts`.
+- **Estado 2026-07-06 (auditoría pre-demo, 28 agentes con verificación adversarial):** UX-0 A–F COMPLETO; T11 (aviso desfase normativo, `157d5ca`) y UX-7.B (cohortes de plantilla + filtro, `8d79720`) CERRADOS. Residual real post-demo: UX-4 (wizard certificaciones autónomas — hoy pide UUIDs a mano, usar deep-links), UX-3.A (informes por fuente canónica — input libre de hash), UX-1.B (índice de expedientes — `/secretaria/acuerdos/:id` solo alcanzable por cross-links), UX-7.A (chip imperativa/dispositiva — BLOQUEADO por matriz del Comité Legal, no fabricar criterio). Runbook de demo: `docs/superpowers/plans/2026-07-06-demo-runbook.md`. **Actualización vinculante 2026-07-21:** las rutas históricas QES/ERDS y las sondas antiguas del proxy son compatibilidad legacy, no capacidad operativa vigente. Las nuevas capturas usan `EAD_INTERPOSITION` únicamente como interposición, mensajería básica y custodia/e-archiving; firma, envío, entrega y ERDS permanecen bloqueados salvo evidencia contractual y técnica separada.
 
 ### Refactor UX bloque de configuración Secretaría — Oleadas 1/2/3A en `main` (2026-07-15)
 
@@ -206,12 +232,14 @@ Landed (opciones A+B del análisis; **la opción C —fail-closed— queda fuera
 
 Deuda declarada y verificada sin impacto hoy: el rescate por materia (`TramitadorStepper.tsx`) resuelve el pack sin órgano, pero los dos packs de `AUTORIZACION_GARANTIA` enrutan ambos a MEETING. Contenido legal dudoso en el dato vivo (pendiente Comité): `NOMBRAMIENTO_CONSEJERO` cita `plazoInscripcion 30 días, art. 17 RRM` — el art. 17 RRM es competencia territorial, y el seed de cooptación no aplicado (`scripts/seed-nombramiento-consejero-rule-pack.ts`) arrastra la misma cita.
 
-### Verificación última conocida (2026-07-19, post-procedencia registral)
+### Verificación última conocida (2026-07-21, cierre convocatoria integral)
 
-- `bun run db:check-target`: pass contra `governance_OS`. Head remoto = `20260718170000`; migraciones de julio en paridad repo/Cloud.
-- `bun test`: pass, **2463 pass / 152 skipped / 0 fail** (8871 aserciones).
-- e2e: 47 pass (`06`, `08`, `14`, `17`, `30`).
-- Árbol git: `main` == `origin/main` en `79a8cee`, working tree limpio. Sin ramas ni stashes con trabajo pendiente de llevar a principal (ver inventario 2026-07-19 abajo).
+- `bun run db:check-target`: pass contra `governance_OS`.
+- `bun test`: pass, **3110 pass / 152 skipped / 0 fail**; `bun run lint`, `bun run typecheck` y `bun run build`: pass.
+- UAT viva: stepper 8/8, 15 destinatarios, 6/6 requisitos PRE, set exacto 9/9 de soportes WORM y DOCX server-side de 13 páginas revisado visualmente y validado como OOXML.
+- Cloud focalizado: migración `20260720149000_secretaria_supporting_attachment_intent_binding.sql` presente en repo y aplicada; Edge Functions `convocation-artifact-register` v5 y `convocation-supporting-artifact-register` v1 activas.
+- No se afirma paridad global de todo el historial de migraciones: persiste drift histórico previo. Verificar siempre el target y la migración concreta antes de mutar Cloud.
+- Árbol git compartido con cambios acumulados del cierre. No asumir working tree limpio ni descartar/stagear cambios ajenos.
 
 <details>
 <summary>Histórico (2026-07-15, post-Oleada 3A)</summary>
@@ -227,7 +255,9 @@ Deuda declarada y verificada sin impacto hoy: el rescate por materia (`Tramitado
 
 </details>
 
-### Inventario de trabajo sin llevar a principal (2026-07-19) — nada pendiente
+### Inventario histórico de trabajo sin llevar a principal (foto de 2026-07-19)
+
+> Esta sección solo conserva la auditoría de ramas, worktrees y stashes de aquel día. No describe el working tree compartido del 2026-07-21 ni autoriza a limpiarlo.
 
 Revisado a petición expresa. **No queda nada por llevar a `main`:**
 
@@ -542,7 +572,7 @@ A0–A3: Seeds ejecutados en Supabase Cloud:
 
 A4–A6: Integración motor en UI:
 - A4: TramitadorStepper conectado al motor (useRulePackForMateria, 5 pasos)
-- A5: GenerarDocumentoStepper con QTSP pipeline (QES signing + SHA-512 archival)
+- A5 (histórico): GenerarDocumentoStepper nació con pipeline QES; la firma genérica está retirada y el flujo vigente genera/custodia el artefacto sin atribuir firma.
 - A6: Storage archiver (`archiveDocxToStorage` + `computeSha512` via Web Crypto API)
 
 ### Sprint B — Hardening Enterprise (commit `18105f2`)
@@ -578,8 +608,8 @@ A4–A6: Integración motor en UI:
 ### Sprint D — Funcionalidades avanzadas ✅ COMPLETADO (commit `f017ff3`)
 
 - D1: Workflow plantillas REVISADA→APROBADA→ACTIVA
-- D2: Firma QES real EAD Trust (hook `useQTSPSign`, pipeline completo)
-- D3: Notificación certificada ERDS (NO_SESSION + Convocatoria SL, hook `useERDSNotification`)
+- D2 (histórico/retirado): el hook `useQTSPSign` conserva el contrato legacy, pero falla cerrado y no inicia firma.
+- D3 (histórico/retirado): `useERDSNotification` es nombre de compatibilidad; las nuevas capturas usan borradores `EAD_INTERPOSITION` sin ERDS ni dispatch.
 - D4: Motor pactos parasociales MVP (pactos-engine.ts, 3 evaluadores, integración orquestador)
 
 ### Sprint E — Mejoras producto ✅ COMPLETADO (commits `f4b79d2`, `23e3d2f`, `3cab2fd`)
@@ -625,7 +655,7 @@ hash basado en censo WORM. Plan: `docs/superpowers/plans/2026-04-21-gestion-soci
 - `000024` — minutes + certifications extensiones: `body_id`, `entity_id`, `snapshot_id`, `snapshot_hash`, `gate_hash`, `authority_evidence_id`, `tsq_token bytea`
 - `000025..000026` — sociedades/personas (sprint paralelo — no MVP F1-F10)
 - `000027` — `fn_generar_acta` + `fn_generar_certificacion` con gate_hash SHA-256(snapshot_hash‖resultado_hash)
-- `000028` — `fn_firmar_certificacion` (QES stub) + `fn_emitir_certificacion` (evidence bundle URI)
+- `000028` — legado: `fn_firmar_certificacion` nació como stub QES; las migraciones vigentes lo sustituyen por evidencia source-bound de interposición sin claim de firma.
 - `000029` — backfill `minutes.body_id` + `minutes.entity_id` para actas legacy (desde `meetings → governing_bodies`). Regresión detectada en F10.2: sin esta propagación, `EmitirCertificacionButton` no renderizaba en ActaDetalle.
 
 **RPCs del pipeline QTSP:**
@@ -633,6 +663,8 @@ hash basado en censo WORM. Plan: `docs/superpowers/plans/2026-04-21-gestion-soci
 - `fn_generar_certificacion(p_minute_id, p_tipo, p_agreements_certified text[], p_certificante_role, p_visto_bueno_persona_id) → uuid` (F8.1)
 - `fn_firmar_certificacion(p_certification_id, p_qtsp_token, p_tsq_token) → void` (F8.2)
 - `fn_emitir_certificacion(p_certification_id) → text` (F8.2) — devuelve URI del evidence bundle
+
+Los nombres de RPC legacy se conservan por compatibilidad técnica y trazabilidad histórica; no autorizan ni prueban firma, ERDS, envío o entrega en el alcance vigente.
 
 **Componente F9:**
 - `src/components/secretaria/EmitirCertificacionButton.tsx` — ejecuta los 3 pasos en cadena, precarga Vº Bº con `usePresidenteVigente`, oculto si `useHasCapability(userRole, "CERTIFICATION")` es false. El rol se resuelve del usuario real vía `useCurrentUserRole` (`primaryRole`); subsiste un default `"SECRETARIO"` como fallback demo inofensivo.
@@ -1084,7 +1116,7 @@ src/
     Plantillas.tsx                  T11  Catálogo de uso (público SECRETARIO) + H4: CTA "Usar esta plantilla" para ACTIVA
     GestorPlantillas.tsx            T11+Sprint1  Consola unificada por tabs (?tab=dashboard|catalogo|cobertura|importar|metricas|auditoria|validacion) con RBAC
     ExpedienteAcuerdo.tsx           T14  Timeline 8 estados + compliance snapshot
-    GenerarDocumentoStepper.tsx     A5   DOCX gen + QTSP QES + Storage archival
+    GenerarDocumentoStepper.tsx     A5   DOCX gen + custodia/archivado sin claim de firma
     BoardPack.tsx                   B6   9 secciones ejecutivas + DL-2/DL-5
     CoAprobacionStepper.tsx         G4   5 pasos adopción CO_APROBACION (k de n)
     SolidarioStepper.tsx            G5   4 pasos adopción SOLIDARIO
@@ -1105,9 +1137,9 @@ src/
     useUserRole.ts                  B2   RBAC roles + permissions + hasPermission()
     useEvidenceBundles.ts           B4   Evidence bundles + audit chain verify
     useBoardPackData.ts             B6   9 parallel queries + DL-2 cotizada logic
-    useQTSPSign.ts                  A5   QES signing hook
+    useQTSPSign.ts                  A5   contrato legacy; firma genérica retirada y fail-closed
     useQTSPVerification.ts          T22  Trust Center verification
-    useERDSNotification.ts          D3   ERDS certified notification hook
+    useERDSNotification.ts          D3   compatibilidad legacy; borrador EAD_INTERPOSITION sin ERDS
     useModelosAcuerdo.ts            OL2  MODELO_ACUERDO query by materia
     usePactosParasociales.ts        D4   Pactos vigentes + hook con cláusulas
     useAcuerdosSinSesion.ts         T8+G6 + useCloseExpiredVotaciones mutation
@@ -1148,6 +1180,10 @@ src/
       variable-resolver.ts              H1a: normalizeFuente fix — dotted DB paths → ENTIDAD/ORGANO/REUNION/EXPEDIENTE
       docx-generator.ts                 DOCX generation via docx-js
     secretaria/
+      convocation-agenda-gates.ts       Gates de coherencia entre materias, PRE y emisión
+      convocatoria-capa3-resolver.ts    Resolución controlada de capa 3 de convocatoria
+      convocation-artifact-registration.ts  Contrato cliente del artefacto final server-side
+      convocation-supporting-artifact-registration.ts  Intención previa y registro de anexos
       status-labels.ts                  H2: mapa central STATUS_LABEL + fn statusLabel()
       template-admin/                   Sprint1: librería canónica para administración de plantillas
         types.ts                        Tipos base + enums + estados workflow
@@ -1165,6 +1201,8 @@ src/
         index.ts                        Barrel exports
     telemetry.ts                    B7   OTel-compatible event tracking stub
 ```
+
+Superficies server-side críticas del cierre: `supabase/functions/convocation-artifact-register/{index.ts,renderer.ts}`, `supabase/functions/convocation-supporting-artifact-register/index.ts` y `supabase/migrations/20260720149000_secretaria_supporting_attachment_intent_binding.sql`.
 
 ---
 
@@ -1190,6 +1228,10 @@ src/
 - No usar staging como bloqueo del desarrollo-test-demo: hasta estabilidad pre-release, `governance_OS` sigue siendo el entorno activo.
 - No escribir en `governance_module_events` ni `governance_module_links`.
 - No declarar evidence/legal hold como final productivo; `000049` sigue HOLD.
+- No emitir un documento final si el conjunto exacto de anexos registrados no coincide con las intenciones WORM previamente creadas.
+- No reescribir trazas ni sobrescribir un artefacto final inmutable; rectificar y crear una nueva captura.
+- No generar en navegador el DOCX final de convocatoria: el manifiesto inmutable debe renderizarse en servidor.
+- No inferir firma, QES, ERDS, envío, entrega ni interacción real con EAD Trust a partir de nombres o códigos legacy.
 - No mezclar `ai_*` con `aims_*` ni tablas legacy GRC con `grc_*` sin contrato aprobado.
 - No usar el nombre real del cliente en código, datos demo, seeds, docs de producto ni commits.
 - No usar colores Tailwind nativos (`text-white`, `bg-gray-*`, `bg-amber-*`, `bg-green-*`) en componentes Garrigues
@@ -1227,6 +1269,8 @@ bun run build
 PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2e/10-grc.spec.ts e2e/11-global-search.spec.ts e2e/12-secretaria-navigation.spec.ts e2e/14-secretaria-documentos.spec.ts e2e/16-sanitization-smoke.spec.ts e2e/17-secretaria-template-context.spec.ts e2e/18-secretaria-golden-path.spec.ts e2e/19-cross-module-handoffs.spec.ts --project=chromium --reporter=list
 ```
 
+**Verificación vigente (2026-07-21):** `db:check-target` pass contra `governance_OS`; `bun test` 3110 pass / 152 skipped / 0 fail; lint, typecheck y build verdes; DOCX canónico validado visualmente y como OOXML. Esta cifra es una fotografía del cierre, no una promesa de estado futuro.
+
 **Verificación histórica (2026-05-02):** `db:check-target` pass, `bun test` 582 pass / 66 skipped, `tsc` pass, `lint` pass con 23 warnings conocidos, `build` pass, `e2e/10-grc.spec.ts` + `e2e/16-sanitization-smoke.spec.ts` 16/16 incluyendo AIMS incidentes, GRC riesgos y Penal/Anticorrupción.
 
 **Verificación Supabase vigente (2026-05-17):** `db:check-target` pass contra `governance_OS`, `supabase migration list --linked` alineado local/remoto hasta `20260516120008`, MCP `get_project_url` apunta a `https://hzqwefkwsxopwrmtksbg.supabase.co`, MCP `schema_migrations` confirma última versión remota `20260516120008`.
@@ -1244,8 +1288,10 @@ PLAYWRIGHT_PORT=5191 bunx playwright test e2e/05-secretaria-reuniones.spec.ts e2
 - **Tenant:** `00000000-0000-0000-0000-000000000001`
 - **Entidad ARGA Seguros canónica Cloud:** `6d7ed736-f263-4531-a59d-c6ca0cd41602`
 - **Entidad legacy en planes/seeds antiguos:** `00000000-0000-0000-0000-000000000010` (no usar como fuente canónica sin probe)
-- **Migraciones:** historial amplio ya aplicado en Cloud; en el cierre actual no aplicar nuevas migraciones.
-- **RLS/RPC/storage/policies:** existen superficies previas; no tocarlas sin paquete product-complete aprobado.
+- **Migración focal vigente del cierre:** `20260720149000_secretaria_supporting_attachment_intent_binding.sql`, verificada en repo y Cloud el 2026-07-21.
+- **Edge Functions focales:** `convocation-artifact-register` v5 y `convocation-supporting-artifact-register` v1.
+- **Historial de migraciones:** existe drift histórico previo; no afirmar paridad global ni usar `repair` como atajo. Aplicar cambios forward-only, mantener espejo en repo y verificar cada versión concreta en Cloud.
+- **RLS/RPC/storage/policies:** pueden evolucionarse en `governance_OS` durante desarrollo-test-demo, siempre con `db:check-target`, migración versionada, pruebas y verificación Cloud proporcionada al riesgo.
 - **Tablas rules engine:** `rule_packs`, `rule_pack_versions`, `rule_param_overrides`, `rbac_roles`, `rbac_user_roles`, `sod_toxic_pairs`, `evidence_bundles`, `audit_worm_trail`
 
 ## Skill routing
