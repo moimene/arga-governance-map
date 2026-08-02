@@ -1,22 +1,24 @@
 import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Building2, Eye, KeyRound, Lock, Network, ShieldCheck, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
+import { resolveLoginBrand } from "@/lib/login-brands";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const brand = resolveLoginBrand(useLocation().search);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
 
-  const DEMO_EMAIL = "demo@arga-seguros.com";
-  const DEMO_PASSWORD = "TGMSdemo2026!";
+  const DEMO_EMAIL = brand.demoEmail;
+  const DEMO_PASSWORD = brand.demoPassword;
 
   const fillDemo = () => {
     setEmail(DEMO_EMAIL);
@@ -64,13 +66,16 @@ export default function Login() {
 
   return (
     <div className="grid min-h-screen w-full grid-cols-1 md:grid-cols-2">
-      <div className="relative hidden flex-col justify-center bg-sidebar px-12 py-16 text-white md:flex">
+      <div
+        className="relative hidden flex-col justify-center bg-sidebar px-12 py-16 text-white md:flex"
+        style={brand.panelBg ? { background: brand.panelBg } : undefined}
+      >
         <div className="mx-auto max-w-sm">
           <div className="flex items-baseline gap-2">
-            <span className="text-[32px] font-bold leading-none">ARGA</span>
-            <span className="text-xl font-medium text-sidebar-foreground">Seguros</span>
+            <span className="text-[32px] font-bold leading-none">{brand.nombre}</span>
+            <span className="text-xl font-medium text-sidebar-foreground">{brand.sufijo}</span>
           </div>
-          <div className="mt-2 text-sm text-sidebar-muted">Sistema de Gobernanza Corporativa</div>
+          <div className="mt-2 text-sm text-sidebar-muted">{brand.tagline}</div>
 
           <div className="mt-12 space-y-5">
             {[
@@ -88,7 +93,7 @@ export default function Login() {
           </div>
         </div>
         <div className="absolute bottom-6 left-12 text-[12px] text-sidebar-muted">
-          TGMS v1.0 · Entorno seguro
+          {brand.footer}
         </div>
       </div>
 
