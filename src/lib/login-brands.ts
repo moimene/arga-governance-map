@@ -38,5 +38,11 @@ const LOGIN_BRANDS: Record<string, LoginBrand> = {
 
 export function resolveLoginBrand(search: string): LoginBrand {
   const t = (new URLSearchParams(search).get("tenant") ?? "").toLowerCase();
-  return LOGIN_BRANDS[t] ?? LOGIN_BRANDS.arga;
+  // hasOwnProperty explícito: LOGIN_BRANDS es un objeto plano y t es un string
+  // sin sanitizar del query param. Indexar directo (LOGIN_BRANDS[t]) colaría
+  // propiedades heredadas de Object.prototype para t="__proto__"/"constructor"
+  // (devuelven un objeto truthy, no undefined), rompiendo el fallback a ARGA.
+  return Object.prototype.hasOwnProperty.call(LOGIN_BRANDS, t)
+    ? LOGIN_BRANDS[t]
+    : LOGIN_BRANDS.arga;
 }

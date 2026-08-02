@@ -21,4 +21,9 @@ describe("resolveLoginBrand", () => {
     expect(resolveLoginBrand("?tenant=acme").key).toBe("arga");
     expect(resolveLoginBrand("?tenant=GARRIGUES").key).toBe("garrigues");
   });
+
+  it("propiedades heredadas de Object.prototype no deben colar → fallback ARGA", () => {
+    expect(resolveLoginBrand("?tenant=__proto__").key).toBe("arga");
+    expect(resolveLoginBrand("?tenant=constructor").key).toBe("arga");
+  });
 });
