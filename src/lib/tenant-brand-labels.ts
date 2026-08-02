@@ -8,7 +8,8 @@ export const DEFAULT_SII_ORG_LABEL = "Grupo ARGA Seguros";
 export const DEFAULT_BRAND_NAME = "TGMS";
 
 function pick(value: string | undefined, fallback: string): string {
-  const v = (value ?? "").trim();
+  if (typeof value !== "string") return fallback;
+  const v = value.trim();
   return v.length > 0 ? v : fallback;
 }
 

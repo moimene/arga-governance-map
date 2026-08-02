@@ -120,6 +120,28 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     expect(after.data?.common_name).toBe(before.data?.common_name);
   });
 
+  it("write cross-tenant: Garrigues no muta el tenant ARGA (branding, 0 filas, sin error)", async () => {
+    if (!authed || !arga || !garr) { expect(true).toBe(true); return; }
+    const before = await arga
+      .from("tenants").select("branding").eq("id", DEMO_TENANT).maybeSingle();
+    expect(before.error).toBeNull();
+
+    const attempt = await garr
+      .from("tenants")
+      .update({ branding: { nombre: "PROBE-DENY-TENANTS-G0" } })
+      .eq("id", DEMO_TENANT)
+      .select();
+    // GOTCHA: RLS filtra → 0 filas afectadas, SIN 42501 (misma semántica que entities).
+    expect(attempt.error).toBeNull();
+    expect(attempt.data ?? []).toEqual([]);
+
+    const after = await arga
+      .from("tenants").select("branding").eq("id", DEMO_TENANT).maybeSingle();
+    expect(after.error).toBeNull();
+    expect(after.data?.branding?.nombre).toBe(before.data?.branding?.nombre);
+    expect(after.data?.branding?.nombre).not.toBe("PROBE-DENY-TENANTS-G0");
+  });
+
   it("excepción documentada: tenants es lectura pública (branding no es secreto)", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }
     const { data, error } = await garr.from("tenants").select("id").limit(50);

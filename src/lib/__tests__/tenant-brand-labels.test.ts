@@ -31,4 +31,8 @@ describe("tenant-brand-labels — defaults ARGA verbatim con branding null", () 
     expect(shellLabel({ shell_label: "  " })).toBe("TGMS PLATFORM");
     expect(scopeLabel({ scope_label: "" })).toBe("Grupo ARGA");
   });
+
+  it("valor no-string (branding JSONB futuro con label numérico) cae al default", () => {
+    expect(shellLabel({ shell_label: 123 as unknown as string })).toBe("TGMS PLATFORM");
+  });
 });
