@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { TourPanel } from "@/components/tour/TourPanel";
 import { NotificationsBell } from "@/components/shell/NotificationsBell";
 import { useTour } from "@/context/TourContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { brandName, scopeLabel, shellLabel } from "@/lib/tenant-brand-labels";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 interface NavItem {
@@ -127,6 +129,7 @@ function ShellSidebarContent({
   onStartTour: () => void;
   tourLabel: string;
 }) {
+  const branding = useTenantBranding();
   return (
     <>
       {/* Logo */}
@@ -141,7 +144,7 @@ function ShellSidebarContent({
           borderBottom: "1px solid rgba(255,255,255,0.15)",
         }}
       >
-        TGMS PLATFORM
+        {shellLabel(branding)}
       </div>
 
       {/* Scope switcher */}
@@ -159,7 +162,7 @@ function ShellSidebarContent({
         }}
       >
         <span>Scope:</span>
-        <span style={{ fontWeight: 700 }}>Grupo ARGA ▾</span>
+        <span style={{ fontWeight: 700 }}>{scopeLabel(branding)} ▾</span>
       </div>
 
       {/* Gobernanza */}
@@ -245,11 +248,12 @@ export function ShellLayout() {
   const { pathname } = useLocation();
   const { start: startTour, step, completed } = useTour();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const branding = useTenantBranding();
   const tourLabel = step > 0 ? "Continuar tour" : completed ? "Repetir tour" : "Iniciar tour";
   const title =
     pageTitles[pathname] ??
     Object.entries(pageTitles).find(([k]) => k !== "/" && pathname.startsWith(k))?.[1] ??
-    "TGMS";
+    brandName(branding);
 
   useEffect(() => {
     setMobileOpen(false);
