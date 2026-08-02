@@ -13,8 +13,22 @@
  */
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ??
+  process.env.SUPABASE_URL ??
+  "https://hzqwefkwsxopwrmtksbg.supabase.co";
+
+// La service-role key se busca por varios nombres habituales para tolerar
+// distintas convenciones de .env. NUNCA se imprime el valor, solo su ausencia.
+const SERVICE_KEY_NAMES = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SERVICE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "SERVICE_ROLE_KEY",
+  "SUPABASE_SERVICE_ROLE",
+  "SB_SERVICE_ROLE_KEY",
+];
+const SERVICE_KEY = SERVICE_KEY_NAMES.map((n) => process.env[n]).find(Boolean) ?? "";
 const COMMIT = process.argv.includes("--commit");
 
 const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
@@ -76,7 +90,15 @@ function fail(msg) {
 if (!SUPABASE_URL.includes("hzqwefkwsxopwrmtksbg")) {
   fail(`Target inesperado (${SUPABASE_URL}) — este seed solo corre contra governance_OS.`);
 }
-if (!SERVICE_KEY) fail("Falta SUPABASE_SERVICE_ROLE_KEY en el entorno.");
+if (!SERVICE_KEY) {
+  fail(
+    `Falta la service-role key en el entorno. Se buscó bajo estos nombres:\n` +
+      SERVICE_KEY_NAMES.map((n) => `    - ${n}`).join("\n") +
+      `\n  Renombra tu variable de .env a SUPABASE_SERVICE_ROLE_KEY (o cualquiera\n` +
+      `  de los anteriores), o expórtala antes de ejecutar:\n` +
+      `    set -a; source .env; set +a; bun run scripts/seed-garrigues-tenant.ts`,
+  );
+}
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
