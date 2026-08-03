@@ -50,6 +50,7 @@ let generateProcessDocx: typeof import("../process-documents").generateProcessDo
 let resolveProcessDocumentFinalEvidenceReadiness: typeof import("../process-document-readiness").resolveProcessDocumentFinalEvidenceReadiness;
 let selectProcessTemplate: typeof import("../process-documents").selectProcessTemplate;
 let resolveProcessTemplateSelection: typeof import("../process-documents").resolveProcessTemplateSelection;
+let inferProcessTemplateCriteria: typeof import("../process-documents").inferProcessTemplateCriteria;
 
 beforeAll(async () => {
   const store = new Map<string, string>();
@@ -66,7 +67,7 @@ beforeAll(async () => {
       },
     },
   });
-  ({ buildProcessDocumentTraceFooterLines, generateProcessDocx, resolveProcessTemplateSelection, selectProcessTemplate } = await import("../process-documents"));
+  ({ buildProcessDocumentTraceFooterLines, generateProcessDocx, inferProcessTemplateCriteria, resolveProcessTemplateSelection, selectProcessTemplate } = await import("../process-documents"));
   ({ resolveProcessDocumentFinalEvidenceReadiness } = await import("../process-document-readiness"));
 });
 
@@ -108,6 +109,28 @@ function template(
 }
 
 describe("process-documents", () => {
+  it("no hereda el órgano del acto base en documentos derivados", () => {
+    const criteria = inferProcessTemplateCriteria({
+      kind: "CERTIFICACION",
+      recordId: "cert-1",
+      title: "Certificación",
+      templateTypes: ["CERTIFICACION"],
+      plantillas: [],
+      variables: {
+        jurisdiccion: "ES",
+        organo_tipo: "CONSEJO_ADMIN",
+      },
+      fallbackText: "Certificación",
+    });
+
+    expect(criteria).toEqual({
+      jurisdiction: "ES",
+      materia: null,
+      adoptionMode: null,
+      organoTipo: null,
+    });
+  });
+
   it("prioriza ACTIVA sobre APROBADA y revisiones aprobadas por Comite Legal ARGA", () => {
     const selected = selectProcessTemplate(
       [
@@ -333,6 +356,61 @@ describe("process-documents", () => {
     expect(result.usedFallback).toBe(false);
     expect(result.templateId).toBe("conv-template");
     expect(result.contentHash).toBe(sha256Text(reviewedBody));
+  });
+
+  it("preserva exactamente el cuerpo autoritativo al calcular el hash del candidato", async () => {
+    const authoritativeBody =
+      "ACTA DE LA REUNIÓN DEL CONSEJO DE ADMINISTRACIÓN\n\nTexto canónico validado en servidor.\n";
+    const result = await generateProcessDocx({
+      kind: "ACTA",
+      recordId: "minute-12345678",
+      title: "ACTA DE LA REUNIÓN DEL CONSEJO DE ADMINISTRACIÓN",
+      templateTypes: ["ACTA_SESION"],
+      plantillas: [],
+      reviewedBodyText: authoritativeBody,
+      preserveReviewedBodyExact: true,
+      fallbackText: "No debe utilizarse",
+      archive: false,
+      filenamePrefix: "acta",
+      generatedAt: "2026-07-20",
+    });
+
+    expect(result.usedReviewedBody).toBe(true);
+    expect(result.candidate.renderedText).toBe(authoritativeBody);
+    expect(result.contentHash).toBe(sha256Text(authoritativeBody));
+  });
+
+  it("antepone un aviso jurídico obligatorio aunque la salida proceda de plantilla activa", async () => {
+    const notice = "SIMULACIÓN DEMO — SIN EFECTOS JURÍDICOS.";
+    const result = await generateProcessDocx({
+      kind: "CERTIFICACION",
+      recordId: "cert-demo-12345678",
+      title: "Certificación demo",
+      templateTypes: ["CERTIFICACION"],
+      plantillas: [
+        template({
+          id: "cert-demo-template",
+          tipo: "CERTIFICACION",
+          estado: "ACTIVA",
+          capa1_inmutable: [
+            "CERTIFICACIÓN FIRMADA Y EMITIDA",
+            "La persona certificante declara su cargo vigente y en ejercicio.",
+            "El acta fue aprobada por el sistema documentado en el expediente.",
+            "Firma de la Secretaría",
+            "Visto bueno de la Presidencia",
+          ].join("\n\n"),
+        }),
+      ],
+      mandatoryVisibleNotice: notice,
+      fallbackText: "No debe utilizarse",
+      archive: false,
+      filenamePrefix: "certificacion-demo",
+      generatedAt: "2026-07-20",
+    });
+
+    expect(result.candidate.renderedText.startsWith(notice)).toBe(true);
+    expect(result.candidate.renderedText).toContain("CERTIFICACIÓN FIRMADA Y EMITIDA");
+    expect(result.contentHash).toBe(sha256Text(result.candidate.renderedText));
   });
 
   it("selecciona fixture legal de convocatoria segun familia de organo", () => {

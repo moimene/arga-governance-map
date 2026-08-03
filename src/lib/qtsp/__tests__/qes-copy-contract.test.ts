@@ -3,16 +3,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 /**
- * Contrato de veracidad del nivel de firma.
+ * Contrato de producto para EAD Trust.
  *
- * EAD Enterprise Suite 1.4.2 NO expone tipo cualificado: su techo es `ADVANCED`
- * (avanzada con OTP, art. 26 eIDAS) e `INTERPOSITION` es simple (art. 25.1).
- * Nuestro proxy emite `INTERPOSITION`. Por tanto ninguna superficie puede
- * rotular "QES" ni "firma cualificada": no es criterio jurídico opinable, es que
- * el proveedor no la emite.
- *
- * Qué nivel resulta suficiente para actas y certificaciones SÍ es criterio del
- * Comité Legal, y va aparte.
+ * La aplicación usa EAD como interposición, mensajería y e-archiving. No exige
+ * ni afirma QES, firma avanzada o firma simple. Las firmas societarias que sean
+ * obligatorias se acreditan separadamente y nunca se infieren de la custodia.
  */
 
 const RAIZ = resolve(process.cwd(), "src");
@@ -49,7 +44,7 @@ function textoVisible(src: string): string[] {
   return salida;
 }
 
-describe("ninguna superficie afirma firma cualificada", () => {
+describe("ninguna superficie atribuye un nivel de firma electrónica a EAD", () => {
   // Codex adversarial: el copy visible también sale de hooks y librerías
   // (mensajes de progreso, etiquetas), no solo de páginas y componentes.
   const paginasYComponentes = [
@@ -58,7 +53,7 @@ describe("ninguna superficie afirma firma cualificada", () => {
     ...ficheros(join(RAIZ, "hooks")),
   ];
 
-  it("no queda 'QES' ni 'firma cualificada' en texto que lea el usuario", () => {
+  it("no queda QES ni un nivel simple, avanzado o cualificado en texto visible", () => {
     const infractores: string[] = [];
     for (const f of paginasYComponentes) {
       const src = readFileSync(f, "utf8");
@@ -73,7 +68,10 @@ describe("ninguna superficie afirma firma cualificada", () => {
         if (/mayor[ií]a cualificada/i.test(t)) continue;
         // Referirse al proveedor como QTSP es correcto: lo es.
         if (/\bQTSP\b/.test(t) && !/QES|firma cualificada/i.test(t)) continue;
-        if (/\bQES\b/.test(t) || /firma\s+(electr[óo]nica\s+)?cualificada/i.test(t)) {
+        if (
+          /\bQES\b/.test(t)
+          || /firma\s+(?:electr[óo]nica\s+)?(?:simple|avanzada|cualificada)/i.test(t)
+        ) {
           infractores.push(`${f.replace(process.cwd() + "/", "")}: ${t.slice(0, 90)}`);
         }
       }

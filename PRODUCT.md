@@ -18,6 +18,12 @@ Success means the product is credible for executive review, honest about demo ve
 
 Until the prototype reaches pre-release stability, `governance_OS` (`hzqwefkwsxopwrmtksbg`) remains the active development-demo Supabase project and the source of truth for connected product behavior. Staging is a future/pre-release isolation capability and must not block prototype evolution.
 
+## Current Verified Boundary — 2026-07-21
+
+The canonical Secretaría UAT completed the eight-step ARGA board-convocation flow with exact WORM-bound supporting artifacts and a server-rendered immutable DOCX. The evidence and limits are recorded in `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`.
+
+This is DEMO validation, not a legally effective corporate act. EAD Trust is currently limited to interposition, basic messaging and custody/e-archiving. Legacy QES/ERDS names do not establish signature, dispatch, delivery or live provider interaction.
+
 ## Brand Personality
 
 Expert, restrained, institutional. The interface should project legal rigor, operational confidence and calm command of complex governance workflows.

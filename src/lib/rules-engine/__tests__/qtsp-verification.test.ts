@@ -1,441 +1,205 @@
-import { describe, it, expect } from "vitest";
-import { verificarIntegridad } from "../qtsp-integration";
-import type { IntegrityCheckDetail } from "../qtsp-integration";
+import { describe, expect, it } from "vitest";
+import {
+  verificarIntegridad,
+  verificarOCSP,
+  type IntegrityCheckDetail,
+  type VerifiableArtifact,
+} from "../qtsp-integration";
 import type { ExplainNode } from "../types";
 
-describe("verificarIntegridad", () => {
-  const DEMO_AGREEMENT_ID = "550e8400-e29b-41d4-a716-446655440000";
+describe("verificarIntegridad · política EAD sin firma personal", () => {
+  const AGREEMENT_ID = "550e8400-e29b-41d4-a716-446655440000";
+  const SHA512 =
+    "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e";
 
-  describe("valid artifacts", () => {
-    it("should verify all checks pass with valid QES+QSEAL+TSQ artifacts", () => {
-      const artifacts = [
+  describe("artefactos no personales", () => {
+    it("acepta integridad, sello de entidad y sello de tiempo válidos", () => {
+      const artifacts: VerifiableArtifact[] = [
         {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
+          type: "HASH",
+          ref: "documento-custodiado",
+          hash: SHA512,
           timestamp: "2026-04-19T10:30:00Z",
         },
         {
-          type: "QSEAL" as const,
-          ref: "seal-001",
+          type: "QSEAL",
+          ref: "sello-entidad",
           hash: "ghi789jkl012",
           timestamp: "2026-04-19T10:30:05Z",
         },
         {
-          type: "TSQ" as const,
-          ref: "tsq-001",
+          type: "TSQ",
+          ref: "sello-tiempo",
           hash: "mno345pqr678",
           timestamp: "2026-04-19T10:30:10Z",
         },
       ];
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+      const result = verificarIntegridad(AGREEMENT_ID, artifacts);
 
       expect(result.ok).toBe(true);
-      expect(result.checks.length).toBeGreaterThan(0);
       expect(result.errors).toEqual([]);
-      expect(result.explain).toBeDefined();
-      expect(Array.isArray(result.explain)).toBe(true);
-
-      // Verify that all checks passed
-      const failedChecks = result.checks.filter((c) => !c.passed);
-      expect(failedChecks).toHaveLength(0);
+      expect(result.checks.every((check) => check.passed)).toBe(true);
+      expect(result.checks.some((check) => check.type === "QES")).toBe(false);
+      expect(result.checks.some((check) => check.type === "QSEAL")).toBe(true);
+      expect(result.checks.some((check) => check.type === "TSQ")).toBe(true);
     });
   });
 
-  describe("hash verification", () => {
-    it("should fail HASH check when artifact has no hash", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "", // empty hash
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+  describe("integridad del hash", () => {
+    it("falla si falta el hash", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
+        { type: "HASH", ref: "sin-hash", hash: "" },
+      ]);
 
       expect(result.ok).toBe(false);
-      const hashChecks = result.checks.filter((c) => c.type === "HASH");
-      expect(hashChecks.length).toBeGreaterThan(0);
-      // passed is falsy (empty string from && operator), not explicitly false
-      expect(!hashChecks[0].passed).toBe(true);
-      expect(hashChecks[0].detail.toLowerCase()).toContain("hash");
+      expect(result.checks.find((check) => check.type === "HASH")?.passed).toBe(false);
+      expect(result.errors).toContain("Hash inválido o faltante para artefacto sin-hash");
     });
 
-    it("should pass HASH check when artifact has valid hash", () => {
-      const artifacts = [
+    it("rechaza URI sentinela y fragmentos demasiado cortos", () => {
+      const uri = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const hashChecks = result.checks.filter((c) => c.type === "HASH");
-      expect(hashChecks.length).toBeGreaterThan(0);
-      expect(hashChecks[0].passed).toBe(true);
-    });
-
-    // Codex (rev. ITEM-107): fail-closed ante deriva de forma. Un hash con
-    // forma de URI (sentinel evidence-bundle://) o un fragmento demasiado corto
-    // NO deben pasar como verificados.
-    it("should FAIL HASH check when hash is a URI sentinel (not a digest)", () => {
-      const artifacts = [
-        {
-          type: "HASH" as const,
-          ref: "doc-001",
+          type: "HASH",
+          ref: "uri",
           hash: "evidence-bundle://tenant/doc.docx",
-          timestamp: "2026-04-19T10:30:00Z",
         },
-      ];
+      ]);
+      const short = verificarIntegridad(AGREEMENT_ID, [
+        { type: "HASH", ref: "short", hash: "abc" },
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      expect(result.ok).toBe(false);
-      const hashChecks = result.checks.filter((c) => c.type === "HASH");
-      expect(hashChecks[0].passed).toBe(false);
-      expect(hashChecks[0].detail.toLowerCase()).toContain("formato inválido");
+      expect(uri.ok).toBe(false);
+      expect(uri.checks[0].detail.toLowerCase()).toContain("formato inválido");
+      expect(short.ok).toBe(false);
+      expect(short.checks[0].passed).toBe(false);
     });
 
-    it("should FAIL HASH check when hash is too short to be a digest", () => {
-      const artifacts = [
-        {
-          type: "HASH" as const,
-          ref: "doc-002",
-          hash: "abc",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
+    it("acepta un SHA-512 real", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
+        { type: "HASH", ref: "sha512", hash: SHA512 },
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      expect(result.ok).toBe(false);
-      expect(result.checks.find((c) => c.type === "HASH")?.passed).toBe(false);
-    });
-
-    it("should pass HASH check for a real SHA-512 hex digest", () => {
-      const artifacts = [
-        {
-          type: "HASH" as const,
-          ref: "doc-003",
-          hash: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const hashCheck = result.checks.find((c) => c.type === "HASH");
-      expect(hashCheck?.passed).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.checks[0].passed).toBe(true);
     });
   });
 
-  describe("QES signature verification", () => {
-    it("should handle QES with valid signer_id", () => {
-      const artifacts = [
+  describe("referencias QES históricas", () => {
+    it("nunca eleva una fila QES a evidencia canónica", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "QES" as const,
-          ref: "sig-001",
+          type: "QES",
+          ref: "legacy-qes",
           hash: "abc123def456",
           signer_id: "00000000-0000-4000-b000-000000000001",
           signer_role: "SECRETARIO",
           timestamp: "2026-04-19T10:30:00Z",
         },
-      ];
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const qesChecks = result.checks.filter((c) => c.type === "QES");
-      expect(qesChecks.length).toBeGreaterThan(0);
-      expect(qesChecks[0].passed).toBe(true);
-      expect(result.errors.length).toBe(0);
+      expect(result.ok).toBe(false);
+      expect(result.checks.find((check) => check.type === "HASH")?.passed).toBe(true);
+      expect(result.checks.find((check) => check.type === "QES")?.passed).toBe(false);
+      expect(result.errors).toContain("Referencia QES legacy no canónica: legacy-qes");
     });
 
-    it("should handle QES without signer_id gracefully", () => {
-      const artifacts = [
+    it("no fabrica OCSP, identidad ni mandato desde metadatos legacy", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "QES" as const,
-          ref: "sig-001",
+          type: "QES",
+          ref: "legacy-persona",
           hash: "abc123def456",
-          timestamp: "2026-04-19T10:30:00Z",
+          signer_id: "REVOKED-DEMO",
+          signer_role: "PRESIDENTE",
         },
-      ];
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      // HASH check should still pass
-      const hashChecks = result.checks.filter((c) => c.type === "HASH");
-      expect(hashChecks.length).toBeGreaterThan(0);
-      expect(hashChecks[0].passed).toBe(true);
+      expect(result.checks.some((check) => check.type === "OCSP")).toBe(false);
+      expect(result.checks.some((check) => check.type === "IDENTITY")).toBe(false);
+      expect(result.checks.some((check) => check.type === "MANDATE")).toBe(false);
     });
   });
 
-  describe("OCSP revocation check", () => {
-    it("should detect REVOKED status when signer_id contains REVOKED", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-revoked",
-          hash: "abc123def456",
-          signer_id: "REVOKED-00000000-0000-4000-b000-000000000099",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const ocspChecks = result.checks.filter((c) => c.type === "OCSP");
-      expect(ocspChecks.length).toBeGreaterThan(0);
-      expect(ocspChecks[0].detail).toContain("revocado");
-    });
-
-    it("should have GOOD OCSP status for normal signer", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-good",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const ocspChecks = result.checks.filter((c) => c.type === "OCSP");
-      expect(ocspChecks.length).toBeGreaterThan(0);
-      expect(ocspChecks[0].passed).toBe(true);
-      expect(ocspChecks[0].detail).toContain("válido");
+  describe("OCSP retirado", () => {
+    it("no infiere GOOD ni REVOKED a partir del identificador", () => {
+      expect(verificarOCSP("PERSONA-NORMAL").status).toBe("UNKNOWN");
+      expect(verificarOCSP("REVOKED-DEMO").status).toBe("UNKNOWN");
+      expect(verificarOCSP("PERSONA-NORMAL").detail).toContain("no se infiere validez");
     });
   });
 
-  describe("TSQ timestamp verification", () => {
-    it("should fail TSQ check with invalid timestamp format", () => {
-      const artifacts = [
+  describe("sello de tiempo", () => {
+    it("rechaza un timestamp inválido", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "TSQ" as const,
-          ref: "tsq-001",
+          type: "TSQ",
+          ref: "tsq-invalido",
           hash: "mno345pqr678",
-          timestamp: "invalid-date", // invalid format
+          timestamp: "invalid-date",
         },
-      ];
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const tsqChecks = result.checks.filter((c) => c.type === "TSQ");
-      expect(tsqChecks.length).toBeGreaterThan(0);
-      expect(tsqChecks[0].passed).toBe(false);
-      expect(tsqChecks[0].detail.toLowerCase()).toContain("inválido");
+      expect(result.ok).toBe(false);
+      expect(result.checks.find((check) => check.type === "TSQ")?.passed).toBe(false);
     });
 
-    it("should pass TSQ check with valid ISO timestamp", () => {
-      const artifacts = [
+    it("acepta un timestamp ISO válido", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "TSQ" as const,
-          ref: "tsq-001",
+          type: "TSQ",
+          ref: "tsq-valido",
           hash: "mno345pqr678",
           timestamp: "2026-04-19T10:30:10Z",
         },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const tsqChecks = result.checks.filter((c) => c.type === "TSQ");
-      expect(tsqChecks.length).toBeGreaterThan(0);
-      expect(tsqChecks[0].passed).toBe(true);
-    });
-  });
-
-  describe("IDENTITY and MANDATE verification", () => {
-    it("should pass IDENTITY check with known signer_role", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const identityChecks = result.checks.filter((c) => c.type === "IDENTITY");
-      expect(identityChecks.length).toBeGreaterThan(0);
-      expect(identityChecks[0].passed).toBe(true);
-    });
-
-    it("should pass MANDATE check for known signer roles", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "PRESIDENTE",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const mandateChecks = result.checks.filter((c) => c.type === "MANDATE");
-      expect(mandateChecks.length).toBeGreaterThan(0);
-      expect(mandateChecks[0].passed).toBe(true);
-    });
-
-    it("should fail MANDATE check with unknown signer_role", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "UNKNOWN_ROLE_XYZ",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const mandateChecks = result.checks.filter((c) => c.type === "MANDATE");
-      expect(mandateChecks.length).toBeGreaterThan(0);
-      expect(mandateChecks[0].passed).toBe(false);
-      expect(result.ok).toBe(false);
-    });
-  });
-
-  describe("empty and mixed scenarios", () => {
-    it("should return ok=true with empty artifacts array", () => {
-      const artifacts: Parameters<typeof verificarIntegridad>[1] = [];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+      ]);
 
       expect(result.ok).toBe(true);
-      expect(result.checks.length).toBe(0);
-      expect(Array.isArray(result.explain)).toBe(true);
-      expect(result.explain.length).toBeGreaterThan(0);
+      expect(result.checks.find((check) => check.type === "TSQ")?.passed).toBe(true);
     });
+  });
 
-    it("should handle mixed valid and invalid artifacts", () => {
-      const artifacts = [
+  describe("metadatos personales sobre artefactos no-QES", () => {
+    it("falla cerrado en vez de inferir identidad o mandato", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
         {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
+          type: "HASH",
+          ref: "hash-con-persona",
+          hash: SHA512,
           signer_id: "00000000-0000-4000-b000-000000000001",
           signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
         },
-        {
-          type: "QES" as const,
-          ref: "sig-002",
-          hash: "", // invalid
-          signer_id: "00000000-0000-4000-b000-000000000002",
-          signer_role: "ADMINISTRADOR",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
+      ]);
 
       expect(result.ok).toBe(false);
-      const failedChecks = result.checks.filter((c) => !c.passed);
-      expect(failedChecks.length).toBeGreaterThan(0);
+      expect(result.checks.find((check) => check.type === "IDENTITY")?.passed).toBe(false);
+      expect(result.checks.find((check) => check.type === "MANDATE")?.passed).toBe(false);
+      expect(result.errors).toContain(
+        "Metadatos personales no verificables en artefacto hash-con-persona",
+      );
+    });
+  });
+
+  describe("estructura y escenarios vacíos", () => {
+    it("devuelve OK cuando no hay artefactos que verificar", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, []);
+
+      expect(result.ok).toBe(true);
+      expect(result.checks).toEqual([]);
+      expect(result.explain.length).toBeGreaterThan(0);
     });
 
-    it("should include explain nodes in result", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SECRETARIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
+    it("incluye nodos explicativos y checks tipados", () => {
+      const result = verificarIntegridad(AGREEMENT_ID, [
+        { type: "HASH", ref: "doc", hash: SHA512 },
+      ]);
 
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      expect(Array.isArray(result.explain)).toBe(true);
-      expect(result.explain.length).toBeGreaterThan(0);
-      // Each explain node should have expected structure
       result.explain.forEach((node: ExplainNode) => {
         expect(node).toHaveProperty("regla");
         expect(node).toHaveProperty("fuente");
         expect(node).toHaveProperty("mensaje");
       });
-    });
-  });
-
-  describe("MANDATE verification", () => {
-    it("should include MANDATE check in result for artifacts with signer_role", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "CONSEJERO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      const mandateChecks = result.checks.filter((c) => c.type === "MANDATE");
-      expect(mandateChecks.length).toBeGreaterThan(0);
-      expect(mandateChecks[0].label).toContain("Mandato");
-      expect(mandateChecks[0].passed).toBe(true);
-    });
-  });
-
-  describe("result structure", () => {
-    it("should return properly structured IntegrityVerificationResult", () => {
-      const artifacts = [
-        {
-          type: "QES" as const,
-          ref: "sig-001",
-          hash: "abc123def456",
-          signer_id: "00000000-0000-4000-b000-000000000001",
-          signer_role: "SOCIO",
-          timestamp: "2026-04-19T10:30:00Z",
-        },
-      ];
-
-      const result = verificarIntegridad(DEMO_AGREEMENT_ID, artifacts);
-
-      // Type guard checks
-      expect(result).toHaveProperty("ok");
-      expect(result).toHaveProperty("checks");
-      expect(result).toHaveProperty("errors");
-      expect(result).toHaveProperty("explain");
-
-      expect(typeof result.ok).toBe("boolean");
-      expect(Array.isArray(result.checks)).toBe(true);
-      expect(Array.isArray(result.errors)).toBe(true);
-      expect(Array.isArray(result.explain)).toBe(true);
-
-      // Verify each check has required fields
       result.checks.forEach((check: IntegrityCheckDetail) => {
-        expect(check).toHaveProperty("type");
-        expect(check).toHaveProperty("label");
-        expect(check).toHaveProperty("passed");
-        expect(check).toHaveProperty("detail");
         expect(typeof check.passed).toBe("boolean");
         expect(typeof check.detail).toBe("string");
       });

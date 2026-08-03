@@ -193,6 +193,13 @@ export interface FinalizedProcessDocumentDraftResult extends ProcessDocumentGene
   composition: ComposeDocumentResult;
 }
 
+function toExactArrayBuffer(buffer: Uint8Array): ArrayBuffer {
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
+}
+
 async function prepareMotorDraftContext(
   input: ProcessDocumentGenerationInput,
 ): Promise<PreparedProcessDocumentDraft> {
@@ -229,6 +236,8 @@ async function prepareMotorDraftContext(
     subtitle: input.subtitle,
     entityName: input.entityName,
     filenamePrefix: input.filenamePrefix ?? input.kind,
+    generatedAt: input.generatedAt,
+    includeEditableFields: false,
   });
 
   return {
@@ -262,6 +271,7 @@ export async function finalizeProcessDocumentDraftWithMotor(params: {
     subtitle: draft.input.subtitle,
     entityName: draft.input.entityName,
     filenamePrefix: draft.input.filenamePrefix ?? draft.input.kind,
+    generatedAt: draft.input.generatedAt,
   });
 
   const archive = await archiveProcessDocx({
@@ -275,8 +285,10 @@ export async function finalizeProcessDocumentDraftWithMotor(params: {
     errors: [error instanceof Error ? error.message : String(error)],
   }));
 
-  await persistProcessArchiveLink(draft.input, archive).catch(() => undefined);
-  downloadDocx(composition.docxBuffer, composition.filename);
+  await persistProcessArchiveLink(draft.input, archive, composition.contentHash).catch((error) => {
+    if (draft.input.kind === "CERTIFICACION") throw error;
+  });
+  if (!archive.reused) downloadDocx(composition.docxBuffer, composition.filename);
 
   const agreementTrace = buildProcessAgreementTrace(draft.input, draft.variables);
   const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
@@ -299,6 +311,14 @@ export async function finalizeProcessDocumentDraftWithMotor(params: {
     agreementTrace,
     evidencePosture,
     finalEvidenceReadiness,
+    candidate: {
+      artifactRole: "UNSIGNED_INPUT",
+      fileName: composition.filename,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      documentData: toExactArrayBuffer(composition.docxBuffer),
+      renderedText: composition.renderedBodyText,
+      contentHashSha256: composition.contentHash,
+    },
     composition,
   };
 }
@@ -347,6 +367,8 @@ export async function generateProcessDocxWithMotor(
     subtitle: input.subtitle,
     entityName: input.entityName,
     filenamePrefix: input.filenamePrefix ?? input.kind,
+    generatedAt: input.generatedAt,
+    includeEditableFields: false,
   });
 
   const archive = await archiveProcessDocx({
@@ -360,8 +382,14 @@ export async function generateProcessDocxWithMotor(
     errors: [error instanceof Error ? error.message : String(error)],
   }));
 
-  await persistProcessArchiveLink(input, archive).catch(() => undefined);
-  downloadDocx(composition.docxBuffer, composition.filename);
+  await persistProcessArchiveLink(input, archive, composition.contentHash).catch((error) => {
+    if (input.kind === "CERTIFICACION") throw error;
+  });
+  // Archive reuse is remote idempotency, not a reason to suppress the local
+  // file explicitly requested by the user from ConvocatoriaDetalle.
+  if (input.kind === "CONVOCATORIA" || !archive.reused) {
+    downloadDocx(composition.docxBuffer, composition.filename);
+  }
 
   const agreementTrace = buildProcessAgreementTrace(input, variables);
   const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
@@ -384,5 +412,13 @@ export async function generateProcessDocxWithMotor(
     agreementTrace,
     evidencePosture,
     finalEvidenceReadiness,
+    candidate: {
+      artifactRole: "UNSIGNED_INPUT",
+      fileName: composition.filename,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      documentData: toExactArrayBuffer(composition.docxBuffer),
+      renderedText: composition.renderedBodyText,
+      contentHashSha256: composition.contentHash,
+    },
   };
 }

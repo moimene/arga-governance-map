@@ -10,7 +10,7 @@ import {
 
 export interface PostAcuerdoPayload {
   inscribible: boolean;
-  instrumentoRequerido: "ESCRITURA" | "INSTANCIA" | "NINGUNO";
+  instrumentoRequerido: "ESCRITURA" | "INSTANCIA" | "CERTIFICACION" | "NINGUNO";
   publicacionRequerida: boolean;
   canalesPublicacion?: string[];
   // ITEM-135: el payload persistido admite la forma escalar (número de días) o
@@ -207,7 +207,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function normalizeInstrumento(value: unknown): PostAcuerdoPayload["instrumentoRequerido"] {
-  if (value === "ESCRITURA" || value === "INSTANCIA" || value === "NINGUNO") return value;
+  if (
+    value === "ESCRITURA" ||
+    value === "INSTANCIA" ||
+    value === "CERTIFICACION" ||
+    value === "NINGUNO"
+  ) return value;
   return "NINGUNO";
 }
 

@@ -63,6 +63,7 @@ import {
   plazoLabel,
   resolveSocietySocialTypeForRules,
   resolveMateriaAlias,
+  resolveMateriaPresentationAlias,
   templateBindingDisplayLabel,
   type MateriaGlobalStatusResult,
   type TemplateDocumentBinding,
@@ -1613,7 +1614,7 @@ function MateriaDetail({
             <p className="mt-1 text-sm leading-6 text-[var(--g-text-secondary)]">
               {selectedSociedadName ? `Regla aplicable para ${selectedSociedadName}.` : "Reglas legales por defecto; selecciona sociedad para ver estatutos y pactos."}
             </p>
-            {resolveMateriaAlias(materia.materia) === "SUPRESION_PREFERENTE" ? (
+            {resolveMateriaPresentationAlias(materia.materia) === "SUPRESION_PREFERENTE" ? (
               <p className="mt-2 text-xs leading-5 text-[var(--g-text-secondary)]">
                 También denominada exclusión del derecho de suscripción preferente (art. 308 LSC).
               </p>

@@ -13,7 +13,9 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  computeFileHashes,
   computeFileHashSha512,
+  buildSupportingAttachmentIntents,
   sanitizeFileName,
   ATTACHMENT_MAX_BYTES,
 } from "../useConvocatorias";
@@ -101,6 +103,82 @@ describe("computeFileHashSha512", () => {
     const ha = await computeFileHashSha512(a);
     const hb = await computeFileHashSha512(b);
     expect(ha).not.toBe(hb);
+  });
+});
+
+describe("computeFileHashes", () => {
+  it("persiste SHA-256 y SHA-512 reales y distintos para el mismo binario", async () => {
+    const hashes = await computeFileHashes(makeFile("abc", "soporte.pdf"));
+    expect(hashes.sha256).toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    );
+    expect(hashes.sha512).toBe(
+      "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    );
+    expect(hashes.sha256).toHaveLength(64);
+    expect(hashes.sha512).toHaveLength(128);
+  });
+});
+
+describe("buildSupportingAttachmentIntents", () => {
+  it("precompromete MIME efectivo, tamaño y huellas duales antes de emitir", async () => {
+    const intents = await buildSupportingAttachmentIntents([{
+      id: "11111111-1111-4111-8111-111111111111",
+      file: makeFile("abc", "soporte.pdf"),
+      alias: "Informe soporte",
+      descripcion: "Anexo de prueba",
+    }]);
+    expect(intents).toEqual([expect.objectContaining({
+      id: "11111111-1111-4111-8111-111111111111",
+      nombre: "Informe soporte",
+      descripcion: "Anexo de prueba",
+      file_name: "soporte.pdf",
+      size_bytes: 3,
+      mime: "application/pdf",
+      hash_sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      hash_sha512: "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+      agenda_item_index: null,
+      upload_status: "intended",
+    })]);
+  });
+
+  it("rechaza vacío y exceso de 25 MB antes de calcular o emitir", async () => {
+    await expect(buildSupportingAttachmentIntents([{
+      id: "22222222-2222-4222-8222-222222222222",
+      file: makeFile("", "vacio.pdf"),
+      alias: "",
+      descripcion: "",
+    }])).rejects.toThrow(/vacío/);
+
+    const oversized = {
+      name: "grande.pdf",
+      type: "application/pdf",
+      size: ATTACHMENT_MAX_BYTES + 1,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as unknown as File;
+    await expect(buildSupportingAttachmentIntents([{
+      id: "33333333-3333-4333-8333-333333333333",
+      file: oversized,
+      alias: "",
+      descripcion: "",
+    }])).rejects.toThrow(/demasiado grande/);
+  });
+
+  it("rechaza una identidad binaria duplicada aunque cambie el UUID", async () => {
+    await expect(buildSupportingAttachmentIntents([
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        file: makeFile("abc", "duplicado.pdf"),
+        alias: "A",
+        descripcion: "",
+      },
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        file: makeFile("abc", "duplicado.pdf"),
+        alias: "B",
+        descripcion: "",
+      },
+    ])).rejects.toThrow(/duplicado/);
   });
 });
 

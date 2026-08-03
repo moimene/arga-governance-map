@@ -241,19 +241,30 @@ test.describe('Motor de reglas societarias', () => {
     await expect(page).not.toHaveURL('/login');
   });
 
-  test('alias del art. 308 y viaje Materias → Plantillas → Gestor conservan contexto', async ({ page }) => {
+  test('sinónimo visual del art. 308 preserva identidad en Materias → Plantillas → Gestor', async ({ page }) => {
     const entityId = '6d7ed736-f263-4531-a59d-c6ca0cd41602';
     await page.goto(
       `/secretaria/catalogo-materias?scope=sociedad&entity=${entityId}&materia=EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE&vista=plantillas`,
     );
 
     await expect(
-      page.locator('h2').filter({ hasText: 'Exclusión o supresión del derecho de preferencia' }),
+      page.locator('h2').filter({ hasText: 'Exclusión del derecho de preferencia —supresión total o parcial—' }),
     ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.getByText(/También denominada exclusión del derecho de suscripción preferente/i),
     ).toBeVisible();
 
+    await expect(page.getByRole('link', { name: /Ver en catálogo de plantillas/i })).toHaveAttribute(
+      'href',
+      /materia=EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE/,
+    );
+
+    await page.goto(
+      `/secretaria/catalogo-materias?scope=sociedad&entity=${entityId}&materia=SUPRESION_PREFERENTE&vista=plantillas`,
+    );
+    await expect(
+      page.locator('h2').filter({ hasText: 'Exclusión del derecho de preferencia —supresión total o parcial—' }),
+    ).toBeVisible({ timeout: 10_000 });
     await page.getByRole('link', { name: /Ver en catálogo de plantillas/i }).click();
     await expect(page).toHaveURL(/\/secretaria\/plantillas\?.*materia=SUPRESION_PREFERENTE/);
     await expect(page).toHaveURL(new RegExp(`entity=${entityId}`));
@@ -305,7 +316,7 @@ test.describe('Motor de reglas societarias', () => {
       scope: 'sociedad',
       entity: entityId,
     });
-    await expect(page.getByText(/1 de 48 materias/)).toBeVisible();
+    await expect(page.getByText(/1 de 49 materias/)).toBeVisible();
     const catalogRestWrites: string[] = [];
     page.on('request', (request) => {
       if (
@@ -396,11 +407,11 @@ test.describe('Motor de reglas societarias', () => {
     });
 
     await search.fill('MODIFICACION_REGLAMENTO');
-    await expect(page.getByText('1 de 48 materias')).toBeVisible();
+    await expect(page.getByText('1 de 49 materias')).toBeVisible();
     await expect(matchingRow).toBeVisible();
 
     await search.fill('APROBACION_REGLAMENTO_CONSEJO');
-    await expect(page.getByText('1 de 48 materias')).toBeVisible();
+    await expect(page.getByText('1 de 49 materias')).toBeVisible();
     await expect(matchingRow).toBeVisible();
 
     await detail.getByRole('link', { name: 'Ver Modificación de estatutos' }).click();

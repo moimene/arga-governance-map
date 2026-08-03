@@ -3,10 +3,10 @@ import {
   useThirdParties, 
   useCreateThirdParty, 
   useUpdateThirdParty, 
+  type CifaAssessment,
   type ThirdParty 
 } from "@/hooks/useThirdParties";
-import { useQTSPSign } from "@/hooks/useQTSPSign";
-import { useCreateEvidenceBundle, useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
+import { useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { toast } from "sonner";
 import { 
@@ -26,12 +26,20 @@ const TEXTAREA_CLASSES =
 
 const LABEL_CLASSES = "block text-xs font-semibold text-[var(--g-text-primary)] uppercase mb-1";
 
+const EMPTY_CIFA_ASSESSMENT: CifaAssessment = {
+  q1_core: false,
+  q2_subcontract: false,
+  q3_alternatives: false,
+  q4_dataloss: false,
+  q5_concentration: false,
+};
+
+type TprmTab = "general" | "cifa" | "exit";
+
 export default function TPRM() {
   const { data: providers = [], isLoading, refetch } = useThirdParties();
   const createMutation = useCreateThirdParty();
   const updateMutation = useUpdateThirdParty();
-  const { signMutation } = useQTSPSign();
-  const createEvidence = useCreateEvidenceBundle();
   // Codex final round: el estado "sellado" se deriva de un evidence bundle FINAL real,
   // no del flag mutable selected.payload.exit_plan_signed (que puede ser stale).
   const { data: allEvidenceBundles = [] } = useEvidenceBundlesList();
@@ -39,7 +47,7 @@ export default function TPRM() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterCriticality, setFilterCriticality] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"general" | "cifa" | "exit">("general");
+  const [activeTab, setActiveTab] = useState<TprmTab>("general");
 
   // Sign fields
   const [signatoryName, setSignatoryName] = useState("Lucía Martín");
@@ -77,12 +85,9 @@ export default function TPRM() {
   });
 
   // Calculate CIFA Answers from provider's payload
-  const cifaPayload = selected?.payload?.cifa || {
-    q1_core: false,
-    q2_subcontract: false,
-    q3_alternatives: false,
-    q4_dataloss: false,
-    q5_concentration: false,
+  const cifaPayload: CifaAssessment = {
+    ...EMPTY_CIFA_ASSESSMENT,
+    ...selected?.payload?.cifa,
   };
 
   const isCifaApproved = 
@@ -104,7 +109,7 @@ export default function TPRM() {
         id: selected.id,
         criticality: computedCriticality,
         payload: {
-          ...selected.payload,
+          ...(selected.payload ?? {}),
           cifa: answers
         }
       });
@@ -115,102 +120,13 @@ export default function TPRM() {
     }
   };
 
-  // Sign Exit Plan with QES
+  // La firma genérica se retiró: el documento deberá llegar firmado por un
+  // canal externo y custodiarse desde un expediente source-bound.
   const handleSignExitPlan = async () => {
-    if (!selected) return;
-    try {
-      setSigningProgress("Preparando documento del Plan de Contingencia y Salida…");
-      
-      const docName = `EXIT-PLAN-${selected.id}-${new Date().getFullYear()}.pdf`;
-      const docData = new TextEncoder().encode(
-        `PLAN DE CONTINGENCIA Y SALIDA (EXIT PLAN) - GRC COMPASS TPRM\n` +
-        `Identificador Proveedor: ${selected.id}\n` +
-        `Proveedor: ${selected.provider}\n` +
-        `Servicio: ${selected.service}\n` +
-        `Grado de Criticidad: ${selected.criticality}\n` +
-        `Estrategia de Salida: ${selected.exit_plan || 'No informada'}\n` +
-        `Firmante Apoderado: ${signatoryName} (${signatoryEmail})\n` +
-        `Fecha de Validación: ${new Date().toLocaleDateString("es-ES")}`
-      ).buffer;
-
-      // Simulated QES Sign
-      const signRes = await signMutation.mutateAsync({
-        documentName: docName,
-        documentData: docData,
-        signatories: [{ name: signatoryName, email: signatoryEmail }],
-        createdBy: signatoryName,
-        onProgress: (step) => setSigningProgress(step),
-      });
-
-      if (!signRes.ok) {
-        throw new Error(signRes.errors.join(", "));
-      }
-
-      setSigningProgress("Sellando evidencia en Ledger Forense WORM…");
-
-      // Save Evidence Bundle
-      await createEvidence.mutateAsync({
-        sourceModule: "GRC",
-        sourceObjectType: "THIRD_PARTY",
-        sourceObjectId: selected.id,
-        referenceCode: `EXIT-PLAN-${selected.id.slice(0, 8).toUpperCase()}`,
-        manifest: {
-          provider_id: selected.id,
-          provider_name: selected.provider,
-          qtsp_transaction_id: signRes.srId,
-          document_hash: signRes.documentHash,
-          signed_at: signRes.signed_at,
-          signatory: signatoryName,
-        },
-        documentUrl: `https://hzqwefkwsxopwrmtksbg.supabase.co/storage/v1/object/public/evidence/exit_plans/${docName}`,
-        legalHold: selected.legal_hold,
-        status: "SEALED",
-        sandbox: signRes.sandbox,
-        srStatus: signRes.srStatus,
-        signedBy: `${signatoryName} (${signatoryEmail})`
-      });
-
-      // Codex review #2-UI: el estado FINAL "firmado" del tercero solo se persiste si
-      // la firma es real (no sandbox). En sandbox se guarda metadata no-final para no
-      // falsear que el plan quedó sellado y para no ocultar la necesidad de firma real.
-      await updateMutation.mutateAsync({
-        id: selected.id,
-        payload: signRes.sandbox
-          ? {
-              ...selected.payload,
-              // Limpia cualquier flag final stale (Codex #2-UI): una firma sandbox no
-              // debe dejar el plan marcado como firmado/sellado por datos previos.
-              exit_plan_signed: false,
-              exit_plan_hash: null,
-              exit_plan_signed_by: null,
-              exit_plan_signed_at: null,
-              exit_plan_transaction: null,
-              exit_plan_sandbox: true,
-              exit_plan_sandbox_at: signRes.signed_at,
-              exit_plan_sandbox_hash: signRes.documentHash,
-            }
-          : {
-              ...selected.payload,
-              exit_plan_signed: true,
-              exit_plan_hash: signRes.documentHash,
-              exit_plan_signed_by: signatoryName,
-              exit_plan_signed_at: signRes.signed_at,
-              exit_plan_transaction: signRes.srId,
-            }
-      });
-
-      toast.success(
-        signRes.sandbox
-          ? "Plan de Salida firmado en modo SANDBOX (demo) — evidencia NO sellada como final."
-          : "Plan de Salida firmado digitalmente y sellado en ledger WORM."
-      );
-      refetch();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(`Error al firmar: ${err.message || "Error desconocido"}`);
-    } finally {
-      setSigningProgress(null);
-    }
+    setSigningProgress(null);
+    toast.info("Firma electrónica retirada", {
+      description: "EAD Trust no firma el Exit Plan. Incorpore el documento firmado externamente mediante un expediente de custodia controlado.",
+    });
   };
 
   const handleAddProviderSubmit = async (e: React.FormEvent) => {
@@ -401,15 +317,15 @@ export default function TPRM() {
 
               {/* Tabs */}
               <div className="flex border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]">
-                {[
+                {([
                   { id: "general", label: "Ficha General" },
                   { id: "cifa", label: "Evaluación CIFA DORA" },
                   { id: "exit", label: "Plan de Contingencia / Firma" }
-                ].map((t) => (
+                ] satisfies Array<{ id: TprmTab; label: string }>).map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setActiveTab(t.id as any)}
+                    onClick={() => setActiveTab(t.id)}
                     className={cn(
                       "px-5 py-3 text-xs font-semibold border-b-2 transition-colors",
                       activeTab === t.id
@@ -509,7 +425,7 @@ export default function TPRM() {
                           desc: "¿Este tercero proporciona múltiples herramientas y servicios a diferentes divisiones de ARGA centralizando el riesgo?",
                         }
                       ].map((q) => {
-                        const val = (cifaPayload as any)[q.key] === true;
+                        const val = cifaPayload[q.key as keyof CifaAssessment] === true;
                         return (
                           <div
                             key={q.key}
@@ -609,13 +525,13 @@ export default function TPRM() {
                       >
                         <div className="flex items-center gap-2 text-[var(--status-success)] font-bold text-xs">
                           <CheckCircle2 className="h-4 w-4 shrink-0" />
-                          <span>PLAN DE SALIDA SELLADO EN LEDGER WORM (FIRMA ELECTRÓNICA)</span>
+                          <span>PLAN DE SALIDA CUSTODIADO EN LEDGER WORM</span>
                         </div>
                         <div className="text-xs text-[var(--g-text-secondary)] space-y-1 font-mono">
-                          <div><strong>Firmante:</strong> {selected.payload.exit_plan_signed_by}</div>
-                          <div><strong>Fecha:</strong> {new Date(selected.payload.exit_plan_signed_at).toLocaleString("es-ES")}</div>
-                          <div><strong>Hash SHA-512:</strong> <span className="break-all">{selected.payload.exit_plan_hash}</span></div>
-                          <div><strong>EAD Trust Tx ID:</strong> {selected.payload.exit_plan_transaction}</div>
+                          <div><strong>Responsable registrado:</strong> {selected.payload.exit_plan_signed_by as string}</div>
+                          <div><strong>Fecha:</strong> {new Date(selected.payload.exit_plan_signed_at as string).toLocaleString("es-ES")}</div>
+                          <div><strong>Hash SHA-512:</strong> <span className="break-all">{selected.payload.exit_plan_hash as string}</span></div>
+                          <div><strong>EAD Trust Tx ID:</strong> {selected.payload.exit_plan_transaction as string}</div>
                         </div>
                         <div className="pt-2 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[10px]">
                           <span className="text-[var(--g-text-secondary)]">Certificado de sellado digital QSeal emitido</span>
@@ -627,7 +543,7 @@ export default function TPRM() {
                             }}
                             className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
                           >
-                            Verificar firma <ExternalLink className="h-3 w-3" />
+                            Verificar custodia <ExternalLink className="h-3 w-3" />
                           </a>
                         </div>
                       </div>
@@ -637,10 +553,10 @@ export default function TPRM() {
                           <ShieldAlert className="h-5 w-5 text-[var(--status-warning)] shrink-0" />
                           <div className="text-xs">
                             <span className="block font-bold text-[var(--g-text-primary)]">
-                              Firma Obligatoria Requerida
+                              Documento final requerido
                             </span>
                             <span className="block text-[var(--g-text-secondary)]">
-                              Para proveedores catalogados como críticos bajo DORA (CIFA Aprobado), el plan de contingencia de salida debe estar firmado por el Apoderado de Riesgo.
+                              Si DORA exige firma del plan, se obtiene fuera de EAD. La plataforma solo custodiará el documento desde un expediente source-bound.
                             </span>
                           </div>
                         </div>
@@ -653,7 +569,7 @@ export default function TPRM() {
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <label htmlFor="tprm-sign-name" className={LABEL_CLASSES}>Nombre Firmante</label>
+                              <label htmlFor="tprm-sign-name" className={LABEL_CLASSES}>Responsable del documento</label>
                               <input
                                 id="tprm-sign-name"
                                 type="text"
@@ -664,7 +580,7 @@ export default function TPRM() {
                               />
                             </div>
                             <div className="space-y-1">
-                              <label htmlFor="tprm-sign-email" className={LABEL_CLASSES}>Email Firmante</label>
+                              <label htmlFor="tprm-sign-email" className={LABEL_CLASSES}>Email del responsable</label>
                               <input
                                 id="tprm-sign-email"
                                 type="email"
@@ -677,12 +593,13 @@ export default function TPRM() {
                             <div className="col-span-1 sm:col-span-2 pt-2">
                               <button
                                 type="button"
-                                onClick={handleSignExitPlan}
-                                className="w-full flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] py-2 text-xs font-bold transition-colors"
+                                disabled
+                                title="La firma genérica está retirada; use un expediente source-bound para custodiar el documento externo."
+                                className="w-full flex items-center justify-center gap-2 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] py-2 text-xs font-bold cursor-not-allowed opacity-70"
                                 style={{ borderRadius: "var(--g-radius-md)" }}
                               >
                                 <PenTool className="h-4 w-4" />
-                                Firmar y Sellar Exit Plan
+                                Custodia disponible desde expediente
                               </button>
                             </div>
                           </div>

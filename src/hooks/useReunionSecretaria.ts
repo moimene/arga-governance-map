@@ -15,11 +15,11 @@ import {
   type MeetingAgendaPoint,
   type PreparedAgreementSource,
 } from "@/lib/secretaria/meeting-agenda";
-import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import {
-  buildMeetingScheduleFromConvocatoria,
-  type ConvocatoriaForMeetingSchedule,
-} from "@/lib/secretaria/meeting-scheduler";
+  canUseLegacyConvocatoriaFallback,
+  extractMeetingSourceLinks,
+} from "@/lib/secretaria/meeting-links";
+import type { ConvocatoriaForMeetingSchedule } from "@/lib/secretaria/meeting-scheduler";
 import {
   addUniversalMeetingHoursIso,
   buildUniversalMeetingDedupHash,
@@ -35,6 +35,7 @@ import {
   type AgendaItemKind,
 } from "@/lib/secretaria/agenda-kind";
 import { computeVocalPersonIds } from "@/lib/secretaria/meeting-census";
+import { patchMeetingQuorumCache } from "@/lib/secretaria/meeting-progress";
 
 export interface MeetingSecretariaRow {
   id: string;
@@ -137,6 +138,8 @@ export interface MeetingForConvocatoria {
   meeting_type: string;
   location: string | null;
   quorum_data: Record<string, unknown> | null;
+  president_id: string | null;
+  secretary_id: string | null;
 }
 
 export interface MeetingMinuteLink {
@@ -149,6 +152,54 @@ export interface MeetingMinuteLink {
 
 function dateOnly(value?: string | null) {
   return value ? String(value).slice(0, 10) : null;
+}
+
+export type MeetingOpeningAvailability = {
+  allowed: boolean;
+  reason: string | null;
+};
+
+/**
+ * Proyección UX del gate autoritativo de apertura. El reloj cliente solo evita
+ * una acción inválida evidente; la RPC vuelve a comprobar estos hechos bajo lock.
+ */
+export function getMeetingOpeningAvailability(
+  status: string | null | undefined,
+  scheduledStart: string | null | undefined,
+  scheduledEnd: string | null | undefined,
+  nowMs = Date.now(),
+): MeetingOpeningAvailability {
+  if (status !== "DRAFT" && status !== "CONVOCADA") {
+    return {
+      allowed: false,
+      reason: "El estado actual de la reunión no permite declarar su apertura.",
+    };
+  }
+
+  const startMs = scheduledStart ? Date.parse(scheduledStart) : Number.NaN;
+  const endMs = scheduledEnd ? Date.parse(scheduledEnd) : Number.NaN;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return {
+      allowed: false,
+      reason: "El horario previsto no es válido. Corrige el inicio y el fin antes de abrir la sesión.",
+    };
+  }
+
+  if (startMs > nowMs) {
+    return {
+      allowed: false,
+      reason: "La sesión solo podrá abrirse cuando llegue la fecha y hora de inicio previstas.",
+    };
+  }
+
+  return { allowed: true, reason: null };
+}
+
+function sameTimestamp(left?: string | null, right?: string | null) {
+  if (!left || !right) return false;
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
 }
 
 type SaveMeetingResolutionRpcRow = SaveMeetingResolutionInput & {
@@ -229,9 +280,33 @@ async function findMeetingForConvocatoria(
   convocatoriaId: string,
   convocatoria?: ConvocatoriaForMeetingSchedule | null,
 ) {
+  // El vínculo autoritativo vive en agenda_items. Consultarlo primero evita
+  // perder reuniones canceladas/rectificadas por límites de listados globales
+  // y mantiene la ficha histórica unida a su sesión exacta.
+  const { data: agendaLink, error: agendaLinkError } = await supabase
+    .from("agenda_items")
+    .select("meeting_id")
+    .eq("tenant_id", tenantId)
+    .eq("source_convocatoria_id", convocatoriaId)
+    .limit(1)
+    .maybeSingle();
+  if (agendaLinkError) throw agendaLinkError;
+
+  if (agendaLink?.meeting_id) {
+    const { data: boundMeeting, error: boundMeetingError } = await supabase
+      .from("meetings")
+      .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data, president_id, secretary_id")
+      .eq("tenant_id", tenantId)
+      .eq("id", agendaLink.meeting_id)
+      .maybeSingle();
+    if (boundMeetingError) throw boundMeetingError;
+    if (boundMeeting) return boundMeeting as MeetingForConvocatoria;
+  }
+
+  // Fallback limitado para expedientes legacy aún sin source_convocatoria_id.
   const { data, error } = await supabase
     .from("meetings")
-    .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data")
+    .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data, president_id, secretary_id")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -242,16 +317,20 @@ async function findMeetingForConvocatoria(
   return rows.find((meeting) => {
     const links = extractMeetingSourceLinks(meeting.quorum_data);
     return links.convocatoria_id === convocatoriaId || (links.convocatoria_ids ?? []).includes(convocatoriaId);
-  }) ?? findMeetingByBodyAndDate(rows, convocatoria) ?? null;
+  }) ?? findMeetingByBodyAndTimestamp(rows, convocatoriaId, convocatoria) ?? null;
 }
 
-function findMeetingByBodyAndDate(
+function findMeetingByBodyAndTimestamp(
   rows: MeetingForConvocatoria[],
+  convocatoriaId: string,
   convocatoria?: ConvocatoriaForMeetingSchedule | null,
 ) {
-  const date = dateOnly(convocatoria?.fecha_1);
-  if (!convocatoria?.body_id || !date) return null;
-  return rows.find((meeting) => meeting.body_id === convocatoria.body_id && dateOnly(meeting.scheduled_start) === date) ?? null;
+  if (!convocatoria?.body_id || !convocatoria.fecha_1) return null;
+  return rows.find((meeting) => (
+    meeting.body_id === convocatoria.body_id
+    && sameTimestamp(meeting.scheduled_start, convocatoria.fecha_1)
+    && canUseLegacyConvocatoriaFallback(meeting.quorum_data, convocatoriaId)
+  )) ?? null;
 }
 
 export function useMeetingForConvocatoria(
@@ -275,159 +354,23 @@ export function useMeetingForConvocatoria(
       const linked = await findMeetingForConvocatoria(tenantId, convocatoriaId, convocatoria);
       if (linked || !convocatoria?.body_id || !convocatoria.fecha_1) return linked;
 
-      const date = dateOnly(convocatoria.fecha_1);
-      if (!date) return linked;
       const { data, error } = await supabase
         .from("meetings")
         .select("id, slug, body_id, scheduled_start, scheduled_end, status, meeting_type, location, quorum_data")
         .eq("tenant_id", tenantId)
         .eq("body_id", convocatoria.body_id)
-        .gte("scheduled_start", `${date}T00:00:00.000Z`)
-        .lt("scheduled_start", nextDateIso(date))
+        .eq("scheduled_start", convocatoria.fecha_1)
         .order("created_at", { ascending: false })
         .limit(1);
       if (error) throw error;
-      return ((data ?? []) as MeetingForConvocatoria[])[0] ?? null;
+      return findMeetingByBodyAndTimestamp(
+        (data ?? []) as MeetingForConvocatoria[],
+        convocatoriaId,
+        convocatoria,
+      );
     },
     staleTime: 20_000,
   });
-}
-
-/**
- * Materializa o reconcilia `agenda_items` rows desde los puntos de la convocatoria.
- *
- * Comportamiento (Codex P2 round 10 — UPDATE + INSERT, no solo gaps):
- *   - Rows faltantes (order_number ausente) → INSERT.
- *   - Rows existentes con kind=DELIBERATIVO (default conservador) Y la
- *     convocatoria declara un kind distinto → UPDATE para reconciliar.
- *     Solo se updatea cuando el row NO tiene historial en
- *     `agenda_item_kind_changelog` (es decir, el kind actual es el default
- *     legacy del flujo previo, no una reclasificación humana explícita).
- *   - Rows con changelog se respetan: una reclasificación humana es SSOT.
- *
- * Idempotente. Se ejecuta tanto en NEW meetings como en reused.
- */
-async function materializeAgendaItemsForConvocatoriaMeeting(
-  meetingId: string,
-  tenantId: string,
-  convocatoria: ConvocatoriaForMeetingSchedule,
-): Promise<void> {
-  const agendaPoints = convocatoria.agenda_items ?? [];
-  if (agendaPoints.length === 0) return;
-  // 1. SELECT existing rows con id+order_number+kind para reconciliar
-  const { data: existingRows, error: selErr } = await supabase
-    .from("agenda_items")
-    .select("id, order_number, kind")
-    .eq("meeting_id", meetingId)
-    .eq("tenant_id", tenantId);
-  if (selErr) {
-    // Codex P2 round 15: abortar en lugar de loguear. Si el lookup falla
-    // (RLS drift, transient PostgREST), no podemos garantizar idempotencia
-    // y el usuario llegaría a voting con BD posiblemente inconsistente.
-    // Mejor fallar temprano con mensaje claro.
-    throw new Error(
-      `Lookup de agenda_items existentes falló: ${selErr.message}. No se puede garantizar la materialización idempotente; reintenta la operación.`,
-    );
-  }
-  const existingByOrder = new Map<number, { id: string; kind: string | null }>();
-  for (const row of (existingRows ?? []) as Array<{
-    id: string;
-    order_number: number | null;
-    kind: string | null;
-  }>) {
-    if (typeof row.order_number === "number") {
-      existingByOrder.set(row.order_number, { id: row.id, kind: row.kind });
-    }
-  }
-
-  // 2. Determinar inserts (gaps) y updates (legacy default ≠ convocatoria)
-  const rowsToInsert: Array<{
-    tenant_id: string;
-    meeting_id: string;
-    order_number: number;
-    title: string;
-    kind: string;
-    decision_subtype: string | null;
-  }> = [];
-  const updateCandidates: Array<{
-    id: string;
-    desired_kind: string;
-    desired_decision_subtype: string | null;
-  }> = [];
-
-  agendaPoints.forEach((point, index) => {
-    const orderNumber = index + 1;
-    const existing = existingByOrder.get(orderNumber);
-    const desiredKind = point.kind ?? "DELIBERATIVO";
-    const desiredSubtype = point.decision_subtype ?? null;
-    if (!existing) {
-      rowsToInsert.push({
-        tenant_id: tenantId,
-        meeting_id: meetingId,
-        order_number: orderNumber,
-        title: (point.titulo ?? "").trim().slice(0, 240) || `Punto ${orderNumber}`,
-        kind: desiredKind,
-        decision_subtype: desiredSubtype,
-      });
-      return;
-    }
-    // Existing row: reconciliar SOLO si current kind es legacy default
-    // (DELIBERATIVO) y la convocatoria declara algo distinto.
-    if (existing.kind === "DELIBERATIVO" && desiredKind !== "DELIBERATIVO") {
-      updateCandidates.push({
-        id: existing.id,
-        desired_kind: desiredKind,
-        desired_decision_subtype: desiredSubtype,
-      });
-    }
-  });
-
-  // 3. INSERT gaps
-  if (rowsToInsert.length > 0) {
-    const { error: insErr } = await supabase.from("agenda_items").insert(rowsToInsert);
-    if (insErr) {
-      // Codex P2 round 14: abortar en lugar de solo loguear. agenda_items
-      // ya es requerido por triggers (T5, integrity rules) — sin esos rows
-      // el usuario llega a voting/save con BD inconsistente y un error
-      // críptico aguas abajo. Mejor fallar temprano con mensaje claro.
-      throw new Error(
-        `Materialización de agenda_items falló: ${insErr.message}. La reunión existe pero la agenda no se persistió; reintenta la creación o contacta soporte.`,
-      );
-    }
-  }
-
-  // 4. UPDATE candidatos legacy → solo si NO tienen changelog (respeta
-  //    reclasificaciones humanas previas como SSOT).
-  if (updateCandidates.length > 0) {
-    const candidateIds = updateCandidates.map((c) => c.id);
-    const { data: changelogRows, error: changelogErr } = await supabase
-      .from("agenda_item_kind_changelog")
-      .select("agenda_item_id")
-      .in("agenda_item_id", candidateIds);
-    if (changelogErr) {
-      throw new Error(
-        `No se pudo comprobar el historial de reclasificación de agenda_items: ${changelogErr.message}.`,
-      );
-    }
-    const idsWithChangelog = new Set(
-      ((changelogRows ?? []) as Array<{ agenda_item_id: string }>).map((r) => r.agenda_item_id),
-    );
-    for (const candidate of updateCandidates) {
-      if (idsWithChangelog.has(candidate.id)) continue; // respeta humano
-      const { error: updErr } = await supabase
-        .from("agenda_items")
-        .update({
-          kind: candidate.desired_kind,
-          decision_subtype: candidate.desired_decision_subtype,
-        })
-        .eq("id", candidate.id);
-      if (updErr) {
-        throw new Error(
-          `Reconciliación de agenda_item ${candidate.id} falló: ${updErr.message}. La reunión no queda preparada para votación.`,
-        );
-      }
-    }
-  }
 }
 
 export function useCreateMeetingFromConvocatoria() {
@@ -436,31 +379,39 @@ export function useCreateMeetingFromConvocatoria() {
   return useMutation({
     mutationFn: async (convocatoria: ConvocatoriaForMeetingSchedule): Promise<{ id: string; reused: boolean }> => {
       if (!tenantId) throw new Error("Tenant no disponible");
-
-      const existing = await findMeetingForConvocatoria(tenantId, convocatoria.id, convocatoria);
-      if (existing) {
-        // Codex P1 round 9: materializar agenda_items también para meetings
-        // reused. Meetings creados por flujos previos (o emparejados manualmente
-        // por body/date) podrían no tener rows agenda_items aún; idempotencia
-        // garantiza que solo insertamos los faltantes.
-        await materializeAgendaItemsForConvocatoriaMeeting(existing.id, tenantId, convocatoria);
-        return { id: existing.id, reused: true };
+      if (convocatoria.tenant_id !== tenantId) {
+        throw new Error("La convocatoria no pertenece al tenant activo.");
       }
 
-      const payload = buildMeetingScheduleFromConvocatoria(convocatoria);
-      const { data, error } = await supabase
-        .from("meetings")
-        .insert(payload)
-        .select("id")
-        .single();
+      // Una única RPC crea/reutiliza meetings, completa cargos y
+      // materializa/reconcilia agenda_items dentro de la misma transacción.
+      // No existe INSERT/UPDATE cliente que pueda dejar una reunión huérfana
+      // si falla el binding de la agenda inmutable.
+      const { data, error } = await supabase.rpc(
+        "fn_secretaria_create_or_reuse_meeting_from_convocation",
+        { p_convocatoria_id: convocatoria.id },
+      );
+      if (error) {
+        throw new Error(`No se pudo programar la reunión autoritativa: ${error.message}`);
+      }
 
-      if (error) throw error;
-      const meetingId = (data as { id: string }).id;
-
-      // Codex P1 round 8: materializar agenda_items rows desde el INSERT inicial.
-      await materializeAgendaItemsForConvocatoriaMeeting(meetingId, tenantId, convocatoria);
-
-      return { id: meetingId, reused: false };
+      const result = data as {
+        id?: string;
+        meeting_id?: string;
+        reused?: boolean;
+        materialized_items?: number;
+      } | null;
+      const meetingId = result?.meeting_id ?? result?.id;
+      if (!meetingId) {
+        throw new Error("La programación autoritativa no devolvió una reunión.");
+      }
+      const expectedItems = convocatoria.agenda_items?.length ?? 0;
+      if (result?.materialized_items !== expectedItems) {
+        throw new Error(
+          "La agenda materializada no coincide en cardinalidad con la convocatoria inmutable.",
+        );
+      }
+      return { id: meetingId, reused: result?.reused === true };
     },
     onSuccess: (_result, convocatoria) => {
       qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
@@ -543,7 +494,7 @@ export function useReunionById(id: string | undefined) {
       const { data, error } = await supabase
         .from("meetings")
         .select(
-          "*, governing_bodies(name, body_type, entity_id, quorum_rule, entities(common_name, jurisdiction, legal_form, tipo_social, es_cotizada))",
+          "*, governing_bodies(name, body_type, entity_id, quorum_rule, entities(common_name, legal_name, jurisdiction, legal_form, tipo_social, es_cotizada))",
         )
         .eq("id", id!)
         .eq("tenant_id", tenantId!)
@@ -649,7 +600,7 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
           // propague la clasificación a debates/votación (sin ellos, source.kind
           // viene undefined y el merge cae a DELIBERATIVO por defecto — Codex P2
           // round 2 + reviewer adversarial C1).
-          .select("id, order_number, title, description, kind, decision_subtype")
+          .select("id, order_number, title, description, matter_code, kind, decision_subtype, proposal_text, requires_attachments")
           .eq("meeting_id", meetingId!)
           .order("order_number", { ascending: true }),
         explicitConvocatoriaId
@@ -672,7 +623,7 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
         (async () => {
           const { data: byMeeting, error: byMeetingError } = await supabase
             .from("agreements")
-            .select("id, agreement_kind, matter_class, proposal_text, status, compliance_snapshot, compliance_explain")
+            .select("id, agreement_kind, matter_class, proposal_text, decision_text, status, compliance_snapshot, compliance_explain")
             .eq("tenant_id", tenantId!)
             .eq("parent_meeting_id", meetingId!)
             .in("status", ["DRAFT", "PROPOSED"]);
@@ -684,7 +635,7 @@ export function useMeetingAgendaSources(meetingId: string | undefined) {
 
           const { data: byExplicitIds, error: byIdsError } = await supabase
             .from("agreements")
-            .select("id, agreement_kind, matter_class, proposal_text, status, compliance_snapshot, compliance_explain")
+            .select("id, agreement_kind, matter_class, proposal_text, decision_text, status, compliance_snapshot, compliance_explain")
             .eq("tenant_id", tenantId!)
             .in("id", explicitAgreementIds)
             .in("status", ["DRAFT", "PROPOSED"]);
@@ -753,8 +704,8 @@ export function useBodyMembers(bodyId: string | undefined) {
 }
 
 // ITEM-146: "Declarar apertura" transiciona la reunión a EN_CURSO (sesión
-// abierta), NO a CELEBRADA. CELEBRADA se reserva para el cierre (generación de
-// acta, vía useCloseMeeting). Antes una sesión abierta y abandonada quedaba
+// abierta), NO a CELEBRADA. CELEBRADA se reserva para el cierre atómico con
+// snapshot WORM y acta (vía useGenerarActa). Antes una sesión abierta y abandonada quedaba
 // "Celebrada" sin asistentes/quórum/acta, distorsionando KPIs y el lenguaje de
 // estado. El CHECK de meetings.status y los guards de agenda (reclassify) admiten
 // EN_CURSO desde la migración 20260613120000/120500.
@@ -763,35 +714,24 @@ export function useOpenMeeting(meetingId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      if (!meetingId || !tenantId) return;
-      const { error } = await supabase
-        .from("meetings")
-        .update({ status: "EN_CURSO" })
-        .eq("id", meetingId)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
-    },
-  });
-}
+      if (!meetingId || !tenantId) {
+        throw new Error("No se puede abrir la sesión sin reunión y tenant activos.");
+      }
 
-// ITEM-146: cierre de la sesión — transiciona EN_CURSO → CELEBRADA. Se invoca
-// desde CierreStep tras generar el acta, de modo que CELEBRADA representa una
-// sesión efectivamente celebrada (con acta), no una simplemente abierta.
-export function useCloseMeeting(meetingId: string | undefined) {
-  const { tenantId } = useTenantContext();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      if (!meetingId || !tenantId) return;
-      const { error } = await supabase
-        .from("meetings")
-        .update({ status: "CELEBRADA" })
-        .eq("id", meetingId)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
+      const { data, error } = await supabase.rpc("fn_secretaria_open_meeting", {
+        p_meeting_id: meetingId,
+      });
+      if (error) {
+        throw new Error(`No se pudo abrir la sesión: ${error.message}`);
+      }
+
+      const result = data as {
+        meeting_id?: string;
+        status?: string;
+      } | null;
+      if (result?.meeting_id !== meetingId || result.status !== "EN_CURSO") {
+        throw new Error("La apertura autoritativa no confirmó el estado EN CURSO.");
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
@@ -877,8 +817,10 @@ export function useUpdateQuorumData(meetingId: string | undefined) {
         .eq("tenant_id", tenantId);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "byId", meetingId] });
+    onSuccess: (_result, quorumData) => {
+      const meetingKey = ["secretaria", tenantId, "meetings", "byId", meetingId] as const;
+      qc.setQueryData(meetingKey, (current) => patchMeetingQuorumCache(current, quorumData));
+      qc.invalidateQueries({ queryKey: meetingKey });
     },
   });
 }
@@ -1075,45 +1017,34 @@ export function useSaveMeetingResolutions(meetingId: string | undefined) {
 }
 
 export function useGenerarActa() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       meetingId,
       content,
       canonicalMinutesHash,
-      entityId,
-      bodyId,
-      sessionKind = "MEETING",
-      snapshotType,
     }: {
       meetingId: string;
       content: string;
       canonicalMinutesHash?: string | null;
-      entityId: string;
-      bodyId: string;
-      sessionKind?: "MEETING" | "NO_SESSION" | "UNIPERSONAL";
-      snapshotType: "ECONOMICO" | "POLITICO" | "UNIVERSAL";
     }) => {
-      const { data: snapshotId, error: snapshotError } = await supabase.rpc(
-        "fn_crear_censo_snapshot",
-        {
-          p_meeting_id: meetingId,
-          p_session_kind: sessionKind,
-          p_entity_id: entityId,
-          p_body_id: bodyId,
-          p_snapshot_type: snapshotType,
-        },
-      );
-      if (snapshotError) throw snapshotError;
-      if (!snapshotId) throw new Error("No se pudo crear el snapshot WORM de censo para el acta.");
+      if (!tenantId) throw new Error("No se pudo resolver el tenant activo para cerrar la reunión.");
 
-      const { data, error } = await supabase.rpc("fn_generar_acta", {
+      const { data, error } = await supabase.rpc("fn_secretaria_close_meeting_and_generate_minute", {
         p_meeting_id: meetingId,
         p_content: content,
-        p_snapshot_id: snapshotId,
         p_canonical_minutes_hash: canonicalMinutesHash ?? null,
       });
       if (error) throw error;
+      if (!data) throw new Error("La operación atómica no devolvió el acta autoritativa.");
       return data as string;
+    },
+    onSuccess: (_minuteId, variables) => {
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings"] });
+      qc.invalidateQueries({ queryKey: ["secretaria", tenantId, "meetings", "byId", variables.meetingId] });
+      qc.invalidateQueries({ queryKey: ["actas", tenantId, "byMeeting", variables.meetingId] });
+      qc.invalidateQueries({ queryKey: ["censo_snapshot", tenantId, variables.meetingId] });
     },
   });
 }

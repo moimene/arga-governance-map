@@ -28,8 +28,14 @@ interface ResendWebhookPayload {
   created_at?: string;
   data?: {
     email_id?: string;
-    tags?: Array<{ name: string; value: string }>;
   };
+}
+
+function canonicalTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim() || Number.isNaN(Date.parse(value))) {
+    return null;
+  }
+  return new Date(value).toISOString();
 }
 
 async function verifySvix(rawBody: string, headers: Headers): Promise<{ ok: true } | { ok: false; reason: string; status: number }> {
@@ -107,58 +113,36 @@ serve(async (req) => {
   const evento = EVENT_MAP[payload.type];
   if (!evento) return new Response(JSON.stringify({ skipped: 'unknown event type' }), { status: 200 });
 
-  const tags = payload.data?.tags ?? [];
-  const recipientTag = tags.find((t) => t.name === 'recipient_id');
+  const providerMessageId = payload.data?.email_id?.trim() ?? '';
+  const providerWebhookId = req.headers.get('svix-id')?.trim() ?? '';
+  const occurredAt = canonicalTimestamp(payload.created_at);
+  if (!providerMessageId || !providerWebhookId || !occurredAt) {
+    return new Response(JSON.stringify({ error: 'Resend callback missing provider ids/timestamp' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-
-  let recipientId: string | null = recipientTag?.value ?? null;
-  if (!recipientId && payload.data?.email_id) {
-    const { data: sentEvent } = await sb
-      .from('communication_delivery_events')
-      .select('recipient_id')
-      .eq('proveedor', 'RESEND')
-      .eq('proveedor_evento_id', payload.data.email_id)
-      .eq('evento', 'SENT')
-      .limit(1)
-      .maybeSingle();
-    recipientId = sentEvent?.recipient_id ?? null;
-  }
-
-  if (!recipientId) return new Response(JSON.stringify({ skipped: 'recipient not found' }), { status: 200 });
-
-  if (evento === 'DELIVERED') {
-    await sb.from('communication_recipients').update({
-      estado_entrega: 'ENTREGADO',
-      fecha_entrega: payload.created_at ?? new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', recipientId);
-  } else if (evento === 'BOUNCED') {
-    const { data: recipient } = await sb
-      .from('communication_recipients')
-      .select('canal_fallback')
-      .eq('id', recipientId)
-      .single();
-    if (recipient?.canal_fallback) {
-      await sb.rpc('fn_recipient_handle_error', {
-        p_recipient_id: recipientId, p_error_message: 'Bounced by Resend', p_retriable: false,
-      });
-    } else {
-      await sb.from('communication_recipients').update({
-        estado_entrega: 'REBOTADO',
-        ultimo_error: 'Bounced by Resend',
-        updated_at: new Date().toISOString(),
-      }).eq('id', recipientId);
-    }
-  }
-
-  await sb.from('communication_delivery_events').insert({
-    recipient_id: recipientId,
-    evento,
-    proveedor: 'RESEND',
-    proveedor_evento_id: payload.data?.email_id ?? null,
-    payload: payload as unknown as Record<string, unknown>,
-    hash_self: '',
+  const { data, error } = await sb.rpc('fn_recipient_record_resend_callback', {
+    p_provider_message_id: providerMessageId,
+    p_provider_event_id: `${providerMessageId}:${providerWebhookId}`,
+    p_event_status: evento,
+    p_occurred_at: occurredAt,
+    p_provider_payload: payload as unknown as Record<string, unknown>,
   });
+  if (error) {
+    return new Response(JSON.stringify({
+      error: 'Resend callback reconciliation failed',
+      detail: error.message,
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({ ok: true, reconciliation: data }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 });

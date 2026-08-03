@@ -11,6 +11,7 @@ import type { AgreementNormativeSnapshot } from "@/lib/secretaria/normative-fram
 import type { ActaLegalStructureViewModel } from "@/lib/secretaria/acta-legal-structure";
 import type { OpenXmlValidationResult } from "@/lib/doc-gen/openxml-validation";
 import type { Capa3Values } from "@/lib/secretaria/capa3-fields";
+import type { DocumentOutputContext } from "@/lib/doc-gen/document-output-normalizer";
 
 export type MotorPlantillasIssue = SecretariaValidationIssue;
 
@@ -72,6 +73,11 @@ export interface ComposeDocumentOptions {
   subtitle?: string;
   entityName?: string | null;
   filenamePrefix?: string;
+  /**
+   * Incluye la hoja técnica con los campos Capa 3. Útil durante authoring,
+   * pero debe ser `false` para un documento final de proceso.
+   */
+  includeEditableFields?: boolean;
   normativeSnapshot?: AgreementNormativeSnapshot | null;
   rulePackContext?: ComposeDocumentRulePackContext | null;
   templateContext?: ComposeDocumentTemplateContext | null;
@@ -125,6 +131,7 @@ export interface ValidatePostRenderInput {
   agreementIds: string[];
   unresolvedVariables?: string[];
   actaLegalStructure?: ActaLegalStructureViewModel | null;
+  outputContext?: DocumentOutputContext;
 }
 
 export type ReviewState =

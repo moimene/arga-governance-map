@@ -1,93 +1,170 @@
 import { Building2, Library, AlertTriangle, CheckCircle2, Clock, Loader2, Search, X, FileSignature, BookOpen, ClipboardList } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useLibrosList, useCerrarVolumen, useLegalizacionTransicion } from "@/hooks/useLibros";
+import { useLibrosList } from "@/hooks/useLibros";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-import {
-  availableLegalizacionActions,
-  type LegalizacionStatus,
-  type LegalizacionAction,
-} from "@/lib/secretaria/libro-legalizacion";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { StandaloneCertificationActions } from "@/components/secretaria/StandaloneCertificationActions";
 import {
   summarizeBookPortfolio,
+  persistedBookIdForActions,
   type BookDeadlineState,
   type LegalizationRequirement,
   type SocietaryBookGroup,
   type SocietaryBookView,
 } from "@/lib/secretaria/libros-societarios";
+import {
+  useCloseSocietaryBookVolume,
+  useConfigureMinuteBookSection,
+} from "@/hooks/useSocietaryBookEntries";
+import { usePrepareRegistryFiling } from "@/hooks/useRegistryLifecycle";
+import { useUploadRegistryEvidenceArtifact } from "@/hooks/useRegistryEvidenceUpload";
+import { registryChannelsForJurisdiction } from "@/lib/secretaria/registry-channels";
 
-// W4 — acciones de cierre de volumen + legalización para libros PERSISTIDOS y
-// legalizables (los virtuales no se pueden cerrar/legalizar). Surface read/write
-// mínimo: usa la máquina de estados pura y las RPC con tenant-assert.
+// Cierre con manifiesto y apertura del expediente registral de legalización.
+// No marca el libro como presentado/legalizado sin justificante registral.
 function LibroLegalizacionActions({ book }: { book: SocietaryBookView }) {
-  const cerrar = useCerrarVolumen();
-  const transicion = useLegalizacionTransicion();
-  if (book.is_virtual || book.legalization_requirement === "NO_APLICA") return null;
-  const libroId = book.source_book_id ?? book.id;
+  const navigate = useNavigate();
+  const scope = useSecretariaScope();
+  const closeVolume = useCloseSocietaryBookVolume();
+  const configureSection = useConfigureMinuteBookSection();
+  const prepareFiling = usePrepareRegistryFiling();
+  const uploadEvidence = useUploadRegistryEvidenceArtifact();
+  const [instanceFile, setInstanceFile] = useState<File | null>(null);
+  const [filingChannel, setFilingChannel] = useState("");
+  const [filingId, setFilingId] = useState<string | null>(null);
+  const closeOperationId = useRef(crypto.randomUUID());
+  const prepareOperationId = useRef(crypto.randomUUID());
+  const libroId = persistedBookIdForActions(book);
+  if (!libroId || book.legalization_requirement === "NO_APLICA") return null;
   const volumeClosed = book.status === "CERRADO" || Boolean(book.closed_at);
-  const actions = availableLegalizacionActions(
-    book.legalization_status as LegalizacionStatus,
-    volumeClosed,
-  );
-  const busy = cerrar.isPending || transicion.isPending;
-  const LABELS: Record<LegalizacionAction, string> = {
-    PRESENTAR: "Presentar a legalización",
-    LEGALIZAR: "Marcar legalizado",
-    RECHAZAR: "Marcar rechazado",
-  };
+  const busy = closeVolume.isPending || prepareFiling.isPending || uploadEvidence.isPending;
   const btnCls =
     "inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-1.5 text-[11px] font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)] disabled:opacity-60";
   const onFail = (e: unknown) =>
     toast.error(e instanceof Error ? e.message : "No se pudo completar la acción.");
+
+  async function prepareLegalizationFiling() {
+    if (!instanceFile || !filingChannel) {
+      toast.error("Adjunte la instancia y seleccione el canal registral.");
+      return;
+    }
+    try {
+      const artifact = await uploadEvidence.mutateAsync({
+        file: instanceFile,
+        entityId: book.entity_id,
+        title: `Instancia de legalización: ${book.display_label}`,
+        artifactKind: "DOCUMENTO_REGISTRAL",
+        sourceDomain: "mandatory_book",
+        sourceId: libroId,
+        metadata: { registry_base_document_kind: "INSTANCIA", book_period: book.period },
+      });
+      const result = await prepareFiling.mutateAsync({
+        operationId: prepareOperationId.current,
+        entityId: book.entity_id,
+        sourceDomain: "MANDATORY_BOOK",
+        sourceId: libroId,
+        baseDocumentKind: "INSTANCIA",
+        baseDocumentArtifactId: artifact.id,
+        filingVia: filingChannel,
+        procedureProfileCode: "LEGALIZACION_LIBROS",
+        procedureSnapshot: {
+          book_kind: book.book_code,
+          period: book.period,
+          volume_number: book.volume_number,
+        },
+      });
+      setFilingId(result.filing_id);
+      toast.success("Expediente de legalización preparado", {
+        description: "El libro sigue sin constar como presentado o legalizado hasta registrar evidencia.",
+      });
+    } catch (error) {
+      onFail(error);
+    }
+  }
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--g-border-subtle)] pt-3">
-      <span className="text-[11px] font-medium text-[var(--g-text-secondary)]">Legalización:</span>
+    <div className="mt-3 space-y-3 border-t border-[var(--g-border-subtle)] pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-medium text-[var(--g-text-secondary)]">Libro persistido:</span>
+        {book.body_id && book.book_code.startsWith("LIBRO_ACTAS") && !volumeClosed ? (
+          <button
+            type="button"
+            disabled={configureSection.isPending}
+            className={btnCls}
+            onClick={() => configureSection.mutate({
+              bookId: libroId,
+              bodyId: book.body_id!,
+              sectionCode: `MINUTES_${book.body_id!.replace(/-/g, "_").toUpperCase()}`,
+              sectionLabel: `Actas — ${book.body_name ?? book.documented_organ}`,
+            }, {
+              onSuccess: () => toast.success("Sección de actas configurada."),
+              onError: onFail,
+            })}
+          >
+            Configurar sección de actas
+          </button>
+        ) : null}
       {!volumeClosed && (
         <button
           type="button"
           disabled={busy}
           className={btnCls}
           onClick={() =>
-            cerrar.mutate(libroId, {
-              onSuccess: () => toast.success("Volumen cerrado."),
+            closeVolume.mutate({ bookId: libroId, operationId: closeOperationId.current }, {
+              onSuccess: () => toast.success("Volumen cerrado con manifiesto persistido."),
               onError: onFail,
             })
           }
         >
-          Cerrar volumen
+          Cerrar volumen con manifiesto
         </button>
       )}
-      {actions.map((a) => (
+      </div>
+
+      {volumeClosed && !filingId ? (
+        <div className="space-y-2 bg-[var(--g-surface-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
+          <p className="text-xs font-medium text-[var(--g-text-primary)]">Preparar expediente de legalización</p>
+          <select
+            value={filingChannel}
+            onChange={(event) => setFilingChannel(event.target.value)}
+            aria-label="Canal registral para legalización"
+            className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-xs text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            <option value="">Seleccionar canal</option>
+            {registryChannelsForJurisdiction(book.jurisdiction ?? "ES").map((channel) => (
+              <option key={channel.value} value={channel.value}>{channel.label}</option>
+            ))}
+          </select>
+          <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+            Instancia de legalización
+            <input
+              type="file"
+              onChange={(event) => {
+                setInstanceFile(event.target.files?.[0] ?? null);
+                prepareOperationId.current = crypto.randomUUID();
+              }}
+              className="mt-1 block w-full text-xs text-[var(--g-text-secondary)] file:mr-2 file:border-0 file:bg-[var(--g-surface-card)] file:px-2 file:py-1.5 file:text-xs file:text-[var(--g-text-primary)]"
+            />
+          </label>
+          <button type="button" disabled={busy || !instanceFile || !filingChannel} className={btnCls} onClick={prepareLegalizationFiling}>
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Crear expediente registral
+          </button>
+        </div>
+      ) : null}
+
+      {filingId ? (
         <button
-          key={a}
           type="button"
-          disabled={busy}
           className={btnCls}
-          onClick={() =>
-            transicion.mutate(
-              {
-                libroId,
-                action: a,
-                evidenceUrl: a === "LEGALIZAR" ? `CSV-DEMO-${libroId.slice(0, 8)}` : null,
-              },
-              {
-                onSuccess: () => toast.success(`${LABELS[a]} — hecho.`),
-                onError: onFail,
-              },
-            )
-          }
+          onClick={() => navigate(scope.createScopedTo(`/secretaria/tramitador/${filingId}`))}
         >
-          {LABELS[a]}
+          Abrir expediente registral
         </button>
-      ))}
-      {volumeClosed && actions.length === 0 && (
-        <span className="text-[11px] text-[var(--g-text-secondary)]">
-          {statusLabel(book.legalization_status)}
-        </span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -694,6 +771,9 @@ export default function LibrosObligatorios() {
                                   },
                                 ]}
                               />
+                            </div>
+                            <div data-testid="libro-legalizacion-actions-desktop">
+                              <LibroLegalizacionActions book={b} />
                             </div>
                           </>
                         );

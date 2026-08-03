@@ -7,14 +7,15 @@ import {
   useAgreementForNoSessionResolution,
   useCastVote,
 } from "@/hooks/useAcuerdosSinSesion";
-import { useERDSNotification } from "@/hooks/useERDSNotification";
+import { useEADInterpositionCommunication } from "@/hooks/useERDSNotification";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { EmitirCertificacionAcuerdoButton } from "@/components/secretaria/EmitirCertificacionAcuerdoButton";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { evaluateNoSessionResult } from "@/lib/secretaria/no-session-client-guards";
-import { useMeetingParticipants } from "@/hooks/useBodies";
+import { useNoSessionParticipants } from "@/hooks/useBodies";
+import { authoritativeNoSessionRecipients } from "@/lib/secretaria/no-session-recipient-eligibility";
 
 function buildNoSessionVariables(
   r: NonNullable<ReturnType<typeof useAcuerdoSinSesionById>["data"]>,
@@ -115,14 +116,18 @@ export default function AcuerdoSinSesionDetalle() {
   const scope = useSecretariaScope();
   const { data, isLoading } = useAcuerdoSinSesionById(id);
   const { data: linkedAgreement } = useAgreementForNoSessionResolution(id);
-  const { sendCertifiedNotification } = useERDSNotification();
-  const { data: bodyParticipants = [] } = useMeetingParticipants(data?.body_id);
+  const { createInterpositionDraft } = useEADInterpositionCommunication();
+  const sourceEntityCandidate = data?.entity_id ?? data?.governing_bodies?.entity_id ?? undefined;
+  const { data: bodyParticipants = [] } = useNoSessionParticipants(
+    data?.body_id,
+    sourceEntityCandidate,
+  );
   const castVote = useCastVote(id);
   const adoptAgreement = useAdoptNoSessionAgreement();
   const { primaryRole } = useCurrentUserRole();
-  const [erdsStatus, setErdsStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [erdsError, setErdsError] = useState<string | null>(null);
-  const [erdsRef, setErdsRef] = useState<string | null>(null);
+  const [eadStatus, setEadStatus] = useState<"idle" | "saving" | "draft" | "error">("idle");
+  const [eadError, setEadError] = useState<string | null>(null);
+  const [communicationId, setCommunicationId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -140,27 +145,32 @@ export default function AcuerdoSinSesionDetalle() {
   }
 
   const r = data;
-  const erdsRecipients = bodyParticipants
-    .filter((participant) => Boolean(participant.email?.trim()))
-    .map((participant) => ({
-      email: participant.email!.trim(),
-      name: participant.full_name ?? participant.email!.trim(),
-    }));
-  // ITEM-063: el cliente EAD Trust (useERDSNotification → generateEvidence → getOktaToken) exige
-  // client_credentials que NO pueden vivir en el navegador (clientSecret hardcodeado a '': trust
-  // boundary intencional). En browser el envío siempre lanza QTSP_SERVER_PROXY_REQUIRED, así que
-  // deshabilitamos el CTA con explicación accionable en vez de dejar una acción garantizada a error.
-  // El despacho certificado real se origina server-side desde el módulo Comunicaciones / EAD Trust.
-  const erdsProxyAvailable = Boolean(
-    import.meta.env.VITE_EAD_TRUST_OKTA_TOKEN_URL &&
-      import.meta.env.VITE_EAD_TRUST_CLIENT_ID &&
-      import.meta.env.VITE_EAD_TRUST_EVIDENCE_API_BASE_URL,
+  const eligibleRecipients = authoritativeNoSessionRecipients(
+    bodyParticipants,
+    r.governing_bodies?.body_type,
+    r.body_id,
   );
-  const erdsDisabledReason = !erdsProxyAvailable
-    ? "El despacho certificado ERDS se ejecuta server-side desde el módulo Comunicaciones (proxy QTSP / EAD Trust). No está disponible desde el navegador en este entorno."
-    : erdsRecipients.length === 0
-      ? "No hay destinatarios vigentes con email en el órgano"
-      : null;
+  const recipientsWithoutEmail = eligibleRecipients.filter((participant) => !participant.email?.trim());
+  const eadRecipients = eligibleRecipients.map((participant) => ({
+    personId: participant.person_id,
+    email: participant.email?.trim() ?? "",
+  }));
+  const sourceEntityId = r.entity_id ?? r.governing_bodies?.entity_id ?? null;
+  const votingDeadline = r.voting_deadline ? new Date(r.voting_deadline) : null;
+  const isOpenVotingWindow = r.status === "VOTING_OPEN"
+    && Boolean(r.opened_at)
+    && !r.closed_at
+    && Boolean(votingDeadline && !Number.isNaN(votingDeadline.getTime()))
+    && votingDeadline!.getTime() > Date.now();
+  const eadDisabledReason = !isOpenVotingWindow
+    ? "El borrador EAD solo puede registrarse durante una votación abierta y no vencida"
+    : eligibleRecipients.length === 0
+      ? "No existe un censo votante vigente para este órgano"
+      : recipientsWithoutEmail.length > 0
+        ? `Falta email en ${recipientsWithoutEmail.length} persona(s) del censo votante`
+        : !sourceEntityId
+          ? "No consta la sociedad de origen de la comunicación"
+          : null;
   const body = r.governing_bodies?.name ?? "Órgano";
   const entity = r.governing_bodies?.entities?.common_name ?? "—";
   const jurisdiction = r.governing_bodies?.entities?.jurisdiction ?? null;
@@ -193,39 +203,31 @@ export default function AcuerdoSinSesionDetalle() {
     });
   }
 
-  const handleSendERDS = async () => {
+  const handleCreateEADDraft = async () => {
     if (!r.id) return;
-    // ITEM-063: sin proxy QTSP server-side el envío lanzaría QTSP_SERVER_PROXY_REQUIRED;
-    // cortamos en seco con explicación accionable en vez de propagar el error del cliente.
-    if (!erdsProxyAvailable) {
-      setErdsError(
-        "El despacho certificado ERDS no está disponible desde el navegador. Gestiónelo desde el módulo Comunicaciones (proxy QTSP / EAD Trust).",
-      );
-      setErdsStatus("error");
+    if (eadDisabledReason || !sourceEntityId) {
+      setEadError(eadDisabledReason ?? "No se pudo resolver el origen de la comunicación.");
+      setEadStatus("error");
       return;
     }
-    if (erdsRecipients.length === 0) {
-      setErdsError("No hay destinatarios vigentes con email en el órgano.");
-      setErdsStatus("error");
-      return;
-    }
-    setErdsStatus("sending");
-    setErdsError(null);
+    setEadStatus("saving");
+    setEadError(null);
     try {
-      const refs: string[] = [];
-      for (const recipient of erdsRecipients) {
-        const result = await sendCertifiedNotification.mutateAsync({
-          recipientEmail: recipient.email,
-          subject: `Notificación certificada: ${r.title}`,
-          body: r.proposal_text ?? "Se adjunta la propuesta de acuerdo para su votación.",
-        });
-        refs.push(`${recipient.name}: ${result.deliveryRef}`);
-      }
-      setErdsRef(refs.join(" · "));
-      setErdsStatus("sent");
+      const result = await createInterpositionDraft.mutateAsync({
+        entityId: sourceEntityId,
+        bodyId: r.body_id,
+        agreementId: linkedAgreement?.id ?? null,
+        subject: `Comunicación societaria: ${r.title}`,
+        body: r.proposal_text ?? "Se remite la propuesta de acuerdo para su votación.",
+        recipients: eadRecipients,
+        sourceDomain: "NO_SESSION_RESOLUTION",
+        sourceId: r.id,
+      });
+      setCommunicationId(result.communicationId);
+      setEadStatus("draft");
     } catch (e) {
-      setErdsError(e instanceof Error ? e.message : "Error desconocido");
-      setErdsStatus("error");
+      setEadError(e instanceof Error ? e.message : "Error desconocido");
+      setEadStatus("error");
     }
   };
 
@@ -492,7 +494,7 @@ export default function AcuerdoSinSesionDetalle() {
         </div>
       )}
 
-      {/* Panel ERDS — Notificación certificada */}
+      {/* Interposición EAD: registro de borrador sin envío ni firma. */}
       <div
         className="mt-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
         style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -500,68 +502,76 @@ export default function AcuerdoSinSesionDetalle() {
         <div className="border-b border-[var(--g-border-subtle)] px-5 py-3">
           <h2 className="text-sm font-semibold text-[var(--g-text-primary)] flex items-center gap-2">
             <Mail className="h-4 w-4" />
-            Notificación certificada ERDS
+            Interposición EAD y custodia documental
           </h2>
         </div>
         <div className="p-5">
-          {erdsStatus === "idle" && (
+          {eadStatus === "idle" && (
             <>
-              {/* ITEM-063: copy honesto — el envío certificado real es server-side; el CTA in-browser
-                  queda deshabilitado con explicación accionable cuando no hay proxy QTSP configurado. */}
               <p className="mb-4 text-xs text-[var(--g-text-secondary)]">
-                {erdsProxyAvailable
-                  ? "Envíe una notificación certificada (ERDS) a los destinatarios del acuerdo con evidencia electrónica de entrega vía EAD Trust."
-                  : "El envío certificado ERDS (evidencia de entrega vía EAD Trust) se ejecuta server-side desde el módulo de Comunicaciones. Este entorno no expone el proxy QTSP en el navegador, por lo que el envío directo desde esta pantalla no está habilitado."}
+                Registra un borrador para mensajería básica y futura custodia/e-archiving. Esta acción
+                no envía, no programa el dispatcher y no afirma firma, ERDS, entrega ni interacción
+                efectiva con EAD Trust.
               </p>
               <button
                 type="button"
-                onClick={handleSendERDS}
-                disabled={sendCertifiedNotification.isPending || Boolean(erdsDisabledReason)}
+                onClick={handleCreateEADDraft}
+                disabled={createInterpositionDraft.isPending || Boolean(eadDisabledReason)}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderRadius: "var(--g-radius-md)" }}
-                aria-busy={sendCertifiedNotification.isPending}
-                title={erdsDisabledReason ?? undefined}
+                aria-busy={createInterpositionDraft.isPending}
+                aria-describedby={eadDisabledReason ? "ead-interposition-disabled-reason" : undefined}
+                title={eadDisabledReason ?? undefined}
               >
-                <Mail className="h-4 w-4" />
-                Enviar notificación ERDS{erdsRecipients.length > 0 ? ` (${erdsRecipients.length})` : ""}
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                Registrar borrador EAD{eadRecipients.length > 0 ? ` (${eadRecipients.length})` : ""}
               </button>
-              {erdsDisabledReason ? (
-                <p className="mt-2 text-xs text-[var(--g-text-secondary)]">{erdsDisabledReason}</p>
+              {eadDisabledReason ? (
+                <p id="ead-interposition-disabled-reason" className="mt-2 text-xs text-[var(--g-text-secondary)]">
+                  {eadDisabledReason}
+                </p>
               ) : null}
             </>
           )}
 
-          {erdsStatus === "sending" && (
+          {eadStatus === "saving" && (
             <div className="flex items-center gap-2 py-2 text-sm text-[var(--g-text-secondary)]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Registrando notificación ERDS (demo)…
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Registrando el borrador…
             </div>
           )}
 
-          {erdsStatus === "sent" && (
+          {eadStatus === "draft" && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-[var(--status-success)]">
-                <Mail className="h-4 w-4" />
-                <span className="font-medium">Notificación ERDS registrada (entorno demo / sandbox)</span>
+              <div className="flex items-center gap-2 text-sm text-[var(--status-info)]">
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                <span className="font-medium">Borrador registrado; sin envío ni interacción con proveedor</span>
               </div>
-              {erdsRef && (
+              {communicationId && (
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Referencia de entrega: <span className="font-mono font-medium text-[var(--g-text-primary)]">{erdsRef}</span>
+                  Expediente de comunicación:{" "}
+                  <button
+                    type="button"
+                    onClick={() => navigate(scope.createScopedTo(`/secretaria/comunicaciones/${communicationId}`))}
+                    className="font-mono font-medium text-[var(--g-brand-3308)] hover:underline"
+                  >
+                    {communicationId}
+                  </button>
                 </p>
               )}
             </div>
           )}
 
-          {erdsStatus === "error" && (
+          {eadStatus === "error" && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-[var(--status-error)]">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="font-medium">Error al enviar la notificación</span>
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                <span className="font-medium">No se pudo registrar el borrador</span>
               </div>
-              {erdsError && <p className="text-xs text-[var(--status-error)]">{erdsError}</p>}
+              {eadError && <p className="text-xs text-[var(--status-error)]">{eadError}</p>}
               <button
                 type="button"
-                onClick={() => setErdsStatus("idle")}
+                onClick={() => setEadStatus("idle")}
                 className="text-xs text-[var(--g-brand-3308)] hover:underline"
               >
                 Reintentar

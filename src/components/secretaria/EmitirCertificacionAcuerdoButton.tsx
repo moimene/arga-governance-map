@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileSignature, Loader2 } from "lucide-react";
+import { FileCheck2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePresidenteVigente } from "@/hooks/useAuthorityEvidence";
@@ -50,22 +50,10 @@ export function EmitirCertificacionAcuerdoButton({
       }
       const certificationId = String(certId);
 
-      const qtspToken = btoa(`qtsp:demo:no-session:${certificationId}`);
-      const tsqToken = btoa(`tsq:demo:no-session:${certificationId}:${new Date().toISOString()}`);
-      const { error: signError } = await supabase.rpc("fn_firmar_certificacion", {
-        p_certification_id: certificationId,
-        p_qtsp_token: qtspToken,
-        p_tsq_token: tsqToken,
-      });
-      if (signError) throw new Error(`Firmar: ${signError.message}`);
-
-      const { data: uri, error: emitError } = await supabase.rpc("fn_emitir_certificacion", {
-        p_certification_id: certificationId,
-      });
-      if (emitError) throw new Error(`Emitir: ${emitError.message}`);
-
-      toast.success("Certificación emitida", {
-        description: `Referencia operativa demo creada (${String(uri)}). Pendiente de audit/retention/legal hold; no constituye evidencia final productiva ni implica envío al Registro Mercantil.`,
+      toast.success("Borrador de certificación preparado", {
+        description:
+          `Certificación ${certificationId} creada. Revise su contenido y complete el circuito `
+          + "autoritativo de constancias y custodia antes de emitirla.",
       });
       queryClient.invalidateQueries({ queryKey: ["certifications"] });
       queryClient.invalidateQueries({ queryKey: ["agreements"] });
@@ -90,9 +78,9 @@ export function EmitirCertificacionAcuerdoButton({
       {busy ? (
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
       ) : (
-        <FileSignature className="h-4 w-4" aria-hidden="true" />
+        <FileCheck2 className="h-4 w-4" aria-hidden="true" />
       )}
-      {busy ? "Emitiendo…" : "Emitir certificación"}
+      {busy ? "Preparando…" : "Preparar certificación"}
     </button>
   );
 }

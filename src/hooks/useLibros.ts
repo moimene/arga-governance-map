@@ -1,10 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
-import type { LegalizacionAction } from "@/lib/secretaria/libro-legalizacion";
 import {
   buildSocietaryBookPortfolio,
-  normalizeMandatoryBookKind,
   type BookBodyLike,
   type BookPortfolioEntityLike,
   type PersistedMandatoryBookLike,
@@ -32,98 +30,6 @@ export interface MandatoryBookRow {
   tipo_social?: string | null;
   es_cotizada?: boolean | null;
   regulated_sector?: string | null;
-}
-
-type ActivityRow = {
-  id: string;
-  entity_id: string | null;
-  body_id?: string | null;
-  created_at?: string | null;
-  signed_at?: string | null;
-  registered_at?: string | null;
-  effective_date?: string | null;
-};
-
-function latestDate(current: string | null, candidate: string | null | undefined) {
-  if (!candidate) return current;
-  if (!current) return candidate;
-  return new Date(candidate).getTime() > new Date(current).getTime() ? candidate : current;
-}
-
-function applyBookActivityMetrics(
-  rows: SocietaryBookView[],
-  params: {
-    minutes: ActivityRow[];
-    capitalMovements: ActivityRow[];
-    unipersonalDecisions: ActivityRow[];
-    cargos: ActivityRow[];
-  },
-) {
-  const minutesByBody = new Map<string, ActivityRow[]>();
-  const minutesByEntity = new Map<string, ActivityRow[]>();
-  const capitalByEntity = new Map<string, ActivityRow[]>();
-  const decisionsByEntity = new Map<string, ActivityRow[]>();
-  const cargosByEntity = new Map<string, ActivityRow[]>();
-
-  for (const minute of params.minutes) {
-    if (minute.entity_id) {
-      const current = minutesByEntity.get(minute.entity_id) ?? [];
-      current.push(minute);
-      minutesByEntity.set(minute.entity_id, current);
-    }
-    if (minute.body_id) {
-      const current = minutesByBody.get(minute.body_id) ?? [];
-      current.push(minute);
-      minutesByBody.set(minute.body_id, current);
-    }
-  }
-  for (const movement of params.capitalMovements) {
-    if (!movement.entity_id) continue;
-    const current = capitalByEntity.get(movement.entity_id) ?? [];
-    current.push(movement);
-    capitalByEntity.set(movement.entity_id, current);
-  }
-  for (const decision of params.unipersonalDecisions) {
-    if (!decision.entity_id) continue;
-    const current = decisionsByEntity.get(decision.entity_id) ?? [];
-    current.push(decision);
-    decisionsByEntity.set(decision.entity_id, current);
-  }
-  for (const cargo of params.cargos) {
-    if (!cargo.entity_id) continue;
-    const current = cargosByEntity.get(cargo.entity_id) ?? [];
-    current.push(cargo);
-    cargosByEntity.set(cargo.entity_id, current);
-  }
-
-  return rows.map((row) => {
-    let activity: ActivityRow[] = [];
-    const code = normalizeMandatoryBookKind(row.book_code);
-    if (code.startsWith("LIBRO_ACTAS")) {
-      activity = row.body_id
-        ? minutesByBody.get(row.body_id) ?? []
-        : row.entity_id
-          ? minutesByEntity.get(row.entity_id) ?? []
-          : [];
-    } else if (code === "LIBRO_REGISTRO_SOCIOS" || code === "LIBRO_ACCIONES_NOMINATIVAS") {
-      activity = row.entity_id ? capitalByEntity.get(row.entity_id) ?? [] : [];
-    } else if (code === "LIBRO_CONTRATOS_SOCIO_UNICO") {
-      activity = row.entity_id ? decisionsByEntity.get(row.entity_id) ?? [] : [];
-    } else if (code === "REGISTRO_PERSONAS_CARGOS") {
-      activity = row.entity_id ? cargosByEntity.get(row.entity_id) ?? [] : [];
-    }
-
-    if (activity.length === 0) return row;
-    const last = activity.reduce<string | null>((acc, item) => {
-      const candidate = item.registered_at ?? item.signed_at ?? item.effective_date ?? item.created_at ?? null;
-      return latestDate(acc, candidate);
-    }, null);
-    return {
-      ...row,
-      entries_count: activity.length,
-      last_entry_at: last,
-    };
-  });
 }
 
 export function useLibrosList(entityId?: string | null) {
@@ -229,79 +135,12 @@ export function useLibrosList(entityId?: string | null) {
         entities: Array.from(entityMap.values()),
       });
 
-      const entityIds = Array.from(new Set(portfolio.map((book) => book.entity_id).filter((id): id is string => Boolean(id))));
-      if (entityIds.length === 0) return portfolio;
-
-      const [minutesRes, capitalRes, decisionsRes, cargosRes] = await Promise.all([
-        supabase
-          .from("minutes")
-          .select("id, entity_id, body_id, created_at, signed_at, registered_at")
-          .eq("tenant_id", tenantId!)
-          .in("entity_id", entityIds),
-        supabase
-          .from("capital_movements")
-          .select("id, entity_id, created_at, effective_date")
-          .eq("tenant_id", tenantId!)
-          .in("entity_id", entityIds),
-        supabase
-          .from("unipersonal_decisions")
-          .select("id, entity_id, created_at")
-          .eq("tenant_id", tenantId!)
-          .in("entity_id", entityIds),
-        supabase
-          .from("condiciones_persona")
-          .select("id, entity_id, effective_date:fecha_inicio")
-          .eq("tenant_id", tenantId!)
-          .in("entity_id", entityIds),
-      ]);
-      if (minutesRes.error) throw minutesRes.error;
-      if (capitalRes.error) throw capitalRes.error;
-      if (decisionsRes.error) throw decisionsRes.error;
-      if (cargosRes.error) throw cargosRes.error;
-
-      return applyBookActivityMetrics(portfolio, {
-        minutes: (minutesRes.data ?? []) as ActivityRow[],
-        capitalMovements: (capitalRes.data ?? []) as ActivityRow[],
-        unipersonalDecisions: (decisionsRes.data ?? []) as ActivityRow[],
-        cargos: (cargosRes.data ?? []) as ActivityRow[],
-      });
+      // Los contadores son proyecciones persistidas de asientos reales. Las
+      // actas o movimientos de dominio no se cuentan como si ya estuvieran
+      // asentados y los libros virtuales no fabrican actividad operativa.
+      return portfolio.map((book) => book.is_virtual
+        ? { ...book, entries_count: null, last_entry_at: null }
+        : book);
     },
-  });
-}
-
-// W4 — mutaciones de cierre de volumen y legalización (RPCs SECURITY DEFINER).
-export function useCerrarVolumen() {
-  const { tenantId } = useTenantContext();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (libroId: string) => {
-      const { data, error } = await supabase.rpc("fn_libro_cerrar_volumen", {
-        p_libro_id: libroId,
-      });
-      if (error) throw error;
-      return data as { libro_id: string; status: string; already_closed: boolean };
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mandatory_books", tenantId] }),
-  });
-}
-
-export function useLegalizacionTransicion() {
-  const { tenantId } = useTenantContext();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: {
-      libroId: string;
-      action: LegalizacionAction;
-      evidenceUrl?: string | null;
-    }) => {
-      const { data, error } = await supabase.rpc("fn_libro_legalizacion_transicion", {
-        p_libro_id: params.libroId,
-        p_action: params.action,
-        p_evidence_url: params.evidenceUrl ?? null,
-      });
-      if (error) throw error;
-      return data as { libro_id: string; legalization_status: string };
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mandatory_books", tenantId] }),
   });
 }

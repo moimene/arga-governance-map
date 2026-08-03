@@ -25,18 +25,18 @@ import {
   Lock,
   Sparkles,
   Save,
-  CloudOff, Clock,} from "lucide-react";
+  CloudOff,
+} from "lucide-react";
 import { useAgreement, type AgreementFull } from "@/hooks/useAgreementCompliance";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { usePlantillaWithOverrides } from "@/hooks/usePlantillaWithOverrides";
-import { useQTSPSign, type QESSignResult } from "@/hooks/useQTSPSign";
 import { supabase } from "@/integrations/supabase/client";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
 import { BloquesSectorialesPanel } from "@/components/secretaria/BloquesSectorialesPanel";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
-import { resolveVariables } from "@/lib/doc-gen/variable-resolver";
+import { normalizeFuente, resolveVariables } from "@/lib/doc-gen/variable-resolver";
 import type { Capa2Variable, ResolverContext } from "@/lib/doc-gen/variable-resolver";
 import { buildAgreementResolverContext } from "@/lib/doc-gen/resolver-context";
 import { downloadDocx, printRenderedDocument } from "@/lib/doc-gen/docx-generator";
@@ -44,7 +44,6 @@ import { archiveDocxToStorage } from "@/lib/doc-gen/storage-archiver";
 import { computeManifestHashSync, generarVerificadorOffline } from "@/lib/rules-engine";
 import type { EvidenceManifest, EvidenceArtifact } from "@/lib/rules-engine";
 import { useTenantContext } from "@/context/TenantContext";
-import { usePersonaCanonical } from "@/hooks/usePersonasCanonical";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   capa3ValueHasContent,
@@ -56,10 +55,13 @@ import {
 import {
   buildSecretariaDocumentGenerationRequest,
   type SecretariaAdoptionMode,
-  type SecretariaDocumentType,
 } from "@/lib/secretaria/document-generation-boundary";
 import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 import { templateCompatibleWithAgreement } from "@/lib/secretaria/agreement-template-compatibility";
+import {
+  agreementTemplateDocumentType,
+  templateTypesForAgreementAdoptionMode,
+} from "@/lib/secretaria/agreement-document-routing";
 import {
   finalizeEditableDocumentDraft,
   prepareDocumentComposition,
@@ -74,7 +76,8 @@ import {
 import { isLegallyReviewedDraft } from "@/lib/doc-gen/template-operability";
 import { EvidenceStatusBadge } from "@/components/secretaria/EvidenceStatusBadge";
 import { evidenceStatusDescriptor } from "@/lib/secretaria/evidence-status-labels";
-import { generatePdf } from "@/lib/doc-gen/pdf-generator";
+import { derivePowerCapa3Prefill } from "@/lib/secretaria/agreement-capa3-prefill";
+import { resolveAgreementDocumentLegalDate } from "@/lib/secretaria/workflow-date-semantics";
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 
@@ -145,6 +148,7 @@ function buildDefaultCapa3Values(
       `Abstenciones: ${abstentions}`,
       `Total legitimados/votantes: ${totalMembers}`,
     ].join("\n");
+  const powerPrefill = derivePowerCapa3Prefill(decisionText);
 
   const defaults: Capa3Values = {};
   // Keys cuyo default proviene de override explícito (incluyendo "") — el
@@ -167,8 +171,20 @@ function buildDefaultCapa3Values(
       continue;
     }
 
+    const resolvedExact = resolvedVars[key];
+    if (capa3ValueHasContent(resolvedExact)) {
+      defaults[key] = resolvedExact as Capa3Values[string];
+      continue;
+    }
+
     if (normalizedKey === "tabla_respuestas" || normalizedKey.includes("respuestas")) {
       defaults[key] = responseSummary;
+    } else if (normalizedKey === "apoderado_nombre" && powerPrefill.apoderado_nombre) {
+      defaults[key] = powerPrefill.apoderado_nombre;
+    } else if (normalizedKey === "facultades_poder" && powerPrefill.facultades_poder) {
+      defaults[key] = powerPrefill.facultades_poder;
+    } else if (normalizedKey === "limitaciones_poder" && powerPrefill.limitaciones_poder) {
+      defaults[key] = powerPrefill.limitaciones_poder;
     } else if (
       normalizedKey === "texto_acuerdo" ||
       normalizedKey.includes("texto_acuerdo") ||
@@ -190,39 +206,6 @@ function buildDefaultCapa3Values(
   );
 }
 
-function inferDocumentTypeForComposer(
-  plantilla: PlantillaProtegidaRow,
-  adoptionMode?: string | null,
-): SecretariaDocumentType {
-  const tipo = plantilla.tipo;
-  const mode = adoptionMode?.toUpperCase() ?? "";
-  if (
-    tipo === "ACTA_ACUERDO_ESCRITO" ||
-    tipo === "ACTA_DECISION_CONJUNTA" ||
-    tipo === "ACTA_ORGANO_ADMIN" ||
-    mode === "NO_SESSION" ||
-    mode === "CO_APROBACION" ||
-    mode === "SOLIDARIO"
-  ) {
-    return "ACUERDO_SIN_SESION";
-  }
-  if (tipo === "ACTA_CONSIGNACION" || mode.startsWith("UNIPERSONAL")) {
-    return "DECISION_UNIPERSONAL";
-  }
-  if (tipo === "INFORME_DOCUMENTAL_PRE") return "INFORME_DOCUMENTAL_PRE";
-  if (tipo === "INFORME_PRECEPTIVO") return "INFORME_DOCUMENTAL_PRE";
-  return "INFORME_DOCUMENTAL_PRE";
-}
-
-function templateTypesForAgreementAdoptionMode(adoptionMode?: string | null): string[] | null {
-  const mode = adoptionMode?.trim().toUpperCase();
-  if (mode === "NO_SESSION") return ["ACTA_ACUERDO_ESCRITO"];
-  if (mode === "CO_APROBACION") return ["ACTA_DECISION_CONJUNTA"];
-  if (mode === "SOLIDARIO") return ["ACTA_ORGANO_ADMIN"];
-  if (mode === "UNIPERSONAL_SOCIO" || mode === "UNIPERSONAL_ADMIN") return ["ACTA_CONSIGNACION"];
-  return null;
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function GenerarDocumentoStepper() {
@@ -230,10 +213,9 @@ export default function GenerarDocumentoStepper() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
-  const { tenantId, personId } = useTenantContext();
+  const { tenantId } = useTenantContext();
   const qc = useQueryClient();
   const { data: agreement, isLoading: agreementLoading } = useAgreement(id);
-  const { data: signer } = usePersonaCanonical(personId ?? undefined);
   const { data: normativeSnapshot } = useAgreementNormativeSnapshot(agreement);
   const { data: plantillas = [], isLoading: plantillasLoading } = usePlantillasProtegidas();
   const requestedPlantillaId = searchParams.get("plantilla");
@@ -247,11 +229,6 @@ export default function GenerarDocumentoStepper() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [contentHash, setContentHash] = useState<string>("");
-  const [signedPdfBuffer, setSignedPdfBuffer] = useState<ArrayBuffer | null>(null);
-  const [signingStatus, setSigningStatus] = useState<"idle" | "pending" | "requested" | "signed" | "error">(
-    "idle"
-  );
-  const [signingError, setSigningError] = useState<string | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<"idle" | "archiving" | "archived" | "error">(
     "idle"
   );
@@ -259,7 +236,6 @@ export default function GenerarDocumentoStepper() {
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [documentActionError, setDocumentActionError] = useState<string | null>(null);
   const [docxBuffer, setDocxBuffer] = useState<Uint8Array | null>(null);
-  const [qesResult, setQesResult] = useState<QESSignResult | null>(null);
   const [capa3Errors, setCapa3Errors] = useState<Record<string, string>>({});
   const [preparedDraft, setPreparedDraft] = useState<PreparedDocumentComposition | null>(null);
   const [editableDraftText, setEditableDraftText] = useState("");
@@ -271,9 +247,12 @@ export default function GenerarDocumentoStepper() {
   const [capa3AssistantSummary, setCapa3AssistantSummary] = useState<string | null>(null);
   const [capa3AssistantApplied, setCapa3AssistantApplied] = useState(false);
 
-  const { signMutation } = useQTSPSign();
   const expedientePath = scope.createScopedTo(`/secretaria/acuerdos/${id}`);
-  const agreementEntityName = agreement?.entities?.common_name ?? undefined;
+  const agreementEntityName = agreement?.entities
+    ? [agreement.entities.common_name, agreement.entities.legal_form]
+        .filter(Boolean)
+        .join(", ")
+    : undefined;
 
   // Load entity-scoped capa3 overrides for the selected plantilla. When
   // entity_id is unavailable (loading or missing) the hook degrades to the
@@ -298,7 +277,7 @@ export default function GenerarDocumentoStepper() {
   // that, Step 2 would render with zero required fields and the user could
   // generate a document without filling them. Preserve the canonical
   // capa3_editables until the overrides query has actually resolved.
-  const effectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
+  const canonicalEffectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
     if (!selectedPlantilla) return null;
     if (overridesLoading || !hasLoadedOverrides) {
       return selectedPlantilla;
@@ -308,6 +287,51 @@ export default function GenerarDocumentoStepper() {
       capa3_editables: overriddenCapa3Editables as PlantillaProtegidaRow["capa3_editables"],
     };
   }, [selectedPlantilla, overriddenCapa3Editables, overridesLoading, hasLoadedOverrides]);
+
+  // Las fuentes manuales de Capa 2 forman parte del formulario, aunque una
+  // plantilla legacy no las haya duplicado todavía en `capa3_editables`.
+  // Sin esta reconciliación el usuario veía "Paso 3", pero el paso siguiente
+  // no contenía ningún control con el que resolver la variable.
+  const normalizedCapa3Fields = useMemo(() => {
+    const fields = normalizeCapa3Fields(canonicalEffectivePlantilla?.capa3_editables);
+    if (!canonicalEffectivePlantilla) return fields;
+
+    const seen = new Set(fields.map((field) => field.campo));
+    const templateText = canonicalEffectivePlantilla.capa1_inmutable ?? "";
+    const manualFields = (canonicalEffectivePlantilla.capa2_variables ?? [])
+      .filter((variable) => normalizeFuente(variable.fuente) === "USUARIO")
+      .filter((variable) => templateText.includes(`{{${variable.variable}}}`))
+      .filter((variable) => /^[a-zA-Z_][a-zA-Z0-9_.-]*$/.test(variable.variable))
+      .filter((variable) => !seen.has(variable.variable))
+      .map((variable) => {
+        seen.add(variable.variable);
+        const raw = variable as Capa2Variable & {
+          descripcion?: string;
+          obligatoria?: string | boolean;
+        };
+        const optional =
+          raw.obligatoria === false ||
+          String(raw.obligatoria ?? raw.condicion ?? "").trim().toUpperCase() === "NO" ||
+          String(raw.condicion ?? "").trim().toUpperCase() === "OPCIONAL";
+        const longText = /texto|detalle|observ|facultad|recomend|resultado/i.test(variable.variable);
+        return {
+          campo: variable.variable,
+          obligatoriedad: optional ? "OPCIONAL" : "OBLIGATORIO",
+          descripcion: raw.descripcion?.trim() || `Valor manual para ${variable.variable}.`,
+          tipo: longText ? "textarea" : "text",
+        };
+      });
+
+    return [...fields, ...manualFields];
+  }, [canonicalEffectivePlantilla]);
+
+  const effectivePlantilla = useMemo<PlantillaProtegidaRow | null>(() => {
+    if (!canonicalEffectivePlantilla) return null;
+    return {
+      ...canonicalEffectivePlantilla,
+      capa3_editables: normalizedCapa3Fields as PlantillaProtegidaRow["capa3_editables"],
+    };
+  }, [canonicalEffectivePlantilla, normalizedCapa3Fields]);
 
   useEffect(() => {
     if (capa3OverridesWarnCompat) {
@@ -320,7 +344,7 @@ export default function GenerarDocumentoStepper() {
   const missingRequiredCapa2 = useMemo(() => {
     if (!selectedPlantilla) return [];
     return (selectedPlantilla.capa2_variables ?? [])
-      .filter((variable) => variable.fuente !== "USUARIO")
+      .filter((variable) => normalizeFuente(variable.fuente) !== "USUARIO")
       .map((variable) => variable.variable)
       .filter((variable) => !hasResolvedValue(resolvedVars[variable]));
   }, [resolvedVars, selectedPlantilla]);
@@ -334,10 +358,6 @@ export default function GenerarDocumentoStepper() {
   const requestedPlantilla = useMemo(
     () => compatiblePlantillas.find((plantilla) => plantilla.id === requestedPlantillaId) ?? null,
     [compatiblePlantillas, requestedPlantillaId],
-  );
-  const normalizedCapa3Fields = useMemo(
-    () => normalizeCapa3Fields(effectivePlantilla?.capa3_editables),
-    [effectivePlantilla?.capa3_editables],
   );
   const normalizedCapa3Draft = useMemo(
     () => normalizeCapa3Draft(normalizedCapa3Fields, capa3Values),
@@ -354,6 +374,13 @@ export default function GenerarDocumentoStepper() {
   const editableDraftLength = useMemo(
     () => editableDraftText.trim().length,
     [editableDraftText],
+  );
+  const legalDocumentDate = useMemo(
+    () => resolveAgreementDocumentLegalDate({
+      effectiveDate: agreement?.effective_date,
+      decisionDate: agreement?.decision_date,
+    }),
+    [agreement?.decision_date, agreement?.effective_date],
   );
 
   useEffect(() => {
@@ -387,7 +414,7 @@ export default function GenerarDocumentoStepper() {
   const buildComposerRequest = useCallback(
     async (plantilla: PlantillaProtegidaRow) => {
       if (!agreement || !tenantId) throw new Error("No hay acuerdo o tenant para componer el documento.");
-      const documentType = inferDocumentTypeForComposer(plantilla, agreement.adoption_mode);
+      const documentType = agreementTemplateDocumentType(plantilla, agreement.adoption_mode);
       return buildSecretariaDocumentGenerationRequest({
         documentType,
         tenantId,
@@ -522,6 +549,7 @@ export default function GenerarDocumentoStepper() {
         plantilla: effectivePlantilla,
         baseVariables: resolvedVars,
         normativeSnapshot,
+        generatedAt: legalDocumentDate ?? undefined,
       });
       setResolvedVars(prepared.capa2.values);
       setUnresolvedVars(Array.from(new Set([...prepared.capa2.unresolved, ...prepared.unresolvedVariables])));
@@ -554,7 +582,7 @@ export default function GenerarDocumentoStepper() {
     }
 
     setStep(3);
-  }, [selectedPlantilla, effectivePlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft]);
+  }, [selectedPlantilla, effectivePlantilla, normalizedCapa3Values, buildComposerRequest, resolvedVars, normativeSnapshot, persistEditableDraft, legalDocumentDate]);
 
   const handleDraftCapa3 = useCallback(async () => {
     if (!selectedPlantilla) return;
@@ -573,7 +601,7 @@ export default function GenerarDocumentoStepper() {
           contenido_acuerdo: agreement.decision_text ?? agreement.proposal_text ?? "",
           texto_decision: agreement.decision_text ?? agreement.proposal_text ?? "",
         },
-        documentType: inferDocumentTypeForComposer(selectedPlantilla, agreement.adoption_mode),
+        documentType: agreementTemplateDocumentType(selectedPlantilla, agreement.adoption_mode),
         templateTipo: selectedPlantilla.tipo,
       });
       setCapa3Values(result.values);
@@ -597,69 +625,6 @@ export default function GenerarDocumentoStepper() {
     }
   }, [agreement, normalizedCapa3Fields, normalizedCapa3Values, resolvedVars, selectedPlantilla]);
 
-  const handleSignQES = useCallback(async () => {
-    if (!docxBuffer || !selectedPlantilla || !agreement) {
-      setSigningError("Documento no generado aún");
-      return;
-    }
-    if (!personId || !signer?.full_name || !signer.email) {
-      setSigningError("No hay firmante vigente con nombre y email para solicitar la firma.");
-      return;
-    }
-    setSigningStatus("pending");
-    setSigningError(null);
-    try {
-      // Se firma un PDF generado AQUI, no el DOCX.
-      //
-      // Antes se enviaba el DOCX y el proveedor lo convertia por su cuenta: se
-      // hasheaba un documento y se firmaba otro, de modo que el hash registrado
-      // como evidencia no correspondia al artefacto firmado. Ademas las
-      // coordenadas de firma son un concepto del espacio PDF. Generando el PDF
-      // antes, lo hasheado, lo archivado y lo firmado son el mismo documento.
-      const pdf = await generatePdf({
-        renderedText: compositionResult.document.renderedText,
-        title: compositionResult.title,
-        subtitle: agreementEntityName,
-        templateTipo: selectedPlantilla.tipo,
-        templateVersion: selectedPlantilla.version,
-        contentHash: compositionResult.document.contentHash,
-        generatedAt: compositionResult.document.generatedAt,
-      });
-      const pdfBuffer = pdf.bytes.buffer.slice(
-        pdf.bytes.byteOffset,
-        pdf.bytes.byteOffset + pdf.bytes.byteLength,
-      ) as ArrayBuffer;
-
-      const result = await signMutation.mutateAsync({
-        documentName: `${selectedPlantilla.tipo}_${agreement.id.slice(0, 8)}.pdf`,
-        documentData: pdfBuffer,
-        signatories: [{ name: signer.full_name, email: signer.email, sequence: 1 }],
-        createdBy: personId,
-        agreementId: agreement.id,
-        // El sello va en la última página del PDF real, no en la primera.
-        signatureAnchor: pdf.signatureAnchor,
-        onProgress: () => {},
-      });
-      setQesResult(result);
-      // Se conserva el PDF EXACTO que se mandó a firmar: es el que hay que
-      // archivar. Archivar el DOCX dejaría la evidencia apuntando a un
-      // artefacto distinto del firmado, que es justo el defecto que este
-      // camino vino a corregir.
-      setSignedPdfBuffer(pdfBuffer);
-      if (result.signedDocumentData) {
-        setDocxBuffer(new Uint8Array(result.signedDocumentData));
-      }
-      // `signed` solo cuando el proveedor acredita la firma. Al activar, la
-      // solicitud queda ACTIVE: los firmantes tienen el enlace y nadie ha
-      // firmado. Decirlo de otro modo seria afirmar un hecho que no ha ocurrido.
-      setSigningStatus(result.signatureProduced ? "signed" : "requested");
-    } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : "Error desconocido al firmar";
-      setSigningError(errorMsg);
-      setSigningStatus("error");
-    }
-  }, [docxBuffer, selectedPlantilla, agreement, signMutation, personId, signer]);
-
   const handleArchive = useCallback(async () => {
     if (!docxBuffer || !agreement?.id) {
       setArchiveError("Buffer del documento o ID del acuerdo no disponible");
@@ -673,17 +638,16 @@ export default function GenerarDocumentoStepper() {
       const filename = (
         compositionResult?.document.filename ??
         `${selectedPlantilla?.tipo || "documento"}_${agreement.id.slice(0, 8)}_${new Date().toISOString().split("T")[0]}.docx`
-      ).replace(/\.docx$/i, "") + (qesResult?.signedDocumentData || signedPdfBuffer ? ".pdf" : "");
-      // Orden de preferencia: el binario firmado que devuelva el proveedor, el
-      // PDF que se le envió a firmar, y solo si no hubo firma, el DOCX de
-      // trabajo. Lo archivado debe ser lo firmado.
-      const archiveBuffer = qesResult?.signedDocumentData
-        ? qesResult.signedDocumentData
-        : signedPdfBuffer
-          ? signedPdfBuffer
-          : docxBuffer.buffer.slice(docxBuffer.byteOffset, docxBuffer.byteOffset + docxBuffer.byteLength) as ArrayBuffer;
+      ).replace(/\.docx$/i, "") + ".docx";
+      // Este archivado conserva solo la copia DOCX de trabajo. La custodia EAD
+      // del artefacto jurídico final se ejecuta desde el expediente source-bound
+      // y no se mezcla con este paso de generación.
+      const archiveBuffer = docxBuffer.buffer.slice(
+        docxBuffer.byteOffset,
+        docxBuffer.byteOffset + docxBuffer.byteLength,
+      ) as ArrayBuffer;
       const result = await archiveDocxToStorage(archiveBuffer, agreement.id, filename, tenantId ?? "", {
-        processKind: compositionResult?.request.document_type ?? inferDocumentTypeForComposer(
+        processKind: compositionResult?.request.document_type ?? agreementTemplateDocumentType(
           selectedPlantilla,
           agreement.adoption_mode,
         ),
@@ -693,19 +657,8 @@ export default function GenerarDocumentoStepper() {
         templateTipo: selectedPlantilla?.tipo,
         templateVersion: selectedPlantilla?.version,
         contentHash,
-        // ITEM-109: en modo sandbox, signedDocumentData es el buffer ORIGINAL sin
-        // firmar y los IDs son SR-SANDBOX-*/SIGN-SANDBOX-*; no debe etiquetarse
-        // como firmado por 'EAD Trust' ni como QTSP_SIGNED_DOCX. Se propaga
-        // sandbox para que el manifest deje constancia (sandbox:true).
-        signedBy: qesResult && !qesResult.sandbox ? "EAD Trust" : undefined,
-        sandbox: qesResult?.sandbox === true,
-        qesSrId: qesResult?.srId,
-        qesDocumentId: qesResult?.documentId,
-        qesDocumentHash: qesResult?.documentHash,
-        qesSignatoryIds: qesResult?.signatoryIds,
-        qesSignedAt: qesResult?.signed_at,
-        archivedBufferKind:
-          qesResult?.signedDocumentData && !qesResult.sandbox ? "QTSP_SIGNED_DOCX" : "ORIGINAL_DOCX",
+        sandbox: false,
+        archivedBufferKind: "ORIGINAL_DOCX",
         normativeSnapshotId: normativeSnapshot?.snapshot_id ?? null,
         normativeProfileId: normativeSnapshot?.profile_id ?? null,
         normativeProfileHash: normativeSnapshot?.profile_hash ?? null,
@@ -744,7 +697,7 @@ export default function GenerarDocumentoStepper() {
       setArchiveError(errorMsg);
       setArchiveStatus("error");
     }
-  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, qesResult, contentHash, compositionResult, normativeSnapshot]);
+  }, [docxBuffer, agreement, selectedPlantilla, tenantId, qc, contentHash, compositionResult, normativeSnapshot]);
 
   // ── Step 5: Configure draft and generate DOCX ───────────────────────────
 
@@ -758,6 +711,9 @@ export default function GenerarDocumentoStepper() {
         baseVariables: resolvedVars,
         archiveDraft: false,
         normativeSnapshot,
+        subtitle: agreementEntityName,
+        entityName: agreementEntityName,
+        generatedAt: legalDocumentDate ?? undefined,
       });
       const persisted = await persistEditableDraft(
         result,
@@ -774,9 +730,6 @@ export default function GenerarDocumentoStepper() {
       setContentHash(result.contentHash);
       setDocxBuffer(result.docxBuffer);
       setDocumentActionError(null);
-      setSigningStatus("idle");
-      setSigningError(null);
-      setQesResult(null);
       setArchiveStatus("idle");
       setArchiveUrl(null);
       setArchiveError(null);
@@ -786,7 +739,7 @@ export default function GenerarDocumentoStepper() {
     } finally {
       setIsGenerating(false);
     }
-  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, effectivePlantilla, normativeSnapshot]);
+  }, [editableDraftText, persistEditableDraft, preparedDraft, resolvedVars, selectedPlantilla, effectivePlantilla, normativeSnapshot, agreementEntityName, legalDocumentDate]);
 
   const handleDownloadDocument = useCallback(() => {
     if (!docxBuffer || !compositionResult) {
@@ -1036,7 +989,7 @@ export default function GenerarDocumentoStepper() {
                                 <span className="text-[var(--g-text-primary)]">
                                   {typeof value === "object" ? JSON.stringify(value).substring(0, 60) + "…" : String(value)}
                                 </span>
-                              ) : v.fuente === "USUARIO" ? (
+                              ) : normalizeFuente(v.fuente) === "USUARIO" ? (
                                 <span className="italic text-[var(--g-text-secondary)]">→ Paso 3</span>
                               ) : (
                                 <span className="italic text-[var(--status-warning)]">No resuelto</span>
@@ -1049,31 +1002,19 @@ export default function GenerarDocumentoStepper() {
                   </table>
                 </div>
 
-                {unresolvedVars.length > 0 && (
+                {missingRequiredCapa2.length > 0 && (
                   <div
-                    className="flex items-start gap-2 px-4 py-2 text-xs text-[var(--status-warning)] bg-[var(--g-surface-muted)]"
+                    id="unresolved-automatic-variables"
+                    className="flex items-start gap-2 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-4 py-2 text-xs text-[var(--status-warning)]"
+                    role="alert"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span>
-                      {unresolvedVars.length} variable(s) sin resolver. El documento se generará con valores vacíos donde falten datos.
+                      Variables automáticas sin resolver: {missingRequiredCapa2.join(", ")}. El documento no se podrá generar hasta completar los datos del expediente o corregir la plantilla.
                     </span>
                   </div>
                 )}
-
-                {missingRequiredCapa2.length > 0 ? (
-                  <div
-                    className="flex items-start gap-2 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-4 py-2 text-xs text-[var(--status-warning)]"
-                    role="status"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      Variables Capa 2 no resueltas: {missingRequiredCapa2.join(", ")}. El composer
-                      las conservara como advertencias de post-render.
-                    </span>
-                  </div>
-                ) : null}
 
                 <div className="flex justify-between pt-2">
                   <button
@@ -1088,7 +1029,9 @@ export default function GenerarDocumentoStepper() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+                    disabled={missingRequiredCapa2.length > 0}
+                    aria-describedby={missingRequiredCapa2.length > 0 ? "unresolved-automatic-variables" : undefined}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     Siguiente
@@ -1478,7 +1421,7 @@ export default function GenerarDocumentoStepper() {
               </h3>
               <p className="text-xs text-[var(--g-text-secondary)] mb-4">
                 El borrador revisado ya tiene hash y artefacto DOCX demo-operativo. Desde aquí puedes
-                descargar el archivo, abrir una vista imprimible o continuar con firma y archivo.
+                descargar el archivo, abrir una vista imprimible o continuar con interposición y archivo.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
@@ -1490,7 +1433,7 @@ export default function GenerarDocumentoStepper() {
                   aria-label="Descargar documento DOCX"
                 >
                   <Download className="h-4 w-4" />
-                  {qesResult?.signedDocumentData ? "Descargar DOCX firmado" : "Descargar DOCX"}
+                  Descargar DOCX
                 </button>
                 <button
                   type="button"
@@ -1520,107 +1463,23 @@ export default function GenerarDocumentoStepper() {
             >
               <h3 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3 flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                Firma electrónica (EAD Trust)
+                Custodia EAD Trust
               </h3>
-
-              {signingStatus === "idle" && (
-                <>
-                  <p className="text-xs text-[var(--g-text-secondary)] mb-4">
-                    El documento se ha generado. Puede solicitar su firma electrónica al QTSP (EAD Trust): se enviará el enlace de firma a los firmantes sobre el PDF generado.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleSignQES}
-                    disabled={signMutation.isPending}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] transition-colors disabled:opacity-50"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                    aria-busy={signMutation.isPending}
-                  >
-                    <Lock className="h-4 w-4" />
-                    Solicitar firma
-                  </button>
-                </>
-              )}
-
-              {signingStatus === "pending" && (
-                <div className="flex items-center justify-center gap-2 py-4 text-sm text-[var(--g-text-secondary)]">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Firmando documento...
-                </div>
-              )}
-
-              {(signingStatus === "signed" || signingStatus === "requested") && (
-                <div className="space-y-2">
-                  {/* Se distingue solicitar de firmar. Activar la solicitud solo
-                      envia el enlace a los firmantes; hasta que el proveedor
-                      reporte la firma, decir "firmado" seria falso. */}
-                  <div
-                    className={`flex items-center gap-2 px-3 py-2 ${
-                      signingStatus === "signed"
-                        ? "bg-[var(--status-success)]/10 text-[var(--status-success)]"
-                        : "bg-[var(--status-info)]/10 text-[var(--status-info)]"
-                    }`}
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
-                  >
-                    {signingStatus === "signed" ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <Clock className="h-4 w-4" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {signingStatus === "signed"
-                        ? "Documento firmado por todos los firmantes"
-                        : "Solicitud de firma enviada — pendiente de firma"}
-                    </span>
-                  </div>
-                  {/* ITEM-109: distinguir la firma sandbox de demo de una transacción
-                      EAD Trust real. En sandbox el buffer NO va firmado y el manifest
-                      se marca sandbox:true; el usuario debe saberlo. */}
-                  {qesResult?.sandbox ? (
-                    <div
-                      className="flex items-start gap-2 px-3 py-2 bg-[var(--status-warning)]/10 text-[var(--status-warning)]"
-                      style={{ borderRadius: "var(--g-radius-sm)" }}
-                    >
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span className="text-xs">
-                        Firma sandbox de demo — NO es una transacción EAD Trust real. El documento se
-                        archiva SIN firma electrónica alguna y la evidencia queda marcada como sandbox (no sellada).
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[var(--g-text-secondary)]">
-                      EAD Trust ha registrado la solicitud sobre el PDF generado. Los firmantes han
-                      recibido el enlace; el documento aún no está firmado. Cuando el proveedor
-                      complete la firma se recuperarán el documento firmado y su certificado.
-                    </p>
-                  )}
-                  {qesResult ? (
-                    <p className="font-mono text-[10px] text-[var(--g-text-secondary)]">
-                      SR {qesResult.srId} · DOC {qesResult.documentId} · hash {qesResult.documentHash.slice(0, 12)}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-
-              {signingStatus === "error" && (
-                <div className="space-y-2">
-                  <div
-                    className="flex items-center gap-2 px-3 py-2 bg-[var(--status-error)]/10 text-[var(--status-error)]"
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Error al firmar</span>
-                  </div>
-                  <p className="text-xs text-[var(--status-error)]">{signingError}</p>
-                  <button
-                    type="button"
-                    onClick={() => setSigningStatus("idle")}
-                    className="text-xs text-[var(--g-brand-3308)] hover:underline"
-                  >
-                    Reintentar
-                  </button>
-                </div>
-              )}
+              <p className="text-xs text-[var(--g-text-secondary)] mb-4">
+                La solicitud genérica de firma está retirada. EAD Trust custodia el artefacto jurídico
+                final únicamente desde el expediente autoritativo, con hashes y contexto source-bound;
+                esa actuación no atribuye ni sustituye firma, consentimiento o causa legal.
+              </p>
+              <button
+                type="button"
+                disabled
+                title="Use el expediente source-bound para custodiar el documento final."
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] cursor-not-allowed opacity-70"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <Lock className="h-4 w-4" />
+                Custodia disponible desde expediente
+              </button>
             </div>
 
             <div
@@ -1635,8 +1494,8 @@ export default function GenerarDocumentoStepper() {
               {archiveStatus === "idle" && (
                 <>
                   <p className="text-xs text-[var(--g-text-secondary)] mb-4">
-                    Guarde el documento en Supabase Storage con hash SHA-512 y bundle operativo demo de evidencia documental; no constituye evidencia final productiva.
-                    {qesResult ? " Se adjuntarán los metadatos QTSP de EAD Trust." : ""}
+                    Guarde una copia de trabajo en Supabase Storage con hash SHA-512. Esta acción no
+                    constituye custodia EAD ni el artefacto jurídico final.
                   </p>
                   <button
                     type="button"
@@ -1783,12 +1642,10 @@ export default function GenerarDocumentoStepper() {
                   setDraftCloudId(null);
                   setCapa3Values({});
                   setSelectedPlantilla(null);
-                  setSigningStatus("idle");
                   setArchiveStatus("idle");
                   setArchiveUrl(null);
                   setArchiveError(null);
                   setDocxBuffer(null);
-                  setQesResult(null);
                   setCompositionResult(null);
                   setDocumentActionError(null);
                 }}

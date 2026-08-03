@@ -45,9 +45,9 @@ describe("Secretaria certification gate regressions", () => {
     expect(archivedIndex).toBeGreaterThan(linkGuardIndex);
   });
 
-  it("genera actas con snapshot WORM de censo en lugar de NO_SNAPSHOT_HASH", () => {
-    expect(reunionHook).toMatch(/fn_crear_censo_snapshot/);
-    expect(reunionHook).toMatch(/p_snapshot_id: snapshotId/);
-    expect(reunionHook).not.toMatch(/p_snapshot_id: null/);
+  it("cierra la reunion y genera snapshot WORM + acta mediante una unica RPC", () => {
+    expect(reunionHook).toMatch(/fn_secretaria_close_meeting_and_generate_minute/);
+    expect(reunionHook).not.toMatch(/supabase\.rpc\("fn_crear_censo_snapshot"/);
+    expect(reunionHook).not.toMatch(/supabase\.rpc\("fn_generar_acta"/);
   });
 });

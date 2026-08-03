@@ -306,7 +306,10 @@ describe("ITEM-006 — alias de materia UI ↔ rule pack", () => {
     expect(normalizeMateriaForRulePack("CESION_GLOBAL")).toBe("CESION_GLOBAL_ACTIVO");
     expect(normalizeMateriaForRulePack("REMUNERACION_CONSEJEROS")).toBe("RETRIBUCION_ADMIN");
     expect(normalizeMateriaForRulePack("AMPLIACION_CAPITAL")).toBe("AUMENTO_CAPITAL");
-    expect(normalizeMateriaForRulePack("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe("SUPRESION_PREFERENTE");
+    expect(normalizeMateriaForRulePack("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+    );
+    expect(MATERIA_PACK_ALIASES.EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE).toBeUndefined();
     // Identidad para materias canónicas.
     expect(normalizeMateriaForRulePack("APROBACION_CUENTAS")).toBe("APROBACION_CUENTAS");
   });

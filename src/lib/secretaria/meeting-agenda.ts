@@ -11,6 +11,8 @@ export type AgendaPointOrigin =
 export interface MeetingAgendaPoint {
   punto: string;
   notas: string;
+  /** Texto jurídico propuesto que, tras la votación, pasa a ser el acuerdo adoptado. */
+  resolution_text?: string | null;
   materia: string;
   tipo: MateriaClase;
   origin: AgendaPointOrigin;
@@ -35,6 +37,9 @@ export interface MeetingAgendaItemSource {
   /** Codex P1 #2: agenda_items.kind autoritative cuando ya existe el row. */
   kind?: string | null;
   decision_subtype?: string | null;
+  matter_code?: string | null;
+  proposal_text?: string | null;
+  requires_attachments?: boolean | null;
 }
 
 export interface ConvocatoriaAgendaItemSource {
@@ -48,6 +53,10 @@ export interface ConvocatoriaAgendaItemSource {
   /** Codex P1 #2: kind seteado por ConvocatoriasStepper en el JSON. */
   kind?: string | null;
   decision_subtype?: string | null;
+  resolution_text?: string | null;
+  texto_acuerdo?: string | null;
+  propuesta_acuerdo?: string | null;
+  requires_attachments?: boolean | null;
 }
 
 export interface PreparedAgreementSource {
@@ -55,6 +64,7 @@ export interface PreparedAgreementSource {
   agreement_kind?: string | null;
   matter_class?: string | null;
   proposal_text?: string | null;
+  decision_text?: string | null;
   compliance_snapshot?: Record<string, unknown> | null;
   compliance_explain?: Record<string, unknown> | null;
 }
@@ -87,13 +97,33 @@ function normalizeMateriaClase(value: unknown): MateriaClase {
 }
 
 function defaultMateriaForTitle(title: string) {
-  const raw = title.toUpperCase();
+  const raw = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (raw.includes("ESTATUT")) return "MODIFICACION_ESTATUTOS";
   if (raw.includes("CAPITAL")) return "AUMENTO_CAPITAL";
   if (raw.includes("AUDITOR")) return "NOMBRAMIENTO_AUDITOR";
   if (raw.includes("DIVIDENDO") || raw.includes("RESULTADO")) return "DISTRIBUCION_DIVIDENDOS";
-  if (raw.includes("CONSEJ") || raw.includes("CARGO")) return "NOMBRAMIENTO_CONSEJERO";
-  return "APROBACION_CUENTAS";
+  // La materia autónoma solo se infiere cuando el título identifica literalmente
+  // al socio o a la socia única. Expresiones genéricas sobre una filial, sobre
+  // derechos de socio o sobre una administradora PJ nunca se reinterpretan.
+  if (
+    raw.includes("REPRESENTANTE")
+    && (
+      raw.includes("SOCIA UNICA")
+      || raw.includes("SOCIO UNICO")
+    )
+  ) {
+    return "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL";
+  }
+  if (
+    raw.includes("REPRESENTANTE")
+    && (raw.includes("PERSONA JURID") || raw.includes("ADMINISTRADORA"))
+  ) {
+    return "OTROS_LIBRE";
+  }
+  if (raw.includes("NOMBRAMIENTO") && raw.includes("CONSEJERO")) {
+    return "NOMBRAMIENTO_CONSEJERO";
+  }
+  return "OTROS_LIBRE";
 }
 
 function materiaClaseFromMateria(materia: string): MateriaClase {
@@ -118,6 +148,11 @@ function titleKey(title: string) {
     .trim();
 }
 
+export function isSubstantiveResolutionText(title: string, value?: string | null) {
+  const normalizedValue = titleKey(value ?? "");
+  return normalizedValue.length >= 20 && normalizedValue !== titleKey(title);
+}
+
 function sourceKey(point: Pick<MeetingAgendaPoint, "source_table" | "source_id" | "source_index" | "agreement_id" | "punto">) {
   if (point.agreement_id) return `agreement:${point.agreement_id}`;
   if (point.source_table && point.source_id) {
@@ -128,10 +163,14 @@ function sourceKey(point: Pick<MeetingAgendaPoint, "source_table" | "source_id" 
 
 function normalizePoint(point: Partial<MeetingAgendaPoint>): MeetingAgendaPoint {
   const title = point.punto?.trim() || "Acuerdo de la sesión";
-  const materia = point.materia ?? defaultMateriaForTitle(title);
+  // Los JSON legacy pueden traer `materia: ""`. Un valor vacío no debe dejar
+  // el <select> sin opción válida (el navegador acabaría mostrando la primera
+  // materia del catálogo como si fuese una decisión real).
+  const materia = point.materia?.trim() || defaultMateriaForTitle(title);
   return {
     punto: title,
     notas: point.notas ?? "",
+    resolution_text: point.resolution_text?.trim() || null,
     materia,
     tipo: point.tipo ?? materiaClaseFromMateria(materia),
     origin: point.origin ?? "MEETING_FLOOR",
@@ -155,6 +194,12 @@ function normalizeSavedDebate(value: unknown): MeetingAgendaPoint | null {
     return normalizePoint({
       punto: title,
       notas: String(value.notas ?? value.notes ?? ""),
+      resolution_text:
+        typeof value.resolution_text === "string"
+          ? value.resolution_text
+          : typeof value.texto_acuerdo === "string"
+            ? value.texto_acuerdo
+            : null,
       materia: typeof value.materia === "string" ? value.materia : undefined,
       tipo: typeof value.tipo === "string" ? normalizeMateriaClase(value.tipo) : undefined,
     origin: typeof value.origin === "string" ? (value.origin as AgendaPointOrigin) : "MEETING_FLOOR",
@@ -179,11 +224,12 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
     .forEach((item, index) => {
       const title = item.title?.trim();
       if (!title) return;
-      const materia = defaultMateriaForTitle(title);
+      const materia = item.matter_code?.trim() || defaultMateriaForTitle(title);
       points.push(
         normalizePoint({
           punto: title,
           notas: item.description ?? "",
+          resolution_text: item.proposal_text ?? null,
           materia,
           tipo: item.type ? normalizeMateriaClase(item.type) : materiaClaseFromMateria(materia),
           origin: "MEETING_AGENDA",
@@ -205,6 +251,7 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
       normalizePoint({
         punto: title,
         notas: item.descripcion ?? item.description ?? "",
+        resolution_text: item.propuesta_acuerdo ?? item.resolution_text ?? item.texto_acuerdo ?? null,
         materia,
         tipo: item.tipo ? normalizeMateriaClase(item.tipo) : materiaClaseFromMateria(materia),
         origin: "CONVOCATORIA",
@@ -227,7 +274,8 @@ function sourcePoints(input: MergeMeetingAgendaSourcesInput): MeetingAgendaPoint
     points.push(
       normalizePoint({
         punto: title,
-        notas: agreement.proposal_text ?? "",
+        notas: "",
+        resolution_text: agreement.decision_text ?? agreement.proposal_text ?? null,
         materia,
         tipo: normalizeMateriaClase(agreement.matter_class ?? materiaClaseFromMateria(materia)),
         origin: "PREPARED_AGREEMENT",
@@ -263,8 +311,24 @@ function dedupeAgendaPoints(points: MeetingAgendaPoint[]) {
     const looseKey = titleKey(normalized.punto);
     const existing = bySource.get(exactKey) ?? byTitle.get(looseKey);
     if (existing) {
+      // `agenda_items` materializa título, orden y kind, pero no conserva la
+      // materia societaria elegida en la convocatoria. Cuando ambas fuentes
+      // describen el mismo punto, la clasificación explícita de convocatoria
+      // (o de una propuesta preparada) debe enriquecer el row materializado.
+      // De lo contrario cada título ambiguo cae en la heurística de
+      // `defaultMateriaForTitle` y puede convertirse, por ejemplo, en un
+      // NOMBRAMIENTO_CONSEJERO que nunca fue seleccionado.
+      const normalizedHasExplicitMateria =
+        normalized.origin === "CONVOCATORIA" || normalized.origin === "PREPARED_AGREEMENT";
+      if (normalizedHasExplicitMateria) {
+        existing.materia = normalized.materia;
+        existing.tipo = normalized.tipo;
+      }
       if (!existing.agreement_id && normalized.agreement_id) existing.agreement_id = normalized.agreement_id;
       if (!existing.notas && normalized.notas) existing.notas = normalized.notas;
+      if (!existing.resolution_text && normalized.resolution_text) {
+        existing.resolution_text = normalized.resolution_text;
+      }
       if (!existing.group_campaign_id && normalized.group_campaign_id) existing.group_campaign_id = normalized.group_campaign_id;
       if (!existing.group_campaign_step && normalized.group_campaign_step) existing.group_campaign_step = normalized.group_campaign_step;
       if (!existing.kind && normalized.kind) existing.kind = normalized.kind;
@@ -300,7 +364,7 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
     // `defaultMateriaForTitle` para puntos con origen MEETING_AGENDA, lo que
     // pisa silenciosamente la materia editada por el secretario en el paso
     // de Agenda y debate (ej. NOMBRAMIENTO_CONSEJERO termina volviendo a
-    // APROBACION_CUENTAS). Solo dejamos prevalecer el source cuando guarda
+    // OTROS_LIBRE). Solo dejamos prevalecer el source cuando guarda
     // la materia de forma explícita (CONVOCATORIA o PREPARED_AGREEMENT).
     // Bug detectado por e2e/51 (Junta universal Admin Único).
     const sourceHasExplicitMateria =
@@ -322,6 +386,7 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
       source_index: source.source_index ?? point.source_index ?? null,
       origin: source.origin ?? point.origin,
       notas: point.notas || source.notas,
+      resolution_text: point.resolution_text ?? source.resolution_text ?? null,
       group_campaign_id: source.group_campaign_id ?? point.group_campaign_id ?? null,
       group_campaign_step: source.group_campaign_step ?? point.group_campaign_step ?? null,
       // Codex P2 fix: propaga kind y decision_subtype desde sources autoritativos.
@@ -338,11 +403,17 @@ export function mergeMeetingAgendaSources(input: MergeMeetingAgendaSourcesInput)
   return [...merged, ...additions];
 }
 
+/** Matter-specific rule resolution only applies to points that adopt an agreement. */
+export function decisionMeetingAgendaPoints<T extends { kind?: unknown }>(points: T[]): T[] {
+  return points.filter((point) => normalizeAgendaItemKind(point.kind) === "DECISORIO");
+}
+
 export function newSessionAgendaPoint(): MeetingAgendaPoint {
   return {
     punto: "",
     notas: "",
-    materia: "APROBACION_CUENTAS",
+    resolution_text: null,
+    materia: "OTROS_LIBRE",
     tipo: "ORDINARIA",
     origin: "MEETING_FLOOR",
     source_table: null,

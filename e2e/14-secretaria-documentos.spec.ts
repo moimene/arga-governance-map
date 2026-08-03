@@ -125,7 +125,7 @@ test.describe('Secretaría — documentos DOCX', () => {
     });
     if (!(await emitirCertificacion.isEnabled())) {
       await expect(
-        page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal|No se puede emitir certificación/i).first()
+        page.getByText(/Falta snapshot legal|No hay acuerdos proclamables|Cargando snapshot legal|No se puede emitir certificación|Esta sociedad aún no tiene censo\/órgano\/cargos suficientes/i).first()
       ).toBeVisible();
     }
   });

@@ -16,6 +16,12 @@ Implementación pura (sin side effects, sin DB, sin React/Supabase) del motor de
 > del barrel) y **no** se cambia su lógica. Los módulos SUPERSEDED llevan una
 > cabecera JSDoc `@deprecated ITEM-117`. Limpieza/poda posterior supervisada.
 
+> **Actualización vinculante (2026-07-21):** `qtsp-integration.ts` permanece
+> activo únicamente para integridad, verificación y compatibilidad. Los exports
+> legacy `firmarDocumentoQES` y `notificarCertificado` no deben conectarse a
+> nuevas capturas. EAD Trust queda limitado a interposición, mensajería básica y
+> custodia/e-archiving; los nombres QES/ERDS no acreditan firma, envío ni entrega.
+
 ---
 
 ## Inventario de módulos (ITEM-117)
@@ -58,7 +64,7 @@ orquestador (`evaluarAcuerdoCompleto`, consumido por `usePreviewAcuerdo.ts` y
 | `meeting-vote-completeness.ts` | `evaluateMeetingVoteCompleteness` consumido por `lib/secretaria`/hooks. |
 | `agenda-item-engine.ts` | Taxonomía v3.1 de puntos; consumido por `lib/secretaria/acta-agenda`, `agenda-kind`, etc. |
 | `compliance-gates.ts` | `buildCompliancePanelResult` / `gateFromEvaluation` consumidos por `PreviewGatePanel.tsx`. |
-| `qtsp-integration.ts` | `verificarIntegridad`, `validarPreFirma` consumidos por `useQTSPVerification`/`useQTSPSign`. |
+| `qtsp-integration.ts` | `verificarIntegridad`, `validarPreFirma` consumidos por `useQTSPVerification`/`useQTSPSign`; activo para integridad/compatibilidad, no para iniciar firma o ERDS. |
 | `evidence-bundle.ts` | `sha256`, `computeManifestHashSync`, `generarVerificadorOffline` consumidos por doc-gen/hooks. |
 | `comms-plazo-engine.ts` | Consumido por la capa de comunicaciones (1 importador externo). |
 
@@ -68,7 +74,8 @@ orquestador (`evaluarAcuerdoCompleto`, consumido por `usePreviewAcuerdo.ts` y
 > `evaluateAgendaItemComplianceGate` (compliance-gates), `determinarAdoptionMode`,
 > `componerPerfilSesion` (orquestador), `firmarDocumentoQES`, `notificarCertificado`
 > (qtsp-integration), `generarEvidenceBundle`, `empaquetarASiCE` (evidence-bundle).
-> Son candidatos a poda de export, no a borrado de archivo.
+> Los dos símbolos QTSP son legacy no operativos; el conjunto es candidato a poda
+> de export, no a borrado de archivo.
 
 ### Módulos SPEC-ONLY (sin consumidor runtime — solo tests; valor de especificación)
 

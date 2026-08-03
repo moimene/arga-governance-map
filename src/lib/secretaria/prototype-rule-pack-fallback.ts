@@ -29,6 +29,11 @@ export interface CloudMeetingRulePackStrictResolution {
   warnings: string[];
 }
 
+export interface MeetingRulePackContextForSpec {
+  operational: PrototypeRulePackResolution;
+  strict: CloudMeetingRulePackStrictResolution;
+}
+
 const tipoSocialValues: TipoSocial[] = ["SA", "SAU", "SL", "SLU"];
 
 function param<T>(valor: T, referencia: string): ReglaParametro<T> {
@@ -222,5 +227,20 @@ export function resolveCloudMeetingRulePacksStrict(
     packs,
     missingSpecs,
     warnings,
+  };
+}
+
+/**
+ * Resolve one agenda point in isolation. A fallback required by another point
+ * must never leak into this point's adoption snapshot or resulting agreement.
+ */
+export function resolveMeetingRulePackContextForSpec(
+  spec: MeetingRuleSpec,
+  resolutions: RuleResolution[],
+  organoTipo: TipoOrgano,
+): MeetingRulePackContextForSpec {
+  return {
+    operational: resolvePrototypeMeetingRulePacks([spec], resolutions, organoTipo),
+    strict: resolveCloudMeetingRulePacksStrict([spec], resolutions, organoTipo),
   };
 }

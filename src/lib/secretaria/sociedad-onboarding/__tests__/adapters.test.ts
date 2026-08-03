@@ -6,7 +6,9 @@ import type { AdapterContext, CargoInputDraft, PersonaDraft } from "../types";
 interface AdapterMockState {
   personsByTax: Map<string, string>;
   inserts: Array<{ table: string; payload: Record<string, unknown> }>;
+  rpcs: Array<{ fn: string; args: Record<string, unknown> }>;
   nextPersonId: number;
+  nextRpcId: number;
 }
 
 function getMockState(): AdapterMockState {
@@ -14,7 +16,9 @@ function getMockState(): AdapterMockState {
   holder.__sociedadOnboardingAdaptersMock ??= {
     personsByTax: new Map<string, string>(),
     inserts: [],
+    rpcs: [],
     nextPersonId: 1,
+    nextRpcId: 1,
   };
   return holder.__sociedadOnboardingAdaptersMock;
 }
@@ -40,13 +44,20 @@ vi.mock("@/integrations/supabase/client", () => {
     holder.__sociedadOnboardingAdaptersMock ??= {
       personsByTax: new Map<string, string>(),
       inserts: [],
+      rpcs: [],
       nextPersonId: 1,
+      nextRpcId: 1,
     };
     return holder.__sociedadOnboardingAdaptersMock;
   }
 
   return {
     supabase: {
+      async rpc(fn: string, args: Record<string, unknown>) {
+        const state = getStore();
+        state.rpcs.push({ fn, args });
+        return { data: `rpc-${state.nextRpcId++}`, error: null };
+      },
       from(table: string) {
         const state = getStore();
         const filters: Record<string, unknown> = {};
@@ -117,7 +128,9 @@ describe("sociedad-onboarding adapters", () => {
   beforeEach(() => {
     mockState.personsByTax.clear();
     mockState.inserts.length = 0;
+    mockState.rpcs.length = 0;
     mockState.nextPersonId = 1;
+    mockState.nextRpcId = 1;
   });
 
   it("reutiliza personas por NIF antes de crear nuevas filas", async () => {
@@ -142,7 +155,6 @@ describe("sociedad-onboarding adapters", () => {
         persona: adminPJ,
         fecha_inicio: "2026-05-12",
         fuente_designacion: "ESCRITURA",
-        metadata: { origen: "test" },
       },
       {
         key: "cargo-2",
@@ -158,23 +170,22 @@ describe("sociedad-onboarding adapters", () => {
 
     expect(result.failedCargos).toEqual([]);
     expect(result.okCount).toBe(2);
-    const condiciones = mockState.inserts.filter((insert) => insert.table === "condiciones_persona");
-    expect(condiciones[0].payload).toMatchObject({
-      tenant_id: "tenant-1",
-      entity_id: "entity-1",
-      body_id: null,
-      tipo_condicion: "ADMIN_PJ",
-      estado: "VIGENTE",
-      fecha_inicio: "2026-05-12",
-      fecha_fin: null,
-      fuente_designacion: "ESCRITURA",
-      representative_person_id: "person-2",
-      metadata: { origen: "test" },
+    expect(mockState.inserts.some((insert) => insert.table === "condiciones_persona")).toBe(false);
+    const designaciones = mockState.rpcs.filter((rpc) => rpc.fn === "fn_designar_cargo");
+    expect(designaciones[0].args).toMatchObject({
+      p_tenant_id: "tenant-1",
+      p_entity_id: "entity-1",
+      p_body_id: null,
+      p_tipo_condicion: "ADMIN_PJ",
+      p_fecha_inicio: "2026-05-12",
+      p_fuente_designacion: "ESCRITURA",
+      p_representative_person_id: "person-2",
+      p_cesar_singleton_previo: true,
     });
-    expect(condiciones[1].payload).toMatchObject({
-      body_id: "body-cda",
-      tipo_condicion: "PRESIDENTE",
-      fuente_designacion: "ACTA_NOMBRAMIENTO",
+    expect(designaciones[1].args).toMatchObject({
+      p_body_id: "body-cda",
+      p_tipo_condicion: "PRESIDENTE",
+      p_fuente_designacion: "ACTA_NOMBRAMIENTO",
     });
   });
 
@@ -195,12 +206,32 @@ describe("sociedad-onboarding adapters", () => {
     ]);
 
     expect(result.failedCargos).toEqual([]);
-    const condicion = mockState.inserts.find((insert) => insert.table === "condiciones_persona");
-    expect(condicion?.payload).toMatchObject({
-      body_id: "body-cda",
-      tipo_condicion: "CONSEJERO",
-      representative_person_id: "person-2",
+    const condicion = mockState.rpcs.find((rpc) => rpc.fn === "fn_designar_cargo");
+    expect(condicion?.args).toMatchObject({
+      p_body_id: "body-cda",
+      p_tipo_condicion: "CONSEJERO",
+      p_representative_person_id: "person-2",
     });
+  });
+
+  it("falla cerrado ante metadata libre que la RPC autoritativa no puede conservar", async () => {
+    const { persistInitialCargos } = await import("../adapters");
+    const cargo: CargoInputDraft = {
+      key: "cargo-metadata",
+      tipo_condicion: "PRESIDENTE",
+      bodyKey: "CDA",
+      persona: persona("presidente", "11111111H"),
+      fecha_inicio: "2026-05-12",
+      fuente_designacion: "ACTA_NOMBRAMIENTO",
+      metadata: { origen: "no-modelado" },
+    };
+
+    const result = await persistInitialCargos(ctx, [cargo]);
+
+    expect(result.okCount).toBe(0);
+    expect(result.failedCargos[0]?.error).toContain("no admite metadata libre");
+    expect(mockState.rpcs).toEqual([]);
+    expect(mockState.inserts).toEqual([]);
   });
 
   it("persiste representaciones ADMIN_PJ_REPRESENTANTE sin meeting_id", async () => {
@@ -219,21 +250,16 @@ describe("sociedad-onboarding adapters", () => {
 
     expect(result.failedReps).toEqual([]);
     expect(result.okCount).toBe(1);
-    const rep = mockState.inserts.find((insert) => insert.table === "representaciones");
-    expect(rep?.payload).toMatchObject({
-      tenant_id: "tenant-1",
-      entity_id: "entity-1",
-      represented_person_id: "person-1",
-      representative_person_id: "person-2",
-      scope: "ADMIN_PJ_REPRESENTANTE",
-      meeting_id: null,
-      porcentaje_delegado: null,
-      effective_from: "2026-05-12",
-      effective_to: null,
-      evidence: {
-        fuente: "ESCRITURA",
-        referencia: "Alta sociedad onboarding D6",
-      },
+    expect(mockState.inserts.some((insert) => insert.table === "representaciones")).toBe(false);
+    const rep = mockState.rpcs.find((rpc) => rpc.fn === "fn_upsert_representante_admin_pj");
+    expect(rep?.args).toMatchObject({
+      p_tenant_id: "tenant-1",
+      p_entity_id: "entity-1",
+      p_represented_person_id: "person-1",
+      p_representative_person_id: "person-2",
+      p_effective_from: "2026-05-12",
+      p_inscripcion_rm_referencia: null,
+      p_inscripcion_rm_fecha: null,
     });
   });
 });

@@ -31,6 +31,15 @@ export interface ConvocatoriaForMeetingSchedule {
     inscribible?: boolean;
     kind?: AgendaItemKind | null;
     decision_subtype?: AgendaDecisionSubtype | null;
+    /** Texto exacto congelado en la convocatoria para los puntos decisorios. */
+    propuesta_acuerdo?: string | null;
+    /** Puede exigirse expresamente; FORMULACION_CUENTAS siempre lo fuerza. */
+    requires_attachments?: boolean | null;
+    target_entity_id?: string | null;
+    representative_person_id?: string | null;
+    representation_authority_route?: string | null;
+    representation_delegation_id?: string | null;
+    representation_evidence_status?: string | null;
   }> | null;
   rule_trace?: Record<string, unknown> | null;
   reminders_trace?: Record<string, unknown> | null;

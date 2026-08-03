@@ -120,15 +120,6 @@ export async function validateGeneratedDocxOpenXml(
     });
   }
 
-  if (input.contentHash && !loaded.packageText.includes(input.contentHash.slice(0, 16))) {
-    pushIssue(issues, {
-      code: "DOCX_CONTENT_HASH_FOOTER_MISSING",
-      severity: "WARNING",
-      field_path: "docx.word.footer",
-      message: "No se detecta el hash de contenido en el pie del DOCX.",
-    });
-  }
-
   if (input.documentType === "ACTA" && input.actaLegalStructure) {
     for (const issue of validateRenderedActaAgainstLegalStructure(loaded.documentText, input.actaLegalStructure)) {
       pushIssue(issues, {

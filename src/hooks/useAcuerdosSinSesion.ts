@@ -14,8 +14,6 @@ export interface CastNoSessionVoteInput {
   choice: VoteChoice;
   personId?: string | null;
   textoRespuesta?: string | null;
-  firmaQesRef?: string | null;
-  notificacionCertificadaRef?: string | null;
 }
 
 export interface NoSessionResolutionRow {
@@ -33,6 +31,7 @@ export interface NoSessionResolutionRow {
   abstentions: number | null;
   requires_unanimity: boolean;
   total_members: number | null;
+  open_idempotency_key: string | null;
   opened_at: string | null;
   closed_at: string | null;
   created_at: string;
@@ -175,8 +174,6 @@ export function useCastVote(resolutionId: string | undefined) {
         p_texto_respuesta: typeof input === "string"
           ? null
           : input.textoRespuesta ?? (isSecretaryRecorded ? "Respuesta documentada por Secretaría en el expediente sin sesión." : null),
-        p_firma_qes_ref: typeof input === "string" ? null : input.firmaQesRef ?? null,
-        p_notificacion_certificada_ref: typeof input === "string" ? null : input.notificacionCertificadaRef ?? null,
       });
       if (!rpcError) return;
       if (isMissingSupabaseRpcError(rpcError)) {
@@ -197,8 +194,8 @@ export interface CreateNoSessionResolutionInput {
   matter_class: string;
   agreement_kind: string;
   requires_unanimity: boolean;
-  total_members: number;
   voting_deadline: string;
+  open_idempotency_key: string;
 }
 
 export function useCreateNoSessionResolution() {
@@ -206,25 +203,22 @@ export function useCreateNoSessionResolution() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateNoSessionResolutionInput): Promise<{ id: string }> => {
-      const { data, error } = await supabase
-        .from("no_session_resolutions")
-        .insert({
-          tenant_id: tenantId!,
-          body_id: input.body_id,
-          title: input.title,
-          proposal_text: input.proposal_text,
-          matter_class: input.matter_class,
-          agreement_kind: input.agreement_kind,
-          requires_unanimity: input.requires_unanimity,
-          total_members: input.total_members,
-          voting_deadline: input.voting_deadline,
-          status: "VOTING_OPEN",
-          opened_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
+      if (!tenantId) throw new Error("No hay tenant activo.");
+      const { data, error } = await supabase.rpc("fn_create_no_session_resolution", {
+        p_body_id: input.body_id,
+        p_title: input.title,
+        p_proposal_text: input.proposal_text,
+        p_matter_class: input.matter_class,
+        p_agreement_kind: input.agreement_kind,
+        p_requires_unanimity: input.requires_unanimity,
+        p_voting_deadline: input.voting_deadline,
+        p_open_idempotency_key: input.open_idempotency_key,
+      });
       if (error) throw error;
-      return data as { id: string };
+      if (typeof data !== "string" || !data) {
+        throw new Error("La apertura gobernada no devolvió el expediente creado.");
+      }
+      return { id: data };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["no_session_resolutions"] });

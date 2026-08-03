@@ -9,6 +9,7 @@ import {
 } from "./mesa-control-societaria";
 import {
   MATERIA_CANONICAL_ALIAS,
+  MATERIA_PRESENTATION_ALIAS,
   labelMateria,
   resolveMateriaAlias,
 } from "./agenda-materias";
@@ -283,10 +284,9 @@ function normalizeMateriaEquivalenceCode(value?: string | null) {
 }
 
 /**
- * Alias de presentación y alias de resolución del motor forman una única
- * relación de equivalencia para esta pantalla. Mantenerlos separados hacía
- * que una grafía se encontrase en el buscador pero no seleccionase su regla
- * versionada (o al revés).
+ * Solo los alias que comparten identidad funcional forman equivalencias para
+ * selección de regla y catálogo. Los sinónimos exclusivamente presentacionales
+ * (art. 308 LSC) quedan deliberadamente fuera de este grafo.
  */
 const MATERIA_EQUIVALENCE_EDGES = [
   ...Object.entries(MATERIA_CANONICAL_ALIAS),
@@ -356,7 +356,15 @@ export function resolveMateriaCodeAgainstCatalog(
 }
 
 export function materiaAliasesForSearch(materia: string): string[] {
-  return materiaEquivalentCodes(materia);
+  const functionalCodes = materiaEquivalentCodes(materia);
+  const searchableCodes = new Set(functionalCodes);
+  for (const [alias, presentationCode] of Object.entries(MATERIA_PRESENTATION_ALIAS)) {
+    if (functionalCodes.includes(alias) || functionalCodes.includes(presentationCode)) {
+      searchableCodes.add(alias);
+      searchableCodes.add(presentationCode);
+    }
+  }
+  return Array.from(searchableCodes);
 }
 
 function documentRows(value: unknown, phase: RulePackDocumentEvidence["phase"]) {

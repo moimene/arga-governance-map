@@ -32,7 +32,7 @@ describe("authority_evidence — integridad de cargos VIGENTES (ITEM-029/043)", 
   }, 30_000);
 
   afterAll(async () => {
-    try { await client?.auth.signOut(); } catch { /* noop */ }
+    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
   });
 
   it("ningún órgano de ARGA tiene PRESIDENTE ni SECRETARIO VIGENTE duplicado", async () => {

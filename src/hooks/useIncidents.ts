@@ -30,7 +30,7 @@ export type IncidentWithJoins = {
   root_cause: string | null;
   lessons_learned: string | null;
   regulatory_notification_required: boolean | null;
-  payload: any | null;
+  payload: Record<string, unknown> | null;
   obligations?: { code?: string | null; title?: string | null } | null;
   regulatory_notifications?: RegulatoryNotificationLite[] | null;
 };
@@ -96,7 +96,7 @@ export function useCreateIncident() {
       detection_date: string;
       regulatory_notification_required: boolean;
       entity_id?: string | null;
-      payload?: any | null;
+      payload?: Record<string, unknown> | null;
     }) => {
       const { data, error } = await supabase
         .from("incidents")

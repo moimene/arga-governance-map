@@ -48,26 +48,22 @@ describe("resolveSignatureOutcome — solo COMPLETED acredita firma", () => {
   });
 
   it("las etiquetas describen el hecho sin adjetivar su eficacia", () => {
-    expect(signatureOutcomeLabel("SOLICITADA")).toBe("Firma solicitada — pendiente de firma");
-    expect(signatureOutcomeLabel("COMPLETADA")).toBe("Firmado por todos los firmantes");
+    expect(signatureOutcomeLabel("SOLICITADA")).toBe("Interposición EAD solicitada — pendiente de resultado");
+    expect(signatureOutcomeLabel("COMPLETADA")).toBe("Actuación EAD completada para todos los intervinientes");
   });
 });
 
-describe("nivel de firma — no se puede rotular QES en este camino", () => {
-  it("INTERPOSITION es firma simple, no cualificada", () => {
-    // EAD Enterprise Suite 1.4.2 no expone tipo cualificado; su máximo es
-    // ADVANCED. Nuestro proxy emite INTERPOSITION, que es art. 25.1 eIDAS.
+describe("política de producto — el nivel electrónico no se presenta", () => {
+  it("INTERPOSITION se rotula como intervención del proveedor", () => {
     const etiqueta = signatureTypeLabel("INTERPOSITION");
-    expect(etiqueta).toContain("simple");
-    expect(etiqueta).toContain("25.1");
-    expect(etiqueta).not.toContain("cualificada");
-    expect(etiqueta).not.toContain("QES");
+    expect(etiqueta).toBe("Interposición EAD Trust");
+    expect(etiqueta).not.toMatch(/firma|simple|avanzada|QES/i);
   });
 
-  it("ADVANCED es avanzada con OTP, tampoco cualificada", () => {
+  it("un valor ADVANCED legacy no se afirma en la interfaz", () => {
     const etiqueta = signatureTypeLabel("ADVANCED");
-    expect(etiqueta).toContain("avanzada");
-    expect(etiqueta).not.toContain("cualificada");
+    expect(etiqueta).toBe("Interposición EAD Trust");
+    expect(etiqueta).not.toMatch(/firma|simple|avanzada|QES/i);
   });
 });
 

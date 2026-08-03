@@ -98,6 +98,12 @@ describe("group-campaign-engine", () => {
       unipersonal: true,
       adoption_mode: "UNIPERSONAL_SOCIO",
     });
+    expect(launch.expedientes[1].steps[1].alertas).toContain(
+      "Canal individual EAD Trust: interposición, mensajería básica y custodia/e-archiving",
+    );
+    expect(JSON.stringify(launch.expedientes[1].steps[1])).not.toMatch(
+      /acuse legal|entrega certificada|evidencia certificada|trazabilidad QTSP/i,
+    );
   });
 
   it("mantiene jurisdicciones base y añade las reales del alcance", () => {

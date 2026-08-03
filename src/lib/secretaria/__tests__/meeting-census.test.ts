@@ -5,6 +5,8 @@ import {
   normalizeMeetingCensusBodyKind,
   selectVotingCapitalHoldings,
   computeVocalPersonIds,
+  summarizeMeetingAttendance,
+  votingRightsFromCapitalHolding,
 } from "../meeting-census";
 
 describe("meeting-census", () => {
@@ -44,6 +46,23 @@ describe("meeting-census", () => {
 
     expect(holdings.map((holding) => holding.id)).toEqual(["a"]);
   });
+
+  it("persists title-based voting rights instead of decimal capital percentages", () => {
+    expect(votingRightsFromCapitalHolding({
+      numero_titulos: 2_145_754_856,
+      porcentaje_capital: 69.69,
+      share_class: { votes_per_title: 1 },
+    })).toBe(2_145_754_856);
+    expect(votingRightsFromCapitalHolding({
+      numero_titulos: "1250",
+      share_class: { votes_per_title: "2" },
+    })).toBe(2500);
+  });
+
+  it("rejects incomplete or non-numeric voting-right inputs", () => {
+    expect(votingRightsFromCapitalHolding({ numero_titulos: null })).toBeNull();
+    expect(votingRightsFromCapitalHolding({ numero_titulos: "not-a-number" })).toBeNull();
+  });
 });
 
 describe("computeVocalPersonIds (ITEM-028/037)", () => {
@@ -70,17 +89,65 @@ describe("computeVocalPersonIds (ITEM-028/037)", () => {
     expect(vocal.has("consejero-secretario")).toBe(true);
   });
 
-  it("caso CdA ARGA: 8 consejeros presentes de 16 vocales NO constituyen aunque asista la secretaria", () => {
-    // 17 condiciones: 1 PRESIDENTE + 15 CONSEJERO + 1 SECRETARIO no consejera.
+  it("el cargo de Presidente no crea un segundo asiento para la misma persona", () => {
+    const vocal = computeVocalPersonIds([
+      { person_id: "presidente", tipo_condicion: "CONSEJERO" },
+      { person_id: "presidente", tipo_condicion: "PRESIDENTE" },
+    ]);
+
+    expect([...vocal]).toEqual(["presidente"]);
+  });
+
+  it("caso CdA ARGA: 8 consejeros presentes de 15 vocales constituyen aunque la secretaria no compute", () => {
+    // 16 condiciones: 1 PRESIDENTE + 14 CONSEJERO + 1 SECRETARIO no consejera.
     const rows = [
       { person_id: "presidente", tipo_condicion: "PRESIDENTE" },
-      ...Array.from({ length: 15 }, (_, i) => ({ person_id: `consejero-${i}`, tipo_condicion: "CONSEJERO" })),
+      ...Array.from({ length: 14 }, (_, i) => ({ person_id: `consejero-${i}`, tipo_condicion: "CONSEJERO" })),
       { person_id: "secretaria", tipo_condicion: "SECRETARIO" },
     ];
     const vocal = computeVocalPersonIds(rows);
-    expect(vocal.size).toBe(16);
-    // floor(16/2)+1 = 9: con 8 vocales presentes (aunque la secretaria asista) no hay quórum.
+    expect(vocal.size).toBe(15);
+    // floor(15/2)+1 = 8: la secretaria puede asistir, pero no altera el denominador.
     const presentesVocales = 8;
-    expect(presentesVocales >= Math.floor(vocal.size / 2) + 1).toBe(false);
+    expect(presentesVocales >= Math.floor(vocal.size / 2) + 1).toBe(true);
+  });
+});
+
+describe("summarizeMeetingAttendance", () => {
+  it("reports 16/16 attendees while keeping the non-vocal secretary outside 15/15 quorum", () => {
+    const rows = [
+      ...Array.from({ length: 15 }, () => ({
+        attendance_type: "PRESENCIAL",
+        es_vocal: true,
+      })),
+      { attendance_type: "PRESENCIAL", es_vocal: false },
+    ];
+
+    expect(summarizeMeetingAttendance(rows, false)).toEqual({
+      attending: 16,
+      total: 16,
+      absent: 0,
+      quorumPresent: 15,
+      quorumTotal: 15,
+    });
+  });
+
+  it("keeps attendance and quorum aligned for Junta census", () => {
+    expect(
+      summarizeMeetingAttendance(
+        [
+          { attendance_type: "PRESENCIAL", es_vocal: true },
+          { attendance_type: "REPRESENTADO", es_vocal: true },
+          { attendance_type: "AUSENTE", es_vocal: true },
+        ],
+        true,
+      ),
+    ).toEqual({
+      attending: 2,
+      total: 3,
+      absent: 1,
+      quorumPresent: 2,
+      quorumTotal: 3,
+    });
   });
 });

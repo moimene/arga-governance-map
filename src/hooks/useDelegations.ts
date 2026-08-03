@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface DelegationRow {
   id: string;
@@ -17,6 +18,12 @@ export interface DelegationRow {
   alert_t90: boolean | null;
   alert_t60: boolean | null;
   alert_t30: boolean | null;
+  representation_authority_route?: string | null;
+  representation_evidence_status?: string | null;
+  representation_source_reference?: string | null;
+  representation_source_uri?: string | null;
+  representation_source_hash_sha512?: string | null;
+  representation_legal_effect?: string | null;
 }
 
 export interface DelegationFull extends DelegationRow {
@@ -105,6 +112,43 @@ export function useDelegationBySlug(slug: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       return data ? mapRow(data as DelegationRaw) : null;
+    },
+  });
+}
+
+export interface ShareholderRepresentationCandidate {
+  delegation_id: string;
+  representative_person_id: string;
+  representative_name: string;
+  authority_route: string;
+  evidence_status: string;
+  legal_effect: string | null;
+  source_reference: string | null;
+}
+
+/**
+ * Títulos vigentes que pueden sostener la representación voluntaria de una
+ * persona jurídica socia única ante su filial. La lista es orientativa para
+ * la UI; el gate de emisión vuelve a derivar y validar todo en servidor.
+ */
+export function useShareholderRepresentationCandidates(
+  shareholderEntityId: string | undefined,
+  asOfDate: string | undefined,
+) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!tenantId && !!shareholderEntityId && !!asOfDate,
+    queryKey: ["delegations", tenantId, "shareholder-representation", shareholderEntityId, asOfDate],
+    queryFn: async (): Promise<ShareholderRepresentationCandidate[]> => {
+      const { data, error } = await supabase.rpc(
+        "fn_shareholder_representation_candidates",
+        {
+          p_shareholder_entity_id: shareholderEntityId!,
+          p_as_of_date: asOfDate!,
+        },
+      );
+      if (error) throw error;
+      return (data ?? []) as ShareholderRepresentationCandidate[];
     },
   });
 }

@@ -1,11 +1,22 @@
 import {
   renderActaAgendaItemsText,
+  formatActaMajorityApplied,
+  formatActaVoteWeight,
   validateActaLegalStructure,
   type ActaAgendaItemRow,
   type ActaAgendaItemViewModel,
   type ActaAgreementRow,
   type ActaLegalStructureIssue,
 } from "./acta-agenda";
+import {
+  canonicalizeLegalArtifactManifest,
+  isLegallySubstantiveText,
+  normalizeLegalArtifactManifest,
+  validateLegalArtifactManifest,
+  validateRenderedLegalArtifactAgainstManifest,
+  type LegalArtifactManifest,
+  type LegalArtifactValidationPhase,
+} from "./legal-artifact-manifest";
 
 export type ActaOrganKind = "JUNTA" | "CONSEJO" | "OTRO";
 export type ActaMeetingCharacter = "ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL" | "NO_UNIVERSAL" | "OTRA";
@@ -48,6 +59,8 @@ export interface ActaLegalStructureInput {
   notarialAct?: boolean;
   annexes?: Array<{ title: string; description: string }>;
   certificationCircumstancesText?: string | null;
+  legalArtifactManifest?: LegalArtifactManifest | null;
+  legalArtifactValidationPhase?: LegalArtifactValidationPhase;
 }
 
 export interface ActaComposerSourceMapEntry {
@@ -89,6 +102,9 @@ export interface ActaLegalStructureViewModel {
   agenda_items: ActaAgendaItemViewModel[];
   attendees: ActaLegalAttendee[];
   canonical_minutes_hash: string | null;
+  legal_artifact_manifest: LegalArtifactManifest | null;
+  legal_artifact_manifest_canonical: string | null;
+  legal_artifact_validation_phase: LegalArtifactValidationPhase;
   composer: ActaDocumentComposerDraft;
 }
 
@@ -121,7 +137,7 @@ function presentAttendees(attendees: ActaLegalAttendee[]) {
 
 function attendeesText(attendees: ActaLegalAttendee[], organKind: ActaOrganKind) {
   const rows = presentAttendees(attendees);
-  if (rows.length === 0) return "La lista de asistentes consta en el expediente de la reunión.";
+  if (rows.length === 0) return "[DATO PENDIENTE: incorporar la lista individualizada de asistentes, representados, ausentes e invitados.]";
   return rows
     .map((attendee, index) => {
       const attendance =
@@ -149,14 +165,32 @@ function agreementsText(points: ActaAgendaItemViewModel[]) {
   return decisionPoints
     .map((point) => {
       const status = point.status === "ADOPTED" ? "aprobado" : point.status === "REJECTED" ? "no aprobado" : "pendiente";
-      const majority = point.decisorio?.majorityApplied ? ` Mayoría aplicada: ${point.decisorio.majorityApplied}.` : "";
+      const majority = point.decisorio?.majorityApplied
+        ? ` Mayoría aplicada: ${formatActaMajorityApplied(point.decisorio.majorityApplied)}.`
+        : "";
       const proclamation = point.decisorio?.proclamation ? ` ${point.decisorio.proclamation}` : "";
       const vote = point.decisorio?.voteResult
-        ? ` Votos a favor ${point.decisorio.voteResult.favor}, en contra ${point.decisorio.voteResult.contra}, abstenciones ${point.decisorio.voteResult.abstenciones}.`
+        ? ` Votos a favor ${formatActaVoteWeight(point.decisorio.voteResult.favor)}, en contra ${formatActaVoteWeight(point.decisorio.voteResult.contra)}, abstenciones ${formatActaVoteWeight(point.decisorio.voteResult.abstenciones)}.`
         : "";
       return `${point.order_number}. ${point.decisorio?.adoptedText ?? point.resolution_text ?? point.title} Resultado: ${status}.${vote}${majority}${proclamation}`;
     })
-    .join("\n");
+    .join("\n\n");
+}
+
+function meetingCharacterLabel(value: string) {
+  const labels: Record<string, string> = {
+    ORDINARIA: "Ordinaria",
+    EXTRAORDINARIA: "Extraordinaria",
+    UNIVERSAL: "Universal",
+    NO_UNIVERSAL: "No universal",
+    OTRA: "Otra",
+  };
+  return labels[value.toUpperCase()] ?? value.split("_").join(" ");
+}
+
+function sentence(value: string) {
+  const clean = value.replace(/[.?!]+$/u, "").trim();
+  return clean ? `${clean}.` : "";
 }
 
 function annexesText(input: ActaLegalStructureInput) {
@@ -171,21 +205,26 @@ function annexesText(input: ActaLegalStructureInput) {
 
 function buildSections(input: ActaLegalStructureInput) {
   const organKind = inferOrganKind(input.organKind);
-  const meetingCharacter = normalizeText(input.meetingCharacter) || (input.isUniversal ? "UNIVERSAL" : "NO_UNIVERSAL");
+  const meetingCharacter = meetingCharacterLabel(
+    normalizeText(input.meetingCharacter) || (input.isUniversal ? "UNIVERSAL" : "NO_UNIVERSAL"),
+  );
   const convocation =
     input.isUniversal
       ? "La reunión se celebra con carácter universal, con aceptación unánime del orden del día por los asistentes."
-      : normalizeText(input.convocationText) || "La reunión fue convocada en la forma legal y estatutariamente prevista, según consta en el expediente.";
+      : normalizeText(input.convocationText) || "[DATO PENDIENTE: fecha, modo, autor y texto íntegro de la convocatoria.]";
   const publication = normalizeText(input.convocationPublicationText);
   const attendeesBlock = attendeesText(input.attendees, organKind);
   const quorum =
     normalizeText(input.quorumText) ||
     normalizeText(input.capitalPresentText) ||
     (organKind === "JUNTA"
-      ? "El porcentaje de capital presente o representado consta en la lista de asistentes."
-      : "Verificado el quórum de constitución exigido legal o estatutariamente.");
-  const approvalMode = normalizeText(input.approvalMode) || "aprobación por el propio órgano al final de la reunión";
-  const approvalDate = normalizeText(input.approvalDate) || input.date;
+      ? "[DATO PENDIENTE: socios concurrentes y capital presente o representado.]"
+      : "[DATO PENDIENTE: vocales elegibles, concurrentes, representados, ausentes y quórum exigible.]");
+  const approvalMode = normalizeText(input.approvalMode);
+  const approvalDate = normalizeText(input.approvalDate);
+  const approval = approvalMode && approvalDate
+    ? `El acta se somete a ${approvalMode}. Fecha de aprobación: ${approvalDate}.`
+    : "Acta en borrador: el sistema y la fecha de aprobación están pendientes. Este borrador no acredita todavía la aprobación ni la firma del acta.";
 
   return {
     heading: [
@@ -193,19 +232,19 @@ function buildSections(input: ActaLegalStructureInput) {
       `Sociedad: ${input.entityName}.`,
       `Clase y carácter de la reunión: ${meetingCharacter}.`,
       `Fecha, hora y lugar: ${input.date}, ${input.startTime}, ${input.place}.`,
-      publication ? `Datos de publicación o comunicación de convocatoria: ${publication}.` : "",
+      publication ? `Datos de publicación o comunicación de convocatoria: ${sentence(publication)}` : "",
     ].filter(Boolean).join("\n"),
     constitution: [
       convocation,
       `Preside la reunión ${input.president} y actúa como secretario ${input.secretary}.`,
       organKind === "JUNTA"
         ? `Constitución: ${quorum}. Asistentes:\n${attendeesBlock}`
-        : `Constitución del órgano colegiado: ${quorum}. Miembros concurrentes:\n${attendeesBlock}`,
+        : `Constitución del órgano colegiado: ${quorum}. Personas concurrentes e invitadas:\n${attendeesBlock}`,
     ].join("\n"),
     agenda: agendaText(input.agendaItems),
     development: renderActaAgendaItemsText(input.agendaItems),
     agreementsAndVotes: agreementsText(input.agendaItems),
-    approval: `El acta se somete a ${approvalMode}. Fecha de aprobación: ${approvalDate}.`,
+    approval,
     signatures: [
       `Firma de la Secretaría: ${input.secretary}.`,
       `Visto bueno de la Presidencia: ${input.president}.`,
@@ -328,6 +367,13 @@ export function buildActaLegalStructureViewModel(input: ActaLegalStructureInput)
     agenda_items: input.agendaItems,
     attendees: input.attendees,
     canonical_minutes_hash: input.canonicalMinutesHash ?? null,
+    legal_artifact_manifest: input.legalArtifactManifest
+      ? normalizeLegalArtifactManifest(input.legalArtifactManifest)
+      : null,
+    legal_artifact_manifest_canonical: input.legalArtifactManifest
+      ? canonicalizeLegalArtifactManifest(input.legalArtifactManifest)
+      : null,
+    legal_artifact_validation_phase: input.legalArtifactValidationPhase ?? "PRE_SIGNATURE",
     composer,
   };
 }
@@ -356,6 +402,7 @@ export function validateActaRrmStructure(input: ActaLegalStructureInput) {
   const warnings = [...base.warnings];
   const organKind = inferOrganKind(input.organKind);
   const universal = input.isUniversal === true;
+  const manifestPhase = input.legalArtifactValidationPhase ?? "PRE_SIGNATURE";
 
   if (!normalizeText(input.entityName)) pushIssue(blockingIssues, "rrm_heading_entity_missing", "Falta la sociedad del acta", "entityName");
   if (!normalizeText(input.organName)) pushIssue(blockingIssues, "rrm_heading_organ_missing", "Falta el órgano que celebra la reunión", "organName");
@@ -365,8 +412,8 @@ export function validateActaRrmStructure(input: ActaLegalStructureInput) {
   if (!normalizeText(input.secretary)) pushIssue(blockingIssues, "rrm_secretary_missing", "Falta la identidad de la Secretaría", "secretary");
   if (input.agendaItems.length === 0) pushIssue(blockingIssues, "rrm_agenda_missing", "Falta orden del día", "agendaItems");
 
-  if (!universal && !normalizeText(input.convocationText)) {
-    pushIssue(blockingIssues, "rrm_convocation_missing", "Falta fecha y modo de convocatoria en reunión no universal", "convocationText");
+  if (!universal && !isLegallySubstantiveText(input.convocationText, 12)) {
+    pushIssue(blockingIssues, "rrm_convocation_missing", "Faltan fecha, modo, autor y texto concreto de convocatoria; una remisión al expediente no satisface el requisito", "convocationText");
   }
 
   if (organKind === "JUNTA" && !universal && isSociedadAnonima(input.entityType) && !normalizeText(input.convocationPublicationText)) {
@@ -379,7 +426,7 @@ export function validateActaRrmStructure(input: ActaLegalStructureInput) {
   }
 
   if (organKind === "JUNTA") {
-    if (!normalizeText(input.quorumText) && !normalizeText(input.capitalPresentText)) {
+    if (!isLegallySubstantiveText(input.quorumText) && !isLegallySubstantiveText(input.capitalPresentText)) {
       pushIssue(blockingIssues, "rrm_junta_quorum_missing", "Falta número de socios concurrentes y porcentaje de capital presente o representado", "quorumText");
     }
     if (universal && presentAttendees(input.attendees).some((attendee) => attendee.signed !== true)) {
@@ -391,11 +438,21 @@ export function validateActaRrmStructure(input: ActaLegalStructureInput) {
     pushIssue(blockingIssues, "rrm_board_attendees_missing", "En órgano colegiado de administración deben constar los miembros concurrentes", "attendees");
   }
 
-  if (!normalizeText(input.approvalMode)) {
+  if ((!input.legalArtifactManifest || manifestPhase === "APPROVED_RECORD") && !isLegallySubstantiveText(input.approvalMode)) {
     pushIssue(blockingIssues, "rrm_approval_mode_missing", "Falta el sistema de aprobación del acta conforme al art. 99 RRM", "approvalMode");
   }
-  if (!normalizeText(input.approvalDate)) {
+  if ((!input.legalArtifactManifest || manifestPhase === "APPROVED_RECORD") && !normalizeText(input.approvalDate)) {
     pushIssue(blockingIssues, "rrm_approval_date_missing", "Falta la fecha de aprobación del acta", "approvalDate");
+  }
+
+  if (input.legalArtifactManifest) {
+    const manifestValidation = validateLegalArtifactManifest(input.legalArtifactManifest, manifestPhase);
+    manifestValidation.blockingIssues.forEach((issue) => {
+      pushIssue(blockingIssues, issue.code, issue.message, issue.field);
+    });
+    manifestValidation.warnings.forEach((issue) => {
+      warnings.push({ code: issue.code, severity: "WARNING", message: `${issue.message} (${issue.field})` });
+    });
   }
 
   return {
@@ -424,6 +481,9 @@ export function actaLegalStructureFromVariables(
 export function buildActaLegalTemplateVariables(model: ActaLegalStructureViewModel) {
   return {
     acta_legal_structure: model,
+    legal_artifact_manifest: model.legal_artifact_manifest,
+    legal_artifact_manifest_canonical: model.legal_artifact_manifest_canonical,
+    legal_artifact_validation_phase: model.legal_artifact_validation_phase,
     encabezado_acta_texto: model.sections.heading,
     convocatoria_acta_texto: model.sections.heading,
     constitucion_acta_texto: model.sections.constitution,
@@ -476,8 +536,18 @@ export function validateRenderedActaAgainstLegalStructure(renderedText: string, 
     lastIndex = index;
   }
 
-  if (model.canonical_minutes_hash && !renderedText.includes(model.canonical_minutes_hash)) {
-    pushIssue(issues, "rrm_render_hash_missing", "El DOCX renderizado no contiene el hash canónico del acta", "canonical_minutes_hash");
+  if (model.legal_artifact_manifest) {
+    const manifestValidation = validateRenderedLegalArtifactAgainstManifest(
+      renderedText,
+      model.legal_artifact_manifest,
+      model.legal_artifact_validation_phase,
+    );
+    manifestValidation.blockingIssues.forEach((issue) => {
+      pushIssue(issues, issue.code, issue.message, issue.field);
+    });
+    manifestValidation.warnings.forEach((issue) => {
+      issues.push({ code: issue.code, severity: "WARNING", message: `${issue.message} (${issue.field})` });
+    });
   }
 
   return issues;

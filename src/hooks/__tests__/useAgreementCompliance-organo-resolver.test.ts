@@ -154,4 +154,10 @@ describe("D1 — adapter source guards (static analysis)", () => {
     // de integración: cualquier refactor que la rompa debe ser deliberado.
     expect(ADAPTER_SOURCE).toMatch(/resolveAgreementOrganoTipo\s*\(/);
   });
+
+  it("el carril V2 no declara NINGUNO cuando el acuerdo es inscribible", () => {
+    expect(ADAPTER_SOURCE).toContain(
+      'instrument_required: inscribable ? "ESCRITURA" : "NINGUNO"',
+    );
+  });
 });

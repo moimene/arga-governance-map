@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Bell,
   Users,
-  FileSignature,
+  FileCheck2,
   FileSearch,
   Gavel,
   Library,
@@ -40,7 +40,7 @@ import {
 interface KpiCounts {
   convocatorias_proximas: number;
   reuniones_semana: number;
-  actas_sin_firmar: number;
+  actas_pendientes_aprobacion: number;
   tramitaciones_curso: number;
   tramitaciones_subsanacion: number;
   acuerdos_sin_sesion_votando: number;
@@ -181,7 +181,7 @@ function useSecretariaKpis(entityId?: string | null) {
         return count ?? 0;
       }
 
-      async function countActasSinFirmar() {
+      async function countActasPendientesAprobacion() {
         let query = supabase
           .from("minutes")
           .select("id", { count: "exact", head: true })
@@ -259,7 +259,7 @@ function useSecretariaKpis(entityId?: string | null) {
       const [conv, reun, actas, tram, tramSub, asoc, du, libros, compliancePending] = await Promise.all([
         countConvocatorias(),
         countReunionesSemana(),
-        countActasSinFirmar(),
+        countActasPendientesAprobacion(),
         countTramitaciones(["EN_TRAMITE", "PRESENTADA"]),
         countTramitaciones(["SUBSANACION"]),
         countAcuerdosSinSesion(),
@@ -271,7 +271,7 @@ function useSecretariaKpis(entityId?: string | null) {
       return {
         convocatorias_proximas: conv,
         reuniones_semana: reun,
-        actas_sin_firmar: actas,
+        actas_pendientes_aprobacion: actas,
         tramitaciones_curso: tram,
         tramitaciones_subsanacion: tramSub,
         acuerdos_sin_sesion_votando: asoc,
@@ -576,7 +576,7 @@ function flowEvidenceLabel(level: string) {
     GENERATED: "generado; no final productivo",
     ARCHIVED: "archivado demo/operativo",
     BUNDLED: "bundle operativo demo",
-    QTSP_SIGNED: "firma QTSP demo/operativa",
+    QTSP_SIGNED: "interposición/custodia EAD (clave legacy)",
     AUDIT_VERIFIED: "audit verificado",
     mixed: "mixta; revisar postura",
   };
@@ -607,7 +607,7 @@ function countLabel(count: number, singular: string, plural: string) {
 function attentionCount(kpis?: KpiCounts) {
   if (!kpis) return 0;
   return (
-    kpis.actas_sin_firmar +
+    kpis.actas_pendientes_aprobacion +
     kpis.tramitaciones_subsanacion +
     kpis.libros_alerta +
     kpis.acuerdos_compliance_pendiente
@@ -795,11 +795,11 @@ export default function SecretariaDashboard() {
             onClick={() => navigateSecretaria(nextAgenda?.nav_to ?? "/secretaria/calendario")}
           />
           <PriorityRow
-            icon={FileSignature}
-            title={countLabel(kpis?.actas_sin_firmar ?? 0, "acta pendiente de firma", "actas pendientes de firma")}
-            detail="Completa firma y certificación desde Secretaría, sin presentarlo como evidencia productiva final."
+            icon={FileCheck2}
+            title={countLabel(kpis?.actas_pendientes_aprobacion ?? 0, "acta pendiente de aprobación", "actas pendientes de aprobación")}
+            detail="Completa la aprobación y registra las constancias societarias desde Secretaría."
             action="Revisar actas"
-            tone={kpis && kpis.actas_sin_firmar > 0 ? "attention" : "ok"}
+            tone={kpis && kpis.actas_pendientes_aprobacion > 0 ? "attention" : "ok"}
             onClick={() => navigateSecretaria("/secretaria/actas")}
           />
           <PriorityRow
@@ -916,10 +916,10 @@ export default function SecretariaDashboard() {
           onClick={() => navigateSecretaria("/secretaria/convocatorias")}
         />
         <KpiCard
-          icon={FileSignature}
-          label="Actas sin firmar"
-          value={kpiLoading ? "…" : kpis?.actas_sin_firmar ?? 0}
-          tone={kpis && kpis.actas_sin_firmar > 0 ? "warning" : "neutral"}
+          icon={FileCheck2}
+          label="Actas pendientes de aprobación"
+          value={kpiLoading ? "…" : kpis?.actas_pendientes_aprobacion ?? 0}
+          tone={kpis && kpis.actas_pendientes_aprobacion > 0 ? "warning" : "neutral"}
           onClick={() => navigateSecretaria("/secretaria/actas")}
         />
         <KpiCard
@@ -1185,12 +1185,12 @@ export default function SecretariaDashboard() {
               note="Última sesión: 9/9 presentes"
             />
             <ComplianceRow
-              label="Actas pendientes de firma"
-              status={kpis && kpis.actas_sin_firmar > 0 ? "WARNING" : "OK"}
+              label="Actas pendientes de aprobación"
+              status={kpis && kpis.actas_pendientes_aprobacion > 0 ? "WARNING" : "OK"}
               note={
-                kpis && kpis.actas_sin_firmar > 0
-                  ? countLabel(kpis.actas_sin_firmar, "acta en borrador", "actas en borrador")
-                  : "Todas firmadas"
+                kpis && kpis.actas_pendientes_aprobacion > 0
+                  ? countLabel(kpis.actas_pendientes_aprobacion, "acta en borrador", "actas en borrador")
+                  : "Todas aprobadas"
               }
             />
             <ComplianceRow

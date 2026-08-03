@@ -77,6 +77,15 @@ export async function persistInitialCargos(
   for (const cargo of cargos) {
     try {
       if (!cargo.persona) throw new Error("Cargo sin persona");
+      if (cargo.metadata && Object.keys(cargo.metadata).length > 0) {
+        throw new Error(
+          "El alta autoritativa de cargos no admite metadata libre; debe modelarse en la RPC antes de persistirla",
+        );
+      }
+      const bodyId = bodyIdForCargo(ctx, cargo);
+      if (cargo.bodyKey && !bodyId) {
+        throw new Error(`No se pudo resolver el órgano ${cargo.bodyKey} para el cargo ${cargo.tipo_condicion}`);
+      }
       const personId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, cargo.persona);
       let representativePersonId: string | null = null;
 
@@ -84,22 +93,32 @@ export async function persistInitialCargos(
         representativePersonId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, cargo.persona.representante);
       }
 
-      const payload: Record<string, unknown> = {
-        tenant_id: ctx.tenantId,
-        person_id: personId,
-        entity_id: ctx.entityId,
-        body_id: bodyIdForCargo(ctx, cargo),
-        tipo_condicion: cargo.tipo_condicion,
-        estado: "VIGENTE",
-        fecha_inicio: cargo.fecha_inicio,
-        fecha_fin: null,
-        fuente_designacion: cargo.fuente_designacion,
-        metadata: cargo.metadata ?? {},
-      };
-      if (representativePersonId) payload.representative_person_id = representativePersonId;
-
-      const { error } = await supabase.from("condiciones_persona").insert(payload);
+      const { data, error } = await supabase.rpc("fn_designar_cargo", {
+        p_tenant_id: ctx.tenantId,
+        p_person_id: personId,
+        p_entity_id: ctx.entityId,
+        p_body_id: bodyId,
+        p_tipo_condicion: cargo.tipo_condicion,
+        p_fecha_inicio: cargo.fecha_inicio,
+        p_fuente_designacion: cargo.fuente_designacion,
+        p_inscripcion_rm_referencia: null,
+        p_inscripcion_rm_fecha: null,
+        p_representative_person_id: representativePersonId,
+        p_cesar_singleton_previo: true,
+        p_idempotency_key: [
+          "onboarding-designar-cargo",
+          ctx.tenantId,
+          ctx.entityId,
+          personId,
+          bodyId ?? "no-body",
+          cargo.tipo_condicion,
+          cargo.fecha_inicio,
+          cargo.fuente_designacion,
+          representativePersonId ?? "no-representative",
+        ].join(":"),
+      });
       if (error) throw error;
+      if (!data) throw new Error("La RPC autoritativa no devolvió el identificador del cargo");
       okCount += 1;
     } catch (error) {
       failedCargos.push({ cargo, error: errorMessage(error) });
@@ -120,22 +139,26 @@ export async function persistInitialRepresentaciones(
     try {
       const representedId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, rep.represented);
       const representativeId = await resolvePersonByTaxIdOrCreate(ctx.tenantId, rep.representante);
-      const { error } = await supabase.from("representaciones").insert({
-        tenant_id: ctx.tenantId,
-        entity_id: ctx.entityId,
-        represented_person_id: representedId,
-        representative_person_id: representativeId,
-        scope: "ADMIN_PJ_REPRESENTANTE",
-        meeting_id: null,
-        porcentaje_delegado: null,
-        effective_from: rep.effective_from,
-        effective_to: null,
-        evidence: {
-          fuente: rep.fuente,
-          referencia: "Alta sociedad onboarding D6",
-        },
+      const { data, error } = await supabase.rpc("fn_upsert_representante_admin_pj", {
+        p_tenant_id: ctx.tenantId,
+        p_represented_person_id: representedId,
+        p_representative_person_id: representativeId,
+        p_entity_id: ctx.entityId,
+        p_effective_from: rep.effective_from,
+        p_inscripcion_rm_referencia: null,
+        p_inscripcion_rm_fecha: null,
+        p_idempotency_key: [
+          "onboarding-representante-admin-pj",
+          ctx.tenantId,
+          ctx.entityId,
+          representedId,
+          representativeId,
+          rep.effective_from,
+          rep.fuente,
+        ].join(":"),
       });
       if (error) throw error;
+      if (!data) throw new Error("La RPC autoritativa no devolvió el identificador de la representación");
       okCount += 1;
     } catch (error) {
       failedReps.push({ rep, error: errorMessage(error) });

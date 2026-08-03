@@ -517,10 +517,10 @@ function DemoScenarioResultContent({
               <div className="rounded-md border border-border bg-secondary/40 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Proveedor sandbox</p>
                 <p className="mt-1 font-medium text-foreground">
-                  {response.trust_center.signature.level} / {response.trust_center.timestamp.level}
+                  {response.trust_center.interposition.mode} / {response.trust_center.timestamp.level}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {response.trust_center.signature.status === "SIMULATED_READY" ? "Firma simulada preparada" : "Firma no procede por gate bloqueante"}
+                  {response.trust_center.interposition.status === "SIMULATED_READY" ? "Interposición simulada preparada" : "Custodia no procede por gate bloqueante"}
                 </p>
               </div>
               <div className="rounded-md border border-border bg-secondary/40 p-3">

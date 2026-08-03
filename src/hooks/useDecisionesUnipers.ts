@@ -134,7 +134,7 @@ export function useCreateUnipersonalDecision() {
           content: input.content,
           decision_date: decisionDate,
           // ITEM-051: la decisión consta bajo la identidad del decisor (art.
-          // 15.2 LSC). La firma QES del documento llega después vía
+          // 15.2 LSC). La custodia documental llega después vía
           // ProcessDocxButton (residual: ligar status a la firma real).
           decided_by_id: input.decidedById,
           status: "FIRMADA",

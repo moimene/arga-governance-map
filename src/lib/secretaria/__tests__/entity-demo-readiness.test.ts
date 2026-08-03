@@ -13,8 +13,8 @@ describe("classifyEntityDemoReadiness", () => {
       activePositions: [{ id: "cargo-1" }],
       authorityEvidence: [{ id: "auth-1" }],
       compatibleTemplates: [{ id: "tpl-1" }],
-      meetings: [{ id: "meeting-1" }],
-      censusSnapshots: [{ id: "censo-1" }],
+      meetings: [{ id: "meeting-1", status: "CELEBRADA" }],
+      censusSnapshots: [{ id: "censo-1", meeting_id: "meeting-1" }],
     });
 
     expect(result).toEqual({ status: "complete", reasons: [] });
@@ -27,12 +27,46 @@ describe("classifyEntityDemoReadiness", () => {
       activePositions: [{ id: "cargo-1" }],
       authorityEvidence: [{ id: "auth-1" }],
       compatibleTemplates: [],
-      meetings: [{ id: "meeting-1" }],
+      meetings: [{ id: "meeting-1", status: "CELEBRADA" }],
       censusSnapshots: [],
     });
 
     expect(result.status).toBe("partial");
     expect(result.reasons).toEqual(["no_compatible_templates", "no_census"]);
+  });
+
+  it("does not require a census snapshot before a future meeting is opened", () => {
+    const result = classifyEntityDemoReadiness({
+      capitalHoldings: [{ porcentaje_capital: 100, effective_to: null }],
+      governingBodies: [{ id: "body-1" }],
+      activePositions: [{ id: "cargo-1" }],
+      authorityEvidence: [{ id: "auth-1" }],
+      compatibleTemplates: [{ id: "tpl-1" }],
+      meetings: [
+        { id: "meeting-draft", status: "DRAFT" },
+        { id: "meeting-convoked", status: "CONVOCADA" },
+      ],
+      censusSnapshots: [],
+    });
+
+    expect(result).toEqual({ status: "complete", reasons: [] });
+  });
+
+  it("requires a snapshot for every opened or celebrated meeting", () => {
+    const result = classifyEntityDemoReadiness({
+      capitalHoldings: [{ porcentaje_capital: 100, effective_to: null }],
+      governingBodies: [{ id: "body-1" }],
+      activePositions: [{ id: "cargo-1" }],
+      authorityEvidence: [{ id: "auth-1" }],
+      compatibleTemplates: [{ id: "tpl-1" }],
+      meetings: [
+        { id: "meeting-open", status: "EN_CURSO" },
+        { id: "meeting-held", status: "CELEBRADA" },
+      ],
+      censusSnapshots: [{ id: "censo-1", meeting_id: "meeting-open" }],
+    });
+
+    expect(result).toEqual({ status: "partial", reasons: ["no_census"] });
   });
 
   it("classifies reference_only when hard operational sources are missing", () => {

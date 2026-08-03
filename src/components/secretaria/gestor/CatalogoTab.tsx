@@ -1116,7 +1116,7 @@ export function CatalogoTab() {
   );
 
   // ITEM-089 + G3 (UX Oleada 1): el contador del catálogo explicita cuántos
-  // ítems son fixtures locales puente (LEGAL-FIXTURE-2026-04-28), etiquetados
+  // ítems son fixtures locales puente, identificados por tenant/protecciones y etiquetados
   // como cobertura provisional. El conteo filtrado (filtered.length) se
   // mantiene íntegro porque el filtro "Fixtures locales" sigue siendo legítimo.
   const fixtureCount = useMemo(

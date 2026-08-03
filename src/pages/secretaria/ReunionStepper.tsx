@@ -15,7 +15,12 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
 // B7 Lote 3: los datos legacy de agenda pueden traer alias de materia; el
 // select solo ofrece códigos canónicos, así que hay que resolverlos al leer.
-import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
+import {
+  AGENDA_MATERIAS,
+  MATERIAS_LIBRES,
+  labelMateria,
+  resolveMateriaAlias,
+} from "@/lib/secretaria/agenda-materias";
 import { toast } from "sonner";
 import { useTenantContext } from "@/context/TenantContext";
 import { useBodiesByEntity } from "@/hooks/useBodies";
@@ -27,9 +32,9 @@ import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import {
   useBodyMembers,
-  useCloseMeeting,
   useCreateUniversalMeeting,
   useGenerarActa,
+  getMeetingOpeningAvailability,
   useMeetingAgendaSources,
   useMinuteForMeeting,
   useOpenMeeting,
@@ -62,8 +67,11 @@ import {
 import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import { statusLabel } from "@/lib/secretaria/status-labels";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import {
   AGENDA_ORIGIN_LABELS,
+  decisionMeetingAgendaPoints,
+  isSubstantiveResolutionText,
   newSessionAgendaPoint,
   type AgendaPointOrigin,
   type MeetingAgendaPoint,
@@ -81,6 +89,7 @@ import { useReclassifyAgendaItemKind } from "@/hooks/useReclassifyAgendaItemKind
 import { useMaterializeAgendaItem } from "@/hooks/useMaterializeAgendaItem";
 import { useAgendaItemRealtimeSubscription } from "@/hooks/useAgendaItemRealtimeSubscription";
 import { useActaAgendaContract } from "@/hooks/useActas";
+import { AnnualAccountsArtifactPanel } from "@/components/secretaria/AnnualAccountsArtifactPanel";
 import {
   buildAgendaConstanciaSummary,
   renderActaAgendaItemsText,
@@ -111,7 +120,7 @@ import {
 } from "@/lib/secretaria/junta-universal";
 import {
   isMeetingRulePackPayload,
-  resolveCloudMeetingRulePacksStrict,
+  resolveMeetingRulePackContextForSpec,
   resolvePrototypeMeetingRulePacks,
   uniqueMeetingRuleSpecs,
 } from "@/lib/secretaria/prototype-rule-pack-fallback";
@@ -119,7 +128,13 @@ import {
   evaluateMeetingCensusAvailability,
   meetingCensusSourceForBodyType,
   selectVotingCapitalHoldings,
+  summarizeMeetingAttendance,
+  votingRightsFromCapitalHolding,
 } from "@/lib/secretaria/meeting-census";
+import {
+  buildDecisionAgendaSnapshots,
+  votingMatterFromSnapshot,
+} from "@/lib/secretaria/meeting-voting";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
@@ -143,6 +158,7 @@ interface VoterRow {
 type CensusMember = BodyMember & {
   default_capital_representado?: number | null;
   default_shares_represented?: number | null;
+  default_voting_rights?: number | null;
 };
 
 interface MeetingVoterRow {
@@ -192,21 +208,6 @@ function formatMeetingVoterName(voter: MeetingVoterRow) {
   return voter.person_name?.trim() || "Miembro sin identificar";
 }
 
-const AGENDA_MATERIAS = [
-  { value: "FORMULACION_CUENTAS", label: "Formulación de cuentas", tipo: "ORDINARIA" },
-  { value: "APROBACION_PRESUPUESTO", label: "Aprobación del presupuesto anual", tipo: "ORDINARIA" },
-  { value: "FINANCIACION", label: "Aprobación de financiación", tipo: "ORDINARIA" },
-  { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA" },
-  { value: "APROBACION_CUENTAS", label: "Aprobación de cuentas", tipo: "ORDINARIA" },
-  { value: "DISTRIBUCION_DIVIDENDOS", label: "Distribución de dividendos", tipo: "ORDINARIA" },
-  { value: "NOMBRAMIENTO_CONSEJERO", label: "Nombramiento de consejero", tipo: "ORDINARIA" },
-  { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA" },
-  { value: "NOMBRAMIENTO_AUDITOR", label: "Nombramiento de auditor", tipo: "ORDINARIA" },
-  { value: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos", tipo: "ESTATUTARIA" },
-  { value: "AUMENTO_CAPITAL", label: "Aumento de capital", tipo: "ESTATUTARIA" },
-  { value: "AUTORIZACION_GARANTIA", label: "Garantía intragrupo", tipo: "ESTRUCTURAL" },
-] as const;
-
 const EMPTY_ACTIVE_CONFLICTS: ConflictFull[] = [];
 
 const UNIVERSAL_SPECIAL_DOCUMENTATION_MATERIAS = new Set([
@@ -247,21 +248,34 @@ function normalizeMateriaClase(value: unknown): MateriaClase {
 }
 
 function defaultMateriaForTitle(title: string) {
-  const raw = title.toUpperCase();
+  const raw = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (raw.includes("ESTATUT")) return "MODIFICACION_ESTATUTOS";
   if (raw.includes("CAPITAL")) return "AUMENTO_CAPITAL";
   if (raw.includes("AUDITOR")) return "NOMBRAMIENTO_AUDITOR";
   if (raw.includes("DIVIDENDO") || raw.includes("RESULTADO")) return "DISTRIBUCION_DIVIDENDOS";
-  if (raw.includes("CONSEJ") || raw.includes("CARGO")) return "NOMBRAMIENTO_CONSEJERO";
-  return "APROBACION_CUENTAS";
+  if (
+    raw.includes("REPRESENTANTE")
+    && (
+      raw.includes("SOCIA UNICA")
+      || raw.includes("SOCIO UNICO")
+    )
+  ) {
+    return "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL";
+  }
+  if (
+    raw.includes("REPRESENTANTE")
+    && (raw.includes("PERSONA JURID") || raw.includes("ADMINISTRADORA"))
+  ) {
+    return "OTROS_LIBRE";
+  }
+  if (raw.includes("NOMBRAMIENTO") && raw.includes("CONSEJERO")) {
+    return "NOMBRAMIENTO_CONSEJERO";
+  }
+  return "OTROS_LIBRE";
 }
 
 function materiaClaseFromMateria(materia: string): MateriaClase {
   return normalizeMateriaClase(AGENDA_MATERIAS.find((m) => m.value === materia)?.tipo);
-}
-
-function labelMateria(materia: string) {
-  return AGENDA_MATERIAS.find((m) => m.value === materia)?.label ?? materia;
 }
 
 function selectedOverrides(resolutions: RuleResolution[]) {
@@ -641,7 +655,16 @@ function ReclassifyKindDialog({
 
 function ConstitutionStep({ meetingId }: { meetingId?: string }) {
   const { data: meeting, isLoading } = useReunionById(meetingId);
+  const { data: agendaSources = [], isLoading: agendaSourcesLoading } = useMeetingAgendaSources(meetingId);
   const openMeeting = useOpenMeeting(meetingId);
+  const [openingClockMs, setOpeningClockMs] = useState(() => Date.now());
+
+  // Una ficha abierta antes de la hora prevista se habilita al llegar el inicio
+  // sin obligar al usuario a recargar. La autoridad sigue siendo la RPC.
+  useEffect(() => {
+    const timer = window.setInterval(() => setOpeningClockMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (isLoading) {
     return (
@@ -663,15 +686,36 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
     scheduled_end: string | null;
     location: string | null;
     confidentiality_level: string | null;
-    governing_bodies?: { name?: string | null; entities?: { common_name?: string | null } | null } | null;
+    governing_bodies?: {
+      name?: string | null;
+      entities?: { common_name?: string | null; legal_name?: string | null } | null;
+    } | null;
   };
 
   // ITEM-146: la sesión está "abierta" cuando ya se declaró apertura — tanto en
   // EN_CURSO (en curso) como en CELEBRADA (cerrada con acta). Ambos estados
   // activan los pasos de asistentes/quórum.
   const isOpen = m.status === "EN_CURSO" || m.status === "CELEBRADA";
+  const openingAvailability = getMeetingOpeningAvailability(
+    m.status,
+    m.scheduled_start,
+    m.scheduled_end,
+    openingClockMs,
+  );
+  const openingHelpId = meetingId ? `meeting-opening-help-${meetingId}` : "meeting-opening-help";
+  const canPrepareAnnualAccounts = m.status === "DRAFT" || m.status === "CONVOCADA";
+  const annualAccountsPoints = agendaSources.filter(
+    (point) =>
+      normalizeAgendaItemKind(point.kind) === "DECISORIO" &&
+      resolveMateriaAlias(point.materia) === "FORMULACION_CUENTAS" &&
+      point.source_table === "agenda_items" &&
+      Boolean(point.source_id),
+  );
   const bodyName = m.governing_bodies?.name ?? "—";
-  const entityName = m.governing_bodies?.entities?.common_name ?? "—";
+  const entityName =
+    m.governing_bodies?.entities?.legal_name ??
+    m.governing_bodies?.entities?.common_name ??
+    "—";
 
   const fields: [string, string][] = [
     ["Entidad", entityName],
@@ -729,6 +773,41 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
         </div>
       </div>
 
+      {canPrepareAnnualAccounts ? (
+        <section className="space-y-3" aria-label="Documentación previa de cuentas anuales">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
+              Documentación previa para formulación de cuentas
+            </h3>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              Custodia y fija ahora la versión que se someterá al Consejo. Esta actuación no abre la sesión,
+              no formula las cuentas y no requiere firma electrónica.
+            </p>
+          </div>
+          {agendaSourcesLoading ? (
+            <div className="flex items-center gap-2 text-xs text-[var(--g-text-secondary)]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando el punto de formulación…
+            </div>
+          ) : annualAccountsPoints.length > 0 ? (
+            annualAccountsPoints.map((point) => (
+              <AnnualAccountsArtifactPanel
+                key={point.source_id!}
+                meetingId={meetingId!}
+                agendaItemId={point.source_id!}
+              />
+            ))
+          ) : (
+            <p
+              className="border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3 text-xs text-[var(--g-text-secondary)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              La convocatoria no contiene un punto decisorio materializado de formulación de cuentas.
+            </p>
+          )}
+        </section>
+      ) : null}
+
       {isOpen ? (
         <div
           className="flex items-center gap-3 border border-[var(--status-success)] bg-[var(--g-sec-100)] p-4"
@@ -740,26 +819,47 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
           </p>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() =>
-            openMeeting.mutate(undefined, {
-              onSuccess: () => toast.success("Sesión abierta"),
-              onError: (e) => toast.error(e instanceof Error ? e.message : "Error al abrir sesión"),
-            })
-          }
-          disabled={openMeeting.isPending}
-          aria-busy={openMeeting.isPending}
-          className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-5 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          {openMeeting.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
-          )}
-          Declarar apertura de la sesión
-        </button>
+        <div className="space-y-3">
+          {!openingAvailability.allowed ? (
+            <div
+              id={openingHelpId}
+              role="status"
+              className="flex items-start gap-3 border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+              style={{ borderRadius: "var(--g-radius-lg)" }}
+            >
+              <AlertTriangle
+                aria-hidden="true"
+                className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-warning)]"
+              />
+              <p className="text-sm text-[var(--g-text-primary)]">
+                {openingAvailability.reason}
+              </p>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() =>
+              openMeeting.mutate(undefined, {
+                onSuccess: () => toast.success("Sesión abierta"),
+                onError: (e) => toast.error(e instanceof Error ? e.message : "Error al abrir sesión"),
+              })
+            }
+            disabled={openMeeting.isPending || !openingAvailability.allowed}
+            aria-disabled={openMeeting.isPending || !openingAvailability.allowed}
+            aria-describedby={!openingAvailability.allowed ? openingHelpId : undefined}
+            aria-busy={openMeeting.isPending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-5 py-2.5 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {openMeeting.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Declarar apertura de la sesión
+          </button>
+        </div>
       )}
     </div>
   );
@@ -834,6 +934,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         es_vocal: attendee.voting_rights === null || attendee.voting_rights === undefined || Number(attendee.voting_rights) !== 0,
         default_capital_representado: attendee.capital_representado ?? null,
         default_shares_represented: attendee.shares_represented ?? null,
+        default_voting_rights: attendee.voting_rights ?? null,
       }));
 
     if (!isJuntaCensus) {
@@ -852,6 +953,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
           "Socio sin identificar",
         default_capital_representado: holding.porcentaje_capital ?? null,
         default_shares_represented: holding.numero_titulos ?? null,
+        default_voting_rights: votingRightsFromCapitalHolding(holding),
       }));
 
     return shareholderMembers.length > 0 ? shareholderMembers : existingAttendeeMembers;
@@ -949,7 +1051,7 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
         // de vocal (1) o voz sin voto (0, secretario no consejero); en juntas
         // conserva el capital con derecho a voto.
         voting_rights: isJuntaCensus
-          ? (Number.isFinite(capitalValue) ? capitalValue : null)
+          ? (attendanceType === "AUSENTE" ? 0 : m.default_voting_rights ?? null)
           : (m.es_vocal ? 1 : 0),
         via_representante: attendanceType === "REPRESENTADO",
       };
@@ -962,16 +1064,19 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
     }
     replaceAttendees.mutate(rows, {
       onSuccess: () => toast.success(`Asistencia de ${rows.length} miembros guardada`),
-      onError: (e) => toast.error(e instanceof Error ? e.message : "Error al guardar asistencia"),
+      onError: (e) => toast.error("Error al guardar asistencia", {
+        description: secretariaErrorMessage(e, "No se pudo guardar la asistencia."),
+      }),
     });
   }
 
-  // ITEM-028/037: en órganos colegiados solo los vocales computan
-  // (el secretario no consejero asiste con voz sin voto — art. 247 LSC).
-  const censoVocal = isJuntaCensus ? members : members.filter((m) => m.es_vocal);
-  const presentes = censoVocal.filter(
-    (m) => (attendance[m.person_id]?.attendance_type ?? "PRESENCIAL") !== "AUSENTE"
-  ).length;
+  const attendanceSummary = summarizeMeetingAttendance(
+    members.map((member) => ({
+      attendance_type: attendance[member.person_id]?.attendance_type ?? "PRESENCIAL",
+      es_vocal: member.es_vocal,
+    })),
+    isJuntaCensus,
+  );
   const universalCapitalPct = members.reduce((sum, member) => {
     const entry = attendance[member.person_id];
     if ((entry?.attendance_type ?? "PRESENCIAL") === "AUSENTE") return sum;
@@ -980,7 +1085,9 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
       : Number(entry?.capital_representado ?? 0);
     return Number.isFinite(raw) ? sum + raw : sum;
   }, 0);
-  const universalMembersPct = censoVocal.length > 0 ? (presentes / censoVocal.length) * 100 : 0;
+  const universalMembersPct = attendanceSummary.quorumTotal > 0
+    ? (attendanceSummary.quorumPresent / attendanceSummary.quorumTotal) * 100
+    : 0;
   const universalConcurrencePct = organoTipo === "JUNTA_GENERAL" ? universalCapitalPct : universalMembersPct;
   const universalConcurrenceOk = universalConcurrencePct >= 99.999;
 
@@ -1173,11 +1280,16 @@ function AsistentesStep({ meetingId }: { meetingId?: string }) {
       >
         <Users className="h-4 w-4 text-[var(--g-text-secondary)]" />
         <span className="font-medium text-[var(--g-text-primary)]">
-          {presentes} / {members.length} presentes o representados
+          {attendanceSummary.attending} / {attendanceSummary.total} presentes o representados
         </span>
         <span className="text-[var(--g-text-secondary)]">
-          {members.length - presentes} ausentes
+          {attendanceSummary.absent} ausentes
         </span>
+        {!isJuntaCensus && attendanceSummary.quorumTotal !== attendanceSummary.total ? (
+          <span className="text-[var(--g-text-secondary)]">
+            {attendanceSummary.quorumPresent} / {attendanceSummary.quorumTotal} vocales computan para quórum
+          </span>
+        ) : null}
       </div>
 
       {isUniversalMeeting ? (
@@ -1282,21 +1394,22 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
   const agendaForRules = agendaSources.length > 0
     ? agendaSources
     : ((existingQuorum?.debates ?? []) as DebatePunto[]);
-  const debates = agendaForRules.map((debate) => {
-    const materia = debate.materia ?? defaultMateriaForTitle(debate.punto);
-    return {
-      ...debate,
-      materia,
-      tipo: debate.tipo ?? materiaClaseFromMateria(materia),
-    };
-  });
+  const debates = decisionMeetingAgendaPoints(agendaForRules)
+    .map((debate) => {
+      const materia = debate.materia ?? defaultMateriaForTitle(debate.punto);
+      return {
+        ...debate,
+        materia,
+        tipo: debate.tipo ?? materiaClaseFromMateria(materia),
+      };
+    });
   const ruleSpecs = uniqueMeetingRuleSpecs(
-    debates.length > 0
-      ? debates.map((debate) => ({
-          materia: debate.materia ?? "APROBACION_CUENTAS",
-          clase: normalizeMateriaClase(debate.tipo),
-        }))
-      : [{ materia: "APROBACION_CUENTAS", clase: "ORDINARIA" as MateriaClase }]
+    debates
+      .filter((debate) => !MATERIAS_LIBRES.has(resolveMateriaAlias(debate.materia)))
+      .map((debate) => ({
+        materia: debate.materia,
+        clase: normalizeMateriaClase(debate.tipo),
+      }))
   );
   const tipoSocial = toTipoSocial(
     meetingRaw?.governing_bodies?.entities?.tipo_social ??
@@ -1723,6 +1836,7 @@ function QuorumStep({ meetingId }: { meetingId?: string }) {
 interface DebatePunto {
   punto: string;
   notas: string;
+  resolution_text?: string | null;
   materia?: string;
   tipo?: MateriaClase;
   origin?: AgendaPointOrigin;
@@ -1832,6 +1946,18 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         source_index: index + 1,
       }));
     const constancias: AgendaItemConstanciaInput[] = [];
+    const decisionWithoutResolution = debatesForSave.find(
+      (point) =>
+        resolvePointKind(point, kindIndex) === "DECISORIO" &&
+        !isSubstantiveResolutionText(point.punto, point.resolution_text),
+    );
+
+    if (decisionWithoutResolution) {
+      toast.error(
+        `Completa el texto resolutivo propuesto del punto «${decisionWithoutResolution.punto}».`,
+      );
+      return;
+    }
 
     if (isUniversalMeeting && debatesForSave.length === 0) {
       toast.error(`Añade al menos un punto del orden del día para la ${universalLabel}.`);
@@ -1937,7 +2063,7 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
             numero: index + 1,
             titulo: point.punto,
             materia: point.materia,
-            texto_acuerdo: point.notas || null,
+            texto_acuerdo: point.resolution_text?.trim() || null,
             kind: point.kind ?? resolvePointKind(point, kindIndex),
             agreement_id: point.agreement_id ?? null,
           })),
@@ -2056,34 +2182,52 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                   <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
                     Materia o ámbito
                   </label>
-                  <select
-                    value={resolveMateriaAlias(d.materia ?? "APROBACION_CUENTAS")}
-                    onChange={(e) => updatePunto(idx, "materia", e.target.value)}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    {AGENDA_MATERIAS.map((materia) => (
-                      <option key={materia.value} value={materia.value}>
-                        {materia.label}
-                      </option>
-                    ))}
-                  </select>
+                  {resolvePointKind(d, kindIndex) === "DECISORIO" ? (
+                    <select
+                      value={resolveMateriaAlias(d.materia?.trim() || "OTROS_LIBRE")}
+                      onChange={(e) => updatePunto(idx, "materia", e.target.value)}
+                      className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      {AGENDA_MATERIAS.map((materia) => (
+                        <option key={materia.value} value={materia.value}>
+                          {materia.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p
+                      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-3 py-2 text-sm text-[var(--g-text-secondary)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      No aplica — punto sin acuerdo
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
                     Clase de acuerdo
                   </label>
-                  <select
-                    value={d.tipo ?? materiaClaseFromMateria(resolveMateriaAlias(d.materia ?? "APROBACION_CUENTAS"))}
-                    onChange={(e) => updatePunto(idx, "tipo", e.target.value)}
-                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="ORDINARIA">Ordinaria</option>
-                    <option value="ESTATUTARIA">Estatutaria</option>
-                    <option value="ESTRUCTURAL">Estructural</option>
-                    <option value="ESPECIAL">Especial</option>
-                  </select>
+                  {resolvePointKind(d, kindIndex) === "DECISORIO" ? (
+                    <select
+                      value={d.tipo ?? materiaClaseFromMateria(resolveMateriaAlias(d.materia?.trim() || "OTROS_LIBRE"))}
+                      onChange={(e) => updatePunto(idx, "tipo", e.target.value)}
+                      className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <option value="ORDINARIA">Ordinaria</option>
+                      <option value="ESTATUTARIA">Estatutaria</option>
+                      <option value="ESTRUCTURAL">Estructural</option>
+                      <option value="ESPECIAL">Especial</option>
+                    </select>
+                  ) : (
+                    <p
+                      className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-muted)] px-3 py-2 text-sm text-[var(--g-text-secondary)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      No aplica — no hay votación
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -2099,15 +2243,48 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
               </div>
+              {resolvePointKind(d, kindIndex) === "DECISORIO" ? (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
+                    Texto resolutivo propuesto <span aria-hidden="true">*</span>
+                  </label>
+                  <textarea
+                    value={d.resolution_text ?? ""}
+                    onChange={(e) => updatePunto(idx, "resolution_text", e.target.value)}
+                    rows={5}
+                    required
+                    aria-required="true"
+                    placeholder="Redacta el acuerdo completo que se someterá a votación; no repitas solo el título del punto."
+                    className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  />
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    Este texto alimentará el acuerdo adoptado, el acta y la certificación.
+                  </p>
+                </div>
+              ) : null}
+              {resolvePointKind(d, kindIndex) === "DECISORIO" &&
+              resolveMateriaAlias(d.materia?.trim() || "OTROS_LIBRE") === "FORMULACION_CUENTAS" ? (
+                meetingId && d.source_table === "agenda_items" && d.source_id ? (
+                  <AnnualAccountsArtifactPanel meetingId={meetingId} agendaItemId={d.source_id} />
+                ) : (
+                  <p
+                    className="border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3 text-xs text-[var(--g-text-secondary)]"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    Guarda primero la agenda para vincular el set de cuentas al punto decisorio exacto.
+                  </p>
+                )
+              ) : null}
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--g-text-secondary)]">
-                {isUniversalMeeting ? "Descripción / propuesta de acuerdo" : "Notas del secretario"}
+                  Notas del secretario
                 </label>
                 <textarea
                   value={d.notas}
                   onChange={(e) => updatePunto(idx, "notas", e.target.value)}
                   rows={3}
-                  placeholder="Resumen del debate, intervenciones relevantes, acuerdos adoptados en este punto…"
+                  placeholder="Resumen del debate e intervenciones relevantes; no se usa como texto del acuerdo."
                   className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
@@ -2150,6 +2327,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
         disabled={
           savingDebates ||
           debates.every((d) => !d.punto.trim()) ||
+          debates.some(
+            (d) =>
+              resolvePointKind(d, kindIndex) === "DECISORIO" &&
+              !isSubstantiveResolutionText(d.punto, d.resolution_text),
+          ) ||
           (isUniversalMeeting && !universalAcceptanceConfirmed)
         }
         aria-busy={savingDebates}
@@ -2174,6 +2356,7 @@ function patchUniversalVotingMetadata(
   agendaPoints: Array<{
     punto: string;
     notas?: string | null;
+    resolution_text?: string | null;
     materia?: string | null;
     agreement_id?: string | null;
   }>,
@@ -2203,8 +2386,11 @@ function patchUniversalVotingMetadata(
     const input: UniversalVotePointInput = {
       numero: index + 1,
       titulo: point.punto,
-      materia: point.materia ?? snapshot?.materia ?? null,
-      texto_acuerdo: point.notas?.trim() || snapshot?.resolution_text || null,
+      // Solo un snapshot decisorio puede aportar materia/votos/proclamación.
+      // Los puntos informativos conservan título y constancia, sin simular un
+      // acuerdo ni heredar la clasificación del formulario de agenda.
+      materia: votingMatterFromSnapshot(snapshot),
+      texto_acuerdo: point.resolution_text?.trim() || snapshot?.resolution_text || null,
       votos_favor: snapshot?.vote_summary.favor ?? null,
       votos_contra: snapshot?.vote_summary.contra ?? null,
       abstenciones: snapshot?.vote_summary.abstenciones ?? null,
@@ -2422,7 +2608,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
             {
               punto: "Acuerdo de la sesión",
               notas: "",
-              materia: "APROBACION_CUENTAS",
+              materia: "OTROS_LIBRE",
               tipo: "ORDINARIA" as MateriaClase,
               origin: "MEETING_FLOOR" as AgendaPointOrigin,
             },
@@ -2501,11 +2687,19 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
   const quorumData = meetingRaw?.quorum_data ?? null;
   const savedQuorumForVote = quorumData?.quorum as { reached?: boolean } | undefined;
   const quorumReachedForVote = savedQuorumForVote?.reached === true;
-  const ruleSpecsForVotes = uniqueMeetingRuleSpecs(
-    agendaPoints.map((point) => ({
+  const decisionRuleSpecs = uniqueMeetingRuleSpecs(
+    votablePointIndices.map((pointIndex) => {
+      const point = agendaPoints[pointIndex];
+      return {
       materia: point.materia ?? defaultMateriaForTitle(point.punto),
       clase: normalizeMateriaClase(point.tipo),
-    }))
+      };
+    })
+  );
+  // OTROS_LIBRE conserva su identidad y su warning de fallback en el snapshot,
+  // pero no dispara una consulta a un rule pack que por contrato no existe.
+  const ruleSpecsForVotes = decisionRuleSpecs.filter(
+    (spec) => !MATERIAS_LIBRES.has(resolveMateriaAlias(spec.materia)),
   );
   const { data: ruleResolutions = [] } = useRuleResolutions({
     materias: ruleSpecsForVotes,
@@ -2513,13 +2707,23 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     organoTipo,
   });
   const { data: pactosVigentes = [] } = usePactosVigentes(entityId ?? undefined);
-  const voteRuleContext = resolvePrototypeMeetingRulePacks(ruleSpecsForVotes, ruleResolutions, organoTipo);
-  const strictVoteRuleContext = resolveCloudMeetingRulePacksStrict(ruleSpecsForVotes, ruleResolutions, organoTipo);
-  const votePacks = voteRuleContext.packs;
-  const strictVotePacks = strictVoteRuleContext.packs;
-  const voteOverrides = selectedOverrides(ruleResolutions);
 
-  const selectedPoint = agendaPoints[selectedPointIndex] ?? agendaPoints[0];
+  const effectiveSelectedPointIndex = votablePointIndices.includes(selectedPointIndex)
+    ? selectedPointIndex
+    : (votablePointIndices[0] ?? null);
+  const selectedPoint = effectiveSelectedPointIndex === null
+    ? null
+    : agendaPoints[effectiveSelectedPointIndex];
+  const selectedPointRuleContext = selectedPoint
+    ? resolveMeetingRulePackContextForSpec(
+        {
+          materia: selectedPoint.materia ?? defaultMateriaForTitle(selectedPoint.punto),
+          clase: normalizeMateriaClase(selectedPoint.tipo),
+        },
+        ruleResolutions,
+        organoTipo,
+      )
+    : null;
 
   useEffect(() => {
     if (selectedPointIndex > agendaPoints.length - 1) {
@@ -2536,7 +2740,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     }
   }, [votablePointIndices, selectedPointIndex]);
 
-  function rowForPoint(voter: VoterRow, pointIndex = selectedPointIndex): VoterRow {
+  function rowForPoint(
+    voter: VoterRow,
+    pointIndex = effectiveSelectedPointIndex ?? selectedPointIndex,
+  ): VoterRow {
     const pointState = votesByPoint[pointIndex]?.[voter.id];
     return pointState ? { ...voter, ...pointState } : voter;
   }
@@ -2551,13 +2758,14 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     // afectado), 190.3 (no priva del voto) y 228.c LSC (abstención en los
     // acuerdos afectados): la decisión es por punto y la toma el secretario.
     setVotesByPoint((prev) => {
-      const currentPoint = prev[selectedPointIndex] ?? {};
+      const targetPointIndex = effectiveSelectedPointIndex ?? selectedPointIndex;
+      const currentPoint = prev[targetPointIndex] ?? {};
       const existing = currentPoint[id] ?? { vote: "" as VoteValue, conflict_flag: false, conflict_reason: "" };
       const nextConflictFlag = patch.conflict_flag ?? existing.conflict_flag;
       const nextConflictReason = patch.conflict_reason ?? existing.conflict_reason;
       return {
         ...prev,
-        [selectedPointIndex]: {
+        [targetPointIndex]: {
           ...currentPoint,
           [id]: {
             vote: patch.vote ?? existing.vote,
@@ -2603,14 +2811,19 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     toast.success("Todos los puntos decisorios quedan marcados como aprobados por unanimidad");
   }
 
-  const currentVoters = pointRows();
+  const currentVoters = effectiveSelectedPointIndex === null
+    ? []
+    : pointRows(effectiveSelectedPointIndex);
 
   function missingStrictSpecLabelsForPoint(pointIndex: number) {
     const point = agendaPoints[pointIndex] ?? agendaPoints[0];
     const materia = point.materia ?? defaultMateriaForTitle(point.punto);
     const clase = normalizeMateriaClase(point.tipo);
-    return strictVoteRuleContext.missingSpecs
-      .filter((spec) => spec.materia === materia && spec.clase === clase)
+    return resolveMeetingRulePackContextForSpec(
+      { materia, clase },
+      ruleResolutions,
+      organoTipo,
+    ).strict.missingSpecs
       .map((spec) => `${organoTipo}:${spec.materia}:${spec.clase}`);
   }
 
@@ -2657,6 +2870,12 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     const point = agendaPoints[pointIndex] ?? agendaPoints[0];
     const rowsForPoint = pointRows(pointIndex);
     const materia = point.materia ?? defaultMateriaForTitle(point.punto);
+    const pointRuleContext = resolveMeetingRulePackContextForSpec(
+      { materia, clase: normalizeMateriaClase(point.tipo) },
+      ruleResolutions,
+      organoTipo,
+    );
+    const pointResolution = ruleResolutionForPoint(pointIndex);
     const explicitVotingData = rowsForPoint.some((voter) => {
       const raw = voter.voting_rights ?? voter.capital_representado ?? voter.shares_represented;
       return typeof raw === "number" && Number.isFinite(raw) && raw > 0;
@@ -2714,8 +2933,10 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       // por cabezas. En consejo la base es por miembros (no aplica); en junta
       // sin datos de capital el motor emite census_not_available.
       capitalDataAvailable: organoTipo !== "JUNTA_GENERAL" || explicitVotingData,
-      packs: mode === "cloud_strict" ? strictVotePacks : votePacks,
-      overrides: voteOverrides,
+      packs: mode === "cloud_strict"
+        ? pointRuleContext.strict.packs
+        : pointRuleContext.operational.packs,
+      overrides: pointResolution?.applicableOverrides ?? [],
       pactos: pactosVigentes,
       votoCalidadHabilitado,
       votoPresidente: (() => {
@@ -2727,8 +2948,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       })(),
     });
 
-    if (mode === "operational" && voteRuleContext.hasFallback) {
-      const warning = `prototype_rule_pack_fallback_used:${voteRuleContext.fallbackPackIds.join(",")}`;
+    if (mode === "operational" && pointRuleContext.operational.hasFallback) {
+      const warning = `prototype_rule_pack_fallback_used:${pointRuleContext.operational.fallbackPackIds.join(",")}`;
       snapshot.societary_validity.warnings = [
         ...snapshot.societary_validity.warnings,
         warning,
@@ -2758,12 +2979,16 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     });
   }
 
-  const currentSnapshot = buildSnapshotForPoint(selectedPointIndex);
-  const currentDualEvaluation = buildDualEvaluationForPoint(selectedPointIndex);
+  const currentSnapshot = effectiveSelectedPointIndex === null
+    ? null
+    : buildSnapshotForPoint(effectiveSelectedPointIndex);
+  const currentDualEvaluation = effectiveSelectedPointIndex === null
+    ? null
+    : buildDualEvaluationForPoint(effectiveSelectedPointIndex);
   const currentVoteCompleteness = evaluateMeetingVoteCompleteness(currentVoters);
-  const favor = currentSnapshot.vote_summary.favor;
-  const contra = currentSnapshot.vote_summary.contra;
-  const abstencion = currentSnapshot.vote_summary.abstenciones;
+  const favor = currentSnapshot?.vote_summary.favor ?? 0;
+  const contra = currentSnapshot?.vote_summary.contra ?? 0;
+  const abstencion = currentSnapshot?.vote_summary.abstenciones ?? 0;
   const hasPersistentVoters = voters.length > 0;
   // Codex P1 (round 3 fix): VotacionesStep solo renderiza puntos DECISORIO en
   // la UI de votación; los puntos no decisorios no reciben voters/votes y
@@ -2800,13 +3025,25 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     (linkedAgreementCount === 0 || hasBlockedExistingSnapshot || hasRejectedExistingResolution);
 
   async function handleSaveResolutions() {
-    const snapshots = agendaPoints.map((_, i) => {
+    const pointWithoutResolution = votablePointIndices
+      .map((index) => agendaPoints[index])
+      .find((point) => !isSubstantiveResolutionText(point.punto, point.resolution_text));
+    if (pointWithoutResolution) {
+      toast.error(
+        `Falta el texto resolutivo del punto «${pointWithoutResolution.punto}». Vuelve a Agenda y debate para completarlo.`,
+      );
+      return;
+    }
+    const snapshots = buildDecisionAgendaSnapshots(votablePointIndices, (i) => {
       const operationalSnapshot = buildSnapshotForPoint(i, "operational");
       return {
         ...operationalSnapshot,
         dual_evaluation: buildDualEvaluationForPoint(i),
       };
     });
+    const snapshotByAgendaIndex = new Map(
+      snapshots.map((snapshot) => [snapshot.agenda_item_index, snapshot]),
+    );
     // Codex P1 (round 3 fix): solo puntos DECISORIO generan rows en
     // `meeting_resolutions`. Los puntos no decisorios se trazan en el acta vía
     // `buildActaPuntosSequencial` (RRM art. 99, orden secuencial). Insertar
@@ -2815,12 +3052,12 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
     const rows = votablePointIndices.map((i) => {
       const point = agendaPoints[i];
       const rowsForPoint = pointRows(i);
-      const snapshot = snapshots[i];
+      const snapshot = snapshotByAgendaIndex.get(i + 1)!;
       const materia = point.materia ?? defaultMateriaForTitle(point.punto);
       const tipo = normalizeMateriaClase(point.tipo);
       return {
         agenda_item_index: i + 1,
-        resolution_text: point.punto,
+        resolution_text: point.resolution_text!.trim(),
         resolution_type: tipo,
         status: snapshot.status_resolucion,
         required_majority_code: `${materia}:${tipo}`,
@@ -2852,6 +3089,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
       const agendaPointsWithAgreements = agendaPoints.map((point, index) => ({
         punto: point.punto,
         notas: point.notas ?? "",
+        resolution_text: point.resolution_text?.trim() || null,
         materia: point.materia ?? defaultMateriaForTitle(point.punto),
         tipo: normalizeMateriaClase(point.tipo),
         origin: point.origin ?? "MEETING_FLOOR",
@@ -2861,6 +3099,8 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         agreement_id: agreementIdByAgendaIndex.get(index + 1) ?? point.agreement_id ?? null,
         group_campaign_id: point.group_campaign_id ?? null,
         group_campaign_step: point.group_campaign_step ?? null,
+        kind: point.kind ?? null,
+        decision_subtype: point.decision_subtype ?? null,
       }));
       // ITEM-145: re-leer quorum_data fresco de BD antes de mergear, para no
       // pisar debates/source_links/otras claves con la copia de caché de
@@ -2929,7 +3169,7 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               {votablePointIndices.map((index) => {
                 const point = agendaPoints[index];
                 const hasVotes = pointRows(index).some((v) => v.vote !== "");
-                const active = index === selectedPointIndex;
+                const active = index === effectiveSelectedPointIndex;
                 const linkedAgreement = existingResolutions.find(
                   (resolution) =>
                     resolution.agenda_item_index === index + 1 && Boolean(resolution.agreement_id),
@@ -3107,33 +3347,35 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
         })()
       ) : null}
 
-      <div
-        className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
-        style={{ borderRadius: "var(--g-radius-md)" }}
-      >
+      {currentSnapshot && currentDualEvaluation && selectedPoint && effectiveSelectedPointIndex !== null ? (
+        <>
+          <div
+            className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
         <div className="flex flex-wrap items-center gap-2">
-          <KindChip kind={pointKinds[selectedPointIndex] ?? "DELIBERATIVO"} />
+          <KindChip kind={pointKinds[effectiveSelectedPointIndex] ?? "DELIBERATIVO"} />
           <p className="text-sm font-semibold text-[var(--g-text-primary)]">
             {selectedPoint?.punto ?? "Acuerdo de la sesión"}
           </p>
         </div>
         <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-          {labelMateria(selectedPoint?.materia ?? "APROBACION_CUENTAS")} ·{" "}
+          {labelMateria(selectedPoint?.materia ?? "OTROS_LIBRE")} ·{" "}
           {normalizeMateriaClase(selectedPoint?.tipo)} ·{" "}
           {AGENDA_ORIGIN_LABELS[selectedPoint?.origin ?? "MEETING_FLOOR"]}
           {selectedPoint?.agreement_id ? " · propuesta preparada vinculada" : ""}
         </p>
       </div>
 
-      {voteRuleContext.hasFallback && (
+      {selectedPointRuleContext?.operational.hasFallback && (
         <div
           className="flex items-start gap-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
           <p className="text-xs text-[var(--g-text-secondary)]">
-            Esta votacion usa fallback tecnico de prototipo porque no hay rule pack Cloud
-            aplicable para todos los puntos. El snapshot queda marcado con warning y no se
+            Este punto usa fallback técnico de prototipo porque no hay rule pack Cloud
+            aplicable. Su snapshot queda marcado con warning y no se
             considera validacion legal productiva.
           </p>
         </div>
@@ -3466,7 +3708,9 @@ function VotacionesStep({ meetingId }: { meetingId?: string }) {
               : "Registrar votación del acuerdo y crear expediente Acuerdo 360"}
           </button>
         ) : null}
-      </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -3514,7 +3758,7 @@ function buildActaContent(
     quorum_data?: Record<string, unknown> | null;
     governing_bodies?: {
       name?: string | null;
-      entities?: { common_name?: string | null } | null;
+      entities?: { common_name?: string | null; legal_name?: string | null } | null;
     } | null;
   } | null;
 
@@ -3531,7 +3775,13 @@ function buildActaContent(
   const lines: string[] = [];
   lines.push("ACTA DE REUNIÓN");
   lines.push("================");
-  lines.push(`Entidad: ${m?.governing_bodies?.entities?.common_name ?? "—"}`);
+  lines.push(
+    `Entidad: ${
+      m?.governing_bodies?.entities?.legal_name ??
+      m?.governing_bodies?.entities?.common_name ??
+      "—"
+    }`,
+  );
   lines.push(`Órgano: ${m?.governing_bodies?.name ?? "—"}`);
   lines.push(`Tipo de sesión: ${m?.meeting_type ?? "—"}`);
   if (m?.scheduled_start) {
@@ -3628,35 +3878,14 @@ function buildActaContent(
     lines.push("");
   }
 
-  if (canonicalMinutesHash) {
-    lines.push("HASH CANÓNICO DEL ACTA:");
-    lines.push(canonicalMinutesHash);
-    lines.push("");
-  }
-
-  lines.push("EVIDENCIA DEMO/OPERATIVA:");
-  lines.push("Documento generado para el prototipo TGMS; la evidencia cualificada queda sujeta al pipeline QTSP configurado.");
+  lines.push("BORRADOR OPERATIVO NO AUTORITATIVO:");
+  lines.push("Este texto sirve de apoyo a la revisión. El acta jurídica se compone en servidor desde el censo, la asistencia, las votaciones y las constancias persistidas, y solo adquiere estado final tras la intervención acreditada de EAD Trust y su archivo electrónico.");
   lines.push("");
 
   lines.push(
     `Generado el ${new Date().toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })}`
   );
   return lines.join("\n");
-}
-
-type CensoSnapshotType = "ECONOMICO" | "POLITICO" | "UNIVERSAL";
-
-function inferCensoSnapshotType(
-  meeting: {
-    meeting_type?: string | null;
-    quorum_data?: Record<string, unknown> | null;
-    governing_bodies?: { body_type?: string | null } | null;
-  } | null | undefined,
-): CensoSnapshotType {
-  const raw = `${meeting?.meeting_type ?? ""} ${meeting?.governing_bodies?.body_type ?? ""}`.toUpperCase();
-  if (meeting?.quorum_data?.junta_universal === true || raw.includes("UNIVERSAL")) return "UNIVERSAL";
-  if (raw.includes("JUNTA")) return "ECONOMICO";
-  return "POLITICO";
 }
 
 function CierreStep({ meetingId }: { meetingId?: string }) {
@@ -3667,7 +3896,6 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const { data: existingMinute } = useMinuteForMeeting(meetingId);
   const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(meetingId);
   const generarActa = useGenerarActa();
-  const closeMeeting = useCloseMeeting(meetingId);
   const updateQuorumData = useUpdateQuorumData(meetingId);
   const [minuteId, setMinuteId] = useState<string | null>(null);
   const meetingQuorumData = (meeting as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
@@ -3715,10 +3943,6 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
   const adoptedWithoutAgreement = resolutions.filter(
     (resolution) => resolution.status === "ADOPTED" && !resolution.agreement_id
   );
-  const censoEntityId = meeting?.governing_bodies?.entity_id ?? null;
-  const censoBodyId = meeting?.body_id ?? null;
-  const censoSnapshotType = inferCensoSnapshotType(meeting);
-  const canCreateCensoSnapshot = Boolean(censoEntityId && censoBodyId);
   const isEntidadCotizada = Boolean(meeting?.governing_bodies?.entities?.es_cotizada);
   const actaPuntos = actaAgendaContract?.puntos ?? [];
   const actaValidationIssues = actaAgendaContract?.validation.blockingIssues ?? [];
@@ -3733,7 +3957,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
     adoptedWithoutAgreement.length === 0 &&
     actaValidationOk &&
     !existingMinute?.id &&
-    canCreateCensoSnapshot &&
+    meeting?.status === "EN_CURSO" &&
     universalCloseReady;
 
   async function handleConfirmar() {
@@ -3745,10 +3969,6 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
       toast.error("No se puede generar el acta: la estructura legal no es válida.", {
         description: actaValidationIssues[0]?.message ?? "Revise el orden del día y las constancias de la reunión.",
       });
-      return;
-    }
-    if (!censoEntityId || !censoBodyId) {
-      toast.error("No se puede generar el acta: falta sociedad u órgano para crear el snapshot WORM de censo.");
       return;
     }
     const baseQuorumData = (meetingQuorumData ?? {}) as Record<string, unknown>;
@@ -3792,25 +4012,9 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         meetingId,
         content,
         canonicalMinutesHash: actaAgendaContract?.canonicalMinutesHash,
-        entityId: censoEntityId,
-        bodyId: censoBodyId,
-        sessionKind: "MEETING",
-        snapshotType: censoSnapshotType,
       });
       setMinuteId(id);
-      // ITEM-146: la sesión queda CELEBRADA al generar el acta (cierre real),
-      // transicionando desde EN_CURSO. Best-effort: si la transición de estado
-      // falla, el acta ya está creada y no debe perderse — solo se avisa.
-      try {
-        await closeMeeting.mutateAsync();
-      } catch (closeErr) {
-        toast.warning(
-          closeErr instanceof Error
-            ? `Acta generada, pero no se pudo marcar la reunión como celebrada: ${closeErr.message}`
-            : "Acta generada, pero no se pudo marcar la reunión como celebrada.",
-        );
-      }
-      toast.success("Acta generada en borrador");
+      toast.success("Reunión cerrada y acta generada en una única operación");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al generar el acta");
     }
@@ -3830,7 +4034,9 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
               {resolutions.length} acuerdo(s) votado(s), {materializedAgreementCount} expediente(s)
-              Acuerdo 360 vinculados. Procede a firmar el acta y emitir la certificación.
+              Acuerdo 360 vinculados. Continúa con la aprobación del acta y la emisión de la
+              certificación. Si la ley exige firma externa, se incorpora aparte: EAD Trust solo
+              presta interposición y custodia.
             </p>
           </div>
         </div>
@@ -4092,7 +4298,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
           <div className="text-xs text-[var(--g-text-secondary)]">
             <p className="font-semibold text-[var(--g-text-primary)]">
-              El acta no está preparada para firma
+              El acta no está preparada para aprobación
             </p>
             <p className="mt-1">
               {actaValidationIssues[0].message}
@@ -4118,7 +4324,7 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning)]" />
         <p className="text-xs text-[var(--g-text-secondary)]">
           Esta acción no se puede deshacer desde la interfaz. El acta quedará en estado BORRADOR
-          hasta que sea firmada por la Secretaria.
+          hasta que Presidencia y Secretaría aporten sus constancias y quede aprobada.
         </p>
       </div>
 
@@ -4132,8 +4338,8 @@ function CierreStep({ meetingId }: { meetingId?: string }) {
             ? "La reunión ya tiene un acta operativa vinculada"
             : isUniversalMeeting && !universalCloseReady
               ? "Completa hora de cierre, modo de aprobación y referencia notarial cuando aplique"
-            : !canCreateCensoSnapshot
-              ? "Falta sociedad u órgano para crear el snapshot WORM de censo"
+            : meeting?.status !== "EN_CURSO"
+              ? "La reunión debe estar abierta antes del cierre autoritativo"
             : actaPuntos.length === 0
               ? "Guarda al menos un punto del orden del día antes de generar el acta"
             : adoptedWithoutAgreement.length > 0

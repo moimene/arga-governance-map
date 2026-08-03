@@ -8,21 +8,32 @@ import {
   pickTemplateHandoffSearchParams,
 } from "@/lib/secretaria/template-configuration-routing";
 
-type TramitadorVista = "todas" | "en-tramite" | "subsanaciones" | "presentaciones" | "inscritas";
+type TramitadorVista =
+  | "todas"
+  | "en-tramite"
+  | "elevadas"
+  | "subsanaciones"
+  | "presentaciones"
+  | "inscritas"
+  | "denegadas";
 
 const VISTA_CONFIG: Record<TramitadorVista, { label: string; estado?: string }> = {
   todas: { label: "Todas" },
   "en-tramite": { label: "En trámite", estado: "EN_TRAMITE" },
+  elevadas: { label: "Elevadas", estado: "ELEVADA" },
   subsanaciones: { label: "Subsanaciones", estado: "SUBSANACION" },
   presentaciones: { label: "Presentaciones", estado: "PRESENTADA" },
   inscritas: { label: "Inscritas", estado: "INSCRITA" },
+  denegadas: { label: "Denegadas", estado: "DENEGADA" },
 };
 
 const ESTADO_TO_VISTA: Record<string, TramitadorVista> = {
   EN_TRAMITE: "en-tramite",
+  ELEVADA: "elevadas",
   SUBSANACION: "subsanaciones",
   PRESENTADA: "presentaciones",
   INSCRITA: "inscritas",
+  DENEGADA: "denegadas",
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -55,8 +66,9 @@ export default function TramitadorLista() {
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useTramitacionesList(scopedEntityId);
   const requestedEstado = searchParams.get("estado") ?? "";
-  const activeVista: TramitadorVista = ESTADO_TO_VISTA[requestedEstado] ?? "todas";
-  const activeEstado = VISTA_CONFIG[activeVista].estado;
+  const activeVista: TramitadorVista | null =
+    ESTADO_TO_VISTA[requestedEstado] ?? (requestedEstado ? null : "todas");
+  const activeEstado = activeVista ? VISTA_CONFIG[activeVista].estado : requestedEstado;
   const rows = (data ?? []).filter((filing) => !activeEstado || filing.status === activeEstado);
 
   function setVista(next: TramitadorVista) {
@@ -85,9 +97,9 @@ export default function TramitadorLista() {
             Tramitaciones registrales
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
-            Elevación a público, presentación en BORME / PSM / SIGER / JUCERJA / CONSERVATORIA y
-            seguimiento de subsanaciones. La tramitación se inicia desde un acuerdo o certificación
-            inscribible, nunca como expediente libre.
+            Seguimiento de expedientes con escritura, instancia o certificación como documento de base,
+            su presentación, calificación, subsanación e inscripción acreditada. Cada tramitación conserva
+            un origen y una evidencia trazables.
           </p>
         </div>
         <button
@@ -134,6 +146,17 @@ export default function TramitadorLista() {
           );
         })}
       </div>
+
+      {!activeVista && requestedEstado ? (
+        <div
+          role="status"
+          className="mb-4 border border-[var(--status-warning)] bg-[var(--g-surface-card)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          Filtro de estado no reconocido: <span className="font-semibold">{requestedEstado}</span>.
+          Se muestran únicamente las filas que conserven ese valor, sin sustituirlo por la vista “Todas”.
+        </div>
+      ) : null}
 
       <div
         className="overflow-hidden border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]"
@@ -232,8 +255,20 @@ export default function TramitadorLista() {
                       >
                         Ver Acuerdo 360
                       </Link>
+                    ) : f.source_domain === "MANDATORY_BOOK" ? (
+                      <Link
+                        to={scope.createScopedTo("/secretaria/libros")}
+                        onClick={(event) => event.stopPropagation()}
+                        className="text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+                      >
+                        Ver libro societario
+                      </Link>
+                    ) : f.source_domain === "GROUP_CAMPAIGN_POST_TASK" ? (
+                      <span className="text-[var(--g-text-secondary)]">Tarea de depósito</span>
+                    ) : f.source_domain === "CERTIFICATION" ? (
+                      <span className="text-[var(--g-text-secondary)]">Certificación</span>
                     ) : (
-                      <span className="text-[var(--g-text-secondary)]">—</span>
+                      <span className="text-[var(--g-text-secondary)]">Origen legacy</span>
                     )}
                   </td>
                 </tr>

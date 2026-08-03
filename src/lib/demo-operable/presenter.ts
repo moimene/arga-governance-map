@@ -51,7 +51,7 @@ const presenterLabels: Record<string, { label: string; narrative: string }> = {
   },
   CERTIFICACION: {
     label: "Certificación sandbox",
-    narrative: "Se enseña la conexión QES/TSQ sandbox sin activar QTSP productivo.",
+    narrative: "Se enseña la interposición y custodia/TSQ sandbox sin activar servicios productivos.",
   },
   EVIDENCIA: {
     label: "Evidencia sandbox",

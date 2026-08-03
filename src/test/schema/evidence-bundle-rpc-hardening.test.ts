@@ -70,7 +70,7 @@ describe("Evidence bundle RPC hardening — prueba conductual cross-tenant", () 
   }, 30_000);
 
   afterAll(async () => {
-    try { await client?.auth.signOut(); } catch { /* noop */ }
+    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
   });
 
   it("un usuario autenticado NO puede crear evidencia para otro tenant (42501)", async () => {

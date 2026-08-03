@@ -28,7 +28,7 @@ export interface CargoRow {
   entity_id: string;
   body_id: string | null;
   tipo_condicion: TipoCondicion;
-  estado: "VIGENTE" | "CESADO";
+  estado: "VIGENTE" | "PROGRAMADO" | "CESADO";
   fecha_inicio: string;
   fecha_fin: string | null;
   representative_person_id: string | null;

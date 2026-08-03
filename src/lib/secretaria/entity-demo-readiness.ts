@@ -15,8 +15,8 @@ export type DemoReadinessInput = {
   activePositions?: Array<{ id: string }>;
   authorityEvidence?: Array<{ id: string }>;
   compatibleTemplates?: Array<{ id: string }>;
-  meetings?: Array<{ id: string }>;
-  censusSnapshots?: Array<{ id: string }>;
+  meetings?: Array<{ id: string; status?: string | null }>;
+  censusSnapshots?: Array<{ id: string; meeting_id?: string | null }>;
 };
 
 export type DemoReadiness = {
@@ -36,7 +36,15 @@ export function classifyEntityDemoReadiness(input: DemoReadinessInput): DemoRead
   if ((input.activePositions ?? []).length === 0) reasons.push("no_active_positions");
   if ((input.authorityEvidence ?? []).length === 0) reasons.push("no_authority_evidence");
   if ((input.compatibleTemplates ?? []).length === 0) reasons.push("no_compatible_templates");
-  if ((input.meetings ?? []).length > 0 && (input.censusSnapshots ?? []).length < (input.meetings ?? []).length) {
+  const meetingsRequiringCensus = (input.meetings ?? []).filter((meeting) =>
+    ["EN_CURSO", "CELEBRADA"].includes(String(meeting.status ?? "").toUpperCase()),
+  );
+  const meetingsWithCensus = new Set(
+    (input.censusSnapshots ?? [])
+      .map((snapshot) => snapshot.meeting_id)
+      .filter((meetingId): meetingId is string => Boolean(meetingId)),
+  );
+  if (meetingsRequiringCensus.some((meeting) => !meetingsWithCensus.has(meeting.id))) {
     reasons.push("no_census");
   }
 
@@ -63,7 +71,7 @@ export const DEMO_READINESS_REASON_LABELS: Record<DemoReadinessReason, string> =
   no_active_positions: "sin cargos o mandatos vigentes",
   no_authority_evidence: "sin authority evidence certificante",
   no_compatible_templates: "sin plantillas compatibles",
-  no_census: "sin snapshot/censo vigente",
+  no_census: "alguna sesión abierta o celebrada carece de snapshot/censo",
 };
 
 export function demoReadinessMessage(readiness: DemoReadiness) {

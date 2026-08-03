@@ -12,9 +12,8 @@ import {
   notificationStatusLabel,
   severityChip,
 } from "@/lib/grc/status-labels";
-import { useQTSPSign } from "@/hooks/useQTSPSign";
 import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
-import { useEvidenceBundlesForObject, useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import { toast } from "sonner";
@@ -93,9 +92,7 @@ export default function IncidenteDetalle() {
   const [signatoryEmail, setSignatoryEmail] = useState("lucia@arga-seguros.com");
 
   // V2 Integration Hooks
-  const { signMutation } = useQTSPSign();
   const navigate = useNavigate();
-  const createEvidence = useCreateEvidenceBundle();
 
   const { data: declarations = [], refetch: refetchDeclarations } = useEvidenceBundlesForObject(
     "GRC",
@@ -159,74 +156,10 @@ export default function IncidenteDetalle() {
   };
 
   const handleSignDeclaration = async () => {
-    try {
-      setSignProgress("Generando acta de cierre forense…");
-      
-      const docName = `ACTA-CIERRE-FORENSE-${incident.code}-${new Date().getFullYear()}.pdf`;
-      const docData = new TextEncoder().encode(
-        `ACTA DE CIERRE FORENSE\n` +
-        `Incidente: ${incident.code}\n` +
-        `Título: ${incident.title}\n` +
-        `Severidad: ${incident.severity}\n` +
-        `Tipo de Incidente: ${incident.incident_type}\n` +
-        `Fecha de Detección: ${incident.detection_date ? new Date(incident.detection_date).toLocaleString() : '—'}\n` +
-        `Causa Raíz: ${incident.root_cause ?? 'No informada'}\n` +
-        `Firmante Certificado: ${signatoryName} (${signatoryEmail})`
-      ).buffer;
-
-      // Call EAD Trust simulation via hook
-      const signRes = await signMutation.mutateAsync({
-        documentName: docName,
-        documentData: docData,
-        signatories: [{ name: signatoryName, email: signatoryEmail }],
-        createdBy: "Compliance Officer",
-        onProgress: (step) => setSignProgress(step),
-      });
-
-      if (!signRes.ok) {
-        throw new Error(signRes.errors.join(", "));
-      }
-
-      setSignProgress("Registrando evidencia forense en ledger WORM…");
-
-      // Save into WORM evidence bundle
-      await createEvidence.mutateAsync({
-        sourceModule: "GRC",
-        sourceObjectType: "INCIDENT",
-        sourceObjectId: incident.id,
-        referenceCode: `ACTA-CIERRE-${incident.id.slice(0, 8).toUpperCase()}`,
-        manifest: {
-          incident_id: incident.id,
-          incident_code: incident.code,
-          incident_title: incident.title,
-          severity: incident.severity,
-          signatory: signatoryName,
-          email: signatoryEmail,
-          qtsp_transaction_id: signRes.srId,
-          document_hash: signRes.documentHash,
-          signed_at: signRes.signed_at
-        },
-        documentUrl: `https://hzqwefkwsxopwrmtksbg.supabase.co/storage/v1/object/public/evidence/closures/${docName}`,
-        legalHold: false,
-        status: "SEALED",
-        sandbox: signRes.sandbox,
-        srStatus: signRes.srStatus,
-        signedBy: `${signatoryName} (${signatoryEmail})`
-      });
-
-      toast.success(
-        signRes.sandbox
-          ? "Acta de Cierre firmada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
-          : "Acta de Cierre Forense firmada electrónicamente y sellada en ledger WORM"
-      );
-      setShowSignModal(false);
-      refetchDeclarations();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(`Firma fallida: ${err.message || "Error desconocido"}`);
-    } finally {
-      setSignProgress(null);
-    }
+    setSignProgress(null);
+    toast.info("Firma electrónica retirada", {
+      description: "EAD Trust no firma este documento. La custodia deberá incorporarse desde un expediente source-bound sin atribuir firma.",
+    });
   };
 
   const regNots: RegulatoryNotificationLite[] = incident.regulatory_notifications ?? [];
@@ -553,7 +486,7 @@ export default function IncidenteDetalle() {
             </div>
           </div>
 
-          {/* Card: Firma de Cierre Forense (QES) */}
+          {/* Card: custodia del cierre forense */}
           <div 
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -561,12 +494,12 @@ export default function IncidenteDetalle() {
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="h-5 w-5 text-[var(--status-success)]" />
               <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
-                Cierre Forense Cualificado
+                Custodia del cierre forense
               </h2>
             </div>
             
             <p className="text-xs text-[var(--g-text-secondary)] mb-4 leading-relaxed">
-              De acuerdo con DORA y la política corporativa de ARGA, los incidentes mayores o críticos requieren un Acta de Cierre Forense firmada electrónicamente y archivada de forma inmutable.
+              Si la política exige firma del acta de cierre, esa firma se obtiene fuera de EAD. EAD Trust solo puede custodiar el documento y su trazabilidad desde un expediente source-bound.
             </p>
 
             {/* Evidence bundles / closures status */}
@@ -581,12 +514,12 @@ export default function IncidenteDetalle() {
               <div className={`h-2.5 w-2.5 rounded-full ${finalDeclarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
               <div className="flex-1">
                 <span className="block text-xs font-semibold text-[var(--g-text-primary)]">
-                  {finalDeclarations.length > 0 ? "Cierre Forense Certificado" : "Cierre Forense Pendiente"}
+                  {finalDeclarations.length > 0 ? "Cierre forense custodiado" : "Custodia pendiente"}
                 </span>
                 <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
                   {finalDeclarations.length > 0 
                     ? `Archivado en ledger WORM (${finalDeclarations.length} actas)` 
-                    : "Requiere firma electrónica del Apoderado / Compliance Officer"}
+                    : "Pendiente de documento externo y custodia desde el expediente"}
                 </span>
               </div>
             </div>
@@ -619,7 +552,7 @@ export default function IncidenteDetalle() {
                       )}
                     </div>
                     <div className="text-[10px] text-[var(--g-text-secondary)]">
-                      <div>Firmante: {dec.signed_by}</div>
+                      <div>Responsable registrado: {dec.signed_by}</div>
                       <div>Fecha: {new Date(dec.created_at).toLocaleString("es-ES")}</div>
                     </div>
                     <div className="pt-1.5 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[9px]">
@@ -646,18 +579,19 @@ export default function IncidenteDetalle() {
               <div className="p-3 bg-[var(--status-error)]/10 border border-[var(--status-error)]/20 text-xs text-[var(--g-text-secondary)] flex items-start gap-2" style={{ borderRadius: "var(--g-radius-md)" }}>
                 <AlertCircle className="h-4 w-4 text-[var(--status-error)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>Firma bloqueada:</strong> El incidente debe estar en estado <em>Resuelto</em> o <em>Cerrado</em> para certificar el acta forense.
+                  <strong>Custodia bloqueada:</strong> El incidente debe estar <em>Resuelto</em> o <em>Cerrado</em> antes de crear su expediente documental.
                 </span>
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => setShowSignModal(true)}
-                className="w-full flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] py-2 text-xs font-semibold hover:bg-[var(--g-sec-700)] transition-colors duration-150"
+                disabled
+                title="La firma genérica está retirada; use un expediente source-bound para custodiar un documento obtenido externamente."
+                className="w-full flex items-center justify-center gap-2 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] py-2 text-xs font-semibold cursor-not-allowed opacity-70"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <PenTool className="h-3.5 w-3.5" />
-                Firmar Cierre Forense
+                Custodia disponible desde expediente
               </button>
             )}
           </div>
@@ -761,7 +695,7 @@ export default function IncidenteDetalle() {
       )}
 
       {/* ============================================================ */}
-      {/* Drawer / Modal 2: Firma Cualificada QES (EAD Trust API)       */}
+      {/* Drawer / Modal 2: aviso de custodia EAD Trust                 */}
       {/* ============================================================ */}
       {showSignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
@@ -773,7 +707,7 @@ export default function IncidenteDetalle() {
               <div className="flex items-center gap-2">
                 <PenTool className="h-5 w-5 text-[var(--g-brand-3308)]" />
                 <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                  Firma electrónica (EAD Trust)
+                  Custodia documental (EAD Trust)
                 </h3>
               </div>
               <button 
@@ -792,20 +726,20 @@ export default function IncidenteDetalle() {
                   <ShieldCheck className="h-4 w-4" />
                   Garrigues Digital & EAD Trust Ecosystem
                 </div>
-                Esta operación solicita al QTSP (EAD Trust) una firma electrónica que vincula al Compliance Officer. El proveedor emite firma simple o avanzada; el enlace se envía al firmante y la firma no se produce hasta que este la completa.
+                EAD Trust no firma ni atribuye un nivel de firma al Compliance Officer. La custodia/e-archiving solo se inicia desde un expediente source-bound con el documento ya finalizado.
               </div>
 
               {signProgress ? (
                 <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[var(--g-brand-3308)]" />
                   <p className="text-sm font-semibold text-[var(--g-text-primary)] animate-pulse">{signProgress}</p>
-                  <p className="text-xs text-[var(--g-text-secondary)]">Por favor no cierre esta ventana mientras se sella la evidencia.</p>
+                  <p className="text-xs text-[var(--g-text-secondary)]">Preparando el registro local de custodia.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label htmlFor="signatory-name" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                      Nombre Completo del Firmante
+                      Responsable del documento
                     </label>
                     <input
                       id="signatory-name"
@@ -849,7 +783,7 @@ export default function IncidenteDetalle() {
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       <PenTool className="h-3.5 w-3.5" />
-                      Solicitar firma
+                      Usar expediente de custodia
                     </button>
                   </div>
                 </div>

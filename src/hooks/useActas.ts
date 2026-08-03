@@ -13,11 +13,22 @@ import {
   type AgreementOrigin,
 } from "@/lib/secretaria/agreement-360";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
+import { secretariaOperationError } from "@/lib/secretaria/supabase-error-message";
+import type {
+  AuthoritativeEadEvidence,
+  AuthoritativeEvidenceState,
+  AuthoritativeLegalArtifact,
+  CertificationLegalGateStatus,
+  EadSignatureType,
+  MinuteApprovalMethod,
+  MinuteLegalGateStatus,
+} from "@/lib/secretaria/authoritative-legal-state";
 import {
   buildActaAgendaViewModel,
   computeCanonicalMinutesHash,
   validateActaLegalStructure,
   type ActaAgendaConstanciaRow,
+  type ActaAgendaDebateRow,
   type ActaAgendaItemRow,
   type ActaAgendaItemViewModel,
   type ActaAgreementRow,
@@ -44,6 +55,24 @@ export interface ActaRow {
   entity_name: string | null;
   resolutions_count: number;
   canonical_minutes_hash?: string | null;
+  content_hash?: string | null;
+  authoritative_manifest_hash?: string | null;
+  final_legal_artifact_id?: string | null;
+  approval_method?: MinuteApprovalMethod | null;
+  approval_effective_at?: string | null;
+  president_consent_verification_id?: string | null;
+  secretary_consent_verification_id?: string | null;
+  legal_gate_status?: MinuteLegalGateStatus;
+  president_consent_evidence_id?: string | null;
+  secretary_constancia_evidence_id?: string | null;
+  approval_evidence_mode?: "INTERPOSITION" | null;
+  approval_signature_claim?: false | null;
+  approval_evidenced_at?: string | null;
+  approval_canonical_status?: "APPROVED_EVIDENCED" | null;
+  book_section_id?: string | null;
+  book_entry_id?: string | null;
+  book_destination_status?: "UNRESOLVED" | "RESOLVED" | "POSTED" | "LEGACY_REVIEW";
+  book_destination_resolved_at?: string | null;
 }
 
 export interface CertificationRow {
@@ -53,6 +82,9 @@ export interface CertificationRow {
   content: string | null;
   agreements_certified: string[] | null;
   certifier_id: string | null;
+  authority_evidence_id: string | null;
+  visto_bueno_persona_id: string | null;
+  certificante_role: string | null;
   requires_qualified_signature: boolean;
   signature_status: string;
   jurisdictional_requirements: Record<string, unknown> | null;
@@ -60,6 +92,22 @@ export interface CertificationRow {
   agreement_id: string | null;
   evidence_id?: string | null;
   gate_hash?: string | null;
+  final_legal_artifact_id?: string | null;
+  certifier_qtsp_verification_id?: string | null;
+  visto_bueno_qtsp_verification_id?: string | null;
+  content_hash_sha256?: string | null;
+  agreements_manifest_hash?: string | null;
+  required_ead_signature_type?: EadSignatureType;
+  verified_ead_signature_type?: EadSignatureType | null;
+  emitted_at?: string | null;
+  legal_gate_status?: CertificationLegalGateStatus;
+  certifier_constancia_evidence_id?: string | null;
+  visto_bueno_constancia_evidence_id?: string | null;
+  interposition_evidence_mode?: "INTERPOSITION" | null;
+  interposition_signature_claim?: false | null;
+  constancia_evidenced_at?: string | null;
+  evidence_binding_hash_sha256?: string | null;
+  interposition_canonical_status?: "CONSTANCIA_VERIFIED" | null;
 }
 
 function requiredMajorityCodeForSnapshot(
@@ -79,7 +127,7 @@ export function useActasList(entityId?: string | null) {
       let query = supabase
         .from("minutes")
         .select(
-          "*, meetings(meeting_type, governing_bodies(name, entities(common_name)))",
+          "*, meetings(meeting_type, governing_bodies(name, entities(common_name, legal_name)))",
         )
         .eq("tenant_id", tenantId!)
         .order("created_at", { ascending: false });
@@ -93,7 +141,10 @@ export function useActasList(entityId?: string | null) {
       type MinuteRaw = Omit<ActaRow, "meeting_type" | "body_name" | "entity_name" | "resolutions_count"> & {
         meetings?: {
           meeting_type?: string | null;
-          governing_bodies?: { name?: string | null; entities?: { common_name?: string | null } | null } | null;
+          governing_bodies?: {
+            name?: string | null;
+            entities?: { common_name?: string | null; legal_name?: string | null } | null;
+          } | null;
         } | null;
       };
       const rows = (data ?? []) as MinuteRaw[];
@@ -115,7 +166,10 @@ export function useActasList(entityId?: string | null) {
         ...m,
         meeting_type: m.meetings?.meeting_type ?? null,
         body_name: m.meetings?.governing_bodies?.name ?? null,
-        entity_name: m.meetings?.governing_bodies?.entities?.common_name ?? null,
+        entity_name:
+          m.meetings?.governing_bodies?.entities?.legal_name ??
+          m.meetings?.governing_bodies?.entities?.common_name ??
+          null,
         resolutions_count: counts.get(m.meeting_id) ?? 0,
       }));
     },
@@ -123,18 +177,24 @@ export function useActasList(entityId?: string | null) {
 }
 
 export type ActaDetailRow = Omit<ActaRow, "meeting_type" | "body_name" | "entity_name" | "resolutions_count"> & {
+  signed_president?: { id?: string | null; full_name?: string | null; email?: string | null } | null;
+  signed_secretary?: { id?: string | null; full_name?: string | null; email?: string | null } | null;
   meetings?: {
     meeting_type?: string | null;
     scheduled_start?: string | null;
     scheduled_end?: string | null;
     location?: string | null;
     quorum_data?: Record<string, unknown> | null;
-    president?: { full_name?: string | null } | null;
-    secretary?: { full_name?: string | null } | null;
+    president?: { id?: string | null; full_name?: string | null; email?: string | null } | null;
+    secretary?: { id?: string | null; full_name?: string | null; email?: string | null } | null;
     governing_bodies?: {
       name?: string | null;
       body_type?: string | null;
-      entities?: { common_name?: string | null; jurisdiction?: string | null } | null;
+      entities?: {
+        common_name?: string | null;
+        legal_name?: string | null;
+        jurisdiction?: string | null;
+      } | null;
     } | null;
   } | null;
 };
@@ -150,7 +210,7 @@ export function useActaById(id: string | undefined) {
       const { data, error } = await supabase
         .from("minutes")
         .select(
-          "*, meetings(meeting_type, scheduled_start, scheduled_end, location, quorum_data, president:president_id(full_name), secretary:secretary_id(full_name), governing_bodies(name, body_type, entities(common_name, jurisdiction)))",
+          "*, signed_president:signed_by_president_id(id, full_name, email), signed_secretary:signed_by_secretary_id(id, full_name, email), meetings(meeting_type, scheduled_start, scheduled_end, location, quorum_data, president:president_id(id, full_name, email), secretary:secretary_id(id, full_name, email), governing_bodies(name, body_type, entities(common_name, legal_name, jurisdiction)))",
         )
         .eq("id", id!)
         .eq("tenant_id", tenantId!)
@@ -222,33 +282,309 @@ export function useCertificationsByMinute(minuteId: string | undefined) {
   });
 }
 
+export function useAuthoritativeLegalEvidence(
+  sourceDomain: "MINUTE" | "CERTIFICATION",
+  sourceId?: string | null,
+  finalLegalArtifactId?: string | null,
+) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!tenantId && !!sourceId,
+    queryKey: [
+      "secretaria_authoritative_evidence",
+      tenantId,
+      sourceDomain,
+      sourceId,
+      finalLegalArtifactId ?? "current",
+    ],
+    queryFn: async (): Promise<AuthoritativeEvidenceState> => {
+      let artifactQuery = supabase
+        .from("secretaria_legal_artifacts")
+        .select(
+          "id, tenant_id, source_domain, source_id, artifact_kind, content_hash_sha256, binary_hash_sha256, binary_hash_sha512, signature_packaging, evidence_mode, evidence_bundle_id, artifact_status, immutable_at",
+        )
+        .eq("tenant_id", tenantId!)
+        .eq("source_domain", sourceDomain)
+        .eq("source_id", sourceId!)
+        .order("immutable_at", { ascending: false })
+        .limit(1);
+      if (finalLegalArtifactId) {
+        artifactQuery = artifactQuery.eq("id", finalLegalArtifactId);
+      }
+
+      const { data: artifactRows, error: artifactError } = await artifactQuery;
+      if (artifactError) {
+        throw secretariaOperationError(
+          artifactError,
+          "No se pudo comprobar el artefacto jurídico final.",
+        );
+      }
+      const artifact = ((artifactRows ?? [])[0] ?? null) as AuthoritativeLegalArtifact | null;
+      if (!artifact) return { artifact: null, verifications: [] };
+
+      const { data: evidenceRows, error: evidenceError } = await supabase
+        .from("secretaria_ead_interposition_evidence")
+        .select(
+          "id, tenant_id, legal_artifact_id, subject_person_id, subject_role, evidence_purpose, provider, provider_mode, provider_reference, provider_status, evidence_bundle_id, signature_claim, verified_at",
+        )
+        .eq("tenant_id", tenantId!)
+        .eq("legal_artifact_id", artifact.id)
+        .in("evidence_purpose", ["CONSENT", "CONSTANCIA"])
+        .order("verified_at", { ascending: true });
+      if (evidenceError) {
+        throw secretariaOperationError(
+          evidenceError,
+          "No se pudieron comprobar los consentimientos y constancias de EAD Trust.",
+        );
+      }
+
+      type EvidenceRaw = {
+        id: string;
+        tenant_id: string;
+        legal_artifact_id: string;
+        subject_person_id: string;
+        subject_role: AuthoritativeEadEvidence["signer_role"];
+        evidence_purpose: AuthoritativeEadEvidence["evidence_purpose"];
+        provider: "EAD_TRUST";
+        provider_mode: "INTERPOSITION";
+        provider_reference: string;
+        provider_status: "COMPLETED" | "VERIFIED";
+        evidence_bundle_id: string;
+        signature_claim: false;
+        verified_at: string;
+      };
+      const evidences: AuthoritativeEadEvidence[] = ((evidenceRows ?? []) as EvidenceRaw[])
+        .map((row) => ({
+          id: row.id,
+          tenant_id: row.tenant_id,
+          legal_artifact_id: row.legal_artifact_id,
+          signer_person_id: row.subject_person_id,
+          signer_role: row.subject_role,
+          evidence_purpose: row.evidence_purpose,
+          provider: row.provider,
+          provider_mode: row.provider_mode,
+          provider_reference: row.provider_reference,
+          provider_evidence_bundle_id: row.evidence_bundle_id,
+          signature_claim: row.signature_claim,
+          verification_status: "VERIFIED",
+          verified_at: row.verified_at,
+        }));
+
+      return {
+        artifact,
+        verifications: evidences,
+      };
+    },
+  });
+}
+
 export interface AprobarActaResult {
   minute_id: string;
-  signed_at: string;
-  already_signed: boolean;
+  approval_evidenced_at: string;
+  final_legal_artifact_id: string;
+  president_consent_evidence_id: string;
+  secretary_constancia_evidence_id: string;
+  evidence_mode: "INTERPOSITION";
+  signature_claim: false;
+  canonical_gate_status: "APPROVED_EVIDENCED";
+  already_evidenced: boolean;
 }
 
 /**
- * Aprueba y firma el acta (minutes.signed_at) y la bloquea (is_locked) vía
- * fn_aprobar_acta. Es el paso que desbloquea el gate de certificación de
- * ActaDetalle (RRM arts. 108-109): sin él, ningún acta generada por el flujo
- * operativo podía emitir certificación (ITEM-003 del loop de estabilización).
+ * Promueve el acta exclusivamente mediante el gate autoritativo: artefacto
+ * final inmutable, consentimientos individuales EAD Trust de Presidencia y
+ * Secretaría y destino de libro resuelto. `signed_at` es un resultado del RPC,
+ * nunca la prueba que habilita la operación.
  */
 export function useAprobarActa(minuteId: string | undefined) {
   const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (params: {
+      finalLegalArtifactId: string;
+      approvalMethod: MinuteApprovalMethod;
+      approvalEffectiveAt: string;
+      presidentConsentVerificationId: string;
+      secretaryConsentVerificationId: string;
+    }) => {
       if (!minuteId) throw new Error("Acta no disponible.");
-      const { data, error } = await supabase.rpc("fn_aprobar_acta", {
+      const { data, error } = await supabase.rpc("fn_aprobar_acta_autoritativa", {
         p_minute_id: minuteId,
+        p_final_legal_artifact_id: params.finalLegalArtifactId,
+        p_approval_method: params.approvalMethod,
+        p_approval_effective_at: params.approvalEffectiveAt,
+        p_president_consent_verification_id: params.presidentConsentVerificationId,
+        p_secretary_consent_verification_id: params.secretaryConsentVerificationId,
       });
-      if (error) throw error;
+      if (error) {
+        throw secretariaOperationError(error, "No se pudo aprobar el acta con evidencia EAD.");
+      }
       return data as AprobarActaResult;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["actas", tenantId] });
+    },
+  });
+}
+
+export function useGenerateAuthoritativeCertification(minuteId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      tipo: string;
+      agreementIds: string[];
+      certificanteRole: string;
+      vistoBuenoPersonaId?: string | null;
+    }) => {
+      if (!minuteId) throw new Error("Acta no disponible.");
+      const { data, error } = await supabase.rpc("fn_generar_certificacion", {
+        p_minute_id: minuteId,
+        p_tipo: params.tipo,
+        p_agreements_certified: params.agreementIds,
+        p_certificante_role: params.certificanteRole,
+        p_visto_bueno_persona_id: params.vistoBuenoPersonaId ?? null,
+      });
+      if (error) {
+        throw secretariaOperationError(
+          error,
+          "No se pudo preparar la certificación autoritativa.",
+        );
+      }
+      return String(data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["certifications", tenantId, "byMinute", minuteId],
+      });
+    },
+  });
+}
+
+export function useSetCertificationDraftContent(minuteId: string | undefined) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { certificationId: string; content: string }) => {
+      const { data, error } = await supabase.rpc(
+        "fn_actualizar_borrador_certificacion",
+        {
+          p_certification_id: params.certificationId,
+          p_content: params.content,
+        },
+      );
+      if (error) {
+        throw secretariaOperationError(
+          error,
+          "No se pudo persistir el cuerpo de la certificación.",
+        );
+      }
+      const result = data as { certification_id?: string } | null;
+      if (!result?.certification_id) {
+        throw new Error(
+          "La certificación ya no está en estado borrador o no pertenece al expediente actual.",
+        );
+      }
+      return String(result.certification_id);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["certifications", tenantId, "byMinute", minuteId],
+      });
+    },
+  });
+}
+
+export interface FirmarCertificacionAutoritativaResult {
+  certification_id: string;
+  canonical_gate_status: "CONSTANCIA_VERIFIED";
+  evidence_mode: "INTERPOSITION";
+  signature_claim: false;
+  certifier_constancia_evidence_id: string;
+  visto_bueno_constancia_evidence_id: string | null;
+  evidence_binding_hash_sha256: string;
+  already_evidenced: boolean;
+}
+
+export function useFirmarCertificacionAutoritativa(
+  minuteId: string | undefined,
+  certificationId: string | undefined,
+) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      finalLegalArtifactId: string;
+      certifierVerificationId: string;
+      vistoBuenoVerificationId?: string | null;
+    }) => {
+      if (!certificationId) throw new Error("Certificación no disponible.");
+      const { data, error } = await supabase.rpc(
+        "fn_firmar_certificacion_autoritativa",
+        {
+          p_certification_id: certificationId,
+          p_final_legal_artifact_id: params.finalLegalArtifactId,
+          p_certifier_qtsp_verification_id: params.certifierVerificationId,
+          p_visto_bueno_qtsp_verification_id:
+            params.vistoBuenoVerificationId ?? null,
+        },
+      );
+      if (error) {
+        throw secretariaOperationError(
+          error,
+          "No se pudo validar la evidencia EAD de la certificación.",
+        );
+      }
+      return data as FirmarCertificacionAutoritativaResult;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["certifications", tenantId, "byMinute", minuteId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [
+            "secretaria_authoritative_evidence",
+            tenantId,
+            "CERTIFICATION",
+            certificationId,
+          ],
+        }),
+      ]);
+    },
+  });
+}
+
+export function useEmitirCertificacionAutoritativa(
+  minuteId: string | undefined,
+  certificationId: string | undefined,
+) {
+  const { tenantId } = useTenantContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!certificationId) throw new Error("Certificación no disponible.");
+      const { data, error } = await supabase.rpc("fn_emitir_certificacion", {
+        p_certification_id: certificationId,
+      });
+      if (error) {
+        throw secretariaOperationError(
+          error,
+          "No se pudo emitir la certificación autoritativa.",
+        );
+      }
+      return String(data);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["certifications", tenantId, "byMinute", minuteId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["certification_plan", tenantId, "forMinute", minuteId],
+        }),
+      ]);
     },
   });
 }
@@ -496,7 +832,7 @@ async function loadActaAgendaContract(params: {
       .maybeSingle(),
     supabase
       .from("agreements")
-      .select("id, parent_meeting_id, agenda_item_id, status")
+      .select("id, parent_meeting_id, agenda_item_id, status, proposal_text, decision_text")
       .eq("parent_meeting_id", params.meetingId)
       .eq("tenant_id", params.tenantId),
   ]);
@@ -513,11 +849,18 @@ async function loadActaAgendaContract(params: {
   const snapshots = extractPointSnapshots(
     (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null,
   );
+  const quorumData =
+    (meetingRes.data as { quorum_data?: Record<string, unknown> | null } | null)?.quorum_data ?? null;
+  const debates = Array.isArray(quorumData?.debates)
+    ? (quorumData.debates as ActaAgendaDebateRow[])
+    : [];
   const puntos = buildActaAgendaViewModel({
     agendaItems,
     resolutions,
     constancias,
     snapshots,
+    debates,
+    agreementRows,
   });
   const validation = validateActaLegalStructure({
     meetingId: params.meetingId,

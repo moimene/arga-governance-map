@@ -65,7 +65,7 @@ describe("No-session NOTIFICADO guard (ITEM-126)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("only useERDSNotification writes no_session_notificaciones, and only erds_* tracking columns", () => {
+  it("has no production writer for the legacy no_session_notificaciones tracking table", () => {
     const writers = sources.filter((file) => {
       const content = readFileSync(file, "utf8");
       return (
@@ -73,13 +73,13 @@ describe("No-session NOTIFICADO guard (ITEM-126)", () => {
         /\.(insert|update|upsert|delete)\(/.test(content)
       );
     });
-    // El único escritor de producción permitido es el hook ERDS.
-    expect(writers.map((f) => f.replace(SRC_ROOT, "src"))).toEqual([
-      "src/hooks/useERDSNotification.ts",
-    ]);
+    // La vía legacy se elimina: el único agregado escribible es communications.
+    expect(writers.map((f) => f.replace(SRC_ROOT, "src"))).toEqual([]);
 
     const erds = readFileSync(join(SRC_ROOT, "hooks/useERDSNotification.ts"), "utf8");
-    // Su update solo toca columnas de tracking ERDS, nunca estado/status.
-    expect(erds).not.toMatch(/\b(estado|status):\s*['"](ENVIADA|NOTIFICADO)['"]/);
+    expect(erds).toMatch(/fn_create_ead_interposition_draft/);
+    expect(erds).not.toMatch(/useProgramCommunication/);
+    expect(erds).not.toMatch(/no_session_notificaciones/);
+    expect(erds).not.toMatch(/\b(estado|status):\s*['"](ENVIADA|NOTIFICADO|DELIVERED)['"]/);
   });
 });

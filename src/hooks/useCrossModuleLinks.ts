@@ -23,7 +23,11 @@ export interface GovernanceModuleLink {
   relation_type: string;
   status: "PROPOSED" | "ACTIVE" | "SUPERSEDED" | "CLOSED";
   evidence_bundle_id?: string | null;
-  payload: Record<string, any>;
+  payload: Record<string, unknown> & {
+    organ?: string;
+    matter?: string;
+    rationale?: string;
+  };
   created_at?: string;
   updated_at?: string;
 }

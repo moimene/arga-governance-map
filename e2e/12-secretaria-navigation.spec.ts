@@ -132,4 +132,27 @@ test.describe('Secretaría navigation smoke', () => {
     });
     await expect(page.getByText('Ha ocurrido un error', { exact: false })).toHaveCount(0);
   });
+
+  test('el tramitador conserva los deep links de elevadas y denegadas', async ({ page }) => {
+    await page.goto('/secretaria/tramitador?estado=ELEVADA');
+    await expect(page.getByRole('button', { name: 'Elevadas', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page).toHaveURL('/secretaria/tramitador?estado=ELEVADA');
+
+    await page.getByRole('button', { name: 'Denegadas', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Denegadas', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page).toHaveURL('/secretaria/tramitador?estado=DENEGADA');
+
+    await page.goto('/secretaria/tramitador?estado=ESTADO_NO_RECONOCIDO');
+    await expect(page.getByRole('status')).toContainText('Filtro de estado no reconocido');
+    await expect(page.getByRole('button', { name: 'Todas', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
 });

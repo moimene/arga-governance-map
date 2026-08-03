@@ -24,6 +24,11 @@ import {
   TabStopType,
   ShadingType,
 } from "docx";
+import {
+  DOCUMENT_DEMO_NOTICE,
+  DOCUMENT_OUTPUT_VERSION,
+  formatSpanishLegalDate,
+} from "./document-output-normalizer";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,6 +69,8 @@ export interface DocxGeneratorInput {
   entityName?: string;
   /** Generation date */
   generatedAt?: string;
+  /** Fecha técnica real de generación, distinta de la fecha jurídica simulada. */
+  technicalGeneratedAt?: string;
   /** capa3_editables fields rendered as bookmarked content controls */
   editableFields?: EditableField[];
 }
@@ -75,6 +82,7 @@ export interface PrintableDocumentInput {
   filename?: string;
   contentHash?: string;
   generatedAt?: string;
+  technicalGeneratedAt?: string;
 }
 
 // ── Text parsing ─────────────────────────────────────────────────────────────
@@ -88,6 +96,27 @@ interface ParsedSection {
  * Parse rendered text into structured sections.
  * Detects headings by ALL-CAPS lines or lines ending with ":"
  */
+function comparableTitle(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLocaleLowerCase("es-ES");
+}
+
+export function removeDuplicateLeadingTitle(text: string, title: string) {
+  const lines = text.split("\n");
+  const firstContentIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (
+    firstContentIndex >= 0 &&
+    comparableTitle(lines[firstContentIndex]) === comparableTitle(title)
+  ) {
+    lines.splice(firstContentIndex, 1);
+  }
+  return lines.join("\n").replace(/^\s*\n/, "");
+}
+
 function parseRenderedText(text: string): ParsedSection[] {
   const lines = text.split("\n");
   const sections: ParsedSection[] = [];
@@ -127,6 +156,17 @@ function parseRenderedText(text: string): ParsedSection[] {
   }
 
   return sections;
+}
+
+export function temporalDemoNotice(
+  legalEffectiveAt?: string,
+  technicalGeneratedAt = new Date().toISOString(),
+) {
+  if (!legalEffectiveAt) return null;
+  const legalDate = legalEffectiveAt.slice(0, 10);
+  const technicalDate = technicalGeneratedAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(legalDate) || legalDate <= technicalDate) return null;
+  return `ESCENARIO TEMPORAL DEMO: fecha societaria declarada ${formatSpanishLegalDate(legalDate)}; generación técnica ${formatSpanishLegalDate(technicalDate)}. No acredita una aprobación, firma o emisión real anticipada.`;
 }
 
 // ── DOCX construction ────────────────────────────────────────────────────────
@@ -169,6 +209,7 @@ function buildParagraphs(sections: ParsedSection[]): Paragraph[] {
 
       paragraphs.push(
         new Paragraph({
+          keepLines: true,
           spacing: { after: isListItem ? 40 : 120 },
           indent: isListItem ? { left: 720 } : undefined,
           alignment: isSignature ? AlignmentType.LEFT : AlignmentType.JUSTIFIED,
@@ -322,10 +363,13 @@ async function stabilizeDocxPackage(buffer: ArrayBuffer, generatedAt: string): P
  * @returns Uint8Array buffer of the DOCX file
  */
 export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Array> {
-  const sections = parseRenderedText(input.renderedText);
+  const sections = parseRenderedText(removeDuplicateLeadingTitle(input.renderedText, input.title));
   const bodyParagraphs = buildParagraphs(sections);
 
   const generatedAt = input.generatedAt || new Date().toISOString().split("T")[0];
+  const technicalGeneratedAt = input.technicalGeneratedAt ?? new Date().toISOString();
+  const temporalNotice = temporalDemoNotice(generatedAt, technicalGeneratedAt);
+  const titleSize = input.title.length > 90 ? 24 : 28;
 
   const doc = new Document({
     styles: {
@@ -348,7 +392,10 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
               height: 16838,
             },
             margin: {
-              top: 1800,    // ~1.25 inch
+              // El encabezado ocupa dos líneas (identidad + aviso DEMO). Con
+              // 1,25 pulgadas los títulos largos podían invadirlo en Word /
+              // LibreOffice. 1,6 pulgadas mantiene un límite visual estable.
+              top: 2304,
               right: 1440,  // 1 inch
               bottom: 1440,
               left: 1440,
@@ -387,6 +434,19 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
                   { type: TabStopType.RIGHT, position: 9026 },
                 ],
               }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 80, after: 80 },
+                children: [
+                  new TextRun({
+                    text: DOCUMENT_DEMO_NOTICE,
+                    size: 14,
+                    font: FONT,
+                    color: TEXT_SECONDARY,
+                    bold: true,
+                  }),
+                ],
+              }),
             ],
           }),
         },
@@ -404,14 +464,8 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
                 },
                 children: [
                   new TextRun({
-                    text: `${input.templateTipo} v${input.templateVersion}`,
+                    text: `Documento demo/operativo · Motor documental v${DOCUMENT_OUTPUT_VERSION}`,
                     size: 14, // 7pt
-                    font: FONT,
-                    color: TEXT_SECONDARY,
-                  }),
-                  new TextRun({
-                    text: input.contentHash ? `  |  Hash: ${input.contentHash.substring(0, 16)}…` : "",
-                    size: 14,
                     font: FONT,
                     color: TEXT_SECONDARY,
                   }),
@@ -438,13 +492,13 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
         children: [
           // Title
           new Paragraph({
-            spacing: { after: 200 },
+            spacing: { before: 120, after: 200 },
             alignment: AlignmentType.CENTER,
             children: [
               new TextRun({
                 text: input.title,
                 bold: true,
-                size: 28, // 14pt
+                size: titleSize,
                 font: FONT,
                 color: BRAND_GREEN,
               }),
@@ -464,6 +518,27 @@ export async function generateDocx(input: DocxGeneratorInput): Promise<Uint8Arra
                       color: TEXT_SECONDARY,
                     }),
                   ],
+                }),
+              ]
+            : []),
+          ...(temporalNotice
+            ? [
+                new Paragraph({
+                  spacing: { after: 300 },
+                  shading: { type: ShadingType.CLEAR, fill: "F0F0F0" },
+                  border: {
+                    left: { style: BorderStyle.SINGLE, size: 8, color: BRAND_GREEN },
+                  },
+                  children: [
+                    new TextRun({
+                      text: temporalNotice,
+                      size: 18,
+                      font: FONT,
+                      color: TEXT_PRIMARY,
+                      bold: true,
+                    }),
+                  ],
+                  indent: { left: 240 },
                 }),
               ]
             : []),
@@ -513,10 +588,13 @@ export function downloadDocx(buffer: Uint8Array, filename: string): void {
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
-  window.dispatchEvent(new CustomEvent("tgms:docx-download", { detail: { filename } }));
   a.click();
+  window.dispatchEvent(new CustomEvent("tgms:docx-download", { detail: { filename } }));
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Chromium/WebView can resolve the blob URL asynchronously after the
+  // synthetic click. Revoking it in the same task races the download manager
+  // and may suppress both the file and the native `download` event.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function escapeHtml(value: string) {
@@ -540,7 +618,9 @@ function paragraphHtml(text: string) {
 
 export function buildPrintableDocumentHtml(input: PrintableDocumentInput) {
   const generatedAt = input.generatedAt ?? new Date().toISOString();
-  const lines = input.renderedText.split("\n");
+  const technicalGeneratedAt = input.technicalGeneratedAt ?? new Date().toISOString();
+  const temporalNotice = temporalDemoNotice(generatedAt, technicalGeneratedAt);
+  const lines = removeDuplicateLeadingTitle(input.renderedText, input.title).split("\n");
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -580,6 +660,14 @@ export function buildPrintableDocumentHtml(input: PrintableDocumentInput) {
       text-align: center;
     }
     .spacer { margin-bottom: 4px; }
+    .temporal {
+      background: #f0f0f0;
+      border-left: 4px solid #004438;
+      font-size: 9pt;
+      font-weight: 600;
+      margin: 0 0 14px;
+      padding: 8px 10px;
+    }
     footer {
       border-top: 1px solid #009a77;
       color: #50564f;
@@ -596,13 +684,14 @@ export function buildPrintableDocumentHtml(input: PrintableDocumentInput) {
   <header>
     <h1>${escapeHtml(input.title)}</h1>
     ${input.subtitle ? `<div class="meta">${escapeHtml(input.subtitle)}</div>` : ""}
+    <div class="meta">${escapeHtml(DOCUMENT_DEMO_NOTICE)}</div>
   </header>
   <main>
+    ${temporalNotice ? `<p class="temporal">${escapeHtml(temporalNotice)}</p>` : ""}
     ${lines.map(paragraphHtml).join("\n    ")}
   </main>
   <footer>
-    Generado: ${escapeHtml(generatedAt)}
-    ${input.contentHash ? ` · Hash: ${escapeHtml(input.contentHash.slice(0, 16))}` : ""}
+    Generado: ${escapeHtml(generatedAt)} · Motor documental v${escapeHtml(DOCUMENT_OUTPUT_VERSION)}
   </footer>
 </body>
 </html>`;

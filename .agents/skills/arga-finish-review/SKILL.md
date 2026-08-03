@@ -32,15 +32,17 @@ bun run agents:route -- "final review of ARGA Secretaria golden path"
 
 3. Use a hierarchical swarm shape with clear boundaries:
 - UX/Garrigues reviewer: token usage, accessibility, responsive behavior.
-- Legal/domain reviewer: ARGA data consistency, LSC rule paths, pactos, QTSP naming.
-- Supabase/schema reviewer: migrations, RPC names, hook column assumptions.
-- Verification reviewer: `bun run test`, `bun run lint`, `bun run build`, and smoke paths.
+- Legal/domain reviewer: ARGA data consistency, LSC rule paths, pactos, and EAD Trust scope language.
+- Supabase/schema reviewer: migration `20260720149000_secretaria_supporting_attachment_intent_binding.sql`, RPC names, hook column assumptions, supporting-attachment intents, and WORM manifest enforcement.
+- Verification reviewer: `bun run test`, `bun run lint`, `bun run build`, live-browser golden path, and visual/OOXML QA of the server-generated DOCX.
 
 4. Integrate findings locally, keeping edits scoped and preserving user changes.
 5. Store durable lessons in Ruflo memory only after the fix is verified.
 
 ## Guardrails
-- Never introduce `MAPFRE` into demo code, data, seeds, or commit text.
+- Never introduce names or identifiers of the cliente real into demo code, data, seeds, documentation, or commit text.
 - Use Bun for project package management.
 - Do not run `ruflo init --force` in this repo.
 - Components under `/secretaria`, `/grc`, and `/ai-governance` must use Garrigues tokens, not raw Tailwind colors or hex values.
+- Treat emitted or rectified convocatorias as immutable. The final path requires prior intent and exact expected-set WORM matching before server-side generation (9/9 in the canonical 2026-07-21 UAT).
+- Limit EAD Trust to interposition, basic messaging, and custody/e-archiving; legacy signing/ERDS paths fail closed and do not prove signature, sending, or delivery.

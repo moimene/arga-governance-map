@@ -4,6 +4,7 @@ import type {
 } from "./types";
 import type { SecretariaValidationResult } from "@/lib/secretaria/document-generation-boundary";
 import { validateRenderedActaAgainstLegalStructure } from "@/lib/secretaria/acta-legal-structure";
+import { validateVisibleDocumentOutput } from "@/lib/doc-gen/document-output-normalizer";
 
 const REQUIRED_SECTION_MARKERS: Record<string, string[]> = {
   CONVOCATORIA: ["CONVOCATORIA", "ORDEN"],
@@ -12,6 +13,7 @@ const REQUIRED_SECTION_MARKERS: Record<string, string[]> = {
   INFORME_PRECEPTIVO: ["INFORME"],
   INFORME_DOCUMENTAL_PRE: ["INFORME", "DOCUMENT"],
   INFORME_GESTION: ["INFORME"],
+  MODELO_ACUERDO: ["ACUERDO"],
   ACUERDO_SIN_SESION: ["ACUERDO"],
   DECISION_UNIPERSONAL: ["DECISION"],
   DOCUMENTO_REGISTRAL: ["REGISTR"],
@@ -74,21 +76,20 @@ export function validatePostRenderDocument(
 
   const unresolved = Array.from(new Set(input.unresolvedVariables ?? []));
   if (unresolved.length > 0) {
-    // ITEM-026: en documentos FORMALES (actas, certificaciones) una variable
-    // sin valor produce un blanco silencioso que invalida el resultado
-    // jurídico (fecha, lugar, firmante, NIF vacíos) → BLOCKING. Los
+    // Una variable del cuerpo sin valor produce un blanco silencioso también
+    // en modelos de acuerdo, poderes e informes. Ningún artefacto descargable
+    // puede declararse generado si su propio contenido sigue incompleto. Los
     // placeholders QTSP.* son post-firma by-design y quedan en WARNING.
     const unresolvedNoQtsp = unresolved.filter(
       (v) => !String(v).toUpperCase().startsWith("QTSP.")
     );
-    const esDocumentoFormal = /^(ACTA|CERTIFICACION)/i.test(String(input.documentType ?? ""));
     pushIssue(issues, {
       code: "UNRESOLVED_VARIABLES",
-      severity: esDocumentoFormal && unresolvedNoQtsp.length > 0 ? "BLOCKING" : "WARNING",
+      severity: unresolvedNoQtsp.length > 0 ? "BLOCKING" : "WARNING",
       field_path: "variables",
       message: `Variables referenciadas sin valor: ${unresolved.slice(0, 8).join(", ")}.${
-        esDocumentoFormal && unresolvedNoQtsp.length > 0
-          ? " Un documento formal no puede emitirse con blancos — revisa la plantilla o completa los datos del expediente."
+        unresolvedNoQtsp.length > 0
+          ? " Un documento no puede emitirse con blancos — revisa la plantilla o completa los datos del expediente."
           : ""
       }`,
     });
@@ -106,15 +107,15 @@ export function validatePostRenderDocument(
     }
   }
 
-  const hasAgreementReferences =
-    input.agreementIds.length === 0 ||
-    input.agreementIds.some((id) => rendered.includes(id));
-  if (!hasAgreementReferences) {
+  // El enlace a Agreement 360 es obligatorio en metadata, no en el cuerpo que
+  // se entrega a terceros. Mostrar UUIDs o snapshots en el documento final
+  // contradice el contrato de salida externa.
+  for (const issue of validateVisibleDocumentOutput(input.documentType, rendered, input.outputContext)) {
     pushIssue(issues, {
-      code: "AGREEMENT_REFERENCE_NOT_RENDERED",
-      severity: "WARNING",
-      field_path: "agreement_ids",
-      message: "El texto renderizado no contiene referencias visibles a los agreement_ids del request.",
+      code: issue.code,
+      severity: "BLOCKING",
+      field_path: "renderedText",
+      message: issue.message,
     });
   }
 

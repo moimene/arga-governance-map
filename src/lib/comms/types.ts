@@ -6,12 +6,9 @@
 // eliminaron por ser código muerto de producción: nunca se ejecutaban (solo los
 // consumían sus propios tests) y ya divergían del runtime real. La ÚNICA fuente
 // de verdad del despacho es la Edge Function `supabase/functions/comms-dispatcher`
-// (claim/send/retry vía RPCs `fn_claim_recipients_for_dispatch`,
-// `fn_recipient_mark_sent`, `fn_recipient_handle_error`). El límite de reintentos
-// vive como literal único en plpgsql (`v_intento < 3` en
-// `20260517143041_comms_dispatcher_rpcs.sql`); ya no hay constante MAX_RETRIES TS
-// duplicada. Estos tipos los consumen la UI (PasoEnvioMiembros, ConvocatoriasStepper)
-// y el motor de plazos (useCommsPlazoCheck).
+// (claim/send/retry mediante RPCs con fencing token). La clave de idempotencia
+// del proveedor es estable para el envío lógico y los leases vencidos pasan a
+// conciliación manual; nunca se reencolan automáticamente.
 
 export type TipoComunicacion =
   | 'CONVOCATORIA' | 'NOTIFICACION_INDIVIDUAL' | 'PUESTA_DISPOSICION'
@@ -35,11 +32,11 @@ export type EstadoComunicacion =
   | 'BORRADOR' | 'PROGRAMADA' | 'ENVIANDO' | 'ENVIADA'
   | 'ENTREGADA_PARCIAL' | 'ENTREGADA_TOTAL'
   | 'RESPONDIDA_PARCIAL' | 'RESPONDIDA_TOTAL'
-  | 'EXPIRADA' | 'CANCELADA' | 'ERROR';
+  | 'EXPIRADA' | 'CANCELADA' | 'ERROR' | 'RECONCILIATION_REQUIRED';
 
 export type EstadoEntrega =
   | 'PENDIENTE' | 'ENVIANDO' | 'ENVIADO' | 'ENTREGADO'
-  | 'LEIDO' | 'RESPONDIDO' | 'REBOTADO' | 'ERROR';
+  | 'LEIDO' | 'RESPONDIDO' | 'REBOTADO' | 'ERROR' | 'RECONCILIATION_REQUIRED';
 
 export type EventoDelivery =
   | 'SENT' | 'DELIVERED' | 'OPENED' | 'CLICKED' | 'BOUNCED'

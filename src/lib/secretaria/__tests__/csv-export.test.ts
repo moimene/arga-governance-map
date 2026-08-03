@@ -22,7 +22,7 @@ describe("serializeCsv", () => {
       "\uFEFFCódigo;Nombre;Activo;Fecha;Sin valor 1;Sin valor 2\r\n" +
         "APROBACION_CUENTAS;Aprobación de cuentas;true;2026-07-11T08:30:00.000Z;;",
     );
-    expect(new TextEncoder().encode(csv).slice(0, 3)).toEqual(new Uint8Array([0xef, 0xbb, 0xbf]));
+    expect(Array.from(new TextEncoder().encode(csv).slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
   });
 
   it("escapa delimitadores, comillas y contenido multilínea según RFC 4180", () => {

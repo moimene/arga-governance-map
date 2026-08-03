@@ -9,6 +9,11 @@ import {
   validateActaRrmStructure,
   validateRenderedActaAgainstLegalStructure,
 } from "../acta-legal-structure";
+import {
+  buildCompleteArgaLegalArtifactManifest,
+  buildDefectiveArgaLegalArtifactManifest,
+  buildPreSignatureArgaLegalArtifactManifest,
+} from "./legal-artifact-manifest.fixture";
 
 const agendaRows: ActaAgendaItemRow[] = [
   {
@@ -100,6 +105,19 @@ describe("acta-legal-structure — RRM + document composer", () => {
     expect(rendered).toContain("ACUERDOS Y VOTACIONES");
   });
 
+  it("renderiza etiquetas y puntuación de negocio, sin códigos técnicos", () => {
+    const model = buildActaLegalStructureViewModel({
+      ...baseInput(),
+      organKind: "JUNTA",
+      meetingCharacter: "NO_UNIVERSAL",
+      convocationPublicationText: "Publicación incorporada al expediente.",
+    });
+
+    expect(model.sections.heading).toContain("Clase y carácter de la reunión: No universal.");
+    expect(model.sections.heading).toContain("Publicación incorporada al expediente.");
+    expect(model.sections.heading).not.toContain("expediente..");
+  });
+
   it("bloquea junta SA no universal sin publicación o medio de convocatoria", () => {
     const result = validateActaRrmStructure({
       ...baseInput(),
@@ -124,5 +142,76 @@ describe("acta-legal-structure — RRM + document composer", () => {
     expect(validateRenderedActaAgainstLegalStructure(rendered, model)).toEqual([]);
     expect(validateRenderedActaAgainstLegalStructure("ACTA\nORDEN DEL DÍA\n2. Aprobación de cuentas", model).map((issue) => issue.code))
       .toContain("rrm_render_section_missing");
+  });
+
+  it("no afirma aprobación ni fecha en un acta que sigue en borrador", () => {
+    const input = { ...baseInput(), approvalMode: null, approvalDate: null };
+    const model = buildActaLegalStructureViewModel(input);
+    const rendered = renderActaLegalStructureText(model);
+    const validation = validateActaRrmStructure(input);
+
+    expect(model.sections.approval).toContain("Acta en borrador");
+    expect(model.sections.approval).toContain("no acredita todavía la aprobación ni la firma");
+    expect(rendered).not.toContain("Fecha de aprobación: 15/05/2026");
+    expect(validation.blockingIssues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining(["rrm_approval_mode_missing", "rrm_approval_date_missing"]),
+    );
+  });
+
+  it("incorpora el manifest canónico a las variables legales sin perder determinismo", () => {
+    const manifest = buildCompleteArgaLegalArtifactManifest();
+    const first = buildActaLegalStructureViewModel({ ...baseInput(), legalArtifactManifest: manifest });
+    const second = buildActaLegalStructureViewModel({ ...baseInput(), legalArtifactManifest: manifest });
+
+    expect(first.legal_artifact_manifest).toMatchObject({
+      schemaVersion: "legal-artifact-manifest.v1",
+      entity: { name: "ARGA Seguros, S.A.", listed: true },
+      organ: { kind: "BOARD" },
+    });
+    expect(first.legal_artifact_manifest_canonical).toBe(second.legal_artifact_manifest_canonical);
+    expect(first.legal_artifact_validation_phase).toBe("PRE_SIGNATURE");
+  });
+
+  it("permite que la proyección PRE_SIGNATURE mantenga aprobación, firmas y asiento pendientes", () => {
+    const result = validateActaRrmStructure({
+      ...baseInput(),
+      approvalMode: null,
+      approvalDate: null,
+      legalArtifactManifest: buildPreSignatureArgaLegalArtifactManifest(),
+      legalArtifactValidationPhase: "PRE_SIGNATURE",
+    });
+    const codes = result.blockingIssues.map((issue) => issue.code);
+
+    expect(codes).not.toContain("rrm_approval_mode_missing");
+    expect(codes).not.toContain("rrm_approval_date_missing");
+    expect(codes).not.toContain("manifest_approval_pending");
+    expect(codes).not.toContain("manifest_required_signature_missing");
+    expect(codes).not.toContain("manifest_book_entry_missing");
+  });
+
+  it("propaga al gate del acta los defectos jurídicos del manifest ARGA observado", () => {
+    const result = validateActaRrmStructure({
+      ...baseInput(),
+      legalArtifactManifest: buildDefectiveArgaLegalArtifactManifest(),
+    });
+    const codes = result.blockingIssues.map((issue) => issue.code);
+
+    expect(result.ok).toBe(false);
+    expect(codes).toEqual(expect.arrayContaining([
+      "listed_board_legal_person_forbidden",
+      "listed_board_capital_percentage_forbidden",
+      "manifest_vote_denominator_mismatch",
+      "manifest_future_meeting_asserted",
+    ]));
+  });
+
+  it("no convierte una remisión genérica en una convocatoria válida", () => {
+    const result = validateActaRrmStructure({
+      ...baseInput(),
+      convocationText: "Según consta en el expediente.",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain("rrm_convocation_missing");
   });
 });

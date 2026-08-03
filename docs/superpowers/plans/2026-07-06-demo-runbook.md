@@ -1,5 +1,12 @@
 # Runbook de demo — Secretaría Societaria (presentación 2026-07-07)
 
+> **Estado documental — sustituido desde 2026-07-21.** Se conserva como guion
+> histórico de la demo del 7 de julio. No ejecutar sus instrucciones de QES,
+> sandbox o envío. Para el estado UAT vigente, usar
+> `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`. EAD Trust
+> se limita hoy a interposición, mensajería básica y custodia/e-archiving; no se
+> afirma firma, ERDS, envío, entrega ni interacción real con el proveedor.
+
 Guion operativo para el presentador. Basado en la auditoría multiagente del
 2026-07-06 (28 agentes, verificación adversarial) + fixes aplicados esa noche
 (commits `86aa463` código, `e6c0909` datos, `c44c822` QTSP proxy).

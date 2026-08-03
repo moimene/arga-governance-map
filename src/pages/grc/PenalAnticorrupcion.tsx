@@ -4,16 +4,16 @@ import {
   Activity, ArrowRight, FileText, PlusCircle, Scale, ShieldCheck, 
   ChevronDown, ChevronUp, AlertTriangle, PenTool, ExternalLink, HelpCircle, Loader2, CheckCircle2, Lock
 } from "lucide-react";
-import { useRisks } from "@/hooks/useRisks";
+import { useRisks, type RiskRow } from "@/hooks/useRisks";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import {
   controlStatusLabel,
+  type ControlRow,
   useAllControlsByObligationIds,
   useObligationsList,
 } from "@/hooks/usePoliciesObligations";
-import { useEvidenceBundlesList, useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
-import { useQTSPSign } from "@/hooks/useQTSPSign";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -56,14 +56,30 @@ function matchesTaxonomy(keywords: string[], ...values: Array<string | null | un
   return keywords.some((term) => text.includes(normalize(term)));
 }
 
+type PenalRisk = Pick<
+  RiskRow,
+  | "id"
+  | "code"
+  | "title"
+  | "description"
+  | "status"
+  | "probability"
+  | "impact"
+  | "inherent_score"
+  | "residual_score"
+>;
+
+type PenalControl = Pick<ControlRow, "id" | "code" | "name" | "status" | "last_test_date">;
+type PenalSubTab = "risks" | "controls" | "evidences";
+
 interface DelitoCategory {
   id: string;
   title: string;
   lawRef: string;
   description: string;
   keywords: string[];
-  fallbackRisks: any[];
-  fallbackControls: any[];
+  fallbackRisks: PenalRisk[];
+  fallbackControls: PenalControl[];
 }
 
 const DELITOS_TAXONOMY: DelitoCategory[] = [
@@ -162,14 +178,12 @@ export default function PenalAnticorrupcion() {
   const { data: controls = [], isLoading: loadingControls, refetch: refetchControls } = useAllControlsByObligationIds(obligationIds);
   const { data: evidences = [], refetch: refetchEvidences } = useEvidenceBundlesList();
 
-  const createEvidence = useCreateEvidenceBundle();
-  const { signMutation } = useQTSPSign();
 
   // Accordion State
   const [expandedDelito, setExpandedDelito] = useState<string | null>("cohecho-corrupcion");
-  const [activeSubTab, setActiveSubTab] = useState<"risks" | "controls" | "evidences">("risks");
+  const [activeSubTab, setActiveSubTab] = useState<PenalSubTab>("risks");
 
-  // QES Sealing State
+  // QSeal/e-archiving preparation state (no personal signature)
   const [sealingObject, setSealingObject] = useState<{
     type: "RISK" | "CONTROL";
     id: string;
@@ -223,7 +237,7 @@ export default function PenalAnticorrupcion() {
   };
 
   // Calculate high-level compliance label dynamically based on controls statuses
-  const getDelitoCompliance = (controlsList: any[]) => {
+  const getDelitoCompliance = (controlsList: PenalControl[]) => {
     if (controlsList.length === 0) {
       return { 
         label: "SIN EVALUAR", 
@@ -249,80 +263,13 @@ export default function PenalAnticorrupcion() {
       };
   };
 
-  // Trigger QES Evidential Seal
+  // QSeal has its own future endpoint; this flow remains fail-closed.
   const handlePerformSeal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sealingObject) return;
-
-    try {
-      setSigningProgress("Inicializando cifrado y pre-validación de censo...");
-      
-      const docName = evidenceDocName || `EVIDENCIA-${sealingObject.code}-${new Date().getFullYear()}.pdf`;
-      const docData = new TextEncoder().encode(
-        `EVIDENCIA DE COMPLIANCE PENAL - CÓDIGO PENAL ART. 31 BIS\n` +
-        `Entidad: ${scopeLabel}\n` +
-        `Objeto Auditado: [${sealingObject.type}] ${sealingObject.code} - ${sealingObject.title}\n` +
-        `Metodología de Auditoría: UNE 19601 / ISO 37001\n` +
-        `Auditor Apoderado: ${auditorName} (${auditorEmail})\n` +
-        `Fecha de Validación Forense: ${new Date().toLocaleDateString("es-ES")}`
-      ).buffer;
-
-      // Simulate Qualified Electronic Signature via QTSP hook
-      const signRes = await signMutation.mutateAsync({
-        documentName: docName,
-        documentData: docData,
-        signatories: [{ name: auditorName, email: auditorEmail }],
-        createdBy: auditorName,
-        onProgress: (step) => setSigningProgress(step),
-      });
-
-      if (!signRes.ok) {
-        throw new Error(signRes.errors.join(", "));
-      }
-
-      setSigningProgress("Sellando certificado de firma y sellado de tiempo en Ledger WORM...");
-
-      // Write Evidence Bundle RPC
-      await createEvidence.mutateAsync({
-        sourceModule: "GRC_PENAL",
-        sourceObjectType: sealingObject.type,
-        sourceObjectId: sealingObject.id,
-        referenceCode: `CP31BIS-${sealingObject.code.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
-        manifest: {
-          object_id: sealingObject.id,
-          object_code: sealingObject.code,
-          object_title: sealingObject.title,
-          qtsp_transaction_id: signRes.srId,
-          document_hash: signRes.documentHash,
-          signed_at: signRes.signed_at,
-          auditor: auditorName,
-          auditor_email: auditorEmail,
-          regulatory_standard: "Spanish Criminal Code Art 31 bis / ISO 37001 Compliance Matrix"
-        },
-        documentUrl: `https://hzqwefkwsxopwrmtksbg.supabase.co/storage/v1/object/public/evidence/penal/${docName}`,
-        legalHold: false,
-        status: "SEALED",
-        sandbox: signRes.sandbox,
-        srStatus: signRes.srStatus,
-        signedBy: `${auditorName} (${auditorEmail})`
-      });
-
-      toast.success(
-        signRes.sandbox
-          ? "Certificación generada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
-          : "Certificación Forense QSeal y bundle WORM generados correctamente."
-      );
-      setSealingObject(null);
-      setEvidenceDocName("");
-      refetchEvidences();
-      refetchRisks();
-      refetchControls();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(`Error al sellar evidencia: ${err.message || "Error desconocido"}`);
-    } finally {
-      setSigningProgress(null);
-    }
+    setSigningProgress(null);
+    toast.info("QSeal no conectado en este flujo", {
+      description: "La ruta genérica de firma está retirada. Un futuro QSeal deberá usar su servicio propio y no atribuir firma personal.",
+    });
   };
 
   const loading = loadingRisks || loadingObligations || loadingControls;
@@ -340,7 +287,7 @@ export default function PenalAnticorrupcion() {
           </div>
           <p className="max-w-3xl text-sm leading-6 text-[var(--g-text-secondary)]">
             Supervisión interactiva del Modelo de Prevención de Delitos (Art. 31 bis CP) y Antisoborno (ISO 37001). 
-            Vincule riesgos y controles mitigantes, y emita evidencias inmutables selladas mediante firma electrónica.
+            Vincule riesgos y controles mitigantes, y prepare su custodia inmutable mediante e-archiving y, cuando proceda, QSeal no personal.
           </p>
         </div>
         <Link
@@ -454,15 +401,15 @@ export default function PenalAnticorrupcion() {
 
                   {/* Tabs for details */}
                   <div className="flex border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]">
-                    {[
+                    {([
                       { id: "risks", label: `Riesgos Penales (${delitoRisks.length})` },
                       { id: "controls", label: `Controles Mitigantes (${delitoControls.length})` },
                       { id: "evidences", label: `Evidencias Forenses (${delitoEvidences.length})` },
-                    ].map((tab) => (
+                    ] satisfies Array<{ id: PenalSubTab; label: string }>).map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setActiveSubTab(tab.id as any)}
+                        onClick={() => setActiveSubTab(tab.id)}
                         className={cn(
                           "px-5 py-3 text-xs font-semibold border-b-2 transition-colors",
                           activeSubTab === tab.id
@@ -534,7 +481,7 @@ export default function PenalAnticorrupcion() {
                                       })}
                                       className="inline-flex items-center gap-1 text-[var(--g-brand-3308)] hover:underline font-semibold"
                                     >
-                                      <PenTool className="h-3 w-3" /> QSeal
+                                      <PenTool className="h-3 w-3" /> Preparar QSeal
                                     </button>
                                   </td>
                                 </tr>
@@ -616,7 +563,7 @@ export default function PenalAnticorrupcion() {
                                           className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] px-2.5 py-1 font-semibold transition-colors"
                                           style={{ borderRadius: "var(--g-radius-sm)" }}
                                         >
-                                          <PenTool className="h-3 w-3" /> Sellar QSeal
+                                          <PenTool className="h-3 w-3" /> Preparar QSeal
                                         </button>
                                       </div>
                                     )}
@@ -669,7 +616,7 @@ export default function PenalAnticorrupcion() {
                                   )}
                                 </div>
                                 <div className="text-[11px] text-[var(--g-text-secondary)] font-mono space-y-1">
-                                  <div><strong>Firmante:</strong> {evidence.signed_by || "Apoderado de Cumplimiento"}</div>
+                                  <div><strong>Responsable registrado:</strong> {evidence.signed_by || "Apoderado de Cumplimiento"}</div>
                                   <div><strong>Fecha Sellado:</strong> {evidence.created_at ? new Date(evidence.created_at).toLocaleString("es-ES") : "—"}</div>
                                   <div className="line-clamp-1"><strong>Hash SHA-512:</strong> <span className="break-all font-mono text-[9px]">{evidence.hash_sha512 || "Pendiente"}</span></div>
                                   <div className="line-clamp-1"><strong>Audit ID:</strong> {evidence.id}</div>
@@ -734,7 +681,7 @@ export default function PenalAnticorrupcion() {
             
             <form onSubmit={handlePerformSeal} className="p-6 space-y-4">
               <div className="p-3 bg-[var(--g-surface-subtle)]/50 border border-[var(--g-border-subtle)] text-xs text-[var(--g-text-secondary)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <span>Está a punto de emitir una evidencia digital cualificada inmutable asociada al {sealingObject.type === "CONTROL" ? "control" : "riesgo"}:</span>
+                <span>QSeal es un servicio distinto de la firma personal y todavía no está conectado en este flujo. Puede revisar los datos, pero no se emitirá ningún sello:</span>
                 <strong className="block mt-1 text-[var(--g-text-primary)] font-mono">{sealingObject.code} — {sealingObject.title}</strong>
               </div>
 
@@ -812,12 +759,14 @@ export default function PenalAnticorrupcion() {
                     Cancelar
                   </button>
                   <button
-                    type="submit"
-                    className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                    type="button"
+                    disabled
+                    title="QSeal requiere su integración source-bound propia; la ruta genérica de firma no se reutiliza."
+                    className="flex-1 h-10 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] text-sm font-semibold cursor-not-allowed opacity-70 flex items-center justify-center gap-1.5"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
                     <PenTool className="h-4 w-4" />
-                    Sellar Evidencia QSeal
+                    QSeal no conectado
                   </button>
                 </div>
               )}

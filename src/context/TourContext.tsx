@@ -99,7 +99,7 @@ export const tourSteps: TourStep[] = [
     route: "/organos/consejo-administracion/reuniones/cda-22-04-2026",
     title: "El expediente de reunión completo",
     description:
-      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta firmada e inmutable. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
+      "Cada reunión tiene su ciclo de vida: desde la convocatoria hasta el acta aprobada, evidenciada e inmutable. El expediente incluye agenda, materiales, confirmaciones, votaciones y acuerdos.",
     bullets: [
       "Punto 3 de la agenda: PR-008 destaca en ámbar — es el punto crítico de esta sesión.",
       "Tab Participantes: 2 consejeros aún no han confirmado — quórum en riesgo si no confirman.",

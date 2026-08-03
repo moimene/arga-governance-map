@@ -25,6 +25,9 @@ const VARIABLE_PATTERN =
   /\{\{\s*([\p{L}_][\p{L}\p{N}_]*(?:\.[\p{L}\p{N}_]+)*)\s*\}\}/gu;
 const HELPER_ALLOWLIST = new Set(["if", "else", "each", "unless", "with"]);
 const PROTECTED_PREFIXES = ["ENTIDAD.", "ORGANO.", "REUNION.", "EXPEDIENTE.", "SISTEMA.", "QTSP."];
+const SIMPLE_VARIABLE_NAME = /^[\p{L}_][\p{L}\p{N}_]*(?:\.[\p{L}\p{N}_]+)*$/u;
+const MACHINE_LITERAL_RE = /\b(?:[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ0-9]*_[A-ZÁÉÍÓÚÑÜ0-9_]+|[a-záéíóúñü][a-záéíóúñü0-9]*_[a-záéíóúñü0-9_]+|true|false)\b/;
+const METADATA_LEAK_RE = /\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|agreement_id|snapshot_hash|request_id|trace_id|trazabilidad (?:documental|del acto)|traza registral)\b/i;
 export type GatePreContext = {
   tenantId: string;
   existingActiveTemplates: PlantillaCandidate[];
@@ -127,7 +130,10 @@ function collectMetadataIssues(
 
 function collectCapa1Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
   const text = t.capa1_inmutable ?? "";
-  if (text.length < 100) {
+  const visibleStaticText = text.replace(/\{\{[\s\S]*?\}\}/g, " ");
+  const isCanonicalActaProjection =
+    t.tipo === "ACTA_SESION" && text.trim() === "{{acta_rrm_texto_completo}}";
+  if (text.length < 100 && !isCanonicalActaProjection) {
     issues.push({
       severity: "BLOCKING",
       code: "CAPA1_LENGTH",
@@ -147,6 +153,22 @@ function collectCapa1Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void
         field: "capa1_inmutable",
       });
     }
+  }
+  if (MACHINE_LITERAL_RE.test(visibleStaticText)) {
+    issues.push({
+      severity: "BLOCKING",
+      code: "CAPA1_MACHINE_LITERAL",
+      message: "capa1 contiene un enum, clave técnica o booleano literal sin traducción jurídica",
+      field: "capa1_inmutable",
+    });
+  }
+  if (METADATA_LEAK_RE.test(visibleStaticText)) {
+    issues.push({
+      severity: "BLOCKING",
+      code: "CAPA1_METADATA_LEAK",
+      message: "capa1 contiene identificadores o trazabilidad técnica reservada al expediente",
+      field: "capa1_inmutable",
+    });
   }
 }
 
@@ -215,9 +237,33 @@ function collectCapa2Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void
       });
     }
   }
+  for (const variable of t.capa2_variables ?? []) {
+    if (variable.fuente === "ENTIDAD") {
+      issues.push({
+        severity: "BLOCKING",
+        code: "LEGACY_FUENTE_ENTIDAD",
+        message: `variable '${variable.variable}' usa fuente legacy ENTIDAD; migrar a entities.*`,
+        field: "capa2_variables",
+      });
+    }
+    if (
+      SIMPLE_VARIABLE_NAME.test(variable.variable) &&
+      ![...used].some((name) => isDeclared(name, new Set([variable.variable])))
+    ) {
+      issues.push({
+        severity: "BLOCKING",
+        code: "CAPA2_ORPHAN_VARIABLE",
+        message: `variable escalar '${variable.variable}' declarada en capa2 pero ausente del texto`,
+        field: "capa2_variables",
+      });
+    }
+  }
 }
 
 function collectCapa3Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void {
+  const capa2ByName = new Map(
+    (t.capa2_variables ?? []).map((variable) => [variable.variable.trim(), variable]),
+  );
   for (const f of t.capa3_editables ?? []) {
     const normalizedField = f.campo.toLocaleUpperCase("es");
     if (PROTECTED_PREFIXES.some((p) => normalizedField.startsWith(p))) {
@@ -225,6 +271,17 @@ function collectCapa3Issues(t: PlantillaCandidate, issues: GatePreIssue[]): void
         severity: "BLOCKING",
         code: "CAPA3_PREFIJO_PROTEGIDO",
         message: `campo '${f.campo}' usa prefijo reservado de capa2`,
+        field: "capa3_editables",
+      });
+    }
+    const duplicated = capa2ByName.get(f.campo.trim());
+    const source = duplicated?.fuente?.toLocaleUpperCase("es") ?? "";
+    const userSupplied = /USUARIO|MANUAL|SECRETAR|CAPA3/.test(source);
+    if (duplicated && !userSupplied) {
+      issues.push({
+        severity: "BLOCKING",
+        code: "CAPA2_CAPA3_SOURCE_CONFLICT",
+        message: `campo '${f.campo}' figura como dato automático en capa2 y editable en capa3`,
         field: "capa3_editables",
       });
     }
@@ -296,23 +353,14 @@ function collectInfoIssues(t: PlantillaCandidate, issues: GatePreIssue[]): void 
     });
   }
 
-  // LEGACY_FUENTE_ENTIDAD
-  for (const v of t.capa2_variables ?? []) {
-    if (v.fuente === "ENTIDAD") {
-      issues.push({
-        severity: "WARNING",
-        code: "LEGACY_FUENTE_ENTIDAD",
-        message: `variable '${v.variable}' usa fuente legacy ENTIDAD; preferir entities.name`,
-        field: "capa2_variables",
-      });
-    }
-  }
-
   // CAPA2_UNUSED_VARIABLE
   const text = t.capa1_inmutable ?? "";
   const used = listTemplateExpressionVariables(text);
   for (const v of t.capa2_variables ?? []) {
-    if (![...used].some((name) => isDeclared(name, new Set([v.variable])))) {
+    if (
+      !SIMPLE_VARIABLE_NAME.test(v.variable) &&
+      ![...used].some((name) => isDeclared(name, new Set([v.variable])))
+    ) {
       issues.push({
         severity: "INFO",
         code: "CAPA2_UNUSED_VARIABLE",

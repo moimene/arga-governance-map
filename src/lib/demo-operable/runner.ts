@@ -65,7 +65,7 @@ export interface DemoSandboxEvidence {
   finalEvidence: false;
   filingPrevented: true;
   productiveQtspPrevented: true;
-  signatureLevel: "QES_SANDBOX";
+  interpositionMode: "INTERPOSITION_SANDBOX";
   timestampLevel: "TSQ_SANDBOX";
   tsq: string;
   integrity: "VALID" | "NOT_APPLICABLE";
@@ -82,7 +82,7 @@ export interface DemoSandboxEvidence {
 
 export interface DemoTrustSimulation {
   simulated: true;
-  signatureLevel: "QES_SANDBOX";
+  interpositionMode: "INTERPOSITION_SANDBOX";
   timestampLevel: "TSQ_SANDBOX";
   ocsp: "ok";
   authority: "valid";
@@ -257,7 +257,7 @@ export function runDemoScenario(scenarioId: DemoScenarioId, options: DemoRunOpti
     },
     trust: {
       simulated: true,
-      signatureLevel: "QES_SANDBOX",
+      interpositionMode: "INTERPOSITION_SANDBOX",
       timestampLevel: "TSQ_SANDBOX",
       ocsp: "ok",
       authority: "valid",
@@ -270,7 +270,7 @@ export function runDemoScenario(scenarioId: DemoScenarioId, options: DemoRunOpti
       finalEvidence: false,
       filingPrevented: true,
       productiveQtspPrevented: true,
-      signatureLevel: "QES_SANDBOX",
+      interpositionMode: "INTERPOSITION_SANDBOX",
       timestampLevel: "TSQ_SANDBOX",
       tsq: adopted ? `mock_tsq_${stableHash(`${scenarioId}:${scenarioRunId}:tsq`).slice(-8)}` : "not_applicable_gate_blocked",
       integrity: adopted ? "VALID" : "NOT_APPLICABLE",

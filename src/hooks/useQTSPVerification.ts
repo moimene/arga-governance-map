@@ -109,10 +109,10 @@ function buildArtifactsFromData(
 
   // ITEM-107: extraer artefactos de manifest.artifacts (la columna real es
   // `manifest` jsonb). En producción los artefactos son DOCX archivados con
-  // hash SHA-512 en `hash_sha512`; se mapean a tipo HASH (integridad de
-  // documento). Si en el futuro el manifest trae sellos QTSP tipados
-  // (QES/QSEAL/TSQ/NOTIFICATION) con `hash`, se respetan tal cual.
-  const KNOWN_QTSP_TYPES = new Set(["QES", "QSEAL", "TSQ", "NOTIFICATION"]);
+  // hash SHA-512 en `hash_sha512`; se mapean a HASH (integridad/custodia).
+  // Un tipo histórico QES nunca se eleva aquí a hecho de firma. QSEAL/TSQ y
+  // NOTIFICATION son servicios distintos y conservan su semántica propia.
+  const NON_SIGNATURE_QTSP_TYPES = new Set(["QSEAL", "TSQ", "NOTIFICATION"]);
   for (const bundle of bundles) {
     const manifestArtifacts = bundle.manifest?.artifacts;
     if (!Array.isArray(manifestArtifacts)) continue;
@@ -121,7 +121,7 @@ function buildArtifactsFromData(
       const ref = art.ref ?? art.filename;
       if (!hash || !ref) continue;
       const timestamp = art.timestamp ?? art.timestamp_iso;
-      const isKnownQtsp = typeof art.type === "string" && KNOWN_QTSP_TYPES.has(art.type);
+      const isKnownQtsp = typeof art.type === "string" && NON_SIGNATURE_QTSP_TYPES.has(art.type);
       artifacts.push({
         type: isKnownQtsp ? (art.type as VerifiableArtifact["type"]) : "HASH",
         ref,
@@ -133,7 +133,8 @@ function buildArtifactsFromData(
     }
   }
 
-  // Extract QES artifacts from rule evaluations (if they contain signature data)
+  // Las referencias históricas a firma se proyectan únicamente como HASH. No
+  // se atribuyen firmante, rol ni nivel eIDAS desde un explain legacy.
   for (const evaluation of evaluations) {
     if (
       evaluation.explain &&
@@ -150,17 +151,11 @@ function buildArtifactsFromData(
       // vez de ocultarlo o falsearlo.
       if ("signature_ref" in explainData && typeof explainData.signature_ref === "string") {
         artifacts.push({
-          type: "QES",
-          ref: `evaluation-${evaluation.id}-signature`,
+          type: "HASH",
+          ref: `evaluation-${evaluation.id}-legacy-artifact`,
           hash: typeof explainData.signature_hash === "string"
             ? explainData.signature_hash
             : "",
-          signer_id: typeof explainData.signer_id === "string"
-            ? explainData.signer_id
-            : undefined,
-          signer_role: typeof explainData.signer_role === "string"
-            ? explainData.signer_role
-            : undefined,
           timestamp: evaluation.created_at,
         });
       }

@@ -70,36 +70,32 @@ export function isSignatureProduced(srStatus?: string | null): boolean {
 export function signatureOutcomeLabel(outcome: SignatureOutcome): string {
   switch (outcome) {
     case "COMPLETADA":
-      return "Firmado por todos los firmantes";
+      return "Actuación EAD completada para todos los intervinientes";
     case "PARCIAL":
-      return "Firmado parcialmente — faltan firmantes";
+      return "Actuación EAD parcial — faltan intervinientes";
     case "SOLICITADA":
-      return "Firma solicitada — pendiente de firma";
+      return "Interposición EAD solicitada — pendiente de resultado";
     case "SIN_EFECTO":
-      return "Solicitud de firma anulada o caducada";
+      return "Solicitud EAD anulada o caducada";
     case "NO_SOLICITADA":
     default:
-      return "Sin solicitud de firma";
+      return "Sin solicitud EAD";
   }
 }
 
 /**
  * Nivel de firma que emite el proveedor, para no afirmar más de lo que es.
  *
- * EAD Enterprise Suite 1.4.2 **no expone tipo cualificado (QES)**: su máximo es
- * `ADVANCED` (avanzada con OTP por SMS, art. 26 eIDAS), e `INTERPOSITION` es
- * firma simple (art. 25.1 eIDAS). Nuestro proxy emite `INTERPOSITION`.
- *
- * Por eso ninguna superficie puede rotular "QES" en este camino. Qué nivel
- * resulta suficiente para actas y certificaciones es criterio del Comité Legal;
- * lo que no admite criterio es llamar cualificada a una firma simple.
+ * Secretaría usa `INTERPOSITION` como modo de actuación del proveedor y no lo
+ * traduce a QES, avanzada o simple. Las claves históricas se conservan solo para
+ * leer registros anteriores; la interfaz no presenta un nivel eIDAS.
  */
 export const SIGNATURE_TYPE_LABEL: Readonly<Record<string, string>> = {
-  INTERPOSITION: "Firma electrónica simple (art. 25.1 eIDAS)",
-  ADVANCED: "Firma electrónica avanzada con OTP (art. 26 eIDAS)",
+  INTERPOSITION: "Interposición EAD Trust",
+  ADVANCED: "Interposición EAD Trust",
 };
 
 export function signatureTypeLabel(signatureType?: string | null): string {
   const raw = String(signatureType ?? "").trim().toUpperCase();
-  return SIGNATURE_TYPE_LABEL[raw] ?? "Firma electrónica";
+  return SIGNATURE_TYPE_LABEL[raw] ?? "Actuación EAD Trust";
 }

@@ -286,7 +286,7 @@ export const LEGAL_DYNAMIC_LIST_BLOCKS: Record<string, string> = {
   miembros_presentes:
     "{{#each miembros_presentes}}{{nombre}}{{#if cargo}} ({{cargo}}){{/if}}{{#unless @last}}\n{{/unless}}{{/each}}",
   relacion_respuestas:
-    "{{#each relacion_respuestas}}{{nombre}}{{#if sentido}} - {{sentido}}{{/if}}{{#if fecha}} - {{fecha}}{{/if}}{{#if firma_qes_ref}} - QES {{firma_qes_ref}}{{/if}}{{#unless @last}}\n{{/unless}}{{/each}}",
+    "{{#each relacion_respuestas}}{{nombre}}{{#if sentido}} - {{sentido}}{{/if}}{{#if fecha}} - {{fecha}}{{/if}}{{#if firma_qes_ref}} - evidencia {{firma_qes_ref}}{{/if}}{{#unless @last}}\n{{/unless}}{{/each}}",
   documentacion:
     "{{#each documentacion}}{{descripcion}}{{#unless @last}}\n{{/unless}}{{/each}}",
   comprobaciones:

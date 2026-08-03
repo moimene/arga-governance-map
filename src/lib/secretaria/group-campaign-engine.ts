@@ -306,7 +306,9 @@ function alertsFor(
   if (status === "BLOQUEADO") alerts.push(mode === "CO_APROBACION" ? "Co-firmas incompletas" : "Bloqueo documental");
   if (phase.code === "FORMULACION_CUENTAS" && mode === "CO_APROBACION") alerts.push("Gate: k=2 firmas mancomunadas");
   if (phase.code === "CONVOCATORIA_JGA" && sociedad.tipo_social === "SA") alerts.push("Antelación SA: 1 mes calendario");
-  if (phase.code === "CONVOCATORIA_JGA" && ["SL", "SLU"].includes(sociedad.tipo_social ?? "")) alerts.push("Canal individual con evidencia ERDS");
+  if (phase.code === "CONVOCATORIA_JGA" && ["SL", "SLU"].includes(sociedad.tipo_social ?? "")) {
+    alerts.push("Canal individual EAD Trust: interposición, mensajería básica y custodia/e-archiving");
+  }
   if (phase.organ === "JUNTA" && sociedad.es_unipersonal) alerts.push("Sin convocatoria: decisión de socio único");
   if (sociedad.es_cotizada) alerts.push("Advertencias LMV activas");
   return alerts;

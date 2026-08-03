@@ -1,4 +1,5 @@
 import type { NormalizedCapa3Field } from "./capa3-fields";
+import { labelMateria } from "./agenda-materias";
 
 export type Capa3PrefillMode = "editable" | "readonly";
 export type Capa3PrefillSource =
@@ -7,7 +8,8 @@ export type Capa3PrefillSource =
   | "canales"
   | "entidad"
   | "organo"
-  | "autoridad";
+  | "autoridad"
+  | "adjuntos";
 
 export interface ConvocatoriaCapa3Field extends NormalizedCapa3Field {
   readonly?: boolean;
@@ -33,8 +35,17 @@ export interface ConvocatoriaCapa3Context {
   organoNombre?: string | null;
   convocanteNombre?: string | null;
   convocanteCargo?: string | null;
+  /**
+   * Proyección documental autoritativa del orden del día. Permite que el
+   * stepper incorpore identidades y destinos ya validados (por ejemplo, la
+   * persona propuesta como representante) sin que un prefill Capa 3 más
+   * pobre pise después esa semántica.
+   */
+  agendaSummaryText?: string | null;
   agendaItems?: ConvocatoriaCapa3AgendaItem[];
   channelLabels?: string[];
+  attachmentAliases?: string[];
+  haySegundaConvocatoria?: boolean | null;
 }
 
 export interface ConvocatoriaCapa3Resolution {
@@ -58,7 +69,10 @@ function agendaSummary(items: ConvocatoriaCapa3AgendaItem[] | undefined) {
     .map((item, index) => {
       const title = text(item.titulo);
       if (!title) return "";
-      const suffix = item.kind === "DECISORIO" && item.materia ? ` (${item.materia})` : "";
+      const suffix =
+        item.kind === "DECISORIO" && item.materia
+          ? ` (Acuerdo · ${labelMateria(item.materia)})`
+          : "";
       return `${index + 1}. ${title}${suffix}`;
     })
     .filter(Boolean)
@@ -66,6 +80,12 @@ function agendaSummary(items: ConvocatoriaCapa3AgendaItem[] | undefined) {
 }
 
 const BINDINGS: Record<string, Binding> = {
+  hay_segunda_convocatoria: {
+    mode: "readonly",
+    source: "stepper",
+    sourceLabel: "Paso 2",
+    read: (context) => (context.haySegundaConvocatoria === true ? "Sí" : "No"),
+  },
   fecha_sesion: {
     mode: "editable",
     source: "stepper",
@@ -166,13 +186,13 @@ const BINDINGS: Record<string, Binding> = {
     mode: "readonly",
     source: "agenda",
     sourceLabel: "Paso 3",
-    read: (context) => agendaSummary(context.agendaItems),
+    read: (context) => text(context.agendaSummaryText) || agendaSummary(context.agendaItems),
   },
   orden_dia_texto: {
     mode: "readonly",
     source: "agenda",
     sourceLabel: "Paso 3",
-    read: (context) => agendaSummary(context.agendaItems),
+    read: (context) => text(context.agendaSummaryText) || agendaSummary(context.agendaItems),
   },
   canal_convocatoria: {
     mode: "readonly",
@@ -191,6 +211,18 @@ const BINDINGS: Record<string, Binding> = {
     source: "canales",
     sourceLabel: "Paso 5",
     read: (context) => (context.channelLabels ?? []).join(", "),
+  },
+  canal_documentacion: {
+    mode: "readonly",
+    source: "adjuntos",
+    sourceLabel: "Paso 6",
+    read: () => "Expediente electrónico de Secretaría Societaria (repositorio documental privado TGMS)",
+  },
+  indice_documentacion_ref: {
+    mode: "readonly",
+    source: "adjuntos",
+    sourceLabel: "Paso 6",
+    read: (context) => (context.attachmentAliases ?? []).filter(Boolean).join(" · "),
   },
   denominacion_social: {
     mode: "readonly",
@@ -217,13 +249,13 @@ const BINDINGS: Record<string, Binding> = {
     read: (context) => text(context.organoNombre),
   },
   nombre_convocante: {
-    mode: "editable",
+    mode: "readonly",
     source: "autoridad",
     sourceLabel: "Autoridad vigente",
     read: (context) => text(context.convocanteNombre),
   },
   cargo_convocante: {
-    mode: "editable",
+    mode: "readonly",
     source: "autoridad",
     sourceLabel: "Autoridad vigente",
     read: (context) => text(context.convocanteCargo),

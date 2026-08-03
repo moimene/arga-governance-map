@@ -1,4 +1,5 @@
 import type { TipoOrgano } from "@/lib/rules-engine";
+import type { AgendaItemKind } from "@/lib/secretaria/agenda-kind";
 
 /**
  * Catálogo canónico de materias del orden del día y su mapeo materia × órgano.
@@ -19,8 +20,34 @@ export interface AgendaMateriaDef {
   lmvCotizada: boolean;
 }
 
+export interface AgendaInformativeMateriaDef {
+  value: string;
+  label: string;
+}
+
+/**
+ * Categorías canónicas para puntos que solo dejan constancia y no producen
+ * un acuerdo. Se mantienen fuera de `AGENDA_MATERIAS`: nunca deben aparecer
+ * en selectores de acuerdos ni adquirir clase, mayoría o efectos registrales.
+ */
+export const AGENDA_INFORMATIVE_MATERIAS: readonly AgendaInformativeMateriaDef[] = [
+  {
+    value: "INFORME_DIRECCION_GENERAL_MARCHA_SOCIEDAD",
+    label: "Informe de la Dirección General sobre la marcha de la sociedad",
+  },
+  {
+    value: "INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO",
+    label: "Informe de gobierno corporativo y cumplimiento",
+  },
+];
+
+export const MATERIAS_INFORMATIVAS = new Set(
+  AGENDA_INFORMATIVE_MATERIAS.map((materia) => materia.value),
+);
+
 export const ALL_ORGANOS: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
 export const JUNTA_ONLY: TipoOrgano[] = ["JUNTA_GENERAL"];
+export const CONSEJO_ONLY: TipoOrgano[] = ["CONSEJO"];
 export const CONSEJO_SCOPE: TipoOrgano[] = ["CONSEJO", "COMISION_DELEGADA"];
 export const JUNTA_AND_CONSEJO: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
 
@@ -37,6 +64,13 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   { value: "CONTRATACION_RELEVANTE", label: "Contratación relevante", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "COMITES_INTERNOS", label: "Constitución o modificación de comités internos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "DISTRIBUCION_CARGOS", label: "Distribución de cargos del consejo", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  // Código legacy de representación genérica en filial/participada. Se conserva
+  // sin reinterpretarlo: no acredita por sí solo condición de socio único.
+  { value: "NOMBRAMIENTO_REPRESENTANTE_FILIAL", label: "Designación de representante de la sociedad en filial o participada", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
+  // Representación de la sociedad matriz en su condición de socia única de la
+  // filial (arts. 15 y 183 LSC). Es una materia exclusiva del Consejo y no la
+  // representación permanente de una administradora PJ del art. 212 bis LSC.
+  { value: "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL", label: "Designación de representante de la socia única en la filial", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "POLITICAS_CORPORATIVAS", label: "Aprobación de políticas corporativas", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "RATIFICACION_ACTOS", label: "Ratificación de actos previos", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
   { value: "SEGUROS_RESPONSABILIDAD", label: "Seguro de responsabilidad de administradores", tipo: "ORDINARIA", inscribible: false, lmvCotizada: false },
@@ -53,6 +87,10 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   // Canonical id `REMUNERACION_CONSEJEROS` (materia_catalog 20260424_000033).
   { value: "REMUNERACION_CONSEJEROS", label: "Política / informe de remuneración de consejeros", tipo: "ORDINARIA", inscribible: false, lmvCotizada: true },
   { value: "DELEGACION_FACULTADES", label: "Delegación de facultades", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+  // Poder voluntario de representación: no es delegación orgánica del art.
+  // 249 LSC. Los poderes generales se elevan a público y se inscriben, por lo
+  // que necesitan identidad propia desde la selección de la materia.
+  { value: "PODER_REPRESENTACION", label: "Otorgamiento o modificación de poderes de representación", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
   // Codex P2 round 9 PR #3: id canonical singular `OPERACION_VINCULADA`
   // (verificado en supabase/migrations/20260420_000017_seed_rule_packs_v2.sql).
   // El plural ("OPERACIONES_VINCULADAS") rompía el match con el rule_pack
@@ -95,6 +133,8 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
 ];
 
 export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
+  INFORME_DIRECCION_GENERAL_MARCHA_SOCIEDAD: ALL_ORGANOS,
+  INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO: ALL_ORGANOS,
   APROBACION_PLAN_NEGOCIO: CONSEJO_SCOPE,
   APROBACION_PRESUPUESTO: CONSEJO_SCOPE,
   FORMULACION_CUENTAS: CONSEJO_SCOPE,
@@ -102,6 +142,8 @@ export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   CONTRATACION_RELEVANTE: CONSEJO_SCOPE,
   COMITES_INTERNOS: CONSEJO_SCOPE,
   DISTRIBUCION_CARGOS: CONSEJO_SCOPE,
+  NOMBRAMIENTO_REPRESENTANTE_FILIAL: CONSEJO_SCOPE,
+  DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL: CONSEJO_ONLY,
   POLITICAS_CORPORATIVAS: CONSEJO_SCOPE,
   RATIFICACION_ACTOS: CONSEJO_SCOPE,
   SEGUROS_RESPONSABILIDAD: CONSEJO_SCOPE,
@@ -115,6 +157,7 @@ export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   NOMBRAMIENTO_AUDITOR: JUNTA_ONLY,
   REMUNERACION_CONSEJEROS: JUNTA_ONLY,
   DELEGACION_FACULTADES: CONSEJO_SCOPE,
+  PODER_REPRESENTACION: CONSEJO_SCOPE,
   OPERACION_VINCULADA: CONSEJO_SCOPE,
   PROGRAMA_RECOMPRA: JUNTA_ONLY,
   ACCION_SOCIAL_RESPONSABILIDAD: JUNTA_ONLY,
@@ -160,23 +203,33 @@ export const LMV_COTIZADA_ADVERTENCIAS: Record<string, string> = {
 };
 
 /**
- * Alias históricos que siguen existiendo en datos Cloud. El colapso es solo
- * de presentación/identidad funcional: nunca implica renombrar ni borrar las
- * filas de `materia_catalog` o de `plantillas`.
+ * Alias históricos que comparten identidad funcional con su código canónico.
+ * Se usan en resolución, matching e identidad única; por eso no deben incluir
+ * sinónimos que solo compartan rótulo jurídico.
  */
 export const MATERIA_CANONICAL_ALIAS: Readonly<Record<string, string>> = {
   AMPLIACION_CAPITAL: "AUMENTO_CAPITAL",
   MOD_ESTATUTOS: "MODIFICACION_ESTATUTOS",
   NOMBRAMIENTO_CESE: "NOMBRAMIENTO_CONSEJERO",
-  EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "SUPRESION_PREFERENTE",
   // B7 Lote 3 (2026-07-18): el plural convive en datos Cloud legacy; el
   // singular es el canónico de materia_catalog. Espejado en
   // fn_secretaria_template_functional_key (migración 20260718090000).
   APROBACION_PRESUPUESTOS: "APROBACION_PRESUPUESTO",
 };
 
+/**
+ * Sinónimos exclusivamente de presentación. No intervienen en resolución de
+ * rule packs, matching de plantillas, navegación ni identidad funcional.
+ *
+ * D5 (art. 308 LSC): EXCLUSION y SUPRESION permanecen como materias técnicas
+ * distintas aunque compartan un rótulo jurídico en la interfaz.
+ */
+export const MATERIA_PRESENTATION_ALIAS: Readonly<Record<string, string>> = {
+  EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE: "SUPRESION_PREFERENTE",
+};
+
 const ART_308_MATERIA = "SUPRESION_PREFERENTE";
-const ART_308_LABEL = "Exclusión o supresión del derecho de preferencia";
+const ART_308_LABEL = "Exclusión del derecho de preferencia —supresión total o parcial—";
 
 const PROCESS_MATERIA_LABELS: Readonly<Record<string, string>> = {
   ACUERDO_SIN_SESION: "Acuerdo sin sesión",
@@ -220,6 +273,8 @@ const CATALOG_MATERIA_LABELS: Readonly<Record<string, string>> = {
   LIQUIDACION: "Liquidación de la sociedad",
   PACTO_PARASOCIAL: "Adhesión o modificación de pacto parasocial",
   PODER_REPRESENTACION: "Otorgamiento o modificación de poderes de representación",
+  NOMBRAMIENTO_REPRESENTANTE_FILIAL: "Designación de representante de la sociedad en filial o participada",
+  DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL: "Designación de representante de la socia única en la filial",
   PRESTACIONES_ACCESORIAS: "Creación, modificación o supresión de prestaciones accesorias",
   PRORROGA_SOCIEDAD: "Prórroga de la duración de la sociedad",
   SEPARACION_SOCIO: "Ejercicio del derecho de separación de socio",
@@ -245,9 +300,22 @@ function humanizeMateriaCode(value: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+export function isMateriaInformativa(materia?: string | null): boolean {
+  return MATERIAS_INFORMATIVAS.has(normalizeMateriaCode(materia));
+}
+
+export function materiaInformativaDefault(): AgendaInformativeMateriaDef {
+  return AGENDA_INFORMATIVE_MATERIAS[0];
+}
+
 export function resolveMateriaAlias(materia?: string | null): string {
   const normalized = normalizeMateriaCode(materia);
   return MATERIA_CANONICAL_ALIAS[normalized] ?? normalized;
+}
+
+export function resolveMateriaPresentationAlias(materia?: string | null): string {
+  const identity = resolveMateriaAlias(materia);
+  return MATERIA_PRESENTATION_ALIAS[identity] ?? identity;
 }
 
 export function isMateriaCompatibleWithOrgano(materia: string, organoTipo: TipoOrgano) {
@@ -259,15 +327,72 @@ export function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
   return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
 
+export interface AgendaMateriaSelection {
+  materia: string;
+  tipo: AgendaMateriaDef["tipo"];
+  inscribible: boolean;
+}
+
+/**
+ * Resuelve el cambio explícito de naturaleza realizado por el usuario.
+ *
+ * - DECISORIO solo conserva una materia del catálogo de acuerdos compatible.
+ * - Cualquier naturaleza no decisoria conserva una categoría informativa o
+ *   asigna el default visible y editable; nunca arrastra una materia de
+ *   acuerdo que estuviera oculta en el estado anterior.
+ */
+export function agendaMateriaSelectionForKind(params: {
+  kind: AgendaItemKind;
+  currentMateria?: string | null;
+  organoTipo: TipoOrgano;
+}): AgendaMateriaSelection {
+  if (params.kind === "DECISORIO") {
+    const current = AGENDA_MATERIAS.find(
+      (materia) =>
+        materia.value === resolveMateriaAlias(params.currentMateria) &&
+        isMateriaCompatibleWithOrgano(materia.value, params.organoTipo),
+    );
+    const materia = current ?? materiaDefaultForOrgano(params.organoTipo);
+    return {
+      materia: materia.value,
+      tipo: materia.tipo,
+      inscribible: materia.inscribible,
+    };
+  }
+
+  const current = AGENDA_INFORMATIVE_MATERIAS.find(
+    (materia) => materia.value === normalizeMateriaCode(params.currentMateria),
+  );
+  const materia = current ?? materiaInformativaDefault();
+  return {
+    materia: materia.value,
+    tipo: "ORDINARIA",
+    inscribible: false,
+  };
+}
+
+/**
+ * Boundary fail-closed para consumidores del motor y de la votación: solo
+ * una clasificación DECISORIO explícita cruza el límite.
+ */
+export function agendaItemsForDecisionEngine<
+  T extends { kind?: AgendaItemKind | null },
+>(items: readonly T[]): T[] {
+  return items.filter((item) => item.kind === "DECISORIO");
+}
+
 export function labelMateria(materia?: string | null, sourceLabel?: string | null) {
-  const canonical = resolveMateriaAlias(materia);
-  if (canonical === ART_308_MATERIA) return ART_308_LABEL;
-  if (PROCESS_MATERIA_LABELS[canonical]) return PROCESS_MATERIA_LABELS[canonical];
+  const identity = resolveMateriaAlias(materia);
+  const presentation = resolveMateriaPresentationAlias(identity);
+  if (presentation === ART_308_MATERIA) return ART_308_LABEL;
+  const informative = AGENDA_INFORMATIVE_MATERIAS.find((m) => m.value === presentation);
+  if (informative) return informative.label;
+  if (PROCESS_MATERIA_LABELS[presentation]) return PROCESS_MATERIA_LABELS[presentation];
   if (sourceLabel?.trim()) return sourceLabel.trim();
   return (
-    AGENDA_MATERIAS.find((m) => m.value === canonical)?.label ??
-    CATALOG_MATERIA_LABELS[canonical] ??
-    humanizeMateriaCode(canonical)
+    AGENDA_MATERIAS.find((m) => m.value === presentation)?.label ??
+    CATALOG_MATERIA_LABELS[presentation] ??
+    humanizeMateriaCode(identity)
   );
 }
 

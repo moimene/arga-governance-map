@@ -1,11 +1,11 @@
 // src/components/secretaria/EmitirCertificacionButton.tsx
 /**
- * F9.1 — Botón "Emitir certificación" respetando `capability_matrix`.
+ * Acción progresiva de certificación autoritativa.
  *
- * Ejecuta el pipeline completo F8.1→F8.2 en tres pasos:
- *   1. `fn_generar_certificacion` — crea la cert con gate_hash.
- *   2. `fn_firmar_certificacion`  — QES stub (TSQ base64 determinista).
- *   3. `fn_emitir_certificacion`  — URI del bundle operativo demo.
+ * Prepara el borrador únicamente desde un acta APPROVED_SIGNED y POSTED. La
+ * emisión posterior exige el artefacto final inmutable y verificaciones EAD
+ * Trust reales por interposición. No exige ni afirma un nivel de firma
+ * electrónica y nunca fabrica tokens probatorios.
  *
  * El botón se oculta si el usuario no tiene la capability CERTIFICATION
  * en `capability_matrix`. Para el demo, confiamos en el rol SECRETARIO
@@ -31,12 +31,16 @@
  * `--status-error`.
  */
 import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileSignature, Loader2, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useTenantContext } from "@/context/TenantContext";
 import { useHasCapability } from "@/hooks/useCapabilityMatrix";
+import {
+  useAuthoritativeLegalEvidence,
+  useEmitirCertificacionAutoritativa,
+  useFirmarCertificacionAutoritativa,
+  useGenerateAuthoritativeCertification,
+  type CertificationRow,
+} from "@/hooks/useActas";
 import {
   useAuthorityEvidence,
   usePresidenteVigente,
@@ -45,13 +49,25 @@ import {
 } from "@/hooks/useAuthorityEvidence";
 import { useCertificationAnnexGate } from "@/hooks/useSecretariaDocumentArtifacts";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
-import { buildCertificacionBody } from "@/lib/secretaria/certificacion-body";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
+import {
+  certificationLegalGateLabel,
+  resolveCertificationSourceGate,
+  verifiedSigner,
+  type MinuteLegalGateStatus,
+} from "@/lib/secretaria/authoritative-legal-state";
 
 export interface EmitirCertificacionButtonProps {
   minuteId: string;
   entityId: string | null;
   bodyId?: string | null;
   agreementIds: string[];
+  certifications: CertificationRow[];
+  minuteLegalGateStatus: MinuteLegalGateStatus;
+  bookDestinationStatus?: string | null;
+  minuteApprovalEvidenceMode?: string | null;
+  minuteApprovalSignatureClaim?: boolean | null;
+  minuteApprovalCanonicalStatus?: string | null;
   /** Rol del certificante — por defecto SECRETARIO (el caso más común). */
   certificanteRole?:
     | "SECRETARIO"
@@ -63,6 +79,12 @@ export interface EmitirCertificacionButtonProps {
   /** Nombres para componer el cuerpo canónico de la certificación (W0 #4). */
   entidadNombre?: string | null;
   organoNombre?: string | null;
+  certifiedAgreementsText: string;
+  /** Circunstancias de aprobación del acta exigibles en la certificación. */
+  actaApprovalMethod: string;
+  actaApprovalDateISO: string;
+  /** Fecha societaria de emisión; nunca se sustituye por la fecha técnica del sistema. */
+  legalEmissionDateISO: string;
   /** Cuando la certificación termina (o falla), el padre puede hookearse. */
   onEmitted?: (certId: string, uri: string) => void;
   disabledReason?: string | null;
@@ -73,15 +95,18 @@ export function EmitirCertificacionButton({
   entityId,
   bodyId,
   agreementIds,
+  certifications,
+  minuteLegalGateStatus,
+  bookDestinationStatus,
+  minuteApprovalEvidenceMode,
+  minuteApprovalSignatureClaim,
+  minuteApprovalCanonicalStatus,
   certificanteRole = "SECRETARIO",
   userRole = "SECRETARIO", // demo default — auth real en sprint futuro
-  entidadNombre,
-  organoNombre,
+  certifiedAgreementsText,
   onEmitted,
   disabledReason,
 }: EmitirCertificacionButtonProps) {
-  const queryClient = useQueryClient();
-  const { tenantId } = useTenantContext();
   const canCertify = useHasCapability(userRole, "CERTIFICATION");
   const { data: presidenteAE } = usePresidenteVigente(entityId ?? undefined, bodyId);
   // Para el dual check necesitamos resolver:
@@ -103,10 +128,37 @@ export function EmitirCertificacionButton({
     isLoading: annexGateLoading,
     error: annexGateError,
   } = useCertificationAnnexGate(validAgreementRefs);
+  const agreementSetKey = useMemo(
+    () => [...validAgreementRefs].sort().join("|"),
+    [validAgreementRefs],
+  );
+  const activeCertification = useMemo(
+    () =>
+      certifications.find(
+        (certification) =>
+          [...(certification.agreements_certified ?? [])].sort().join("|") ===
+          agreementSetKey,
+      ) ?? null,
+    [agreementSetKey, certifications],
+  );
+  const certificationEvidence = useAuthoritativeLegalEvidence(
+    "CERTIFICATION",
+    activeCertification?.id,
+    activeCertification?.final_legal_artifact_id,
+  );
+  const generateCertification = useGenerateAuthoritativeCertification(minuteId);
+  const signCertification = useFirmarCertificacionAutoritativa(
+    minuteId,
+    activeCertification?.id,
+  );
+  const emitCertification = useEmitirCertificacionAutoritativa(
+    minuteId,
+    activeCertification?.id,
+  );
 
   // L23: dual check de RM solo aplica cuando el flujo es de Secretario
   // (SA + VºBº). Para ADMIN_UNICO/ADMIN_SOLIDARIO la certificación es propia,
-  // sin co-firma de presidente.
+  // sin visto bueno de presidente.
   const flujoConVistoBueno = certificanteRole === "SECRETARIO";
 
   const certificanteAE = useMemo<AuthorityEvidenceDetailRow | null>(() => {
@@ -165,13 +217,86 @@ export function EmitirCertificacionButton({
     : blockingAnnexRequirements.length > 0
       ? `Faltan ${blockingAnnexRequirements.length} anexo(s) documental(es) bloqueante(s) para certificar.`
       : null;
+  const sourceGate = resolveCertificationSourceGate({
+    minuteLegalGateStatus,
+    bookDestinationStatus,
+    approvalEvidenceMode: minuteApprovalEvidenceMode,
+    approvalSignatureClaim: minuteApprovalSignatureClaim,
+    approvalCanonicalStatus: minuteApprovalCanonicalStatus,
+  });
+  const certificationStatus = activeCertification?.legal_gate_status ?? null;
+  const certifierVerification = verifiedSigner(
+    certificationEvidence.data?.verifications ?? [],
+    "CERTIFICANTE",
+  );
+  const vistoBuenoVerification = verifiedSigner(
+    certificationEvidence.data?.verifications ?? [],
+    "VISTO_BUENO",
+  );
+  const authoritativeStageReason = (() => {
+    if (!activeCertification) return null;
+    if (certificationStatus === "DEMO_SIMULATION") {
+      return "La certificación es una simulación demo y no puede emitirse con efecto jurídico.";
+    }
+    if (certificationStatus === "LEGACY_REVIEW") {
+      return "La certificación legacy requiere remediación probatoria antes de emitirse.";
+    }
+    if (certificationStatus === "EMITTED") {
+      return "La certificación ya ha sido emitida con evidencia EAD verificada.";
+    }
+    if (certificationStatus === "DRAFT" && activeCertification.content) {
+      return "Genere el candidato DOCX, solicite la interposición EAD, recupere el output y e-archive ese resultado antes de registrar el artefacto final.";
+    }
+    if (certificationStatus === "ARTIFACT_FINAL") {
+      if (certificationEvidence.isLoading) {
+        return "Comprobando el artefacto final y las constancias de EAD Trust.";
+      }
+      if (certificationEvidence.error) {
+        return secretariaErrorMessage(
+          certificationEvidence.error,
+          "No se pudo comprobar la evidencia EAD de la certificación.",
+        );
+      }
+      if (
+        !certificationEvidence.data?.artifact ||
+        certificationEvidence.data.artifact.id !== activeCertification.final_legal_artifact_id ||
+        certificationEvidence.data.artifact.artifact_status !== "FINAL_IMMUTABLE" ||
+        certificationEvidence.data.artifact.source_domain !== "CERTIFICATION" ||
+        certificationEvidence.data.artifact.artifact_kind !== "CERTIFICATION_FINAL" ||
+        certificationEvidence.data.artifact.evidence_mode !== "INTERPOSITION_CUSTODY" ||
+        certificationEvidence.data.artifact.signature_packaging !== null
+      ) {
+        return "La certificación no está vinculada a su artefacto final inmutable.";
+      }
+      if (!certifierVerification) {
+        return "Falta la constancia individual EAD Trust de la persona certificante.";
+      }
+      if (flujoConVistoBueno && !vistoBuenoVerification) {
+        return "Falta la constancia individual EAD Trust del visto bueno de Presidencia.";
+      }
+      if (
+        flujoConVistoBueno &&
+        certifierVerification &&
+        vistoBuenoVerification &&
+        (certifierVerification.signer_person_id === vistoBuenoVerification.signer_person_id ||
+          certifierVerification.provider_reference === vistoBuenoVerification.provider_reference)
+      ) {
+        return "La persona certificante y el visto bueno necesitan evidencias EAD individuales y diferenciadas.";
+      }
+    }
+    return null;
+  })();
   const effectiveDisabledReason =
     disabledReason ??
-    (invalidAgreementRefs.length > 0
+    (!sourceGate.ready
+      ? sourceGate.reason
+      : invalidAgreementRefs.length > 0
       ? "La certificación contiene referencias por punto sin Acuerdo 360 materializado."
       : agreementIds.length === 0
         ? "No hay acuerdos proclamables para certificar."
-        : annexGateReason);
+        : !certifiedAgreementsText.trim()
+          ? "Falta la transcripción íntegra de los acuerdos que se pretenden certificar."
+          : annexGateReason ?? authoritativeStageReason);
 
   async function handleClick() {
     if (busy) return;
@@ -188,79 +313,72 @@ export function EmitirCertificacionButton({
       // + LSC 529 octies), debe identificarse correctamente en el RPC.
       const effectiveCertificanteRole = certificanteAE?.cargo ?? certificanteRole;
 
-      // Paso 1 — fn_generar_certificacion
-      const { data: certId, error: e1 } = await supabase.rpc(
-        "fn_generar_certificacion",
-        {
-          p_minute_id: minuteId,
-          p_tipo: "ACUERDO",
-          p_agreements_certified: agreementIds,
-          p_certificante_role: effectiveCertificanteRole,
-          p_visto_bueno_persona_id: vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
-        },
-      );
-      if (e1) throw new Error(`Generar: ${e1.message}`);
-      const certificationId = String(certId);
+      if (!activeCertification || certificationStatus === "DRAFT") {
+        const certificationId = activeCertification?.id ??
+          await generateCertification.mutateAsync({
+            tipo: "ACUERDO",
+            agreementIds: validAgreementRefs,
+            certificanteRole: effectiveCertificanteRole,
+            vistoBuenoPersonaId:
+              vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
+          });
+        toast.success("Borrador de certificación preparado", {
+          description:
+            "El cuerpo canónico ha sido compuesto en servidor. Genere el candidato DOCX; el artefacto final solo podrá registrarse después de recuperar y e-archivar el output de la interposición EAD.",
+        });
+        return;
+      }
 
-      // W0 #4 — persistir el cuerpo canónico de la certificación (hasta ahora
-      // `content` quedaba NULL). DEBE ir antes de firmar: fn_firmar_certificacion
-      // computa hash_certificacion = SHA-256(gate_hash ‖ content ‖ tsq_token),
-      // así que el contenido tiene que estar presente para que el hash lo cubra.
-      const certBody = buildCertificacionBody({
-        certificanteCargoLabel:
-          CARGO_CERT_LABELS[effectiveCertificanteRole as keyof typeof CARGO_CERT_LABELS] ??
-          effectiveCertificanteRole,
-        certificanteNombre: certificanteAE?.person?.full_name ?? null,
-        vistoBuenoCargoLabel: vistoBuenoAE ? CARGO_CERT_LABELS[vistoBuenoAE.cargo] : null,
-        vistoBuenoNombre:
-          vistoBuenoAE?.person?.full_name ?? presidenteAE?.person?.full_name ?? null,
-        entidadNombre: entidadNombre ?? "la sociedad",
-        organoNombre: organoNombre ?? null,
-        numAcuerdos: agreementIds.length,
-        fechaISO: new Date().toISOString(),
+      if (certificationStatus === "ARTIFACT_FINAL") {
+        const artifact = certificationEvidence.data?.artifact;
+        if (!artifact || !certifierVerification) {
+          throw new Error("Falta el artefacto final o la constancia EAD de la persona certificante.");
+        }
+        await signCertification.mutateAsync({
+          finalLegalArtifactId: artifact.id,
+          certifierVerificationId: certifierVerification.id,
+          vistoBuenoVerificationId: vistoBuenoVerification?.id ?? null,
+        });
+      }
+
+      if (
+        certificationStatus !== "ARTIFACT_FINAL" &&
+        certificationStatus !== "INTERPOSITION_VERIFIED"
+      ) {
+        throw new Error(
+          `La certificación no está lista para emisión (${certificationStatus ?? "sin estado"}).`,
+        );
+      }
+      const uri = await emitCertification.mutateAsync();
+
+      toast.success("Certificación emitida con evidencia EAD verificada", {
+        description: `Referencia probatoria ${uri}`,
       });
-      const { error: eContent } = await supabase
-        .from("certifications")
-        .update({ content: certBody })
-        .eq("id", certificationId)
-        .eq("tenant_id", tenantId ?? "");
-      if (eContent) throw new Error(`Cuerpo certificación: ${eContent.message}`);
-
-      // Paso 2 — firma QES (stub determinista base64). El pipeline
-      // productivo reemplaza este bloque con la llamada al QTSP EAD Trust.
-      const qtspToken = btoa(`qtsp:demo:${certificationId}`);
-      const tsqToken = btoa(`tsq:demo:${certificationId}:${new Date().toISOString()}`);
-      const { error: e2 } = await supabase.rpc("fn_firmar_certificacion", {
-        p_certification_id: certificationId,
-        p_qtsp_token: qtspToken,
-        p_tsq_token: tsqToken,
-      });
-      if (e2) throw new Error(`Firmar: ${e2.message}`);
-
-      // Paso 3 — emitir (registra audit + URI bundle)
-      const { data: uri, error: e3 } = await supabase.rpc(
-        "fn_emitir_certificacion",
-        { p_certification_id: certificationId },
-      );
-      if (e3) throw new Error(`Emitir: ${e3.message}`);
-
-      toast.success(`Certificación emitida`, {
-        description: `Referencia operativa demo creada (${String(uri)}). Pendiente de audit/retention/legal hold; no constituye evidencia final productiva.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["certifications", tenantId, "byMinute", minuteId] });
-      queryClient.invalidateQueries({ queryKey: ["certification_plan", tenantId, "forMinute", minuteId] });
-      queryClient.invalidateQueries({ queryKey: ["certifications"] });
-      queryClient.invalidateQueries({ queryKey: ["certification_plan"] });
-      onEmitted?.(certificationId, String(uri));
+      onEmitted?.(activeCertification.id, uri);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = secretariaErrorMessage(e, "No se pudo emitir la certificación.");
       toast.error("Error al emitir certificación", { description: msg });
     } finally {
       setBusy(false);
     }
   }
 
-  const isDisabled = busy || !!effectiveDisabledReason || bloqueaRM;
+  const isDisabled =
+    busy ||
+    generateCertification.isPending ||
+    signCertification.isPending ||
+    emitCertification.isPending ||
+    !!effectiveDisabledReason ||
+    bloqueaRM;
+  const buttonLabel = !activeCertification
+    ? "Preparar certificación"
+    : certificationStatus === "INTERPOSITION_VERIFIED"
+      ? "Emitir certificación"
+      : certificationStatus === "ARTIFACT_FINAL"
+        ? "Validar evidencia y emitir"
+        : certificationStatus === "EMITTED"
+          ? "Certificación emitida"
+          : "Pendiente de artefacto final";
 
   return (
     <div className="flex max-w-[360px] flex-col items-end gap-2">
@@ -337,6 +455,14 @@ export function EmitirCertificacionButton({
           No se pudo comprobar la matriz de anexos; aplica la migración documental para activar este gate.
         </p>
       ) : null}
+      {activeCertification?.legal_gate_status ? (
+        <p className="w-full text-right text-xs text-[var(--g-text-secondary)]">
+          Estado jurídico: {certificationLegalGateLabel(activeCertification.legal_gate_status)}
+          {activeCertification.verified_ead_signature_type
+            ? " · intervención EAD verificada"
+            : ""}
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={handleClick}
@@ -351,7 +477,7 @@ export function EmitirCertificacionButton({
         ) : (
           <FileSignature className="h-4 w-4" aria-hidden="true" />
         )}
-        {busy ? "Emitiendo…" : "Emitir certificación"}
+        {busy ? "Procesando…" : buttonLabel}
       </button>
       {effectiveDisabledReason ? (
         <p className="text-right text-xs leading-relaxed text-[var(--g-text-secondary)]">

@@ -23,17 +23,48 @@ describe("post-render validation", () => {
     expect(result.issues.find((issue) => issue.code === "CAPA1_TOO_SHORT")?.severity).toBe("WARNING");
   });
 
-  it("advierte si no se ve el agreement_id, sin bloquear el render", () => {
+  it("mantiene el agreement_id fuera del cuerpo visible sin bloquear el render", () => {
     const result = validatePostRenderDocument({
       documentType: "CERTIFICACION",
-      renderedText: "CERTIFICACION DE ACUERDOS\nTexto certificado suficiente para pasar la validacion minima.",
+      renderedText: "CERTIFICACION DE ACUERDOS\nDña. Lucía Paredes, Secretaria, cargo vigente y en ejercicio.\nEl acta fue aprobada mediante firma por la Secretaría el 3 de mayo de 2026.\nTexto certificado suficiente.\nFirma del certificante: Lucía Paredes.\nVisto bueno de la Presidencia: Antonio Ríos.",
       capa1Template: "CERTIFICACION DE ACUERDOS\nTexto de plantilla suficientemente largo para no bloquear.",
       agreementIds: ["00000000-0000-4000-8000-000000000001"],
       unresolvedVariables: [],
+      outputContext: {
+        meetingDateISO: "2026-05-03",
+        approvalDateISO: "2026-05-03",
+        emissionDateISO: "2026-05-03",
+      },
     });
 
     expect(result.ok).toBe(true);
-    expect(result.issues.some((issue) => issue.code === "AGREEMENT_REFERENCE_NOT_RENDERED")).toBe(true);
+    expect(result.issues.some((issue) => issue.code === "AGREEMENT_REFERENCE_NOT_RENDERED")).toBe(false);
+  });
+
+  it("bloquea tambien un modelo de acuerdo con variables del cuerpo sin resolver", () => {
+    const result = validatePostRenderDocument({
+      documentType: "MODELO_ACUERDO",
+      renderedText: "ACUERDO DEL CONSEJO DE ADMINISTRACIÓN\nSe otorgan facultades a favor de .",
+      capa1Template: "ACUERDO DEL CONSEJO DE ADMINISTRACIÓN con contenido legal suficiente y la variable {{apoderado_nombre}}.",
+      agreementIds: [],
+      unresolvedVariables: ["apoderado_nombre"],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.issues.find((issue) => issue.code === "UNRESOLVED_VARIABLES")?.severity).toBe("BLOCKING");
+  });
+
+  it("mantiene como advertencia los placeholders QTSP que nacen tras la firma", () => {
+    const result = validatePostRenderDocument({
+      documentType: "MODELO_ACUERDO",
+      renderedText: "ACUERDO DEL CONSEJO DE ADMINISTRACIÓN\nDocumento preparado para firma cualificada posterior.",
+      capa1Template: "ACUERDO DEL CONSEJO DE ADMINISTRACIÓN con contenido legal suficiente para firma cualificada posterior.",
+      agreementIds: [],
+      unresolvedVariables: ["QTSP.firma_qes_ref"],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.issues.find((issue) => issue.code === "UNRESOLVED_VARIABLES")?.severity).toBe("WARNING");
   });
 
   it("bloquea ACTA con contrato RRM si el texto final no respeta secciones legales", () => {
@@ -79,6 +110,6 @@ describe("post-render validation", () => {
 
     expect(result.ok).toBe(false);
     expect(result.issues.map((issue) => issue.code)).toContain("rrm_render_section_missing");
-    expect(result.issues.map((issue) => issue.code)).toContain("rrm_render_hash_missing");
+    expect(result.issues.map((issue) => issue.code)).not.toContain("rrm_render_hash_missing");
   });
 });

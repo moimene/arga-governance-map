@@ -1,5 +1,4 @@
 import { computeContentHash, downloadDocx, generateDocx } from "./docx-generator";
-import type { EditableField } from "./docx-generator";
 import { mergeVariables } from "./variable-resolver";
 import { renderTemplate } from "./template-renderer";
 import { archiveDocxToStorage } from "./storage-archiver";
@@ -25,7 +24,16 @@ import type {
 } from "@/lib/secretaria/agreement-document-contract";
 import type { FinalEvidenceReadinessResult } from "@/lib/secretaria/final-evidence-readiness-contract";
 import { expandLegalStructuredVariables } from "@/lib/secretaria/legal-template-normalizer";
-import { capa3ValueToText, type Capa3Values } from "@/lib/secretaria/capa3-fields";
+import type { Capa3Values } from "@/lib/secretaria/capa3-fields";
+import {
+  documentOutputContextFromVariables,
+  documentFilenamePrefix,
+  normalizeVisibleDocumentText,
+  validateVisibleDocumentOutput,
+} from "./document-output-normalizer";
+import {
+  renderAndRegisterAuthoritativeConvocation,
+} from "@/lib/secretaria/convocation-artifact-registration";
 
 export type ProcessDocumentKind =
   | "CONVOCATORIA"
@@ -54,8 +62,22 @@ export interface ProcessDocumentGenerationInput {
    * for traceability but must not recompose the legal text.
    */
   reviewedBodyText?: string | null;
+  /**
+   * The reviewed body was rendered and hashed by an authoritative server
+   * workflow. Preserve every text byte when calculating its canonical hash;
+   * client-side normalizers may validate it, but never rewrite it.
+   */
+  preserveReviewedBodyExact?: boolean;
+  /**
+   * Aviso jurídico que debe quedar dentro del cuerpo visible con independencia
+   * de la plantilla seleccionada. Se usa, entre otros, para impedir que una
+   * exportación DEMO_SIMULATION aparente firma o eficacia jurídica.
+   */
+  mandatoryVisibleNotice?: string | null;
   fallbackText: string;
   filenamePrefix?: string;
+  /** Fecha efectiva que debe figurar en la cabecera del documento (YYYY-MM-DD). */
+  generatedAt?: string;
   tenantId?: string | null;
   archive?: ProcessDocumentArchiveOptions | false;
   templateCriteria?: ProcessDocumentTemplateCriteria;
@@ -106,6 +128,10 @@ export interface ProcessDocumentArchiveResult {
   attachmentIds: string[];
   agreementIds: string[];
   errors: string[];
+  /** Exact server-rendered bytes; present for an authoritative convocatoria. */
+  authoritativeDocumentData?: ArrayBuffer;
+  authoritativeFileName?: string;
+  authoritativeManifestHashSha512?: string;
 }
 
 export interface ProcessDocumentGenerationResult {
@@ -124,6 +150,16 @@ export interface ProcessDocumentGenerationResult {
   agreementTrace: AgreementDocumentTrace;
   evidencePosture: DocumentEvidencePosture;
   finalEvidenceReadiness: FinalEvidenceReadinessResult;
+  /** Candidato exacto anterior a custodia. Solo puede finalizarse mediante el
+   *  flujo EAD source-bound que revalida fuente, hashes, rol y tenant. */
+  candidate: {
+    artifactRole: "UNSIGNED_INPUT";
+    fileName: string;
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    documentData: ArrayBuffer;
+    renderedText: string;
+    contentHashSha256: string;
+  };
 }
 
 export class DocumentPreflightError extends Error {
@@ -270,6 +306,10 @@ function readStringVariable(variables: Record<string, unknown> | undefined, keys
 export function inferProcessTemplateCriteria(
   input: ProcessDocumentGenerationInput,
 ): ProcessDocumentTemplateCriteria {
+  const isDerivedDocument =
+    input.kind === "CERTIFICACION" ||
+    input.kind === "DOCUMENTO_REGISTRAL" ||
+    input.kind === "SUBSANACION_REGISTRAL";
   return {
     jurisdiction:
       input.templateCriteria?.jurisdiction ??
@@ -282,7 +322,9 @@ export function inferProcessTemplateCriteria(
       readStringVariable(input.variables, ["modo_adopcion", "adoption_mode"]),
     organoTipo:
       input.templateCriteria?.organoTipo ??
-      readStringVariable(input.variables, ["organo_tipo", "tipo_organo"]),
+      (isDerivedDocument
+        ? null
+        : readStringVariable(input.variables, ["organo_tipo", "tipo_organo"])),
   };
 }
 
@@ -361,18 +403,6 @@ export function resolveProcessTemplateSelection(
   };
 }
 
-function templateEditableFields(
-  plantilla: PlantillaProtegidaRow | null,
-  values: Capa3Values,
-): EditableField[] | undefined {
-  const fields = (plantilla?.capa3_editables ?? []).map((field) => ({
-    key: field.campo,
-    label: field.descripcion || field.campo,
-    value: capa3ValueToText(values[field.campo]) || undefined,
-  }));
-  return fields.length > 0 ? fields : undefined;
-}
-
 function isRequiredCapa3(obligatoriedad?: string | null) {
   return obligatoriedad === "OBLIGATORIO";
 }
@@ -401,7 +431,8 @@ function variableIsRequired(varName: string, required: Set<string>) {
 
 function reviewedBodyText(input: ProcessDocumentGenerationInput) {
   const value = input.reviewedBodyText;
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  return input.preserveReviewedBodyExact ? value : value.trim();
 }
 
 function withTraceFooter(
@@ -593,11 +624,7 @@ export async function archiveProcessDocx(params: {
     };
   }
 
-  if (
-    params.input.kind === "CONVOCATORIA" ||
-    params.input.kind === "INFORME_PRECEPTIVO" ||
-    params.input.kind === "INFORME_DOCUMENTAL_PRE"
-  ) {
+  if (params.input.kind === "CONVOCATORIA") {
     return archiveConvocatoriaDocx(params);
   }
 
@@ -685,109 +712,33 @@ async function archiveConvocatoriaDocx(params: {
   contentHash: string;
   template: PlantillaProtegidaRow | null;
 }): Promise<ProcessDocumentArchiveResult> {
-  const archiveOptions = params.input.archive && typeof params.input.archive === "object" ? params.input.archive : {};
-  const tenantId = archiveOptions.tenantId ?? params.input.tenantId ?? null;
-  if (!tenantId) {
-    return {
-      attempted: false,
-      archived: false,
-      reused: false,
-      skippedReason: "tenant_context_not_available",
-      documentUrls: [],
-      evidenceBundleIds: [],
-      attachmentIds: [],
-      agreementIds: [],
-      errors: [],
-    };
-  }
-
-  const filenameWithoutExtension = params.filename.replace(/\.docx$/i, "");
-  const archiveTimestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
-  const archiveFilename = `${filenameWithoutExtension}_${archiveTimestamp}_${params.contentHash.slice(0, 12)}.docx`;
-  const storagePath = `convocatorias/${params.input.recordId}/${archiveFilename}`;
-  const buffer = toExactArrayBuffer(params.buffer);
-  const { error: uploadError } = await supabase.storage
-    .from("matter-documents")
-    .upload(storagePath, buffer, {
-      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      upsert: false,
-    });
-
-  if (uploadError) {
-    return {
-      attempted: true,
-      archived: false,
-      reused: false,
-      skippedReason: "archive_failed",
-      documentUrls: [],
-      evidenceBundleIds: [],
-      attachmentIds: [],
-      agreementIds: [],
-      errors: [`Upload fallido: ${uploadError.message}`],
-    };
-  }
-
-  // F3.G3: getPublicUrl removed — bucket matter-documents es privado. La URL
-  // legacy publicUrl devolvía 403 al accederla. Sentinel mantiene compat con
-  // UI legacy que comprueba `if (document_url)`. Acceso real vía Edge
-  // Function sign-evidence-url (hook useEvidenceBundleSignedUrl).
-  const publicUrl = `evidence-bundle://${storagePath}`;
-  if (!publicUrl) {
-    return {
-      attempted: true,
-      archived: false,
-      reused: false,
-      skippedReason: "archive_failed",
-      documentUrls: [],
-      evidenceBundleIds: [],
-      attachmentIds: [],
-      agreementIds: [],
-      errors: ["No se pudo obtener URL pública del documento"],
-    };
-  }
-
-  const { data: attachment, error: insertError } = await supabase
-    .from("attachments")
-    .insert({
-      tenant_id: tenantId,
-      convocatoria_id: params.input.recordId,
-      agenda_item_index: null,
-      file_name: params.filename,
-      file_url: publicUrl,
-      file_hash: params.contentHash,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (insertError || !attachment?.id) {
-    return {
-      attempted: true,
-      archived: false,
-      reused: false,
-      skippedReason: "archive_failed",
-      documentUrls: [publicUrl],
-      evidenceBundleIds: [],
-      attachmentIds: [],
-      agreementIds: [],
-      errors: [insertError ? `Adjunto no creado: ${insertError.message}` : "Adjunto no creado"],
-    };
-  }
-
+  const observedManifestHash =
+    typeof params.input.variables?.convocation_manifest_hash_sha512 === "string"
+      ? params.input.variables.convocation_manifest_hash_sha512
+      : null;
+  const artifact = await renderAndRegisterAuthoritativeConvocation({
+    convocatoriaId: params.input.recordId,
+    expectedManifestHashSha512: observedManifestHash,
+  });
   return {
     attempted: true,
     archived: true,
-    reused: false,
-    documentUrls: [publicUrl],
+    reused: artifact.reused,
+    documentUrls: [artifact.file_url],
     evidenceBundleIds: [],
-    attachmentIds: [attachment.id],
+    attachmentIds: [artifact.id],
     agreementIds: [],
     errors: [],
+    authoritativeDocumentData: artifact.documentData,
+    authoritativeFileName: artifact.file_name,
+    authoritativeManifestHashSha512: artifact.manifest_hash_sha512,
   };
 }
 
 export async function persistProcessArchiveLink(
   input: ProcessDocumentGenerationInput,
   archive: ProcessDocumentArchiveResult,
+  contentHash?: string | null,
 ) {
   if (!archive.archived) return;
 
@@ -797,7 +748,11 @@ export async function persistProcessArchiveLink(
   // sincronizan vive —y se testea— en `domainTextTargetForKind`. RLS aísla por
   // tenant; el call-site envuelve esta función en `.catch()` (best-effort).
   const reviewedBody = input.reviewedBodyText?.trim();
-  const domainTarget = reviewedBody ? domainTextTargetForKind(input.kind) : null;
+  // Convocatorias are immutable before the server manifest/render boundary;
+  // a browser-side body must never be written back after that render.
+  const domainTarget = reviewedBody && input.kind !== "CONVOCATORIA"
+    ? domainTextTargetForKind(input.kind)
+    : null;
   if (reviewedBody && domainTarget) {
     if (domainTarget.table === "convocatorias") {
       await supabase
@@ -813,10 +768,68 @@ export async function persistProcessArchiveLink(
   }
 
   if (input.kind === "CERTIFICACION" && archive.evidenceBundleIds[0]) {
-    await supabase
+    const evidenceBundleId = archive.evidenceBundleIds[0];
+    const { error: certificationUpdateError } = await supabase
       .from("certifications")
-      .update({ evidence_id: archive.evidenceBundleIds[0] })
+      .update({ evidence_id: evidenceBundleId })
       .eq("id", input.recordId);
+    if (certificationUpdateError) throw certificationUpdateError;
+
+    const entityId = typeof input.variables?.entity_id === "string"
+      ? input.variables.entity_id
+      : null;
+    if (!entityId) {
+      throw new Error("La certificación generada no tiene entity_id para materializar su artefacto.");
+    }
+
+    const { data: bundle, error: bundleError } = await supabase
+      .from("evidence_bundles")
+      .select("id, document_url, hash_sha512")
+      .eq("id", evidenceBundleId)
+      .maybeSingle();
+    if (bundleError) throw bundleError;
+    if (!bundle) throw new Error("No se encontró el bundle de la certificación generada.");
+
+    const { data: existingArtifact, error: artifactLookupError } = await supabase
+      .from("secretaria_document_artifacts")
+      .select("id")
+      .eq("source_domain", "certification")
+      .eq("source_id", input.recordId)
+      .eq("evidence_bundle_id", evidenceBundleId)
+      .eq("content_hash", contentHash ?? "")
+      .limit(1)
+      .maybeSingle();
+    if (artifactLookupError) throw artifactLookupError;
+
+    if (!existingArtifact) {
+      const { error: artifactInsertError } = await supabase
+        .from("secretaria_document_artifacts")
+        .insert({
+          tenant_id: input.tenantId,
+          entity_id: entityId,
+          artifact_kind: "CERTIFICACION_ACUERDO",
+          title: input.title,
+          status: "ARCHIVED",
+          document_url: archive.documentUrls[0] ?? bundle.document_url,
+          mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          content_hash: contentHash ?? null,
+          hash_sha512: bundle.hash_sha512,
+          evidence_bundle_id: evidenceBundleId,
+          source_domain: "certification",
+          source_id: input.recordId,
+          source_hash: contentHash ?? null,
+          source_payload: {
+            agreement_ids: input.variables?.agreement_ids ?? [],
+            certified_agreement_ids: input.variables?.certified_agreement_ids ?? [],
+          },
+          evidence_status: "DEMO_OPERATIVA",
+          metadata: {
+            process_kind: input.kind,
+            registry_base_artifact: true,
+          },
+        });
+      if (artifactInsertError) throw artifactInsertError;
+    }
   }
 
   if (!archive.documentUrls[0] || archive.agreementIds.length === 0) return;
@@ -882,6 +895,11 @@ export async function generateProcessDocx(
     }
   }
 
+  const mandatoryVisibleNotice = input.mandatoryVisibleNotice?.trim();
+  if (mandatoryVisibleNotice && !renderedText.trimStart().startsWith(mandatoryVisibleNotice)) {
+    renderedText = `${mandatoryVisibleNotice}\n\n${renderedText}`;
+  }
+
   // BATCH 14 (ronda 2 U-E) + corrección post-revisión adversarial:
   // El documento DOCX final contiene SOLO el body legal. La trazabilidad
   // (Request ID, hashes, plantilla, evidence_status) se mantiene como
@@ -896,6 +914,22 @@ export async function generateProcessDocx(
   // Fix: contentHash se calcula sobre el MISMO texto que se inyecta en el
   // DOCX (`renderedText` body limpio). El `withTraceFooter` se conserva
   // para retrocompatibilidad de la firma pero NO se usa en el hash.
+  // A server-rendered legal body is already the exact text whose SHA-256 is
+  // stored in the domain record. Rewriting even whitespace here would bind
+  // the DOCX candidate to a different source. Validate it and fail closed.
+  if (!(reviewedBody && input.preserveReviewedBodyExact)) {
+    renderedText = normalizeVisibleDocumentText(renderedText);
+  }
+  const visibleOutputIssues = validateVisibleDocumentOutput(
+    input.kind as Parameters<typeof validateVisibleDocumentOutput>[0],
+    renderedText,
+    documentOutputContextFromVariables(variables, input.generatedAt),
+  );
+  if (visibleOutputIssues.length > 0) {
+    throw new Error(
+      `Validación de salida visible bloqueada: ${visibleOutputIssues.map((issue) => issue.code).join(", ")}`,
+    );
+  }
   const tracedText = withTraceFooter(renderedText, input, plantilla, variables);
   const contentHash = await computeContentHash(renderedText);
   const buffer = await generateDocx({
@@ -906,11 +940,17 @@ export async function generateProcessDocx(
     templateVersion: plantilla?.version ?? "system",
     contentHash,
     entityName: input.entityName ?? undefined,
-    generatedAt: new Date().toISOString().split("T")[0],
-    editableFields: templateEditableFields(plantilla, capa3Values),
+    generatedAt: input.generatedAt ?? new Date().toISOString().split("T")[0],
+    // Capa 3 is merged into `variables` before rendering. Repeating those
+    // values as a technical appendix leaked machine keys into the final Word
+    // document and contradicted the final-output contract above. Authoring
+    // drafts may still expose editable controls through the composer flow;
+    // process documents contain only the reviewed/rendered legal body.
   });
 
-  const filename = `${normalizeFilenamePart(input.filenamePrefix ?? input.kind)}_${input.recordId.slice(0, 8)}_${new Date().toISOString().split("T")[0]}.docx`;
+  const filenameDate = input.generatedAt ?? new Date().toISOString().split("T")[0];
+  const filenamePrefix = documentFilenamePrefix(input.kind, input.filenamePrefix ?? input.kind);
+  const filename = `${normalizeFilenamePart(filenamePrefix)}_${input.recordId.slice(0, 8)}_${filenameDate}.docx`;
   const archive = await archiveProcessDocx({
     input,
     buffer,
@@ -928,9 +968,33 @@ export async function generateProcessDocx(
     errors: [error instanceof Error ? error.message : String(error)],
   }));
 
-  await persistProcessArchiveLink(input, archive).catch(() => undefined);
+  await persistProcessArchiveLink(input, archive, contentHash).catch((error) => {
+    if (input.kind === "CERTIFICACION") throw error;
+  });
 
-  downloadDocx(buffer, filename);
+  const authoritativeConvocationBytes = archive.authoritativeDocumentData
+    ? new Uint8Array(archive.authoritativeDocumentData)
+    : null;
+  const authoritativeConvocationRequested = input.kind === "CONVOCATORIA"
+    && input.archive !== false
+    && input.archive?.enabled !== false;
+  const deliveredBuffer = authoritativeConvocationRequested
+    ? authoritativeConvocationBytes
+    : buffer;
+  const deliveredFilename = authoritativeConvocationRequested
+    ? archive.authoritativeFileName ?? filename
+    : filename;
+  if (input.kind === "CONVOCATORIA") {
+    if (authoritativeConvocationRequested && (!archive.archived || !deliveredBuffer)) {
+      throw new Error(
+        archive.errors[0]
+          ?? "La convocatoria no dispone de un DOCX autoritativo generado en servidor.",
+      );
+    }
+    downloadDocx(deliveredBuffer ?? buffer, deliveredFilename);
+  } else if (!archive.reused) {
+    downloadDocx(buffer, filename);
+  }
   const agreementTrace = buildProcessAgreementTrace(input, variables);
   const evidencePosture = resolveDocumentEvidencePosture(agreementTrace, archive);
   const finalEvidenceReadiness = resolveProcessDocumentFinalEvidenceReadiness({
@@ -941,7 +1005,7 @@ export async function generateProcessDocx(
   });
 
   return {
-    filename,
+    filename: deliveredFilename,
     contentHash,
     templateId: plantilla?.id ?? null,
     templateTipo: plantilla?.tipo ?? input.kind,
@@ -956,5 +1020,13 @@ export async function generateProcessDocx(
     agreementTrace,
     evidencePosture,
     finalEvidenceReadiness,
+    candidate: {
+      artifactRole: "UNSIGNED_INPUT",
+      fileName: deliveredFilename,
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      documentData: toExactArrayBuffer(deliveredBuffer ?? buffer),
+      renderedText,
+      contentHashSha256: contentHash,
+    },
   };
 }

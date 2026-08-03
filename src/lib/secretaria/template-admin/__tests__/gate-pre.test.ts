@@ -85,6 +85,27 @@ describe("gate-pre — capas BLOCKING", () => {
     expect(r.issues.some((i) => i.code === "CAPA1_LENGTH")).toBe(true);
   });
 
+  it("acepta la proyección canónica de acta aunque el marcador sea corto", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        tipo: "ACTA_SESION",
+        materia: "CONSEJO_ADMIN",
+        organo_tipo: "CONSEJO_ADMIN",
+        capa1_inmutable: "{{acta_rrm_texto_completo}}",
+        capa2_variables: [
+          {
+            variable: "acta_rrm_texto_completo",
+            fuente: "EXPEDIENTE",
+            condicion: "OBLIGATORIO",
+          },
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA1_LENGTH")).toBe(false);
+  });
+
   it("CAPA2_VAR_NO_CATALOGADA bloquea variable usada en capa1 que no está en capa2", () => {
     const r = validateTemplateForActivation(
       baseTemplate({
@@ -134,6 +155,73 @@ describe("gate-pre — capas BLOCKING", () => {
       emptyCtx,
     );
     expect(r.issues.some((i) => i.code === "CAPA3_PREFIJO_PROTEGIDO")).toBe(true);
+  });
+
+  it("bloquea enums, claves técnicas y metadatos escritos en el cuerpo visible", () => {
+    const machine = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "ACUERDO PODER_REPRESENTACION con valor true".padEnd(150, "x"),
+      }),
+      emptyCtx,
+    );
+    const metadata = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable:
+          "Trazabilidad documental: agreement_id 77ea753c-d89e-4285-a946-d38c294bae06".padEnd(150, "x"),
+      }),
+      emptyCtx,
+    );
+
+    expect(machine.issues.some((i) => i.code === "CAPA1_MACHINE_LITERAL")).toBe(true);
+    expect(metadata.issues.some((i) => i.code === "CAPA1_METADATA_LEAK")).toBe(true);
+  });
+
+  it("bloquea una variable automática escalar huérfana", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "Texto sin la variable automática".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "entities.name", fuente: "entities.name", condicion: "SIEMPRE" },
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_ORPHAN_VARIABLE")).toBe(true);
+  });
+
+  it("bloquea una fuente automática duplicada como campo editable", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "Sociedad {{nombre_candidato}}".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "nombre_candidato", fuente: "persons.full_name", condicion: "SIEMPRE" },
+        ],
+        capa3_editables: [
+          { campo: "nombre_candidato", obligatoriedad: "OBLIGATORIO", descripcion: "Candidato" } as never,
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_CAPA3_SOURCE_CONFLICT")).toBe(true);
+  });
+
+  it("permite el puente explícito de un campo de usuario entre capa2 y capa3", () => {
+    const r = validateTemplateForActivation(
+      baseTemplate({
+        capa1_inmutable: "Sociedad {{nombre_candidato}}".padEnd(150, "x"),
+        capa2_variables: [
+          { variable: "nombre_candidato", fuente: "USUARIO", condicion: "SIEMPRE" },
+        ],
+        capa3_editables: [
+          { campo: "nombre_candidato", obligatoriedad: "OBLIGATORIO", descripcion: "Candidato" } as never,
+        ],
+      }),
+      emptyCtx,
+    );
+
+    expect(r.issues.some((i) => i.code === "CAPA2_CAPA3_SOURCE_CONFLICT")).toBe(false);
   });
 
   it("ENTITY_REF_FORBIDDEN bloquea variable usada con prefijo entity_id", () => {
@@ -234,17 +322,17 @@ describe("gate-pre — WARNING e INFO", () => {
     expect(r.issues.some((i) => i.code === "GEN_IF_COUNT" && i.severity === "WARNING")).toBe(true);
   });
 
-  it("LEGACY_FUENTE_ENTIDAD WARNING para fuente ENTIDAD literal", () => {
+  it("LEGACY_FUENTE_ENTIDAD bloquea la fuente ENTIDAD literal", () => {
     const r = validateTemplateForActivation(
       baseTemplate({
         capa2_variables: [{ variable: "ENTIDAD.denominacion", fuente: "ENTIDAD", condicion: "SIEMPRE" }],
       }),
       emptyCtx,
     );
-    expect(r.issues.some((i) => i.code === "LEGACY_FUENTE_ENTIDAD" && i.severity === "WARNING")).toBe(true);
+    expect(r.issues.some((i) => i.code === "LEGACY_FUENTE_ENTIDAD" && i.severity === "BLOCKING")).toBe(true);
   });
 
-  it("CAPA2_UNUSED_VARIABLE INFO si variable declarada y no usada en capa1", () => {
+  it("CAPA2_ORPHAN_VARIABLE bloquea si una variable escalar declarada no se usa en capa1", () => {
     const r = validateTemplateForActivation(
       baseTemplate({
         capa2_variables: [{ variable: "entities.name", fuente: "entities.*", condicion: "SIEMPRE" }],
@@ -252,7 +340,7 @@ describe("gate-pre — WARNING e INFO", () => {
       }),
       emptyCtx,
     );
-    expect(r.issues.some((i) => i.code === "CAPA2_UNUSED_VARIABLE" && i.severity === "INFO")).toBe(true);
+    expect(r.issues.some((i) => i.code === "CAPA2_ORPHAN_VARIABLE" && i.severity === "BLOCKING")).toBe(true);
   });
 
   it("reconoce variables Unicode declaradas y usadas en capa1", () => {

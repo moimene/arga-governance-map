@@ -14,6 +14,10 @@ import type {
 } from './types';
 import { resolverReglaEfectiva } from './jerarquia-normativa';
 import { subMonths } from 'date-fns';
+import {
+  EAD_INTERPOSITION_CHANNEL,
+  channelsForNewCapture,
+} from '../secretaria/ead-channel-semantics';
 
 /**
  * evaluarConvocatoria — Main entry point
@@ -116,7 +120,8 @@ export function evaluarConvocatoria(
     input.tipoSocial,
     input.organoTipo,
     packs,
-    overrides
+    overrides,
+    input.organoNoticeDays,
   );
   // ITEM-142: para la junta de SA con plazo legal "un mes" se computa la fecha
   // límite de fecha a fecha (art. 5.1 CC); en el resto, restando los días.
@@ -148,30 +153,32 @@ export function evaluarConvocatoria(
 
   // ================================================================
   // Rule 2: Canales — publicación pública SÓLO para juntas (LSC art. 173,
-  //         179). Los consejos / comisiones se NOTIFICAN al miembro
-  //         (art. 246 LSC) por canales directos: email, correo certificado,
-  //         ERDS, burofax. Sin este guard, una convocatoria de CdA en SA
+  //         179). Los consejos / comisiones preparan la comunicación al
+  //         miembro (art. 246 LSC) por canales directos: email, correo
+  //         certificado, interposición EAD o burofax. Sin este guard, una convocatoria de CdA en SA
   //         cotizada con web inscrita recibía WEB_SOCIEDAD como canal
   //         exigido y el filtro de la UI (CHANNELS_RELEVANT_BY_BODY_TYPE)
   //         lo ocultaba → reminder perpetuo "CHANNEL_REMINDER" falso
   //         (Codex P2 PR #3).
   // ================================================================
-  let canalesExigidos = calcularCanales(input, packs, overrides);
+  // Los rule packs históricos pueden conservar códigos de capacidades no
+  // acreditadas. Para una captura nueva el motor solo devuelve la semántica
+  // permitida de interposición, mensajería básica y custodia/e-archiving.
+  let canalesExigidos = channelsForNewCapture(calcularCanales(input, packs, overrides));
 
   // Codex P2 round 7: filtrar canales abstractos del rule_pack que no
   // tienen counterpart concreto seleccionable en la UI. Los packs de
   // CONSEJO usan códigos genéricos tipo `CONVOCATORIA_CONSEJO` o
   // `NOTIFICACION_GENERICA`, pero Paso 5 sólo ofrece EMAIL_SIMPLE,
-  // CORREO_CERTIFICADO, ERDS, BUROFAX. `channelSatisfiesReminder()` no
+  // CORREO_CERTIFICADO, EAD_INTERPOSITION, BUROFAX. `channelSatisfiesReminder()` no
   // los reconoce como equivalentes → reminder perpetuamente pending.
   // Para órganos NO junta, eliminamos los códigos abstractos del
   // contrato de reminders.
   //
   // Codex P2 round 15: si tras filtrar quedan CERO canales para non-
-  // junta, garantizamos al menos un canal concreto (ERDS — preferido
-  // por trazabilidad QTSP + acuse legal) para que el reminder dispare
-  // y el secretario tenga que confirmar al menos un canal de
-  // notificación directa al miembro. Sin esto, una convocatoria CdA
+  // junta, garantizamos al menos un canal concreto para que el reminder
+  // dispare y el secretario tenga que confirmar al menos un canal de
+  // preparación de la comunicación al miembro. Sin esto, una convocatoria CdA
   // con pack que sólo trae códigos abstractos podía emitirse sin
   // canales y sin reminder, contradiciendo el explain node "art. 246
   // LSC: notificación individual obligatoria".
@@ -185,16 +192,15 @@ export function evaluarConvocatoria(
     ]);
     canalesExigidos = canalesExigidos.filter((c) => !ABSTRACT_NON_JUNTA_CODES.has(c));
     if (canalesExigidos.length === 0) {
-      // Codex P2 round 17 PR #3: el fallback debe ser un canal que la UI
-      // de la jurisdicción del tenant SÍ ofrezca y `channelSatisfiesReminder`
-      // pueda mapear a algo seleccionable. ERDS funciona en ES/PT/MX (con
-      // QTSP) pero no aparece en CHANNEL_OPTIONS.BR → CdA brasileño con
-      // pack abstracto quedaba con reminder eterno tras EMAIL_SIMPLE.
+      // El fallback debe ser un canal que la UI de la jurisdicción del tenant
+      // ofrezca y `channelSatisfiesReminder` pueda mapear a algo seleccionable.
+      // EAD_INTERPOSITION expresa únicamente preparación/interposición,
+      // mensajería básica y custodia; no acredita un resultado externo.
       const jurisdictionUpper = (input.jurisdiction ?? 'ES').toUpperCase();
       const FALLBACK_NON_JUNTA: Record<string, string> = {
-        ES: 'ERDS',           // EAD Trust QTSP — preferido por trazabilidad
-        PT: 'ERDS',           // misma cobertura QTSP eIDAS
-        MX: 'CORREO_CERTIFICADO', // QTSP no obligatorio; correo certificado equivalente
+        ES: EAD_INTERPOSITION_CHANNEL,
+        PT: EAD_INTERPOSITION_CHANNEL,
+        MX: 'CORREO_CERTIFICADO',
         BR: 'EMAIL_SIMPLE',   // único canal directo en CHANNEL_OPTIONS.BR
       };
       const fallback = FALLBACK_NON_JUNTA[jurisdictionUpper] ?? 'EMAIL_SIMPLE';
@@ -205,7 +211,7 @@ export function evaluarConvocatoria(
           'SISTEMA',
           'art. 246 LSC + Codex round 15/17',
           'OK',
-          `${organoTipoUpper} (${jurisdictionUpper}): rule_pack sólo declaraba códigos abstractos; se exige ${fallback} como mínimo concreto disponible en la UI de la jurisdicción.`,
+          `${organoTipoUpper} (${jurisdictionUpper}): el rule_pack sólo declaraba códigos abstractos; se registra ${fallback} como opción concreta de preparación disponible en la UI de la jurisdicción.`,
           undefined
         )
       );
@@ -254,7 +260,7 @@ export function evaluarConvocatoria(
         'LEY',
         'art. 246 LSC / reglamento del órgano',
         'OK',
-        `${organoTipoUpper}: no aplica publicación pública (BORME, web). Notificación individual a cada miembro (email/correo certificado/ERDS/burofax).`,
+        `${organoTipoUpper}: no aplica publicación pública (BORME, web). La comunicación individual se prepara por email, correo certificado, interposición EAD o burofax; la selección no acredita un resultado externo.`,
         undefined
       )
     );
@@ -403,7 +409,8 @@ function calcularAntelacion(
   tipoSocial: TipoSocial,
   organoTipo: string | undefined,
   packs: RulePack[],
-  overrides: RuleParamOverride[]
+  overrides: RuleParamOverride[],
+  organoNoticeDays?: number,
 ): { dias: number; mensual: boolean } {
   // Defaults por órgano cuando no hay pack aplicable.
   const organoUpper = (organoTipo ?? 'JGA').toUpperCase();
@@ -426,6 +433,18 @@ function calcularAntelacion(
   // declara un número concreto, ese valor es autoritativo (jerarquía normativa)
   // y se respeta tal cual en días.
   const esJuntaSA = isJunta && tipoSocial === 'SA';
+
+  // Para órganos de administración el plazo lo gobierna su reglamento. La
+  // configuración vigente de la entidad es más específica que payloads
+  // legacy que todavía arrastran por error el art. 176 propio de las juntas.
+  if (
+    !isJunta &&
+    typeof organoNoticeDays === 'number' &&
+    Number.isFinite(organoNoticeDays) &&
+    organoNoticeDays >= 0
+  ) {
+    return { dias: Math.trunc(organoNoticeDays), mensual: false };
+  }
 
   // Collect all rules from applicable packs
   const antelacionFromPacks = packs

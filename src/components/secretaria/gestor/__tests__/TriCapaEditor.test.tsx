@@ -292,7 +292,9 @@ describe("TriCapaEditor", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Editor de contenido capa 1"), {
-      target: { value: "Texto actualizado con contenido jurídico suficiente para conservar todas las extensiones legacy.".padEnd(140, "z") },
+      target: {
+        value: "Texto actualizado para {{denominacion_social}} con contenido jurídico suficiente para conservar todas las extensiones legacy.".padEnd(160, "z"),
+      },
     });
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
 

@@ -55,14 +55,14 @@ describe("adoption-routing", () => {
     ).toBe("/secretaria/decisiones-unipersonales/nueva?materia=OTROS&decisor=ADMINISTRADOR_UNICO");
   });
 
-  it("canonicaliza alias de materia y propaga la plantilla", () => {
+  it("conserva la identidad técnica del alias de presentación y propaga la plantilla", () => {
     const target = resolveAdoptionRoute({
       materia: "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
       adoptionModes: [{ code: "MEETING" }],
       plantillaId: "plantilla-1",
     });
     expect(target.to).toBe(
-      "/secretaria/convocatorias/nueva?materia=SUPRESION_PREFERENTE&plantilla=plantilla-1",
+      "/secretaria/convocatorias/nueva?materia=EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE&plantilla=plantilla-1",
     );
   });
 

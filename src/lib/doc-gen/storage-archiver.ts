@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { resolveSandboxSafeEvidencePersistence } from "@/lib/secretaria/evidence-sandbox-gate";
-import { SOURCE_OBJECT_TYPE } from "@/lib/secretaria/evidence-source-types";
+import {
+  resolveArchiveBinaryDescriptor,
+  type ArchivedBufferKind,
+} from "./archive-binary-contract";
 
 export interface ArchiveResult {
   ok: boolean;
@@ -20,17 +23,28 @@ export interface ArchiveMetadata {
   templateTipo?: string;
   templateVersion?: string;
   contentHash?: string;
+  /** Actor que registra el binario en custodia. No atribuye firma. */
+  archivedBy?: string;
   signedBy?: string;
-  /** ITEM-109: true cuando la firma QES provino del adaptador sandbox de demo
+  /** ITEM-109: true cuando la firma provino del adaptador sandbox de demo
    *  (no es una transacción EAD Trust real). Marca el manifest con sandbox:true
    *  vía el gate de custodia para que la cadena deje constancia explícita. */
   sandbox?: boolean;
   qesSrId?: string;
+  qesSrStatus?: string;
+  qesSignatureProduced?: boolean;
   qesDocumentId?: string;
   qesDocumentHash?: string;
   qesSignatoryIds?: string[];
   qesSignedAt?: string;
-  archivedBufferKind?: "ORIGINAL_DOCX" | "QTSP_SIGNED_DOCX";
+  /** Trazabilidad de una actuación EAD por interposición. Estos campos no
+   *  atribuyen firma al binario custodiado ni lo convierten en output final. */
+  eadInterpositionRequestId?: string;
+  eadInterpositionStatus?: string;
+  eadDocumentId?: string;
+  eadDocumentHash?: string;
+  eadParticipantIds?: string[];
+  archivedBufferKind?: ArchivedBufferKind;
   normativeSnapshotId?: string | null;
   normativeProfileId?: string | null;
   normativeProfileHash?: string | null;
@@ -43,23 +57,6 @@ export interface ArchiveMetadata {
   rulePackVersionId?: string | null;
   rulePackVersionLabel?: string | null;
   rulePackOrgano?: string | null;
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-
-  return `{${Object.keys(value)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`)
-    .join(",")}}`;
-}
-
-async function computeSha256(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text);
-  const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -92,6 +89,10 @@ export async function archiveDocxToStorage(
         .eq("tenant_id", tenantId)
         .eq("agreement_id", agreementId)
         .eq("manifest->metadata->>contentHash", metadata.contentHash)
+        // El hash lógico del body no basta para reutilizar el artefacto: dos
+        // DOCX pueden renderizar el mismo texto y diferir en una hoja técnica,
+        // propiedades OpenXML o firmas. Solo se reutilizan bytes idénticos.
+        .eq("hash_sha512", hashHex)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -118,12 +119,16 @@ export async function archiveDocxToStorage(
     // re-upload solo puede sobreescribir bytes idénticos (caso de fallo parcial:
     // upload OK pero INSERT falló → reintento idempotente en vez de bucle).
     const contentFragment = hashHex.slice(0, 8);
-    const storagePath = `${tenantId}/${agreementId}/${filename}__${contentFragment}.docx`;
+    const binary = resolveArchiveBinaryDescriptor(
+      filename,
+      metadata.archivedBufferKind ?? "ORIGINAL_DOCX",
+    );
+    const storagePath = `${tenantId}/${agreementId}/${binary.baseFilename}__${contentFragment}${binary.extension}`;
     const archivedAt = new Date().toISOString();
     const { error: uploadError, data } = await supabase.storage
       .from("matter-documents")
       .upload(storagePath, buffer, {
-        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        contentType: binary.mimeType,
         upsert: true,
       });
 
@@ -151,49 +156,46 @@ export async function archiveDocxToStorage(
       evidence_status: metadata.evidenceStatus ?? "DEMO_OPERATIVA",
       artifacts: [
         {
-          type: "DOCX",
+          type: binary.artifactType,
           ref: data?.path ?? storagePath,
-          filename: `${filename}.docx`,
-          mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          filename: `${binary.baseFilename}${binary.extension}`,
+          mime_type: binary.mimeType,
           hash_sha512: hashHex,
           timestamp_iso: archivedAt,
         },
       ],
-      metadata,
+      // Estos metadatos describen el binario local, pero NO fabrican una firma
+      // ni un e-archive verificable: la custodia EAD vive en su flujo source-bound.
+      metadata: {
+        ...metadata,
+        archivedArtifactType: binary.artifactType,
+        archivedMimeType: binary.mimeType,
+        signedQtspArtifact: binary.signedQtspArtifact,
+      },
     };
-    // ITEM-109: si la firma fue sandbox, el gate marca el manifest con
-    // sandbox:true + sandbox_reason (el status ya es OPEN, nunca SEALED). Así la
-    // cadena de custodia no presenta un buffer sin firmar como QES real.
+    // ITEM-109 legacy: un resultado sandbox queda OPEN y nunca se presenta
+    // como evidencia EAD productiva ni como firma.
     const persistence = resolveSandboxSafeEvidencePersistence({
       sandbox: metadata.sandbox === true,
       status: "OPEN",
       manifest,
     });
     const effectiveManifest = persistence.manifest;
-    const manifestHash = await computeSha256(canonicalJson(effectiveManifest));
 
-    // Insert into evidence_bundles table.
-    // F3.G15: populamos `storage_path` (forma nueva, source of truth para
-    // la Edge Function sign-evidence-url) y `document_url` con sentinel
-    // (compat con legacy callers).
-    const { data: bundle, error: insertError } = await supabase.from("evidence_bundles").insert({
-      tenant_id: tenantId,
-      agreement_id: agreementId,
-      // ITEM-044: provenance obligatoria — useAgreementSignedDocumentUrl
-      // resuelve el bundle por source_object_type='AGREEMENT' +
-      // source_object_id; sin estos campos el documento archivado quedaba
-      // irrecuperable desde el expediente.
-      source_module: "secretaria",
-      source_object_type: SOURCE_OBJECT_TYPE.AGREEMENT,
-      source_object_id: agreementId,
-      manifest: effectiveManifest,
-      manifest_hash: manifestHash,
-      hash_sha512: hashHex,
-      storage_path: storagePath,
-      document_url: sentinelUrl,
-      signed_by: metadata.signedBy ?? "SISTEMA",
-      status: persistence.status,
-    }).select("id").maybeSingle();
+    // La tabla WORM no admite INSERT del navegador. Este RPC registra el
+    // binario únicamente como UNSIGNED_INPUT/OPEN; la finalización y custodia
+    // EAD de una fuente canónica usa otro trust boundary server-side.
+    const { data: bundle, error: insertError } = await supabase.rpc(
+      "fn_secretaria_register_unsigned_input_custody",
+      {
+        p_tenant_id: tenantId,
+        p_agreement_id: agreementId,
+        p_storage_path: storagePath,
+        p_document_url: sentinelUrl,
+        p_binary_hash_sha512: hashHex,
+        p_manifest: effectiveManifest,
+      },
+    );
 
     if (insertError) {
       return {
@@ -204,7 +206,8 @@ export async function archiveDocxToStorage(
       };
     }
 
-    if (!bundle?.id) {
+    const custody = bundle as { evidence_bundle_id?: string } | null;
+    if (!custody?.evidence_bundle_id) {
       return {
         ok: false,
         documentUrl: sentinelUrl,
@@ -217,7 +220,7 @@ export async function archiveDocxToStorage(
       ok: true,
       documentUrl: sentinelUrl,
       hash512: hashHex,
-      evidenceBundleId: bundle.id,
+      evidenceBundleId: custody.evidence_bundle_id,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Error desconocido";
