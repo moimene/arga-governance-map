@@ -57,6 +57,17 @@ Reglas:
 - **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
 - **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
 
+### Tenant Garrigues — G0 fundación (2026-08-02)
+
+Segundo tenant activo en `governance_OS`: `00000000-0000-0000-0000-000000000002` (spec `docs/superpowers/specs/2026-08-02-garrigues-tenant-gobernanza-design.md`, plan `docs/superpowers/plans/2026-08-02-g0-tenant-garrigues-fundacion.md`). **ARGA (`…0001`) intacta.** Primera vez que el proyecto opera con dos tenants reales.
+
+- **Theming por tenant:** columna `tenants.branding jsonb` (migración `20260802120000`, aplicada vía MCP `execute_sql` + registro manual en `schema_migrations` por el drift de junio; **no `db push`**). `TenantBrandProvider` (`src/context/TenantBrandContext.tsx`) resuelve el branding tras el login y aplica ~31 tokens CSS (`--t-*`, `--primary`, `--sidebar-*`) sobre `document.documentElement`. `branding` NULL = defaults del producto (`src/lib/tenant-brand-labels.ts`, contrato **"cero cambio visual ARGA"** verificado en vivo: login ARGA pixel-idéntico).
+- **Login por tenant:** `/login?tenant=garrigues` (mapa estático pre-auth `src/lib/login-brands.ts`, con guard `hasOwnProperty` anti prototype-pollution). GOTCHA cosmético conocido (fuera de alcance G0): en la pantalla de login (pre-auth, sin provider) el panel es verde pero los botones CTA siguen en `--primary` rojo. En el **shell post-auth el theming es completo y correcto** (sidebar verde `#004438`, "GARRIGUES GOBERNANZA", "Grupo Garrigues", botones verdes — confirmado por CSS computado).
+- **Usuarios demo:** `demo@garrigues-demo.dev` (SECRETARIO) y `admin@garrigues-demo.dev` (ADMIN_TENANT), password demo TGMS, dominio ficticio `garrigues-demo.dev` (nunca el real). Seed idempotente service-role `scripts/seed-garrigues-tenant.ts` (dry-run por defecto; resuelve `role_code` — no `code` — y varios nombres de service-role). Datos de personas: fuente pública (web + BORME); lo no publicado se simula y etiqueta.
+- **Aislamiento RLS bidireccional:** `src/test/schema/tenant-isolation.test.ts` (gate de salida de G0, ejecutado con logins reales: 12/12, 30 expects, sin warns). GOTCHA: un write cross-tenant filtrado por RLS devuelve **0 filas sin error**, no `42501`. Nota de secuenciación: la dirección ARGA→Garrigues es hoy vacua (Garrigues sin dato de dominio hasta G1); la dirección de riesgo real (Garrigues no ve el dato de ARGA) sí queda probada.
+- **Sonda SII para G6:** `sii.cases` y `sii_cases_view` tienen `tenant_id`; `sii.evidences`/`sii.audit_log`/vistas hijas no (heredan scoping vía `case_id`). → G6 puede tener casos demo propios de Garrigues sin tocar el schema `sii.*`.
+- **Deuda anotada (no G0):** `src/lib/demo-operable/runner.ts:136` hardcodea `ARGA_TENANT_ID` (acoplamiento single-tenant pre-existente en demo-operable, relevante solo si Garrigues usa escenarios demo-operables); placeholders `@arga-seguros.com` en varios steppers/GRC/AI (contenido cosmético pre-existente, no theming).
+
 ### Rediseño UX Secretaría — auditoría + UX-0 (2026-06-20)
 
 El Comité Legal revisó un informe de rediseño UX/copy de `/secretaria` (`docs/superpowers/reviews/2026-06-20-informe-ux-redesign-copy-legal.md`). Trabajo ejecutado:

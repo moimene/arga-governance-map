@@ -278,3 +278,18 @@ Then rerun script.
 **Author:** AI Agent (Claude Opus)  
 **Phase:** T3 + T3e + T3f + T3h (complete)  
 **Status:** Ready for integration test
+
+---
+
+## seed-garrigues-tenant.ts (G0 — 2026-08-02)
+
+Tenant Garrigues (`00000000-0000-0000-0000-000000000002`) + branding + 2 usuarios
+demo (`demo@garrigues-demo.dev` SECRETARIO, `admin@garrigues-demo.dev` ADMIN_TENANT,
+password demo TGMS). Service-role, dry-run por defecto, idempotente. Requiere
+`SUPABASE_SERVICE_ROLE_KEY`. Verificado contra Cloud: `rbac_roles` usa `role_code`
+(no `code`), ARGA `tenant_type='group'`.
+
+```bash
+bun run scripts/seed-garrigues-tenant.ts            # dry-run
+bun run scripts/seed-garrigues-tenant.ts --commit   # ejecuta
+```

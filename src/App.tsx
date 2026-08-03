@@ -9,6 +9,7 @@ import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
+import { TenantBrandProvider } from "@/context/TenantBrandContext";
 import { ProtectedShell, RequireAuth } from "@/components/RequireAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
@@ -166,6 +167,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <TenantProvider>
+          <TenantBrandProvider>
           <ScopeProvider>
             <TourProvider>
               <ErrorBoundary>
@@ -331,6 +333,7 @@ const App = () => (
               </ErrorBoundary>
             </TourProvider>
           </ScopeProvider>
+          </TenantBrandProvider>
           </TenantProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -32,6 +32,10 @@ export function hasAdminClient(): boolean {
 }
 
 export const DEMO_TENANT = "00000000-0000-0000-0000-000000000001";
+// G0 — tenant Garrigues (segundo tenant real en governance_OS, aislado por RLS).
+// Seed de G0 creó el tenant y dos usuarios auth (SECRETARIO/ADMIN_TENANT).
+export const GARRIGUES_TENANT = "00000000-0000-0000-0000-000000000002";
+export const GARRIGUES_DEMO_EMAIL = "demo@garrigues-demo.dev";
 // Real Cloud UUID for ARGA Seguros, S.A. (entity was pre-seeded with a
 // random UUID, not the 00000000-0000-0000-0000-000000000010 the plan
 // assumed). Verified on project hzqwefkwsxopwrmtksbg at T17 dispatch time:
