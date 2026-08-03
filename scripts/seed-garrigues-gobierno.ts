@@ -48,6 +48,13 @@ const FASE_PERSONAS = process.argv.includes("--personas");
 const FASE_COMITES = process.argv.includes("--comites");
 const EAD_ENTITY = "00000000-0000-0000-0002-000000000026";
 
+// fn_designar_cargo exige p_fecha_inicio NOT NULL incondicionalmente (y la
+// columna condiciones_persona.fecha_inicio también lo es) — hallazgo de la
+// ronda de fix 2, verificado contra el código real de la RPC. Los dos
+// call-sites de --comites usan estas referencias en vez de null/`?? null`.
+const FECHA_INICIO_COMITE = "2026-05-06"; // fecha del acta que constituye el censo/gobierno vigente (bootstrap)
+const fechaInicioEad = (c) => c.desde ?? "2023-04-20"; // fallback: constitución del consejo conocida por BORME (Delgado); los que tienen `desde` propio lo conservan
+
 // Pase complementario: contenido EXACTO acordado con el controller (ronda de fix
 // 1). Cubre solo lo que fn_designar_cargo no acepta (metadata/fecha_fin) para
 // las 4 filas concretas que lo necesitan — no se inventan columnas adicionales
@@ -193,6 +200,22 @@ async function faseComites() {
   // Igual que fasePersonas(): estadísticas locales del catálogo primero (sin
   // Cloud), para que el dry-run sea informativo también en esta fase.
   const totalMiembros = cat.estructuras.reduce((acc, e) => acc + e.miembros.length, 0);
+
+  // Smoke de regresión (ronda de fix 2): un dry-run nunca llega a llamar a la
+  // RPC, así que esto es lo único que puede detectar en local, antes de
+  // --commit, que un call-site futuro reintroduzca un fecha_inicio nulo — que
+  // es justo lo que rompió --comites --commit la primera vez (fn_designar_cargo
+  // exige p_fecha_inicio NOT NULL incondicionalmente). Usa las MISMAS
+  // referencias (FECHA_INICIO_COMITE / fechaInicioEad) que los dos loops de
+  // más abajo, no una copia, para que no puedan divergir entre sí.
+  const fechasPlaneadas = [
+    ...cat.estructuras.flatMap((e) => e.miembros.map(() => FECHA_INICIO_COMITE)),
+    ...cat.eadBoard.map((c) => fechaInicioEad(c)),
+  ];
+  const nulas = fechasPlaneadas.filter((f) => !f).length;
+  if (nulas > 0) fail(`${nulas} cargo(s) de --comites quedarían con fecha_inicio nula — fn_designar_cargo los rechazaría`);
+  console.log(`✓ ${fechasPlaneadas.length} cargos, ${nulas} con fecha_inicio nula`);
+
   console.table([
     { dato: "estructuras consultivas", valor: cat.estructuras.length },
     { dato: "membresías previstas", valor: totalMiembros },
@@ -218,7 +241,7 @@ async function faseComites() {
       const tipo = m.rol === "PRESIDE" ? "PRESIDENTE" : "CONSEJERO";
       await designarCargo({
         person_id: pid, entity_id: GARRIGUES_MATRIZ_UUID, body_id: bodyId,
-        tipo_condicion: tipo, fecha_inicio: null,
+        tipo_condicion: tipo, fecha_inicio: FECHA_INICIO_COMITE,
         fuente_designacion: "BOOTSTRAP",
         idempotency_key: `g2:COM:${bodyId}:${pid}:${tipo}`,
       });
@@ -233,7 +256,7 @@ async function faseComites() {
     const pid = await ensurePerson(c.nombre);
     await designarCargo({
       person_id: pid, entity_id: EAD_ENTITY, body_id: eadBody,
-      tipo_condicion: c.tipoCondicion, fecha_inicio: c.desde ?? null,
+      tipo_condicion: c.tipoCondicion, fecha_inicio: fechaInicioEad(c),
       fuente_designacion: "ACTA_NOMBRAMIENTO",
       idempotency_key: `g2:EAD:${pid}:${c.tipoCondicion}`,
     });
