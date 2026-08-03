@@ -1,0 +1,340 @@
+{
+  "$nota": "Dataset G2 — estructuras consultivas del sistema de gobierno corporativo de Garrigues. Fuente: página interna 'Sistema de gobierno corporativo' aportada por el usuario (2026-08-02, verbatim). Nombres y categorías tal como publica el titular (minimización RGPD: nombre + categoría + pertenencia). Incidencias de la spec §3.5: (1) Nominaciones dice 'diez socios' y lista 12; (2) el Comité de Gobernanza de la IA aparece bajo ambas ramas → UNA entrada con dependencia dual.",
+  "estructuras": [
+    {
+      "slug": "comite-direccion", "nombre": "Comité de Dirección", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Órgano interno permanente de carácter consultivo con los socios responsables de las principales áreas de práctica y oficinas y los directores de los departamentos Financiero y de RR.HH. Se reúne al menos una vez al mes y cuantas veces lo considere el administrador único.",
+      "miembros": [
+        { "nombre": "Fernando Vives", "categoria": "SOCIO" },
+        { "nombre": "Eduardo Abad", "categoria": "SOCIO" },
+        { "nombre": "Juan Jose Barragan", "categoria": "SOCIO" },
+        { "nombre": "Miriam Barrera", "categoria": "SOCIO" },
+        { "nombre": "Eloy Castañer", "categoria": "SOCIO" },
+        { "nombre": "Manuel Delgado", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "Alfredo Fernández Rancaño", "categoria": "SOCIO" },
+        { "nombre": "Pedro Learreta", "categoria": "SOCIO" },
+        { "nombre": "Alvaro Lopez-Jorrin", "categoria": "SOCIO" },
+        { "nombre": "Carlos Lopez Mariano", "categoria": "SOCIO" },
+        { "nombre": "Mónica Martín De Vidales", "categoria": "SOCIO" },
+        { "nombre": "Joao Miranda Sousa", "categoria": "SOCIO" },
+        { "nombre": "Alberto Pimenta", "categoria": "SOCIO" },
+        { "nombre": "Oscar De Santiago", "categoria": "SOCIO" },
+        { "nombre": "Lourdes Ramos", "categoria": "DIRECTOR_GENERAL" }
+      ]
+    },
+    {
+      "slug": "comite-nominaciones", "nombre": "Comité de Nominaciones", "dependeDe": ["ADMINISTRADOR_UNICO"], "mandatoAnios": 4,
+      "mision": "Órgano consultivo sin funciones ejecutivas, compuesto por socios seleccionados por el administrador único (30%) y la Junta de Socios (70%); informa sobre criterios de selección de candidatos a socio y sobre las candidaturas a presentar a la Junta.",
+      "incidencias": ["El texto dice 'diez socios'; la lista publicada trae doce (incidencia 1 de la spec) — se cargan los doce"],
+      "miembros": [
+        { "nombre": "Marcos Botella", "categoria": "SOCIO" },
+        { "nombre": "Naiara Bueno Aybar", "categoria": "SOCIO" },
+        { "nombre": "Lorena Colomer", "categoria": "SOCIO" },
+        { "nombre": "Carla Frangoni", "categoria": "SOCIO" },
+        { "nombre": "Ana Garrote", "categoria": "SOCIO" },
+        { "nombre": "Jaime de Larraechea", "categoria": "SOCIO" },
+        { "nombre": "Jose Manuel Mateo", "categoria": "SOCIO" },
+        { "nombre": "Pilar Navalon", "categoria": "SOCIO" },
+        { "nombre": "José Luis Ortin Romero", "categoria": "SOCIO" },
+        { "nombre": "Jose Maria Perez", "categoria": "SOCIO" },
+        { "nombre": "Sandra Royo", "categoria": "SOCIO" },
+        { "nombre": "Rui Valente", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-innovacion-digitalizacion", "nombre": "Comité de Innovación y Digitalización (CID)", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Establece y coordina la estrategia de innovación y digitalización y facilita la ejecución y control de sus proyectos. De él dependen los subcomités de Infraestructuras y Operaciones, Práctica y Servicios y Nuevos Negocios Digitales.",
+      "miembros": [
+        { "nombre": "Fernando Vives", "categoria": "SOCIO" },
+        { "nombre": "Eduardo Abad", "categoria": "SOCIO" },
+        { "nombre": "Hugo Alonso", "categoria": "SUPPORT" },
+        { "nombre": "Cristina Franco Figueroa", "categoria": "GERENTE" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Cesar Mejías", "categoria": "DIRECTOR" },
+        { "nombre": "Moises Menéndez", "categoria": "OF_COUNSEL" },
+        { "nombre": "Cristina Mesa", "categoria": "SOCIO" },
+        { "nombre": "José Ramón Morales", "categoria": "OF_COUNSEL" },
+        { "nombre": "Alejandro Padín", "categoria": "SOCIO" },
+        { "nombre": "Carolina Pina", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-pro-bono", "nombre": "Comité Pro Bono", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Coordinación general del Programa Pro Bono del despacho, incluida la aprobación de nuevos proyectos.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Iñigo Esquiroz", "categoria": "SOCIO" },
+        { "nombre": "Ana Garrote", "categoria": "SOCIO" },
+        { "nombre": "Renata Mendaña", "categoria": "SOCIO" },
+        { "nombre": "Pablo Molina Alegre", "categoria": "SOCIO" },
+        { "nombre": "Jesus De La Morena", "categoria": "DIRECTOR" },
+        { "nombre": "Javier Navarro Martinez", "categoria": "OF_COUNSEL" },
+        { "nombre": "M. Angeles Pérez De Ayala", "categoria": "SOCIO" },
+        { "nombre": "Nicolas Santos", "categoria": "SOCIO" },
+        { "nombre": "Jose Ramon Tenor", "categoria": "SOCIO" },
+        { "nombre": "Camilo Zarama", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-tecnico-tributario", "nombre": "Comité Técnico Tributario", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Coordina y unifica los criterios técnicos tributarios, revisa técnicamente publicaciones y actúa como órgano consultivo del director del departamento tributario (incluye el grupo de consultas DAC-6).",
+      "miembros": [
+        { "nombre": "Eduardo Abad", "categoria": "SOCIO" },
+        { "nombre": "Ricardo Gomez", "categoria": "OF_COUNSEL" },
+        { "nombre": "Miriam Barrera", "categoria": "SOCIO" },
+        { "nombre": "Abelardo Delgado", "categoria": "OF_COUNSEL" },
+        { "nombre": "Carlos Gómez Barrero", "categoria": "SOCIO" },
+        { "nombre": "Juan Reig", "categoria": "SOCIO" },
+        { "nombre": "Joseba Sáez", "categoria": "SOCIO" },
+        { "nombre": "Luis Manuel Viñuales", "categoria": "SOCIO" },
+        { "nombre": "Juan Luis Zayas", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comision-igualdad", "nombre": "Comisión de Igualdad", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Conformada por empleados representativos de los distintos colectivos, desarrolla iniciativas de seguimiento y apoyo al cumplimiento del Plan de Igualdad.",
+      "miembros": [
+        { "nombre": "Xavier Asensio", "categoria": "ASOCIADO_PRINCIPAL" },
+        { "nombre": "Victoria Cabezos", "categoria": "COUNSEL" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Carol Ferro", "categoria": "GERENTE" },
+        { "nombre": "Cristina Franco Figueroa", "categoria": "GERENTE" },
+        { "nombre": "Alberto García", "categoria": "ASOCIADO_PRINCIPAL" },
+        { "nombre": "Mónica Lasquibar", "categoria": "ASOCIADO_PRINCIPAL" },
+        { "nombre": "Maria Jesus De Quinto", "categoria": "SECRETARY" },
+        { "nombre": "Lourdes Ramos", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "León Vidaller", "categoria": "ASOCIADO_PRINCIPAL" }
+      ]
+    },
+    {
+      "slug": "oficina-dpo", "nombre": "Delegado de Protección de Datos (DPO)", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Asesora en cumplimiento de protección de datos, supervisa las medidas implantadas y gestiona la relación con la autoridad de control y los interesados.",
+      "miembros": [
+        { "nombre": "Alejandro Padín", "categoria": "SOCIO" },
+        { "nombre": "Juana Vergara Herrero", "categoria": "SUPERVISOR" }
+      ]
+    },
+    {
+      "slug": "comite-editorial-global", "nombre": "Comité Editorial Global", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Vela por el cumplimiento de la política de publicaciones del despacho (PI-14, aprobación de contenidos divulgativos y comunicaciones comerciales).",
+      "miembros": [
+        { "nombre": "Abigail Blanco", "categoria": "SOCIO" },
+        { "nombre": "Teresa Bocos", "categoria": "ASOCIADO_PRINCIPAL" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Jabier Gómez", "categoria": "SOCIO" },
+        { "nombre": "Antonio Muñoz Vico", "categoria": "SOCIO" },
+        { "nombre": "Bernardo Perez-Navas", "categoria": "SOCIO" },
+        { "nombre": "Cecilia Pérez", "categoria": "SOCIO" },
+        { "nombre": "Susana Rodríguez", "categoria": "SUPERVISOR" },
+        { "nombre": "Cecilia Rosende Villar", "categoria": "SOCIO" },
+        { "nombre": "Adrian Thery", "categoria": "SOCIO" },
+        { "nombre": "Almudena Vigil", "categoria": "SUPERVISOR" }
+      ]
+    },
+    {
+      "slug": "comite-itp", "nombre": "Comité International Training Program (ITP)", "dependeDe": ["ADMINISTRADOR_UNICO"],
+      "mision": "Valora y selecciona las solicitudes de candidatos al ITP y busca, negocia y canaliza las oportunidades de secondments del despacho.",
+      "miembros": [
+        { "nombre": "Alejandro Beigveder", "categoria": "SOCIO" },
+        { "nombre": "Susana Cabrera", "categoria": "SOCIO" },
+        { "nombre": "Rafael Calvo", "categoria": "SOCIO" },
+        { "nombre": "Ignacio Corbera", "categoria": "SOCIO" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Ferran Escayola", "categoria": "SOCIO" },
+        { "nombre": "Carla Frangoni", "categoria": "SOCIO" },
+        { "nombre": "Adriano Gomez", "categoria": "SOCIO" },
+        { "nombre": "Jose Manuel Hernando", "categoria": "SOCIO" },
+        { "nombre": "Mário Lino Dias", "categoria": "SOCIO" },
+        { "nombre": "Javier Manchado", "categoria": "SOCIO" },
+        { "nombre": "Javier Marzo", "categoria": "SOCIO" },
+        { "nombre": "Lourdes Ramos", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "Rosa Sánchez", "categoria": "GERENTE" },
+        { "nombre": "Francisco Manuel Serrano", "categoria": "SOCIO" },
+        { "nombre": "Thomas Thorndike", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-gobernanza-ia", "nombre": "Comité de Gobernanza de la Inteligencia Artificial", "dependeDe": ["ADMINISTRADOR_UNICO", "SENIOR_PARTNER"],
+      "mision": "Supervisa, evalúa, orienta y promueve el uso responsable, eficaz y conforme a derecho de las tecnologías de IA, con enfoque legal, técnico, estratégico y ético. Depende tanto del órgano de administración como de la senior partner.",
+      "incidencias": ["Aparece duplicado en la fuente bajo ambas ramas — coherente con su dependencia dual; se carga UNA vez (incidencia 2 de la spec)"],
+      "miembros": [
+        { "nombre": "Eduardo Abad", "categoria": "SOCIO" },
+        { "nombre": "Alejandro Padín", "categoria": "SOCIO" },
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" },
+        { "nombre": "Juan José Terrero", "categoria": "DIRECTOR" },
+        { "nombre": "Juana Vergara Herrero", "categoria": "SUPERVISOR" }
+      ]
+    },
+    {
+      "slug": "consejo-de-socios", "nombre": "Consejo de Socios", "dependeDe": ["SENIOR_PARTNER"], "mandatoAnios": 4,
+      "mision": "Órgano colegiado interno permanente de carácter consultivo: senior partner (preside), administrador único y doce socios designados por la Junta entre profesionales sin funciones ejecutivas. Asesora a la senior partner e informa preceptivamente a la Junta de Socios antes de determinados acuerdos de relevancia.",
+      "informePreceptivo": true,
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO", "rol": "PRESIDE" },
+        { "nombre": "Fernando Vives", "categoria": "SOCIO" },
+        { "nombre": "Jaime Bragado", "categoria": "SOCIO" },
+        { "nombre": "Albert Collado", "categoria": "SOCIO" },
+        { "nombre": "Antonio Entrena", "categoria": "SOCIO" },
+        { "nombre": "Adriana Espinosa", "categoria": "SOCIO" },
+        { "nombre": "Rafael Giménez-Arnau", "categoria": "SOCIO" },
+        { "nombre": "Estefania Iceta", "categoria": "SOCIO" },
+        { "nombre": "Vicente Lloret", "categoria": "SOCIO" },
+        { "nombre": "Patricia Palacios", "categoria": "SOCIO" },
+        { "nombre": "Jose Maria Perez", "categoria": "SOCIO" },
+        { "nombre": "Carolina Pina", "categoria": "SOCIO" },
+        { "nombre": "Ramón Tejada", "categoria": "SOCIO" },
+        { "nombre": "Rui Valente", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-practica-profesional", "nombre": "Comité de Práctica Profesional", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Impulsa la elaboración y actualización de las políticas del Sistema Normativo Interno, incluidas las del Programa para la Prevención de Delitos, y colabora en las iniciativas de la senior partner sobre el modelo preventivo.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Javier Aguado Zarraga", "categoria": "SOCIO" },
+        { "nombre": "Joaquín Almoguera", "categoria": "SOCIO" },
+        { "nombre": "Jesus Andujar", "categoria": "SOCIO" },
+        { "nombre": "Antonio Lon", "categoria": "SOCIO" },
+        { "nombre": "Melissa Núñez", "categoria": "SOCIO" },
+        { "nombre": "M. Angeles Pérez De Ayala", "categoria": "SOCIO" },
+        { "nombre": "Arnau Tapias Monne", "categoria": "SOCIO" },
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" },
+        { "nombre": "Susana Rodríguez Sánchez", "categoria": "SOCIO" },
+        { "nombre": "Rui Valente", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comite-prevencion-delitos", "nombre": "Comité de Prevención de Delitos", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Apoya a la senior partner en el Programa para la Prevención de Delitos, en su adaptación a las peculiaridades de los departamentos y su correcta aplicación.",
+      "miembros": [
+        { "nombre": "David Arias Guedon", "categoria": "SOCIO" },
+        { "nombre": "Manuel Delgado", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "Roberto Delgado", "categoria": "SOCIO" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Cristina Franco Figueroa", "categoria": "GERENTE" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Roberto Garcia Polo", "categoria": "ASOCIADO_SENIOR" },
+        { "nombre": "Eduardo Gomez De Salazar", "categoria": "SOCIO" },
+        { "nombre": "Cesar Mejías", "categoria": "DIRECTOR" },
+        { "nombre": "Braulio Molina", "categoria": "SOCIO" },
+        { "nombre": "Jesus De La Morena", "categoria": "DIRECTOR" },
+        { "nombre": "Isabel Pascual De Quinto", "categoria": "COUNSEL" },
+        { "nombre": "Jaime Portillo", "categoria": "ASOCIADO_PRINCIPAL" },
+        { "nombre": "Eduardo Santamaria Moral", "categoria": "SOCIO" },
+        { "nombre": "Teresa Semprún", "categoria": "LEGAL_SUPPORT" },
+        { "nombre": "Juan Luis Zayas", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "caci", "nombre": "Comité de Análisis y Control Interno (CACI)", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Órgano de control interno en materia de prevención del blanqueo de capitales y de la financiación del terrorismo: elabora políticas y procedimientos y garantiza su correcta aplicación.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Alberto Acevedo", "categoria": "SOCIO" },
+        { "nombre": "Miguel Angel Castejon", "categoria": "SOCIO" },
+        { "nombre": "Gabriel Castro", "categoria": "SOCIO" },
+        { "nombre": "Joao Duarte De Sousa", "categoria": "SOCIO" },
+        { "nombre": "Carlos Lopez Mariano", "categoria": "SOCIO" },
+        { "nombre": "Patricia Palacios", "categoria": "SOCIO" },
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" },
+        { "nombre": "Sergio Sánchez Solé", "categoria": "SOCIO" },
+        { "nombre": "Nicolas Santos", "categoria": "SOCIO" },
+        { "nombre": "Jose Luis Zurro", "categoria": "SOCIO" },
+        { "nombre": "Ricardo Gomez", "categoria": "OF_COUNSEL", "rol": "INVITADO" }
+      ]
+    },
+    {
+      "slug": "departamento-compliance", "nombre": "Departamento de Compliance", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Apoya a la senior partner en el ejercicio de las funciones de práctica profesional y cumplimiento que tiene atribuidas.",
+      "miembros": [
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" },
+        { "nombre": "Rocío Aguilar", "categoria": "UTTAI" },
+        { "nombre": "Jose María Buades", "categoria": "UTTAI" },
+        { "nombre": "Nuria Díaz", "categoria": "UTTAI" },
+        { "nombre": "Alfonso Fernández", "categoria": "UTTAI" },
+        { "nombre": "Mónica Kim", "categoria": "UTTAI" },
+        { "nombre": "Marina Lorente", "categoria": "GERENTE" },
+        { "nombre": "Juan Luis Luna", "categoria": "UTTAI" },
+        { "nombre": "María Auxiliadora Murube", "categoria": "UTTAI" },
+        { "nombre": "Rafael Pérez", "categoria": "UTTAI" },
+        { "nombre": "Francisco Del Río", "categoria": "UTTAI" },
+        { "nombre": "Belén Rojas", "categoria": "UTTAI" },
+        { "nombre": "Jorge Salazar", "categoria": "UTTAI" },
+        { "nombre": "María Toledo", "categoria": "UTTAI" },
+        { "nombre": "Ana Luisa Torio", "categoria": "UTTAI" }
+      ]
+    },
+    {
+      "slug": "comite-seguridad-privacidad", "nombre": "Comité de Seguridad y Privacidad", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Responsable de la revisión y buen funcionamiento del SGSI (ISO 27001), con foco en la seguridad de la información personal y la privacidad, coordinado con la Oficina DPO, el CISO y la OTS.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Hugo Alonso", "categoria": "SUPPORT" },
+        { "nombre": "Ricardo Cofrades", "categoria": "GERENTE" },
+        { "nombre": "Manuel Delgado", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "Roberto Delgado", "categoria": "SOCIO" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Cristina Franco Figueroa", "categoria": "GERENTE" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Cesar Mejías", "categoria": "DIRECTOR" },
+        { "nombre": "Cristina Mesa", "categoria": "SOCIO" },
+        { "nombre": "José Ramón Morales", "categoria": "OF_COUNSEL" },
+        { "nombre": "Alejandro Padín", "categoria": "SOCIO" },
+        { "nombre": "Alfredo Perez", "categoria": "GERENTE" },
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" },
+        { "nombre": "Marcos Roso", "categoria": "DIRECTOR" },
+        { "nombre": "Juan José Terrero", "categoria": "DIRECTOR" }
+      ]
+    },
+    {
+      "slug": "oficina-tecnica-seguridad", "nombre": "Oficina Técnica de Seguridad (OTS)", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Oficina técnica del SGSI, dirigida por el responsable de seguridad (CISO).",
+      "miembros": [
+        { "nombre": "Alfredo Perez", "categoria": "GERENTE", "rol": "CISO" },
+        { "nombre": "Rodrigo Calvo", "categoria": "SUPPORT" },
+        { "nombre": "Fabio Di Certo", "categoria": "SUPPORT" },
+        { "nombre": "Ricardo Cofrades", "categoria": "GERENTE" },
+        { "nombre": "Claudia Garagorri", "categoria": "SUPPORT" },
+        { "nombre": "Cesar Mejías", "categoria": "DIRECTOR" },
+        { "nombre": "Raul Moreno Del Real", "categoria": "SUPERVISOR" },
+        { "nombre": "David Sanz López", "categoria": "SUPPORT" }
+      ]
+    },
+    {
+      "slug": "comite-sostenibilidad", "nombre": "Comité de Sostenibilidad", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Coordina la estrategia ESG y de sostenibilidad del despacho, como organización y como firma de servicios profesionales.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Sergio Amiel", "categoria": "SOCIO" },
+        { "nombre": "Gaspar Atienza", "categoria": "SOCIO" },
+        { "nombre": "Naiara Bueno Aybar", "categoria": "SOCIO" },
+        { "nombre": "José María Cobos", "categoria": "SOCIO" },
+        { "nombre": "Eva Diez-Ordas", "categoria": "SOCIO" },
+        { "nombre": "Javier Fernandez Rivaya", "categoria": "SOCIO" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Israel Garcia Rico", "categoria": "SOCIO" },
+        { "nombre": "Sergio Gonzalez Galan", "categoria": "SOCIO" },
+        { "nombre": "Alberto Guerra", "categoria": "SOCIO" },
+        { "nombre": "Sofía Lazcano", "categoria": "SOCIO" },
+        { "nombre": "Jesus De La Morena", "categoria": "DIRECTOR" },
+        { "nombre": "Rafael Paniza", "categoria": "SOCIO" },
+        { "nombre": "Vasco Rodrigues", "categoria": "SOCIO" }
+      ]
+    },
+    {
+      "slug": "comision-seguimiento-sostenibilidad", "nombre": "Comisión de Seguimiento del Plan de Sostenibilidad", "dependeDe": ["SENIOR_PARTNER"],
+      "mision": "Analiza el cumplimiento de los objetivos del Plan de Sostenibilidad 2023-2025 y evalúa la contribución de las actuaciones, con apoyo del Grupo de Trabajo de Medioambiente.",
+      "miembros": [
+        { "nombre": "Rosa Zarza", "categoria": "SOCIO" },
+        { "nombre": "Roberto Delgado", "categoria": "SOCIO" },
+        { "nombre": "Laura Elorza", "categoria": "GERENTE" },
+        { "nombre": "Sonia Franco", "categoria": "DIRECTOR" },
+        { "nombre": "Jesus De La Morena", "categoria": "DIRECTOR" },
+        { "nombre": "M. Angeles Pérez De Ayala", "categoria": "SOCIO" },
+        { "nombre": "Lourdes Ramos", "categoria": "DIRECTOR_GENERAL" },
+        { "nombre": "Isabel Redel", "categoria": "COMPLIANCE_OFFICER" }
+      ]
+    }
+  ]
+}
