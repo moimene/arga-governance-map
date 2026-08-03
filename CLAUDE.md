@@ -57,7 +57,7 @@ Reglas:
 - **QTSP:** EAD Trust Digital Trust API (firma QES, QSeal, ERDS)
 - **Multi-jurisdicción:** Matriz de normalización jurisdiccional como paso previo a BR/MX/PT
 
-### Tenant Garrigues — G0 fundación (2026-08-02)
+### Tenant Garrigues — G0 fundación + G1 espejo societario
 
 Segundo tenant activo en `governance_OS`: `00000000-0000-0000-0000-000000000002` (spec `docs/superpowers/specs/2026-08-02-garrigues-tenant-gobernanza-design.md`, plan `docs/superpowers/plans/2026-08-02-g0-tenant-garrigues-fundacion.md`). **ARGA (`…0001`) intacta.** Primera vez que el proyecto opera con dos tenants reales.
 
@@ -67,6 +67,7 @@ Segundo tenant activo en `governance_OS`: `00000000-0000-0000-0000-000000000002`
 - **Aislamiento RLS bidireccional:** `src/test/schema/tenant-isolation.test.ts` (gate de salida de G0, ejecutado con logins reales: 12/12, 30 expects, sin warns). GOTCHA: un write cross-tenant filtrado por RLS devuelve **0 filas sin error**, no `42501`. Nota de secuenciación: la dirección ARGA→Garrigues es hoy vacua (Garrigues sin dato de dominio hasta G1); la dirección de riesgo real (Garrigues no ve el dato de ARGA) sí queda probada.
 - **Sonda SII para G6:** `sii.cases` y `sii_cases_view` tienen `tenant_id`; `sii.evidences`/`sii.audit_log`/vistas hijas no (heredan scoping vía `case_id`). → G6 puede tener casos demo propios de Garrigues sin tocar el schema `sii.*`.
 - **Deuda anotada (no G0):** `src/lib/demo-operable/runner.ts:136` hardcodea `ARGA_TENANT_ID` (acoplamiento single-tenant pre-existente en demo-operable, relevante solo si Garrigues usa escenarios demo-operables); placeholders `@arga-seguros.com` en varios steppers/GRC/AI (contenido cosmético pre-existente, no theming).
+- **G1 (2026-08-03):** perímetro societario completo — 33 entidades (catálogo testeado `scripts/garrigues/entities-catalog.ts`, única fuente de verdad) con cadena de control (matriz → filiales → NewLaw → EAD Trust 51% *a confirmar*), datos registrales reales del RM en la matriz (B81709081, M-190538), columna `entities.data_provenance` (migración `20260803120000`) con confianza/cobertura/incidencias §3.5, badges de procedencia gateados por provenance (ARGA NULL = cero cambio), scopes y saludo del Dashboard por tenant (`src/lib/tenant-scopes.ts`; `branding.scopes` sembrado con 8 ámbitos), labels de grupo por tenant (`groupFullLabel`/`groupPortfolioLabel` en Secretaría/GRC/Conflictos/Matriz), scope de Secretaría prefiere la matriz en tenants sin hardcode, y sonda catálogo↔Cloud (`garrigues-entities-seed.test.ts`, 18/18 con logins reales). El gate de aislamiento G0 es ahora bidireccional REAL. Seeds aditivos: el Carril B (BORME) rellenará `data_provenance` sin re-sembrar. GOTCHA operativo: al editar ficheros pre-sucios del árbol compartido (CLAUDE.md, README-seed.md, secretaria/Dashboard.tsx), reconstruir desde HEAD o commitear por hunks — dos incidentes de arrastre de prosa WIP 2026-07-21 evitados/reparados así en G0/G1.
 
 ### Rediseño UX Secretaría — auditoría + UX-0 (2026-06-20)
 
