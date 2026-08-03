@@ -3,8 +3,7 @@
 // (T2-T5 seeds). Verifica condiciones, órganos, capital y RLS ARGA intacta.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
-import { loadGovernanceCatalog } from "../../../scripts/garrigues/gobierno/governance-catalog";
+import { DEMO_TENANT, GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -17,6 +16,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
   let authed = false;
+  let argaAuthed = false;
 
   beforeAll(async () => {
     try {
@@ -32,6 +32,7 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
       const { error: argaError } = await arga.auth.signInWithPassword({
         email: DEMO_EMAIL, password: DEMO_PASSWORD,
       });
+      argaAuthed = !argaError;
       if (argaError) console.warn(`[g2-seed] login ARGA falló: ${argaError.message}`);
     } catch {
       authed = false;
@@ -95,9 +96,13 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
     expect(Math.abs(suma - 100)).toBeLessThan(0.01);
   });
 
-  it("ARGA intacta: sus bodies/condiciones no cambian de recuento", async () => {
-    if (!authed || !arga) { expect(true).toBe(true); return; }
-    const { data } = await arga.from("governing_bodies").select("id").limit(100);
-    expect((data ?? []).every?.(Boolean) ?? true).toBe(true); // ARGA sigue viendo solo lo suyo (RLS)
+  it("ARGA intacta: RLS aísla — su cliente ve sus bodies y ninguno de Garrigues", async () => {
+    if (!argaAuthed || !arga) { expect(true).toBe(true); return; }
+    const { data, error } = await arga.from("governing_bodies").select("id, tenant_id").limit(200);
+    expect(error).toBeNull();
+    // ARGA sigue viendo su gobierno (no lo vació el seed Garrigues)...
+    expect((data ?? []).length).toBeGreaterThan(0);
+    // ...y SOLO el suyo: la RLS nunca deja filtrar filas de otro tenant.
+    expect((data ?? []).every((r) => r.tenant_id === DEMO_TENANT)).toBe(true);
   });
 });
