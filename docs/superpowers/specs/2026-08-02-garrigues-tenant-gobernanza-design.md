@@ -1,6 +1,6 @@
 # Tenant Garrigues — espejo de gobierno corporativo, motor SLP y programa G0–G8
 
-**Fecha:** 2026-08-02 · **Estado:** diseño validado en brainstorming, pendiente de plan de implementación por fase
+**Fecha:** 2026-08-02 · **Última revisión:** 2026-08-03 (revisión adversarial pre-G1 aplicada: H1–H12) · **Estado:** G0 ejecutada y mergeada a `origin/main` (`c3df611`); G1 pendiente de plan
 **Fuentes:** `version garrigues/Garr_politicas/` (inventario societario, sistema de gobierno corporativo, 30 políticas PI, Código Ético, PPD + mapas evaluados 2025, Manual PBC/FT v.10, PI-30, PI-31) + código y Cloud verificados en sesión.
 
 ---
@@ -53,6 +53,8 @@ La audiencia son abogados mercantilistas mirando su propia casa: el listón no e
 
 **Contenido real de Estatutos útil para el motor** (mismo certificado): edad estatutaria de retiro ordinario de socios de cuota = **60 años** (art. 21.1.e, con adquisición de autocartera por la Sociedad); causa de exclusión de socio (art. 21.1.f, con excepción mientras se integre el Órgano de Administración); mecanismo de dividendo mixto (10% proporcional a capital social + resto según "baremo de unidades" entre Socios de Cuota, con retribución variable de la prestación accesoria — señalada en el acta como "EPU", sigla del propio documento sin expansión confirmada). Estas son materias candidatas naturales para el gate de informe preceptivo (D-3: nombramientos, exclusión/admisión de socio).
 
+**Modelado de capital canónico (H5 — paridad con ARGA):** el motor no calcula sobre `condiciones_persona` a secas — vive en `entity_capital_profile` (una fila VIGENTE por entidad), `share_classes`, `capital_holdings` y `censo_snapshot`. Seed de la matriz: capital escriturado **11.040 miles €** (balance consolidado 2025, partida Capital); clase **A** de participaciones (citada en el punto 3.3 del orden del día); autocartera **18 participaciones = 2,59% de los derechos de voto** con `is_treasury = true` (regla canónica del repo: voting_weight 0 y denominator_weight 0); restricción agregada real adicional: los 3 socios presenciales (Vives, Zarza, Delgado) suman **0,8875%**. Los pesos individuales por socio **no son públicos** (el Anexo 2 del acta no está transcrito): se simulan verosímiles, etiquetados `INFERIDO`, respetando las restricciones agregadas reales. `censo_snapshot` tipo UNIVERSAL de la Junta 2026 como base del caso canónico (§3.6). Filiales: la matriz como socio único/mayoritario en `capital_holdings` con los % del IDC.
+
 ### 3.4 Personas y categorías
 
 ~120 personas únicas de la web de gobierno corporativo, campos mínimos: nombre + categoría + cargos en comités. Sin datos de contacto ni nada no publicado. **Política de datos confirmada por el usuario:** toda la información de personas procede de fuentes públicas (web corporativa y Registro Mercantil/BORME); lo no publicado se **simula y se etiqueta** como tal. Vocabulario de categorías propio de despacho (nuevo respecto a ARGA): `SOCIO, OF COUNSEL, COUNSEL, DIRECTOR GENERAL, DIRECTOR, GERENTE, ASOCIADO PRINCIPAL, ASOCIADO SENIOR, SUPERVISOR, COMPLIANCE OFFICER, SUPPORT, SECRETARY, LEGAL SUPPORT, UTTAI`. Nota RGPD en seed y docs: datos personales de fuente pública del propio titular, finalidad demo, minimización aplicada.
@@ -61,12 +63,24 @@ La audiencia son abogados mercantilistas mirando su propia casa: el listón no e
 
 1. Comité de Nominaciones: el texto dice "diez socios", la lista trae doce.
 2. Comité de Gobernanza de la IA: duplicado en la fuente (aparece bajo ambas ramas — coherente con su dependencia dual, pero la composición se carga una vez).
-3. Garrigues Chile: Manual dice SpA; DUNS y Diario Oficial dicen Limitada (transformación posterior).
+3. Garrigues Chile: Manual dice SpA; DUNS y Diario Oficial dicen Limitada (transformación posterior). **Matiz 2026-08-03:** las cuentas consolidadas 2025 depositadas aún la denominan **SpA** — coherente con la denominación al cierre 2025, pre-transformación; cargar señalado.
 4. G-Advisory Colombia: oficina confirmada, denominación social local no verificada.
 5. BSVV: integración oficial sin vehículo societario final localizado en el inventario original — **actualizado:** el punto 5 del orden del día de la Junta de Socios 2026 aprueba formalmente la integración de BSVV con Garrigues Chile Limitada, la admisión de los Socios de Cuota de BSVV y un aumento de capital social para su asunción — ya no es una integración informal de marca, es un acuerdo societario real y fechado (6 de mayo de 2026).
 6. Centro de Estudios: vinculada, no controlada (20% transmitido; marca + presidente).
 7. EAD Trust: variación nominal en un contrato (51% vs 51,001%).
 8. Garrigues México S.C. y Garrigues MX S.C.: dos vehículos coexistentes.
+9. Centro de Estudios, evolución 2026: el punto 4 del orden del día de la Junta 2026 aprueba una **"Operación de toma de participación"** en el Centro de Estudios, posterior a la transmisión del 20% comunicada en 2025 — dirección del movimiento sin reconciliar entre fuentes; cargar señalada.
+
+### 3.6 Caso canónico Garrigues — la Junta de Socios real de 6 de mayo de 2026 (H3)
+
+Paridad con el caso canónico de ARGA (Convocatoria integral UAT del 2026-07-21): el tenant Garrigues reproduce dentro de la plataforma su Junta ordinaria real, documentada íntegramente en el depósito del RM:
+
+- **Convocatoria** (art. 27.3 Estatutos): comunicación personal individualizada por correo electrónico con acuse de recibo, enviada el 21/04/2026 para el 06/05/2026 — **15 días de antelación reales**. El texto literal de la carta ("Querido socio: …") sirve de capa 1 de la plantilla de convocatoria de Junta.
+- **Censo y asistencia:** 346 socios = 100% de los derechos de voto; 3 presenciales (0,8875%) + 343 representados, todos por **Roberto Delgado**, que exhibió las cartas de delegación a la Presidenta; autocartera (18 participaciones, 2,59%) excluida del cómputo.
+- **Mesa:** preside **Rosa Zarza** como socia y senior partner (art. 29 Estatutos); **Roberto Delgado**, Secretario elegido por unanimidad de los asistentes.
+- **12 puntos del orden del día** como agreements (mandato/estatutos, exclusión-continuidad-admisión de socios, Centro de Estudios, integración BSVV con aumento sin derecho de preferencia, cuentas, sostenibilidad, gestión, auditor, retribución de prestaciones accesorias, delegación de facultades, acta). Los acuerdos no transcritos en el certificado (p. ej. exclusiones de socios concretos) se modelan **sin identificar personas** y con contenido `INFERIDO`.
+- **Cierre documental con la cadena real de firmas:** acta redactada por el Secretario conforme al art. 97 RRM y aprobada al final de la reunión, **firmada por el Secretario con el VºBº de la Presidenta**; **certificación expedida por el administrador único** (Fernando Vives — patrón art. 109 RRM, sin VºBº); elevación a público con inscripción parcial (Tramitador) y **depósito de cuentas** con certificación de huella digital.
+- Todos los artefactos generados se etiquetan como **reconstrucción demo sin efecto jurídico**: el expediente real ya existe en el RM; la plataforma lo reproduce, no lo sustituye.
 
 ## 4. Programa G0–G8 (orden = valor decreciente)
 
@@ -93,25 +107,29 @@ Carril de adquisición de dato público, independiente del código de producto (
 - **Perímetro de consolidación oficial (fuente: cuentas anuales consolidadas 2025, formulario IDC2.1.1 depositado en el Registro Mercantil)** — confirma y refina el inventario original con `%` exacto de participación de J&A Garrigues SLP:
   - **100,00%** (alta confianza, cifra redonda y legible): Garrigues IP SLP · Garrigues Letrados de Soporte SLP · Garrigues Human Capital Services SLP · Garrigues Consultoría de Empresa Familiar SLP · Garrigues LLP (US) · Garrigues Maroc SARLAU · Garrigues-IP Unipessoal Lda (PT) · Compañía Digital NewLaw SLU.
   - **75,00%**: G-Advisory Consultoría Técnica, Económica y Estratégica SLP — **no 100%**, corrige un supuesto tácito del inventario original.
-  - **~99% (cifra a confirmar, dígito dudoso por calidad de OCR):** Garrigues Polska i Roberto Delgado Gil SpK; J&A Garrigues Perú SCRL.
-  - **EAD Trust** — confirmado en la tabla oficial como participada por **Compañía Digital NewLaw SLU** (no directamente por J&A Garrigues SLP), ratificando la cadena de dos niveles del inventario original; % en el entorno del 51% (coherente con el 51,001% de otras fuentes internas, cifra exacta a confirmar).
-  - **Garrigues México SC, Garrigues MX SC, Garrigues Chile SpA, G-Advisory Chile SpA:** aparecen en la tabla con porcentajes de participación **indirecta** de lectura no fiable por OCR (valores ilegibles o con formato inconsistente) — **no se afirman cifras concretas**; se cargan con `ownership_percentage` NULL y nota "pendiente de confirmación" hasta una relectura dirigida.
-  - **4 vehículos nuevos, no presentes en el inventario original** (participación 100,00% legible): **Violet Inversiones 2010, S.L.** · **Eachi Inversiones 2010, S.L.** · **Xoo.com Digital, S.L.U.** · **Barben Inversiones 2013, S.L.U.** — añadir como entidades holding/vehículo del perímetro español.
+  - **Split directa/indirecta legible (sembrar como *a confirmar*, no como dato firme):** Garrigues Polska SpK 98,99% directa; J&A Garrigues Perú SCRL 0,01% directa + 98,99% indirecta; Garrigues México S.C. 0,01% + 98,98%; Garrigues Chile **SpA** 0,32% + 98,58%; Garrigues MX S.C. ~5,25% + 94,74%; G-Advisory México y G-Advisory Chile 75% indirecta.
+  - **EAD Trust** — la tabla oficial registra **51,00% de participación indirecta** (participante directo ilegible en la celda); la cadena **vía Compañía Digital NewLaw SLU** procede del contrato interno citado en el inventario (51,001%), y ambas fuentes son coherentes entre sí. Titular directo y cifra exacta: a confirmar (BORME / Carril B).
+  - **3 vehículos holding nuevos, no presentes en el inventario original** (relectura dirigida del IDC2.1.1, 2026-08-03): **Violet Inversiones 2010, S.L.** (100% indirecta) · **EWCH(?) Inversiones 20¿10?, S.L.** (100% indirecta; denominación parcialmente ilegible — confirmar antes de sembrar) · **Garben Inversiones 2013, S.L.U.** (~75%, no 100% — confirmar). **Corrección adversarial (H1):** una versión anterior de esta spec listaba un cuarto vehículo, "Xoo.com Digital, S.L.U.", que **no existe** en la tabla — error de lectura, retirado.
+  - **Datos registrales reales para `entities` (fuente: certificación del RM del propio depósito):** matriz J&A Garrigues SLP — NIF `B81709081`, Hoja `M-190538`, Tomo `17456`, Folio `132`, Plaza de Colón 2 (28046 Madrid), inicio de operaciones 01/04/1997, duración indefinida y, **impreso por el propio Registro, "Estructura del órgano: Administrador único"** — el gobierno unipersonal es literalmente dato registral. El IDC aporta además NIF de las dependientes españolas (sembrar los legibles; el resto *a confirmar*).
   - Dato curioso de identidad cruzada: **Roberto Delgado Gil** (Secretario de la Junta de Socios, según el acta 2026) es el mismo nombre que figura como socio de la razón social de la vinculada polaca ("Garrigues Polska **i Roberto Delgado Gil**, Sp.K.") y como Secretario no consejero del CdA de EAD Trust (§3.1) — coherencia entre fuentes independientes, refuerza la fiabilidad del dato.
 - Internacionales: `jurisdiction` real + etiqueta expresa "fuera de cobertura normativa del motor (ES)" — la brecha como gancho de multi-jurisdicción, no como silencio.
 - Mapa de gobernanza y ScopeSwitcher mostrando 29+ entidades / 12 países / 32 oficinas.
 - Incidencias §3.5 registradas en el dato (campo/nota visible), incluida la confirmación 2026 de BSVV (ver actualización del punto 3).
 
-### G2 — Gobierno de la matriz: topología + personas (L)
+### G2 — Gobierno de la matriz: topología + personas + censo real (L)
 - La topología completa: Junta de Socios, administrador único, senior partner (cargo) y las ~17 estructuras consultivas con naturaleza/dependencia/misión/mandatos (§3.2), incluida la dependencia dual del Comité de IA.
-- ~120 personas + categorías (§3.4) + composición real de cada comité; censo representativo de la Junta (§3.3).
-- CdA EAD Trust: composición **pendiente de fuente** (decisión abierta D-2); si no la hay, cargos con titular "no verificado".
-- Vencimientos de mandato (4 años) en calendario.
+- ~120 personas con cargos de comité (§3.4) como subconjunto identificado del **censo real de 346 socios** del acta 2026 (§3.3), con el modelo de capital canónico (perfil VIGENTE, clase A, autocartera `is_treasury`, pesos `INFERIDO` bajo restricciones agregadas reales).
+- CdA EAD Trust: composición **resuelta** (D-2, §3.1) — seed directo de los 5 consejeros + secretario no consejero + vicesecretaria; contraste BORME diferido al Carril B.
+- **Libros societarios** (H8 — paridad con el módulo Libros de ARGA): Libro registro de socios alimentado por el censo real de 346 y libro de actas arrancando con la Junta 2026 (§3.6) — dos de los espejos más potentes, y salen del mismo seed.
+- Mandatos reales: administrador único **30/06/2026 → 30/06/2032** (el anterior vencía 31/01/2028; terminación anticipada + reelección por 6 años, art. 36 reformado); Consejo de Socios y Nominaciones a 4 años → vencimientos en calendario.
 
 ### G3 — Motor jurídico Garrigues: SLP + unipersonal + gate preceptivo (L)
 - `TipoSocial += 'SLP'` (`types.ts:16`) + barrido de `Record<TipoSocial, …>` exhaustivos (antelaciones, canales) hasta typecheck verde.
 - **Rule packs del tenant Garrigues** (los 57 de ARGA no se heredan): materias núcleo con `organo_tipo` correcto — decisiones del administrador único (CONSEJO + `UNIPERSONAL_ADMIN`), Junta de Socios (JUNTA_GENERAL), socio único de filiales (SOCIO_UNICO), CdA EAD Trust (CONSEJO colegiado). Payload con la mayoría en clave de primer nivel legible por el extractor actual — **el gotcha del extractor de ARGA no se toca**.
 - Overlay Ley 2/2007 como parámetros de pack (transmisión, separación/exclusión de socio profesional, mayoría de socios profesionales además de capital). Redacción de citas legales: **pendiente de revisión legal** (patrón del repo); la demo enseña estructura y gates, no dictamina.
+- **Cadena de certificación unipersonal (H4 — art. 109 RRM, visible en el certificado real):** el pipeline F9 (`fn_generar_certificacion` + `EmitirCertificacionButton` + `usePresidenteVigente`) nace del patrón ARGA (secretario certifica + VºBº del presidente). En la matriz: **acta** = Secretario de la Junta + VºBº de la Presidenta (senior partner); **certificación** = administrador único **sin VºBº**. En EAD Trust: secretario no consejero + VºBº del presidente. Sonda G3 obligatoria: verificar que el pipeline acepta certificante ADMIN_UNICO con `p_visto_bueno_persona_id` NULL — es la clase de error "pack de Junta servido a un admin único" aplicada a la certificación.
+- **Materias SLP nuevas en el catálogo del tenant (H7)**, exigidas por los 12 puntos reales de la Junta 2026: admisión de socio de cuota, exclusión estatutaria (retiro a los 60, art. 21.1.e), continuidad post-60, retribución de prestaciones accesorias, integración de despacho (aumento sin derecho de preferencia). ⚠️ Los cambios de clasificación tocan todos los read-paths (routing de adopción, intakes `?materia=`, cobertura de plantillas): review adversarial por fase, como manda la experiencia del repo.
+- **Parámetros reales de convocatoria de Junta (H11)** para los packs: antelación **15 días** (21-abr → 6-may), canal = comunicación individual por correo electrónico **con acuse de recibo** (art. 27.3 Estatutos); el texto literal de la carta real como capa 1 de plantilla (§3.6).
 - **Gate de informe preceptivo del Consejo de Socios**: requisito PRE para materias reservadas cuando adopta la Junta; lista de materias = decisión abierta D-3 (si no hay fuente interna, set demo etiquetado).
 - Plantillas núcleo del tenant (vía TemplateImportWizard con el ADMIN_TENANT de G0 o seed service-role): decisión de administrador único + acta de consignación + convocatoria/acta de Junta + certificación. Inventario completo = post-demo.
 - Con packs propios del tenant, el selector deja de caer en `FALLBACK_ORGANO_DISTINTO`: los avisos de procedencia quedan como red de seguridad, no como estado permanente.
@@ -119,6 +137,7 @@ Carril de adquisición de dato público, independiente del código de producto (
 ### G4 — Sistema normativo interno navegable (M)
 - Las 30 PI + Código Ético + PPD + Manual PBC/FT como catálogo en `/politicas` con metadatos y **ownership real por comité**: Práctica Profesional impulsa el sistema; Editorial Global ↔ PI-14; CACI + senior partner ↔ PBC/FT; Comité IA ↔ PI-30; SII ↔ PI-31.
 - Documentos fuente como referencias de evidencia postura `reference` (no final; `000049` sigue HOLD).
+- **Obligaciones y controles (H12 — paridad con `/obligaciones` de ARGA):** obligaciones PBC/FT de la Ley 10/2010 (formación, examen especial, comunicaciones) y controles del PPD mapeados al módulo de obligaciones/controles con ownership real: CACI, Comité de Prevención de Delitos y Departamento de Compliance.
 
 ### G5 — Penal/PBC con dato real puntuado (M)
 - Los dos **mapas evaluados 2025** (áreas de negocio + departamentos internos) → `risks` con puntuaciones reales vía `/grc/risk-360` (owner-write; sin tocar columnas generadas). Catálogo de situaciones del PPD → catálogo de riesgo.
@@ -174,6 +193,7 @@ Motor multi-jurisdicción (UK/US/MA/PL/CO/PE/MX/CL); segregación a repos por m�
 4. El **catálogo normativo** navega de política → comité responsable → personas, con las 30 PI reales.
 5. Los **mapas penales 2025** aparecen con sus puntuaciones reales en Risk360.
 6. El **CdA de EAD Trust** completa un ciclo colegiado y su evidencia queda custodiada por interposición del propio EAD.
-7. En ningún punto la consola afirma algo que la fuente no soporta: censo representativo etiquetado, cargos no verificados etiquetados, internacionales fuera de cobertura etiquetadas.
+7. En ningún punto la consola afirma algo que la fuente no soporta: el censo de 346 es real pero los **pesos individuales van etiquetados como simulados**, cargos no verificados etiquetados, internacionales fuera de cobertura etiquetadas, y porcentajes de participación dudosos marcados *a confirmar*.
 8. El histórico por sociedad muestra actos reales del BORME con su cita de boletín, y todo contenido inferido va etiquetado como tal.
 9. El área de riesgo tecnológico/seguridad enseña el SGSI ISO 27001 con su alcance real y el marco QTSP de EAD Trust como objeto de cumplimiento — sin que la plataforma se atribuya capacidades de firma.
+10. **La Junta real de 6 de mayo de 2026 está reproducida end-to-end como caso canónico** (§3.6): convocatoria art. 27.3 → censo 346 → acta con VºBº de la Presidenta → certificación del administrador único → depósito, con todos los artefactos etiquetados como reconstrucción demo.
