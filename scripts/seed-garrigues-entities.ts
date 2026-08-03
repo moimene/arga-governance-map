@@ -104,8 +104,9 @@ async function main() {
       forma_administracion: e.formaAdministracion,
       registration_number: e.nif,
       data_provenance: e.provenance,
-      // "El schema manda": copiados de la matriz ARGA.
-      entity_status: arga.entity_status,
+      // "El schema manda": copiados de la matriz ARGA, salvo estado registral
+      // propio del catálogo (p.ej. Sports & Entertainment = Liquidated).
+      entity_status: e.entityStatus ?? arga.entity_status,
       onboarding_status: arga.onboarding_status,
       materiality: arga.materiality,
       support_docs_metadata: arga.support_docs_metadata ?? {},
@@ -130,13 +131,14 @@ async function main() {
   }
 
   // 2) Segunda pasada: parents (UUIDs fijos del catálogo, sin lookups).
+  //    Escribe SIEMPRE (incluido null): una corrección de catálogo que retire
+  //    un parent no debe dejar el valor viejo en Cloud.
   for (const e of GARRIGUES_ENTITIES) {
-    if (!e.parentSlug) continue;
-    const parent = bySlug.get(e.parentSlug);
-    if (!parent) fail(`parentSlug inválido en catálogo: ${e.parentSlug}`);
+    const parent = e.parentSlug ? bySlug.get(e.parentSlug) : null;
+    if (e.parentSlug && !parent) fail(`parentSlug inválido en catálogo: ${e.parentSlug}`);
     const { error } = await admin.from("entities")
-      .update({ parent_entity_id: parent.uuid }).eq("id", e.uuid);
-    if (error) fail(`parent ${e.slug} → ${e.parentSlug}: ${error.message}`);
+      .update({ parent_entity_id: parent ? parent.uuid : null }).eq("id", e.uuid);
+    if (error) fail(`parent ${e.slug} → ${e.parentSlug ?? "null"}: ${error.message}`);
   }
   console.log("✓ Parents enlazados.");
   console.log("✓ Seed G1 completado (idempotente: re-ejecutar es seguro).");

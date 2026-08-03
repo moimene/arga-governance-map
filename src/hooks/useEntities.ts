@@ -98,7 +98,8 @@ const labelMateriality = (m: string) => {
   return map[m] ?? m;
 };
 
-const labelStatus = (s: string) => (s === "Active" ? "Activa" : s === "Inactive" ? "Inactiva" : s);
+const labelStatus = (s: string) =>
+  s === "Active" ? "Activa" : s === "Inactive" ? "Inactiva" : s === "Liquidated" ? "Liquidada" : s;
 
 export const formatJurisdiction = labelJurisdiction;
 export const formatMateriality = labelMateriality;
