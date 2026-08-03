@@ -120,6 +120,13 @@ export function useEntitiesList(options?: { sociedadesOnly?: boolean }) {
 
       if (sociedadesOnly) {
         query = query.not("person_id", "is", null);
+        // G2 T6: excluye entes no-sociedad (DIVISION/OFICINA/OFICINA_REPRESENTACION/SUCURSAL).
+        // NOT IN es hostil a NULL: group_role NOT IN (...) excluiría también las
+        // filas ARGA (group_role NULL). El patrón OR deja pasar NULL por la
+        // primera rama y solo filtra group_role conocidos no-sociedad.
+        query = query.or(
+          "group_role.is.null,group_role.not.in.(DIVISION,OFICINA,OFICINA_REPRESENTACION,SUCURSAL)",
+        );
       }
       query = applyVisibleDataClass(query); // W3: oculta entities TEST (opt-in E2E)
 

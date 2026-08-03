@@ -301,3 +301,10 @@ Perímetro societario Garrigues: 33 entities + 33 persons PJ desde
 Aditivo e idempotente (condición Carril B: nunca DELETE; los históricos BORME
 se inyectarán sobre `data_provenance` sin re-sembrar). Dos pasadas (entities →
 parents). Requiere `SUPABASE_SERVICE_ROLE_KEY`.
+
+## seed-garrigues-gobierno.ts (G2 — 2026-08-03)
+
+Gobierno de la matriz en dos fases idempotentes: `--personas` (censo 346 +
+no-socios de comités + ADMIN_UNICO Vives con inscripción + metadata senior
+partner) y `--comites` (membresías body-scoped + consejo EAD verificado).
+Requiere `SUPABASE_SERVICE_ROLE_KEY` y, para --comites, seed-garrigues-bodies.
