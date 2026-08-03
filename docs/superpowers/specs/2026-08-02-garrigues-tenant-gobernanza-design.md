@@ -121,6 +121,7 @@ Carril de adquisición de dato público, independiente del código de producto (
 - ~120 personas con cargos de comité (§3.4) como subconjunto identificado del **censo real de 346 socios** del acta 2026 (§3.3), con el modelo de capital canónico (perfil VIGENTE, clase A, autocartera `is_treasury`, pesos `INFERIDO` bajo restricciones agregadas reales).
 - CdA EAD Trust: composición **resuelta** (D-2, §3.1) — seed directo de los 5 consejeros + secretario no consejero + vicesecretaria; contraste BORME diferido al Carril B.
 - **Libros societarios** (H8 — paridad con el módulo Libros de ARGA): Libro registro de socios alimentado por el censo real de 346 y libro de actas arrancando con la Junta 2026 (§3.6) — dos de los espejos más potentes, y salen del mismo seed.
+- **Delegaciones** (módulo shell `/delegaciones`): contenido real — la delegación de facultades del punto 11 de la Junta 2026 (a favor de Vives y apoderados, con facultades de elevación a público y subsanación) y la delegación inscrita del consejero delegado de EAD Trust (Eduardo Inza).
 - Mandatos reales: administrador único **30/06/2026 → 30/06/2032** (el anterior vencía 31/01/2028; terminación anticipada + reelección por 6 años, art. 36 reformado); Consejo de Socios y Nominaciones a 4 años → vencimientos en calendario.
 
 ### G3 — Motor jurídico Garrigues: SLP + unipersonal + gate preceptivo (L)
@@ -139,9 +140,12 @@ Carril de adquisición de dato público, independiente del código de producto (
 - Documentos fuente como referencias de evidencia postura `reference` (no final; `000049` sigue HOLD).
 - **Obligaciones y controles (H12 — paridad con `/obligaciones` de ARGA):** obligaciones PBC/FT de la Ley 10/2010 (formación, examen especial, comunicaciones) y controles del PPD mapeados al módulo de obligaciones/controles con ownership real: CACI, Comité de Prevención de Delitos y Departamento de Compliance.
 
-### G5 — Penal/PBC con dato real puntuado (M)
+### G5 — Penal/PBC + ESG + hallazgos con dato real puntuado (M→L, ampliada 2026-08-03)
 - Los dos **mapas evaluados 2025** (áreas de negocio + departamentos internos) → `risks` con puntuaciones reales vía `/grc/risk-360` (owner-write; sin tocar columnas generadas). Catálogo de situaciones del PPD → catálogo de riesgo.
 - Ownership: senior partner (supervisión PPD/PBC con autonomía) + Comité de Prevención de Delitos + CACI + Departamento de Compliance.
+- **ESG** (módulo shell `/esg`): contenido desde el **Informe de Sostenibilidad 2025** real (fuente disponible: PDF de 90 páginas + los 84 del depósito; lectura dirigida en esta fase) — Plan de Sostenibilidad 2023-2025, Comité de Sostenibilidad y Comisión de Seguimiento como owners.
+- **Hallazgos y planes de acción** (`/hallazgos`): sembrados desde la lógica de autoevaluación del PPD, etiquetados como simulados-verosímiles (la fuente da el marco, no hallazgos concretos).
+- **Conflictos** (`/conflictos`): declaraciones de conflicto de interés de socios simuladas y etiquetadas — ningún conflicto real se afirma; el módulo no puede quedar vacío en una demo de gobernanza integral de un despacho.
 
 ### G6 — SII por tenant (S)
 - Rebrand UI por tenant (hardcode de `SiiLayout`), PI-31 como política rectora enlazada, casos demo neutros. Restricción: **no modificar tablas del schema `sii.*`**; si las vistas no son tenant-scoped (sonda G0), el dato es compartido-neutro y la marca va solo en UI.
@@ -163,6 +167,8 @@ Carril de adquisición de dato público, independiente del código de producto (
 - **D-2 Composición del CdA de EAD Trust: RESUELTA** — composición completa en §3.1, aportada por el usuario (consejero de la entidad); el Carril B la contrastará con BORME.
 - **D-3 Informes preceptivos: RESUELTA** — todos los legalmente preceptivos aplicables a una SLP + nombramientos, con órgano informante por materia (§3.2).
 - **D-4 Evaluaciones IA: RESUELTA** — se activa vía migración RLS; G7 ampliado a riesgo tecnológico/seguridad y certificación de sistemas.
+- **D-5 Aplicabilidad de módulos por tenant (ABIERTA, 2026-08-03):** DORA, los country packs aseguradores y el Board Pack de cotizada no aplican al perfil de un despacho. Opciones: (a) **visibilidad de módulos por tenant** vía `tenants.branding.modules` filtrando sidebar/rutas (recomendada: honesta, barata, reversible; ARGA sin cambio); (b) mostrarlos con badge "No aplicable al perfil"; (c) dejarlos visibles tal cual (diluye el espejo). Afecta a G4/G5/G7; no bloquea G1-G3.
+- **Cobertura integral de la consola (2026-08-03):** verificado que todas las superficies tienen fase asignada — shell/branding G0; entidades/mapa/scopes/saludo G1 (incl. Task 8: hardcodes `src/data/scopes.ts` y saludo del Dashboard descubiertos bajo Garrigues); órganos/personas/libros/delegaciones/calendario G2; Secretaría+motor G3; políticas+obligaciones G4; GRC penal+ESG+hallazgos+conflictos G5; SII G6; IA+cyber+certificaciones G7; vitrina y runbook integral G8; módulos no aplicables D-5.
 
 ## 6. Riesgos y salvaguardas
 

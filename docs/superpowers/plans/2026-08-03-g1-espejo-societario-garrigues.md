@@ -1261,6 +1261,135 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ---
 
+### Task 8: Scopes y saludo del Dashboard tenant-aware (hardcodes del shell core, TDD)
+
+**Contexto:** bajo el tenant Garrigues, el Dashboard muestra "Vista de **Grupo ARGA (Global)**" y "Buen día, **Lucía**". Causa: `src/data/scopes.ts` es una lista estática ARGA (consumida por `ScopeContext`, `ScopeSwitcher` del shell, `ScopeNotice` y `Dashboard`) y el saludo es un literal en `Dashboard.tsx:145`. Mismo patrón de fix que G0: **defaults ARGA verbatim** cuando `branding` es NULL.
+
+**Files:**
+- Create: `src/lib/tenant-scopes.ts`
+- Test: `src/lib/__tests__/tenant-scopes.test.ts`
+- Modify: `src/context/ScopeContext.tsx` (consumir `scopesForTenant`), `src/pages/Dashboard.tsx:145` (saludo)
+
+**Interfaces:**
+- Consumes: `useTenantBranding()` / `TenantBranding` (G0); `scopes` de `src/data/scopes.ts` (lista ARGA actual, queda como default).
+- Produces: `scopesForTenant(branding): readonly string[]` y `dashboardGreeting(branding): string`.
+
+- [ ] **Step 1: Test que falla**
+
+```typescript
+// src/lib/__tests__/tenant-scopes.test.ts
+import { describe, expect, it } from "vitest";
+import { dashboardGreeting, scopesForTenant } from "@/lib/tenant-scopes";
+import { scopes as ARGA_SCOPES } from "@/data/scopes";
+
+describe("tenant-scopes — defaults ARGA verbatim con branding null", () => {
+  it("branding null → lista ARGA actual y saludo actual, byte a byte", () => {
+    expect(scopesForTenant(null)).toEqual(ARGA_SCOPES);
+    expect(scopesForTenant(null)[0]).toBe("Grupo ARGA (Global)");
+    expect(dashboardGreeting(null)).toBe("Buen día, Lucía");
+  });
+
+  it("branding con scopes propios → esa lista", () => {
+    const b = { scope_label: "Grupo Garrigues", scopes: ["Grupo Garrigues (Global)", "España", "Portugal"] };
+    expect(scopesForTenant(b)).toEqual(["Grupo Garrigues (Global)", "España", "Portugal"]);
+  });
+
+  it("branding sin scopes → deriva '<scope_label> (Global)'", () => {
+    expect(scopesForTenant({ scope_label: "Grupo Garrigues" })).toEqual(["Grupo Garrigues (Global)"]);
+  });
+
+  it("branding presente → saludo sin nombre (la persona llega en G2)", () => {
+    expect(dashboardGreeting({ nombre: "Garrigues" })).toBe("Buen día");
+  });
+
+  it("scopes con basura (no-strings) → cae al derivado, no revienta", () => {
+    expect(scopesForTenant({ scope_label: "X", scopes: [1, 2] as unknown as string[] })).toEqual(["X (Global)"]);
+  });
+});
+```
+
+- [ ] **Step 2: Ver el fallo**
+
+Run: `bun test src/lib/__tests__/tenant-scopes.test.ts`
+Expected: FAIL — módulo no existe.
+
+- [ ] **Step 3: Implementar**
+
+```typescript
+// src/lib/tenant-scopes.ts
+// Scopes geográficos y saludo del Dashboard por tenant (G1 Task 8).
+// branding NULL (ARGA) → lista estática y saludo actuales VERBATIM (contrato
+// cero-cambio). branding presente → scopes del branding o derivado del
+// scope_label; saludo genérico hasta que G2 aporte la persona del perfil.
+import type { TenantBranding } from "@/context/TenantBrandContext";
+import { scopeLabel } from "@/lib/tenant-brand-labels";
+import { scopes as ARGA_SCOPES } from "@/data/scopes";
+
+type BrandingWithScopes = TenantBranding & { scopes?: string[] };
+
+export function scopesForTenant(
+  branding: BrandingWithScopes | null,
+): readonly string[] {
+  if (!branding) return ARGA_SCOPES;
+  const list = branding.scopes;
+  if (Array.isArray(list) && list.length > 0 && list.every((s) => typeof s === "string")) {
+    return list;
+  }
+  return [`${scopeLabel(branding)} (Global)`];
+}
+
+export function dashboardGreeting(branding: TenantBranding | null): string {
+  return branding ? "Buen día" : "Buen día, Lucía";
+}
+```
+
+- [ ] **Step 4: Ver verde**
+
+Run: `bun test src/lib/__tests__/tenant-scopes.test.ts`
+Expected: PASS (5 tests).
+
+- [ ] **Step 5: Cablear ScopeContext y Dashboard**
+
+En `src/context/ScopeContext.tsx`: localizar dónde importa/usa la lista de `@/data/scopes` (grep `scopes`). Dentro del componente provider, añadir `const branding = useTenantBranding();` y sustituir el uso de la lista estática por `scopesForTenant(branding)` (incluido el scope seleccionado por defecto = primer elemento). El provider vive dentro de `TenantBrandProvider` (App.tsx, G0), así que el hook tiene contexto. NO tocar `src/data/scopes.ts` (sigue siendo el default ARGA).
+
+En `src/pages/Dashboard.tsx:145`: `const branding = useTenantBranding();` y sustituir el literal:
+
+```tsx
+<h1 className="text-2xl font-semibold tracking-tight text-foreground">{dashboardGreeting(branding)}</h1>
+```
+
+Nota: `src/lib/aims/readiness.ts:687` compara contra el literal "Grupo ARGA (Global)" — con scopes Garrigues simplemente no matchea y sigue su rama genérica; verificar que no lanza (grep del else). No tocarlo.
+
+- [ ] **Step 6: Sembrar los scopes de Garrigues en branding (aditivo)**
+
+Vía MCP `execute_sql`:
+
+```sql
+UPDATE tenants
+SET branding = branding || '{"scopes": ["Grupo Garrigues (Global)", "España", "Portugal", "Europa", "LATAM", "EE.UU.", "Marruecos", "China"]}'::jsonb
+WHERE id = '00000000-0000-0000-0000-000000000002'
+  AND (branding->'scopes') IS NULL;
+
+SELECT branding->'scopes' AS scopes FROM tenants WHERE id = '00000000-0000-0000-0000-000000000002';
+```
+
+Expected: array con los 8 scopes. (Guard `IS NULL` = idempotente.)
+
+- [ ] **Step 7: Gates y commit**
+
+Run: `bun run typecheck 2>&1 | grep -E "tenant-scopes|ScopeContext|Dashboard"` (vacío) `&& bun test src/lib/__tests__/tenant-scopes.test.ts && bun run lint`
+
+```bash
+git add src/lib/tenant-scopes.ts src/lib/__tests__/tenant-scopes.test.ts src/context/ScopeContext.tsx src/pages/Dashboard.tsx
+git commit -m "feat(g1): scopes y saludo del dashboard por tenant con defaults ARGA verbatim
+
+Co-Authored-By: claude-flow <ruv@ruv.net>"
+```
+
+(La verificación viva de la Task 7 añade un check: bajo Garrigues, el Dashboard dice "Vista de Grupo Garrigues (Global)" y el saludo no menciona a Lucía; bajo ARGA, todo idéntico.)
+
+---
+
 ## Self-review del plan (hecho)
 
 - **Cobertura de spec §4 G1:** entities del inventario completo con cadena de control ✓ (T2/T3) · % oficiales IDC con *a confirmar* donde OCR dudoso ✓ (catálogo, H1/H2 aplicados: 3 vehículos, sin "Xoo.com", EAD 51 indirecta) · datos registrales reales del RM ✓ (matriz, T2/T3) · internacionales etiquetadas fuera de cobertura ✓ (provenance + badges T4) · incidencias §3.5 señaladas ✓ (provenance.incidencias: 3,4,5,6,7,8,9 mapeadas; 1-2 son de comités → G2) · seeds aditivos e idempotentes ✓ (T3, condición Carril B) · mapa y ScopeSwitcher ✓ (verificación T7 + fix multi-tenant T5) · gate suite completa + verificación viva ✓ (T6/T7).
