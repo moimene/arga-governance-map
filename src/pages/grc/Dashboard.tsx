@@ -1,4 +1,6 @@
 import { useGrcKpis } from "@/hooks/useGrcDashboard";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   GRC_COMPLIANCE_AREAS,
   GRC_COMPLIANCE_MONITORS,
@@ -314,11 +316,12 @@ function ReadinessDomainCard({
 
 export default function GrcDashboard() {
   const scope = useSecretariaScope();
+  const branding = useTenantBranding();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const scopeLabel =
     scope.mode === "sociedad" && scope.selectedEntity
       ? scope.selectedEntity.legalName
-      : "Grupo ARGA Seguros";
+      : groupFullLabel(branding);
   const scopeCopy =
     scope.mode === "sociedad"
       ? "Vista Sociedad: riesgos filtrados por entidad y señales GRC relacionadas."

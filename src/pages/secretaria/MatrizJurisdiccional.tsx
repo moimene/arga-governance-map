@@ -16,6 +16,8 @@ import {
   useFilialAgreementCounts,
 } from "@/hooks/useFilialEntities";
 import { useEntityRules } from "@/hooks/useJurisdiccionRules";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 
 /* ── Tipos ────────────────────────────────────────────────────────────────── */
 
@@ -246,6 +248,7 @@ type ViewMode = "dashboard" | "materias";
 export default function MatrizJurisdiccional() {
   const [activeTab, setActiveTab] = useState<JurisCode>("ES");
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const branding = useTenantBranding();
   const f = FILIALES[activeTab];
 
   const totalEntidades = JURIS_ORDER.reduce((s, k) => s + FILIALES[k].entidades.length, 0);
@@ -276,7 +279,7 @@ export default function MatrizJurisdiccional() {
                 Secretaría Multi-jurisdicción
               </h1>
               <p className="text-sm text-[var(--g-text-secondary)] mt-0.5">
-                Grupo ARGA Seguros · {JURIS_ORDER.length} jurisdicciones ·
+                {groupFullLabel(branding)} · {JURIS_ORDER.length} jurisdicciones ·
                 Formalización local de decisiones del grupo
               </p>
             </div>

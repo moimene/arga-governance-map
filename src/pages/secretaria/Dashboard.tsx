@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupPortfolioLabel } from "@/lib/tenant-brand-labels";
 import { useAutoScanVacanciasPresidencia } from "@/hooks/useNotifications";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
@@ -718,6 +720,7 @@ export default function SecretariaDashboard() {
   const navigate = useNavigate();
   useAutoScanVacanciasPresidencia();
   const scope = useSecretariaScope();
+  const branding = useTenantBranding();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data: kpis, isLoading: kpiLoading } = useSecretariaKpis(scopedEntityId);
   const { data: agenda, isLoading: agendaLoading } = useSecretariaAgenda(scopedEntityId);
@@ -732,7 +735,7 @@ export default function SecretariaDashboard() {
   const scopeLine =
     scope.mode === "sociedad" && scope.selectedEntity
       ? `Vista filtrada por ${scope.selectedEntity.legalName}`
-      : "Vista de grupo: cartera societaria ARGA";
+      : groupPortfolioLabel(branding);
 
   return (
     <div className="mx-auto max-w-screen-2xl px-4 py-5 sm:px-6 lg:px-8">

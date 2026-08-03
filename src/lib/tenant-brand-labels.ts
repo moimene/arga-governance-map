@@ -28,3 +28,17 @@ export function siiOrgLabel(b: TenantBranding | null): string {
 export function brandName(b: TenantBranding | null): string {
   return pick(b?.nombre, DEFAULT_BRAND_NAME);
 }
+
+export const DEFAULT_GROUP_FULL_LABEL = "Grupo ARGA Seguros";
+
+/** Nombre completo del grupo para breadcrumbs/copy. Default ARGA verbatim. */
+export function groupFullLabel(b: TenantBranding | null): string {
+  if (!b) return DEFAULT_GROUP_FULL_LABEL;
+  return pick(b.scope_label, DEFAULT_GROUP_FULL_LABEL);
+}
+
+/** Chip de vista de grupo del dashboard de Secretaría. Default ARGA verbatim. */
+export function groupPortfolioLabel(b: TenantBranding | null): string {
+  if (!b) return "Vista de grupo: cartera societaria ARGA";
+  return `Vista de grupo: cartera societaria ${brandName(b)}`;
+}
