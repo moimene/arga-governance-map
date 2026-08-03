@@ -18,6 +18,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ScopeSwitcher } from "@/components/secretaria/shell/ScopeSwitcher";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 
 interface NavItem {
   label: string;
@@ -112,10 +114,11 @@ function GrcSidebarContent({
 export function GrcLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const scope = useSecretariaScope();
+  const branding = useTenantBranding();
   const scopeLabel =
     scope.mode === "sociedad" && scope.selectedEntity
       ? scope.selectedEntity.legalName
-      : "Grupo ARGA Seguros";
+      : groupFullLabel(branding);
   const modeLabel =
     scope.mode === "sociedad"
       ? "Modo Sociedad · vista filtrada a la sociedad"

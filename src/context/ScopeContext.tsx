@@ -1,17 +1,32 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, ReactNode } from "react";
-import { Scope, scopes } from "@/data/scopes";
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { scopesForTenant } from "@/lib/tenant-scopes";
 
 interface ScopeContextValue {
-  scope: Scope;
-  setScope: (s: Scope) => void;
+  scope: string;
+  setScope: (s: string) => void;
+  scopes: readonly string[];
 }
 
 const ScopeContext = createContext<ScopeContextValue | undefined>(undefined);
 
 export function ScopeProvider({ children }: { children: ReactNode }) {
-  const [scope, setScope] = useState<Scope>(scopes[0]);
-  return <ScopeContext.Provider value={{ scope, setScope }}>{children}</ScopeContext.Provider>;
+  const branding = useTenantBranding();
+  const scopeList = useMemo(() => scopesForTenant(branding), [branding]);
+  const [scope, setScope] = useState<string>(scopeList[0]);
+
+  useEffect(() => {
+    if (!scopeList.includes(scope)) {
+      setScope(scopeList[0]);
+    }
+  }, [scopeList, scope]);
+
+  return (
+    <ScopeContext.Provider value={{ scope, setScope, scopes: scopeList }}>
+      {children}
+    </ScopeContext.Provider>
+  );
 }
 
 export function useScope() {

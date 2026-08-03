@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   brandName,
+  groupFullLabel,
+  groupPortfolioLabel,
   scopeLabel,
   shellLabel,
   siiOrgLabel,
@@ -34,5 +36,17 @@ describe("tenant-brand-labels — defaults ARGA verbatim con branding null", () 
 
   it("valor no-string (branding JSONB futuro con label numérico) cae al default", () => {
     expect(shellLabel({ shell_label: 123 as unknown as string })).toBe("TGMS PLATFORM");
+  });
+});
+
+describe("labels de grupo — defaults ARGA verbatim", () => {
+  it("null → strings actuales exactos", () => {
+    expect(groupFullLabel(null)).toBe("Grupo ARGA Seguros");
+    expect(groupPortfolioLabel(null)).toBe("Vista de grupo: cartera societaria ARGA");
+  });
+  it("branding → etiquetas del tenant", () => {
+    const b = { nombre: "Garrigues", scope_label: "Grupo Garrigues" };
+    expect(groupFullLabel(b)).toBe("Grupo Garrigues");
+    expect(groupPortfolioLabel(b)).toBe("Vista de grupo: cartera societaria Garrigues");
   });
 });

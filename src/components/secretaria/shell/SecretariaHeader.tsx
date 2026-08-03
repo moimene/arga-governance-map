@@ -1,5 +1,7 @@
 import { forwardRef } from "react";
 import { Building2, Menu, Network } from "lucide-react";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import type { SecretariaScopeController } from "./types";
 
 interface SecretariaHeaderProps {
@@ -8,8 +10,9 @@ interface SecretariaHeaderProps {
 }
 
 export const SecretariaHeader = forwardRef<HTMLElement, SecretariaHeaderProps>(({ scope, onOpenMobileNav }, ref) => {
+  const branding = useTenantBranding();
   const Icon = scope.mode === "sociedad" ? Building2 : Network;
-  const scopeLabel = scope.mode === "sociedad" ? scope.selectedEntity?.legalName ?? "Sociedad" : "Grupo ARGA Seguros";
+  const scopeLabel = scope.mode === "sociedad" ? scope.selectedEntity?.legalName ?? "Sociedad" : groupFullLabel(branding);
   const scopeMeta =
     scope.mode === "sociedad" && scope.selectedEntity
       ? `${scope.selectedEntity.legalForm} · ${scope.selectedEntity.jurisdiction}`

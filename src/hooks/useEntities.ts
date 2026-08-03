@@ -31,6 +31,10 @@ export interface EntityRow {
   // 231). Para el ConvocatoriasStepper la heurística rápida es esta columna,
   // que coincide para ARGA (SA cotizada IBEX 35).
   es_cotizada?: boolean | null;
+  // G1: procedencia/cobertura del espejo societario Garrigues. NULL para
+  // todas las filas ARGA (contrato: sin provenance, sin badges — ver
+  // src/lib/entity-provenance.ts).
+  data_provenance?: unknown;
 }
 
 export interface EntityWithParent extends EntityRow {

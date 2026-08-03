@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { provenanceBadges } from "@/lib/entity-provenance";
 import {
   useEntitiesList,
   formatJurisdiction,
@@ -164,6 +165,11 @@ export default function EntidadesList() {
                     <Link to={`/entidades/${e.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">
                       {e.legal_name}
                     </Link>
+                    {provenanceBadges(e.data_provenance).slice(0, 1).map((b) => (
+                      <span key={b.label} title={b.title} className="ml-2 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {b.label}
+                      </span>
+                    ))}
                     <div className="text-xs text-muted-foreground">{e.common_name}</div>
                   </TableCell>
                   <TableCell>{formatJurisdiction(e.jurisdiction)}</TableCell>

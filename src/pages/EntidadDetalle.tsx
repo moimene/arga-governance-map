@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadgeTip } from "@/components/StatusBadgeTip";
+import { provenanceBadges } from "@/lib/entity-provenance";
 import {
   useEntityBySlug,
   useEntityChildren,
@@ -69,6 +70,15 @@ export default function EntidadDetalle() {
             <div className="flex items-center gap-2">
               <StatusBadgeTip label={statusLabel} />
               <StatusBadgeTip label={materialityLabel} tone={matTone(entity.materiality)} />
+              {provenanceBadges(entity.data_provenance).map((b) => (
+                <span
+                  key={b.label}
+                  title={b.title}
+                  className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  {b.label}
+                </span>
+              ))}
             </div>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{entity.legal_name}</h1>
             <div className="mt-1 text-sm text-muted-foreground">

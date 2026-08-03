@@ -14,9 +14,12 @@ import { useConflictsList, useAttestationsList } from "@/hooks/useConflicts";
 import { relatedPartyTransactions, type RelatedPartyTransaction } from "@/data/conflicts";
 import { Scale, ShieldAlert, CheckCircle, AlertTriangle, Bell, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 
 export default function ConflictosList() {
   const [selectedOpv, setSelectedOpv] = useState<RelatedPartyTransaction | null>(null);
+  const branding = useTenantBranding();
   const { data: conflicts = [], isLoading: loadingConflicts } = useConflictsList();
   const { data: attestations = [], isLoading: loadingAtts } = useAttestationsList();
 
@@ -37,7 +40,9 @@ export default function ConflictosList() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
         <Scale className="h-6 w-6 text-primary" />Conflictos, Operaciones Vinculadas y Attestations
       </h1>
-      <p className="mt-1 text-sm text-muted-foreground">Los tres vectores de integridad del Grupo ARGA Seguros.</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {branding ? `Los tres vectores de integridad de ${groupFullLabel(branding)}.` : "Los tres vectores de integridad del Grupo ARGA Seguros."}
+      </p>
 
       <Tabs defaultValue="conflictos" className="mt-6">
         <TabsList>
@@ -119,19 +124,23 @@ export default function ConflictosList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {relatedPartyTransactions.map((o) => (
-                  <TableRow key={o.id} onClick={() => setSelectedOpv(o)} className={cn("cursor-pointer", o.status.includes("REVISIÓN") && "bg-status-warning-bg")}>
-                    <TableCell className="font-mono text-xs font-semibold">{o.id}</TableCell>
-                    <TableCell className="max-w-md text-sm">
-                      <div>{o.title}</div>
-                      {o.relatedPerson && <div className="mt-0.5 text-xs italic text-muted-foreground">{o.relatedPerson}</div>}
-                    </TableCell>
-                    <TableCell className="text-sm">{o.type}</TableCell>
-                    <TableCell className="text-sm font-medium">{o.amount}</TableCell>
-                    <TableCell><StatusBadge label={o.status} tone={o.status === "APROBADA" ? "active" : "warning"} /></TableCell>
-                    <TableCell className="text-sm">{o.armLength}</TableCell>
-                  </TableRow>
-                ))}
+                {branding ? (
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Sin operaciones vinculadas registradas para este grupo (datos de ejemplo del tenant demo ocultos).</TableCell></TableRow>
+                ) : (
+                  relatedPartyTransactions.map((o) => (
+                    <TableRow key={o.id} onClick={() => setSelectedOpv(o)} className={cn("cursor-pointer", o.status.includes("REVISIÓN") && "bg-status-warning-bg")}>
+                      <TableCell className="font-mono text-xs font-semibold">{o.id}</TableCell>
+                      <TableCell className="max-w-md text-sm">
+                        <div>{o.title}</div>
+                        {o.relatedPerson && <div className="mt-0.5 text-xs italic text-muted-foreground">{o.relatedPerson}</div>}
+                      </TableCell>
+                      <TableCell className="text-sm">{o.type}</TableCell>
+                      <TableCell className="text-sm font-medium">{o.amount}</TableCell>
+                      <TableCell><StatusBadge label={o.status} tone={o.status === "APROBADA" ? "active" : "warning"} /></TableCell>
+                      <TableCell className="text-sm">{o.armLength}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </Card>
