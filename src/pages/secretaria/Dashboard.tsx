@@ -22,7 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
-import { groupPortfolioLabel } from "@/lib/tenant-brand-labels";
+import { groupPortfolioLabel, scopeLabel } from "@/lib/tenant-brand-labels";
 import { useAutoScanVacanciasPresidencia } from "@/hooks/useNotifications";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { AgendaDraftInbox } from "@/components/secretaria/AgendaDraftInbox";
@@ -1034,7 +1034,7 @@ export default function SecretariaDashboard() {
               icon={HandshakeIcon}
               label="Pactos vigentes"
               value={crossModule?.pactos_vigentes ?? "…"}
-              sublabel={scope.mode === "sociedad" && scope.selectedEntity ? scope.selectedEntity.name : "Grupo ARGA"}
+              sublabel={scope.mode === "sociedad" && scope.selectedEntity ? scope.selectedEntity.name : scopeLabel(branding)}
               tone="primary"
               onClick={() => navigateSecretaria("/secretaria/acuerdos-sin-sesion")}
             />

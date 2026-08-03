@@ -684,7 +684,7 @@ export function filterSystemsByScope<T extends { name: string; description?: str
   systems: T[],
   scope: string
 ): T[] {
-  if (scope === "Grupo ARGA (Global)") {
+  if (scope.endsWith("(Global)")) {
     return systems;
   }
   if (scope === "España" || scope === "Europa") {
@@ -719,6 +719,6 @@ export function filterSystemsByScope<T extends { name: string; description?: str
       );
     });
   }
-  return [];
+  return systems;
 }
 

@@ -67,25 +67,20 @@ async function main() {
 
   // 1) Primera pasada: persons PJ + entities SIN parent.
   for (const e of GARRIGUES_ENTITIES) {
-    const taxId = e.nif ?? `PTE-${e.slug.toUpperCase()}`;
-    // persons: select-then-insert/update por (tenant, tax_id) — UNIQUE(tenant_id, tax_id).
+    // persons: ancladas a la entidad (uuid fijo). tax_id solo si hay NIF real —
+    // nada de placeholders: la UI ya tiene fallback honesto para NULL.
     let personId = null;
-    const { data: p, error: eP } = await admin
-      .from("persons").select("id")
-      .eq("tenant_id", GARRIGUES_TENANT).eq("tax_id", taxId).maybeSingle();
-    if (eP) fail(`persons select ${e.slug}: ${eP.message}`);
-    if (p) {
-      personId = p.id;
+    const { data: ent } = await admin
+      .from("entities").select("person_id").eq("id", e.uuid).maybeSingle();
+    if (ent?.person_id) {
+      personId = ent.person_id;
       const { error } = await admin.from("persons")
-        .update({ full_name: e.legalName, denomination: e.commonName, person_type: "PJ" })
+        .update({ full_name: e.legalName, denomination: e.commonName, person_type: "PJ", tax_id: e.nif ?? null })
         .eq("id", personId);
       if (error) fail(`persons update ${e.slug}: ${error.message}`);
     } else {
       const { data, error } = await admin.from("persons")
-        .insert({
-          tenant_id: GARRIGUES_TENANT, full_name: e.legalName,
-          denomination: e.commonName, person_type: "PJ", tax_id: taxId,
-        })
+        .insert({ tenant_id: GARRIGUES_TENANT, full_name: e.legalName, denomination: e.commonName, person_type: "PJ", tax_id: e.nif ?? null })
         .select("id").single();
       if (error) fail(`persons insert ${e.slug}: ${error.message}`);
       personId = data.id;

@@ -249,6 +249,20 @@ export default function MatrizJurisdiccional() {
   const [activeTab, setActiveTab] = useState<JurisCode>("ES");
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const branding = useTenantBranding();
+
+  if (branding) {
+    return (
+      <div className="min-h-screen bg-[var(--g-surface-page)] px-8 py-6">
+        <div
+          className="bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] p-6 text-sm text-[var(--g-text-secondary)]"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          Matriz multi-jurisdiccional en preparación para {groupFullLabel(branding)}. Los datos de ejemplo del tenant de demostración no aplican a este grupo.
+        </div>
+      </div>
+    );
+  }
+
   const f = FILIALES[activeTab];
 
   const totalEntidades = JURIS_ORDER.reduce((s, k) => s + FILIALES[k].entidades.length, 0);
