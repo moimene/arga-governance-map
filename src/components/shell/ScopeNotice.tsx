@@ -1,10 +1,9 @@
 import { X } from "lucide-react";
 import { useScope } from "@/context/ScopeContext";
-import { scopes } from "@/data/scopes";
 
 /** Small chip shown OUTSIDE the dashboard when scope ≠ Group, to remind the user. */
 export function ScopeNotice() {
-  const { scope, setScope } = useScope();
+  const { scope, setScope, scopes } = useScope();
   if (scope === scopes[0]) return null;
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning-bg px-2.5 py-1 text-[12px] font-medium text-status-warning">

@@ -3,11 +3,10 @@ import { Building2, Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useScope } from "@/context/ScopeContext";
-import { scopes } from "@/data/scopes";
 import { cn } from "@/lib/utils";
 
 export function ScopeSwitcher() {
-  const { scope, setScope } = useScope();
+  const { scope, setScope, scopes } = useScope();
   const [open, setOpen] = useState(false);
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>

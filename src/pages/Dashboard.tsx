@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { dashboardGreeting } from "@/lib/tenant-scopes";
 import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
 import { useModuleStatus } from "@/hooks/useModuleStatus";
 import { DemoOperablePanel } from "@/components/arga-console/DemoOperablePanel";
@@ -40,10 +42,16 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { consoleJourneys } from "@/lib/arga-console/contracts";
 
+// Fallback cuando el scope activo (p.ej. un scope Garrigues) no tiene entrada
+// en scopeData (lista demo ARGA). Ceros = estado de carga honesto; los KPIs
+// reales del tenant (useDashboardKpis()) mandan sobre este fallback.
+const EMPTY_SCOPE_KPIS = { entidades: 0, mandatosVencimiento: 0, politicasPendientes: 0, hallazgosAbiertos: 0, excepcionesActivas: 0, alertas: [] };
+
 export default function Dashboard() {
   const { start, step, completed } = useTour();
   const { scope } = useScope();
-  const data = scopeData[scope];
+  const branding = useTenantBranding();
+  const data = scopeData[scope as keyof typeof scopeData] ?? EMPTY_SCOPE_KPIS;
   const navigate = useNavigate();
 
   const { data: kpis } = useDashboardKpis();
@@ -142,7 +150,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-screen-2xl p-4 sm:p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Buen día, Lucía</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{dashboardGreeting(branding)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Vista de <span className="font-medium text-foreground">{scope}</span> — operación al {new Date().toLocaleDateString("es-ES")}.
           </p>
