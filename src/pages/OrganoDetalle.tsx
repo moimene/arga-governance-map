@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useBodyBySlug, useBodyMandates, useBodyMeetings, formatDate, formatTime } from "@/hooks/useBodies";
 import { useConvocatoriasList, type ConvocatoriaWithBody } from "@/hooks/useConvocatorias";
 import { getRegulationById } from "@/data/regulations";
+import { organoNaturalezaBadges } from "@/lib/organo-naturaleza";
 import { AlertTriangle, CalendarPlus, Download, FileCheck2, Network, Plus, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -56,6 +57,7 @@ export default function OrganoDetalle() {
   const entity = (body as typeof body & { entity?: { common_name?: string; legal_name?: string | null } | null }).entity ?? null;
   const regulation = body.regulation_id ? getRegulationById(body.regulation_id) : null;
   const alertCount = members.filter((m) => m.status && m.status !== "Activo" && m.status !== "VIGENTE").length;
+  const naturalezaBadges = organoNaturalezaBadges(body.config);
 
   return (
     <div className="mx-auto max-w-[1440px] p-6">
@@ -67,6 +69,15 @@ export default function OrganoDetalle() {
             <StatusBadge label={body.status === "Activo" ? "ACTIVO" : "INACTIVO"} tone={body.status === "Activo" ? "active" : "neutral"} />
             <StatusBadge label="Grupo" tone="neutral" />
             {entity && <StatusBadge label={entity.legal_name ?? entity.common_name} tone="info" />}
+            {naturalezaBadges.map((nb, i) => (
+              <span
+                key={i}
+                title={nb.title}
+                className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                {nb.label}
+              </span>
+            ))}
           </>
         }
         metadata={

@@ -19,6 +19,7 @@ export interface BodyListRow {
   entity_name: string | null;
   entity_slug: string | null;
   member_count: number;
+  config?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -34,6 +35,7 @@ export interface BodyRow {
   secretary: string | null;
   status: string | null;
   next_meeting_date: string | null;
+  config?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 

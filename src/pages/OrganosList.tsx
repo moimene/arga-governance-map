@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatusBadge } from "@/components/StatusBadge";
 import { useBodiesList, formatDate } from "@/hooks/useBodies";
 import { useEntitiesList } from "@/hooks/useEntities";
+import { organoNaturalezaBadges } from "@/lib/organo-naturaleza";
 import { AlertTriangle, Plus, Users } from "lucide-react";
 
 export default function OrganosList() {
@@ -91,10 +92,21 @@ export default function OrganosList() {
               <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Sin órganos</TableCell></TableRow>
             ) : filtered.map((b) => {
               const alerts = b.alerts_count ?? 0;
+              const naturalezaBadge = organoNaturalezaBadges(b.config)[0];
               return (
                 <TableRow key={b.id} className="cursor-pointer">
                   <TableCell>
-                    <Link to={`/organos/${b.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">{b.name}</Link>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/organos/${b.slug}`} className="font-medium text-foreground hover:text-primary hover:underline">{b.name}</Link>
+                      {naturalezaBadge && (
+                        <span
+                          title={naturalezaBadge.title}
+                          className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {naturalezaBadge.label}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm">{b.entity_name ?? "—"}</TableCell>
                   <TableCell className="text-sm">{b.body_type}</TableCell>
