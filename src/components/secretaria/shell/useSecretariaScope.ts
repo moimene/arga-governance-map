@@ -38,6 +38,7 @@ function toEntityOption(entity: EntityWithParent): SecretariaEntityOption {
     status: entity.entity_status,
     materiality: entity.materiality,
     tipoSocial: entity.tipo_social ?? null,
+    parentEntityId: entity.parent_entity_id ?? null,
   };
 }
 
@@ -53,12 +54,14 @@ function readQueryMode(searchParams: URLSearchParams): SecretariaMode | null {
   return searchParams.get(ENTITY_PARAM) ? "sociedad" : null;
 }
 
-function getPreferredEntity(entities: SecretariaEntityOption[]) {
+export function getPreferredEntity(entities: SecretariaEntityOption[]) {
   return (
     entities.find((entity) => entity.legalName === "ARGA Seguros, S.A.") ??
     entities.find((entity) => entity.name === "ARGA Seguros, S.A.") ??
     entities.find((entity) => entity.legalName.startsWith("ARGA Seguros,")) ??
     entities.find((entity) => entity.name.startsWith("ARGA Seguros,")) ??
+    // Multi-tenant (G1): la matriz del grupo — primera entidad sin parent.
+    entities.find((entity) => entity.parentEntityId == null) ??
     entities[0] ??
     null
   );

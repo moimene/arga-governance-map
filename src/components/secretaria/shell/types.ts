@@ -15,6 +15,9 @@ export interface SecretariaEntityOption {
   materiality: string;
   // ITEM-080/112: tipo social (SA/SL/SAU/SLU) para compatibilidad DL-4 de plantillas.
   tipoSocial?: string | null;
+  // G1: id de la entidad matriz (null = raíz del grupo). Alimenta la
+  // preferencia de matriz en getPreferredEntity para tenants sin hardcode ARGA.
+  parentEntityId?: string | null;
 }
 
 /**
