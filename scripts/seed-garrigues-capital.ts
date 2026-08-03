@@ -4,6 +4,9 @@
  * Restricciones REALES respetadas: capital vigente 11.104.008 € (BORME 24/04/2026);
  * autocartera 18 participaciones = 2,59% derechos (is_treasury); los 3 presenciales
  * suman 0,8875% (acta). Pesos individuales SIEMPRE metadata.peso='INFERIDO'.
+ * TOTAL_TITULOS (695) derivado, no inventado: 18 en autocartera = 2,59% de los
+ * derechos de voto (acta) → 18/0,0259 ≈ 695 títulos totales; ~2 por socio,
+ * coincide con el patrón de transmisión por pares del BORME (121A-122A, 3040A-3041A…).
  */
 import { createClient } from "@supabase/supabase-js";
 import { GARRIGUES_TENANT, GARRIGUES_MATRIZ_UUID, GARRIGUES_ENTITIES } from "./garrigues/entities-catalog";
@@ -28,6 +31,7 @@ const cat = loadGovernanceCatalog();
 // Restricciones agregadas reales
 const AUTOCARTERA_PCT = 2.59;          // 18 participaciones (acta 06/05/2026)
 const PRESENCIALES_PCT_TOTAL = 0.8875; // Vives+Zarza+Delgado (acta)
+const TOTAL_TITULOS = 695; // derivado: 18 en autocartera = 2,59% (acta 06/05/2026) → ≈695; ~2/socio, coincide con el patrón BORME
 
 async function main() {
   const presenciales = cat.censo.presenciales;
@@ -83,6 +87,8 @@ async function main() {
       tenant_id: GARRIGUES_TENANT, entity_id: GARRIGUES_MATRIZ_UUID,
       holder_person_id: holderId, share_class_id: claseA,
       porcentaje_capital: pct, voting_rights: true, is_treasury: false,
+      numero_titulos: Math.max(1, Math.round((pct / 100) * TOTAL_TITULOS)),
+      effective_from: "2026-05-06",
       metadata: { peso: "INFERIDO", nota: "Reparto uniforme bajo restricciones agregadas reales del acta 06/05/2026" },
       ...extra,
     };
@@ -108,7 +114,7 @@ async function main() {
   // Autocartera: titular = la propia matriz (persona PJ de la entidad matriz)
   const { data: matriz } = await admin.from("entities").select("person_id").eq("id", GARRIGUES_MATRIZ_UUID).single();
   await ensureHolding(matriz.person_id, AUTOCARTERA_PCT, {
-    is_treasury: true, voting_rights: false, numero_titulos: 18,
+    is_treasury: true, voting_rights: false, numero_titulos: 18, effective_from: "2026-05-06",
     metadata: { peso: "REAL", nota: "18 participaciones en autocartera (acta 06/05/2026, 2,59% de los derechos de voto)" },
   });
   console.log("✓ 347 holdings de la matriz (346 socios + autocartera)");
@@ -126,7 +132,8 @@ async function main() {
     const row = {
       tenant_id: GARRIGUES_TENANT, entity_id: e.uuid, holder_person_id: pEnt.person_id,
       porcentaje_capital: e.ownershipPct, voting_rights: true, is_treasury: false,
-      metadata: { fuente: "IDC 2025", confianza: e.provenance.confianza },
+      numero_titulos: 1, effective_from: "2026-04-24",
+      metadata: { fuente: "IDC 2025", confianza: e.provenance.confianza, titulos_no_aplica: true },
     };
     if (h0) await admin.from("capital_holdings").update(row).eq("id", h0.id);
     else await admin.from("capital_holdings").insert(row);
