@@ -1,10 +1,5 @@
 # Demo Data Seed Script — TGMS Motor de Reglas LSC
 
-> **Compatibilidad legacy (2026-07-21):** `firma_qes_ref` es solo un nombre de
-> campo histórico en fixtures demo. No acredita ni habilita QES, firma personal,
-> ERDS, envío o entrega. Las nuevas capturas usan EAD Trust únicamente para
-> interposición, mensajería básica y custodia/e-archiving.
-
 ## Overview
 
 **File:** `scripts/seed-demo-data.ts`  
@@ -234,7 +229,7 @@ After seeding, you can:
 - **DEMO_TENANT scope:** All data filtered by `tenant_id = DEMO_TENANT`, multi-tenant ready
 - **WORM-aware:** Notifications + respuestas use insert-with-skip on duplicates (no DELETE)
 - **Error handling:** Try-catch per section, graceful degradation (logs + continues)
-- **Realistic data:** Capital distribution sums to 100% and dates are coherent; `firma_qes_ref` is a legacy placeholder with no operational trust-service meaning
+- **Realistic data:** Capital distribution sums to 100%, dates are coherent, firma_qes_ref mocks real QES references
 - **Comments sparse:** Code is self-documenting; logic is clear from variable names
 
 ## Troubleshooting
