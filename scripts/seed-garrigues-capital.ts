@@ -135,8 +135,13 @@ async function main() {
       numero_titulos: 1, effective_from: "2026-04-24",
       metadata: { fuente: "IDC 2025", confianza: e.provenance.confianza, titulos_no_aplica: true },
     };
-    if (h0) await admin.from("capital_holdings").update(row).eq("id", h0.id);
-    else await admin.from("capital_holdings").insert(row);
+    if (h0) {
+      const { error } = await admin.from("capital_holdings").update(row).eq("id", h0.id);
+      if (error) fail(`holding filial update ${e.slug}: ${error.message}`);
+    } else {
+      const { error } = await admin.from("capital_holdings").insert(row);
+      if (error) fail(`holding filial insert ${e.slug}: ${error.message}`);
+    }
   }
   console.log("✓ Holdings de filiales (CONFIRMADO + EAD 51 A_CONFIRMAR)");
 
