@@ -293,3 +293,11 @@ password demo TGMS). Service-role, dry-run por defecto, idempotente. Requiere
 bun run scripts/seed-garrigues-tenant.ts            # dry-run
 bun run scripts/seed-garrigues-tenant.ts --commit   # ejecuta
 ```
+
+## seed-garrigues-entities.ts (G1 — 2026-08-03)
+
+Perímetro societario Garrigues: 33 entities + 33 persons PJ desde
+`scripts/garrigues/entities-catalog.ts` (única fuente de verdad, testeada).
+Aditivo e idempotente (condición Carril B: nunca DELETE; los históricos BORME
+se inyectarán sobre `data_provenance` sin re-sembrar). Dos pasadas (entities →
+parents). Requiere `SUPABASE_SERVICE_ROLE_KEY`.
