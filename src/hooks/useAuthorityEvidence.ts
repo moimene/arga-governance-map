@@ -32,7 +32,7 @@ export interface AuthorityEvidenceRow {
   fuente_designacion: FuenteDesignacion;
   inscripcion_rm_referencia: string | null;
   inscripcion_rm_fecha: string | null;
-  estado: "VIGENTE" | "CESADO";
+  estado: "VIGENTE" | "PROGRAMADO" | "CESADO";
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -42,6 +42,7 @@ export interface AuthorityEvidenceDetailRow extends AuthorityEvidenceRow {
   person?: {
     id: string;
     full_name: string;
+    email: string | null;
     tax_id: string | null;
     person_type: string | null;
   } | null;
@@ -63,7 +64,7 @@ export function useAuthorityEvidence(entityId: string | undefined) {
         .from("authority_evidence")
         .select(`
           *,
-          person:person_id(id, full_name, tax_id, person_type),
+          person:person_id(id, full_name, email, tax_id, person_type),
           body:body_id(id, name, body_type)
         `)
         .eq("tenant_id", tenantId!)
@@ -72,6 +73,33 @@ export function useAuthorityEvidence(entityId: string | undefined) {
         .order("cargo", { ascending: true });
       if (error) throw error;
       return (data ?? []) as AuthorityEvidenceDetailRow[];
+    },
+  });
+}
+
+/**
+ * Recupera exactamente la evidencia de autoridad que quedó fijada al emitir
+ * un artefacto. Evita recalcular el convocante desde el censo actual y, con
+ * ello, reescribir retrospectivamente una convocatoria histórica.
+ */
+export function useAuthorityEvidenceById(authorityEvidenceId: string | null | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!authorityEvidenceId && !!tenantId,
+    queryKey: ["authority_evidence", tenantId, "byId", authorityEvidenceId ?? "none"],
+    queryFn: async (): Promise<AuthorityEvidenceDetailRow | null> => {
+      const { data, error } = await supabase
+        .from("authority_evidence")
+        .select(`
+          *,
+          person:person_id(id, full_name, email, tax_id, person_type),
+          body:body_id(id, name, body_type)
+        `)
+        .eq("tenant_id", tenantId!)
+        .eq("id", authorityEvidenceId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as AuthorityEvidenceDetailRow | null) ?? null;
     },
   });
 }
@@ -138,7 +166,7 @@ export function usePresidenteVigente(
         .from("authority_evidence")
         .select(`
           *,
-          person:person_id(id, full_name, tax_id, person_type)
+          person:person_id(id, full_name, email, tax_id, person_type)
         `)
         .eq("tenant_id", tenantId!)
         .eq("entity_id", entityId!)

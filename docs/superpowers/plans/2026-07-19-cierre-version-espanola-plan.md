@@ -1,5 +1,11 @@
 # Plan de cierre de la versión española — 2026-07-19
 
+> **Estado documental — parcialmente superado desde 2026-07-21.** Se conserva
+> como plan histórico. Sus afirmaciones sobre firma real o ERDS no describen la
+> política vigente. El cierre UAT canónico está en
+> `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`; EAD Trust
+> queda limitado a interposición, mensajería básica y custodia/e-archiving.
+
 > Origen: análisis multiagente (90 agentes, verificación adversarial de cada brecha:
 > 44 confirmadas, 34 reclasificadas, 1 ya resuelta) sobre el informe del equipo legal
 > `Análisis_del_Estado_del_Proyecto_Legal.docx` contrastado contra código y Cloud.

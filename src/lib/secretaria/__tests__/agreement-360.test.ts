@@ -88,6 +88,26 @@ const baseInput = {
 };
 
 describe("agreement 360 meeting materialization", () => {
+  it("trata el poder de representación como formalización inscribible", () => {
+    const payload = buildMeetingAgreementPayload({
+      ...baseInput,
+      snapshot: snapshot({
+        materia: "PODER_REPRESENTACION",
+        resolution_text: "Otorgar poderes generales a la CFO",
+      }),
+    });
+
+    expect(payload).toMatchObject({
+      agreement_kind: "PODER_REPRESENTACION",
+      inscribable: true,
+    });
+    expect(payload?.compliance_explain).toMatchObject({
+      normative_snapshot: {
+        formalization: expect.arrayContaining(["ESCRITURA_PUBLICA", "INSCRIPCION_REGISTRAL"]),
+      },
+    });
+  });
+
   it("materializa un agreement efectivo desde una resolución proclamable nacida en sala", () => {
     const payload = buildMeetingAgreementPayload({
       ...baseInput,

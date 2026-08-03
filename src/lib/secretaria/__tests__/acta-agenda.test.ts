@@ -3,6 +3,7 @@ import {
   buildActaAgendaViewModel,
   computeCanonicalMinutesHash,
   renderActaAgendaItemsText,
+  renderCertifiedAgreementsText,
   validateActaLegalStructure,
   type ActaAgendaItemRow,
   type ActaMeetingResolutionRow,
@@ -170,6 +171,71 @@ describe("acta-agenda — contrato cronológico P0", () => {
     expect(rendered).toContain("Resultado de votación: APROBADO.");
   });
 
+  it("incorpora la deliberación guardada al texto y al hash canónico del acta", async () => {
+    const puntos = buildActaAgendaViewModel({
+      agendaItems: baseAgenda.slice(0, 2),
+      resolutions: [resolutions[0]],
+      snapshots: [snapshot(2, "Se aprueban las cuentas anuales.")],
+      debates: [
+        {
+          punto: "Aprobación de cuentas",
+          notas: "La Presidencia presenta las cuentas y responde las aclaraciones solicitadas.",
+          source_id: "ai-2",
+          source_index: 2,
+        },
+      ],
+    });
+
+    expect(puntos[1].deliberation).toBe(
+      "La Presidencia presenta las cuentas y responde las aclaraciones solicitadas.",
+    );
+    expect(renderActaAgendaItemsText(puntos)).toContain(
+      "Deliberación: La Presidencia presenta las cuentas y responde las aclaraciones solicitadas.",
+    );
+
+    const withoutDebate = buildActaAgendaViewModel({
+      agendaItems: baseAgenda.slice(0, 2),
+      resolutions: [resolutions[0]],
+      snapshots: [snapshot(2, "Se aprueban las cuentas anuales.")],
+    });
+    await expect(
+      computeCanonicalMinutesHash({ meetingId: "m-1", puntos }),
+    ).resolves.not.toBe(
+      await computeCanonicalMinutesHash({ meetingId: "m-1", puntos: withoutDebate }),
+    );
+  });
+
+  it("prioriza el texto decisorio de Agreement 360 y certifica con ordinales jurídicos", () => {
+    const puntos = buildActaAgendaViewModel({
+      agendaItems: baseAgenda,
+      resolutions,
+      snapshots: [
+        snapshot(2, "Aprobación de cuentas"),
+        snapshot(4, "Nombramiento de auditor"),
+      ],
+      agreementRows: [
+        {
+          id: "ag-2",
+          agenda_item_id: "ai-2",
+          proposal_text: "Se propone formular las cuentas anuales.",
+          decision_text: "Se acuerda formular las cuentas anuales del ejercicio 2025 y firmarlas por todos los consejeros.",
+        },
+        {
+          id: "ag-4",
+          agenda_item_id: "ai-4",
+          proposal_text: "Se propone nombrar auditor.",
+          decision_text: "Se acuerda nombrar auditor de cuentas para el periodo legal aplicable.",
+        },
+      ],
+    });
+
+    expect(puntos[1].decisorio?.adoptedText).toContain("firmarlas por todos los consejeros");
+    expect(renderCertifiedAgreementsText(puntos)).toBe(
+      "PRIMERO.- Se acuerda formular las cuentas anuales del ejercicio 2025 y firmarlas por todos los consejeros.\n\n" +
+      "SEGUNDO.- Se acuerda nombrar auditor de cuentas para el periodo legal aplicable.",
+    );
+  });
+
   it("valida estructura completa sin huecos ni acuerdos bajo puntos no decisorios", () => {
     const puntos = buildActaAgendaViewModel({
       agendaItems: baseAgenda,
@@ -238,6 +304,29 @@ describe("acta-agenda — contrato cronológico P0", () => {
 
     expect(result.ok).toBe(false);
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("adopted_decision_without_vote_result");
+  });
+
+  it("bloquea un acuerdo aprobado cuyo texto es solo el título de agenda", () => {
+    const weakResolution: ActaMeetingResolutionRow = {
+      ...resolutions[0],
+      resolution_text: "Aprobación de cuentas",
+    };
+    const puntos = buildActaAgendaViewModel({
+      agendaItems: baseAgenda.slice(0, 2),
+      resolutions: [weakResolution],
+      snapshots: [snapshot(2, "Aprobación de cuentas")],
+    });
+
+    const result = validateActaLegalStructure({
+      meetingId: "m-1",
+      puntos,
+      agendaItems: baseAgenda.slice(0, 2),
+      agreementRows: [{ id: "ag-2", parent_meeting_id: "m-1", agenda_item_id: "ai-2" }],
+    });
+
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain(
+      "adopted_decision_without_resolutive_text",
+    );
   });
 
   it("bloquea acta que omite o reordena puntos", () => {

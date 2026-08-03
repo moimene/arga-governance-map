@@ -103,9 +103,10 @@ describe("mesa de control jurídico-societaria — UI contract", () => {
     expect(model).toContain("groupStageBindingsForDisplay");
     expect(model).toContain("detectTemplateDataDuplicates");
 
-    // Alias legacy colapsados en presentación (la ortografía vive ya en BD:
-    // migración 20260710103000 aplicada el 2026-07-11)
+    // Alias funcionales y alias exclusivos de presentación permanecen
+    // separados; el art. 308 comparte rótulo sin compartir identidad.
     expect(model).toContain("MATERIA_CANONICAL_ALIAS");
+    expect(model).toContain("MATERIA_PRESENTATION_ALIAS");
     expect(model).toContain("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE");
     expect(catalogo).toContain("También denominada exclusión del derecho de suscripción preferente");
 

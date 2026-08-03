@@ -136,11 +136,24 @@ function sourceAnnexTargets(sourcePayload?: Record<string, unknown>) {
   return Array.isArray(raw) ? raw.filter((target): target is string => typeof target === "string") : [];
 }
 
-export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sourceDomain?: string | null; entityId?: string | null }) {
+export function useSecretariaDocumentArtifacts(filters?: {
+  kinds?: string[];
+  sourceDomain?: string | null;
+  sourceIds?: string[];
+  entityId?: string | null;
+}) {
   const { tenantId } = useTenantContext();
+  const sourceIds = Array.from(new Set((filters?.sourceIds ?? []).filter(Boolean))).sort();
   return useQuery({
-    enabled: !!tenantId,
-    queryKey: ["secretaria_document_artifacts", tenantId, filters?.kinds?.join("|") ?? "all", filters?.sourceDomain ?? "all", filters?.entityId ?? "all"],
+    enabled: !!tenantId && (filters?.sourceIds === undefined || sourceIds.length > 0),
+    queryKey: [
+      "secretaria_document_artifacts",
+      tenantId,
+      filters?.kinds?.join("|") ?? "all",
+      filters?.sourceDomain ?? "all",
+      sourceIds.join("|") || "all",
+      filters?.entityId ?? "all",
+    ],
     queryFn: async (): Promise<SecretariaDocumentArtifactRow[]> => {
       let query = supabase
         .from("secretaria_document_artifacts")
@@ -149,6 +162,7 @@ export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sou
         .order("updated_at", { ascending: false });
       if (filters?.kinds?.length) query = query.in("artifact_kind", filters.kinds);
       if (filters?.sourceDomain) query = query.eq("source_domain", filters.sourceDomain);
+      if (sourceIds.length > 0) query = query.in("source_id", sourceIds);
       // W11: scope opcional por sociedad (entity_id añadido en migración; el hook
       // solo filtra si se pasa entityId — la cola sigue siendo tenant-wide por defecto).
       if (filters?.entityId) query = query.eq("entity_id", filters.entityId);
@@ -161,6 +175,24 @@ export function useSecretariaDocumentArtifacts(filters?: { kinds?: string[]; sou
 
 export function useInformesArtifacts() {
   return useSecretariaDocumentArtifacts({ kinds: INFORME_KINDS });
+}
+
+export function useSecretariaDocumentArtifactsByIds(ids: string[]) {
+  const { tenantId } = useTenantContext();
+  const stableIds = Array.from(new Set(ids.filter(Boolean))).sort();
+  return useQuery({
+    enabled: !!tenantId && stableIds.length > 0,
+    queryKey: ["secretaria_document_artifacts", tenantId, "by-id", stableIds.join("|")],
+    queryFn: async (): Promise<SecretariaDocumentArtifactRow[]> => {
+      const { data, error } = await supabase
+        .from("secretaria_document_artifacts")
+        .select("*")
+        .eq("tenant_id", tenantId!)
+        .in("id", stableIds);
+      if (error) throw error;
+      return (data ?? []) as SecretariaDocumentArtifactRow[];
+    },
+  });
 }
 
 export function useAgreementDocumentRequirements(agreementId?: string | null) {
@@ -248,6 +280,14 @@ export function useCreateSecretariaDocumentArtifact() {
     mutationFn: async (params: {
       artifactKind: string;
       title: string;
+      entityId?: string | null;
+      status?: string;
+      evidenceStatus?: string;
+      documentUrl?: string | null;
+      mimeType?: string | null;
+      contentHash?: string | null;
+      hashSha512?: string | null;
+      evidenceBundleId?: string | null;
       sourceDomain?: string | null;
       sourceId?: string | null;
       sourceHash?: string | null;
@@ -259,14 +299,20 @@ export function useCreateSecretariaDocumentArtifact() {
         .from("secretaria_document_artifacts")
         .insert({
           tenant_id: tenantId,
+          entity_id: params.entityId ?? null,
           artifact_kind: params.artifactKind,
           title: params.title,
-          status: "DRAFT",
+          status: params.status ?? "DRAFT",
+          document_url: params.documentUrl ?? null,
+          mime_type: params.mimeType ?? null,
+          content_hash: params.contentHash ?? null,
+          hash_sha512: params.hashSha512 ?? null,
+          evidence_bundle_id: params.evidenceBundleId ?? null,
           source_domain: params.sourceDomain ?? null,
           source_id: params.sourceId ?? null,
           source_hash: params.sourceHash ?? null,
           source_payload: params.sourcePayload ?? {},
-          evidence_status: "DEMO_OPERATIVA",
+          evidence_status: params.evidenceStatus ?? "DEMO_OPERATIVA",
           metadata: params.metadata ?? {},
         })
         .select("*")
@@ -334,6 +380,7 @@ export function useCreateAndLinkAgreementDocumentArtifact() {
         subtitle: params.entityName ?? undefined,
         entityName: params.entityName ?? undefined,
         filenamePrefix: params.artifactKind,
+        includeEditableFields: false,
         templateContext: {
           templateId: null,
           bindingId: params.templateBindingKey ?? null,
@@ -347,6 +394,7 @@ export function useCreateAndLinkAgreementDocumentArtifact() {
         .from("secretaria_document_artifacts")
         .insert({
           tenant_id: tenantId,
+          entity_id: params.entityId,
           artifact_kind: params.artifactKind,
           title: params.title,
           status: composition.archive.archived ? "ARCHIVED" : "GENERATED",

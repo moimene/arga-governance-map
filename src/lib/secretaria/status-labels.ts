@@ -25,6 +25,7 @@ export const STATUS_LABEL: Record<string, string> = {
   INSCRITA:     "Inscrita",
   ELEVADA:      "Elevada a público",
   DENEGADA:     "Denegada",
+  PUBLICADA:    "Publicada",
 
   // Reuniones
   PROGRAMADA:   "Programada",
@@ -41,17 +42,29 @@ export const STATUS_LABEL: Record<string, string> = {
 
   // Convocatorias
   EMITIDA:      "Emitida",
+  RECTIFICADA:  "Rectificada",
   ENVIADA:      "Enviada",
   CONFIRMADA:   "Confirmada",
+  PRESENCIAL:   "Presencial",
+  TELEMATICA:   "Telemática",
+  MIXTA:        "Mixta",
+  ORDINARIA:    "Ordinaria",
+  ESTATUTARIA:  "Estatutaria",
+  ESTRUCTURAL:  "Estructural",
+  ESPECIAL:     "Especial",
 
   // Libros obligatorios — legalización
   PENDIENTE:    "Pendiente",
   PRESENTADO:   "Preparado para legalización",
   LEGALIZADO:   "Legalizado",
   NO_APLICA:    "No aplica",  // ITEM-070: libros sin legalización obligatoria
+  UNRESOLVED:   "Destino pendiente",
+  RESOLVED:     "Destino resuelto",
+  POSTED:       "Asentada en libro",
+  LEGACY_REVIEW:"Revisión legacy",
 
   // Decisiones unipersonales
-  FIRMADA:      "Firmada",
+  FIRMADA:      "Formalizada (estado legacy)",
 
   // Expediente acuerdo
   DRAFT:        "Borrador",
@@ -66,7 +79,10 @@ export const STATUS_LABEL: Record<string, string> = {
 
   // ITEM-070: claves de estado en inglés que la BD emite en
   // certificaciones/actas/workflow y que aparecían sin traducir en la UI.
-  SIGNED:       "Firmada",
+  SIGNED:       "Formalizada (estado legacy)",
+  EVIDENCED:    "Constancia verificada",
+  INTERPOSITION_VERIFIED: "Interposición verificada",
+  CONSTANCIA_VERIFIED: "Constancia verificada",
   APPROVED:     "Aprobado",
   REJECTED:     "Rechazado",
   PENDING:      "Pendiente",
@@ -84,6 +100,7 @@ export const STATUS_LABEL: Record<string, string> = {
   RESPONDIDA_TOTAL:   "Respondida",
   EXPIRADA:           "Expirada",
   ERROR:              "Error",
+  RECONCILIATION_REQUIRED: "Conciliación con proveedor requerida",
   // Entrega por destinatario
   ENVIADO:    "Enviado",
   ENTREGADO:  "Entregado",

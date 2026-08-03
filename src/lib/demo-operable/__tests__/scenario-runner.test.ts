@@ -30,7 +30,7 @@ describe("demo-operable scenario runner", () => {
       expect(run.evidence.finalEvidence).toBe(false);
       expect(run.evidence.filingPrevented).toBe(true);
       expect(run.evidence.productiveQtspPrevented).toBe(true);
-      expect(run.evidence.signatureLevel).toBe("QES_SANDBOX");
+      expect(run.evidence.interpositionMode).toBe("INTERPOSITION_SANDBOX");
       expect(run.evidence.timestampLevel).toBe("TSQ_SANDBOX");
       expect(run.trust.provider).toBe("EAD_TRUST_SANDBOX");
       expect(run.evidence.integrity).toBe(run.outcome === "ADOPTADO" ? "VALID" : "NOT_APPLICABLE");
@@ -152,10 +152,6 @@ describe("demo-operable scenario runner", () => {
     expect(qtspApiContract.secretHandling).toBe("never in browser");
     expect(qtspApiContract.requiredEnvKeys).toContain("OKTA_CLIENT_SECRET");
     expect(qtspApiContract.endpoints.map((endpoint) => endpoint.id)).toEqual([
-      "create-signature-request",
-      "add-document",
-      "add-signatory",
-      "activate-signature-request",
       "create-evidence",
       "get-evidence",
     ]);

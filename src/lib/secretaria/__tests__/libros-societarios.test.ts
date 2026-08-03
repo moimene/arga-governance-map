@@ -6,6 +6,7 @@ import {
   classifyBookDeadline,
   expectedBookCodesForEntity,
   normalizeMandatoryBookKind,
+  persistedBookIdForActions,
   summarizeBookPortfolio,
 } from "../libros-societarios";
 
@@ -98,10 +99,30 @@ describe("libros societarios", () => {
     expect(codes).toContain("LIBRO_ACCIONES_NOMINATIVAS");
     expect(codes).toContain("REGISTRO_SOLVENCIA_II_SUPERVISION");
     expect(portfolio.find((book) => book.book_code === "LIBRO_ACTAS_JUNTA_GENERAL")?.source_book_id).toBe("book-actas");
+    const derivedCouncilBook = portfolio.find(
+      (book) => book.book_code === "LIBRO_ACTAS_CONSEJO_ADMINISTRACION",
+    );
+    expect(derivedCouncilBook?.is_virtual).toBe(true);
+    expect(persistedBookIdForActions(derivedCouncilBook!)).toBe("book-actas");
 
     const summary = summarizeBookPortfolio(portfolio);
     expect(summary.mandatory).toBeGreaterThan(0);
     expect(summary.auxiliary).toBeGreaterThan(0);
     expect(bookDefinitionForKind("LIBRO_CONTRATOS_SOCIO_UNICO").contentRoute).toBe("/secretaria/decisiones-unipersonales");
+  });
+
+  it("mantiene acciones de libro en una vista derivada cuando existe source_book_id persistido", () => {
+    expect(persistedBookIdForActions({
+      id: "29f37d94-persisted-book",
+      source_book_id: "29f37d94-persisted-book",
+    })).toBe("29f37d94-persisted-book");
+    expect(persistedBookIdForActions({
+      id: "virtual:entity-sa:LIBRO_ACTAS_CONSEJO_ADMINISTRACION:2026",
+      source_book_id: "29f37d94-persisted-book",
+    })).toBe("29f37d94-persisted-book");
+    expect(persistedBookIdForActions({
+      id: "virtual:entity-sa:LIBRO_ACTAS_CONSEJO_ADMINISTRACION:2026",
+      source_book_id: null,
+    })).toBeNull();
   });
 });

@@ -1,10 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { computeContentHash } from "@/lib/doc-gen/docx-generator";
 import { actaLegalStructureFromVariables } from "@/lib/secretaria/acta-legal-structure";
+import { documentOutputContextFromVariables } from "@/lib/doc-gen/document-output-normalizer";
 import { validatePostRenderDocument } from "./post-render-validation";
 import type { PreparedDocumentComposition } from "./types";
 
 export const DOCUMENT_DRAFTS_TABLE = "secretaria_document_drafts";
+export const DOCUMENT_DRAFT_SAVE_RPC = "fn_secretaria_save_document_draft";
+export const DOCUMENT_DRAFT_TRANSITION_RPC = "fn_secretaria_transition_document_draft";
 
 // Postgres acepta cualquier uuid con forma 8-4-4-4-12 hex (no exige version/variant
 // RFC), así que NO usamos el `isUuidReference` RFC-estricto: nullaría seeds demo
@@ -67,7 +70,6 @@ export interface SaveEditableDocumentDraftInput {
   draftState?: EditableDocumentDraftState;
   version?: number;
   contentHashSha256?: string | null;
-  actorId?: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -107,19 +109,16 @@ type SelectBuilder = PromiseLike<QueryResult> & {
   maybeSingle: () => Promise<QueryResult>;
 };
 
-type MutationBuilder = {
-  select: (columns: string) => {
-    maybeSingle: () => Promise<QueryResult>;
-  };
-};
-
 type DraftTableBuilder = {
   select: (columns: string) => SelectBuilder;
-  upsert: (payload: Record<string, unknown>, options: { onConflict: string }) => MutationBuilder;
 };
 
 type DraftSupabaseClient = {
   from: (table: string) => DraftTableBuilder;
+  rpc: (
+    functionName: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<QueryResult>;
 };
 
 const REQUIRED_DOCUMENT_DRAFT_COLUMNS = [
@@ -169,10 +168,13 @@ function isSchemaMissing(error: SupabaseLikeError | null | undefined) {
   const message = error.message.toLowerCase();
   return (
     error.code === "PGRST205" ||
+    error.code === "PGRST202" ||
     error.code === "42P01" ||
     message.includes("could not find the table") ||
+    message.includes("could not find the function") ||
     message.includes("schema cache") ||
-    message.includes(DOCUMENT_DRAFTS_TABLE)
+    message.includes(DOCUMENT_DRAFTS_TABLE) ||
+    message.includes(DOCUMENT_DRAFT_SAVE_RPC)
   );
 }
 
@@ -224,9 +226,14 @@ export async function probeDocumentDraftSchema(): Promise<DocumentDraftSchemaGat
 export async function computeEditableDocumentDraftKey(
   prepared: PreparedDocumentComposition,
 ): Promise<string> {
+  const sourceBodyHashSha256 = await computeContentHash(prepared.renderedBodyText);
   return computeContentHash(
     stableStringify({
       request_hash_sha256: prepared.request.request_hash_sha256,
+      // El request identifica refs, no el estado canónico resuelto en Cloud.
+      // Incluir el cuerpo compuesto evita recuperar una revisión humana creada
+      // con otros firmantes, fechas, quorum o acuerdos.
+      source_body_hash_sha256: sourceBodyHashSha256,
       document_type: prepared.request.document_type,
       agreement_ids: prepared.request.agreement_ids,
       template_id: prepared.template.id,
@@ -241,10 +248,12 @@ export async function buildEditableDocumentDraftPayload(
   input: SaveEditableDocumentDraftInput,
 ): Promise<Record<string, unknown>> {
   const renderedBodyText = input.renderedBodyText.trim();
-  const renderedText = `${renderedBodyText}${systemTraceFor(input.prepared)}`;
   const postRenderValidation = validatePostRenderDocument({
     documentType: input.prepared.request.document_type,
-    renderedText,
+    // La traza se persiste en `system_trace_text`, pero nunca forma parte del
+    // documento visible que valida este gate. Mezclar ambos planos hacía que
+    // un borrador limpio se autobloquease por su propia evidencia interna.
+    renderedText: renderedBodyText,
     capa1Template: input.prepared.template.capa1_inmutable,
     agreementIds: input.prepared.request.agreement_ids,
     unresolvedVariables: input.prepared.unresolvedVariables,
@@ -252,9 +261,9 @@ export async function buildEditableDocumentDraftPayload(
       input.prepared.request.document_type === "ACTA"
         ? actaLegalStructureFromVariables(input.prepared.mergedVariables)
         : null,
+    outputContext: documentOutputContextFromVariables(input.prepared.mergedVariables),
   });
   const draftState = input.draftState ?? "EDITABLE_DRAFT";
-  const now = new Date().toISOString();
 
   // Las columnas uuid solo aceptan refs con forma uuid; fixtures locales y refs de
   // punto se nullan (su traza va a metadata) para no romper el INSERT.
@@ -262,6 +271,7 @@ export async function buildEditableDocumentDraftPayload(
   const rawAgreementId = input.prepared.request.agreement_ids[0] ?? null;
   const templateId = toUuidColumn(rawTemplateId);
   const agreementId = toUuidColumn(rawAgreementId);
+  const sourceBodyHashSha256 = await computeContentHash(input.prepared.renderedBodyText);
 
   return {
     tenant_id: input.prepared.request.tenant_id,
@@ -280,12 +290,10 @@ export async function buildEditableDocumentDraftPayload(
     capa3_values: input.prepared.capa3Values,
     post_render_validation: postRenderValidation,
     content_hash_sha256: input.contentHashSha256 ?? null,
-    configured_at: draftState === "DRAFT_CONFIGURED" ? now : null,
-    updated_by: input.actorId ?? null,
-    updated_at: now,
     metadata: {
       ...(input.metadata ?? {}),
       source_request_id: input.prepared.request.request_id,
+      source_body_hash_sha256: sourceBodyHashSha256,
       evidence_status: input.prepared.request.evidence_status,
       generation_lane: input.prepared.request.generation_lane,
       // Trazabilidad de refs no-uuid que no caben en columnas uuid (fixtures
@@ -300,11 +308,12 @@ export async function saveEditableDocumentDraft(
   input: SaveEditableDocumentDraftInput,
 ): Promise<SaveEditableDocumentDraftResult> {
   const payload = await buildEditableDocumentDraftPayload(input);
-  const { data, error } = await draftClient()
-    .from(DOCUMENT_DRAFTS_TABLE)
-    .upsert(payload, { onConflict: "tenant_id,draft_key_sha256,version" })
-    .select("*")
-    .maybeSingle();
+  // La tabla no admite escrituras de navegador. Tenant, actor, rol y la
+  // transición EDITABLE_DRAFT/DRAFT_CONFIGURED se validan en PostgreSQL. El
+  // cliente ni siquiera envía actor o timestamps autoritativos.
+  const { data, error } = await draftClient().rpc(DOCUMENT_DRAFT_SAVE_RPC, {
+    p_payload: payload,
+  });
 
   if (error) {
     return {
@@ -323,7 +332,7 @@ export async function saveEditableDocumentDraft(
       missing: [],
       error: null,
     },
-    draft: parseDraftRow(data),
+    draft: parseDraftRow(Array.isArray(data) ? data[0] ?? null : data),
     error: null,
   };
 }

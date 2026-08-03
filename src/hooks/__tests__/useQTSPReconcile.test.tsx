@@ -6,20 +6,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 /**
- * EAD **no emite webhooks**: sin reconciliar, un expediente se queda en "firma
- * solicitada" para siempre aunque los firmantes ya hayan firmado. Este hook es
- * el único camino que cierra el ciclo, así que su comportamiento se fija aquí.
- *
- * Reglas que se prueban:
- *  · los artefactos SOLO se piden cuando la firma está completada (los endpoints
- *    fallan antes, y pedirlos solo produce ruido);
- *  · cada artefacto es independiente: que falle el certificado no puede impedir
- *    recuperar el documento firmado, que es el que contiene el acuerdo;
- *  · si el proxy no está desplegado, se informa sin romper.
+ * La reconciliación solo puede consultar el endpoint source-bound. Un `status`
+ * genérico por UUID no acredita tenant, fuente, clase de artefacto ni hash.
  */
-
-const estado = vi.fn();
-const artefactos = vi.fn();
+const cierre = vi.fn();
 
 const __realModules: Array<[string, Record<string, unknown>]> = [
   ["@/lib/qtsp/qtsp-proxy-client", { ...__realProxyModule }],
@@ -31,8 +21,7 @@ __afterAllRestore(() => {
 });
 
 vi.mock("@/lib/qtsp/qtsp-proxy-client", () => ({
-  fetchQTSPSignatureStatus: (...a: unknown[]) => estado(...a),
-  fetchQTSPSignatureArtifacts: (...a: unknown[]) => artefactos(...a),
+  reconcileVerifiedEADInterposition: (...a: unknown[]) => cierre(...a),
 }));
 
 const { useQTSPReconcile } = await import("../useQTSPReconcile");
@@ -42,138 +31,61 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-const IDS = { caseFileId: "cf-1", srId: "sr-1", documentId: "doc-1" };
+const INPUT = {
+  signatureRequestId: "11111111-1111-4111-8111-111111111111",
+  sourceDomain: "MINUTE" as const,
+  sourceId: "22222222-2222-4222-8222-222222222222",
+  artifactKind: "MINUTE_FINAL" as const,
+  contentHash: "a".repeat(64),
+};
 
 async function reconciliar() {
   const { result } = renderHook(() => useQTSPReconcile(), { wrapper });
-  result.current.mutate(IDS);
+  result.current.mutate(INPUT);
   await waitFor(() => expect(result.current.isSuccess || result.current.isError).toBe(true));
   return result.current;
 }
 
 beforeEach(() => {
-  estado.mockReset();
-  artefactos.mockReset();
+  cierre.mockReset();
 });
 
 describe("useQTSPReconcile", () => {
-  it("ACTIVE es solicitud: no se piden artefactos", async () => {
-    estado.mockResolvedValue({ status: "ACTIVE", documents: [] });
-    const r = await reconciliar();
-    expect(r.data?.outcome).toBe("SOLICITADA");
-    expect(r.data?.outcomeLabel).toBe("Firma solicitada — pendiente de firma");
-    expect(r.data?.artifacts).toBeNull();
-    expect(artefactos).not.toHaveBeenCalled();
-  });
-
-  it("PARTIALLY_SIGNED tampoco basta: faltan firmantes", async () => {
-    estado.mockResolvedValue({ status: "PARTIALLY_SIGNED", documents: [] });
-    const r = await reconciliar();
-    expect(r.data?.outcome).toBe("PARCIAL");
-    expect(artefactos).not.toHaveBeenCalled();
-  });
-
-  it("COMPLETED recupera los DOS artefactos", async () => {
-    estado.mockResolvedValue({ status: "COMPLETED", documents: [] });
-    artefactos.mockResolvedValue({
-      signedDocumentUrl: "https://ead/firmado.pdf",
-      signedDocumentError: null,
-      certificateUrl: "https://ead/certificado.pdf",
-      certificateError: null,
-      certificatePackageUrl: "https://ead/paquete.zip",
+  it("consulta directamente el cierre source-bound y proyecta el resultado verificado", async () => {
+    cierre.mockResolvedValue({
+      status: "VERIFIED",
+      providerStatus: "COMPLETED",
+      legalArtifactId: "33333333-3333-4333-8333-333333333333",
     });
+
     const r = await reconciliar();
+
+    expect(cierre).toHaveBeenCalledTimes(1);
+    expect(cierre).toHaveBeenCalledWith(INPUT);
     expect(r.data?.outcome).toBe("COMPLETADA");
-    // El documento firmado es el que contiene el acuerdo; el certificado
-    // acredita el proceso pero NO lleva el texto. Hacen falta los dos.
-    expect(r.data?.artifacts?.signedDocumentUrl).toBe("https://ead/firmado.pdf");
-    expect(r.data?.artifacts?.certificateUrl).toBe("https://ead/certificado.pdf");
-    expect(r.data?.avisos).toEqual([]);
-    expect(artefactos).toHaveBeenCalledWith("cf-1", "sr-1", "doc-1");
+    expect(r.data?.providerStatus).toBe("COMPLETED");
+    expect(r.data?.reconciliation?.legalArtifactId).toBe(
+      "33333333-3333-4333-8333-333333333333",
+    );
   });
 
-  it("un artefacto que falla no impide recuperar el otro", async () => {
-    estado.mockResolvedValue({ status: "COMPLETED", documents: [] });
-    artefactos.mockResolvedValue({
-      signedDocumentUrl: "https://ead/firmado.pdf",
-      signedDocumentError: null,
-      certificateUrl: null,
-      certificateError: "403 Forbidden",
-      certificatePackageUrl: null,
-    });
-    const r = await reconciliar();
-    expect(r.data?.artifacts?.signedDocumentUrl).toBe("https://ead/firmado.pdf");
-    expect(r.data?.avisos).toHaveLength(1);
-    expect(r.data?.avisos[0]).toContain("Certificado no recuperado");
-  });
+  it("sin proxy source-bound informa indisponibilidad sin elevar estado alguno", async () => {
+    cierre.mockResolvedValue(null);
 
-  it("si falla el documento firmado se avisa, y sigue sin ser fatal", async () => {
-    estado.mockResolvedValue({ status: "COMPLETED", documents: [] });
-    artefactos.mockResolvedValue({
-      signedDocumentUrl: null,
-      signedDocumentError: "aún no disponible",
-      certificateUrl: "https://ead/certificado.pdf",
-      certificateError: null,
-      certificatePackageUrl: null,
-    });
     const r = await reconciliar();
-    expect(r.data?.avisos[0]).toContain("Documento firmado no recuperado");
-    expect(r.data?.artifacts?.certificateUrl).toBe("https://ead/certificado.pdf");
-  });
 
-  it("proxy no desplegado: se informa sin romper el flujo", async () => {
-    estado.mockResolvedValue(null);
-    const r = await reconciliar();
     expect(r.data?.disponible).toBe(false);
     expect(r.data?.providerStatus).toBeNull();
-    expect(artefactos).not.toHaveBeenCalled();
-  });
-
-  it("una solicitud anulada no acredita firma", async () => {
-    estado.mockResolvedValue({ status: "CANCELLED", documents: [] });
-    const r = await reconciliar();
-    expect(r.data?.outcome).toBe("SIN_EFECTO");
-    expect(artefactos).not.toHaveBeenCalled();
-  });
-});
-
-describe("respuestas incompletas del proveedor (Codex adversarial)", () => {
-  it("COMPLETED sin artefactos no se queda callado", async () => {
-    // Un 2xx sin URLs dejaba el expediente como firmado y sin documento, sin
-    // que nadie se enterara.
-    estado.mockResolvedValue({ status: "COMPLETED", documents: [] });
-    artefactos.mockResolvedValue(null);
-    const r = await reconciliar();
-    expect(r.data?.outcome).toBe("COMPLETADA");
-    expect(r.data?.artifacts).toBeNull();
-    expect(r.data?.avisos.length).toBeGreaterThan(0);
-  });
-
-  it("COMPLETED con ambas URL nulas y sin error tampoco pasa en silencio", async () => {
-    estado.mockResolvedValue({ status: "COMPLETED", documents: [] });
-    artefactos.mockResolvedValue({
-      signedDocumentUrl: null,
-      signedDocumentError: null,
-      certificateUrl: null,
-      certificateError: null,
-      certificatePackageUrl: null,
-    });
-    const r = await reconciliar();
-    expect(r.data?.avisos.length).toBeGreaterThan(0);
-  });
-
-  it("un estado desconocido del proveedor no acredita firma", async () => {
-    // El proxy devuelve UNKNOWN cuando activó pero no pudo leer el estado.
-    estado.mockResolvedValue({ status: "UNKNOWN", documents: [] });
-    const r = await reconciliar();
-    expect(r.data?.outcome).toBe("SOLICITADA");
-    expect(artefactos).not.toHaveBeenCalled();
-  });
-
-  it("un cuerpo 2xx sin campo status se trata como no acreditado", async () => {
-    estado.mockResolvedValue({ documents: [] });
-    const r = await reconciliar();
     expect(r.data?.outcome).toBe("NO_SOLICITADA");
-    expect(artefactos).not.toHaveBeenCalled();
+    expect(r.data?.reconciliation).toBeNull();
+  });
+
+  it("propaga un rechazo source-bound y no lo degrada a estado genérico", async () => {
+    cierre.mockRejectedValue(new Error("source binding mismatch"));
+
+    const r = await reconciliar();
+
+    expect(r.isError).toBe(true);
+    expect(r.error?.message).toContain("source binding mismatch");
   });
 });

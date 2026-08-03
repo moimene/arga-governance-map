@@ -90,12 +90,12 @@ describe("alias de materias legacy", () => {
     expect(resolveMateriaAlias("NOMBRAMIENTO_CESE")).toBe("NOMBRAMIENTO_CONSEJERO");
     expect(resolveMateriaAlias("APROBACION_PRESUPUESTOS")).toBe("APROBACION_PRESUPUESTO");
     expect(resolveMateriaAlias("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
-      "SUPRESION_PREFERENTE",
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
     );
     expect(resolveMateriaAlias("CESE_CONSEJERO")).toBe("CESE_CONSEJERO");
   });
 
-  it("colapsa las dos materias del art. 308 con un rótulo jurídico conjunto", () => {
+  it("conserva las dos identidades del art. 308 con un rótulo jurídico conjunto", () => {
     const rows = buildMateriaCatalogRows([
       materiaRow({
         materia: "SUPRESION_PREFERENTE",
@@ -106,11 +106,18 @@ describe("alias de materias legacy", () => {
         materia_label_es: "Exclusión del derecho de suscripción preferente",
       }),
     ]);
-    const art308 = rows.filter((row) => row.materia === "SUPRESION_PREFERENTE");
-    expect(art308).toHaveLength(1);
-    expect(art308[0].materia_label_es).toBe(
-      "Exclusión o supresión del derecho de preferencia",
-    );
+    const art308 = rows.filter((row) => [
+      "SUPRESION_PREFERENTE",
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+    ].includes(row.materia));
+    expect(art308).toHaveLength(2);
+    expect(art308.map((row) => row.materia)).toEqual(expect.arrayContaining([
+      "SUPRESION_PREFERENTE",
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+    ]));
+    expect(art308.every((row) => (
+      row.materia_label_es === "Exclusión del derecho de preferencia —supresión total o parcial—"
+    ))).toBe(true);
   });
 
   it("colapsa la fila alias cuando existe la canónica (sin tarjetas duplicadas)", () => {

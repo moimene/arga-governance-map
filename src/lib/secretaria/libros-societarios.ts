@@ -72,6 +72,13 @@ export interface SocietaryBookView extends PersistedMandatoryBookLike {
   source_book_id: string | null;
 }
 
+export function persistedBookIdForActions(
+  book: Pick<SocietaryBookView, "id" | "source_book_id">,
+): string | null {
+  const candidate = book.source_book_id?.trim() || book.id?.trim();
+  return candidate && !candidate.startsWith("virtual:") ? candidate : null;
+}
+
 export interface BookPortfolioEntityLike {
   id: string;
   tenant_id?: string | null;

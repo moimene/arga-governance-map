@@ -1,10 +1,16 @@
-# Estado plantillas societarias TGMS — fuente única de verdad
+# Estado plantillas societarias TGMS — snapshot histórico de mayo de 2026
+
+> **Estado documental — fotografía histórica, superada desde 2026-07-21.** Ya no
+> es la fuente única del estado operativo. Se conserva como inventario de mayo.
+> Para el ciclo de convocatoria vigente, usar
+> `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`. Las cifras,
+> estados y referencias a firma de este documento requieren nueva verificación.
 
 > **Última actualización:** 2026-05-04
 > **Cliente demo:** Grupo ARGA Seguros (pseudónimo)
 > **Estado de evidencia:** demo / operativa
 >
-> Este es el ÚNICO documento que necesitas leer para entender el estado actual de las plantillas. Todo lo demás en este directorio es material de trabajo o anexo técnico.
+> Este fue el documento de consolidación de mayo; no debe utilizarse por sí solo para describir el estado actual.
 
 ---
 

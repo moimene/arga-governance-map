@@ -26,6 +26,7 @@ import { useAgreement, useAgreementCompliance, type ComplianceResult } from "@/h
 import { useAgreementSignedDocumentUrl } from "@/hooks/useEvidenceBundleSignedUrl";
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useQTSPVerification } from "@/hooks/useQTSPVerification";
+import { resolveAgreementApprovalEadAction } from "@/lib/secretaria/agreement-approval-ead";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { useAgreementNormativeSnapshot } from "@/hooks/useNormativeFramework";
 import { useAgreementRuleSnapshot } from "@/hooks/useRuleManager";
@@ -48,6 +49,10 @@ import { AgreementDocumentRequirementsPanel } from "@/components/secretaria/Agre
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { REVIEW_STATE_VIEW } from "@/lib/motor-plantillas";
 import { useTenantContext } from "@/context/TenantContext";
+import {
+  certificationSignatureForPresentation,
+  type CertificationLegalGateStatus,
+} from "@/lib/secretaria/authoritative-legal-state";
 
 interface RuleEvaluationResult {
   id: string;
@@ -67,6 +72,7 @@ interface AgreementCertRow {
   id: string;
   tipo_certificacion: string | null;
   signature_status: string | null;
+  legal_gate_status: CertificationLegalGateStatus | null;
   created_at: string;
   agreement_id: string | null;
   agreements_certified: string[] | null;
@@ -273,7 +279,7 @@ export default function ExpedienteAcuerdo() {
       const { data, error } = await supabase
         .from("certifications")
         .select(
-          "id, tipo_certificacion, signature_status, created_at, agreement_id, agreements_certified, minute_id",
+          "id, tipo_certificacion, signature_status, legal_gate_status, created_at, agreement_id, agreements_certified, minute_id",
         )
         .or(`agreement_id.eq.${id},agreements_certified.cs.{${id}}`)
         .order("created_at", { ascending: false });
@@ -555,6 +561,10 @@ export default function ExpedienteAcuerdo() {
             <Card icon={<FileSignature className="h-4 w-4" />} title="Certificaciones">
               <ul className="space-y-2">
                 {certificaciones.map((c) => {
+                  const signaturePresentation = certificationSignatureForPresentation({
+                    legalGateStatus: c.legal_gate_status,
+                    signatureStatus: c.signature_status,
+                  });
                   const agreementParam = a.entity_id
                     ? `&agreement=${encodeURIComponent(id!)}`
                     : "";
@@ -574,7 +584,9 @@ export default function ExpedienteAcuerdo() {
                           {c.tipo_certificacion ?? "Certificación"}
                         </span>
                         <span className="text-xs text-[var(--g-text-secondary)]">
-                          {statusLabel(c.signature_status ?? "—")}
+                          {c.legal_gate_status === "DEMO_SIMULATION"
+                            ? signaturePresentation.label
+                            : statusLabel(signaturePresentation.status)}
                         </span>
                       </span>
                       <Link
@@ -639,8 +651,6 @@ export default function ExpedienteAcuerdo() {
             currentUserRole={primaryRole}
             currentUserName={displayName}
             initialWorkflow={normalizeApprovalWorkflow(a.approval_workflow)}
-            /* ITEM-105: cuando el documento ya está firmado/archivado (document_url),
-               el paso QES_FIRMA puede completarse y alcanzar 'totalmente aprobado'. */
             documentArchived={Boolean(a.document_url)}
           />
 
@@ -1656,15 +1666,21 @@ function normalizeApprovalWorkflow(value: Record<string, unknown>[] | null): App
       const id = typeof raw.id === "string" ? raw.id : "";
       if (!id) return null;
 
-      const role = typeof raw.role === "string" && raw.role.trim()
+      const legacySignatureStep = id === "QES_FIRMA";
+      const normalizedId = legacySignatureStep ? "ARCHIVO_DOCUMENTAL" : id;
+      const role = legacySignatureStep
+        ? "ARCHIVO_DOCUMENTAL"
+        : typeof raw.role === "string" && raw.role.trim()
         ? raw.role
         : id;
-      const label = typeof raw.label === "string" && raw.label.trim()
+      const label = legacySignatureStep
+        ? "Archivo documental"
+        : typeof raw.label === "string" && raw.label.trim()
         ? raw.label
         : role;
 
       return {
-        id,
+        id: normalizedId,
         label,
         role,
         approvedAt: typeof raw.approvedAt === "string" ? raw.approvedAt : null,
@@ -1687,7 +1703,7 @@ function makeDefaultSteps(): ApprovalStep[] {
     { id: "SECRETARIO",   label: "Revisión Secretaría",         role: "SECRETARIO",   approvedAt: null, approvedBy: null },
     { id: "COMITE_LEGAL", label: "Validación comité legal",     role: "COMITE_LEGAL", approvedAt: null, approvedBy: null },
     { id: "PRESIDENTE",   label: "Aprobación Presidente",        role: "PRESIDENTE",   approvedAt: null, approvedBy: null },
-    { id: "QES_FIRMA",    label: "Firma electrónica",        role: "QES_FIRMA",    approvedAt: null, approvedBy: null },
+    { id: "ARCHIVO_DOCUMENTAL", label: "Archivo documental", role: "ARCHIVO_DOCUMENTAL", approvedAt: null, approvedBy: null },
   ];
 }
 
@@ -1717,6 +1733,7 @@ function ApprovalWorkflowCard({
 
   const currentIdx = steps.findIndex((s) => s.approvedAt === null);
   const allApproved = currentIdx === -1;
+  const eadAction = resolveAgreementApprovalEadAction({ documentArchived });
 
   // ITEM-105: saveWorkflow ya no ignora el error del update. Si la escritura falla,
   // se revierte el estado en memoria al valor previo y se avisa con toast.error, en
@@ -1736,19 +1753,15 @@ function ApprovalWorkflowCard({
   }, [agreementId, tenantId, qc]);
 
   const approveStep = useCallback((idx: number) => {
-    const isLast = idx === steps.length - 1;
-    // ITEM-105: el último paso (QES_FIRMA) solo se marca aprobado cuando el documento
-    // ya está firmado/archivado (document_url presente). Si aún no se ha firmado, se
-    // navega al generador de documento para ejecutar la firma; al volver con el
-    // documento archivado, este paso ya es completable y se alcanza 'totalmente
-    // aprobado'. Antes el último paso solo navegaba y nunca marcaba approvedAt, dejando
-    // el estado allApproved inalcanzable.
-    if (isLast && !documentArchived) {
+    const step = steps[idx];
+    // Este paso acredita que existe un artefacto archivado y trazado. La
+    // interposición o el e-archiving de EAD se registran por separado y no se
+    // convierten en una exigencia de firma electrónica.
+    if (step.id === "ARCHIVO_DOCUMENTAL" && !eadAction.canApprove) {
       onNavigateGenerar();
       return;
     }
     const prev = steps;
-    const step = steps[idx];
     const approverName =
       step.role === currentUserRole && currentUserName
         ? currentUserName
@@ -1760,7 +1773,7 @@ function ApprovalWorkflowCard({
     );
     setSteps(next);
     saveWorkflow(next, prev);
-  }, [steps, onNavigateGenerar, currentUserRole, currentUserName, saveWorkflow, documentArchived]);
+  }, [steps, onNavigateGenerar, currentUserRole, currentUserName, saveWorkflow, eadAction.canApprove]);
 
   const resetWorkflow = useCallback(() => {
     const fresh = makeDefaultSteps();
@@ -1776,7 +1789,7 @@ function ApprovalWorkflowCard({
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-[var(--status-success)]">
             <CheckCircle2 className="h-5 w-5" />
-            Acuerdo totalmente aprobado y firmado
+            Acuerdo aprobado y documentado
           </div>
           <button
             type="button"
@@ -1855,10 +1868,10 @@ function ApprovalWorkflowCard({
                       className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
-                      {step.id === "QES_FIRMA" ? (
+                      {step.id === "ARCHIVO_DOCUMENTAL" ? (
                         <>
                           <Lock className="h-3 w-3" />
-                          Solicitar firma
+                          {eadAction.label}
                         </>
                       ) : (
                         <>
@@ -1867,6 +1880,13 @@ function ApprovalWorkflowCard({
                         </>
                       )}
                     </button>
+                    {step.id === "ARCHIVO_DOCUMENTAL" ? (
+                      <p className="mt-2 text-[11px] text-[var(--g-text-secondary)]">
+                        {eadAction.canApprove
+                          ? "El expediente ya tiene un artefacto archivado y trazado. Registra el cierre documental."
+                          : "Genera y archiva el documento. La intervención EAD es un servicio probatorio separado, no un requisito de firma."}
+                      </p>
+                    ) : null}
                     </>
                   )}
                 </div>

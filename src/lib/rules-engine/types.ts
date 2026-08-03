@@ -555,6 +555,12 @@ export interface ConvocatoriaInput {
    */
   jurisdiction?: string;
   /**
+   * Plazo operativo del reglamento del órgano, resuelto desde el rule set
+   * vigente de la entidad. Solo se aplica a consejo/comisiones: nunca puede
+   * rebajar el plazo legal de una Junta General.
+   */
+  organoNoticeDays?: number;
+  /**
    * ITEM-093: fecha real (prevista) de publicación / notificación de la
    * convocatoria en formato date-only 'YYYY-MM-DD'. Opcional para
    * retro-compat. Cuando se pasa, el motor compara contra

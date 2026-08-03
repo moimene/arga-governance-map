@@ -15,7 +15,7 @@ Run focused security review when work touches authorization, Supabase policies, 
 ## When to Trigger
 - Migrations change RLS, SECURITY DEFINER RPCs, or audit/evidence tables.
 - Hooks read or mutate tenant-scoped data.
-- Code touches QTSP signing, ERDS, storage archival, or generated documents.
+- Code touches EAD Trust interposition/messaging/e-archiving, legacy signing/ERDS compatibility paths, storage archival, or generated documents.
 - Dependencies or MCP/orchestration tooling change.
 
 ## When to Skip
@@ -27,6 +27,10 @@ Run focused security review when work touches authorization, Supabase policies, 
 - Tenant scoping is explicit and consistent.
 - SECURITY DEFINER functions validate tenant/entity scope.
 - Evidence hashes and WORM assumptions remain intact.
+- Final convocatoria uploads have prior immutable intents, exact expected-set matching, and server-side rendering from the WORM manifest.
+- The intent-binding schema remains aligned with migration `20260720149000_secretaria_supporting_attachment_intent_binding.sql`.
+- Emitted or rectified captures cannot be mutated; corrections create a new capture.
+- EAD Trust claims are limited to interposition, basic messaging, and custody/e-archiving. Legacy signature/ERDS paths fail closed and cannot imply signature, sending, or delivery.
 - No secrets are logged, committed, or stored in Ruflo memory.
 - Demo-only shortcuts are named as such and isolated.
 
@@ -34,7 +38,7 @@ Run focused security review when work touches authorization, Supabase policies, 
 Route a security review:
 
 ```bash
-bun run agents:route -- "security review of Supabase RPC and QTSP pipeline"
+bun run agents:route -- "security review of Supabase RPC and EAD Trust evidence pipeline"
 ```
 
 Run project verification after fixes:

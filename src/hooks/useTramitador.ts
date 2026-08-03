@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import {
   buildCertificationRegistryIntake,
+  isCertificationEvidenced,
   parseMeetingPointReference,
   type CertificationRegistryIntake,
 } from "@/lib/secretaria/certification-registry-intake";
@@ -28,6 +29,12 @@ export interface FilingRow {
   created_at: string;
   updated_at: string;
   agreement_id: string | null;
+  workflow_version?: number | null;
+  entity_id?: string | null;
+  source_domain?: string | null;
+  source_id?: string | null;
+  base_document_kind?: string | null;
+  qualification_outcome?: string | null;
   agreement_entity_id?: string | null;
 }
 
@@ -48,7 +55,6 @@ export function useTramitacionesList(entityId?: string | null) {
 
         if (agreementsError) throw agreementsError;
         agreementIds = (agreements ?? []).map((agreement) => agreement.id);
-        if (agreementIds.length === 0) return [];
       }
 
       let query = supabase
@@ -58,7 +64,9 @@ export function useTramitacionesList(entityId?: string | null) {
         .order("presentation_date", { ascending: false });
 
       if (agreementIds) {
-        query = query.in("agreement_id", agreementIds);
+        query = agreementIds.length > 0
+          ? query.or(`entity_id.eq.${entityId},agreement_id.in.(${agreementIds.join(",")})`)
+          : query.eq("entity_id", entityId!);
       }
 
       const { data, error } = await query;
@@ -98,7 +106,7 @@ export function useCertificationRegistryIntake(certificationId: string | null | 
     queryFn: async (): Promise<CertificationRegistryIntake | null> => {
       const { data: certification, error: certificationError } = await supabase
         .from("certifications")
-        .select("id, tenant_id, agreement_id, agreements_certified, signature_status, evidence_id, minute_id, created_at, gate_hash")
+        .select("id, tenant_id, agreement_id, agreements_certified, signature_status, legal_gate_status, interposition_canonical_status, evidence_id, minute_id, created_at, gate_hash")
         .eq("id", certificationId!)
         .eq("tenant_id", tenantId!)
         .maybeSingle();
@@ -124,10 +132,30 @@ export function useCertificationRegistryIntake(certificationId: string | null | 
         agreement_id?: string | null;
         agreements_certified?: string[] | null;
         signature_status?: string | null;
+        legal_gate_status?: string | null;
+        interposition_canonical_status?: string | null;
         evidence_id?: string | null;
         minute_id?: string | null;
         gate_hash?: string | null;
       };
+      let baseDocumentArtifact:
+        | { id: string; document_url: string | null }
+        | null = null;
+      if (raw.evidence_id && minute?.entity_id) {
+        const { data: artifactData, error: artifactError } = await supabase
+          .from("secretaria_document_artifacts")
+          .select("id, document_url")
+          .eq("tenant_id", tenantId!)
+          .eq("entity_id", minute.entity_id)
+          .eq("source_domain", "certification")
+          .eq("source_id", raw.id)
+          .eq("evidence_bundle_id", raw.evidence_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (artifactError) throw artifactError;
+        baseDocumentArtifact = artifactData as typeof baseDocumentArtifact;
+      }
       const parsedPointRefs = (raw.agreements_certified ?? [])
         .map((reference) => ({ reference, parsed: parseMeetingPointReference(reference) }))
         .filter((item): item is { reference: string; parsed: { meetingId: string; agendaItemIndex: number } } =>
@@ -172,7 +200,11 @@ export function useCertificationRegistryIntake(certificationId: string | null | 
         resolvedPointAgreementIds,
         unresolvedPointReferences,
         signatureStatus: raw.signature_status,
+        legalGateStatus: raw.legal_gate_status,
+        interpositionCanonicalStatus: raw.interposition_canonical_status,
         evidenceId: raw.evidence_id,
+        baseDocumentArtifactId: baseDocumentArtifact?.id ?? null,
+        baseDocumentUrl: baseDocumentArtifact?.document_url ?? null,
         gateHash: raw.gate_hash,
         entityId: minute?.entity_id ?? null,
         bodyId: minute?.body_id ?? null,
@@ -184,10 +216,12 @@ export function useCertificationRegistryIntake(certificationId: string | null | 
 
 /**
  * ITEM-106 (Comité Legal + Garrigues): ¿el acuerdo tiene una certificación
- * FIRMADA que lo cubra? Sin ella, la elevación a público no debe registrarse
+ * EMITIDA y evidenciada que lo cubra? Sin ella, la elevación a público no debe registrarse
  * (art. 107 RRM: la inscripción exige título — escritura o certificación con el
  * acuerdo). Se consulta por `agreement_id` directo o por `agreements_certified`
- * que contenga el id. Devuelve `false` solo cuando no consta ninguna firmada.
+ * que contenga el id. Devuelve `false` solo cuando no consta ninguna emisión
+ * con constancia/custodia verificable (las filas SIGNED se admiten solo como
+ * compatibilidad histórica).
  */
 export function useAgreementHasCertification(agreementId: string | null | undefined) {
   const { tenantId } = useTenantContext();
@@ -197,14 +231,15 @@ export function useAgreementHasCertification(agreementId: string | null | undefi
     queryFn: async (): Promise<boolean> => {
       const { data, error } = await supabase
         .from("certifications")
-        .select("id, signature_status")
+        .select("id, signature_status, legal_gate_status, interposition_canonical_status")
         .eq("tenant_id", tenantId!)
         .or(`agreement_id.eq.${agreementId},agreements_certified.cs.{${agreementId}}`);
       if (error) throw error;
-      const SIGNED = new Set(["SIGNED", "FIRMADA", "EMITIDA", "ISSUED", "SEALED", "EMITTED"]);
-      return (data ?? []).some((c) =>
-        SIGNED.has(String((c as { signature_status?: string | null }).signature_status ?? "").toUpperCase()),
-      );
+      return (data ?? []).some((certification) => isCertificationEvidenced({
+        signatureStatus: certification.signature_status,
+        legalGateStatus: certification.legal_gate_status,
+        interpositionCanonicalStatus: certification.interposition_canonical_status,
+      }));
     },
   });
 }

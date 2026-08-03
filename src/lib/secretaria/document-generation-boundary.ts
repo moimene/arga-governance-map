@@ -13,6 +13,7 @@ export type SecretariaDocumentType =
   | "INFORME_PRECEPTIVO"
   | "INFORME_DOCUMENTAL_PRE"
   | "INFORME_GESTION"
+  | "MODELO_ACUERDO"
   | "ACUERDO_SIN_SESION"
   | "DECISION_UNIPERSONAL"
   | "DOCUMENTO_REGISTRAL"
@@ -136,6 +137,12 @@ const DOC_TYPE_RULES: Record<SecretariaDocumentType, DocTypeRules> = {
     agreement_ids: { min: 0 },
     require: [],
     forbid: ["minute_id", "certification_id", "tramitador_id"],
+    require_entity_id: true,
+  },
+  MODELO_ACUERDO: {
+    agreement_ids: { min: 1 },
+    require: [],
+    forbid: [],
     require_entity_id: true,
   },
   ACTA: {

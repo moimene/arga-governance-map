@@ -1,5 +1,12 @@
 # Especificación Funcional — Módulo de Secretaría Societaria TGMS
 
+> **Estado documental — target histórico pendiente de re-ratificación desde
+> 2026-07-21.** Esta spec no acredita implementación ni autorización contractual
+> de QES, QSeal, TSQ o ERDS. Toda ampliación de la política vigente de EAD Trust
+> —interposición, mensajería básica y custodia/e-archiving— requiere nueva
+> validación jurídica, contractual y técnica. El estado UAT actual se documenta en
+> `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`.
+
 ## De prototipo operativo avanzado a plataforma productiva de gestión de sociedades
 
 ---
@@ -711,4 +718,3 @@ Las 13 limitaciones del Anexo C del documento de referencia, con el requisito qu
 ---
 
 *Especificación funcional del estado objetivo productivo del Módulo de Secretaría Societaria TGMS. Basada en la descripción funcional verificada del 13-jun-2026 y la revisión del Comité Legal. Las capacidades marcadas MANTENER reflejan el estado verificado en `governance_OS`; las marcadas NUEVO/CAMBIO son requisitos de evolución forward-only sujetos a los guardrails del repositorio. Documento de continuidad: punto de entrada para conversaciones de ejecución por fase (F0→F3).*
-

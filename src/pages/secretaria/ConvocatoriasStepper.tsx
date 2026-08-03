@@ -3,20 +3,25 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, Check, ChevronDown, ChevronRight, Copy,
-  AlertTriangle, FileText, Globe, Plus, Send, ShieldCheck, Trash2, Users,
+  AlertTriangle, FileText, Globe, Plus, ShieldCheck, Trash2, Users,
 } from "lucide-react";
 import { evaluarConvocatoria, tiposPlantillaConvocatoriaPreferidos } from "@/lib/rules-engine";
 import { segundaConvocatoriaGapIncumplido, gapSegundaConvocatoriaHoras } from "@/lib/secretaria/segunda-convocatoria";
 import type { ConvocatoriaInput, RulePack, RuleParamOverride, RuleResolution, TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import { resolveOrganoTipo } from "@/lib/secretaria/organo-resolver";
 import {
+  AGENDA_INFORMATIVE_MATERIAS,
   AGENDA_MATERIAS,
   LMV_COTIZADA_ADVERTENCIAS,
   MATERIAS_LIBRES,
+  agendaItemsForDecisionEngine,
+  agendaMateriaSelectionForKind,
   agendaMateriaGroups,
+  isMateriaInformativa,
   isMateriaCompatibleWithOrgano,
   labelMateria,
   materiaDefaultForOrgano,
+  materiaInformativaDefault,
   resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
 import { checkNoticePeriodByType, useEntityRules } from "@/hooks/useJurisdiccionRules";
@@ -30,21 +35,23 @@ import {
   useConvocatoriaById,
   useCreateConvocatoria,
   useUploadConvocatoriaAttachment,
+  buildSupportingAttachmentIntents,
   type AgendaItem,
   type ConvocatoriaWithBody,
+  type SupportingAttachmentIntent,
 } from "@/hooks/useConvocatorias";
-// ITEM-064: paso de envío de la comunicación de convocatoria (genera la fila
-// en `communications` vía `fn_create_communication_atomic`). Se monta en la
-// pantalla de éxito tras emitir, respetando la decisión adversarial M4
-// (wiring desde el stepper sin tocar el state management del monolito).
-import { PasoEnvioMiembros } from "@/components/secretaria/comunicaciones/PasoEnvioMiembros";
-import type { OrganoTipo as CommsOrganoTipo } from "@/lib/comms/types";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import { useCapitalHoldings } from "@/hooks/useCapitalHoldings";
+import { usePresidenteVigente } from "@/hooks/useAuthorityEvidence";
+import { useShareholderRepresentationCandidates } from "@/hooks/useDelegations";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
 import { Capa3Form } from "@/components/secretaria/Capa3Form";
 import { selectProcessTemplate } from "@/lib/doc-gen/process-documents";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  DOCUMENT_DEMO_NOTICE,
+  normalizeVisibleDocumentText,
+} from "@/lib/doc-gen/document-output-normalizer";
 import type { AgendaItemKind, AgendaDecisionSubtype } from "@/lib/secretaria/agenda-kind";
 import { useRuleResolutions } from "@/hooks/useRuleResolution";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
@@ -68,16 +75,34 @@ import {
   buildTemplateTraceEvidence,
   resolveTemplateProcessMatrix,
 } from "@/lib/secretaria/template-process-matrix";
+import { resolveWorkflowDateTimeInputParts } from "@/lib/secretaria/workflow-date-semantics";
+import {
+  EAD_INTERPOSITION_CHANNEL,
+  channelsForNewCapture,
+  isLegacyErdsChannel,
+} from "@/lib/secretaria/ead-channel-semantics";
+import {
+  buildSoleShareholderRepresentativeProposal,
+  evaluateAnnualAccountsTimeliness,
+  hasSoleShareholderRepresentativeConditions,
+} from "@/lib/secretaria/convocation-agenda-gates";
+
+const WORKFLOW_TIME_ZONE_BY_JURISDICTION: Record<string, string> = {
+  ES: "Europe/Madrid",
+  PT: "Europe/Lisbon",
+  BR: "America/Sao_Paulo",
+  MX: "America/Mexico_City",
+};
 
 const STEPS = [
   { n: 1, label: "Sociedad y órgano",      hint: "Seleccionar sociedad, órgano convocante y tipo de reunión" },
   { n: 2, label: "Fecha y plazo legal",     hint: "Calcular antelación según jurisdicción y forma jurídica" },
   { n: 3, label: "Orden del día",           hint: "Clasificar ítems en ordinaria / estatutaria / estructural" },
   { n: 4, label: "Destinatarios",           hint: "Miembros del órgano que recibirán la convocatoria" },
-  { n: 5, label: "Canales de publicación",  hint: "BORME / PSM / JORNAL / web corporativa / ERDS" },
+  { n: 5, label: "Publicación y comunicación", hint: "Publicación / notificación / interposición EAD" },
   { n: 6, label: "Adjuntos",                hint: "Documentos de referencia y propuestas que se adjuntan" },
   { n: 7, label: "Borrador documento",      hint: "Plantilla + capa 3 editable + borrador final del texto" },
-  { n: 8, label: "Revisión y emisión",      hint: "Verificación de compliance y emisión definitiva" },
+  { n: 8, label: "Revisión y registro",     hint: "Verificación y registro de la simulación DEMO sin efecto jurídico" },
 ];
 
 const JURIS_FLAGS: Record<string, string> = { ES: "🇪🇸", PT: "🇵🇹", BR: "🇧🇷", MX: "🇲🇽" };
@@ -86,7 +111,10 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
   ES: [
     { value: "WEB_CORPORATIVA",    label: "Web corporativa (art. 173 LSC)", recommended: true },
     { value: "BORME",              label: "BORME" },
-    { value: "ERDS",               label: "Notificación ERDS (EAD Trust)", recommended: true },
+    {
+      value: EAD_INTERPOSITION_CHANNEL,
+      label: "EAD Trust · interposición, mensajería básica y custodia (sin firma ni ERDS)",
+    },
     { value: "CORREO_CERTIFICADO", label: "Correo certificado" },
     { value: "BUROFAX",            label: "Burofax" },
     { value: "EMAIL_SIMPLE",       label: "Email simple a los miembros del órgano" },
@@ -95,7 +123,10 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
     { value: "JORNAL_OFICIAL",  label: "Diário da República", recommended: true },
     { value: "JORNAL_DIARIO",   label: "Jornal diário de grande circulação" },
     { value: "WEB_CORPORATIVA", label: "Site corporativo" },
-    { value: "ERDS",            label: "Notificação ERDS certificada (EAD Trust)" },
+    {
+      value: EAD_INTERPOSITION_CHANNEL,
+      label: "EAD Trust · interposição, mensagem básica e custódia (sem assinatura nem ERDS)",
+    },
     { value: "EMAIL_SIMPLE",    label: "Email simple aos membros do órgão" },
   ],
   BR: [
@@ -108,7 +139,10 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
     { value: "DOF",                label: "Diario Oficial de la Federación", recommended: true },
     { value: "CORREO_CERTIFICADO", label: "Correo certificado a socios" },
     { value: "WEB_CORPORATIVA",    label: "Sitio corporativo" },
-    { value: "ERDS",               label: "Notificación ERDS (EAD Trust)" },
+    {
+      value: EAD_INTERPOSITION_CHANNEL,
+      label: "EAD Trust · interposición, mensajería básica y custodia (sin firma ni ERDS)",
+    },
     { value: "EMAIL_SIMPLE",       label: "Email simple a los miembros del órgano" },
   ],
 };
@@ -121,15 +155,15 @@ const CHANNEL_OPTIONS: Record<string, { value: string; label: string; recommende
 // (BORME etc.) que no aplica.
 //
 // Reglas:
-//   JUNTA → todos los canales (publicidad oficial art. 173 LSC + ERDS)
+//   JUNTA → todos los canales (publicidad oficial art. 173 LSC + EAD opcional)
 //   CDA / COMISION / COMITE / COMISION_DELEGADA → notificación directa
-//     al miembro (email, correo certificado, ERDS, burofax)
+//     al miembro (email, correo certificado, interposición EAD, burofax)
 const CHANNELS_RELEVANT_BY_BODY_TYPE: Record<string, Set<string>> = {
   JUNTA: new Set([]),  // empty = no filter, mostrar todos
-  CDA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
-  COMISION: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
-  COMISION_DELEGADA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
-  COMITE: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", "ERDS", "BUROFAX"]),
+  CDA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", EAD_INTERPOSITION_CHANNEL, "BUROFAX"]),
+  COMISION: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", EAD_INTERPOSITION_CHANNEL, "BUROFAX"]),
+  COMISION_DELEGADA: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", EAD_INTERPOSITION_CHANNEL, "BUROFAX"]),
+  COMITE: new Set(["EMAIL_SIMPLE", "CORREO_CERTIFICADO", EAD_INTERPOSITION_CHANNEL, "BUROFAX"]),
 };
 
 // BATCH 8.3 (ronda 2 U-A): tooltips para clarificar las 3 clases de materia.
@@ -225,7 +259,8 @@ const CHANNEL_LABELS: Record<string, string> = {
   NOTIFICACION: "Notificación individual",
   PERSONALIZADA: "Notificación individual personalizada",
   NOTIFICACION_CERTIFICADA: "Notificación certificada",
-  ERDS: "Notificación ERDS (EAD Trust)",
+  EAD_INTERPOSITION: "EAD Trust · interposición, mensajería básica y custodia (sin firma ni ERDS)",
+  ERDS: "Canal ERDS histórico · capacidad no acreditada en la demo",
   CORREO_CERTIFICADO: "Correo certificado",
   BUROFAX: "Burofax",
   EMAIL_CON_ACUSE: "Email con acuse",
@@ -234,24 +269,32 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 const MANDATE_ROLE_PRIORITY: Record<string, number> = {
   PRESIDENTE: 1,
-  SECRETARIO: 2,
-  VICEPRESIDENTE: 3,
-  CONSEJERO_COORDINADOR: 4,
-  CONSEJERO: 5,
+  VICEPRESIDENTE: 2,
+  CONSEJERO_COORDINADOR: 3,
+  CONSEJERO: 4,
 };
 
+const POLITICAL_BOARD_RECIPIENT_ROLES = new Set([
+  "CONSEJERO",
+  "PRESIDENTE",
+  "VICEPRESIDENTE",
+  "CONSEJERO_COORDINADOR",
+]);
+
 function newAgendaItem(organoTipo: TipoOrgano = "JUNTA_GENERAL"): AgendaItem {
-  const materia = materiaDefaultForOrgano(organoTipo);
+  const materia = materiaInformativaDefault();
   return {
     id: crypto.randomUUID(),
     titulo: "",
     materia: materia.value,
-    tipo: materia.tipo,
-    inscribible: materia.inscribible,
-    // agenda_item.kind v3.1: default DELIBERATIVO (coincide con BD default).
-    kind: "DELIBERATIVO",
+    tipo: "ORDINARIA",
+    inscribible: false,
+    // La UI crea un punto informativo explícito con categoría visible. Así
+    // nunca nace con una materia decisoria oculta bajo el default de BD.
+    kind: "INFORMATIVO",
     decision_subtype: null,
     propuesta_acuerdo: null,
+    requires_attachments: false,
   };
 }
 
@@ -319,16 +362,23 @@ function channelLabel(value: string, options = CHANNEL_OPTIONS["ES"]) {
 function channelSatisfiesReminder(selected: string, reminder: string) {
   const selectedValue = normalizeChannel(selected);
   const reminderValue = normalizeChannel(reminder);
+  // Los códigos históricos son únicamente legibles: ni siquiera una
+  // coincidencia literal puede convertirlos en capacidad válida de captura.
+  if (isLegacyErdsChannel(selectedValue) || isLegacyErdsChannel(reminderValue)) return false;
   if (selectedValue === reminderValue) return true;
 
   const webChannels = new Set(["WEB_SOCIEDAD", "WEB_CORPORATIVA"]);
   if (webChannels.has(selectedValue) && webChannels.has(reminderValue)) return true;
 
+  // La interposición EAD solo satisface el recordatorio canónico homónimo. No
+  // se interpreta como una capacidad histórica distinta ni como acreditación
+  // de un resultado externo.
+  if (selectedValue === EAD_INTERPOSITION_CHANNEL || reminderValue === EAD_INTERPOSITION_CHANNEL) return false;
+
   const individualNoticeChannels = new Set([
     "NOTIFICACION",
     "PERSONALIZADA",
     "NOTIFICACION_CERTIFICADA",
-    "ERDS",
     "CORREO_CERTIFICADO",
     "BUROFAX",
     "EMAIL_CON_ACUSE",
@@ -387,17 +437,56 @@ function isFormatoReunion(value: string | null | undefined): value is "PRESENCIA
 function normalizeAgendaDraftItems(items: ConvocatoriaWithBody["agenda_items"], organoTipo: TipoOrgano): AgendaItem[] {
   if (!Array.isArray(items) || items.length === 0) return [newAgendaItem(organoTipo)];
   return items.map((item) => {
-    const materia = item.materia ?? materiaDefaultForOrgano(organoTipo).value;
+    const kind = item.kind ?? "DELIBERATIVO";
+    const rawMateria = item.materia ?? "";
+    // Los expedientes anteriores a la ruta gobernada conservan el código
+    // genérico NOMBRAMIENTO_REPRESENTANTE_FILIAL. En una nueva captura no
+    // puede quedar como valor huérfano (el catálogo ya no lo ofrece): lo
+    // elevamos a la materia canónica para que el Paso 3 exija filial,
+    // representante, delegación vigente y propuesta condicionada.
+    const normalizedRawMateria =
+      kind === "DECISORIO" && rawMateria === "NOMBRAMIENTO_REPRESENTANTE_FILIAL"
+        ? "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+        : rawMateria;
+    const materia = kind === "DECISORIO"
+      ? (
+          isMateriaInformativa(normalizedRawMateria)
+            ? materiaDefaultForOrgano(organoTipo).value
+            : normalizedRawMateria || materiaDefaultForOrgano(organoTipo).value
+        )
+      : (isMateriaInformativa(normalizedRawMateria) ? normalizedRawMateria : "");
     const meta = AGENDA_MATERIAS.find((m) => m.value === materia);
     return {
       id: crypto.randomUUID(),
       titulo: item.titulo ?? "",
       materia,
       tipo: ((item.tipo ?? meta?.tipo ?? "ORDINARIA") as AgendaItem["tipo"]),
-      inscribible: item.inscribible ?? meta?.inscribible ?? false,
-      kind: item.kind ?? "DELIBERATIVO",
-      decision_subtype: item.kind === "DECISORIO" ? (item.decision_subtype ?? null) : null,
-      propuesta_acuerdo: item.kind === "DECISORIO" ? (item.propuesta_acuerdo ?? null) : null,
+      inscribible: kind === "DECISORIO" ? (item.inscribible ?? meta?.inscribible ?? false) : false,
+      kind,
+      decision_subtype: kind === "DECISORIO" ? (item.decision_subtype ?? null) : null,
+      propuesta_acuerdo: kind === "DECISORIO" ? (item.propuesta_acuerdo ?? null) : null,
+      requires_attachments:
+        kind === "DECISORIO" && (materia === "FORMULACION_CUENTAS" || item.requires_attachments === true),
+      target_entity_id:
+        materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+          ? (item.target_entity_id ?? null)
+          : null,
+      representative_person_id:
+        materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+          ? (item.representative_person_id ?? null)
+          : null,
+      representation_authority_route:
+        materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+          ? (item.representation_authority_route ?? null)
+          : null,
+      representation_delegation_id:
+        materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+          ? (item.representation_delegation_id ?? null)
+          : null,
+      representation_evidence_status:
+        materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+          ? (item.representation_evidence_status ?? null)
+          : null,
     };
   });
 }
@@ -453,16 +542,6 @@ function serializeRuleResolution(resolution: RuleResolution) {
   };
 }
 
-// ITEM-064: el stepper razona en `TipoOrgano` del motor V2 (JUNTA_GENERAL /
-// CONSEJO / COMISION_DELEGADA), mientras que el módulo de comunicaciones usa
-// `OrganoTipo` (JUNTA_GENERAL / CONSEJO_ADMIN / COMISION_DELEGADA / ...).
-// Mapeo conservador para alimentar PasoEnvioMiembros.
-function toCommsOrganoTipo(organoTipo: TipoOrgano): CommsOrganoTipo {
-  if (organoTipo === "JUNTA_GENERAL") return "JUNTA_GENERAL";
-  if (organoTipo === "COMISION_DELEGADA") return "COMISION_DELEGADA";
-  return "CONSEJO_ADMIN";
-}
-
 export default function ConvocatoriasStepper() {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
@@ -506,11 +585,6 @@ export default function ConvocatoriasStepper() {
   const [current, setCurrent] = useState(1);
   const [expandExplain, setExpandExplain] = useState(false);
   const [emitidoId, setEmitidoId] = useState<string | null>(null);
-  // ITEM-064: en la pantalla de éxito, abre el paso de generación de la
-  // comunicación de convocatoria (PasoEnvioMiembros). `comunicacionId` guarda
-  // la fila creada para reflejar el éxito.
-  const [enviarComOpen, setEnviarComOpen] = useState(false);
-  const [comunicacionId, setComunicacionId] = useState<string | null>(null);
   const [appliedPlantillaId, setAppliedPlantillaId] = useState<string | null>(null);
   const [templateCapa3Open, setTemplateCapa3Open] = useState(false);
   const [templateCapa3Values, setTemplateCapa3Values] = useState<Capa3Values>({});
@@ -520,11 +594,20 @@ export default function ConvocatoriasStepper() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(() => scopedEntityId);
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(null);
   const [tipoConvocatoria, setTipoConvocatoria] = useState<"ORDINARIA" | "EXTRAORDINARIA" | "UNIVERSAL">("ORDINARIA");
+  const previousScopedEntityIdRef = useRef(scopedEntityId);
 
   useEffect(() => {
     if (!scopedEntityId) return;
     setSelectedEntityId((current) => (current === scopedEntityId ? current : scopedEntityId));
-    setSelectedBodyId(null);
+    // Fast Refresh vuelve a ejecutar efectos conservando el estado React. El
+    // reset incondicional anterior borraba el Consejo ya seleccionado mientras
+    // `appliedDraftRef` impedía rehidratarlo, y el motor degradaba la agenda a
+    // JUNTA_GENERAL. Solo se limpia el órgano cuando cambia realmente la
+    // sociedad del scope.
+    if (previousScopedEntityIdRef.current !== scopedEntityId) {
+      setSelectedBodyId(null);
+    }
+    previousScopedEntityIdRef.current = scopedEntityId;
   }, [scopedEntityId]);
 
   const { data: entities = [], isLoading: entitiesLoading } = useEntitiesList({ sociedadesOnly: true });
@@ -541,10 +624,19 @@ export default function ConvocatoriasStepper() {
     error: bodiesError,
   } = useBodiesByEntity(bodyQueryEntityId);
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
+  const { data: convocanteAuthority } = usePresidenteVigente(
+    selectedEntityId ?? undefined,
+    selectedBodyId,
+  );
+  const lastResolvedOrganoTipoRef = useRef<TipoOrgano>("JUNTA_GENERAL");
+  const resolvedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
+  if (resolvedOrganoTipo) lastResolvedOrganoTipoRef.current = resolvedOrganoTipo;
   const bodiesPending = Boolean(selectedEntityId && (entitiesLoading || bodiesLoading || bodiesFetching));
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const tipoSocial = toTipoSocial(selectedEntity?.tipo_social ?? selectedEntity?.legal_form);
-  const organoTipo = resolveOrganoTipo(selectedBody);
+  const organoTipo = resolvedOrganoTipo ?? (
+    selectedBodyId ? lastResolvedOrganoTipoRef.current : "JUNTA_GENERAL"
+  );
   const domicilioSocial = entityDomicilioSocial(selectedEntity);
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
@@ -552,10 +644,7 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 3 ──
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([newAgendaItem()]);
-  const agendaRuleSpecs = agendaItems
-    // agenda_item.kind v3.1: solo DECISORIO produce acuerdo y exige reglas LSC.
-    // Los puntos no decisorios no se someten a votación → no aplica motor V2.
-    .filter((item) => (item.kind ?? "DELIBERATIVO") === "DECISORIO")
+  const agendaRuleSpecs = agendaItemsForDecisionEngine(agendaItems)
     // BATCH 8.3 (ronda 2 U-A): filtrar materias libres antes del motor.
     // OTROS_LIBRE indica intencionalmente que el secretario asume el punto
     // como no decisorio / sin reglas LSC aplicables — no es bug, es diseño.
@@ -616,6 +705,41 @@ export default function ConvocatoriasStepper() {
 
   // ── Step 2 ──
   const [fechaReunion, setFechaReunion] = useState("");
+  const {
+    data: shareholderRepresentationCandidates = [],
+    isLoading: shareholderRepresentationCandidatesLoading,
+    error: shareholderRepresentationCandidatesError,
+  } = useShareholderRepresentationCandidates(
+    selectedEntityId ?? undefined,
+    fechaReunion || undefined,
+  );
+  const agendaTitleForDocument = useCallback((item: AgendaItem) => {
+    if (item.materia !== "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL") {
+      return item.titulo;
+    }
+    const target = entities.find((entity) => entity.id === item.target_entity_id);
+    const candidate = shareholderRepresentationCandidates.find(
+      (row) => row.delegation_id === item.representation_delegation_id,
+    );
+    const targetName = target?.legal_name ?? target?.common_name ?? "filial pendiente";
+    const representativeName = candidate?.representative_name ?? "representante pendiente";
+    return `${item.titulo} — Filial: ${targetName}; representante propuesta: ${representativeName}`;
+  }, [entities, shareholderRepresentationCandidates]);
+  const canonicalAgendaSummary = useMemo(
+    () =>
+      agendaItems
+        .filter((item) => item.titulo.trim())
+        .map(
+          (item, index) =>
+            `${index + 1}. ${agendaTitleForDocument(item)}${
+              item.kind === "DECISORIO"
+                ? ` (Acuerdo · ${labelMateria(item.materia)})`
+                : ""
+            }`,
+        )
+        .join("\n"),
+    [agendaItems, agendaTitleForDocument],
+  );
   const [horaReunion, setHoraReunion] = useState("10:00");
   // A.2 (art. 176.2 LSC): fecha de remisión del anuncio al último socio cuando la
   // convocatoria es por comunicación individual y escrita; el motor computa el
@@ -683,14 +807,17 @@ export default function ConvocatoriasStepper() {
     primeraConvocatoria: true,
     esJuntaUniversal: tipoConvocatoria === "UNIVERSAL",
     // agenda_item.kind v3.1: motor V2 solo recibe materias DECISORIO.
-    materias: agendaItems
-      .filter((i) => (i.kind ?? "DELIBERATIVO") === "DECISORIO")
+    materias: agendaItemsForDecisionEngine(agendaItems)
       .map((i) => i.materia),
     // Codex P2 round 17 PR #3: jurisdiction es necesaria para elegir el
     // canal de fallback non-junta que la UI de cada país sí puede
-    // ofrecer (ERDS para ES/PT, CORREO_CERTIFICADO para MX,
+    // ofrecer (interposición EAD para ES/PT, CORREO_CERTIFICADO para MX,
     // EMAIL_SIMPLE para BR).
     jurisdiction,
+    organoNoticeDays:
+      organoTipo === "JUNTA_GENERAL" || typeof liveNoticeDays !== "number"
+        ? undefined
+        : liveNoticeDays,
     // A.2 (art. 176.2 LSC): si se informa la fecha de remisión al último socio, el
     // motor computa el plazo desde esa fecha (Rule 6 de convocatoria-engine).
     fechaPublicacion: fechaRemisionUltimoSocio || undefined,
@@ -742,24 +869,42 @@ export default function ConvocatoriasStepper() {
   // ── Step 4 ──
   const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
   const { data: capitalHoldings = [] } = useCapitalHoldings(selectedEntityId ?? undefined);
-  // BATCH 8.4 (ronda 2 U-B): los destinatarios ahora se ordenan con
-  // PRESIDENTE primero, SECRETARIO segundo, después órdenes de prioridad
-  // estándar y resto alfabético. Antes aparecían en orden de inserción
-  // (alfabético por tipo_condicion) lo cual ponía CONSEJERO antes que
-  // PRESIDENTE — inverso al uso operativo.
-  const activeMandates = useMemo(
-    () =>
-      mandates
-        .filter((m) => m.status === "Activo")
-        .sort((a, b) => {
-          const pa = MANDATE_ROLE_PRIORITY[a.role ?? ""] ?? 99;
-          const pb = MANDATE_ROLE_PRIORITY[b.role ?? ""] ?? 99;
-          if (pa !== pb) return pa - pb;
-          // Mismo rol: orden alfabético por nombre
-          return (a.full_name ?? "").localeCompare(b.full_name ?? "", "es");
-        }),
-    [mandates],
-  );
+  // La convocatoria del Consejo se dirige a sus miembros políticos, no a los
+  // cargos operativos de Secretaría. El corte temporal es fecha_1: incorpora
+  // PROGRAMADO en futuro y CESADO en histórico, igual que el censo servidor.
+  const activeMandates = useMemo(() => {
+    const effectiveDay = fechaReunion || new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Madrid",
+    }).format(new Date());
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Madrid",
+    }).format(new Date());
+    const byPerson = new Map<string, (typeof mandates)[number]>();
+    for (const mandate of mandates) {
+      const role = String(mandate.role ?? "").toUpperCase();
+      const state = String(mandate.source_status ?? "").toUpperCase();
+      const stateValid = effectiveDay > today
+        ? state === "VIGENTE" || state === "PROGRAMADO"
+        : effectiveDay < today
+          ? state === "VIGENTE" || state === "CESADO"
+          : state === "VIGENTE";
+      if (
+        !mandate.person_id
+        || !POLITICAL_BOARD_RECIPIENT_ROLES.has(role)
+        || String(mandate.seat_semantics ?? "PRIMARY").toUpperCase() === "ACCESSORY"
+        || !stateValid
+        || (mandate.start_date && mandate.start_date > effectiveDay)
+        || (mandate.end_date && mandate.end_date < effectiveDay)
+      ) continue;
+      if (!byPerson.has(mandate.person_id)) byPerson.set(mandate.person_id, mandate);
+    }
+    return [...byPerson.values()].sort((a, b) => {
+      const pa = MANDATE_ROLE_PRIORITY[a.role ?? ""] ?? 99;
+      const pb = MANDATE_ROLE_PRIORITY[b.role ?? ""] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return (a.full_name ?? "").localeCompare(b.full_name ?? "", "es");
+    });
+  }, [fechaReunion, mandates]);
   const activeRecipients = useMemo(() => {
     if (organoTipo !== "JUNTA_GENERAL") return activeMandates;
 
@@ -808,7 +953,7 @@ export default function ConvocatoriasStepper() {
   // ── Step 5 ──
   // BATCH 8.5 (ronda 2 U-C): filtrar canales según body_type del órgano
   // convocado. JUNTA → lista completa (publicidad oficial); CDA / COMISION
-  // → solo notificación directa (email/correo certificado/ERDS/burofax).
+  // → solo notificación directa (email/correo certificado/EAD/burofax).
   // Sin este filtro, el secretario ve toda la lista cuando convoca CdA y
   // genera ruido innecesario.
   const channelOptsBase = CHANNEL_OPTIONS[jurisdiction] ?? CHANNEL_OPTIONS["ES"];
@@ -853,7 +998,9 @@ export default function ConvocatoriasStepper() {
     }
     setLugar(source.lugar ?? domicilioSocial);
     lastAutoLugarRef.current = source.lugar ?? domicilioSocial;
-    setChannels(Array.isArray(source.publication_channels) ? source.publication_channels : []);
+    // Compatibilidad histórica: las capturas ERDS se pueden consultar, pero
+    // al clonarlas pasan al valor seguro de nueva captura EAD_INTERPOSITION.
+    setChannels(channelsForNewCapture(source.publication_channels));
     setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
     setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
     setDocumentosIncluidos(new Set());
@@ -965,7 +1112,11 @@ export default function ConvocatoriasStepper() {
     }
 
     if (requestedPlantilla.tipo === "CONVOCATORIA_SL_NOTIFICACION") {
-      setChannels((prev) => (prev.includes("ERDS") ? prev : [...prev, "ERDS"]));
+      setChannels((prev) => (
+        prev.includes(EAD_INTERPOSITION_CHANNEL)
+          ? prev
+          : [...prev, EAD_INTERPOSITION_CHANNEL]
+      ));
     }
 
     setAppliedPlantillaId(requestedPlantillaId);
@@ -1154,12 +1305,20 @@ export default function ConvocatoriasStepper() {
         };
       });
   }, [effectiveBorradorTemplate]);
+  // El índice documental alimenta Capa 3 y el borrador del Paso 7, por lo que
+  // su estado debe existir antes de resolver esos campos derivados.
+  const [adjuntos, setAdjuntos] = useState<{
+    id: string;
+    file: File;
+    alias: string;
+    descripcion: string;
+    error?: string;
+  }[]>([]);
   const [borradorCapa3Values, setBorradorCapa3Values] = useState<Capa3Values>({});
   const channelLabelsForCapa3 = useMemo(
     () => channels.map((channel) => channelLabel(channel, channelOpts)),
     [channels, channelOpts],
   );
-  const convocanteMandate = activeMandates.find((mandate) => mandate.role === "PRESIDENTE") ?? activeMandates[0] ?? null;
   const borradorCapa3Resolution = useMemo(
     () =>
       buildConvocatoriaCapa3Resolution(borradorCapa3BaseFields, {
@@ -1171,20 +1330,26 @@ export default function ConvocatoriasStepper() {
         denominacionSocial: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
         entidadCotizada: Boolean(selectedEntity?.es_cotizada),
         organoNombre: selectedBody?.name ?? "",
-        convocanteNombre: convocanteMandate?.full_name ?? "",
-        convocanteCargo: convocanteMandate?.role ?? "",
+        convocanteNombre: convocanteAuthority?.person?.full_name ?? "",
+        convocanteCargo: convocanteAuthority?.cargo ?? "",
+        agendaSummaryText: canonicalAgendaSummary,
         agendaItems,
         channelLabels: channelLabelsForCapa3,
+        attachmentAliases: adjuntos.map((adjunto) => adjunto.alias.trim()).filter(Boolean),
+        haySegundaConvocatoria: habilitarSegunda,
       }),
     [
       agendaItems,
+      adjuntos,
       borradorCapa3BaseFields,
       channelLabelsForCapa3,
-      convocanteMandate?.full_name,
-      convocanteMandate?.role,
+      canonicalAgendaSummary,
+      convocanteAuthority?.person?.full_name,
+      convocanteAuthority?.cargo,
       domicilioSocial,
       fechaReunion,
       formatoReunion,
+      habilitarSegunda,
       horaReunion,
       lugar,
       selectedBody?.name,
@@ -1211,7 +1376,7 @@ export default function ConvocatoriasStepper() {
     }
     setBorradorCapa3Values(prefills);
     lastCapa3PrefillsRef.current = {};
-  }, [effectiveBorradorTemplate?.id, borradorCapa3BaseFields]);
+  }, [effectiveBorradorTemplate?.id, borradorCapa3BaseFields, borradorCapa3Fields]);
 
   useEffect(() => {
     setBorradorCapa3Values((currentValues) => {
@@ -1295,6 +1460,24 @@ export default function ConvocatoriasStepper() {
       tipoConvocatoria === "ORDINARIA" ? "Junta General Ordinaria"
       : tipoConvocatoria === "EXTRAORDINARIA" ? "Junta General Extraordinaria"
       : "Junta Universal";
+    const tipoJuntaBreve =
+      tipoConvocatoria === "ORDINARIA" ? "ordinaria"
+      : tipoConvocatoria === "EXTRAORDINARIA" ? "extraordinaria"
+      : "universal";
+    const ordenDelDiaResumen = canonicalAgendaSummary;
+    const canalDocumentacion = firstText(
+      borradorCapa3Values.canal_documentacion,
+      "repositorio documental privado de TGMS",
+    );
+    const publicacionRef = firstText(
+      borradorCapa3Values.publicacion_ref,
+      "expediente de publicación y comunicaciones de la convocatoria",
+    );
+    const votoDistanciaRef = firstText(
+      borradorCapa3Values.cotizada_procedimiento_voto_distancia_ref,
+      "procedimiento de delegación y voto a distancia publicado en la web corporativa",
+    );
+    const cotizadaCanalPublicidad = channelLabelsForCapa3.join(", ") || "web corporativa y BORME";
 
     return {
       denominacion_social: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
@@ -1344,15 +1527,17 @@ export default function ConvocatoriasStepper() {
       fecha_primera_convocatoria: fechaReunion,
       hora_primera_convocatoria: horaReunion,
       fecha_emision: new Date().toISOString().slice(0, 10),
+      // Lugar y fecha son datos del documento. La eventual interposición o
+      // custodia EAD se registra después en el expediente, nunca como una
+      // variable de firma o sello dentro de la convocatoria.
+      lugar_emision: lugar || domicilioSocial || "Madrid",
       SISTEMA: {
         lugar_emision: lugar || domicilioSocial || "Madrid",
         fecha_emision: new Date().toISOString().slice(0, 10),
       },
-      QTSP: {
-        firma_convocante_ref: "EAD Trust QSeal demo/operativo pendiente de emisión",
-      },
       entities: {
         name: selectedEntity?.legal_name ?? selectedEntity?.common_name ?? "",
+        es_cotizada: selectedEntity?.es_cotizada ? "SÍ" : "NO",
       },
       persons: {
         socio_destinatario: {
@@ -1364,6 +1549,7 @@ export default function ConvocatoriasStepper() {
         convocatoria: {
           id: "pendiente de emisión",
           fecha_adopcion: new Date().toISOString().slice(0, 10),
+          expediente_id: "expediente electrónico de convocatoria TGMS",
           indice_documentacion_ref: "expediente de convocatoria",
         },
       },
@@ -1374,6 +1560,7 @@ export default function ConvocatoriasStepper() {
 
       // Segunda convocatoria — boolean + aliases canonical + cortos.
       segunda_convocatoria: habilitarSegunda,
+      hay_segunda_convocatoria: habilitarSegunda,
       fecha_segunda: habilitarSegunda ? fechaReunion2 : "",
       hora_segunda: habilitarSegunda ? horaReunion2 : "",
       fecha_segunda_convocatoria: habilitarSegunda ? fechaReunion2 : "",
@@ -1385,6 +1572,24 @@ export default function ConvocatoriasStepper() {
       canal_convocatoria: channelLabelsForCapa3.join(", "),
       canales_convocatoria: channelLabelsForCapa3.join(", "),
       meetings: {
+        junta: {
+          tipo_junta: tipoJuntaBreve,
+          forma_social: tipoSocial.startsWith("SA") ? "SA" : "SL",
+          fecha: fechaReunion,
+          hora: horaReunion,
+          lugar,
+          modalidad: formatoReunion,
+          fecha_segunda_convocatoria: habilitarSegunda ? fechaReunion2 : "",
+          hora_segunda_convocatoria: habilitarSegunda ? horaReunion2 : "",
+          orden_del_dia_resumen: ordenDelDiaResumen,
+          canal_documentacion: canalDocumentacion,
+          canal_convocatoria: channelLabelsForCapa3.join(", "),
+          publicacion_ref: publicacionRef,
+          cotizada_canal_publicidad: cotizadaCanalPublicidad,
+          cotizada_procedimiento_preguntas_ref:
+            "procedimiento de información y preguntas de la Junta General publicado en la web corporativa",
+          cotizada_procedimiento_voto_distancia_ref: votoDistanciaRef,
+        },
         junta_sl: {
           canal_notificacion: channelLabelsForCapa3.join(", "),
           canal_documentacion: "repositorio documental TGMS",
@@ -1393,10 +1598,7 @@ export default function ConvocatoriasStepper() {
           hora: horaReunion,
           lugar,
           modalidad: formatoReunion,
-          orden_del_dia_resumen: agendaItems
-            .filter((i) => i.titulo.trim())
-            .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
-            .join("\n"),
+          orden_del_dia_resumen: ordenDelDiaResumen,
           fecha_envio: new Date().toISOString().slice(0, 10),
           envio_ref: "TGMS-demo-pending",
           acuse_ref: firstText(borradorCapa3Values["meetings.junta_sl.acuse_ref"], "pendiente de acuse"),
@@ -1409,25 +1611,41 @@ export default function ConvocatoriasStepper() {
       // exacto que el template espera (contrato variables-plantillas v1.1).
       orden_dia: agendaItems
         .filter((i) => i.titulo.trim())
-        .map((i, idx) => ({
-          ordinal: idx + 1,
-          descripcion_punto: i.titulo,
-          kind: i.kind ?? "DELIBERATIVO",
-          materia: i.kind === "DECISORIO" ? i.materia : null,
-          materia_label: i.kind === "DECISORIO" ? labelMateria(i.materia) : null,
-          tipo: i.tipo,
-          inscribible: i.inscribible,
-          propuesta_acuerdo: i.kind === "DECISORIO" ? (i.propuesta_acuerdo ?? null) : null,
-        })),
+        .map((i, idx) => {
+          const carriesMatter = i.kind === "DECISORIO" || isMateriaInformativa(i.materia);
+          const itemKind: AgendaItemKind = i.kind ?? "DELIBERATIVO";
+          const kindLabel = KIND_OPTIONS.find((option) => option.value === itemKind)?.label ?? itemKind;
+          const targetEntity = entities.find((entity) => entity.id === i.target_entity_id) ?? null;
+          const representative = shareholderRepresentationCandidates.find(
+            (candidate) => candidate.delegation_id === i.representation_delegation_id,
+          ) ?? null;
+          return {
+            ordinal: idx + 1,
+            descripcion_punto: agendaTitleForDocument(i),
+            kind: i.kind ?? "DELIBERATIVO",
+            materia: carriesMatter ? i.materia : null,
+            materia_label: carriesMatter ? labelMateria(i.materia) : null,
+            tipo: itemKind === "DECISORIO" ? `Acuerdo · ${labelMateria(i.materia)}` : kindLabel,
+            inscribible: i.inscribible,
+            propuesta_acuerdo: i.kind === "DECISORIO" ? (i.propuesta_acuerdo ?? null) : null,
+            requires_attachments:
+              i.kind === "DECISORIO" &&
+              (i.materia === "FORMULACION_CUENTAS" || i.requires_attachments === true),
+            target_entity_id: i.target_entity_id ?? null,
+            target_entity_name: targetEntity?.legal_name ?? targetEntity?.common_name ?? null,
+            representative_person_id: i.representative_person_id ?? null,
+            representative_name: representative?.representative_name ?? null,
+          };
+        }),
       // Plain-text fallback para plantillas legacy que esperaban string
       // newline-delimited (compatibilidad backwards).
       orden_dia_texto: agendaItems
         .filter((i) => i.titulo.trim())
-        .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+        .map((i, idx) => `${idx + 1}. ${agendaTitleForDocument(i)}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
         .join("\n"),
       orden_del_dia_resumen: agendaItems
         .filter((i) => i.titulo.trim())
-        .map((i, idx) => `${idx + 1}. ${i.titulo}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
+        .map((i, idx) => `${idx + 1}. ${agendaTitleForDocument(i)}${i.kind === "DECISORIO" ? ` (Acuerdo · ${labelMateria(i.materia)})` : ""}`)
         .join("\n"),
       destinatarios: memberNames.join(", "),
       // Misma protección para `destinatarios`: si la plantilla espera
@@ -1440,15 +1658,16 @@ export default function ConvocatoriasStepper() {
           email: m.email ?? null,
           rol: m.role ?? null,
         })),
-      nombre_convocante: convocanteMandate?.full_name ?? "",
-      cargo_convocante: convocanteMandate?.role ?? "",
+      nombre_convocante: convocanteAuthority?.person?.full_name ?? "",
+      cargo_convocante: convocanteAuthority?.cargo ?? "",
     };
   }, [
-    activeMandates, activeRecipients, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
+    activeRecipients, excludedPersonIds, selectedEntity, tipoSocial, selectedBody, organoTipo,
     jurisdiction, tipoConvocatoria, fechaReunion, horaReunion, lugar, formatoReunion,
     habilitarSegunda, fechaReunion2, horaReunion2, evaluacionV2.antelacionDiasRequerida,
     evaluacionV2.fechaLimitePublicacion, channelLabelsForCapa3, agendaItems, domicilioSocial,
-    borradorCapa3Values, convocanteMandate?.full_name, convocanteMandate?.role,
+    borradorCapa3Values, convocanteAuthority?.person?.full_name, convocanteAuthority?.cargo,
+    entities, agendaTitleForDocument, canonicalAgendaSummary, shareholderRepresentationCandidates,
   ]);
 
   const [borradorTexto, setBorradorTexto] = useState<string>("");
@@ -1491,21 +1710,29 @@ export default function ConvocatoriasStepper() {
     }
     // fecha_1 / fecha_2 son ISO; los partimos en fecha (YYYY-MM-DD) y hora.
     if (source.fecha_1) {
-      const d = new Date(source.fecha_1);
-      if (!Number.isNaN(d.getTime())) {
-        setFechaReunion(d.toISOString().slice(0, 10));
-        setHoraReunion(d.toISOString().slice(11, 16));
+      const parts = resolveWorkflowDateTimeInputParts(
+        source.fecha_1,
+        WORKFLOW_TIME_ZONE_BY_JURISDICTION[jurisdiction],
+      );
+      if (parts) {
+        setFechaReunion(parts.date);
+        setHoraReunion(parts.time);
       }
     }
     if (source.fecha_2) {
-      const d2 = new Date(source.fecha_2);
-      if (!Number.isNaN(d2.getTime())) {
+      const parts = resolveWorkflowDateTimeInputParts(
+        source.fecha_2,
+        WORKFLOW_TIME_ZONE_BY_JURISDICTION[jurisdiction],
+      );
+      if (parts) {
         setHabilitarSegunda(true);
-        setFechaReunion2(d2.toISOString().slice(0, 10));
-        setHoraReunion2(d2.toISOString().slice(11, 16));
+        setFechaReunion2(parts.date);
+        setHoraReunion2(parts.time);
       }
     }
-    setChannels(Array.isArray(source.publication_channels) ? source.publication_channels : []);
+    // Un borrador legacy se puede reabrir sin perderlo, pero cualquier nueva
+    // persistencia abandona el claim ERDS no acreditado.
+    setChannels(channelsForNewCapture(source.publication_channels));
     setExcludedPersonIds(excludedRecipientsFromTrace(source.reminders_trace));
     if (Array.isArray(source.agenda_items) && source.agenda_items.length > 0) {
       setAgendaItems(normalizeAgendaDraftItems(source.agenda_items, organoTipo));
@@ -1551,7 +1778,7 @@ export default function ConvocatoriasStepper() {
     if (
       hasUnsavedWork &&
       !window.confirm(
-        "Tienes una convocatoria sin emitir. Si sales ahora se perderán los datos introducidos. ¿Seguro que quieres salir?",
+        "Tienes una simulación DEMO sin registrar. Si sales ahora se perderán los datos introducidos. ¿Seguro que quieres salir?",
       )
     ) {
       return;
@@ -1582,7 +1809,15 @@ export default function ConvocatoriasStepper() {
   const borradorContextHash = useMemo(() => {
     const agendaSignature = agendaItems
       .filter((i) => i.titulo.trim())
-      .map((i) => `${i.titulo}|${i.materia}|${i.tipo}|${i.kind ?? ""}|${i.propuesta_acuerdo ?? ""}`)
+      .map((i) => [
+        i.titulo,
+        i.materia,
+        i.tipo,
+        i.kind ?? "",
+        i.propuesta_acuerdo ?? "",
+        i.target_entity_id ?? "",
+        i.representative_person_id ?? "",
+      ].join("|"))
       .join("");
     const capa3Signature = Object.entries(borradorCapa3Values)
       .map(([k, v]) => `${k}=${capa3ValueToText(v)}`)
@@ -1639,12 +1874,26 @@ export default function ConvocatoriasStepper() {
         // pending=true; no lo bajamos aquí porque la nueva sigue activa.
         return;
       }
-      const merged = { ...borradorVariables, ...borradorCapa3Values };
+      const merged = {
+        ...borradorVariables,
+        ...borradorCapa3Values,
+        // La plantilla expone el indicador como Capa 3 por trazabilidad,
+        // pero su fuente de verdad es el interruptor del Paso 2. Un texto
+        // "No" sería truthy en Handlebars y mostraría indebidamente el
+        // bloque; preservamos aquí el booleano canónico del stepper.
+        hay_segunda_convocatoria: habilitarSegunda,
+        entidad_cotizada: Boolean(selectedEntity?.es_cotizada),
+      };
       const result = renderTemplate({
         template: effectiveBorradorTemplate.capa1_inmutable!,
         variables: merged,
       });
-      setBorradorTexto(result.text);
+      const normalizedText = normalizeVisibleDocumentText(result.text);
+      setBorradorTexto(
+        normalizedText.startsWith(DOCUMENT_DEMO_NOTICE)
+          ? normalizedText
+          : `${DOCUMENT_DEMO_NOTICE}\n\n${normalizedText}`,
+      );
       setRenderUnresolved(result.unresolvedVariables);
       setBorradorDirty(false);
       setBorradorRenderPending(false);
@@ -1658,7 +1907,7 @@ export default function ConvocatoriasStepper() {
         setBorradorRenderPending(false);
       }
     });
-  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values, borradorContextHash]);
+  }, [effectiveBorradorTemplate, borradorVariables, borradorCapa3Values, borradorContextHash, habilitarSegunda, selectedEntity?.es_cotizada]);
 
   // Auto-regenerar cuando cambian plantilla / variables / capa3 — solo si:
   //   1. usuario está actualmente en Paso 7 (evita imports dinámicos y
@@ -1667,7 +1916,15 @@ export default function ConvocatoriasStepper() {
   //   2. no está "dirty" (no sobreescribir edits manuales del usuario).
   useEffect(() => {
     if (borradorDirty) return;
-    if (current === 7) {
+    // Solo renderizar al entrar en el paso o cuando cambió de verdad el
+    // contexto. `borradorRenderPending` forma parte de las dependencias del
+    // efecto: regenerar incondicionalmente al volver a `false` creaba un
+    // ciclo false → true → false y dejaba "Siguiente" bloqueado para siempre.
+    if (
+      current === 7 &&
+      !borradorRenderPending &&
+      borradorLastRenderHashRef.current !== borradorContextHash
+    ) {
       regenerateBorrador();
       return;
     }
@@ -1689,6 +1946,7 @@ export default function ConvocatoriasStepper() {
     borradorDirty,
     borradorTexto,
     borradorRenderPending,
+    borradorContextHash,
     effectiveBorradorTemplate,
   ]);
 
@@ -1713,7 +1971,12 @@ export default function ConvocatoriasStepper() {
     borradorLastRenderHashRef.current !== borradorContextHash &&
     staleAcknowledgedHash !== borradorContextHash;
 
-  const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL"
+  // BORME/diario/web que pueda declarar el rule pack de una materia
+  // inscribible pertenece a la formalización/publicidad POSTERIOR del acuerdo,
+  // no a la citación de los consejeros. En Consejo, la convocatoria se dirige
+  // a sus miembros por el canal estatutario; trasladar aquí
+  // esos canales generaba falsos pendientes en la evidencia de convocatoria.
+  const legalChannelReminderItems = tipoConvocatoria === "UNIVERSAL" || organoTipo === "CONSEJO"
     ? []
     : Array.from(new Set(evaluacionV2.canalesExigidos)).map((channel) => {
       const selectedVia = channels.find((selected) => channelSatisfiesReminder(selected, channel)) ?? null;
@@ -1730,13 +1993,6 @@ export default function ConvocatoriasStepper() {
   // Cada adjunto mantiene el File en memoria; el upload a Storage + INSERT
   // en `attachments` se ejecuta tras crear la convocatoria (handleEmitir).
   // Si el usuario abandona antes de emitir no quedan huérfanos en Storage.
-  const [adjuntos, setAdjuntos] = useState<{
-    id: string;
-    file: File;
-    alias: string;
-    descripcion: string;
-    error?: string;
-  }[]>([]);
   const [uploadStatus, setUploadStatus] = useState<{
     ok: number;
     failed: number;
@@ -1748,6 +2004,7 @@ export default function ConvocatoriasStepper() {
     messages: [],
     inFlight: 0,
   });
+  const [isPreparingAttachmentIntents, setIsPreparingAttachmentIntents] = useState(false);
   const [documentosIncluidos, setDocumentosIncluidos] = useState<Set<string>>(new Set());
   const requiredDocuments = evaluacionV2.documentosObligatorios;
   // BATCH 8.6 (ronda 2 U-D): mapear cada documento obligatorio a las
@@ -1828,12 +2085,66 @@ export default function ConvocatoriasStepper() {
     [borradorCapa3Fields, borradorCapa3Values, telematicaEnabled],
   );
   const borradorCapa3HasMissing = Object.keys(borradorCapa3MissingRequired).length > 0;
+  const convocationAuthorityReady =
+    organoTipo !== "CONSEJO" || convocanteAuthority?.cargo === "PRESIDENTE";
+  const representationAgendaReady = agendaItems.every((item) => {
+    if (item.materia !== "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL") return true;
+    const target = entities.find((entity) => entity.id === item.target_entity_id) ?? null;
+    const candidate = shareholderRepresentationCandidates.find(
+      (row) =>
+        row.delegation_id === item.representation_delegation_id &&
+        row.representative_person_id === item.representative_person_id,
+    ) ?? null;
+    const proposal = item.propuesta_acuerdo?.toLocaleLowerCase("es") ?? "";
+    const targetName = (target?.legal_name ?? target?.common_name ?? "").toLocaleLowerCase("es");
+    const representativeName = (candidate?.representative_name ?? "").toLocaleLowerCase("es");
+    return Boolean(
+      item.target_entity_id &&
+      item.representative_person_id &&
+      item.representation_delegation_id &&
+      candidate &&
+      targetName &&
+      representativeName &&
+      proposal.includes(targetName) &&
+      proposal.includes(representativeName) &&
+      hasSoleShareholderRepresentativeConditions(item.propuesta_acuerdo),
+    );
+  });
+  const annualAccountsAgendaIssues = useMemo(
+    () => agendaItems
+      .filter((item) => item.materia === "FORMULACION_CUENTAS")
+      .map((item) => ({
+        item,
+        result: evaluateAnnualAccountsTimeliness({
+          sessionDate: fechaReunion,
+          title: item.titulo,
+          proposal: item.propuesta_acuerdo,
+        }),
+      }))
+      .filter(({ result }) => result.blocking),
+    [agendaItems, fechaReunion],
+  );
+  const annualAccountsAgendaReady = annualAccountsAgendaIssues.length === 0;
 
   function canAdvance(): boolean {
     switch (current) {
-      case 1: return !!selectedEntity && !!selectedBody && !readinessBlocked;
+      case 1:
+        return Boolean(
+          selectedEntity &&
+          selectedBody &&
+          !readinessBlocked &&
+          convocationAuthorityReady,
+        );
       case 2: return !!fechaReunion && (!lugarRequired || !!lugar);
-      case 3: return agendaItems.some((i) => i.titulo.trim().length > 0);
+      case 3: {
+        if (!annualAccountsAgendaReady) return false;
+        const populatedItems = agendaItems.filter((i) => i.titulo.trim().length > 0);
+        return populatedItems.length > 0 && populatedItems.every((item) => {
+          if (item.kind !== "DECISORIO" && !isMateriaInformativa(item.materia)) return false;
+          if (item.materia !== "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL") return true;
+          return representationAgendaReady;
+        });
+      }
       // Codex P2 round 12: bloqueamos avance del Paso 7 si:
       //   - el render del borrador está aún pendiente (import dinámico)
       //   - hay capa3 obligatorios sin rellenar
@@ -1848,7 +2159,7 @@ export default function ConvocatoriasStepper() {
       ? [{
         type: "NOTICE_PERIOD",
         severity: "WARNING",
-        message: "El plazo de convocatoria no parece cumplido; la emisión continúa como recordatorio no bloqueante.",
+        message: "El plazo de convocatoria no parece cumplido; el registro DEMO continúa como recordatorio no bloqueante.",
         required_days: evaluacionV2.antelacionDiasRequerida,
         meeting_date: meetingIso,
         deadline: evaluacionV2.fechaLimitePublicacion,
@@ -1858,7 +2169,7 @@ export default function ConvocatoriasStepper() {
       ? [{
         type: "RULE_RESOLUTION_PENDING",
         severity: "WARNING",
-        message: "La regla aplicable no estaba completamente resuelta al emitir; se conserva el estado disponible.",
+        message: "La regla aplicable no estaba completamente resuelta al registrar la simulación; se conserva el estado disponible.",
       }]
       : []),
     ...(ruleAlertActive
@@ -1894,7 +2205,7 @@ export default function ConvocatoriasStepper() {
     })),
   ];
 
-  function buildConvocatoriaTrace() {
+  function buildConvocatoriaTrace(attachmentIntents: SupportingAttachmentIntent[]) {
     const emittedAt = new Date().toISOString();
     const selectedChannels = channels.map((channel) => ({
       value: channel,
@@ -2046,21 +2357,10 @@ export default function ConvocatoriasStepper() {
             : null,
           included_required: includedRequiredDocuments,
           missing_required: missingRequiredDocuments,
-          // Codex P2 round 8 PR #3: marcamos los adjuntos como `intended`
-          // en el trace inicial (antes de los uploads). Tras los uploads,
-          // `handleEmitir` hace UPDATE de `reminders_trace` con el status
-          // real de cada archivo (`uploaded` / `failed` + error_message).
-          // Sin este patch, el trace mentía afirmando upload exitoso de
-          // archivos que en realidad fallaron en Storage o INSERT.
-          uploaded_references: adjuntos.map((adjunto) => ({
-            id: adjunto.id,
-            nombre: adjunto.alias || adjunto.file.name,
-            descripcion: adjunto.descripcion,
-            file_name: adjunto.file.name,
-            size_bytes: adjunto.file.size,
-            mime: adjunto.file.type || null,
-            upload_status: "intended" as const,
-          })),
+          // Identidad dual precomprometida antes de la emisión. El servidor
+          // materializa esta proyección en un set WORM y `attachments` es la
+          // fuente autoritativa del resultado de cada registro posterior.
+          uploaded_references: attachmentIntents,
         },
         recipients: {
           source: organoTipo === "JUNTA_GENERAL" ? "capital_holdings" : "condiciones_persona",
@@ -2079,7 +2379,68 @@ export default function ConvocatoriasStepper() {
 
   // ── Submit ──
   async function handleEmitir() {
-    if (!selectedBodyId || !fechaReunion || createConvocatoria.isPending) return;
+    if (createConvocatoria.isPending || isPreparingAttachmentIntents) return;
+    if (!selectedBodyId) {
+      toast.error("Selecciona el órgano convocante antes de registrar la simulación DEMO.");
+      setCurrent(1);
+      return;
+    }
+    if (!fechaReunion) {
+      toast.error("Indica la fecha de la reunión antes de registrar la simulación DEMO.");
+      setCurrent(2);
+      return;
+    }
+    const invalidNonDecisionItem = agendaItems.find(
+      (item) =>
+        item.titulo.trim().length > 0 &&
+        item.kind !== "DECISORIO" &&
+        !isMateriaInformativa(item.materia),
+    );
+    if (invalidNonDecisionItem) {
+      toast.error(
+        `Selecciona una categoría informativa válida para «${invalidNonDecisionItem.titulo}».`,
+      );
+      return;
+    }
+    if (
+      organoTipo !== "CONSEJO" ||
+      jurisdiction.toUpperCase() !== "ES" ||
+      selectedEntity?.entity_status !== "Active"
+    ) {
+      toast.error(
+        "Este registro gobernado solo está habilitado para Consejos de sociedades españolas activas en el entorno DEMO.",
+      );
+      return;
+    }
+    if (agendaItems.some((item) => item.materia === "NOMBRAMIENTO_REPRESENTANTE_FILIAL")) {
+      toast.error(
+        "La materia legacy de representante en filial no está disponible en este flujo. Selecciona «Designación de representante de la socia única en la filial».",
+      );
+      return;
+    }
+    if (!lugar.trim()) {
+      toast.error("Indica el lugar de la sesión; el servidor lo contrasta con el borrador DEMO revisado.");
+      return;
+    }
+    if (organoTipo === "CONSEJO" && convocanteAuthority?.cargo !== "PRESIDENTE") {
+      toast.error(
+        "No existe evidencia vigente del cargo de Presidente para este Consejo. Esa evidencia solo acredita el cargo y no una actuación personal; el registro DEMO queda bloqueado.",
+      );
+      return;
+    }
+    if (!representationAgendaReady) {
+      toast.error(
+        "Completa la filial, selecciona un registro de representante para validación y genera una propuesta condicionada al poder público, al 100 % del capital y a la ausencia de administrador persona jurídica.",
+      );
+      return;
+    }
+    if (!annualAccountsAgendaReady) {
+      toast.error(
+        annualAccountsAgendaIssues[0]?.result.message ??
+          "La propuesta de formulación extemporánea debe incorporar expresamente su condición de regularización.",
+      );
+      return;
+    }
     // ITEM-034: el gap mínimo de 24h entre 1ª y 2ª convocatoria (art. 177.2 LSC)
     // es un mínimo legal imperativo → bloquea la emisión, no solo advierte.
     if (segundaConvocatoriaGapWarning) {
@@ -2091,7 +2452,9 @@ export default function ConvocatoriasStepper() {
     const fecha2Iso = habilitarSegunda && segundaConvocatoriaDisponible && fechaReunion2
       ? new Date(`${fechaReunion2}T${horaReunion2}:00`).toISOString()
       : null;
+    setIsPreparingAttachmentIntents(true);
     try {
+      const attachmentIntents = await buildSupportingAttachmentIntents(adjuntos);
       const created = await createConvocatoria.mutateAsync({
         body_id: selectedBodyId,
         tipo_convocatoria: tipoConvocatoria,
@@ -2104,7 +2467,19 @@ export default function ConvocatoriasStepper() {
         publication_channels: channels,
         agenda_items: agendaItems
           .filter((i) => i.titulo.trim().length > 0)
-          .map(({ titulo, materia, tipo, inscribible, kind, decision_subtype, propuesta_acuerdo }) => {
+          .map(({
+            titulo,
+            materia,
+            tipo,
+            inscribible,
+            kind,
+            decision_subtype,
+            propuesta_acuerdo,
+            requires_attachments,
+            target_entity_id,
+            representative_person_id,
+            representation_delegation_id,
+          }) => {
             const effectiveKind: AgendaItemKind = kind ?? "DELIBERATIVO";
             return {
               titulo,
@@ -2121,12 +2496,28 @@ export default function ConvocatoriasStepper() {
               // Para puntos no decisorios no hay propuesta de acuerdo posible.
               propuesta_acuerdo:
                 effectiveKind === "DECISORIO" ? (propuesta_acuerdo ?? null) : null,
+              requires_attachments:
+                effectiveKind === "DECISORIO" &&
+                (materia === "FORMULACION_CUENTAS" || requires_attachments === true),
+              target_entity_id:
+                materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                  ? (target_entity_id ?? null)
+                  : null,
+              representative_person_id:
+                materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                  ? (representative_person_id ?? null)
+                  : null,
+              representation_delegation_id:
+                materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                  ? (representation_delegation_id ?? null)
+                  : null,
             };
           }),
         statutory_basis: activeRuleSet?.legal_reference ?? null,
         convocatoria_text: borradorTexto.trim() ? borradorTexto : null,
-        ...buildConvocatoriaTrace(),
+        ...buildConvocatoriaTrace(attachmentIntents),
       });
+      setIsPreparingAttachmentIntents(false);
 
       // Upload de adjuntos paralelo con Promise.allSettled — la convocatoria
       // ya está creada en DB (rollback no es viable sin DELETE), así que
@@ -2137,10 +2528,6 @@ export default function ConvocatoriasStepper() {
       let okCount = 0;
       let failCount = 0;
       const failMessages: string[] = [];
-      // Por adjunto: registra el outcome (ok | failed + msg) — usado luego
-      // para parchear `reminders_trace.documents.uploaded_references` con
-      // el status real (Codex P2 round 8 PR #3).
-      const outcomesById = new Map<string, { ok: true } | { ok: false; msg: string }>();
       if (adjuntos.length > 0) {
         setUploadStatus({ ok: 0, failed: 0, messages: [], inFlight: adjuntos.length });
         type UploadOutcome =
@@ -2149,7 +2536,11 @@ export default function ConvocatoriasStepper() {
         const results = await Promise.allSettled(
           adjuntos.map<Promise<UploadOutcome>>((adjunto) =>
             uploadAttachment
-              .mutateAsync({ convocatoriaId: created.id, file: adjunto.file })
+              .mutateAsync({
+                convocatoriaId: created.id,
+                file: adjunto.file,
+                intentId: adjunto.id,
+              })
               .then((): UploadOutcome => ({ adjunto, ok: true }))
               .catch((err: unknown): UploadOutcome => ({
                 adjunto,
@@ -2164,7 +2555,6 @@ export default function ConvocatoriasStepper() {
           const outcome = result.value;
           if (outcome.ok === true) {
             okCount += 1;
-            outcomesById.set(outcome.adjunto.id, { ok: true });
             continue;
           }
           // outcome.ok === false aquí → TS estrecha a la variante con msg.
@@ -2172,72 +2562,34 @@ export default function ConvocatoriasStepper() {
           const failedAdjunto = outcome.adjunto;
           const failedMsg = outcome.msg;
           failMessages.push(`${failedAdjunto.file.name}: ${failedMsg}`);
-          outcomesById.set(failedAdjunto.id, { ok: false, msg: failedMsg });
           setAdjuntos((prev) =>
             prev.map((a) => (a.id === failedAdjunto.id ? { ...a, error: failedMsg } : a)),
           );
         }
         setUploadStatus({ ok: okCount, failed: failCount, messages: failMessages, inFlight: 0 });
-
-        // PATCH reminders_trace para reflejar status real de cada adjunto.
-        // Sin esto, el trace original decía `upload_status: 'intended'`
-        // para todos, escondiendo los fallos del audit.
-        const existingTrace = (created.reminders_trace ?? {}) as Record<string, unknown>;
-        const existingDocuments = (existingTrace.documents ?? {}) as Record<string, unknown>;
-        const existingUploaded = (existingDocuments.uploaded_references ?? []) as Array<Record<string, unknown>>;
-        const patchedUploaded = existingUploaded.map((entry) => {
-          const id = typeof entry.id === "string" ? entry.id : null;
-          const outcome = id ? outcomesById.get(id) : undefined;
-          if (!outcome) {
-            return { ...entry, upload_status: "unknown" };
-          }
-          if (outcome.ok === true) {
-            return { ...entry, upload_status: "uploaded", upload_error: null };
-          }
-          // outcome.ok === false aquí — extraemos msg de forma narrowing-
-          // friendly para evitar problemas de control-flow en map callbacks.
-          const failureMsg = outcome.msg;
-          return { ...entry, upload_status: "failed", upload_error: failureMsg };
-        });
-        const patchedTrace = {
-          ...existingTrace,
-          documents: {
-            ...existingDocuments,
-            uploaded_references: patchedUploaded,
-            uploaded_summary: { ok: okCount, failed: failCount },
-          },
-        };
-        const { error: patchError } = await supabase
-          .from("convocatorias")
-          .update({ reminders_trace: patchedTrace } as never)
-          .eq("id", created.id);
-        if (patchError) {
-          // No bloqueamos la emisión — solo log para que un futuro audit
-          // detecte que el patch del trace falló y el shape original
-          // permanece (con `upload_status: 'intended'`).
-          console.warn("[convocatorias] reminders_trace patch skipped", {
-            convocatoriaId: created.id,
-            message: patchError.message,
-          });
-        }
       }
 
       setEmitidoId(created.id);
       if (failCount === 0) {
         toast.success(
           adjuntos.length > 0
-            ? `Convocatoria emitida con ${okCount} adjunto(s)`
-            : "Convocatoria emitida correctamente",
+            ? `Simulación DEMO registrada con ${okCount} adjunto(s)`
+            : "Simulación DEMO registrada correctamente",
         );
       } else {
         toast.warning(
-          `Convocatoria emitida; ${okCount} adjunto(s) subidos, ${failCount} fallaron`,
+          `Simulación DEMO registrada; ${okCount} adjunto(s) subidos, ${failCount} fallaron`,
           { description: failMessages[0] },
         );
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      toast.error("No se pudo emitir la convocatoria", { description: msg });
+      const msg = secretariaErrorMessage(
+        err,
+        "No se pudo completar el registro DEMO.",
+      );
+      toast.error("No se pudo registrar la simulación DEMO", { description: msg });
+    } finally {
+      setIsPreparingAttachmentIntents(false);
     }
   }
 
@@ -2258,12 +2610,12 @@ export default function ConvocatoriasStepper() {
             <Check className="h-6 w-6 text-[var(--g-text-inverse)]" />
           </div>
           <h2 className="text-xl font-semibold text-[var(--g-text-primary)]">
-            Convocatoria emitida
+            Simulación DEMO registrada
           </h2>
           <p className="mt-2 text-sm text-[var(--g-text-secondary)]">
             {/* ITEM-095: copy honesto — TGMS registra los canales, no realiza el envío. */}
-            La convocatoria ha quedado registrada. Los canales de notificación seleccionados quedan
-            registrados; el envío efectivo se gestiona desde Comunicaciones o fuera de TGMS.
+            Se ha registrado un borrador operativo sin efecto jurídico. No afirma que el Presidente
+            haya ordenado, consentido, emitido o firmado una convocatoria y no realiza ningún envío real.
           </p>
           {(uploadStatus.ok > 0 || uploadStatus.failed > 0) && (
             <div
@@ -2286,62 +2638,16 @@ export default function ConvocatoriasStepper() {
               )}
             </div>
           )}
-          {/* ITEM-064: generación de la comunicación de convocatoria. La
-              emisión registra la convocatoria; la notificación a los miembros
-              del órgano (fila en `communications` + recipients) se materializa
-              aquí vía PasoEnvioMiembros (fn_create_communication_atomic). */}
-          {comunicacionId ? (
-            <div
-              className="mt-4 border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-3 text-left text-xs text-[var(--g-text-primary)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <p className="font-medium">Comunicación de convocatoria programada.</p>
-              <p className="mt-1 text-[var(--g-text-secondary)]">
-                El envío certificado quedará trazado en Comunicaciones.
-              </p>
-            </div>
-          ) : enviarComOpen && selectedBodyId && selectedEntityId ? (
-            <div
-              className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4 text-left"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <PasoEnvioMiembros
-                bodyId={selectedBodyId}
-                entityId={selectedEntityId}
-                organoTipo={toCommsOrganoTipo(organoTipo)}
-                meetingDate={fechaReunion ? new Date(meetingIso) : null}
-                tipoComunicacion="CONVOCATORIA"
-                documentUri={`convocatoria:${emitidoId}`}
-                documentLabel="Convocatoria"
-                documentTipo="DOCUMENTO_GENERADO"
-                asunto={`Convocatoria · ${selectedBody?.name ?? "órgano"}${fechaReunion ? ` · ${fechaReunion}` : ""}`}
-                cuerpoHtml={
-                  borradorTexto.trim()
-                    ? borradorTexto
-                    : `Se convoca reunión del órgano ${selectedBody?.name ?? ""}.`
-                }
-                onProgramado={(commId) => {
-                  setComunicacionId(commId);
-                  setEnviarComOpen(false);
-                  toast.success("Comunicación de convocatoria programada");
-                }}
-                onCancel={() => setEnviarComOpen(false)}
-              />
-            </div>
-          ) : null}
+          <div
+            className="mt-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3 text-left text-xs text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            La comunicación se habilita en el detalle después de generar y archivar el DOCX final.
+            El sistema vinculará la convocatoria, la reunión y el binario real de Storage antes de programar el envío.
+          </div>
           {/* ITEM-069/062 + ITEM-064: CTA de comunicación (si procede) + navegación
               al artefacto creado. "Abrir convocatoria" es el destino primario. */}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            {!comunicacionId && !enviarComOpen && (
-              <button
-                type="button"
-                onClick={() => setEnviarComOpen(true)}
-                className="border border-[var(--g-border-subtle)] px-4 py-2 text-sm text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)]"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                Generar comunicación
-              </button>
-            )}
             <button
               type="button"
               onClick={() =>
@@ -2417,7 +2723,7 @@ export default function ConvocatoriasStepper() {
               </span>
               {requestedPlantilla.tipo === "CONVOCATORIA_SL_NOTIFICACION" ? (
                 <span className="ml-1 text-xs text-[var(--g-text-secondary)]">
-                  · se sugiere ERDS como canal certificado
+                  · se sugiere interposición EAD sin firma ni claim ERDS
                 </span>
               ) : null}
               {isRequestedModeloTemplate ? (
@@ -2564,7 +2870,7 @@ export default function ConvocatoriasStepper() {
                 </label>
                 {isSociedadScoped && (
                   <p className="text-xs text-[var(--g-text-secondary)]">
-                    Modo Sociedad activo: la convocatoria se emitirá dentro de esta sociedad.
+                    Modo Sociedad activo: la simulación DEMO se registrará dentro de esta sociedad.
                   </p>
                 )}
                 <select
@@ -2630,6 +2936,29 @@ export default function ConvocatoriasStepper() {
                       </select>
                     </>
                   )}
+                </div>
+              )}
+
+              {selectedBodyId && organoTipo === "CONSEJO" && (
+                <div
+                  className={`border-l-4 p-3 ${
+                    convocanteAuthority?.cargo === "PRESIDENTE"
+                      ? "border-[var(--status-success)] bg-[var(--g-sec-100)]"
+                      : "border-[var(--status-error)] bg-[var(--g-surface-card)]"
+                  }`}
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  role="status"
+                >
+                  <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                    {convocanteAuthority?.cargo === "PRESIDENTE"
+                      ? "Cargo de Presidencia vigente"
+                      : "Falta evidencia del cargo de Presidencia"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                    {convocanteAuthority?.cargo === "PRESIDENTE"
+                      ? `${convocanteAuthority.person?.full_name ?? "Presidente"} · art. 246.1 LSC · evidencia de cargo ${convocanteAuthority.id.slice(0, 8)}. Acredita el cargo, no el acto concreto; el manifiesto registra una simulación DEMO sin efecto jurídico.`
+                      : "Esta versión solo permite la ruta del Presidente del Consejo (art. 246.1 LSC). Registra la evidencia vigente antes de continuar; la ruta excepcional del art. 246.2 no se simula."}
+                  </p>
                 </div>
               )}
 
@@ -2801,6 +3130,7 @@ export default function ConvocatoriasStepper() {
                     type="date"
                     value={fechaReunion}
                     onChange={(e) => setFechaReunion(e.target.value)}
+                    onInput={(e) => setFechaReunion(e.currentTarget.value)}
                     className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   />
@@ -2964,7 +3294,7 @@ export default function ConvocatoriasStepper() {
                   ) : (
                     /* B1 — sin items DECISORIO en el orden del día, el
                        motor V2 corre con 0 rule packs y cae a defaults por
-                       organoTipo (LSC art. 176 para juntas, art. 246.2 +
+                       organoTipo (LSC art. 176 para juntas, art. 246.1 +
                        reglamento para CdA). Mostramos copy contextual que
                        explica QUÉ default está aplicando para que el
                        secretario sepa que la antelación es orientativa
@@ -2984,7 +3314,7 @@ export default function ConvocatoriasStepper() {
                       (DL-2) → warning. */}
                   {!noticeOk && fechaReunion && (
                     <p className="mt-2 text-xs text-[var(--status-warning)]">
-                      El plazo mínimo de antelación no parece cumplido para la fecha elegida. Es un recordatorio (no bloquea la emisión); ajusta la fecha de la reunión si procede.
+                      El plazo mínimo de antelación no parece cumplido para la fecha elegida. Es un recordatorio (no bloquea el registro DEMO); ajusta la fecha de la reunión si procede.
                     </p>
                   )}
                   {ruleAlertActive && (
@@ -3064,10 +3394,11 @@ export default function ConvocatoriasStepper() {
                           <label className="text-xs font-medium text-[var(--g-text-primary)]">
                             Fecha segunda convocatoria
                           </label>
-                          <input
-                            type="date"
-                            value={fechaReunion2}
-                            onChange={(e) => setFechaReunion2(e.target.value)}
+                        <input
+                          type="date"
+                          value={fechaReunion2}
+                          onChange={(e) => setFechaReunion2(e.target.value)}
+                          onInput={(e) => setFechaReunion2(e.currentTarget.value)}
                             min={fechaReunion}
                             className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                             style={{ borderRadius: "var(--g-radius-md)" }}
@@ -3125,6 +3456,7 @@ export default function ConvocatoriasStepper() {
                 {agendaItems.map((item, idx) => {
                   const itemKind: AgendaItemKind = item.kind ?? "DELIBERATIVO";
                   const isDecisorio = itemKind === "DECISORIO";
+                  const categoriaInformativaValida = isMateriaInformativa(item.materia);
                   const kindHelper =
                     KIND_OPTIONS.find((k) => k.value === itemKind)?.helper ?? "";
                   const materiaCompatible = isMateriaCompatibleWithOrgano(item.materia, organoTipo);
@@ -3134,7 +3466,14 @@ export default function ConvocatoriasStepper() {
                   // de un borrador previo se conserva visible en su propio
                   // grupo para no perder el valor, pero no se ofrece el resto
                   // del catálogo incompatible.
-                  const materiaGroups = agendaMateriaGroups(organoTipo);
+                  const materiaGroups = agendaMateriaGroups(organoTipo)
+                    .map((group) => ({
+                      ...group,
+                      materias: group.materias.filter(
+                        (materia) => materia.value !== "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+                      ),
+                    }))
+                    .filter((group) => group.materias.length > 0);
                   // Lote 1 coherencia (A2): las materias del catálogo societario
                   // que no existen en AGENDA_MATERIAS (p.ej. DIVIDENDO_A_CUENTA)
                   // también necesitan su opción propia — sin ella el select
@@ -3143,6 +3482,31 @@ export default function ConvocatoriasStepper() {
                   const materiaEnAgenda = materiaGroups.some((group) =>
                     group.materias.some((m) => m.value === item.materia),
                   );
+                  const isShareholderRepresentativeMatter =
+                    item.materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL";
+                  const targetEntityOptions = entities.filter((entity) => {
+                    if (entity.id === selectedEntityId) return false;
+                    if (entity.entity_status !== "Active" || entity.jurisdiction?.toUpperCase() !== "ES") {
+                      return false;
+                    }
+                    const targetType = toTipoSocial(entity.tipo_social ?? entity.legal_form);
+                    return targetType === "SL" || targetType === "SLU";
+                  });
+                  const selectedRepresentationCandidate = shareholderRepresentationCandidates.find(
+                    (candidate) =>
+                      candidate.delegation_id === item.representation_delegation_id &&
+                      candidate.representative_person_id === item.representative_person_id,
+                  ) ?? null;
+                  const selectedRepresentationTarget = entities.find(
+                    (entity) => entity.id === item.target_entity_id,
+                  ) ?? null;
+                  const annualAccountsTimeliness = item.materia === "FORMULACION_CUENTAS"
+                    ? evaluateAnnualAccountsTimeliness({
+                        sessionDate: fechaReunion,
+                        title: item.titulo,
+                        proposal: item.propuesta_acuerdo,
+                      })
+                    : null;
                   return (
                   <div
                     key={item.id}
@@ -3194,9 +3558,18 @@ export default function ConvocatoriasStepper() {
                               aria-checked={active}
                               aria-label={`${opt.label}: ${opt.helper}`}
                               onClick={() => {
-                                // Al cambiar a cualquier tipo no decisorio,
-                                // limpiar decision_subtype (solo aplica a DECISORIO).
-                                const patch: Partial<AgendaItem> = { kind: opt.value };
+                                const materiaSelection = agendaMateriaSelectionForKind({
+                                  kind: opt.value,
+                                  currentMateria: item.materia,
+                                  organoTipo,
+                                });
+                                const patch: Partial<AgendaItem> = {
+                                  kind: opt.value,
+                                  ...materiaSelection,
+                                  requires_attachments:
+                                    opt.value === "DECISORIO" &&
+                                    materiaSelection.materia === "FORMULACION_CUENTAS",
+                                };
                                 if (opt.value !== "DECISORIO") {
                                   patch.decision_subtype = null;
                                 }
@@ -3219,6 +3592,55 @@ export default function ConvocatoriasStepper() {
                         {kindHelper}
                       </p>
                     </div>
+
+                    {/* La categoría permanece visible en todo punto no
+                        decisorio. Es una clasificación de constancia, no una
+                        materia de acuerdo: no activa rule pack ni votación. */}
+                    {!isDecisorio && (
+                      <div className="mt-3 pl-5">
+                        <label
+                          htmlFor={`informative-matter-${item.id}`}
+                          className="block text-xs font-medium text-[var(--g-text-primary)] mb-1"
+                        >
+                          Categoría informativa
+                        </label>
+                        <select
+                          id={`informative-matter-${item.id}`}
+                          value={categoriaInformativaValida ? item.materia : ""}
+                          onChange={(e) =>
+                            updateAgendaItem(item.id, {
+                              materia: e.target.value,
+                              tipo: "ORDINARIA",
+                              inscribible: false,
+                              requires_attachments: false,
+                            })
+                          }
+                          aria-invalid={!categoriaInformativaValida}
+                          aria-describedby={`informative-matter-help-${item.id}`}
+                          className="min-w-[320px] border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1.5 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          <option value="" disabled>— Selecciona una categoría —</option>
+                          {AGENDA_INFORMATIVE_MATERIAS.map((materia) => (
+                            <option key={materia.value} value={materia.value}>
+                              {materia.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p
+                          id={`informative-matter-help-${item.id}`}
+                          className={`mt-1 text-xs ${
+                            categoriaInformativaValida
+                              ? "text-[var(--g-text-secondary)]"
+                              : "text-[var(--status-error)]"
+                          }`}
+                        >
+                          {categoriaInformativaValida
+                            ? "Esta categoría se documenta como constancia y queda fuera del motor de acuerdos y votación."
+                            : "Revisa el borrador legacy y selecciona una categoría informativa antes de continuar."}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Subtipo de decisión: solo aplica a DECISORIO. */}
                     {isDecisorio && (
@@ -3274,6 +3696,20 @@ export default function ConvocatoriasStepper() {
                                 materia,
                                 tipo: (meta?.tipo ?? item.tipo) as AgendaItem["tipo"],
                                 inscribible: meta?.inscribible ?? item.inscribible,
+                                target_entity_id:
+                                  materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                                    ? item.target_entity_id ?? null
+                                    : null,
+                                representative_person_id:
+                                  materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                                    ? item.representative_person_id ?? null
+                                    : null,
+                                representation_authority_route: null,
+                                representation_delegation_id:
+                                  materia === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL"
+                                    ? item.representation_delegation_id ?? null
+                                    : null,
+                                representation_evidence_status: null,
                               });
                             }}
                             aria-label="Materia del acuerdo"
@@ -3367,6 +3803,177 @@ export default function ConvocatoriasStepper() {
                               {LMV_COTIZADA_ADVERTENCIAS[item.materia] ??
                                 "SA cotizada: revisar especialidades LMV / CNMV aplicables a esta materia antes de convocar."}
                             </p>
+                          </div>
+                        )}
+
+                        {(annualAccountsTimeliness?.isLate || annualAccountsTimeliness?.blocking) && (
+                          <div
+                            className={`mt-3 ml-5 border p-3 ${
+                              annualAccountsTimeliness.blocking
+                                ? "border-[var(--status-error)] bg-[var(--g-surface-card)]"
+                                : "border-[var(--status-warning)] bg-[var(--g-surface-subtle)]"
+                            }`}
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                            role="alert"
+                            aria-label="Alerta de formulación extemporánea"
+                          >
+                            <p className={`text-xs font-semibold ${
+                              annualAccountsTimeliness.blocking
+                                ? "text-[var(--status-error)]"
+                                : "text-[var(--status-warning)]"
+                            }`}>
+                              Validación del ejercicio y del plazo · art. 253.1 LSC
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--g-text-primary)]">
+                              {annualAccountsTimeliness.message}
+                            </p>
+                            {annualAccountsTimeliness.blocking && (
+                              <p className="mt-2 text-xs font-medium text-[var(--status-error)]">
+                                Bloqueo: añade a la propuesta que la formulación es extemporánea, que se adopta como regularización y que se hace sin convalidar el incumplimiento del plazo.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {isShareholderRepresentativeMatter && (
+                          <div
+                            className="mt-3 ml-5 border border-[var(--g-border-default)] bg-[var(--g-surface-subtle)] p-3"
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                            aria-label="Gate de representación de la socia única"
+                          >
+                            <p className="text-xs font-semibold text-[var(--g-text-primary)]">
+                              Datos autoritativos de la representación
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+                              La selección es un registro para validación, no una acreditación. El servidor deberá comprobar el poder general en documento público (art. 183.1 LSC), la titularidad del 100 % y la ausencia de administrador persona jurídica. El texto libre no sustituye esas evidencias.
+                            </p>
+
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              <div>
+                                <label
+                                  htmlFor={`target-entity-${item.id}`}
+                                  className="block text-xs font-medium text-[var(--g-text-primary)]"
+                                >
+                                  Filial participada al 100 %
+                                </label>
+                                <select
+                                  id={`target-entity-${item.id}`}
+                                  value={item.target_entity_id ?? ""}
+                                  onChange={(event) => updateAgendaItem(item.id, {
+                                    target_entity_id: event.target.value || null,
+                                    representative_person_id: null,
+                                    representation_authority_route: null,
+                                    representation_delegation_id: null,
+                                    representation_evidence_status: null,
+                                  })}
+                                  aria-invalid={!item.target_entity_id}
+                                  aria-describedby={`target-entity-help-${item.id}`}
+                                  className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                                  style={{ borderRadius: "var(--g-radius-md)" }}
+                                >
+                                  <option value="">— Selecciona la filial —</option>
+                                  {targetEntityOptions.map((entity) => (
+                                    <option key={entity.id} value={entity.id}>
+                                      {entity.legal_name ?? entity.common_name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <p
+                                  id={`target-entity-help-${item.id}`}
+                                  className={`mt-1 text-xs ${
+                                    item.target_entity_id
+                                      ? "text-[var(--g-text-secondary)]"
+                                      : "text-[var(--status-error)]"
+                                  }`}
+                                >
+                                  {item.target_entity_id
+                                    ? "Selección pendiente de verificar: no acredita por sí sola el 100 % del capital."
+                                    : "La filial concreta es obligatoria."}
+                                </p>
+                              </div>
+
+                              <div>
+                                <label
+                                  htmlFor={`representative-${item.id}`}
+                                  className="block text-xs font-medium text-[var(--g-text-primary)]"
+                                >
+                                  Registro de representante para validación
+                                </label>
+                                <select
+                                  id={`representative-${item.id}`}
+                                  value={item.representation_delegation_id ?? ""}
+                                  onChange={(event) => {
+                                    const candidate = shareholderRepresentationCandidates.find(
+                                      (row) => row.delegation_id === event.target.value,
+                                    );
+                                    updateAgendaItem(item.id, {
+                                      representative_person_id: candidate?.representative_person_id ?? null,
+                                      representation_authority_route: null,
+                                      representation_delegation_id: candidate?.delegation_id ?? null,
+                                      representation_evidence_status: null,
+                                    });
+                                  }}
+                                  disabled={shareholderRepresentationCandidatesLoading}
+                                  aria-invalid={!item.representation_delegation_id}
+                                  aria-describedby={`representative-help-${item.id}`}
+                                  className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] disabled:opacity-50"
+                                  style={{ borderRadius: "var(--g-radius-md)" }}
+                                >
+                                  <option value="">
+                                    {shareholderRepresentationCandidatesLoading
+                                      ? "Cargando registros…"
+                                      : "— Selecciona representante —"}
+                                  </option>
+                                  {shareholderRepresentationCandidates.map((candidate) => (
+                                    <option
+                                      key={candidate.delegation_id}
+                                      value={candidate.delegation_id}
+                                    >
+                                      {candidate.representative_name} · {candidate.source_reference ?? candidate.delegation_id.slice(0, 8)}
+                                    </option>
+                                  ))}
+                                </select>
+                                <p
+                                  id={`representative-help-${item.id}`}
+                                  className={`mt-1 text-xs ${
+                                    item.representation_delegation_id && !shareholderRepresentationCandidatesError
+                                      ? "text-[var(--g-text-secondary)]"
+                                      : "text-[var(--status-error)]"
+                                  }`}
+                                >
+                                  {shareholderRepresentationCandidatesError
+                                    ? "No se pudo verificar el registro de poderes. El registro DEMO quedará bloqueado."
+                                    : selectedRepresentationCandidate
+                                    ? `Registro candidato: ${selectedRepresentationCandidate.authority_route} · estado declarado ${selectedRepresentationCandidate.evidence_status}. Pendiente de comprobar el documento público y su suficiencia.`
+                                    : "Solo se muestran registros estructurados candidatos; ninguno acredita por sí solo poder vigente o suficiente."}
+                                </p>
+                              </div>
+                            </div>
+
+                            {selectedRepresentationCandidate?.legal_effect === "DEMO_SIMULATION_NO_LEGAL_EFFECT" && (
+                              <p className="mt-3 border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-card)] p-2 text-xs text-[var(--g-text-primary)]">
+                                Registro sintético del tenant DEMO: permite validar el flujo, pero no acredita poder vigente, titularidad del capital ni estructura del órgano de la filial y no produce efectos jurídicos.
+                              </p>
+                            )}
+
+                            <button
+                              type="button"
+                              disabled={!selectedRepresentationTarget || !selectedRepresentationCandidate || !selectedEntity}
+                              onClick={() => {
+                                if (!selectedRepresentationTarget || !selectedRepresentationCandidate || !selectedEntity) return;
+                                updateAgendaItem(item.id, {
+                                  propuesta_acuerdo: buildSoleShareholderRepresentativeProposal({
+                                    shareholderName: selectedEntity.legal_name ?? selectedEntity.common_name,
+                                    targetName: selectedRepresentationTarget.legal_name ?? selectedRepresentationTarget.common_name,
+                                    representativeName: selectedRepresentationCandidate.representative_name,
+                                  }),
+                                });
+                              }}
+                              className="mt-3 border border-[var(--g-brand-3308)] bg-[var(--g-surface-card)] px-3 py-2 text-xs font-medium text-[var(--g-brand-3308)] hover:bg-[var(--g-sec-100)] disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{ borderRadius: "var(--g-radius-md)" }}
+                            >
+                              Generar propuesta condicionada a validación
+                            </button>
                           </div>
                         )}
 
@@ -3488,7 +4095,7 @@ export default function ConvocatoriasStepper() {
                 {activeRecipients.length - excludedPersonIds.size} destinatario(s) seleccionado(s).
                 {/* ITEM-064: tras emitir, la pantalla de éxito ofrece generar la
                     comunicación de convocatoria a estos destinatarios. */}
-                Tras emitir podrás generar la comunicación de convocatoria a estos destinatarios.
+                Tras registrar la simulación podrás preparar la comunicación en sandbox para estos destinatarios.
               </p>
             </div>
           )}
@@ -3499,6 +4106,9 @@ export default function ConvocatoriasStepper() {
               <p className="text-xs text-[var(--g-text-secondary)]">
                 Selecciona los canales de publicación y notificación. Los canales recomendados
                 se resaltan según la jurisdicción ({jurisdiction}).
+              </p>
+              <p className="border-l-4 border-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)] p-3 text-xs text-[var(--g-text-primary)]">
+                EAD Trust se registra exclusivamente como interposición, mensajería básica y custodia/e-archiving. En esta demo no existe capacidad contractual acreditada para afirmar firma, ERDS, envío o entrega.
               </p>
 
               <div
@@ -3520,7 +4130,7 @@ export default function ConvocatoriasStepper() {
                       Recordatorios de canales del motor legal
                     </p>
                     <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                      No bloquean el avance ni la emisión; quedan como trazabilidad si la publicación o notificación se ejecuta fuera de TGMS.
+                      No bloquean el avance ni el registro DEMO; quedan como trazabilidad si una publicación o notificación se ejecuta fuera de TGMS.
                     </p>
                   </div>
                 </div>
@@ -3597,7 +4207,7 @@ export default function ConvocatoriasStepper() {
                   {/* ITEM-064: los canales son trazabilidad del expediente; la
                       notificación efectiva se genera tras emitir desde
                       "Generar comunicación". */}
-                  Sin canales seleccionados quedan sin recordatorio de publicación; podrás generar la comunicación a los destinatarios tras emitir.
+                  Sin canales seleccionados quedan sin recordatorio de publicación; podrás preparar una comunicación sandbox tras registrar la simulación.
                 </p>
               )}
             </div>
@@ -3700,7 +4310,7 @@ export default function ConvocatoriasStepper() {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
                   <p className="text-sm text-[var(--g-text-secondary)]">
-                    No hay adjuntos añadidos. Los archivos se subirán al emitir la convocatoria
+                    No hay adjuntos añadidos. Los archivos se subirán al registrar la simulación DEMO
                     y quedarán archivados con SHA-512 en <code>attachments</code>.
                   </p>
                 </div>
@@ -3756,11 +4366,11 @@ export default function ConvocatoriasStepper() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                Añadir adjuntos (PDF / DOCX / XLSX / PPT / CSV / TXT / PNG / JPG, ≤25 MB)
+                Añadir adjuntos (PDF / DOCX, ≤25 MB)
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={(e) => {
                     handleFilesSelected(e.target.files);
@@ -3784,7 +4394,7 @@ export default function ConvocatoriasStepper() {
                 Se aplica la plantilla protegida correspondiente al órgano y forma jurídica.
                 Capa 1 (texto inmutable) + Capa 2 (variables resueltas del expediente) +
                 Capa 3 (campos editables) componen el borrador. El texto final queda
-                persistido en <code>convocatoria_text</code> al emitir.
+                persistido en <code>convocatoria_text</code> al registrar la simulación.
               </p>
 
               {candidateTemplates.length === 0 ? (
@@ -3862,7 +4472,7 @@ export default function ConvocatoriasStepper() {
                           <>
                             Esta plantilla no ha pasado por el flujo de revisión legal
                             (BORRADOR → REVISADA → APROBADA → ACTIVA). Su uso en una
-                            convocatoria emitida queda como evidencia{" "}
+                            simulación registrada queda como evidencia{" "}
                             <em>demo / operativa</em>, sin cobertura legal de plantilla
                             aprobada.
                           </>
@@ -4001,7 +4611,7 @@ export default function ConvocatoriasStepper() {
 
                 {/* Codex P2 round 8 PR #3: borrador stale cuando el contexto
                     upstream (entidad, órgano, fecha, agenda, plantilla)
-                    cambió tras el último render limpio. Bloquea la emisión
+                    cambió tras el último render limpio. Bloquea el registro DEMO
                     hasta que el usuario decida explícitamente: regenerar
                     desde plantilla o confirmar que el texto editado sigue
                     siendo correcto. */}
@@ -4048,7 +4658,7 @@ export default function ConvocatoriasStepper() {
             </div>
           )}
 
-          {/* ── PASO 8: Revisión y emisión ── */}
+          {/* ── PASO 8: Revisión y registro DEMO ── */}
           {current === 8 && (
             <div className="mt-6 space-y-5">
               {/* Summary grid */}
@@ -4118,7 +4728,7 @@ export default function ConvocatoriasStepper() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g-brand-3308)]">
-                      Documento que se emitirá
+                      Borrador DEMO que se registrará
                     </p>
                     <p className="mt-1 text-sm text-[var(--g-text-primary)]">
                       Fuente del documento: texto revisado del Paso 7
@@ -4241,7 +4851,7 @@ export default function ConvocatoriasStepper() {
                 </p>
                 <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
                   {legalChannelReminderItems.length === 0
-                    ? "La emisión no queda condicionada por canales de publicación o notificación."
+                    ? "El registro DEMO no queda condicionado por canales de publicación o notificación."
                     : `${legalChannelReminderItems.length - pendingLegalChannelReminders.length}/${legalChannelReminderItems.length} canal(es) seleccionados o equivalentes.`}
                 </p>
                 {pendingLegalChannelReminders.length > 0 && (
@@ -4287,7 +4897,7 @@ export default function ConvocatoriasStepper() {
 
               {/* Destinatarios count */}
               <p className="text-xs text-[var(--g-text-secondary)]">
-                <span className="font-semibold">{Math.max(activeMandates.length - excludedPersonIds.size, 0)}</span> destinatario(s)
+                <span className="font-semibold">{Math.max(activeRecipients.length - excludedPersonIds.size, 0)}</span> destinatario(s)
                 {adjuntos.length > 0 && (
                   <> · <span className="font-semibold">{adjuntos.length}</span> adjunto(s)</>
                 )}
@@ -4309,44 +4919,75 @@ export default function ConvocatoriasStepper() {
 
             {isLastStep ? (
               <button
+                key="register-convocation"
                 type="button"
                 disabled={
                   createConvocatoria.isPending ||
+                  isPreparingAttachmentIntents ||
                   uploadStatus.inFlight > 0 ||
+                  !selectedBodyId ||
+                  !fechaReunion ||
                   borradorIsStale ||
                   borradorRenderPending ||
                   borradorCapa3HasMissing ||
+                  !convocationAuthorityReady ||
+                  !representationAgendaReady ||
+                  !annualAccountsAgendaReady ||
                   Boolean(segundaConvocatoriaGapWarning)
                 }
                 onClick={handleEmitir}
-                aria-busy={createConvocatoria.isPending || uploadStatus.inFlight > 0 || borradorRenderPending}
+                aria-busy={
+                  createConvocatoria.isPending ||
+                  isPreparingAttachmentIntents ||
+                  uploadStatus.inFlight > 0 ||
+                  borradorRenderPending
+                }
                 title={
-                  borradorIsStale
-                    ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de emitir."
+                  !selectedBodyId
+                    ? "Selecciona el órgano convocante en el Paso 1."
+                    : !fechaReunion
+                    ? "Indica la fecha de la reunión en el Paso 2."
+                    : borradorIsStale
+                    ? "El borrador del Paso 7 está desactualizado por cambio de contexto. Regenerar o confirmar antes de registrarlo."
                     : borradorRenderPending
                     ? "El motor de plantillas aún no terminó de renderizar. Espera unos segundos."
                     : borradorCapa3HasMissing
                     ? `Faltan campos obligatorios de capa 3 en Paso 7: ${Object.keys(borradorCapa3MissingRequired).join(", ")}.`
+                    : !convocationAuthorityReady
+                    ? "No hay titular del cargo de Presidente acreditado como referencia para el registro DEMO."
+                    : !representationAgendaReady
+                    ? "Falta completar la filial, el registro del representante o las condiciones de poder público, capital y ausencia de administrador persona jurídica."
+                    : !annualAccountsAgendaReady
+                    ? annualAccountsAgendaIssues[0]?.result.message ?? "La formulación extemporánea requiere condición expresa de regularización."
                     : undefined
                 }
                 className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                <Send className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4" />
                 {borradorIsStale
                   ? "Borrador stale — resolver Paso 7"
                   : borradorRenderPending
                   ? "Renderizando borrador…"
                   : borradorCapa3HasMissing
                   ? "Capa 3 incompleta — Paso 7"
+                  : !convocationAuthorityReady
+                  ? "Autoridad convocante pendiente"
+                  : !representationAgendaReady
+                  ? "Representación pendiente — Paso 3"
+                  : !annualAccountsAgendaReady
+                  ? "Regularización de cuentas pendiente — Paso 3"
+                  : isPreparingAttachmentIntents
+                  ? "Calculando huellas de anexos…"
                   : uploadStatus.inFlight > 0
                   ? `Subiendo ${uploadStatus.inFlight} adjunto(s)…`
                   : createConvocatoria.isPending
-                  ? "Emitiendo…"
-                  : "Emitir convocatoria"}
+                  ? "Registrando simulación…"
+                  : "Registrar simulación DEMO"}
               </button>
             ) : (
               <button
+                key="advance-step"
                 type="button"
                 disabled={!canAdvance()}
                 onClick={() => setCurrent((n) => Math.min(STEPS.length, n + 1))}

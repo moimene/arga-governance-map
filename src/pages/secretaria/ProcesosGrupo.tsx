@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
   FileText,
   GitBranch,
   ListChecks,
+  Loader2,
   Play,
   Repeat2,
   Route,
@@ -45,6 +46,10 @@ import {
   type CampaignStatus,
 } from "@/lib/secretaria/group-campaign-engine";
 import { adoptionModeBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
+import { usePrepareRegistryFiling } from "@/hooks/useRegistryLifecycle";
+import { useUploadRegistryEvidenceArtifact } from "@/hooks/useRegistryEvidenceUpload";
+import { registryChannelsForJurisdiction } from "@/lib/secretaria/registry-channels";
+import type { RegistryBaseDocumentKind } from "@/lib/secretaria/registry-lifecycle";
 
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("es-ES", {
@@ -743,7 +748,9 @@ function WarRoomExpediente({ expediente }: { expediente: GroupCampaignWarRoomExp
                 </td>
               </tr>
             ) : (
-              expediente.steps.map((step) => <WarRoomStepRow key={step.id} step={step} />)
+              expediente.steps.map((step) => (
+                <WarRoomStepRow key={step.id} step={step} jurisdiction={expediente.jurisdiction} />
+              ))
             )}
           </tbody>
         </table>
@@ -752,8 +759,10 @@ function WarRoomExpediente({ expediente }: { expediente: GroupCampaignWarRoomExp
   );
 }
 
-function WarRoomStepRow({ step }: { step: GroupCampaignWarRoomStep }) {
+function WarRoomStepRow({ step, jurisdiction }: { step: GroupCampaignWarRoomStep; jurisdiction: string | null }) {
   const deadline = step.live_record?.deadline ?? step.deadline;
+  const normalizedTask = `${step.materia} ${step.label}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const isDepositTask = normalizedTask.includes("DEPOSITO");
   return (
     <tr className="hover:bg-[var(--g-surface-subtle)]/50">
       <td className="px-4 py-3 text-sm">
@@ -791,8 +800,124 @@ function WarRoomStepRow({ step }: { step: GroupCampaignWarRoomStep }) {
       </td>
       <td className="px-4 py-3 text-sm">
         <LiveRecordLink liveRecord={step.live_record} table={step.live_table} id={step.live_record_id} />
+        {isDepositTask && step.live_table === "group_campaign_post_tasks" && step.live_record_id ? (
+          <DepositRegistryFilingAction step={step} jurisdiction={jurisdiction} />
+        ) : null}
       </td>
     </tr>
+  );
+}
+
+function DepositRegistryFilingAction({
+  step,
+  jurisdiction,
+}: {
+  step: GroupCampaignWarRoomStep;
+  jurisdiction: string | null;
+}) {
+  const prepareFiling = usePrepareRegistryFiling();
+  const uploadEvidence = useUploadRegistryEvidenceArtifact();
+  const [baseKind, setBaseKind] = useState<RegistryBaseDocumentKind>("CERTIFICACION");
+  const [channel, setChannel] = useState("");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [filingId, setFilingId] = useState<string | null>(null);
+  const operationId = useRef(crypto.randomUUID());
+
+  async function createFiling() {
+    if (!step.live_record_id || !documentFile || !channel) return;
+    try {
+      const artifact = await uploadEvidence.mutateAsync({
+        file: documentFile,
+        entityId: step.entity_id,
+        title: `Documento de depósito: ${step.label}`,
+        artifactKind: "DOCUMENTO_REGISTRAL",
+        sourceDomain: "group_campaign_post_task",
+        sourceId: step.live_record_id,
+        metadata: { registry_base_document_kind: baseKind, campaign_step_id: step.id },
+      });
+      const result = await prepareFiling.mutateAsync({
+        operationId: operationId.current,
+        entityId: step.entity_id,
+        sourceDomain: "GROUP_CAMPAIGN_POST_TASK",
+        sourceId: step.live_record_id,
+        baseDocumentKind: baseKind,
+        baseDocumentArtifactId: artifact.id,
+        filingVia: channel,
+        procedureProfileCode: "DEPOSITO_CUENTAS",
+        procedureSnapshot: {
+          campaign_id: step.campaign_id,
+          campaign_step_id: step.id,
+          materia: step.materia,
+        },
+      });
+      setFilingId(result.filing_id);
+      toast.success("Expediente de depósito preparado", {
+        description: "La tarea no se considera depositada hasta acreditar los hechos registrales.",
+      });
+    } catch (error) {
+      toast.error("No se pudo preparar el expediente de depósito", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (filingId) {
+    return (
+      <Link
+        to={`/secretaria/tramitador/${filingId}`}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--g-link)] hover:text-[var(--g-link-hover)]"
+      >
+        Abrir expediente registral
+      </Link>
+    );
+  }
+
+  const busy = prepareFiling.isPending || uploadEvidence.isPending;
+  return (
+    <div className="mt-2 space-y-2 bg-[var(--g-surface-subtle)] p-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+      <select
+        value={baseKind}
+        onChange={(event) => setBaseKind(event.target.value as RegistryBaseDocumentKind)}
+        aria-label="Documento base del depósito"
+        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)]"
+      >
+        <option value="CERTIFICACION">Certificación</option>
+        <option value="INSTANCIA">Instancia</option>
+      </select>
+      <select
+        value={channel}
+        onChange={(event) => setChannel(event.target.value)}
+        aria-label="Canal registral del depósito"
+        className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2 py-1 text-xs text-[var(--g-text-primary)]"
+      >
+        <option value="">Seleccionar canal</option>
+        {registryChannelsForJurisdiction(jurisdiction ?? "ES").map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </select>
+      <label className="block text-xs font-medium text-[var(--g-text-primary)]">
+        Documento aportado
+        <input
+          type="file"
+          onChange={(event) => {
+            setDocumentFile(event.target.files?.[0] ?? null);
+            operationId.current = crypto.randomUUID();
+          }}
+          className="mt-1 block w-full text-xs text-[var(--g-text-secondary)]"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={createFiling}
+        disabled={busy || !documentFile || !channel}
+        aria-busy={busy}
+        className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-2 py-1 text-xs font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+        style={{ borderRadius: "var(--g-radius-md)" }}
+      >
+        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        Crear expediente
+      </button>
+    </div>
   );
 }
 

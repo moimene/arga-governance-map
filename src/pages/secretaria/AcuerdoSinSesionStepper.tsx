@@ -7,8 +7,7 @@ import {
 } from "lucide-react";
 import { useEntitiesList } from "@/hooks/useEntities";
 import { StepRail } from "./_shared/StepNav";
-import { useBodiesByEntity } from "@/hooks/useBodies";
-import { useBodyMandates } from "@/hooks/useBodies";
+import { useBodiesByEntity, useNoSessionParticipants } from "@/hooks/useBodies";
 import { usePlantillaProtegida } from "@/hooks/usePlantillasProtegidas";
 import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
 import {
@@ -27,6 +26,8 @@ import { bodyOptionLabel } from "@/lib/secretaria/body-labels";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { usePactosVigentes } from "@/hooks/usePactosParasociales";
 import { PactosCompliancePanel } from "@/components/secretaria/PactosCompliancePanel";
+import { authoritativeNoSessionRecipients } from "@/lib/secretaria/no-session-recipient-eligibility";
+import { EAD_INTERPOSITION_CHANNEL } from "@/lib/secretaria/ead-channel-semantics";
 
 const STEPS = [
   { n: 1, label: "Tipo y órgano",    hint: "Seleccionar sociedad, órgano y tipo de acuerdo" },
@@ -156,12 +157,34 @@ const TALLY_COUNT_CLASS = {
   ABSTAIN: "text-[var(--g-text-secondary)]",
 } as const;
 
+function supportsGovernedNoSessionFlow(bodyType: string | null | undefined) {
+  const normalized = (bodyType ?? "").trim().toUpperCase();
+  return [
+    "CDA", "CONSEJO", "CONSEJO_ADMIN", "CONSEJO_ADMINISTRACION",
+    "COMISION", "COMITE",
+  ].includes(normalized)
+    || normalized.includes("CONSEJO");
+}
+
 const VOTE_BADGE_CLASS: Record<VoteChoice, string> = {
   FOR: "bg-[var(--status-success)]",
   AGAINST: "bg-[var(--status-error)]",
   ABSTAIN: "bg-[var(--status-warning)]",
   OBJECT_PROCEDURE: "bg-[var(--status-warning)]",
 };
+
+const NO_SESSION_COMMUNICATION_CHANNELS = [
+  {
+    value: EAD_INTERPOSITION_CHANNEL,
+    label: "EAD Trust · interposición, mensajería básica y custodia/e-archiving",
+  },
+  {
+    value: "EMAIL_SIMPLE",
+    label: "Email ordinario",
+  },
+] as const;
+
+type NoSessionCommunicationChannel = (typeof NO_SESSION_COMMUNICATION_CHANNELS)[number]["value"];
 
 export default function AcuerdoSinSesionStepper() {
   const navigate = useNavigate();
@@ -214,8 +237,12 @@ export default function AcuerdoSinSesionStepper() {
 
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
   const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const eligibleBodies = useMemo(
+    () => bodies.filter((body) => supportsGovernedNoSessionFlow(body.body_type)),
+    [bodies],
+  );
   const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null;
-  const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
+  const selectedBody = eligibleBodies.find((b) => b.id === selectedBodyId) ?? null;
   const jurisdiction = selectedEntity?.jurisdiction ?? "ES";
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
@@ -232,45 +259,36 @@ export default function AcuerdoSinSesionStepper() {
   const [fundamentoJuridico, setFundamentoJuridico] = useState("");
 
   // ── Step 3 ──
-  // BATCH 9 (ronda 2 F-B): dirección de notificación opcional pero recomendada
-  // para QTSP/ERDS trazabilidad. Sin schema column dedicada, se concatena al
-  // proposal_text como bloque legible "Dirección de notificación: <texto>".
-  const [direccionNotificacion, setDireccionNotificacion] = useState("");
-  const { data: mandates = [] } = useBodyMandates(selectedBodyId ?? undefined);
-  // Dedupe por `person_id`: `useBodyMandates` puede devolver dos filas para
-  // la misma persona (ej. Mateo CONSEJERO+SECRETARIO en `condiciones_persona`).
-  // Cada persona vota una vez bajo WORM, así que `total_members` debe contar
-  // personas únicas. Sin dedup, `fn_no_session_close_and_materialize_agreement`
-  // rechaza el cierre porque `votes_for + against + abstain` queda siempre
-  // por debajo de `total_required`. Bug detectado por e2e/50.
+  // La captura registra únicamente la preparación del canal operativo. Sin
+  // columna dedicada, el canal canónico y su referencia interna se añaden a
+  // proposal_text sin afirmar ningún resultado externo.
+  const [communicationChannel, setCommunicationChannel] =
+    useState<NoSessionCommunicationChannel>(EAD_INTERPOSITION_CHANNEL);
+  const [communicationReference, setCommunicationReference] = useState("");
+  const { data: mandates = [] } = useNoSessionParticipants(
+    selectedBodyId ?? undefined,
+    selectedEntityId ?? undefined,
+  );
+  // El mismo clasificador que usa el detalle excluye Secretaría sin asiento,
+  // roles accesorios y periodos no vigentes; para Junta incluye SOCIO aunque
+  // su condición canónica tenga body_id NULL. El servidor lo recalcula otra vez.
   const activeMembers = useMemo(() => {
-    const filtered = mandates.filter((m) => m.status === "Activo");
-    const byPersonId = new Map<string, (typeof filtered)[number]>();
-    for (const m of filtered) {
-      if (!byPersonId.has(m.person_id)) byPersonId.set(m.person_id, m);
-    }
-    return Array.from(byPersonId.values());
-  }, [mandates]);
+    return authoritativeNoSessionRecipients(
+      mandates,
+      selectedBody?.body_type,
+      selectedBodyId,
+    );
+  }, [mandates, selectedBody?.body_type, selectedBodyId]);
   const [deadlineDays, setDeadlineDays] = useState(5);
-  const [excludedPersonIds, setExcludedPersonIds] = useState<Set<string>>(new Set());
-  const includedMembers = activeMembers.filter((m) => !excludedPersonIds.has(m.person_id));
-
-  function toggleExclude(personId: string) {
-    setExcludedPersonIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(personId)) {
-        next.delete(personId);
-      } else {
-        next.add(personId);
-      }
-      return next;
-    });
-  }
+  const includedMembers = activeMembers;
 
   // ── Step 4: voting ──
   const [resolutionId, setResolutionId] = useState<string | null>(null);
   // ITEM-060 (Codex #P1): mutex síncrono contra doble-creación de votación.
   const openingVotingRef = useRef(false);
+  // Permanece estable también si PostgreSQL confirma el alta pero la respuesta
+  // HTTP se pierde: el siguiente intento reutiliza el mismo expediente.
+  const openingVotingIdempotencyKeyRef = useRef(crypto.randomUUID());
   const [memberVotes, setMemberVotes] = useState<Record<string, VoteChoice>>({});
   const castVote = useCastVote(resolutionId ?? undefined);
   const { data: resolution } = useAcuerdoSinSesionById(resolutionId ?? undefined);
@@ -314,16 +332,20 @@ export default function AcuerdoSinSesionStepper() {
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + deadlineDays);
     try {
-      // BATCH 9 (ronda 2 F-B): concatenar dirección de notificación al
-      // proposal_text como bloque legible — sin migration de schema.
-      // Cuando se autorice ALTER TABLE no_session_resolutions ADD COLUMN
-      // direccion_notificacion, mover este bloque a una columna dedicada.
+      // El bloque operativo queda normalizado a uno de los dos canales de
+      // nueva captura. Se registra como preparación y no como hecho externo.
       const proposalParts = [proposalText];
       if (fundamentoJuridico) {
         proposalParts.push(`Fundamento jurídico: ${fundamentoJuridico}`);
       }
-      if (direccionNotificacion.trim()) {
-        proposalParts.push(`Dirección de notificación: ${direccionNotificacion.trim()}`);
+      const communicationChannelLabel = NO_SESSION_COMMUNICATION_CHANNELS.find(
+        (channel) => channel.value === communicationChannel,
+      )?.label ?? "Email ordinario";
+      proposalParts.push(
+        `Canal operativo preparado [${communicationChannel}]: ${communicationChannelLabel}`,
+      );
+      if (communicationReference.trim()) {
+        proposalParts.push(`Referencia operativa del destinatario: ${communicationReference.trim()}`);
       }
       const created = await createResolution.mutateAsync({
         body_id: selectedBodyId,
@@ -332,8 +354,8 @@ export default function AcuerdoSinSesionStepper() {
         matter_class: matterClass,
         agreement_kind: agreementKind,
         requires_unanimity: requiresUnanimity,
-        total_members: includedMembers.length,
         voting_deadline: deadline.toISOString(),
+        open_idempotency_key: openingVotingIdempotencyKeyRef.current,
       });
       setResolutionId(created.id);
       setCurrent(4);
@@ -566,8 +588,10 @@ export default function AcuerdoSinSesionStepper() {
               {selectedEntityId && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-[var(--g-text-primary)]">Órgano</label>
-                  {bodies.length === 0 ? (
-                    <p className="text-xs text-[var(--g-text-secondary)]">No hay órganos registrados.</p>
+                  {eligibleBodies.length === 0 ? (
+                    <p className="text-xs text-[var(--g-text-secondary)]">
+                      No hay un Consejo o comisión colegiada habilitada para acuerdos escritos sin sesión.
+                    </p>
                   ) : (
                     <select
                       value={selectedBodyId ?? ""}
@@ -576,7 +600,7 @@ export default function AcuerdoSinSesionStepper() {
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       <option value="">— Seleccionar órgano —</option>
-                      {bodies.map((b) => (
+                      {eligibleBodies.map((b) => (
                         <option key={b.id} value={b.id}>
                           {bodyOptionLabel(b)}
                         </option>
@@ -745,21 +769,15 @@ export default function AcuerdoSinSesionStepper() {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
                   <p className="text-sm text-[var(--g-text-secondary)]">
-                    No hay miembros vigentes en este órgano. El proceso se iniciará con 1 votante por defecto.
+                    No hay personas con derecho a voto en el censo vigente. Corrige el censo antes de iniciar el proceso.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {activeMembers.map((m) => {
-                    const excluded = excludedPersonIds.has(m.person_id);
-                    return (
+                  {activeMembers.map((m) => (
                       <div
                         key={m.id}
-                        className={`flex items-center justify-between p-3 border ${
-                          excluded
-                            ? "border-[var(--g-border-subtle)] opacity-40"
-                            : "border-[var(--g-sec-300)] bg-[var(--g-sec-100)]"
-                        }`}
+                        className="flex items-center justify-between border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] p-3"
                         style={{ borderRadius: "var(--g-radius-md)" }}
                       >
                         <div>
@@ -768,43 +786,63 @@ export default function AcuerdoSinSesionStepper() {
                           </p>
                           <p className="text-xs text-[var(--g-text-secondary)]">{m.role ?? "Miembro"}</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleExclude(m.person_id)}
-                          className={`text-xs px-2 py-1 border ${
-                            excluded
-                              ? "border-[var(--g-border-subtle)] text-[var(--g-text-secondary)]"
-                              : "border-[var(--status-error)] text-[var(--status-error)]"
-                          }`}
+                        <span
+                          className="border border-[var(--status-success)] px-2 py-1 text-xs text-[var(--status-success)]"
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
-                          {excluded ? "Incluir" : "Excluir"}
-                        </button>
+                          Censo autoritativo
+                        </span>
                       </div>
-                    );
-                  })}
+                    ))}
                 </div>
               )}
 
-              {/* BATCH 9 (ronda 2 F-B): dirección de notificación del acuerdo
-                  para QTSP/ERDS trazabilidad. Texto libre — pre-cargar manual
-                  desde domicilio social cuando exista columna entities.domicilio_social. */}
+              {/* Canal operativo de nueva captura: únicamente interposición EAD
+                  o email ordinario, registrado como preparación interna. */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[var(--g-text-primary)]">
-                  Dirección de notificación del acuerdo
-                  <span className="ml-1 text-[var(--g-text-secondary)]">(opcional, recomendable)</span>
+                <label
+                  htmlFor="no-session-communication-channel"
+                  className="text-xs font-medium text-[var(--g-text-primary)]"
+                >
+                  Canal de preparación de la comunicación
+                </label>
+                <select
+                  id="no-session-communication-channel"
+                  value={communicationChannel}
+                  onChange={(event) => setCommunicationChannel(event.target.value as NoSessionCommunicationChannel)}
+                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {NO_SESSION_COMMUNICATION_CHANNELS.map((channel) => (
+                    <option key={channel.value} value={channel.value}>
+                      {channel.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-[var(--g-text-secondary)]">
+                  Se guarda únicamente como trazabilidad de preparación interna del canal.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="no-session-communication-reference"
+                  className="text-xs font-medium text-[var(--g-text-primary)]"
+                >
+                  Dirección de contacto o referencia interna
+                  <span className="ml-1 text-[var(--g-text-secondary)]">(opcional)</span>
                 </label>
                 <input
+                  id="no-session-communication-reference"
                   type="text"
-                  value={direccionNotificacion}
-                  onChange={(e) => setDireccionNotificacion(e.target.value)}
-                  placeholder="Ej. Domicilio social C/ Gran Vía 1, Madrid · burofax + email certificado a cada miembro"
+                  value={communicationReference}
+                  onChange={(event) => setCommunicationReference(event.target.value)}
+                  placeholder="Ej. secretaria@arga-seguros.com o referencia interna SEC-2026-001"
                   className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Se incluirá en el proposal_text para trazabilidad QTSP/ERDS y queda
-                  registrada en el acuerdo emitido.
+                  Se incorpora al expediente como referencia operativa del destinatario.
                 </p>
               </div>
 
@@ -833,7 +871,7 @@ export default function AcuerdoSinSesionStepper() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 <p className="text-sm text-[var(--g-text-primary)]">
-                  <span className="font-semibold">{includedMembers.length}</span> votante(s) incluido(s) ·{" "}
+                  <span className="font-semibold">{includedMembers.length}</span> votante(s) del censo ·{" "}
                   {requiresUnanimity
                     ? "Se requiere unanimidad"
                     : `Mayoría requerida: ${matterClass === "ESTRUCTURAL" ? ">66.67%" : matterClass === "ESTATUTARIA" ? ">60%" : ">50%"}`}

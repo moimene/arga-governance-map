@@ -19,6 +19,7 @@ export interface BodyListRow {
   entity_name: string | null;
   entity_slug: string | null;
   member_count: number;
+  // G2 T6: naturaleza consultiva del órgano (badge). NULL en ARGA.
   config?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
@@ -35,6 +36,7 @@ export interface BodyRow {
   secretary: string | null;
   status: string | null;
   next_meeting_date: string | null;
+  // G2 T6: naturaleza consultiva del órgano (badge). NULL en ARGA.
   config?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
@@ -50,6 +52,8 @@ export interface MandateRow {
   status: string | null;
   full_name: string | null;
   email: string | null;
+  source_status?: string | null;
+  seat_semantics?: string | null;
   [key: string]: unknown;
 }
 
@@ -140,7 +144,7 @@ export function useBodyMandates(bodyId: string | undefined) {
       const { data, error } = await supabase
         .from("condiciones_persona")
         .select(
-          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id(full_name, email)"
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, metadata, person:person_id(full_name, email)"
         )
         .eq("body_id", bodyId!)
         .order("tipo_condicion", { ascending: true });
@@ -153,6 +157,7 @@ export function useBodyMandates(bodyId: string | undefined) {
         fecha_inicio: string | null;
         fecha_fin: string | null;
         estado: string | null;
+        metadata?: Record<string, unknown> | null;
         person?: { full_name?: string | null; email?: string | null } | null;
       };
       return ((data ?? []) as CondRaw[]).map((m) => ({
@@ -166,6 +171,10 @@ export function useBodyMandates(bodyId: string | undefined) {
         status: m.estado === "VIGENTE" ? "Activo" : "Cesado",
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,
+        source_status: m.estado,
+        seat_semantics: typeof m.metadata?.seat_semantics === "string"
+          ? m.metadata.seat_semantics
+          : null,
       }));
     },
   });
@@ -239,7 +248,7 @@ export function useMeetingParticipants(bodyId: string | undefined) {
       const { data, error } = await supabase
         .from("condiciones_persona")
         .select(
-          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, person:person_id(full_name, email)"
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, metadata, person:person_id(full_name, email)"
         )
         .eq("body_id", bodyId!)
         .eq("estado", "VIGENTE");
@@ -252,6 +261,7 @@ export function useMeetingParticipants(bodyId: string | undefined) {
         fecha_inicio: string | null;
         fecha_fin: string | null;
         estado: string | null;
+        metadata?: Record<string, unknown> | null;
         person?: { full_name?: string | null; email?: string | null } | null;
       };
       return ((data ?? []) as CondRaw[]).map((m) => ({
@@ -265,6 +275,64 @@ export function useMeetingParticipants(bodyId: string | undefined) {
         status: m.estado === "VIGENTE" ? "Activo" : "Cesado",
         full_name: m.person?.full_name ?? null,
         email: m.person?.email ?? null,
+        source_status: m.estado,
+        seat_semantics: typeof m.metadata?.seat_semantics === "string"
+          ? m.metadata.seat_semantics
+          : null,
+      }));
+    },
+  });
+}
+
+/**
+ * Censo candidato para acuerdos sin sesión. Se lee por entidad, no solo por
+ * body_id, porque los socios/administradores canónicos usan body_id NULL. La
+ * elegibilidad final se clasifica en cliente para UX y se recalcula en la RPC.
+ */
+export function useNoSessionParticipants(
+  bodyId: string | undefined,
+  entityId: string | undefined,
+) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    enabled: !!bodyId && !!entityId && !!tenantId,
+    queryKey: ["condiciones_persona", "no-session-candidates", tenantId, entityId, bodyId],
+    queryFn: async (): Promise<MandateRow[]> => {
+      const { data, error } = await supabase
+        .from("condiciones_persona")
+        .select(
+          "id, body_id, person_id, tipo_condicion, fecha_inicio, fecha_fin, estado, metadata, person:person_id(full_name, email)",
+        )
+        .eq("tenant_id", tenantId!)
+        .eq("entity_id", entityId!)
+        .eq("estado", "VIGENTE");
+      if (error) throw error;
+      type CondRaw = {
+        id: string;
+        body_id: string | null;
+        person_id: string;
+        tipo_condicion: string | null;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        estado: string | null;
+        metadata?: Record<string, unknown> | null;
+        person?: { full_name?: string | null; email?: string | null } | null;
+      };
+      return ((data ?? []) as CondRaw[]).map((condition) => ({
+        id: condition.id,
+        body_id: condition.body_id ?? "",
+        person_id: condition.person_id,
+        role: condition.tipo_condicion,
+        type: null,
+        start_date: condition.fecha_inicio,
+        end_date: condition.fecha_fin,
+        status: condition.estado === "VIGENTE" ? "Activo" : "Cesado",
+        full_name: condition.person?.full_name ?? null,
+        email: condition.person?.email ?? null,
+        source_status: condition.estado,
+        seat_semantics: typeof condition.metadata?.seat_semantics === "string"
+          ? condition.metadata.seat_semantics
+          : null,
       }));
     },
   });

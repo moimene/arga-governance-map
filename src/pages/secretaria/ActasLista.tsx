@@ -1,15 +1,19 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { FileSignature, Lock, Unlock, FolderOpen, Loader2 } from "lucide-react";
+import { FileCheck2, Lock, Unlock, FolderOpen, Loader2 } from "lucide-react";
 import { useActasList } from "@/hooks/useActas";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import {
+  minuteHasLegalSignature as minuteIsAuthoritativelyApproved,
+  minuteSignedAtForPresentation as minuteApprovalAtForPresentation,
+} from "@/lib/secretaria/authoritative-legal-state";
 
-type ActasVista = "todas" | "pendientes" | "borradores" | "firma" | "certificaciones" | "cerradas";
+type ActasVista = "todas" | "pendientes" | "borradores" | "aprobacion" | "certificaciones" | "cerradas";
 
 const VISTA_LABEL: Record<ActasVista, string> = {
   todas: "Todas",
   pendientes: "Pendientes de generar",
   borradores: "Borradores",
-  firma: "Pendientes de firma",
+  aprobacion: "Pendientes de aprobación",
   certificaciones: "Certificaciones vinculadas",
   cerradas: "Cerradas",
 };
@@ -41,10 +45,18 @@ export default function ActasLista() {
   }
 
   const rows = (data ?? []).filter((acta) => {
-    if (activeVista === "borradores") return !acta.signed_at;
-    if (activeVista === "firma") return !acta.signed_at;
+    const isApproved = minuteIsAuthoritativelyApproved({
+      legalGateStatus: acta.legal_gate_status,
+      signedAt: acta.signed_at,
+      isLocked: acta.is_locked,
+      approvalEvidenceMode: acta.approval_evidence_mode,
+      approvalSignatureClaim: acta.approval_signature_claim,
+      approvalCanonicalStatus: acta.approval_canonical_status,
+    });
+    if (activeVista === "borradores") return !isApproved;
+    if (activeVista === "aprobacion") return !isApproved;
     if (activeVista === "certificaciones") return acta.resolutions_count > 0;
-    if (activeVista === "cerradas") return Boolean(acta.signed_at && acta.is_locked);
+    if (activeVista === "cerradas") return isApproved;
     if (activeVista === "pendientes") return false;
     return true;
   });
@@ -53,7 +65,7 @@ export default function ActasLista() {
     <div className="mx-auto max-w-[1440px] p-6">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-          <FileSignature className="h-3.5 w-3.5" />
+          <FileCheck2 className="h-3.5 w-3.5" />
           Secretaría · Actas
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--g-text-primary)]">
@@ -176,7 +188,7 @@ export default function ActasLista() {
                 Tipo reunión
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
-                Firmada
+                Aprobación acreditada
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--g-text-primary)]">
                 Estado
@@ -210,7 +222,17 @@ export default function ActasLista() {
                 </td>
               </tr>
             ) : (
-              rows.map((a) => (
+              rows.map((a) => {
+                const approvalAt = minuteApprovalAtForPresentation({
+                  legalGateStatus: a.legal_gate_status,
+                  signedAt: a.signed_at,
+                  isLocked: a.is_locked,
+                  approvalEvidenceMode: a.approval_evidence_mode,
+                  approvalSignatureClaim: a.approval_signature_claim,
+                  approvalCanonicalStatus: a.approval_canonical_status,
+                });
+                const isApproved = Boolean(approvalAt);
+                return (
                 <tr
                   key={a.id}
                   onClick={() => navigate(actaDetailPath(a.id))}
@@ -232,24 +254,24 @@ export default function ActasLista() {
                     {a.meeting_type ?? "—"}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                    {a.signed_at ? new Date(a.signed_at).toLocaleDateString("es-ES") : "—"}
+                    {approvalAt ? new Date(approvalAt).toLocaleDateString("es-ES") : "—"}
                   </td>
                   <td className="px-6 py-4">
-                    {a.signed_at && a.is_locked ? (
+                    {a.legal_gate_status === "DEMO_SIMULATION" ? (
+                      <span
+                        className="inline-flex items-center gap-1 bg-[var(--status-warning)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        <Unlock className="h-3 w-3" />
+                        Simulación demo · sin efecto jurídico
+                      </span>
+                    ) : isApproved ? (
                       <span
                         className="inline-flex items-center gap-1 bg-[var(--status-success)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
                         style={{ borderRadius: "var(--g-radius-sm)" }}
                       >
                         <Lock className="h-3 w-3" />
-                        Firmada y cerrada
-                      </span>
-                    ) : a.signed_at ? (
-                      <span
-                        className="inline-flex items-center gap-1 bg-[var(--status-info)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
-                        style={{ borderRadius: "var(--g-radius-sm)" }}
-                      >
-                        <Lock className="h-3 w-3" />
-                        Firmada
+                        Aprobada y evidenciada
                       </span>
                     ) : (
                       <span
@@ -262,7 +284,8 @@ export default function ActasLista() {
                     )}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

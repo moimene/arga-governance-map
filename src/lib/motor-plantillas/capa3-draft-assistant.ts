@@ -189,7 +189,7 @@ function localSuggestionForField(
   }
 
   if (key.includes("firma_qes")) {
-    return { value: "Pendiente de firma QES EAD Trust en entorno productivo.", reason: "Referencia demo segura, no productiva." };
+    return { value: "Campo legacy no utilizado: la custodia EAD Trust no acredita ni sustituye una firma.", reason: "Referencia de compatibilidad sin claim de firma." };
   }
 
   if (key.includes("nif") || key.includes("cif")) {

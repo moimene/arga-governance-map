@@ -70,7 +70,7 @@ describe("Comms RPC hardening — prueba conductual cross-tenant", () => {
   }, 30_000);
 
   afterAll(async () => {
-    try { await client?.auth.signOut(); } catch { /* noop */ }
+    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
   });
 
   it("un usuario autenticado NO puede crear comunicaciones para otro tenant", async () => {
@@ -97,7 +97,7 @@ describe("Comms RPC hardening — prueba conductual cross-tenant", () => {
     expect(data).toBeNull();
   }, 30_000);
 
-  it("fn_aprobar_acta sobre acta inexistente devuelve error de negocio, no de permisos", async () => {
+  it("fn_aprobar_acta legacy queda cerrado por el gate autoritativo", async () => {
     if (!authed || !client) {
       expect(true).toBe(true);
       return;
@@ -105,8 +105,12 @@ describe("Comms RPC hardening — prueba conductual cross-tenant", () => {
     const { data, error } = await client.rpc("fn_aprobar_acta", {
       p_minute_id: "00000000-0000-0000-0000-000000000000",
     });
-    // authenticated SÍ puede ejecutarla (GRANT), pero el acta dummy no existe.
-    expect(error?.message ?? "").toMatch(/no encontrada/i);
+    // authenticated puede invocar el wrapper para recibir una instrucción
+    // explícita, pero nunca aprobar saltándose artefacto final y las dos
+    // verificaciones individuales del Presidente y la Secretaría.
+    expect(error?.code).toBe("42501");
+    expect(error?.message ?? "").toMatch(/authoritative legal gate/i);
+    expect(error?.message ?? "").toMatch(/fn_aprobar_acta_autoritativa/i);
     expect(data).toBeNull();
   }, 30_000);
 });

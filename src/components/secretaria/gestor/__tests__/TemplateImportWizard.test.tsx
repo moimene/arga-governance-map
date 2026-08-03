@@ -1,18 +1,25 @@
 import { afterAll as __afterAllRestore, mock as __bunMockRestore } from "bun:test";
-import * as __realRouter from "react-router-dom";
-import * as __realImportHook from "@/hooks/secretaria/useImportPlantillaPackage";
-import * as __realPreflightHook from "@/hooks/secretaria/useTemplatePreflight";
-import * as __realImporter from "@/lib/secretaria/template-admin/template-importer";
+import * as __realModule0 from "react-router-dom";
+import * as __realModule1 from "@/hooks/secretaria/useTemplatePreflight";
+import * as __realModule2 from "@/hooks/secretaria/useImportPlantillaPackage";
+import * as __realModule3 from "@/lib/secretaria/template-admin/template-importer";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TemplateImportWizard } from "../TemplateImportWizard";
 
-const mockNavigate = vi.fn();
-const mockPreflight = vi.fn();
-const mockImport = vi.fn();
-const searchParams = new URLSearchParams(
-  "tab=importar&scope=sociedad&entity=arga&materia=FUSION&q=acta&modo=legal",
-);
+if (typeof vi.hoisted !== "function") {
+  (vi as { hoisted?: <T>(factory: () => T) => T }).hoisted = <T,>(factory: () => T) => factory();
+}
+
+const mockState = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  preflight: vi.fn(),
+  importPackage: vi.fn(),
+  search: "tab=importar&scope=sociedad&entity=arga&materia=FUSION&q=acta&modo=legal",
+}));
+const mockNavigate = mockState.navigate;
+const mockPreflight = mockState.preflight;
+const mockImport = mockState.importPackage;
 const gateOk = {
   ok: true,
   issues: [],
@@ -20,37 +27,33 @@ const gateOk = {
 };
 const originalFileReader = globalThis.FileReader;
 
-const modulesForRestore: Array<[string, Record<string, unknown>]> = [
-  ["react-router-dom", { ...__realRouter }],
-  ["@/hooks/secretaria/useImportPlantillaPackage", { ...__realImportHook }],
-  ["@/hooks/secretaria/useTemplatePreflight", { ...__realPreflightHook }],
-  ["@/lib/secretaria/template-admin/template-importer", { ...__realImporter }],
+const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
+  ["react-router-dom", { ...__realModule0 }],
+  ["@/hooks/secretaria/useTemplatePreflight", { ...__realModule1 }],
+  ["@/hooks/secretaria/useImportPlantillaPackage", { ...__realModule2 }],
+  ["@/lib/secretaria/template-admin/template-importer", { ...__realModule3 }],
 ];
 
 __afterAllRestore(() => {
-  for (const [specifier, exports] of modulesForRestore) {
-    __bunMockRestore.module(specifier, () => exports);
+  for (const [__specifier, __exports] of __realModulesForRestore) {
+    __bunMockRestore.module(__specifier, () => __exports);
   }
 });
 
 vi.mock("react-router-dom", () => ({
-  ...__realRouter,
-  useNavigate: () => mockNavigate,
-  useSearchParams: () => [searchParams, vi.fn()],
+  useNavigate: () => mockState.navigate,
+  useSearchParams: () => [new URLSearchParams(mockState.search), vi.fn()],
 }));
 
 vi.mock("@/hooks/secretaria/useTemplatePreflight", () => ({
-  ...__realPreflightHook,
-  useTemplatePreflight: () => ({ mutateAsync: mockPreflight, isPending: false }),
+  useTemplatePreflight: () => ({ mutateAsync: mockState.preflight, isPending: false }),
 }));
 
 vi.mock("@/hooks/secretaria/useImportPlantillaPackage", () => ({
-  ...__realImportHook,
-  useImportPlantillaPackage: () => ({ mutateAsync: mockImport, isPending: false }),
+  useImportPlantillaPackage: () => ({ mutateAsync: mockState.importPackage, isPending: false }),
 }));
 
 vi.mock("@/lib/secretaria/template-admin/template-importer", () => ({
-  ...__realImporter,
   parseImport: () => ({ ok: true, value: {} }),
 }));
 

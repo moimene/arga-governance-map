@@ -152,10 +152,14 @@ describe("legal-template-fixtures", () => {
       variables: expandLegalStructuredVariables({
         denominacion_social: "ARGA Seguros, S.A.",
         materia_acuerdo: "NOMBRAMIENTO_AUDITOR",
-        modo_adopcion: "MEETING",
+        materia_etiqueta: "Nombramiento de auditor",
+        modo_adopcion: "Sesión formal",
         estado_acuerdo: "Certificado",
         instrumento_requerido: "ESCRITURA",
+        instrumento_requerido_label: "Escritura pública",
         tipo_presentacion: "SIGER",
+        tipo_presentacion_label: "Inscripción mediante escritura pública",
+        canal_presentacion_label: "Registro Mercantil (España)",
         datos_presentacion: "asiento 1/2026",
         texto_decision: "Se nombra auditor.",
         documentacion_texto: "Certificación firmada\nEscritura pública",
@@ -172,6 +176,7 @@ describe("legal-template-fixtures", () => {
     expect(documento.ok).toBe(true);
     expect(documento.unresolvedVariables).toEqual([]);
     expect(documento.text).toContain("Certificación firmada");
-    expect(documento.text).toContain("Agreement ID");
+    expect(documento.text).toContain("No acredita por sí solo el otorgamiento");
+    expect(documento.text).not.toContain("Agreement ID");
   });
 });

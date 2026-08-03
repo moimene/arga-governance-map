@@ -324,11 +324,19 @@ export interface SignatureRequestView {
   [key: string]: unknown;
 }
 
+export type EADProviderSignatureType = 'INTERPOSITION';
+
+/**
+ * How the provider binds its completion evidence to the source document.
+ * This is deliberately separate from the legal/eIDAS signature level.
+ */
+export type EADSignaturePackaging = 'ENVELOPED' | 'DETACHED' | 'PROVIDER_ATTESTATION';
+
 export interface AddDocumentInput {
   filename: string;
   title: string;
   hash: string;
-  signatureType: 'INTERPOSITION' | 'ADVANCED' | 'OTHER';
+  signatureType: EADProviderSignatureType;
   description?: string;
   signatureDeadline?: string;
   provider?: 'EADTRUST';
@@ -362,34 +370,12 @@ export interface SignatoryView {
  * Creates a new Signature Request in DRAFT status.
  */
 export async function createSignatureRequest(
-  input: CreateSignatureRequestInput
+  _input: CreateSignatureRequestInput
 ): Promise<SignatureRequestView> {
-  const token = await getOktaToken();
-
-  const response = await fetch(
-    `${EAD_CONFIG.signatureApiBaseUrl}/api/v1/private/signature-requests`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-      body: JSON.stringify({
-        name: input.name,
-        createdBy: input.createdBy,
-        description: input.description,
-        notifications: input.notifications ?? true,
-        language: input.language ?? 'ES',
-      }),
-    }
+  throw new EADTrustError(
+    'Signature Manager write operations are retired; use source-bound custody/e-archiving.',
+    'EAD_SIGNATURE_SERVICE_RETIRED',
   );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new EADTrustError(
-      `createSignatureRequest failed (${response.status}): ${text}`,
-      'SR_CREATE_FAILED'
-    );
-  }
-
-  return response.json();
 }
 
 /**
@@ -423,67 +409,27 @@ export async function getSignatureRequest(
  * Adds a document to a Signature Request and returns presigned upload URL.
  */
 export async function addDocumentToSR(
-  srId: string,
-  input: AddDocumentInput
+  _srId: string,
+  _input: AddDocumentInput
 ): Promise<AddDocumentResponse> {
-  const token = await getOktaToken();
-
-  const response = await fetch(
-    `${EAD_CONFIG.signatureApiBaseUrl}/api/v1/private/signature-requests/${srId}/documents`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-      body: JSON.stringify(input),
-    }
+  throw new EADTrustError(
+    'Signature Manager write operations are retired; use source-bound custody/e-archiving.',
+    'EAD_SIGNATURE_SERVICE_RETIRED',
   );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new EADTrustError(
-      `addDocument failed (${response.status}): ${text}`,
-      'SR_ADD_DOC_FAILED'
-    );
-  }
-
-  return response.json();
 }
 
 /**
  * Adds a signatory to a document within a SR.
  */
 export async function addSignatoryToDocument(
-  srId: string,
-  documentId: string,
-  input: AddSignatoryInput
+  _srId: string,
+  _documentId: string,
+  _input: AddSignatoryInput
 ): Promise<SignatoryView> {
-  const token = await getOktaToken();
-
-  const body: Record<string, unknown> = {
-    name: input.name,
-    email: input.email,
-  };
-  if (input.surnames) body.surnames = input.surnames;
-  if (input.phone) body.phone = input.phone;
-  if (input.sequence !== undefined) body.sequence = input.sequence;
-
-  const response = await fetch(
-    `${EAD_CONFIG.signatureApiBaseUrl}/api/v1/private/signature-requests/${srId}/documents/${documentId}/signatories`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-      body: JSON.stringify(body),
-    }
+  throw new EADTrustError(
+    'Signature Manager write operations are retired; use source-bound custody/e-archiving.',
+    'EAD_SIGNATURE_SERVICE_RETIRED',
   );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new EADTrustError(
-      `addSignatory failed (${response.status}): ${text}`,
-      'SR_ADD_SIGNATORY_FAILED'
-    );
-  }
-
-  return response.json();
 }
 
 /**
@@ -491,27 +437,12 @@ export async function addSignatoryToDocument(
  * Triggers notifications to all signatories.
  */
 export async function activateSignatureRequest(
-  srId: string
+  _srId: string
 ): Promise<{ id: string; status: string }> {
-  const token = await getOktaToken();
-
-  const response = await fetch(
-    `${EAD_CONFIG.signatureApiBaseUrl}/api/v1/private/signature-requests/${srId}/activate`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-    }
+  throw new EADTrustError(
+    'Signature Manager write operations are retired; use source-bound custody/e-archiving.',
+    'EAD_SIGNATURE_SERVICE_RETIRED',
   );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new EADTrustError(
-      `activateSignatureRequest failed (${response.status}): ${text}`,
-      'SR_ACTIVATE_FAILED'
-    );
-  }
-
-  return response.json();
 }
 
 /**
@@ -541,10 +472,10 @@ export async function waitForDocumentsReady(
 }
 
 // ============================================================
-// Full QES Signing Flow (orchestrated)
+// Full EAD Trust signing flow (orchestrated)
 // ============================================================
 
-export interface QESSignFlowInput {
+export interface EADSignFlowInput {
   documentName: string;
   documentData: ArrayBuffer;
   signatories: Array<{
@@ -555,10 +486,12 @@ export interface QESSignFlowInput {
   }>;
   createdBy: string;
   agreementId?: string;
+  /** Campo legacy restringido a INTERPOSITION; el writer está retirado. */
+  providerSignatureType?: EADProviderSignatureType;
   onProgress?: (step: string) => void;
 }
 
-export interface QESSignFlowResult {
+export interface EADSignFlowResult {
   srId: string;
   /** Expediente EAD: obligatorio para consultar estado y recuperar el firmado. */
   caseFileId?: string;
@@ -566,11 +499,19 @@ export interface QESSignFlowResult {
   documentId: string;
   documentHash: string;
   signatoryIds: string[];
+  /** Exact mode requested from and accepted by EAD Trust. */
+  providerSignatureType: EADProviderSignatureType;
+  /** Provider-issued creation time; never synthesized from the browser clock. */
+  providerRequestedAt: string;
+  /** Provider-issued activation time when the API exposes it. */
+  providerActivatedAt?: string;
   signedDocumentData?: ArrayBuffer;
 }
 
 /**
- * Full QES signature flow:
+ * Full EAD Trust signature flow. The configured provider mode is persisted and
+ * reported as INTERPOSITION; this client never upgrades it to a qualified
+ * electronic signature label.
  * 1. Create Signature Request
  * 2. Compute SHA-256 of document
  * 3. Add document + upload to S3
@@ -578,63 +519,10 @@ export interface QESSignFlowResult {
  * 5. Add all signatories
  * 6. Activate SR
  */
-export async function executeQESSignFlow(
-  input: QESSignFlowInput
-): Promise<QESSignFlowResult> {
-  const { onProgress } = input;
-
-  // 1. Create SR
-  onProgress?.('Creando solicitud de firma…');
-  const sr = await createSignatureRequest({
-    name: `Firma QES — ${input.documentName}`,
-    createdBy: input.createdBy,
-    description: input.agreementId
-      ? `Acuerdo ${input.agreementId}`
-      : undefined,
-    language: 'ES',
-  });
-
-  // 2. Hash document
-  onProgress?.('Calculando hash SHA-256…');
-  const hashHex = await computeSha256(input.documentData);
-
-  // 3. Add document + upload
-  onProgress?.('Registrando documento en Signature Manager…');
-  const doc = await addDocumentToSR(sr.id, {
-    filename: input.documentName,
-    title: input.documentName,
-    hash: hashHex,
-    signatureType: 'INTERPOSITION',
-    provider: 'EADTRUST',
-  });
-
-  onProgress?.('Subiendo documento a S3…');
-  const hashBase64 = sha256HexToBase64(hashHex);
-  await uploadToS3(doc.url, input.documentData, hashBase64);
-
-  // 4. Wait for READY_TO_SIGN
-  onProgress?.('Esperando procesamiento del documento…');
-  await waitForDocumentsReady(sr.id);
-
-  // 5. Add signatories
-  const signatoryIds: string[] = [];
-  for (const signer of input.signatories) {
-    onProgress?.(`Añadiendo firmante: ${signer.name}…`);
-    const result = await addSignatoryToDocument(sr.id, doc.id, signer);
-    signatoryIds.push(result.id);
-  }
-
-  // 6. Activate
-  onProgress?.('Activando solicitud de firma…');
-  await activateSignatureRequest(sr.id);
-
-  onProgress?.('Solicitud de firma QES activada.');
-
-  return {
-    srId: sr.id,
-    srStatus: 'ACTIVE',
-    documentId: doc.id,
-    documentHash: hashHex,
-    signatoryIds,
-  };
+export async function executeEADSignFlow(
+  input: EADSignFlowInput
+): Promise<EADSignFlowResult> {
+  const message = 'Signature Manager is retired; use source-bound custody/e-archiving.';
+  input.onProgress?.(message);
+  throw new EADTrustError(message, 'EAD_SIGNATURE_SERVICE_RETIRED');
 }

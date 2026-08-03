@@ -17,7 +17,7 @@ function fixture(patch: FixturePatch): PlantillaProtegidaRow {
     tipo: patch.tipo,
     materia: patch.materia ?? null,
     jurisdiccion: patch.jurisdiccion ?? "ES",
-    version: patch.version ?? "LEGAL-FIXTURE-2026-04-28",
+    version: patch.version ?? "1.0.0",
     estado: patch.estado ?? "ACTIVA",
     aprobada_por: null,
     fecha_aprobacion: null,
@@ -45,10 +45,10 @@ function fixture(patch: FixturePatch): PlantillaProtegidaRow {
 }
 
 const commonEntityVariables = [
-  { variable: "denominacion_social", fuente: "ENTIDAD", condicion: "OBLIGATORIO" },
-  { variable: "cif", fuente: "ENTIDAD", condicion: "RECOMENDADO" },
-  { variable: "domicilio_social", fuente: "ENTIDAD", condicion: "RECOMENDADO" },
-  { variable: "registro_mercantil", fuente: "ENTIDAD", condicion: "RECOMENDADO" },
+  { variable: "denominacion_social", fuente: "entities.legal_name", condicion: "OBLIGATORIO" },
+  { variable: "cif", fuente: "entities.tax_id", condicion: "RECOMENDADO" },
+  { variable: "domicilio_social", fuente: "entities.registered_address", condicion: "RECOMENDADO" },
+  { variable: "registro_mercantil", fuente: "entities.registry_info", condicion: "RECOMENDADO" },
 ];
 
 // ITEM-073: ortografía española correcta restituida en descripciones (UTF-8).
@@ -78,7 +78,7 @@ const unipersonalFields = [
   { campo: "identidad_decisor", obligatoriedad: "OBLIGATORIO", descripcion: "Nombre del socio único o administrador único." },
   { campo: "nif_decisor", obligatoriedad: "RECOMENDADO", descripcion: "NIF/NIE del decisor, si debe constar." },
   { campo: "texto_decision", obligatoriedad: "OBLIGATORIO", descripcion: "Texto literal de la decisión adoptada." },
-  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia de firma QES o firma manuscrita." },
+  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia de evidencia jurídica o custodia EAD, si procede." },
 ];
 
 // ITEM-073: ortografía española correcta restituida en descripciones (UTF-8).
@@ -91,7 +91,7 @@ const adminJointFields = [
   { campo: "texto_decision", obligatoriedad: "OBLIGATORIO", descripcion: "Texto literal de la decisión adoptada." },
   { campo: "conflictos_texto", obligatoriedad: "RECOMENDADO", descripcion: "Conflictos declarados, abstenciones o manifestación de inexistencia." },
   { campo: "expediente_hash", obligatoriedad: "RECOMENDADO", descripcion: "Hash o identificador de integridad del expediente electrónico." },
-  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia QES/TSQ del expediente." },
+  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia de evidencia jurídica o custodia EAD, si procede." },
 ];
 
 // ITEM-073: ortografía española correcta restituida en descripciones (UTF-8).
@@ -104,7 +104,7 @@ const adminSolidaryFields = [
   { campo: "comunicaciones_texto", obligatoriedad: "RECOMENDADO", descripcion: "Comunicaciones al resto de administradores o manifestación de no exigibilidad." },
   { campo: "conflictos_texto", obligatoriedad: "RECOMENDADO", descripcion: "Conflictos declarados, abstenciones o manifestación de inexistencia." },
   { campo: "expediente_hash", obligatoriedad: "RECOMENDADO", descripcion: "Hash o identificador de integridad del expediente electrónico." },
-  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia QES/TSQ del expediente." },
+  { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia de evidencia jurídica o custodia EAD, si procede." },
 ];
 
 // ITEM-073: ortografía española correcta restituida en descripciones (UTF-8).
@@ -183,9 +183,6 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "{{#if acta_rrm_texto_completo}}",
       "{{acta_rrm_texto_completo}}",
-      "",
-      "HASH CANÓNICO DEL ACTA",
-      "{{canonical_minutes_hash}}",
       "{{else}}",
       "ACTA DE JUNTA GENERAL",
       "",
@@ -222,9 +219,6 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "{{#if acta_rrm_texto_completo}}",
       "{{acta_rrm_texto_completo}}",
-      "",
-      "HASH CANÓNICO DEL ACTA",
-      "{{canonical_minutes_hash}}",
       "{{else}}",
       "ACTA DEL CONSEJO DE ADMINISTRACIÓN",
       "",
@@ -261,13 +255,13 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "DECISIÓN DEL SOCIO ÚNICO",
       "",
-      "En {{ciudad_emision}}, a {{fecha}}, D./D.ª {{identidad_decisor}}{{#if nif_decisor}}, con NIF {{nif_decisor}}{{/if}}, como socio único de {{denominacion_social}}, en ejercicio de las competencias que le atribuye el artículo 15 de la Ley de Sociedades de Capital, adopta la siguiente decisión:",
+      "En {{ciudad_emision}}, a {{fecha}}, {{identidad_decisor}}{{#if nif_decisor}}, con NIF {{nif_decisor}}{{/if}}, como socio único de {{denominacion_social}}, en ejercicio de las competencias que le atribuye el artículo 15 de la Ley de Sociedades de Capital, adopta la siguiente decisión:",
       "",
       "{{texto_decision}}",
       "",
       "La decisión se consignará en el Libro de Actas de la sociedad, sin perjuicio de su elevación a público o inscripción cuando proceda.",
       "",
-      "{{#if firma_qes_ref}}Referencia de firma: {{firma_qes_ref}}{{/if}}",
+      "{{#if firma_qes_ref}}Referencia probatoria: {{firma_qes_ref}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -284,13 +278,13 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "DECISIÓN DEL ADMINISTRADOR ÚNICO",
       "",
-      "En {{ciudad_emision}}, a {{fecha}}, D./D.ª {{identidad_decisor}}{{#if nif_decisor}}, con NIF {{nif_decisor}}{{/if}}, como administrador único de {{denominacion_social}}, adopta en materias de su competencia la siguiente decisión:",
+      "En {{ciudad_emision}}, a {{fecha}}, {{identidad_decisor}}{{#if nif_decisor}}, con NIF {{nif_decisor}}{{/if}}, como administrador único de {{denominacion_social}}, adopta en materias de su competencia la siguiente decisión:",
       "",
       "{{texto_decision}}",
       "",
       "La decisión se incorpora al expediente societario y, cuando proceda, se consignará en el Libro de Actas o se elevará a público para producir sus efectos.",
       "",
-      "{{#if firma_qes_ref}}Referencia de firma: {{firma_qes_ref}}{{/if}}",
+      "{{#if firma_qes_ref}}Referencia probatoria: {{firma_qes_ref}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -322,7 +316,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "{{texto_decision}}",
       "",
       "{{#if expediente_hash}}Hash del expediente electrónico: {{expediente_hash}}{{/if}}",
-      "{{#if firma_qes_ref}}Referencia de firma: {{firma_qes_ref}}{{/if}}",
+      "{{#if firma_qes_ref}}Referencia probatoria: {{firma_qes_ref}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -339,7 +333,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       { campo: "condicion_adopcion", obligatoriedad: "OBLIGATORIO", descripcion: "Condición evaluada por el motor para considerar adoptado el acuerdo." },
       { campo: "texto_decision", obligatoriedad: "OBLIGATORIO", descripcion: "Texto literal del acuerdo adoptado." },
       { campo: "expediente_hash", obligatoriedad: "RECOMENDADO", descripcion: "Hash o identificador de integridad del expediente electrónico." },
-      { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia QES/TSQ del expediente." },
+      { campo: "firma_qes_ref", obligatoriedad: "RECOMENDADO", descripcion: "Referencia de evidencia jurídica o custodia EAD, si procede." },
     ],
   }),
   fixture({
@@ -367,7 +361,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "",
       "{{#if conflictos_texto}}CONFLICTOS Y ABSTENCIONES\n{{conflictos_texto}}{{/if}}",
       "{{#if expediente_hash}}Hash del expediente electrónico: {{expediente_hash}}{{/if}}",
-      "{{#if firma_qes_ref}}Referencia de firma: {{firma_qes_ref}}{{/if}}",
+      "{{#if firma_qes_ref}}Referencia probatoria: {{firma_qes_ref}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -393,7 +387,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "ACTA DE DECISIÓN DE ADMINISTRADOR SOLIDARIO",
       "",
-      "En {{ciudad_emision}}, a {{fecha}}, D./D.ª {{administrador_actuante}}, en su condición de administrador solidario de {{denominacion_social}}, documenta la siguiente decisión o actuación dentro del ámbito de sus facultades.",
+      "En {{ciudad_emision}}, a {{fecha}}, {{administrador_actuante}}, en su condición de administrador solidario de {{denominacion_social}}, documenta la siguiente decisión o actuación dentro del ámbito de sus facultades.",
       "",
       "FACULTAD DE ACTUACIÓN",
       "{{facultad_actuacion}}",
@@ -404,7 +398,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "{{#if comunicaciones_texto}}COMUNICACIONES\n{{comunicaciones_texto}}{{/if}}",
       "{{#if conflictos_texto}}CONFLICTOS\n{{conflictos_texto}}{{/if}}",
       "{{#if expediente_hash}}Hash del expediente electrónico: {{expediente_hash}}{{/if}}",
-      "{{#if firma_qes_ref}}Referencia de firma: {{firma_qes_ref}}{{/if}}",
+      "{{#if firma_qes_ref}}Referencia probatoria: {{firma_qes_ref}}{{/if}}",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -426,19 +420,27 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     capa1_inmutable: [
       "CERTIFICACIÓN DE ACUERDOS",
       "",
-      "D./D.ª {{nombre_certificante}}, en calidad de {{cargo_certificante}} del órgano de administración de {{denominacion_social}}, certifica:",
+      "{{nombre_certificante}}, en calidad de {{cargo_certificante}} de {{denominacion_social}}, cargo vigente y en ejercicio, certifica:",
       "",
       "Que en la reunión celebrada el día {{fecha}} se adoptaron los siguientes acuerdos:",
       "",
       "{{transcripcion_acuerdos}}",
       "",
+      "El acta fue aprobada mediante {{metodo_aprobacion_acta}} el {{fecha_aprobacion_acta}}.",
+      "",
       "Y para que así conste, se expide la presente certificación en {{ciudad_emision}}, a {{fecha_emision}}.",
+      "",
+      "Firma de la Secretaría: {{nombre_certificante}}.",
+      "Visto bueno de la Presidencia: {{presidente}}.",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
       { variable: "nombre_certificante", fuente: "ORGANO", condicion: "OBLIGATORIO" },
       { variable: "cargo_certificante", fuente: "ORGANO", condicion: "OBLIGATORIO" },
+      { variable: "presidente", fuente: "ORGANO", condicion: "OBLIGATORIO" },
       { variable: "fecha", fuente: "REUNION", condicion: "OBLIGATORIO" },
+      { variable: "metodo_aprobacion_acta", fuente: "REUNION", condicion: "OBLIGATORIO" },
+      { variable: "fecha_aprobacion_acta", fuente: "REUNION", condicion: "OBLIGATORIO" },
       { variable: "transcripcion_acuerdos", fuente: "EXPEDIENTE", condicion: "OBLIGATORIO" },
     ],
     capa3_editables: [
@@ -472,12 +474,6 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "",
       "CONCLUSIÓN",
       "{{conclusion_informe}}",
-      "",
-      "--- TRAZA PRE ---",
-      "Resultado motor: {{resultado_gate}}",
-      "Resumen evaluación: {{resultado_evaluacion}}",
-      "Snapshot reglas: {{snapshot_hash}}",
-      "--- FIN TRAZA PRE ---",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -508,11 +504,6 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "",
       "{{#if canal_notificacion}}Canal previsto: {{canal_notificacion}}{{/if}}",
       "{{#if erds_delivery_ref}}Referencia ERDS: {{erds_delivery_ref}}{{/if}}",
-      "",
-      "--- TRAZA PRE ---",
-      "Resultado motor: {{resultado_gate}}",
-      "Snapshot reglas: {{snapshot_hash}}",
-      "--- FIN TRAZA PRE ---",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -535,16 +526,17 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
     tipo: "DOCUMENTO_REGISTRAL",
     referencia_legal: "Documento de tramitación registral posterior al acuerdo",
     capa1_inmutable: [
-      "DOCUMENTO REGISTRAL",
+      "DOCUMENTO DEMO PREPARATORIO PARA TRAMITACIÓN REGISTRAL — NO OFICIAL",
       "",
       "Sociedad: {{denominacion_social}}",
-      "Acuerdo: {{materia_acuerdo}}",
+      "Acuerdo: {{materia_etiqueta}}",
       "Modo de adopción: {{modo_adopcion}}",
       "Estado del acuerdo: {{estado_acuerdo}}",
       "",
       "INSTRUMENTO",
-      "Instrumento requerido: {{instrumento_requerido}}",
-      "Tipo de presentación: {{tipo_presentacion}}",
+      "Instrumento requerido: {{instrumento_requerido_label}}",
+      "Procedimiento: {{tipo_presentacion_label}}",
+      "{{#if canal_presentacion_label}}Canal previsto: {{canal_presentacion_label}}{{/if}}",
       "{{#if datos_presentacion}}Datos de presentación: {{datos_presentacion}}{{/if}}",
       "",
       "ACUERDO OBJETO DE TRAMITACIÓN",
@@ -555,11 +547,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "",
       "{{#if observaciones_registrales}}Observaciones registrales: {{observaciones_registrales}}{{/if}}",
       "",
-      "--- TRAZA REGISTRAL ---",
-      "Agreement ID: {{agreement_id}}",
-      "Certificación ID: {{certificacion_id}}",
-      "Snapshot reglas: {{snapshot_hash}}",
-      "--- FIN TRAZA REGISTRAL ---",
+      "Este documento prepara el expediente interno. No acredita por sí solo el otorgamiento del instrumento público ni la presentación o inscripción registral.",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,
@@ -602,12 +590,7 @@ export const LEGAL_TEAM_TEMPLATE_FIXTURES: PlantillaProtegidaRow[] = [
       "",
       "La presente respuesta se limita a aclarar, completar o subsanar los extremos requeridos por el Registro Mercantil, sin alterar el contenido esencial del acuerdo adoptado salvo que conste nuevo acuerdo societario habilitante.",
       "",
-      "--- TRAZA REGISTRAL ---",
-      "Agreement ID: {{agreement_id}}",
-      "Documento registral previo: {{documento_registral_ref}}",
-      "Estado trámite: {{estado_tramite}}",
-      "{{#if tsq_token}}Sello de tiempo: {{tsq_token}}{{/if}}",
-      "--- FIN TRAZA REGISTRAL ---",
+      "DOCUMENTO DEMO / NO OFICIAL. Este documento prepara una respuesta interna y no acredita por sí solo la presentación, subsanación ni calificación del Registro Mercantil.",
     ].join("\n"),
     capa2_variables: [
       ...commonEntityVariables,

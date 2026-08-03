@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Loader2, AlertTriangle, CheckCircle2, Gavel } from "lucide-react";
@@ -20,7 +20,22 @@ import { useTenantContext } from "@/context/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
-import { useDocumentAnnexLinks, type DocumentAnnexLinkRow } from "@/hooks/useSecretariaDocumentArtifacts";
+import {
+  useCreateSecretariaDocumentArtifact,
+  useDocumentAnnexLinks,
+  useSecretariaDocumentArtifacts,
+  useSecretariaDocumentArtifactsByIds,
+  type DocumentAnnexLinkRow,
+} from "@/hooks/useSecretariaDocumentArtifacts";
+import {
+  usePrepareRegistryFiling,
+  useRegistryFilingEvents,
+  useRecordRegistryPresentation,
+  useSubmitRegistryRemedy,
+} from "@/hooks/useRegistryLifecycle";
+import { useUploadRegistryEvidenceArtifact } from "@/hooks/useRegistryEvidenceUpload";
+import type { ProcessDocumentGenerationResult } from "@/lib/doc-gen/process-documents";
+import type { RegistryBaseDocumentKind } from "@/lib/secretaria/registry-lifecycle";
 import { validateCapa3 } from "@/lib/secretaria/capa3-form-validation";
 import { capa3ValueHasContent, type Capa3Values } from "@/lib/secretaria/capa3-fields";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -28,12 +43,19 @@ import { resolveTemplateProcessMatrix } from "@/lib/secretaria/template-process-
 import { buildPrototypeRegistryRulePackFallback } from "@/lib/secretaria/prototype-registry-rule-fallback";
 import { registryChannelsForJurisdiction } from "@/lib/secretaria/registry-channels";
 import { statusLabel } from "@/lib/secretaria/status-labels";
-import { persistRegistryFilingCertificationLink } from "@/lib/secretaria/registry-certification-link";
 import { adoptionModeBusinessLabel, matterClassBusinessLabel } from "@/lib/secretaria/mesa-control-societaria";
 import { resolveAdoptionRoute } from "@/lib/secretaria/adoption-routing";
+import { resolveRegistryProcedureProfile } from "@/lib/secretaria/registry-procedure-profile";
 import { extractRulePackAdoptionModes } from "@/lib/secretaria/materia-catalog-ux";
 import { labelMateria } from "@/lib/secretaria/agenda-materias";
 import { MatterExecutionProfilePanel } from "@/components/secretaria/MatterExecutionProfilePanel";
+import { RegistryLifecycleActions } from "@/components/secretaria/RegistryLifecycleActions";
+import {
+  buildRegistryFallback,
+  buildRegistryVariables,
+  registryDocumentGeneratedAt,
+} from "@/lib/secretaria/registry-document-variables";
+import { resolveRegistryEventTimelineDate } from "@/lib/secretaria/workflow-date-semantics";
 
 const STEPS: StepDef[] = [
   {
@@ -63,126 +85,6 @@ const STEPS: StepDef[] = [
   },
 ];
 
-function buildRegistryVariables({
-  agreement,
-  entityName,
-  legalName,
-  instrumentData,
-  filingChannel,
-  filingStatus,
-  filingType,
-  instrumentRequired,
-  registryFilingId,
-  isSubsanacion,
-  subsanacionMotivo,
-  subsanacionDocs,
-}: {
-  agreement: AgreementListRow;
-  entityName: string;
-  legalName: string;
-  instrumentData: { notary: string; deedDate: string; protocolNumber: string };
-  filingChannel: string;
-  filingStatus: string;
-  filingType: string | null;
-  instrumentRequired: string;
-  registryFilingId?: string | null;
-  isSubsanacion?: boolean;
-  subsanacionMotivo?: string;
-  subsanacionDocs?: string;
-}) {
-  const documentosDisponibles = [
-    agreement.status ? `Acuerdo en estado ${statusLabel(agreement.status)}` : null,
-    instrumentData.protocolNumber ? `Protocolo ${instrumentData.protocolNumber}` : null,
-    instrumentData.notary ? `Notaría ${instrumentData.notary}` : null,
-    filingChannel ? `Canal ${filingChannel}` : null,
-    subsanacionDocs?.trim() ? subsanacionDocs.trim() : null,
-  ].filter(Boolean);
-  const datosPresentacion = [
-    filingType,
-    filingChannel,
-    instrumentData.protocolNumber ? `protocolo ${instrumentData.protocolNumber}` : null,
-  ].filter(Boolean).join(" · ");
-  const textoDecision = [
-    `Materia: ${agreement.agreement_kind}`,
-    `Tipo de materia: ${matterClassBusinessLabel(agreement.matter_class)}`,
-    `Forma de adopción: ${adoptionModeBusinessLabel(agreement.adoption_mode)}`,
-  ].join("\n");
-
-  return {
-    denominacion_social: legalName || entityName,
-    materia: agreement.agreement_kind,
-    materia_acuerdo: agreement.agreement_kind,
-    clase_materia: agreement.matter_class,
-    agreement_id: agreement.id,
-    snapshot_hash: registryFilingId ?? agreement.id,
-    modo_adopcion: agreement.adoption_mode,
-    estado_acuerdo: statusLabel(agreement.status),
-    instrumento_requerido: instrumentRequired,
-    tipo_presentacion: filingType ?? "",
-    canal_presentacion: filingChannel || "No asignado",
-    estado_tramite: statusLabel(filingStatus),
-    notaria: instrumentData.notary,
-    fecha_escritura: instrumentData.deedDate,
-    numero_protocolo: instrumentData.protocolNumber,
-    datos_presentacion: datosPresentacion,
-    texto_decision: textoDecision,
-    documentos_requeridos: [instrumentRequired, filingType].filter(Boolean),
-    documentos_disponibles: documentosDisponibles,
-    documentacion_texto: documentosDisponibles.join("\n"),
-    advertencias_aceptadas: isSubsanacion
-      ? [{ message: "Respuesta de subsanación preparada por Secretaría." }]
-      : [],
-    fecha: new Date().toLocaleDateString("es-ES"),
-    expediente_registral_ref: registryFilingId ?? "",
-    documento_registral_ref: registryFilingId ?? "",
-    fecha_requerimiento: "",
-    motivo_subsanacion: subsanacionMotivo ?? "",
-    respuesta_subsanacion: subsanacionMotivo ?? "",
-    documentos_subsanacion: subsanacionDocs ?? "",
-  };
-}
-
-function buildRegistryFallback({
-  agreement,
-  entityName,
-  legalName,
-  instrumentData,
-  filingChannel,
-  filingStatus,
-  filingType,
-  instrumentRequired,
-}: {
-  agreement: AgreementListRow;
-  entityName: string;
-  legalName: string;
-  instrumentData: { notary: string; deedDate: string; protocolNumber: string };
-  filingChannel: string;
-  filingStatus: string;
-  filingType: string | null;
-  instrumentRequired: string;
-}) {
-  return [
-    "DOCUMENTO REGISTRAL",
-    "",
-    `Sociedad: ${legalName || entityName}`,
-    `Acuerdo: ${agreement.agreement_kind}`,
-    `Tipo de materia: ${matterClassBusinessLabel(agreement.matter_class)}`,
-    `Forma de adopción: ${adoptionModeBusinessLabel(agreement.adoption_mode)}`,
-    `Estado del acuerdo: ${statusLabel(agreement.status)}`,
-    "",
-    "INSTRUMENTO",
-    `Instrumento requerido: ${instrumentRequired}`,
-    `Tipo de presentacion: ${filingType ?? "No consta"}`,
-    `Notaria: ${instrumentData.notary || "No consta"}`,
-    `Fecha de escritura: ${instrumentData.deedDate || "No consta"}`,
-    `Numero de protocolo: ${instrumentData.protocolNumber || "No consta"}`,
-    "",
-    "TRAMITE",
-    `Canal: ${filingChannel || "No asignado"}`,
-    `Estado: ${statusLabel(filingStatus)}`,
-  ].join("\n");
-}
-
 function buildSubsanacionFallback({
   agreement,
   entityName,
@@ -211,6 +113,11 @@ function buildSubsanacionFallback({
 }
 
 type TramitacionDetalleRow = {
+  workflow_version?: number | null;
+  entity_id?: string | null;
+  base_document_kind?: string | null;
+  base_document_artifact_id?: string | null;
+  qualification_outcome?: string | null;
   agreement_id?: string | null;
   filing_number?: string | null;
   filing_via?: string | null;
@@ -234,6 +141,17 @@ type TramitacionDetalleRow = {
   } | null;
 };
 
+const REGISTRY_EVENT_LABEL: Record<string, string> = {
+  EXPEDIENTE_PREPARADO: "Expediente preparado",
+  DOCUMENTO_BASE_VINCULADO: "Documento base vinculado",
+  PRESENTACION_ASENTADA: "Presentación registrada",
+  CALIFICACION_REGISTRADA: "Calificación registrada",
+  SUBSANACION_PREPARADA: "Subsanación preparada",
+  SUBSANACION_PRESENTADA: "Subsanación presentada",
+  INSCRIPCION_ACREDITADA: "Inscripción acreditada",
+  PUBLICACION_ACREDITADA: "Publicación acreditada",
+};
+
 function formatDetailDate(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(value));
@@ -245,15 +163,66 @@ function supportHash(row: DocumentAnnexLinkRow) {
   return hash.length > 24 ? `${hash.slice(0, 14)}...${hash.slice(-8)}` : hash;
 }
 
-function RegistrySupportDocuments({ agreementId }: { agreementId: string | null | undefined }) {
+function RegistrySupportDocuments({
+  agreementId,
+  baseDocumentArtifactId,
+}: {
+  agreementId: string | null | undefined;
+  baseDocumentArtifactId: string | null | undefined;
+}) {
   const annexes = useDocumentAnnexLinks({ linkedDomain: "agreement", linkedIds: agreementId ? [agreementId] : [] });
-  const rows = (annexes.data ?? []).filter(
+  const baseArtifacts = useSecretariaDocumentArtifactsByIds(baseDocumentArtifactId ? [baseDocumentArtifactId] : []);
+  const directArtifacts = useSecretariaDocumentArtifacts({
+    kinds: ["DOCUMENTO_REGISTRAL", "INFORME_DOCUMENTAL_PRE"],
+    sourceDomain: "agreement",
+    sourceIds: agreementId ? [agreementId] : [],
+  });
+  const linkedRows = (annexes.data ?? []).filter(
     (row) =>
       row.included_in_export ||
       row.annex_role.includes("REGISTRO") ||
       row.artifact?.artifact_kind === "DOCUMENTO_REGISTRAL" ||
       row.artifact?.artifact_kind === "INFORME_DOCUMENTAL_PRE",
   );
+  const linkedArtifactIds = new Set(linkedRows.map((row) => row.artifact_id));
+  const baseRows: DocumentAnnexLinkRow[] = (baseArtifacts.data ?? [])
+    .filter((artifact) => !linkedArtifactIds.has(artifact.id))
+    .map((artifact) => ({
+      id: `base:${artifact.id}`,
+      tenant_id: artifact.tenant_id,
+      artifact_id: artifact.id,
+      linked_domain: "registry_filing",
+      linked_id: baseDocumentArtifactId ?? "",
+      annex_role: "DOCUMENTO_BASE_EXPEDIENTE",
+      annex_order: -1,
+      is_mandatory_annex: true,
+      included_in_export: true,
+      included_in_certification_bundle: false,
+      frozen_at: artifact.created_at,
+      created_at: artifact.created_at,
+      artifact,
+    }));
+  const occupiedArtifactIds = new Set([...linkedArtifactIds, ...baseRows.map((row) => row.artifact_id)]);
+  const directRows: DocumentAnnexLinkRow[] = (directArtifacts.data ?? [])
+    .filter((artifact) => !occupiedArtifactIds.has(artifact.id))
+    .map((artifact, index) => ({
+      id: `direct:${artifact.id}`,
+      tenant_id: artifact.tenant_id,
+      artifact_id: artifact.id,
+      linked_domain: "agreement",
+      linked_id: agreementId ?? "",
+      annex_role: "REGISTRO_DIRECTO",
+      annex_order: linkedRows.length + index + 1,
+      is_mandatory_annex: false,
+      included_in_export: true,
+      included_in_certification_bundle: false,
+      frozen_at: null,
+      created_at: artifact.created_at,
+      artifact,
+    }));
+  const rows = [...baseRows, ...linkedRows, ...directRows];
+  const loading = annexes.isLoading || directArtifacts.isLoading || baseArtifacts.isLoading;
+  const supportError = annexes.error ?? directArtifacts.error ?? baseArtifacts.error;
 
   return (
     <section
@@ -261,11 +230,11 @@ function RegistrySupportDocuments({ agreementId }: { agreementId: string | null 
       style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
     >
       <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Soportes documentales registrales</h2>
-      {annexes.error ? (
+      {supportError ? (
         <p className="mt-3 text-sm text-[var(--status-warning)]">
           No se pudo consultar la capa documental. Aplica la migración de informes y certificaciones para activar anexos.
         </p>
-      ) : annexes.isLoading ? (
+      ) : loading ? (
         <div className="mt-3 flex items-center gap-2 text-sm text-[var(--g-text-secondary)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Cargando soportes...
@@ -289,7 +258,10 @@ function RegistrySupportDocuments({ agreementId }: { agreementId: string | null 
                 <tr key={row.id}>
                   <td className="px-3 py-2 text-sm text-[var(--g-text-primary)]">
                     <div className="font-medium">{row.artifact?.title ?? row.annex_role}</div>
-                    <div className="text-xs text-[var(--g-text-secondary)]">{row.artifact?.artifact_kind ?? row.annex_role}</div>
+                    <div className="text-xs text-[var(--g-text-secondary)]">
+                      {row.artifact?.artifact_kind ?? row.annex_role}
+                      {row.artifact_id === baseDocumentArtifactId ? " · Documento base del expediente" : " · Versión archivada"}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-sm text-[var(--g-text-secondary)]">
                     {statusLabel(row.artifact?.status ?? "PENDING")}
@@ -307,6 +279,7 @@ function RegistrySupportDocuments({ agreementId }: { agreementId: string | null 
 
 function TramitacionDetalle({ id }: { id: string }) {
   const { data, isLoading, error } = useTramitacionById(id);
+  const events = useRegistryFilingEvents(id);
   const filing = data as TramitacionDetalleRow | null | undefined;
   const refs = [
     filing?.inscription_number && ["Inscripción", filing.inscription_number],
@@ -346,7 +319,7 @@ function TramitacionDetalle({ id }: { id: string }) {
               adivinar que debía ir a /nuevo y re-seleccionar el mismo acuerdo). */}
           {filing?.status === "SUBSANACION" && filing?.agreement_id && (
             <Link
-              to={`/secretaria/tramitador/nuevo?agreement=${filing.agreement_id}`}
+              to={`/secretaria/tramitador/nuevo?agreement=${filing.agreement_id}&filing=${id}`}
               className="inline-flex items-center gap-1 bg-[var(--g-brand-3308)] px-3 py-1.5 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
@@ -437,6 +410,12 @@ function TramitacionDetalle({ id }: { id: string }) {
                     {statusLabel(filing.deeds?.status ?? filing.status ?? "—")}
                   </dd>
                 </div>
+                <div>
+                  <dt className="text-xs text-[var(--g-text-secondary)]">Documento de base</dt>
+                  <dd className="mt-1 text-sm font-medium text-[var(--g-text-primary)]">
+                    {filing.base_document_kind ?? "Legacy sin tipificar"}
+                  </dd>
+                </div>
               </dl>
             </section>
 
@@ -459,7 +438,73 @@ function TramitacionDetalle({ id }: { id: string }) {
               )}
             </section>
 
-            <RegistrySupportDocuments agreementId={filing.agreement_id} />
+            <section
+              className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5 lg:col-span-2"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Timeline registral</h2>
+              {filing.workflow_version !== 2 ? (
+                <p className="mt-3 text-sm text-[var(--g-text-secondary)]">
+                  Expediente legacy: se conserva sin reinterpretar ni fabricar eventos históricos.
+                </p>
+              ) : events.isLoading ? (
+                <div className="mt-3 flex items-center gap-2 text-sm text-[var(--g-text-secondary)]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando eventos…
+                </div>
+              ) : events.error ? (
+                <p className="mt-3 text-sm text-[var(--status-error)]">No se pudo cargar el timeline registral.</p>
+              ) : (events.data ?? []).length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--status-warning)]">Expediente v2 sin eventos: requiere revisión.</p>
+              ) : (
+                <ol className="mt-4 space-y-3">
+                  {(events.data ?? []).map((event) => {
+                    const timelineDate = resolveRegistryEventTimelineDate({
+                      eventType: event.event_type,
+                      effectiveAt: event.effective_at,
+                      payload: event.payload,
+                      deedDate: filing.deed_date,
+                    });
+                    return (
+                      <li key={event.id} className="flex gap-3">
+                        <span className="mt-1 h-2.5 w-2.5 shrink-0 bg-[var(--g-brand-bright)]" style={{ borderRadius: "var(--g-radius-full)" }} />
+                        <div>
+                          <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                            {REGISTRY_EVENT_LABEL[event.event_type] ?? event.event_type}
+                          </p>
+                          <p className="text-xs text-[var(--g-text-secondary)]">
+                            {timelineDate.businessDateLabel && timelineDate.businessDate
+                              ? `${timelineDate.businessDateLabel}: ${formatDetailDate(timelineDate.businessDate)} · `
+                              : ""}
+                            {statusLabel(event.to_status)} · evento {event.sequence_no}
+                          </p>
+                          <p className="text-xs text-[var(--g-text-secondary)]">
+                            Traza técnica: {formatDetailDate(timelineDate.recordedAt)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </section>
+
+            {filing.workflow_version === 2 && filing.entity_id ? (
+              <div className="lg:col-span-2">
+                <RegistryLifecycleActions
+                  filingId={id}
+                  entityId={filing.entity_id}
+                  status={filing.status ?? "PREPARADA"}
+                  filingVia={filing.filing_via}
+                  qualificationOutcome={filing.qualification_outcome}
+                />
+              </div>
+            ) : null}
+
+            <RegistrySupportDocuments
+              agreementId={filing.agreement_id}
+              baseDocumentArtifactId={filing.base_document_artifact_id}
+            />
           </div>
         )}
       </div>
@@ -476,6 +521,7 @@ function TramitadorNuevo() {
   const requestedTemplateType = searchParams.get("tipo");
   const requestedCertificationId = searchParams.get("certificacion");
   const requestedAgreementId = searchParams.get("agreement");
+  const requestedFilingId = searchParams.get("filing");
   const scopedEntityId =
     searchParams.get("scope") === "sociedad" ? searchParams.get("entity") : null;
   const isSociedadScoped = Boolean(scopedEntityId);
@@ -582,7 +628,7 @@ function TramitadorNuevo() {
   const effectiveSelectedAgreementId = selectedAgreementId ?? defaultAgreementId;
   const { data: selectedAgreement } = useAgreementById(effectiveSelectedAgreementId || undefined);
   // ITEM-106 (Comité Legal + Garrigues): en la vía DIRECTA (sin ?certificacion=)
-  // se comprueba que el acuerdo tenga certificación firmada antes de permitir la
+  // se comprueba que el acuerdo tenga certificación emitida y evidenciada antes de permitir la
   // elevación a público (art. 107 RRM). Cuando se entra por certificación, el
   // intake ya garantiza el título y este check no aplica.
   const { data: agreementHasCertification, isLoading: agreementCertCheckLoading } =
@@ -672,6 +718,25 @@ function TramitadorNuevo() {
   const [registryLinkSaved, setRegistryLinkSaved] = useState(false);
   const [registryLinkMessage, setRegistryLinkMessage] = useState<string | null>(null);
   const [registryFilingId, setRegistryFilingId] = useState<string | null>(null);
+  const [registryWorkflowVersion, setRegistryWorkflowVersion] = useState<number | null>(null);
+  const [baseDocumentArtifactId, setBaseDocumentArtifactId] = useState<string | null>(null);
+  const [baseDocumentArtifactMessage, setBaseDocumentArtifactMessage] = useState<string | null>(null);
+  const [filingNumber, setFilingNumber] = useState("");
+  const [presentationDate, setPresentationDate] = useState("");
+  const [presentationEvidenceFile, setPresentationEvidenceFile] = useState<File | null>(null);
+  const [presentationEvidenceArtifactId, setPresentationEvidenceArtifactId] = useState<string | null>(null);
+  const [subsanacionEvidenceFile, setSubsanacionEvidenceFile] = useState<File | null>(null);
+  const [subsanacionEvidenceArtifactId, setSubsanacionEvidenceArtifactId] = useState<string | null>(null);
+  const prepareOperationId = useRef(crypto.randomUUID());
+  const presentationOperationId = useRef(crypto.randomUUID());
+  const remedyOperationId = useRef(crypto.randomUUID());
+  const presentationRecordedAt = useRef(new Date().toISOString());
+  const remedyEffectiveAt = useRef(new Date().toISOString());
+  const createArtifact = useCreateSecretariaDocumentArtifact();
+  const prepareFiling = usePrepareRegistryFiling();
+  const recordPresentation = useRecordRegistryPresentation();
+  const submitRemedy = useSubmitRegistryRemedy();
+  const uploadRegistryEvidence = useUploadRegistryEvidenceArtifact();
 
   useEffect(() => {
     if (!requestedAgreementId || selectedAgreementId) return;
@@ -699,6 +764,20 @@ function TramitadorNuevo() {
     setRegistryLinkSaved(false);
     setRegistryLinkMessage(null);
     setRegistryFilingId(null);
+    setRegistryWorkflowVersion(null);
+    setBaseDocumentArtifactId(null);
+    setBaseDocumentArtifactMessage(null);
+    setFilingNumber("");
+    setPresentationDate("");
+    setPresentationEvidenceFile(null);
+    setPresentationEvidenceArtifactId(null);
+    setSubsanacionEvidenceFile(null);
+    setSubsanacionEvidenceArtifactId(null);
+    prepareOperationId.current = crypto.randomUUID();
+    presentationOperationId.current = crypto.randomUUID();
+    remedyOperationId.current = crypto.randomUUID();
+    presentationRecordedAt.current = new Date().toISOString();
+    remedyEffectiveAt.current = new Date().toISOString();
   }, [certificationIntake, certifiedAgreementIds, displayedAgreements, requestedAgreementId, selectedAgreementId]);
 
   useEffect(() => {
@@ -746,26 +825,50 @@ function TramitadorNuevo() {
     if (filingStatus !== "DRAFT" && registryFilingId) return;
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("registry_filings")
-        .select("id, status")
+        .select("id, status, workflow_version, base_document_artifact_id, filing_number, presentation_date")
         .eq("tenant_id", tenantId)
-        .eq("agreement_id", effectiveSelectedAgreementId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("agreement_id", effectiveSelectedAgreementId);
+      query = requestedFilingId
+        ? query.eq("id", requestedFilingId)
+        : query.order("created_at", { ascending: false }).limit(1);
+      const { data, error } = await query;
       if (cancelled) return;
       if (error) return;
       const row = (data ?? [])[0];
       if (!row) return;
       setRegistryFilingId(row.id as string);
       setFilingStatus(String(row.status ?? "DRAFT"));
+      setRegistryWorkflowVersion(Number(row.workflow_version ?? 1));
+      setBaseDocumentArtifactId(row.base_document_artifact_id ?? null);
+      setFilingNumber(row.filing_number ?? "");
+      setPresentationDate(row.presentation_date ?? "");
       setDeedSaved(["ELEVADA", "PRESENTADA", "INSCRITA", "ELEVATED", "SUBMITTED", "INSCRIBED"].includes(String(row.status ?? ""))); // ITEM-102: vocabulario ES canónico (+ inglés legacy)
     })();
     return () => { cancelled = true; };
-  }, [effectiveSelectedAgreementId, filingStatus, registryFilingId, tenantId]);
+  }, [effectiveSelectedAgreementId, filingStatus, registryFilingId, requestedFilingId, tenantId]);
 
-  const isDeedRequired = registryRulePackData?.payload.instrumentoRequerido === "ESCRITURA";
+  const registryProcedureProfile = selectedAgreement && registryRulePackData
+    ? resolveRegistryProcedureProfile(selectedAgreement.agreement_kind, registryRulePackData.payload)
+    : null;
+  const registryBaseDocumentKind: RegistryBaseDocumentKind | null =
+    registryProcedureProfile?.baseDocumentKind ?? null;
+  const isDeedRequired = registryBaseDocumentKind === "ESCRITURA";
+  const baseDocumentBusinessLabel = registryBaseDocumentKind === "ESCRITURA"
+    ? "Escritura pública"
+    : registryBaseDocumentKind === "INSTANCIA"
+      ? "Instancia"
+      : registryBaseDocumentKind === "CERTIFICACION"
+        ? "Certificación"
+        : "Documento de base";
+  const registryDocumentTitleLabel = registryBaseDocumentKind === "ESCRITURA"
+    ? "Documento preparatorio para escritura pública"
+    : "Documento preparatorio registral";
   const filingType = (() => {
+    if (registryProcedureProfile?.procedureProfileCode) {
+      return registryProcedureProfile.procedureProfileCode;
+    }
     if (!registryRulePackData) return null;
     const payload = registryRulePackData.payload as Record<string, unknown>;
     if (typeof payload.filing_type === "string" && payload.filing_type.trim()) {
@@ -784,15 +887,30 @@ function TramitadorNuevo() {
     ? entities.find((entity) => entity.id === selectedAgreement.entity_id) ?? null
     : null;
   const selectedAgreementEntityName =
-    selectedAgreementEntity?.common_name ??
     selectedAgreementEntity?.legal_name ??
-    scopedEntity?.common_name ??
+    selectedAgreementEntity?.common_name ??
     scopedEntity?.legal_name ??
+    scopedEntity?.common_name ??
     "ARGA Seguros";
   const selectedAgreementLegalName =
     selectedAgreementEntity?.legal_name ??
     scopedEntity?.legal_name ??
     selectedAgreementEntityName;
+
+  useEffect(() => {
+    if (registryBaseDocumentKind !== "CERTIFICACION") return;
+    if (!certificationIntake?.baseDocumentArtifactId) return;
+    if (registryFilingId || baseDocumentArtifactId) return;
+    setBaseDocumentArtifactId(certificationIntake.baseDocumentArtifactId);
+    setBaseDocumentArtifactMessage(
+      "Certificación emitida y custodiada reutilizada como documento base; conserva el mismo bundle y hash de evidencia.",
+    );
+  }, [
+    baseDocumentArtifactId,
+    certificationIntake?.baseDocumentArtifactId,
+    registryBaseDocumentKind,
+    registryFilingId,
+  ]);
   const selectedModeloTemplate = useMemo(() => selectedModelo
     ? ({
       ...selectedModelo,
@@ -907,7 +1025,7 @@ function TramitadorNuevo() {
           filingChannel,
           filingStatus,
           filingType,
-          instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
+          instrumentRequired: registryBaseDocumentKind ?? registryRulePackData.payload.instrumentoRequerido,
           registryFilingId,
         }),
         ...certificationRegistryVariables,
@@ -922,7 +1040,7 @@ function TramitadorNuevo() {
       filingChannel,
       filingStatus,
       filingType,
-      instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
+      instrumentRequired: registryBaseDocumentKind ?? registryRulePackData.payload.instrumentoRequerido,
     })
     : "";
   const subsanacionDocVariables = selectedAgreement && registryRulePackData
@@ -935,7 +1053,7 @@ function TramitadorNuevo() {
           filingChannel,
           filingStatus,
           filingType,
-          instrumentRequired: registryRulePackData.payload.instrumentoRequerido,
+          instrumentRequired: registryBaseDocumentKind ?? registryRulePackData.payload.instrumentoRequerido,
           registryFilingId,
           isSubsanacion: true,
           subsanacionMotivo,
@@ -979,14 +1097,20 @@ function TramitadorNuevo() {
       selectedAgreement &&
       selectedAgreementAllowedByCertification &&
       certificationRegistryReady &&
-      // ITEM-106: bloqueo duro si el acuerdo no tiene certificación firmada en la
+      // ITEM-106: bloqueo duro si el acuerdo no tiene certificación emitida y evidenciada en la
       // vía directa, salvo override justificado del usuario (art. 107 RRM).
-      !(agreementLacksCertification && !deedCertificationOverride) &&
-      isDeedRequired &&
+      !(isDeedRequired && agreementLacksCertification && !deedCertificationOverride) &&
+      registryBaseDocumentKind &&
+      baseDocumentArtifactId &&
+      filingChannel &&
       filingType &&
-      instrumentData.notary.trim() &&
-      instrumentData.deedDate &&
-      instrumentData.protocolNumber.trim()
+      (
+        !isDeedRequired || (
+          instrumentData.notary.trim() &&
+          instrumentData.deedDate &&
+          instrumentData.protocolNumber.trim()
+        )
+      )
   );
 
   const handleSelectAgreement = (agreementId: string) => {
@@ -1010,11 +1134,81 @@ function TramitadorNuevo() {
     setRegistryLinkSaved(false);
     setRegistryLinkMessage(null);
     setRegistryFilingId(null);
+    setRegistryWorkflowVersion(null);
+    setBaseDocumentArtifactId(null);
+    setBaseDocumentArtifactMessage(null);
+    setFilingNumber("");
+    setPresentationDate("");
+    setPresentationEvidenceFile(null);
+    setPresentationEvidenceArtifactId(null);
+    setSubsanacionEvidenceFile(null);
+    setSubsanacionEvidenceArtifactId(null);
+    prepareOperationId.current = crypto.randomUUID();
+    presentationOperationId.current = crypto.randomUUID();
+    remedyOperationId.current = crypto.randomUUID();
+    presentationRecordedAt.current = new Date().toISOString();
+    remedyEffectiveAt.current = new Date().toISOString();
   };
+
+  async function handleRegistryDocumentGenerated(result: ProcessDocumentGenerationResult) {
+    if (!selectedAgreement?.entity_id) {
+      throw new Error("El acuerdo no tiene una sociedad resuelta para archivar el documento registral.");
+    }
+    const documentUrl = result.archive.documentUrls[0] ?? null;
+    if (!result.archive.archived || !documentUrl) {
+      throw new Error("El documento debe quedar archivado antes de vincularlo al expediente registral.");
+    }
+    const evidenceBundleId = result.archive.evidenceBundleIds[0] ?? null;
+    if (!evidenceBundleId) {
+      throw new Error("El documento archivado no tiene bundle de evidencia para el expediente registral.");
+    }
+    const { data: evidenceBundle, error: evidenceBundleError } = await supabase
+      .from("evidence_bundles")
+      .select("hash_sha512")
+      .eq("id", evidenceBundleId)
+      .eq("tenant_id", tenantId!)
+      .maybeSingle();
+    if (evidenceBundleError) throw evidenceBundleError;
+    if (!evidenceBundle?.hash_sha512) {
+      throw new Error("El bundle registral no contiene el hash SHA-512 del binario archivado.");
+    }
+
+    const artifact = await createArtifact.mutateAsync({
+      artifactKind: "DOCUMENTO_REGISTRAL",
+      title: `${registryDocumentTitleLabel}: ${selectedAgreement.decision_text || selectedAgreement.proposal_text || selectedAgreement.agreement_kind}`,
+      entityId: selectedAgreement.entity_id,
+      status: "ARCHIVED",
+      evidenceStatus: "DEMO_OPERATIVA",
+      documentUrl,
+      contentHash: result.contentHash,
+      hashSha512: evidenceBundle.hash_sha512,
+      evidenceBundleId,
+      sourceDomain: "agreement",
+      sourceId: selectedAgreement.id,
+      sourceHash: result.contentHash,
+      sourcePayload: {
+        filing_type: filingType,
+        base_document_kind: registryBaseDocumentKind,
+        certification_id: certificationIntake?.id ?? null,
+        agreement_decision: selectedAgreement.decision_text ?? selectedAgreement.proposal_text ?? null,
+      },
+      metadata: {
+        filename: result.filename,
+        template_id: result.templateId,
+        template_version: result.templateVersion,
+        registry_base_artifact: true,
+        document_purpose: registryProcedureProfile?.kind ?? null,
+      },
+    });
+    setBaseDocumentArtifactId(artifact.id);
+    setBaseDocumentArtifactMessage(
+      `Documento base archivado y vinculado por hash ${result.contentHash.slice(0, 12)}.`,
+    );
+  }
 
   async function handleRegisterDeed() {
     if (!tenantId || !selectedAgreement || !registryRulePackData) {
-      toast.error("No se pudo preparar la escritura para este acuerdo.");
+      toast.error("No se pudo preparar el expediente registral para este acuerdo.");
       return;
     }
 
@@ -1024,139 +1218,187 @@ function TramitadorNuevo() {
     }
 
     if (!certificationRegistryReady) {
-      toast.error("La certificación debe estar firmada y tener evidencia demo/operativa vinculada antes de registrar la escritura.");
+      toast.error("La certificación debe estar emitida, custodiada y tener constancia vinculada antes de preparar el expediente.");
       return;
     }
 
-    if (!isDeedRequired) {
-      toast.error("Este acuerdo no requiere escritura pública.");
+    if (!registryBaseDocumentKind) {
+      toast.error("El perfil registral no determina un documento de base soportado.");
       return;
     }
 
-    if (
+    if (!baseDocumentArtifactId) {
+      toast.error("Genere y archive primero el documento de base del expediente.");
+      return;
+    }
+
+    if (!filingChannel) {
+      toast.error("Seleccione el canal de presentación.");
+      return;
+    }
+
+    if (isDeedRequired && (
       !instrumentData.notary.trim() ||
       !instrumentData.deedDate ||
       !instrumentData.protocolNumber.trim()
-    ) {
+    )) {
       toast.error("Complete notaría, fecha de escritura y número de protocolo.");
       return;
     }
 
-    const filingPayload = {
-      tenant_id: tenantId,
-      agreement_id: selectedAgreement.id,
-      deed_reference: instrumentData.protocolNumber.trim(),
-      deed_date: instrumentData.deedDate,
-      notary_id: null,
-      notary_name: instrumentData.notary.trim(),
-      protocol_number: instrumentData.protocolNumber.trim(),
-      elevated_at: new Date().toISOString(),
-      status: "ELEVADA", // ITEM-102
-      filing_type: filingType,
-      filing_via: filingChannel || null,
-    };
-
     setDeedSaving(true);
     try {
-      let registryFilingId: string | null = null;
-      const { data: existingRows, error: existingError } = await supabase
-        .from("registry_filings")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("agreement_id", selectedAgreement.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (existingError) throw existingError;
+      const result = await prepareFiling.mutateAsync({
+        operationId: prepareOperationId.current,
+        entityId: selectedAgreement.entity_id,
+        sourceDomain: certificationIntake ? "CERTIFICATION" : "AGREEMENT",
+        sourceId: certificationIntake?.id ?? selectedAgreement.id,
+        baseDocumentKind: registryBaseDocumentKind,
+        baseDocumentArtifactId,
+        filingVia: filingChannel,
+        agreementId: selectedAgreement.id,
+        rulePackVersionId: rulePackData?.version.id ?? null,
+        procedureProfileCode: filingType,
+        procedureSnapshot: {
+          instrument_required: registryBaseDocumentKind,
+          filing_type: filingType,
+          procedure_kind: registryProcedureProfile?.kind ?? null,
+          source_agreement_kind: selectedAgreement.agreement_kind,
+          source_agreement_decision: selectedAgreement.decision_text ?? selectedAgreement.proposal_text ?? null,
+          rule_pack_selection: rulePackData?.selectionReason ?? "PROTOTIPO",
+          certification_id: certificationIntake?.id ?? null,
+        },
+        deedDate: isDeedRequired ? instrumentData.deedDate : null,
+        notaryName: isDeedRequired ? instrumentData.notary.trim() : null,
+        protocolNumber: isDeedRequired ? instrumentData.protocolNumber.trim() : null,
+      });
+      const nextRegistryFilingId = result.filing_id;
 
-      const existingId = existingRows?.[0]?.id;
-      if (existingId) {
-        const { error: updateError } = await supabase
-          .from("registry_filings")
-          .update(filingPayload)
-          .eq("id", existingId);
-        if (updateError) throw updateError;
-        registryFilingId = existingId;
-      } else {
-        const { data: insertedFiling, error: insertError } = await supabase
-          .from("registry_filings")
-          .insert(filingPayload)
-          .select("id")
-          .maybeSingle();
-        if (insertError) throw insertError;
-        registryFilingId = (insertedFiling as { id?: string } | null)?.id ?? null;
-      }
-
-      if (registryFilingId && certificationIntake) {
-        const linkResult = await persistRegistryFilingCertificationLink({
-          tenantId,
-          registryFilingId,
-          agreementId: selectedAgreement.id,
-          certification: certificationIntake,
-        });
-        if (linkResult.auditLogged || linkResult.evidenceArtifactCreated) {
-          setRegistryLinkSaved(true);
-          setRegistryLinkMessage(
-            linkResult.evidenceArtifactCreated
-              ? "Vínculo certificación-tramitación añadido a la evidencia demo/operativa, pendiente de controles productivos de auditoría, conservación y legal hold."
-              : "Vínculo certificación-tramitación registrado en la trazabilidad operativa.",
-          );
-        } else {
-          setRegistryLinkSaved(false);
-          setRegistryLinkMessage(
-            linkResult.errors[0] ?? "La escritura se guardó, pero no se pudo registrar el vínculo probatorio.",
-          );
-          toast.warning("Escritura registrada en expediente con vínculo probatorio pendiente", {
-            description: linkResult.errors[0],
-          });
-        }
+      if (nextRegistryFilingId && certificationIntake) {
+        setRegistryLinkSaved(true);
+        setRegistryLinkMessage(
+          "La certificación figura como origen explícito del expediente v2; la RPC ha validado la constancia documental, la evidencia, el tenant y la sociedad, sin atribuir firma a EAD Trust.",
+        );
       }
 
       setDeedSaved(true);
-      setRegistryFilingId(registryFilingId);
-      setFilingStatus("ELEVADA"); // ITEM-102
-      await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
+      setRegistryFilingId(nextRegistryFilingId);
+      setRegistryWorkflowVersion(2);
+      setFilingStatus(result.status);
       await queryClient.invalidateQueries({ queryKey: ["evidence_bundles", tenantId] });
+      toast.success(
+        registryBaseDocumentKind === "ESCRITURA"
+          ? "Escritura vinculada al expediente"
+          : "Documento de base vinculado al expediente",
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(`No se pudo registrar la escritura: ${message}`);
+      toast.error(`No se pudo preparar el expediente: ${message}`);
     } finally {
       setDeedSaving(false);
     }
   }
 
+  async function handleRecordPresentation() {
+    if (!registryFilingId || registryWorkflowVersion !== 2 || !selectedAgreement?.entity_id) {
+      toast.error("Prepare primero un expediente registral v2 para este acuerdo.");
+      return;
+    }
+    const missingPresentationFields = [
+      !filingNumber.trim() ? "número de entrada" : null,
+      !presentationDate ? "fecha de presentación" : null,
+      !filingChannel ? "canal de presentación" : null,
+    ].filter((field): field is string => Boolean(field));
+    if (missingPresentationFields.length > 0) {
+      toast.error(`Complete: ${missingPresentationFields.join(", ")}.`);
+      return;
+    }
+    if (!presentationEvidenceFile && !presentationEvidenceArtifactId) {
+      toast.error("Adjunte el justificante real de presentación.");
+      return;
+    }
+
+    try {
+      let evidenceArtifactId = presentationEvidenceArtifactId;
+      if (!evidenceArtifactId && presentationEvidenceFile) {
+        const artifact = await uploadRegistryEvidence.mutateAsync({
+          file: presentationEvidenceFile,
+          entityId: selectedAgreement.entity_id,
+          title: `Justificante de presentación ${filingNumber.trim()}`,
+          artifactKind: "ANEXO_EXTERNO",
+          sourceDomain: "registry_filing",
+          sourceId: registryFilingId,
+          metadata: { registry_evidence_role: "PRESENTATION_RECEIPT" },
+        });
+        evidenceArtifactId = artifact.id;
+        setPresentationEvidenceArtifactId(artifact.id);
+      }
+      if (!evidenceArtifactId) throw new Error("No se pudo persistir el justificante de presentación.");
+
+      const result = await recordPresentation.mutateAsync({
+        filingId: registryFilingId,
+        operationId: presentationOperationId.current,
+        filingNumber: filingNumber.trim(),
+        presentationDate,
+        filingVia: filingChannel,
+        evidenceArtifactId,
+        // La firma histórica de la RPC conserva `effectiveAt`; semánticamente
+        // es el timestamp técnico del asiento. La fecha de negocio es
+        // `presentationDate` y se presenta separada en el timeline.
+        effectiveAt: presentationRecordedAt.current,
+      });
+      setFilingStatus(result.status);
+      setDeedSaved(true);
+      toast.success("Presentación registrada con justificante y evento de auditoría");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error("No se pudo registrar la presentación", { description: message });
+    }
+  }
+
   async function handleSubsanacionSubmit() {
-    if (!effectiveSelectedAgreementId || !tenantId) {
+    if (!effectiveSelectedAgreementId || !tenantId || !selectedAgreement?.entity_id) {
       toast.error("No se puede preparar la subsanación sin acuerdo y contexto activos.");
+      return;
+    }
+    if (!registryFilingId || registryWorkflowVersion !== 2) {
+      toast.error("La subsanación requiere un expediente registral v2 identificado de forma exacta.");
+      return;
+    }
+    if (!subsanacionEvidenceFile && !subsanacionEvidenceArtifactId) {
+      toast.error("Adjunte el documento real presentado para subsanar.");
       return;
     }
     setSubsanacionSaving(true);
     try {
-      let targetFilingId = registryFilingId;
-      if (!targetFilingId) {
-        const { data: existingRows, error: existingError } = await supabase
-          .from("registry_filings")
-          .select("id")
-          .eq("tenant_id", tenantId)
-          .eq("agreement_id", effectiveSelectedAgreementId)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (existingError) throw existingError;
-        targetFilingId = existingRows?.[0]?.id ?? null;
+      let evidenceArtifactId = subsanacionEvidenceArtifactId;
+      if (!evidenceArtifactId && subsanacionEvidenceFile) {
+        const artifact = await uploadRegistryEvidence.mutateAsync({
+          file: subsanacionEvidenceFile,
+          entityId: selectedAgreement.entity_id,
+          title: `Documento de subsanación: ${selectedAgreement.agreement_kind}`,
+          artifactKind: "SUBSANACION_REGISTRAL",
+          sourceDomain: "registry_filing",
+          sourceId: registryFilingId,
+          metadata: {
+            registry_evidence_role: "REMEDY_SUBMISSION",
+            document_reference: subsanacionDocs.trim() || null,
+          },
+        });
+        evidenceArtifactId = artifact.id;
+        setSubsanacionEvidenceArtifactId(artifact.id);
       }
-      if (!targetFilingId) {
-        throw new Error("No hay tramitación registral activa para subsanar.");
-      }
+      if (!evidenceArtifactId) throw new Error("No se pudo persistir la evidencia de subsanación.");
 
-      const { error } = await supabase
-        .from("registry_filings")
-        .update({ status: "PRESENTADA" }) // ITEM-102
-        .eq("id", targetFilingId)
-        .eq("tenant_id", tenantId);
-      if (error) throw error;
-      setRegistryFilingId(targetFilingId);
-      setFilingStatus("PRESENTADA"); // ITEM-102
+      const result = await submitRemedy.mutateAsync({
+        filingId: registryFilingId,
+        operationId: remedyOperationId.current,
+        remedyDescription: subsanacionMotivo.trim(),
+        evidenceArtifactId,
+        effectiveAt: remedyEffectiveAt.current,
+      });
+      setFilingStatus(result.status);
       setSubsanacionDone(true);
-      await queryClient.invalidateQueries({ queryKey: ["registry_filings", tenantId] });
     } catch (error) {
       const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
       toast.error("No se pudo registrar la respuesta de subsanación", { description });
@@ -1196,7 +1438,7 @@ function TramitadorNuevo() {
                 ) : certificationIntake ? (
                   <>
                     Certificación <span className="font-mono text-xs">{certificationIntake.id.slice(0, 8)}</span>
-                    {" "}· firma {statusLabel(certificationIntake.signatureStatus)}
+                    {" "}· evidencia {statusLabel(certificationIntake.signatureStatus)}
                     {" "}· {certificationIntake.references.length} referencia(s) certificada(s).
                   </>
                 ) : (
@@ -1222,13 +1464,13 @@ function TramitadorNuevo() {
               <div className="flex flex-wrap gap-2">
                 <span
                   className={`px-2 py-0.5 text-[11px] font-semibold ${
-                    certificationIntake.signed
+                    certificationIntake.evidenced
                       ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                       : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                   }`}
                   style={{ borderRadius: "var(--g-radius-full)" }}
                 >
-                  {certificationIntake.signed ? "Firmada" : "Pendiente de firma"}
+                  {certificationIntake.evidenced ? "Constancia verificada" : "Constancia pendiente"}
                 </span>
                 <span
                   className={`px-2 py-0.5 text-[11px] font-semibold ${
@@ -1379,6 +1621,9 @@ function TramitadorNuevo() {
                   <div className="text-xs text-[var(--g-text-secondary)] mt-0.5">
                     Tipo de materia: {matterClassBusinessLabel(agreement.matter_class)} · Forma de adopción: {adoptionModeBusinessLabel(agreement.adoption_mode)}
                   </div>
+                  <div className="mt-1 text-xs font-medium text-[var(--g-text-primary)]">
+                    {agreement.decision_text || agreement.proposal_text || `Expediente ${agreement.id.slice(0, 8)}`}
+                  </div>
                 </div>
                 <span
                   className={`px-2 py-1 text-[10px] font-semibold rounded-full ${
@@ -1416,7 +1661,7 @@ function TramitadorNuevo() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--g-text-secondary)]">Inscribible:</span>
+            <span className="text-sm text-[var(--g-text-secondary)]">Acuerdo inscribible:</span>
             <span
               className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                 registryRulePackData.payload.inscribible
@@ -1429,9 +1674,16 @@ function TramitadorNuevo() {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--g-text-secondary)]">Instrumento requerido:</span>
+            <span className="text-sm text-[var(--g-text-secondary)]">Documento base del procedimiento:</span>
             <span className="px-2 py-0.5 text-xs font-medium text-[var(--g-text-primary)]">
-              {registryRulePackData.payload.instrumentoRequerido}
+              {registryBaseDocumentKind ?? "Ninguno"}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[var(--g-text-secondary)]">Procedimiento aplicable:</span>
+            <span className="px-2 py-0.5 text-xs font-medium text-[var(--g-text-primary)]">
+              {registryProcedureProfile?.label ?? "Sin determinar"}
             </span>
           </div>
 
@@ -1450,15 +1702,23 @@ function TramitadorNuevo() {
         </div>
       </div>
 
-      {registryRulePackData.payload.plazoInscripcion != null && (
+      {registryProcedureProfile?.kind === "DEPOSITO_CUENTAS" ? (
+        <div
+          className="border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          La aprobación de las cuentas no se presenta como inscripción del acuerdo. Este expediente
+          tramita el depósito posterior y reutiliza la certificación emitida y custodiada como documento de base.
+        </div>
+      ) : null}
+
+      {registryProcedureProfile?.deadlineDays != null && (
         <div
           className="px-4 py-2 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           {/* ITEM-135: el plazo puede ser escalar o estructurado {dias} — extraer el número. */}
-          Plazo de inscripción: {typeof registryRulePackData.payload.plazoInscripcion === "number"
-            ? registryRulePackData.payload.plazoInscripcion
-            : registryRulePackData.payload.plazoInscripcion.dias} días
+          Plazo del procedimiento: {registryProcedureProfile.deadlineDays} días
         </div>
       )}
 
@@ -1598,50 +1858,57 @@ function TramitadorNuevo() {
   );
 
   // Step 3: Instrument data (only if ESCRITURA or INSTANCIA)
-  const showInstrumentForm =
-    registryRulePackData && registryRulePackData.payload.instrumentoRequerido !== "NINGUNO";
+  const showInstrumentForm = Boolean(registryProcedureProfile?.canPrepareFiling);
 
   const step3Body = showInstrumentForm ? (
     <div className="space-y-4">
-      {registryRulePackData?.payload.instrumentoRequerido === "ESCRITURA" && (
+      {registryBaseDocumentKind === "ESCRITURA" && (
         <>
           <div>
-            <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
+            <label htmlFor="registry-notary" className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
               Notaría
             </label>
             <input
+              id="registry-notary"
               type="text"
               placeholder="Ej: Notaría López García, Madrid"
               value={instrumentData.notary}
               onChange={(e) => setInstrumentData({ ...instrumentData, notary: e.target.value })}
+              onInput={(e) => setInstrumentData({ ...instrumentData, notary: e.currentTarget.value })}
               className="w-full px-3 py-2 border border-[var(--g-border-subtle)] text-sm text-[var(--g-text-primary)] placeholder-[var(--g-text-secondary)] bg-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
+            <label htmlFor="registry-deed-date" className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
               Fecha de escritura
             </label>
             <input
+              id="registry-deed-date"
               type="date"
               value={instrumentData.deedDate}
               onChange={(e) => setInstrumentData({ ...instrumentData, deedDate: e.target.value })}
+              onInput={(e) => setInstrumentData({ ...instrumentData, deedDate: e.currentTarget.value })}
               className="w-full px-3 py-2 border border-[var(--g-border-subtle)] text-sm text-[var(--g-text-primary)] bg-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
+            <label htmlFor="registry-protocol-number" className="block text-sm font-medium text-[var(--g-text-primary)] mb-2">
               Número de protocolo
             </label>
             <input
+              id="registry-protocol-number"
               type="text"
               placeholder="Ej: 2026/5432"
               value={instrumentData.protocolNumber}
               onChange={(e) =>
                 setInstrumentData({ ...instrumentData, protocolNumber: e.target.value })
+              }
+              onInput={(e) =>
+                setInstrumentData({ ...instrumentData, protocolNumber: e.currentTarget.value })
               }
               className="w-full px-3 py-2 border border-[var(--g-border-subtle)] text-sm text-[var(--g-text-primary)] placeholder-[var(--g-text-secondary)] bg-[var(--g-surface-card)]"
               style={{ borderRadius: "var(--g-radius-md)" }}
@@ -1650,12 +1917,22 @@ function TramitadorNuevo() {
         </>
       )}
 
-      {registryRulePackData?.payload.instrumentoRequerido === "INSTANCIA" && (
+      {registryBaseDocumentKind === "INSTANCIA" && (
         <div
           className="px-4 py-3 text-sm text-[var(--g-text-secondary)] bg-[var(--g-surface-muted)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           Tramitación vía instancia notarial. Los datos se completarán en el paso siguiente.
+        </div>
+      )}
+
+      {registryBaseDocumentKind === "CERTIFICACION" && (
+        <div
+          className="border border-[var(--g-sec-300)] bg-[var(--g-sec-100)] px-4 py-3 text-sm text-[var(--g-text-primary)]"
+          style={{ borderRadius: "var(--g-radius-md)" }}
+        >
+          La certificación emitida y archivada se utilizará sin recomponerla. El expediente conserva
+          su artefacto, bundle de evidencia y hash originales.
         </div>
       )}
     </div>
@@ -1665,7 +1942,7 @@ function TramitadorNuevo() {
       style={{ borderRadius: "var(--g-radius-md)" }}
     >
       <AlertTriangle className="h-4 w-4" />
-      Este acuerdo no requiere instrumento especial (NINGUNO)
+      El rule pack no determina un procedimiento registral para este acuerdo.
     </div>
   );
 
@@ -1705,6 +1982,144 @@ function TramitadorNuevo() {
           este entorno demo no realiza envío telemático al Registro.
         </div>
       )}
+
+      {selectedAgreement && registryRulePackData && registryDocVariables && showInstrumentForm ? (
+        <div
+          className="space-y-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Documento de base</h3>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              {registryBaseDocumentKind === "CERTIFICACION"
+                ? "La certificación ya emitida y custodiada se reutiliza con su misma evidencia, sin generar una copia divergente."
+                : "Genere y archive el documento preparatorio antes de crear el expediente. El hash y la sociedad quedan vinculados al trámite."}
+            </p>
+          </div>
+          {registryBaseDocumentKind === "CERTIFICACION" && baseDocumentArtifactId ? (
+            <div
+              className="inline-flex items-center gap-2 bg-[var(--g-sec-100)] px-3 py-2 text-xs font-semibold text-[var(--g-brand-3308)]"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+              Certificación emitida vinculada
+            </div>
+          ) : (
+            <ProcessDocxButton
+              label={registryBaseDocumentKind === "ESCRITURA" ? "Documento preparatorio de escritura DOCX" : "Documento registral DOCX"}
+              variant="outline"
+              onGenerated={handleRegistryDocumentGenerated}
+              input={{
+                kind: "DOCUMENTO_REGISTRAL",
+                recordId: selectedAgreement.id,
+                title: `${registryDocumentTitleLabel}: ${selectedAgreement.decision_text || selectedAgreement.proposal_text || selectedAgreement.agreement_kind}`,
+                subtitle: selectedAgreementLegalName,
+                entityName: selectedAgreementLegalName,
+                templateTypes: ["DOCUMENTO_REGISTRAL"],
+                variables: registryDocVariables,
+                templateCriteria: {
+                  jurisdiction: selectedAgreementEntity?.jurisdiction ?? scopedEntity?.jurisdiction,
+                  materia: selectedAgreement.agreement_kind,
+                  adoptionMode: selectedAgreement.adoption_mode,
+                },
+                preferredTemplateId: preferredTemplateIdFor("DOCUMENTO_REGISTRAL"),
+                fallbackText: registryDocFallback,
+                filenamePrefix: "documento_registral",
+                generatedAt: registryDocumentGeneratedAt(instrumentData),
+              }}
+            />
+          )}
+          {baseDocumentArtifactMessage ? (
+            <p className="text-xs text-[var(--status-success)]">{baseDocumentArtifactMessage}</p>
+          ) : null}
+
+          {deedSaved ? (
+            <div className="inline-flex items-center gap-2 bg-[var(--g-sec-100)] px-3 py-1 text-xs font-semibold text-[var(--g-brand-3308)]" style={{ borderRadius: "var(--g-radius-full)" }}>
+              <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
+              Expediente v2 preparado
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRegisterDeed}
+              disabled={!canRegisterDeed || deedSaving}
+              aria-busy={deedSaving}
+              className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)] disabled:opacity-100"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {deedSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deedSaving
+                ? "Preparando expediente..."
+                : "Preparar expediente registral"}
+            </button>
+          )}
+        </div>
+      ) : null}
+
+      {registryWorkflowVersion === 2 && ["PREPARADA", "ELEVADA"].includes(filingStatus) ? (
+        <div
+          className="space-y-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">Asiento de presentación</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="registry-filing-number" className="block text-xs font-medium text-[var(--g-text-primary)]">
+                Número de entrada o asiento
+              </label>
+              <input
+                id="registry-filing-number"
+                value={filingNumber}
+                onChange={(event) => setFilingNumber(event.target.value)}
+                onInput={(event) => setFilingNumber(event.currentTarget.value)}
+                className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+            <div>
+              <label htmlFor="registry-presentation-date" className="block text-xs font-medium text-[var(--g-text-primary)]">
+                Fecha de presentación
+              </label>
+              <input
+                id="registry-presentation-date"
+                type="date"
+                value={presentationDate}
+                onChange={(event) => setPresentationDate(event.target.value)}
+                onInput={(event) => setPresentationDate(event.currentTarget.value)}
+                className="mt-1 w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="registry-presentation-evidence" className="block text-xs font-medium text-[var(--g-text-primary)]">
+              Justificante de presentación
+            </label>
+            <input
+              id="registry-presentation-evidence"
+              type="file"
+              onChange={(event) => {
+                setPresentationEvidenceFile(event.target.files?.[0] ?? null);
+                setPresentationEvidenceArtifactId(null);
+                presentationOperationId.current = crypto.randomUUID();
+                presentationRecordedAt.current = new Date().toISOString();
+              }}
+              className="mt-1 block w-full text-xs text-[var(--g-text-secondary)] file:mr-3 file:border-0 file:bg-[var(--g-surface-subtle)] file:px-3 file:py-2 file:text-xs file:font-medium file:text-[var(--g-text-primary)]"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleRecordPresentation}
+            disabled={recordPresentation.isPending || uploadRegistryEvidence.isPending}
+            aria-busy={recordPresentation.isPending || uploadRegistryEvidence.isPending}
+            className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+          >
+            {(recordPresentation.isPending || uploadRegistryEvidence.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
+            Registrar presentación
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -1723,10 +2138,12 @@ function TramitadorNuevo() {
         <CheckCircle2 className="h-5 w-5" />
         <span className="text-sm font-medium">
           {deedSaved
-            ? "Escritura registrada en expediente"
+            ? `${baseDocumentBusinessLabel} vinculada al expediente`
             : isDeedRequired
               ? "Pendiente de registrar escritura en expediente"
-              : "Expediente en seguimiento"}
+              : registryProcedureProfile?.canPrepareFiling
+                ? `Pendiente de vincular ${baseDocumentBusinessLabel.toLocaleLowerCase("es-ES")}`
+                : "Sin procedimiento registral aplicable"}
         </span>
       </div>
 
@@ -1741,8 +2158,10 @@ function TramitadorNuevo() {
               </div>
               <div className="mt-1 text-xs text-[var(--g-text-secondary)]">
                 {certificationIntake && !certificationIntake.readyForRegistry
-                  ? "Antes de registrar, firme y archive la certificación DOCX para vincular evidencia demo/operativa; no constituye evidencia final productiva."
-                  : "Se guardará en el tramitador registral como elevada a público."}
+                  ? "Antes de registrar, emita y archive la certificación DOCX con constancia de interposición; no constituye por sí sola prueba de presentación registral."
+                  : deedSaved
+                    ? "Datos notariales y artefacto declarados en el expediente demo. La prueba no acredita por sí sola un otorgamiento productivo."
+                    : "Al preparar el expediente se registrarán los datos notariales y el artefacto aportado, sin atribuirles efectos jurídicos no acreditados."}
               </div>
             </div>
 
@@ -1755,11 +2174,11 @@ function TramitadorNuevo() {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
                 <div className="space-y-1.5">
                   <div className="font-medium">
-                    Acuerdo sin certificación firmada — no inscribible (art. 107 RRM)
+                    Acuerdo sin certificación emitida — no inscribible (art. 107 RRM)
                   </div>
                   <p className="text-xs text-[var(--g-text-secondary)]">
                     La elevación a público exige un título inscribible (escritura o certificación del
-                    acuerdo). Este acuerdo no tiene una certificación firmada vinculada. Emite primero
+                    acuerdo). Este acuerdo no tiene una certificación emitida y evidenciada vinculada. Emite primero
                     la certificación desde el acta, o marca el override justificado para proceder bajo
                     tu responsabilidad.
                   </p>
@@ -1800,7 +2219,7 @@ function TramitadorNuevo() {
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
                 {deedSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-                {deedSaving ? "Guardando escritura..." : "Registrar escritura"}
+                {deedSaving ? "Vinculando escritura..." : "Vincular escritura al expediente"}
               </button>
             )}
           </div>
@@ -1814,10 +2233,10 @@ function TramitadorNuevo() {
               </div>
               <div className="mt-1">
                 {!certificationIntake.readyForRegistry
-                  ? "Certificación pendiente: debe estar firmada y con evidencia demo/operativa archivada desde el acta antes de registrar la escritura."
+                  ? "Certificación pendiente: debe estar emitida, custodiada y con constancia vinculada desde el acta antes de registrar la escritura."
                   : registryLinkSaved
                   ? registryLinkMessage ?? "Vínculo registrado."
-                  : "Al registrar la escritura se añadirá trazabilidad operativa y, si existe evidencia demo/operativa, una referencia documental pendiente de controles productivos de auditoría, conservación y legal hold."}
+                  : "Al preparar el expediente, la certificación quedará como origen explícito y la RPC validará constancia, custodia, tenant y sociedad."}
               </div>
             </div>
           ) : null}
@@ -1847,36 +2266,6 @@ function TramitadorNuevo() {
           </div>
         </div>
 
-        {selectedAgreement && registryRulePackData && registryDocVariables && showInstrumentForm ? (
-          <div className="mt-4 border-t border-[var(--g-border-subtle)] pt-4">
-            <p className="mb-3 text-xs text-[var(--g-text-secondary)]">
-              Salida documental auxiliar del prototipo. El futuro carril Document Assembly recibirá
-              los datos canónicos del trámite; este DOCX mantiene estado demo/operativo y no
-              constituye evidencia final productiva.
-            </p>
-            <ProcessDocxButton
-              label="Documento registral DOCX"
-              variant="outline"
-              input={{
-                kind: "DOCUMENTO_REGISTRAL",
-                recordId: selectedAgreement.id,
-                title: `Documento registral: ${selectedAgreement.agreement_kind}`,
-                subtitle: selectedAgreementLegalName,
-                entityName: selectedAgreementLegalName,
-                templateTypes: ["DOCUMENTO_REGISTRAL"],
-                variables: registryDocVariables,
-                templateCriteria: {
-                  jurisdiction: selectedAgreementEntity?.jurisdiction ?? scopedEntity?.jurisdiction,
-                  materia: selectedAgreement.agreement_kind,
-                  adoptionMode: selectedAgreement.adoption_mode,
-                },
-                preferredTemplateId: preferredTemplateIdFor("DOCUMENTO_REGISTRAL"),
-                fallbackText: registryDocFallback,
-                filenamePrefix: "documento_registral",
-              }}
-            />
-          </div>
-        ) : null}
       </div>
 
       {filingStatus === "SUBSANACION" && (
@@ -1928,10 +2317,27 @@ function TramitadorNuevo() {
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
               </div>
+              <div className="space-y-1">
+                <label htmlFor="registry-remedy-evidence" className="text-xs font-medium text-[var(--g-text-primary)]">
+                  Documento presentado para subsanar
+                </label>
+                <input
+                  id="registry-remedy-evidence"
+                  type="file"
+                  onChange={(event) => {
+                    setSubsanacionEvidenceFile(event.target.files?.[0] ?? null);
+                    setSubsanacionEvidenceArtifactId(null);
+                    remedyOperationId.current = crypto.randomUUID();
+                    remedyEffectiveAt.current = new Date().toISOString();
+                  }}
+                  className="block w-full text-xs text-[var(--g-text-secondary)] file:mr-3 file:border-0 file:bg-[var(--g-surface-subtle)] file:px-3 file:py-2 file:text-xs file:font-medium file:text-[var(--g-text-primary)]"
+                />
+              </div>
               <button
                 type="button"
                 onClick={handleSubsanacionSubmit}
-                disabled={!subsanacionMotivo.trim() || subsanacionSaving}
+                disabled={!subsanacionMotivo.trim() || (!subsanacionEvidenceFile && !subsanacionEvidenceArtifactId) || subsanacionSaving}
+                aria-busy={subsanacionSaving}
                 className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:opacity-50"
                 style={{ borderRadius: "var(--g-radius-md)" }}
               >
@@ -1975,6 +2381,17 @@ function TramitadorNuevo() {
     </div>
   );
 
+  const step2CanAdvance = Boolean(registryProcedureProfile?.canPrepareFiling);
+  const step3CanAdvance = Boolean(
+    registryProcedureProfile?.canPrepareFiling &&
+      (!isDeedRequired || (
+        instrumentData.notary.trim() &&
+        instrumentData.deedDate &&
+        instrumentData.protocolNumber.trim()
+      )),
+  );
+  const step4CanAdvance = Boolean(registryFilingId && deedSaved);
+
   return (
     <>
       <StepperShell
@@ -1983,9 +2400,9 @@ function TramitadorNuevo() {
         backTo={scopedBackTo}
         steps={[
           { ...STEPS[0], body: step1Body, canAdvance: step1CanAdvance },
-          { ...STEPS[1], body: step2Body },
-          { ...STEPS[2], body: step3Body },
-          { ...STEPS[3], body: step4Body },
+          { ...STEPS[1], body: step2Body, canAdvance: step2CanAdvance },
+          { ...STEPS[2], body: step3Body, canAdvance: step3CanAdvance },
+          { ...STEPS[3], body: step4Body, canAdvance: step4CanAdvance },
           { ...STEPS[4], body: step5Body },
         ]}
         /* ITEM-068/062: tras registrar la escritura/subsanación, el último paso

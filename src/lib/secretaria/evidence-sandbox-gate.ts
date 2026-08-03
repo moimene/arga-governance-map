@@ -1,10 +1,9 @@
 // ============================================================
 // Evidence sandbox gate — Codex adversarial review #2
 // ============================================================
-// Un resultado de firma/notificación QTSP en modo SANDBOX (cuando el proxy o las
-// credenciales de EAD Trust no están disponibles y `useQTSPSign` cae al adaptador
-// de demo) NO representa una transacción QES/ERDS real. Por tanto NUNCA debe
-// persistirse como evidencia SEALED/WORM "final".
+// Un resultado QTSP histórico en modo SANDBOX NO representa una transacción
+// productiva de mensajería o e-archiving. Por tanto NUNCA debe persistirse como
+// evidencia SEALED/WORM "final". El flujo EAD vigente no fabrica una firma.
 //
 // `evidence_bundles.status` está acotado por CHECK a ('OPEN','SEALED','VERIFIED')
 // y la RPC `fn_create_governance_evidence_bundle` lanza excepción para cualquier

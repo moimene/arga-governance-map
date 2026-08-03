@@ -17,6 +17,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { formatSpanishLegalDate } from "@/lib/doc-gen/document-output-normalizer";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,8 @@ type MeetingWithJoins = {
   status?: string | null;
   date?: string | null;
   scheduled_date?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   location?: string | null;
@@ -365,14 +368,24 @@ async function resolveBodyVars(bodyId: string, tenantId: string): Promise<Record
 async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<Record<string, unknown>> {
   const { data: meeting, error } = await supabase
     .from("meetings")
-    .select("*, meeting_participants(*), meeting_agenda(*), meeting_resolutions(*)")
+    .select("*")
     .eq("id", meetingId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error || !meeting) return {};
 
-  const meetingTyped = meeting as unknown as MeetingWithJoins;
+  const [participantsResult, agendaResult, resolutionsResult] = await Promise.all([
+    supabase.from("meeting_participants").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
+    supabase.from("agenda_items").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
+    supabase.from("meeting_resolutions").select("*").eq("meeting_id", meetingId).eq("tenant_id", tenantId),
+  ]);
+  const meetingTyped = {
+    ...(meeting as unknown as MeetingWithJoins),
+    meeting_participants: (participantsResult.data ?? []) as unknown as MeetingWithJoins["meeting_participants"],
+    meeting_agenda: (agendaResult.data ?? []) as unknown as MeetingWithJoins["meeting_agenda"],
+    meeting_resolutions: (resolutionsResult.data ?? []) as unknown as MeetingWithJoins["meeting_resolutions"],
+  };
   const participants = meetingTyped.meeting_participants ?? [];
   const agenda = (meetingTyped.meeting_agenda ?? [])
     .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
@@ -403,14 +416,46 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
       tipo: r.resolution_type || "—",
     }));
 
-  const meetingDate = meetingTyped.date || meetingTyped.scheduled_date;
+  const formatScheduledDate = (value?: string | null) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Madrid",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    return year && month && day
+      ? formatSpanishLegalDate(`${year}-${month}-${day}`)
+      : null;
+  };
+  const formatScheduledTime = (value?: string | null) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleTimeString("es-ES", {
+      timeZone: "Europe/Madrid",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+  const meetingDate = meetingTyped.date || meetingTyped.scheduled_date || formatScheduledDate(meetingTyped.scheduled_start);
+  const meetingStartTime = meetingTyped.start_time || formatScheduledTime(meetingTyped.scheduled_start);
+  const meetingEndTime = meetingTyped.end_time || formatScheduledTime(meetingTyped.scheduled_end);
 
   return {
     status: meetingTyped.status,
-    date: meetingTyped.date,
-    scheduled_date: meetingTyped.scheduled_date,
-    start_time: meetingTyped.start_time,
-    end_time: meetingTyped.end_time,
+    date: meetingDate,
+    scheduled_date: meetingDate,
+    scheduled_start: meetingTyped.scheduled_start,
+    scheduled_end: meetingTyped.scheduled_end,
+    start_time: meetingStartTime,
+    end_time: meetingEndTime,
     location: meetingTyped.location,
     convocation_date: meetingTyped.convocation_date,
     publication_medium: meetingTyped.publication_medium,
@@ -419,15 +464,15 @@ async function resolveMeetingVars(meetingId: string, tenantId: string): Promise<
     second_call_date: meetingTyped.second_call_date,
     second_call_time: meetingTyped.second_call_time,
     fecha: meetingDate,
-    hora_inicio: meetingTyped.start_time || "—",
-    hora_fin: meetingTyped.end_time || "—",
+    hora_inicio: meetingStartTime || "—",
+    hora_fin: meetingEndTime || "—",
     // ITEM-026: aliases de plantillas de acta (hora_cierre / medio de convocatoria).
-    hora_cierre: meetingTyped.end_time || "—",
+    hora_cierre: meetingEndTime || "—",
     medio_convocatoria: meetingTyped.publication_medium || "—",
     lugar: meetingTyped.location || "—",
     lugar_junta: meetingTyped.location || "—",
     fecha_junta: meetingDate,
-    hora_junta: meetingTyped.start_time || "—",
+    hora_junta: meetingStartTime || "—",
     // Mesa roles from participants (used when no governing_body mandate is available, e.g. JGA)
     presidente: presidenteP?.person_name || presidenteP?.name || null,
     secretario: secretarioP?.person_name || secretarioP?.name || null,
@@ -566,7 +611,7 @@ function resolveSystemVars(nowInput?: Date | string): Record<string, unknown> {
     fecha_emision: iso.split("T")[0],
     fecha_generacion: iso,
     tsq_token: `TSQ-${iso.replace(/\D/g, "").slice(0, 17)}`,
-    firma_qes_ref: null, // Filled after QES signing
+    firma_qes_ref: null, // Campo legacy: nunca se completa desde el flujo EAD de custodia.
     ocsp_status: null,
     firma_qes_timestamp: null,
     canal_notificacion: "comunicación electrónica con acuse de recibo",
@@ -722,7 +767,18 @@ export function normalizeFuente(fuente: string): string {
   ) {
     return "SISTEMA";
   }
-  if (["usuario", "user", "capa3"].includes(lower)) return "USUARIO";
+  // Fuentes manuales legacy (`SECRETARIO_MANUAL`) y fuentes mixtas que
+  // incluyen al usuario (`EXPEDIENTE + USUARIO`, `USUARIO + MOTOR`) no son
+  // resolubles sin intervención humana. Tratarlas como una categoría técnica
+  // desconocida dejaba sus placeholders vacíos y, además, impedía que el
+  // stepper ofreciera el campo correspondiente en Capa 3.
+  if (
+    ["usuario", "user", "capa3", "manual", "secretario_manual"].includes(lower) ||
+    lower.includes("usuario") ||
+    lower.includes("manual")
+  ) {
+    return "USUARIO";
+  }
   // Already uppercase category key or unknown — pass through uppercased
   return raw.toUpperCase();
 }
@@ -745,6 +801,25 @@ function directFuenteValue(source: Record<string, unknown>, fuente: string): unk
   if (pathAfterCategory in source) return source[pathAfterCategory];
 
   return undefined;
+}
+
+function dottedVariableLeaf(variable: string): string {
+  return variable.split(".").filter(Boolean).at(-1) ?? variable;
+}
+
+function setDottedValue(target: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return;
+
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const existing = current[part];
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]] = value;
 }
 
 // ── Main resolver ────────────────────────────────────────────────────────────
@@ -793,7 +868,12 @@ export async function resolveVariables(
     ENTIDAD: entityVars,
     ORGANO: bodyVars,
     REUNION: meetingVars,
-    EXPEDIENTE: agreementVars,
+    EXPEDIENTE: {
+      id: context.agreementId,
+      agreement_id: context.agreementId,
+      agreementId: context.agreementId,
+      ...agreementVars,
+    },
     CAP_TABLE: capTableVars,
     MOTOR: motorVars,
     SISTEMA: systemVars,
@@ -804,10 +884,14 @@ export async function resolveVariables(
   for (const v of capa2) {
     const normalizedFuente = normalizeFuente(v.fuente);
     const source = sourceMap[normalizedFuente] || {};
-    const value = source[v.variable] ?? directFuenteValue(source, v.fuente);
+    const value =
+      source[v.variable] ??
+      source[dottedVariableLeaf(v.variable)] ??
+      directFuenteValue(source, v.fuente);
 
     if (value !== undefined && value !== null) {
       values[v.variable] = value;
+      setDottedValue(values, v.variable, value);
       resolved.push(v.variable);
     } else if (normalizedFuente === "USUARIO") {
       // USUARIO variables are expected to come from capa3 form
@@ -852,9 +936,10 @@ export async function resolveVariables(
     // (No esperamos colisiones — los namespaces son MAYÚSCULAS y las keys planas
     // son snake_case — pero el guard previene corromper datos si una plantilla
     // futura usara una key "ENTIDAD" plana.)
-    if (!(namespace in values)) {
-      values[namespace] = sourceVars;
-    }
+    const existing = values[namespace];
+    values[namespace] = existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...sourceVars, ...(existing as Record<string, unknown>) }
+      : sourceVars;
   }
 
   // Codex P2 round 16: alias `entities` lowercase para plantillas legacy/audited

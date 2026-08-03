@@ -152,6 +152,8 @@ describe("standalone-certifications", () => {
     expect(rendered).toContain("ARGA Seguros S.A.");
     expect(rendered).toContain(documentCertification.source_hash);
     expect(rendered).toContain("Authority evidence: ae-secretario");
+    expect(rendered).toContain("Servicio EAD: interposición, mensajería y custodia");
+    expect(rendered).not.toContain("QES EAD Trust requerida");
     expect(rendered).toContain('"cargo": "SECRETARIO"');
   });
 
@@ -175,5 +177,10 @@ describe("standalone-certifications", () => {
     expect(manifest.source.hash).toBe(documentCertification.source_hash);
     expect(manifest.metadata.source_object_type).toBe("STANDALONE_CERTIFICATION");
     expect(manifest.artifacts[0].hash_sha512).toHaveLength(128);
+    expect(manifest.certification).toMatchObject({
+      ead_operation: "INTERPOSITION_CUSTODY",
+      signature_claim: false,
+      legacy_requires_qes_ignored: false,
+    });
   });
 });

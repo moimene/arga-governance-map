@@ -3,8 +3,9 @@
  * Cloud contract for editable Secretaria document drafts.
  *
  * This is intentionally read-only: Composer write behavior is covered by the
- * UI/persistence layer, while this schema probe catches missing table/columns
- * in Cloud without leaving test data behind.
+ * UI/persistence layer. Anonymous access is expected to fail closed after the
+ * authorization hardening migration; the selected column list still makes
+ * PostgREST resolve the Cloud schema contract before PostgreSQL denies access.
  */
 import { describe, expect, it } from "vitest";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 type SchemaProbeClient = {
   from: (table: string) => {
     select: (columns: string) => {
-      limit: (count: number) => Promise<{ error: { message: string } | null }>;
+      limit: (count: number) => Promise<{
+        error: { code?: string; message: string } | null;
+      }>;
     };
   };
 };
@@ -50,6 +53,12 @@ describe("Secretaria document drafts — Cloud schema", () => {
       )
       .limit(1);
 
-    expect(error).toBeNull();
+    expect(error?.code).toBe("42501");
+    expect(error?.message ?? "").toMatch(
+      /permission denied for table secretaria_document_drafts/i,
+    );
+    expect(error?.message ?? "").not.toMatch(
+      /column .* does not exist|could not find .* column|schema cache/i,
+    );
   });
 });

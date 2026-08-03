@@ -84,6 +84,27 @@ describe("document-generation-boundary — happy path", () => {
     });
     expect(request.expected_organo_tipo).toBe("CONSEJO");
   });
+
+  it("builds MODELO_ACUERDO linked to Agreement 360 without registral references", async () => {
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "MODELO_ACUERDO",
+      tenantId: DEMO_TENANT,
+      entityId: DEMO_ENTITY,
+      agreementIds: ["agreement-77ea"],
+      templateId: "modelo-delegacion-consejo-v1-1-0",
+      expectedOrganoTipo: "CONSEJO_ADMIN",
+      expectedAdoptionMode: "MEETING",
+    });
+
+    expect(request).toMatchObject({
+      document_type: "MODELO_ACUERDO",
+      agreement_ids: ["agreement-77ea"],
+      tramitador_id: null,
+      expected_organo_tipo: "CONSEJO",
+      expected_adoption_mode: "MEETING",
+    });
+    expect((await validateSecretariaDocumentGenerationRequest(request)).ok).toBe(true);
+  });
 });
 
 describe("document-generation-boundary — invariants", () => {

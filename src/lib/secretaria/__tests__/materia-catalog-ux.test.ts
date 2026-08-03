@@ -8,6 +8,7 @@ import {
   filterMateriaCatalogItems,
   groupActiveRulePacksByOrgano,
   materiaAliasesForSearch,
+  materiaCodesAreEquivalent,
   matchesMateriaCatalogSearch,
   normalizeCatalogSearchText,
   resolveMateriaCodeAgainstCatalog,
@@ -121,11 +122,22 @@ describe("materia-catalog-ux", () => {
     );
   });
 
+  it("mantiene separados los sinónimos exclusivamente presentacionales del art. 308", () => {
+    expect(materiaCodesAreEquivalent(
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+      "SUPRESION_PREFERENTE",
+    )).toBe(false);
+    expect(resolveMateriaCodeAgainstCatalog(
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+      ["EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE", "SUPRESION_PREFERENTE"],
+    )).toBe("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE");
+  });
+
   it("busca por alias, artículo y documento real del rule pack", () => {
     const item = {
       materia: materia({
         materia: "SUPRESION_PREFERENTE",
-        materia_label_es: "Exclusión o supresión del derecho de preferencia",
+        materia_label_es: "Exclusión del derecho de preferencia —supresión total o parcial—",
         referencia_legal: "art. 308 LSC",
       }),
       status: "lista" as const,

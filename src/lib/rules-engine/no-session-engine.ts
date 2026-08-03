@@ -164,10 +164,6 @@ export function evaluarProcesoSinSesion(
     };
   }
 
-  // QES Verification warnings
-  const qesWarnings = verificarQESFirmas(input);
-  warnings.push(...qesWarnings);
-
   // ================================================================
   // Final state
   // ================================================================
@@ -687,22 +683,4 @@ export function evaluarDecisionSocioUnico(input: NoSessionInput): {
   });
 
   return { ok: true, severity: 'OK', explain };
-}
-
-// ================================================================
-// QES Verification (warnings only)
-// ================================================================
-
-function verificarQESFirmas(input: NoSessionInput): string[] {
-  const warnings: string[] = [];
-
-  const sinFirma = input.respuestas.filter(r => r.sentido === 'CONSENTIMIENTO' && !r.firma_qes_ref);
-
-  if (sinFirma.length > 0) {
-    warnings.push(
-      `${sinFirma.length} socio(s)/consejero(s) consienten pero no disponen de firma QES (considerar requerir)`
-    );
-  }
-
-  return warnings;
 }

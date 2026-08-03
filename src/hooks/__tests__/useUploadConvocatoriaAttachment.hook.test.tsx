@@ -13,8 +13,13 @@ if (typeof vi.hoisted !== "function") {
 const mocks = vi.hoisted(() => ({
   upload: vi.fn(),
   remove: vi.fn(),
-  insertPayloads: [] as Array<Record<string, unknown>>,
-  insertError: { current: null as { message: string } | null },
+  invoke: vi.fn(),
+  getSession: vi.fn(),
+  getUser: vi.fn(),
+  refreshSession: vi.fn(),
+  invokedFunctions: [] as string[],
+  registrationPayloads: [] as Array<Record<string, unknown>>,
+  registrationError: { current: null as Error | null },
 }));
 
 // Captura eager de los módulos reales ANTES de registrar los mocks:
@@ -44,31 +49,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         remove: mocks.remove,
       })),
     },
-    from: vi.fn((table: string) => {
-      if (table !== "attachments") throw new Error(`Unexpected table ${table}`);
-      const chain = {
-        insert: vi.fn((payload: Record<string, unknown>) => {
-          mocks.insertPayloads.push(payload);
-          return chain;
-        }),
-        select: vi.fn(() => chain),
-        single: vi.fn(async () => {
-          if (mocks.insertError.current) {
-            return { data: null, error: mocks.insertError.current };
-          }
-          return {
-            data: {
-              id: "attachment-1",
-              file_name: "acuerdo.pdf",
-              file_url: "https://storage.test/acuerdo.pdf",
-              file_hash: "hash",
-            },
-            error: null,
-          };
-        }),
-      };
-      return chain;
-    }),
+    functions: { invoke: mocks.invoke },
+    auth: {
+      getSession: mocks.getSession,
+      getUser: mocks.getUser,
+      refreshSession: mocks.refreshSession,
+    },
   },
 }));
 
@@ -85,12 +71,51 @@ describe("useUploadConvocatoriaAttachment", () => {
     mocks.upload.mockResolvedValue({ error: null });
     mocks.remove.mockReset();
     mocks.remove.mockResolvedValue({ error: null });
-    mocks.insertPayloads.length = 0;
-    mocks.insertError.current = null;
+    mocks.registrationPayloads.length = 0;
+    mocks.invokedFunctions.length = 0;
+    mocks.registrationError.current = null;
+    mocks.invoke.mockReset();
+    mocks.getSession.mockReset();
+    mocks.getSession.mockResolvedValue({
+      data: { session: { access_token: "live-token" } },
+      error: null,
+    });
+    mocks.getUser.mockReset();
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    mocks.refreshSession.mockReset();
+    mocks.refreshSession.mockResolvedValue({
+      data: { session: { access_token: "refreshed-token" } },
+      error: null,
+    });
+    mocks.invoke.mockImplementation(async (name: string, options: { body: Record<string, unknown> }) => {
+      mocks.invokedFunctions.push(name);
+      mocks.registrationPayloads.push(options.body);
+      if (mocks.registrationError.current) {
+        return { data: null, error: mocks.registrationError.current };
+      }
+      return {
+        data: {
+          attachment: {
+            id: "attachment-1",
+            file_name: options.body.fileName,
+            file_url: options.body.storageUri,
+            file_hash: options.body.expectedHashSha256,
+            file_hash_sha512: options.body.expectedHashSha512,
+            artifact_kind: "SUPPORTING_DOCUMENT",
+            agenda_item_index: null,
+            artifact_verified_at: new Date().toISOString(),
+            artifact_verified_by_service: true,
+            artifact_verified_size_bytes: 9,
+            artifact_verified_mime_type: options.body.expectedMimeType,
+          },
+        },
+        error: null,
+      };
+    });
   });
 
-  it("elimina el objeto de Storage si falla la insercion en attachments", async () => {
-    mocks.insertError.current = { message: "insert failed" };
+  it("no borra Storage tras una respuesta ambigua del registro servidor", async () => {
+    mocks.registrationError.current = new Error("server verification failed");
     const { result } = renderHook(() => useUploadConvocatoriaAttachment(), { wrapper });
     const file = {
       name: "acuerdo.pdf",
@@ -102,17 +127,54 @@ describe("useUploadConvocatoriaAttachment", () => {
     let mutationError: unknown = null;
     await act(async () => {
       try {
-        await result.current.mutateAsync({ convocatoriaId: "convocatoria-1", file });
+        await result.current.mutateAsync({
+          convocatoriaId: "convocatoria-1",
+          file,
+          intentId: "11111111-1111-4111-8111-111111111111",
+        });
       } catch (e) {
         mutationError = e;
       }
     });
 
-    expect(mutationError).toMatchObject({ message: "insert failed" });
+    expect(mutationError).toMatchObject({
+      message: expect.stringContaining("server verification failed"),
+    });
 
     expect(mocks.upload).toHaveBeenCalledTimes(1);
-    expect(mocks.remove).toHaveBeenCalledTimes(1);
+    expect(mocks.remove).not.toHaveBeenCalled();
     const uploadedPath = mocks.upload.mock.calls[0][0];
-    expect(mocks.remove).toHaveBeenCalledWith([uploadedPath]);
+    expect(uploadedPath).toContain(
+      "convocatorias/convocatoria-1/supporting/11111111-1111-4111-8111-111111111111-",
+    );
+  });
+
+  it("envía ambos hashes candidatos al servidor y consume solo su fila verificada", async () => {
+    const { result } = renderHook(() => useUploadConvocatoriaAttachment(), { wrapper });
+    const file = {
+      name: "acuerdo.pdf",
+      type: "application/pdf",
+      size: 9,
+      arrayBuffer: async () => new TextEncoder().encode("contenido").buffer,
+    } as unknown as File;
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        convocatoriaId: "convocatoria-1",
+        file,
+        intentId: "22222222-2222-4222-8222-222222222222",
+      });
+    });
+
+    expect(mocks.registrationPayloads).toHaveLength(1);
+    expect(mocks.registrationPayloads[0].expectedHashSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(mocks.registrationPayloads[0].expectedHashSha512).toMatch(/^[0-9a-f]{128}$/);
+    expect(mocks.registrationPayloads[0].expectedHashSha256)
+      .not.toBe(mocks.registrationPayloads[0].expectedHashSha512);
+    expect(mocks.registrationPayloads[0]).toMatchObject({
+      expectedMimeType: "application/pdf",
+    });
+    expect(mocks.registrationPayloads[0]).not.toHaveProperty("artifactKind");
+    expect(mocks.invokedFunctions).toEqual(["convocation-supporting-artifact-register"]);
   });
 });

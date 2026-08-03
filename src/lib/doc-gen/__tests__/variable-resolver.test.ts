@@ -89,6 +89,9 @@ describe("variable-resolver", () => {
     expect(normalizeFuente("LEY")).toBe("MOTOR");
     expect(normalizeFuente("rule_pack.materia")).toBe("MOTOR");
     expect(normalizeFuente("QTSP.signature_reference")).toBe("SISTEMA");
+    expect(normalizeFuente("SECRETARIO_MANUAL")).toBe("USUARIO");
+    expect(normalizeFuente("EXPEDIENTE + USUARIO")).toBe("USUARIO");
+    expect(normalizeFuente("USUARIO + MOTOR")).toBe("USUARIO");
   });
 
   it("resuelve fuente canónica entities.name y fallback legacy ENTIDAD sin fallar silenciosamente", async () => {
@@ -150,6 +153,44 @@ describe("variable-resolver", () => {
       resultado_adopcion_texto: "Adoptado",
     });
     expect(result.unresolved).toEqual([]);
+  });
+
+  it("resuelve DELEGACION.agreement_id desde el agreementId canónico y conserva el namespace", async () => {
+    mockDb.rows.agreements = {
+      id: "agr-77ea",
+      agreement_kind: "DELEGACION_FACULTADES",
+      matter_class: "ORDINARIA",
+      adoption_mode: "MEETING",
+      status: "ADOPTED",
+      proposal_text: "Delegar facultades.",
+      decision_text: null,
+      decision_date: "2026-07-19",
+      statutory_basis: "Arts. 249 y 249 bis LSC",
+    };
+
+    const result = await resolveVariables(
+      [
+        {
+          variable: "DELEGACION.agreement_id",
+          fuente: "EXPEDIENTE",
+          condicion: "OBLIGATORIO",
+        },
+      ],
+      { agreementId: "agr-77ea", tenantId: "tenant-1" },
+    );
+
+    expect(result.values["DELEGACION.agreement_id"]).toBe("agr-77ea");
+    expect(result.values.DELEGACION).toEqual({ agreement_id: "agr-77ea" });
+    expect(result.resolved).toContain("DELEGACION.agreement_id");
+    expect(result.unresolved).toEqual([]);
+
+    const { renderTemplate } = await import("../template-renderer");
+    const rendered = renderTemplate({
+      template: "Trazabilidad: agreement_id = {{DELEGACION.agreement_id}}",
+      variables: result.values,
+    });
+    expect(rendered.text).toContain("agreement_id = agr-77ea");
+    expect(rendered.unresolvedVariables).toEqual([]);
   });
 
   it("resuelve mandate.* y persons.* desde el organo sin saltarse presidente/secretario", async () => {
@@ -265,6 +306,31 @@ describe("variable-resolver", () => {
       acta_aprobada: true,
       fecha: "2026-05-02",
       lugar: "Madrid",
+    });
+    expect(result.unresolved).toEqual([]);
+  });
+
+  it("deriva meetings.date del scheduled_start real de la reunión", async () => {
+    mockDb.rows.meetings = {
+      status: "CELEBRADA",
+      scheduled_start: "2026-08-08T08:00:00.000Z",
+      scheduled_end: "2026-08-08T10:00:00.000Z",
+      meeting_participants: [],
+      meeting_agenda: [],
+      meeting_resolutions: [],
+    };
+
+    const result = await resolveVariables(
+      [
+        { variable: "fecha_consejo", fuente: "meetings.date", condicion: "SIEMPRE" },
+        { variable: "hora_inicio", fuente: "meetings.start_time", condicion: "SIEMPRE" },
+      ],
+      { agreementId: "agr-1", tenantId: "tenant-1", meetingId: "meeting-1" },
+    );
+
+    expect(result.values).toMatchObject({
+      fecha_consejo: "8 de agosto de 2026",
+      hora_inicio: "10:00",
     });
     expect(result.unresolved).toEqual([]);
   });

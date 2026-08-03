@@ -1,6 +1,6 @@
 // ============================================================
-// QTSP Integration — QES Signatures & Certified Notifications
-// Spec: Motor de Reglas LSC § QTSP Integration (T23)
+// QTSP legacy boundary — interposición, mensajería y custodia EAD.
+// Las APIs de firma/OCSP se conservan solo como adaptadores fail-closed.
 // ============================================================
 
 import type {
@@ -29,11 +29,17 @@ export interface QESSignResult {
 
 export interface CertifiedNotificationResult {
   ok: boolean;
-  delivery_ref: string;
+  status: 'PENDING' | 'ERROR';
+  delivery_ref: null;
+  provider_request_id: null;
+  requested_at: null;
   recipient_id: string;
-  delivered_at: string;
-  evidence_hash: string;
-  tsq_token: string;
+  delivered_at: null;
+  delivery_proven: false;
+  local_message_fingerprint: string;
+  evidence_hash: null;
+  tsq_token: null;
+  archive_status: 'PENDING';
   explain: ExplainNode[];
   errors: string[];
 }
@@ -69,21 +75,6 @@ const KNOWN_DOCUMENT_TYPES = [
   'PODER',
 ];
 
-const DEMO_X509_CHAIN = [
-  'MIIDQDCCAigCCQDf5aEfKWJSAjANBgkqhkiG9w0BAQsFADBHMQswCQYDVQQGEwJFUzEVMBMGA1UECAwM',
-  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2Zy5dBmBDm5qTbcz7pJ3',
-  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z7pQlX5RfFQNd0XYqR9',
-];
-
-type QTSPEnv = {
-  VITE_EAD_TRUST_OCSP_URL?: string;
-  VITE_EAD_TRUST_API_KEY?: string;
-};
-
-function getQTSPEnv(): QTSPEnv {
-  return (import.meta as unknown as { env?: QTSPEnv }).env ?? {};
-}
-
 // ============================================================
 // Helper: OCSP Verification
 // ============================================================
@@ -96,134 +87,25 @@ export function verificarOCSP(signerId: string): OCSPVerificationResult {
     };
   }
 
-  // Allow test/demo override: include 'REVOKED' in signerId to simulate revocation
-  if (signerId.includes('REVOKED')) {
-    return {
-      status: 'REVOKED',
-      detail: `Certificado del firmante ${signerId} ha sido revocado`,
-    };
-  }
-
-  // Real OCSP: if EAD Trust endpoint is configured, delegate to async version
-  // Use verificarOCSPAsync() for real network calls when VITE_EAD_TRUST_OCSP_URL is set.
-  // This sync version is retained for synchronous gate evaluation.
-  const ocspUrl = getQTSPEnv().VITE_EAD_TRUST_OCSP_URL;
-
-  if (ocspUrl) {
-    // Endpoint configured but we can't await here — return UNKNOWN and let async version handle it
-    return {
-      status: 'UNKNOWN',
-      detail: `OCSP endpoint configurado (${ocspUrl.substring(0, 30)}…). Use verificarOCSPAsync() para validación en tiempo real.`,
-    };
-  }
-
   return {
-    status: 'GOOD',
-    detail: `Certificado válido para ${signerId} (modo demo — EAD Trust OCSP no configurado)`,
+    status: 'UNKNOWN',
+    detail: `La validación OCSP de firma está retirada para ${signerId}; no se infiere validez.`,
   };
 }
 
 /**
- * Async OCSP verification against EAD Trust endpoint.
- * Only active when VITE_EAD_TRUST_OCSP_URL and VITE_EAD_TRUST_API_KEY are set.
- * Falls back to sync stub otherwise.
+ * Adaptador legacy fail-closed. No llama a EAD ni infiere el estado de un
+ * certificado porque la aplicación no presta un flujo de firma personal.
  */
 export async function verificarOCSPAsync(signerId: string): Promise<OCSPVerificationResult> {
-  const { VITE_EAD_TRUST_OCSP_URL: ocspUrl, VITE_EAD_TRUST_API_KEY: apiKey } = getQTSPEnv();
-
-  if (!ocspUrl || !apiKey) {
-    // Fall back to sync stub
-    return verificarOCSP(signerId);
-  }
-
-  try {
-    const response = await fetch(`${ocspUrl}/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'X-EAD-Client': 'TGMS-Secretaria/1.0',
-      },
-      body: JSON.stringify({ certificate_id: signerId }),
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) {
-      return {
-        status: 'UNKNOWN',
-        detail: `EAD Trust OCSP respondió con ${response.status}. Revocación no verificada.`,
-      };
-    }
-
-    const data = await response.json() as { status?: string; reason?: string };
-
-    if (data.status === 'REVOKED') {
-      return {
-        status: 'REVOKED',
-        detail: `Certificado revocado por EAD Trust. Motivo: ${data.reason ?? 'no especificado'}`,
-      };
-    }
-
-    if (data.status === 'GOOD') {
-      return {
-        status: 'GOOD',
-        detail: `Certificado válido según EAD Trust OCSP (${new Date().toISOString()})`,
-      };
-    }
-
-    return {
-      status: 'UNKNOWN',
-      detail: `Estado OCSP desconocido: ${data.status ?? 'sin respuesta'}`,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      status: 'UNKNOWN',
-      detail: `Error al contactar EAD Trust OCSP: ${msg}`,
-    };
-  }
+  return verificarOCSP(signerId);
 }
 
 // ============================================================
-// Helper: Generate deterministic signature reference
+// Helper: deterministic non-cryptographic fingerprint for UI comparison only
 // ============================================================
 
-function generateSignatureRef(signerId: string, documentHash: string): string {
-  // Simple deterministic hash-like generation for demo
-  // In production, this would integrate with QTSP API
-  const combined = `${signerId}:${documentHash}`;
-  const hash = combined
-    .split('')
-    .reduce((acc, char) => {
-      return (acc << 5) - acc + char.charCodeAt(0);
-    }, 0);
-  return `QES-${Math.abs(hash).toString(16).toUpperCase().padStart(16, '0')}`;
-}
-
-// ============================================================
-// Helper: Generate deterministic delivery reference
-// ============================================================
-
-function generateDeliveryRef(
-  recipientEmail: string,
-  subject: string,
-  deliveryType: string
-): string {
-  // Simple deterministic generation for demo
-  const combined = `${recipientEmail}:${subject}:${deliveryType}`;
-  const hash = combined
-    .split('')
-    .reduce((acc, char) => {
-      return (acc << 5) - acc + char.charCodeAt(0);
-    }, 0);
-  return `DEL-${Math.abs(hash).toString(16).toUpperCase().padStart(16, '0')}`;
-}
-
-// ============================================================
-// Helper: Generate evidence hash
-// ============================================================
-
-function generateEvidenceHash(
+function generateLocalMessageFingerprint(
   subject: string,
   body: string,
   recipient: string
@@ -234,21 +116,7 @@ function generateEvidenceHash(
     .reduce((acc, char) => {
       return (acc << 5) - acc + char.charCodeAt(0);
     }, 0);
-  return `SHA256-${Math.abs(hash).toString(16).toUpperCase().padStart(32, '0')}`;
-}
-
-// ============================================================
-// Helper: Generate TSQ token (Time Stamp Qualifier)
-// ============================================================
-
-function generateTSQToken(hash: string): string {
-  const combined = `TSQ:${hash}`;
-  const digest = combined
-    .split('')
-    .reduce((acc, char) => {
-      return (acc << 5) - acc + char.charCodeAt(0);
-    }, 0);
-  return `TSQ-${Math.abs(digest).toString(16).toUpperCase().padStart(24, '0')}`;
+  return `LOCAL-NONCRYPTO-${Math.abs(hash).toString(16).toUpperCase().padStart(8, '0')}`;
 }
 
 // ============================================================
@@ -386,98 +254,25 @@ export function validarPreFirma(
 export function firmarDocumentoQES(
   request: QTSPSignRequest
 ): QESSignResult {
-  const errors: string[] = [];
-  const explain: ExplainNode[] = [];
-
-  // Pre-flight validation
   const preCheck = validarPreFirma(
     request.document_hash,
     request.signer_role,
     request.document_type
   );
-
-  if (!preCheck.ok) {
-    errors.push(...preCheck.errors);
-    explain.push(...preCheck.explain);
-    return {
-      ok: false,
-      signature_ref: '',
-      signer_id: request.signer_id,
-      signer_role: request.signer_role,
-      document_hash: request.document_hash,
-      x509_chain: [],
-      ocsp_status: 'UNKNOWN',
-      signed_at: new Date().toISOString(),
-      explain,
-      errors,
-    };
-  }
-
-  // Verify OCSP
-  const ocspResult = verificarOCSP(request.signer_id);
-  explain.push(
-    crearExplainNode(
-      'VERIFICACION_OCSP_PREVIA',
-      'REGLAMENTO',
-      `Estado OCSP: ${ocspResult.status}. ${ocspResult.detail}`,
-      'QTSP Integration § OCSP Pre-verification'
-    )
-  );
-
-  if (ocspResult.status === 'REVOKED') {
-    errors.push(
-      `Certificado del firmante revocado: ${request.signer_id}. Firma QES rechazada.`
-    );
-    return {
-      ok: false,
-      signature_ref: '',
-      signer_id: request.signer_id,
-      signer_role: request.signer_role,
-      document_hash: request.document_hash,
-      x509_chain: [],
-      ocsp_status: 'REVOKED',
-      signed_at: new Date().toISOString(),
-      explain,
-      errors,
-    };
-  }
-
-  // Generate signature
-  const signatureRef = generateSignatureRef(
-    request.signer_id,
-    request.document_hash
-  );
-  const signedAt = new Date().toISOString();
-
-  explain.push(
-    crearExplainNode(
-      'FIRMA_QES_SOLICITADA',
-      'REGLAMENTO',
-      `Firma QES generada para ${request.document_type} (${signatureRef})`,
-      'QTSP Integration § QES Generation'
-    )
-  );
-
-  explain.push(
-    crearExplainNode(
-      'CADENA_X509_ADJUNTA',
-      'REGLAMENTO',
-      `Cadena X.509 de ${DEMO_X509_CHAIN.length} certificados adjunta`,
-      'QTSP Integration § Certificate Chain'
-    )
-  );
-
   return {
-    ok: true,
-    signature_ref: signatureRef,
+    ok: false,
+    signature_ref: '',
     signer_id: request.signer_id,
     signer_role: request.signer_role,
     document_hash: request.document_hash,
-    x509_chain: DEMO_X509_CHAIN,
-    ocsp_status: ocspResult.status as 'GOOD' | 'REVOKED' | 'UNKNOWN',
-    signed_at: signedAt,
-    explain,
-    errors,
+    x509_chain: [],
+    ocsp_status: 'UNKNOWN',
+    signed_at: '',
+    explain: preCheck.explain,
+    errors: [
+      ...preCheck.errors,
+      'La firma QES está retirada: EAD solo presta interposición, mensajería y custodia/e-archiving.',
+    ],
   };
 }
 
@@ -504,11 +299,17 @@ export function notificarCertificado(
     );
     return {
       ok: false,
-      delivery_ref: '',
+      status: 'ERROR',
+      delivery_ref: null,
+      provider_request_id: null,
+      requested_at: null,
       recipient_id: request.recipient_id,
-      delivered_at: new Date().toISOString(),
-      evidence_hash: '',
-      tsq_token: '',
+      delivered_at: null,
+      delivery_proven: false,
+      local_message_fingerprint: '',
+      evidence_hash: null,
+      tsq_token: null,
+      archive_status: 'PENDING',
       explain,
       errors,
     };
@@ -530,42 +331,42 @@ export function notificarCertificado(
     );
     return {
       ok: false,
-      delivery_ref: '',
+      status: 'ERROR',
+      delivery_ref: null,
+      provider_request_id: null,
+      requested_at: null,
       recipient_id: request.recipient_id,
-      delivered_at: new Date().toISOString(),
-      evidence_hash: '',
-      tsq_token: '',
+      delivered_at: null,
+      delivery_proven: false,
+      local_message_fingerprint: '',
+      evidence_hash: null,
+      tsq_token: null,
+      archive_status: 'PENDING',
       explain,
       errors,
     };
   }
 
-  // Generate notification artifacts
-  const deliveryRef = generateDeliveryRef(
-    request.recipient_email,
-    request.subject,
-    request.delivery_type
-  );
-  const evidenceHash = generateEvidenceHash(
+  // Only prepare the content binding. A synchronous rules engine cannot assert
+  // provider acceptance, delivery, timestamping or Evidence Manager custody.
+  const localMessageFingerprint = generateLocalMessageFingerprint(
     request.subject,
     request.body,
     request.recipient_id
   );
-  const tsqToken = generateTSQToken(evidenceHash);
-  const deliveredAt = new Date().toISOString();
 
   explain.push(
     crearExplainNode(
       'NOTIFICACION_PREPARADA',
       'REGLAMENTO',
-      `Notificación para ${request.recipient_email} preparada`,
+      `Solicitud para ${request.recipient_email} validada; pendiente de Notice Manager`,
       'QTSP Integration § Notification Preparation'
     )
   );
 
   explain.push(
     crearExplainNode(
-      'CANAL_ENTREGA',
+      'CANAL_SOLICITADO',
       'REGLAMENTO',
       `Canal seleccionado: ${request.delivery_type}`,
       'QTSP Integration § Delivery Channel'
@@ -574,29 +375,35 @@ export function notificarCertificado(
 
   explain.push(
     crearExplainNode(
-      'EVIDENCIA_ENTREGA_GENERADA',
+      'HASH_MENSAJE_LOCAL',
       'REGLAMENTO',
-      `Evidencia de entrega generada (${evidenceHash.substring(0, 16)}...)`,
-      'QTSP Integration § Evidence Generation'
+      `Huella local no criptográfica calculada (${localMessageFingerprint}); no es evidencia ni hash de custodia`,
+      'QTSP Integration § Message Preparation'
     )
   );
 
   explain.push(
     crearExplainNode(
-      'TSQ_APLICADO',
+      'EARCHIVE_PENDIENTE',
       'REGLAMENTO',
-      `Token de sellado de tiempo (TSQ) aplicado: ${tsqToken.substring(0, 16)}...`,
-      'QTSP Integration § Time Stamp Qualification'
+      'Custodia en EAD Trust Evidence Manager pendiente de confirmación del proveedor',
+      'QTSP Integration § Evidence Manager'
     )
   );
 
   return {
     ok: true,
-    delivery_ref: deliveryRef,
+    status: 'PENDING',
+    delivery_ref: null,
+    provider_request_id: null,
+    requested_at: null,
     recipient_id: request.recipient_id,
-    delivered_at: deliveredAt,
-    evidence_hash: evidenceHash,
-    tsq_token: tsqToken,
+    delivered_at: null,
+    delivery_proven: false,
+    local_message_fingerprint: localMessageFingerprint,
+    evidence_hash: null,
+    tsq_token: null,
+    archive_status: 'PENDING',
     explain,
     errors,
   };
@@ -624,7 +431,8 @@ export interface IntegrityVerificationResult {
 /**
  * Artefacto verificable por el Trust Center. `HASH` representa la integridad de
  * un documento archivado (DOCX con SHA-512) sin sello QTSP tipado; el resto son
- * sellos cualificados EAD Trust (QES/QSEAL/TSQ) o notificación certificada (ERDS).
+ * servicios no personales (QSEAL/TSQ), notificación o filas QES históricas.
+ * QES se conserva solo para lectura y siempre falla cerrado como prueba canónica.
  */
 export interface VerifiableArtifact {
   type: 'HASH' | 'QES' | 'QSEAL' | 'TSQ' | 'NOTIFICATION';
@@ -648,7 +456,8 @@ function esDigestValido(hash: string | undefined | null): boolean {
 
 /**
  * Verify integrity of artifacts signed by QTSP.
- * Performs comprehensive checks on QES signatures, seals, timestamps, and identity.
+ * Comprueba hashes y servicios no personales. Una fila QES legacy nunca se
+ * convierte en firma válida dentro del estado canónico.
  *
  * @param agreementId UUID of the agreement
  * @param artifacts Array of signed artifacts with metadata
@@ -750,31 +559,17 @@ export function verificarIntegridad(
       );
     }
 
-    // Check 2: QES signature (if applicable)
-    if (artifact.type === 'QES' && artifact.signer_id) {
+    // Check 2: QES es una proyección legacy, nunca evidencia canónica nueva.
+    if (artifact.type === 'QES') {
       const qesCheck: IntegrityCheckDetail = {
         type: 'QES',
-        label: `Firma QES de ${artifact.signer_id}`,
-        passed: artifact.signer_id && artifact.signer_id.trim().length > 0,
-        detail: artifact.signer_id
-          ? `Firmante identificado: ${artifact.signer_id}`
-          : 'Identificador de firmante vacío',
+        label: `Referencia QES histórica (${artifact.ref})`,
+        passed: false,
+        detail: 'Referencia legacy no aceptada como prueba canónica de firma',
         timestamp: artifact.timestamp,
       };
       checks.push(qesCheck);
-
-      if (qesCheck.passed) {
-        explain.push(
-          crearExplainNode(
-            'VALIDACION_QES',
-            'REGLAMENTO',
-            `Firma QES de ${artifact.signer_id} detectada`,
-            'Trust Center § QES Validation'
-          )
-        );
-      } else {
-        errors.push(`Identificador de firmante vacío para ${artifact.ref}`);
-      }
+      errors.push(`Referencia QES legacy no canónica: ${artifact.ref}`);
     }
 
     // Check 3: QSEAL token (if applicable)
@@ -833,110 +628,30 @@ export function verificarIntegridad(
       }
     }
 
-    // Check 5: OCSP verification (if signer present)
-    if (artifact.signer_id) {
-      const ocspResult = verificarOCSP(artifact.signer_id);
-      const ocspCheck: IntegrityCheckDetail = {
-        type: 'OCSP',
-        label: `Estado OCSP de ${artifact.signer_id}`,
-        passed: ocspResult.status === 'GOOD',
-        detail: ocspResult.detail,
-        timestamp: artifact.timestamp,
-      };
-      checks.push(ocspCheck);
-
-      if (ocspCheck.passed) {
-        explain.push(
-          crearExplainNode(
-            'VERIFICACION_OCSP_ARTEFACTO',
-            'REGLAMENTO',
-            `OCSP: ${ocspResult.status} para ${artifact.signer_id}`,
-            'Trust Center § OCSP Verification'
-          )
-        );
-      } else if (ocspResult.status === 'REVOKED') {
-        errors.push(`Certificado revocado: ${artifact.signer_id}`);
-        explain.push(
-          crearExplainNode(
-            'VERIFICACION_OCSP_ARTEFACTO',
-            'REGLAMENTO',
-            `OCSP: ${ocspResult.status} — certificado revocado`,
-            'Trust Center § OCSP Verification'
-          )
-        );
-      } else {
-        explain.push(
-          crearExplainNode(
-            'VERIFICACION_OCSP_ARTEFACTO',
-            'REGLAMENTO',
-            `OCSP: ${ocspResult.status} — estado desconocido`,
-            'Trust Center § OCSP Verification'
-          )
-        );
-      }
-    }
-
-    // Check 6: Identity check (signer_id + signer_role)
-    if (artifact.signer_id && artifact.signer_role) {
-      const idCheck: IntegrityCheckDetail = {
+    // La custodia, el sello de entidad y el sello de tiempo no prueban una
+    // identidad personal ni un mandato societario. Si una proyección legacy
+    // intenta adjuntar esos campos a un artefacto no-QES, el Trust Center falla
+    // cerrado en vez de convertir metadatos declarativos en una validación.
+    if (artifact.type !== 'QES' && (artifact.signer_id || artifact.signer_role)) {
+      const identityCheck: IntegrityCheckDetail = {
         type: 'IDENTITY',
-        label: `Identidad: ${artifact.signer_role}`,
-        passed: artifact.signer_id.trim().length > 0 && artifact.signer_role.trim().length > 0,
-        detail: `Firmante ${artifact.signer_id} con rol ${artifact.signer_role}`,
-        timestamp: artifact.timestamp,
-      };
-      checks.push(idCheck);
-
-      if (idCheck.passed) {
-        explain.push(
-          crearExplainNode(
-            'VALIDACION_IDENTIDAD',
-            'REGLAMENTO',
-            `Identidad verificada: ${artifact.signer_role}`,
-            'Trust Center § Identity Validation'
-          )
-        );
-      }
-    }
-
-    // Check 7: MANDATE check (role validation)
-    if (artifact.signer_role && KNOWN_SIGNER_ROLES.includes(artifact.signer_role)) {
-      const mandateCheck: IntegrityCheckDetail = {
-        type: 'MANDATE',
-        label: `Mandato: ${artifact.signer_role}`,
-        passed: true,
-        detail: `Rol ${artifact.signer_role} autorizado para firmar`,
-        timestamp: artifact.timestamp,
-      };
-      checks.push(mandateCheck);
-
-      explain.push(
-        crearExplainNode(
-          'VALIDACION_MANDATO',
-          'REGLAMENTO',
-          `Mandato válido para rol ${artifact.signer_role}`,
-          'Trust Center § Mandate Validation'
-        )
-      );
-    } else if (artifact.signer_role) {
-      const mandateCheck: IntegrityCheckDetail = {
-        type: 'MANDATE',
-        label: `Mandato: ${artifact.signer_role}`,
+        label: `Identidad personal no evaluada (${artifact.ref})`,
         passed: false,
-        detail: `Rol ${artifact.signer_role} no es conocido`,
+        detail: 'La interposición/custodia EAD no acredita identidad personal',
         timestamp: artifact.timestamp,
       };
-      checks.push(mandateCheck);
+      checks.push(identityCheck);
+      errors.push(`Metadatos personales no verificables en artefacto ${artifact.ref}`);
 
-      errors.push(`Rol de firmante desconocido: ${artifact.signer_role}`);
-      explain.push(
-        crearExplainNode(
-          'VALIDACION_MANDATO',
-          'REGLAMENTO',
-          `Mandato inválido: rol ${artifact.signer_role} no reconocido`,
-          'Trust Center § Mandate Validation'
-        )
-      );
+      if (artifact.signer_role) {
+        checks.push({
+          type: 'MANDATE',
+          label: `Mandato no evaluado: ${artifact.signer_role}`,
+          passed: false,
+          detail: 'El rol declarado no sustituye la evidencia autoritativa de cargo o poder',
+          timestamp: artifact.timestamp,
+        });
+      }
     }
   }
 

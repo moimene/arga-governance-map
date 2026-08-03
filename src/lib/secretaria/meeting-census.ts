@@ -22,9 +22,24 @@ export interface VotingCapitalHoldingLike {
   is_treasury?: boolean | null;
   voting_rights?: boolean | null;
   porcentaje_capital?: number | string | null;
+  numero_titulos?: number | string | null;
   share_class?: {
     voting_rights?: boolean | null;
+    votes_per_title?: number | string | null;
   } | null;
+}
+
+export interface MeetingAttendanceSummaryRow {
+  attendance_type?: string | null;
+  es_vocal?: boolean | null;
+}
+
+export interface MeetingAttendanceSummary {
+  attending: number;
+  total: number;
+  absent: number;
+  quorumPresent: number;
+  quorumTotal: number;
 }
 
 export function normalizeMeetingCensusBodyKind(value: unknown): MeetingCensusBodyKind {
@@ -96,4 +111,49 @@ export function selectVotingCapitalHoldings<T extends VotingCapitalHoldingLike>(
     }
     return true;
   });
+}
+
+/**
+ * Las columnas `shares_represented` y `voting_rights` guardan títulos/votos,
+ * no el porcentaje de capital. Mezclar ambos conceptos hacía que una posición
+ * del 69,69 % intentase persistirse como `69.69` en un contador entero y
+ * bloqueaba la celebración de Juntas. La regla soporta clases con más de un
+ * voto por título y devuelve null ante datos incompletos o no numéricos.
+ */
+export function votingRightsFromCapitalHolding(holding: VotingCapitalHoldingLike): number | null {
+  if (holding.numero_titulos === null || holding.numero_titulos === undefined || holding.numero_titulos === "") {
+    return null;
+  }
+  const titles = Number(holding.numero_titulos);
+  const votesPerTitle = Number(holding.share_class?.votes_per_title ?? 1);
+  if (!Number.isFinite(titles) || !Number.isFinite(votesPerTitle)) return null;
+  const votingRights = titles * votesPerTitle;
+  if (!Number.isFinite(votingRights) || votingRights < 0) return null;
+  return votingRights;
+}
+
+/**
+ * Separa el recuento humano de asistencia del censo legal de quórum.
+ *
+ * En un órgano colegiado una secretaria no consejera puede asistir con voz y
+ * sin voto. Debe figurar en la lista (16/16), aunque no entre en numerador ni
+ * denominador del quórum (15/15). En Junta todos los rows del censo ya están
+ * filtrados por derecho de voto y ambos recuentos coinciden.
+ */
+export function summarizeMeetingAttendance(
+  rows: MeetingAttendanceSummaryRow[],
+  isJuntaCensus: boolean,
+): MeetingAttendanceSummary {
+  const isPresent = (row: MeetingAttendanceSummaryRow) =>
+    String(row.attendance_type ?? "PRESENCIAL").toUpperCase() !== "AUSENTE";
+  const quorumRows = isJuntaCensus ? rows : rows.filter((row) => row.es_vocal !== false);
+  const attending = rows.filter(isPresent).length;
+
+  return {
+    attending,
+    total: rows.length,
+    absent: rows.length - attending,
+    quorumPresent: quorumRows.filter(isPresent).length,
+    quorumTotal: quorumRows.length,
+  };
 }

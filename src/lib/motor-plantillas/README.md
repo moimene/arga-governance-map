@@ -2,6 +2,12 @@
 
 Fachada estable para composicion documental de Secretaria Societaria.
 
+> **Frontera vigente (2026-07-21):** este motor compone borradores y artefactos
+> genéricos. El DOCX final de una convocatoria se renderiza en servidor desde su
+> manifiesto inmutable mediante `convocation-artifact-register`. La firma está
+> fuera del alcance vigente; EAD Trust solo cubre interposición, mensajería básica
+> y custodia/e-archiving.
+
 ## Public API
 
 Importar siempre desde `@/lib/motor-plantillas`:
@@ -46,8 +52,8 @@ Orden de ejecucion:
 
 El resultado incluye `document`, que representa el documento generado con
 `filename`, `mimeType`, `buffer`, `renderedText`, `contentHash`, plantilla y
-`evidenceStatus`. La descarga, impresion y firma son acciones posteriores
-sobre ese artefacto; generar no implica descargar automaticamente.
+`evidenceStatus`. La descarga y custodia son acciones posteriores sobre ese
+artefacto; generar no implica descargar automáticamente ni acredita firma.
 
 Para la aplicacion real, el flujo interactivo recomendado es
 `prepareDocumentComposition()` -> edicion humana del cuerpo del borrador ->
@@ -64,6 +70,10 @@ permanecen en fallback legacy hasta que entren en scope.
 Los flujos productivos interactivos deben usar el editor de borrador previo a
 DOCX; los botones rapidos quedan como compatibilidad hasta migrarlos a ese
 contrato.
+
+Esta recomendación no se aplica al artefacto final de convocatoria: su vía
+canónica es exclusivamente server-side y exige coincidencia exacta entre las
+intenciones WORM y el conjunto de anexos registrados.
 
 ## Marco normativo societario
 

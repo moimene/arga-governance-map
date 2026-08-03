@@ -17,24 +17,38 @@ const erdsHook = readFileSync(
   "utf8",
 );
 
-describe("Secretaria QES and ERDS hardcode regression", () => {
-  it("uses current person as QES signer instead of a demo literal", () => {
-    expect(generar).toMatch(/usePersonaCanonical\(personId/);
-    expect(generar).toMatch(/createdBy: personId/);
+describe("Secretaría · interposición EAD y mensajería sin hardcodes", () => {
+  it("el generador no inicia firma ni custodia genérica desde el navegador", () => {
+    expect(generar).not.toMatch(/useQTSPSign/);
+    expect(generar).not.toMatch(/signMutation/);
+    expect(generar).not.toMatch(/providerSignatureType/);
+    expect(generar).not.toMatch(/signatureAnchor/);
+    expect(generar).not.toMatch(/signedDocumentData/);
+    expect(generar).toMatch(/custodia el artefacto jurídico[\s\S]{0,120}expediente autoritativo/i);
+    expect(generar).not.toContain("Solicitar firma");
     expect(generar).not.toMatch(/lucia\.martin@arga-seguros\.com/i);
     expect(generar).not.toMatch(/secretaria-demo/);
   });
 
-  it("sends ERDS to body participants without mutating WORM notification rows from detail", () => {
-    expect(noSessionDetail).toMatch(/useMeetingParticipants\(data\?\.body_id\)/);
-    expect(noSessionDetail).toMatch(/sendCertifiedNotification\.mutateAsync/);
+  it("registers a non-dispatchable EAD interposition draft for body participants", () => {
+    expect(noSessionDetail).toContain("useNoSessionParticipants(");
+    expect(noSessionDetail).toContain("sourceEntityCandidate");
+    expect(noSessionDetail).toMatch(/createInterpositionDraft\.mutateAsync/);
+    expect(noSessionDetail).toMatch(/sin envío ni interacción con proveedor/i);
     expect(noSessionDetail).not.toMatch(/destinatario@arga-seguros\.com/i);
     expect(noSessionDetail).not.toMatch(/sendAndTrackNotification/);
   });
 
-  it("keeps ERDS status values aligned with the database contract", () => {
-    expect(erdsHook).toMatch(/COMPLETED/);
-    expect(erdsHook).not.toMatch(/erdsStatus: 'DELIVERED'/);
-    expect(erdsHook).not.toMatch(/updated_at/);
+  it("keeps the browser outside dispatch, signature and provider fact creation", () => {
+    expect(erdsHook).toMatch(/fn_create_ead_interposition_draft/);
+    expect(erdsHook).toMatch(/status: "BORRADOR"/);
+    expect(erdsHook).toMatch(/providerInteraction: false/);
+    expect(erdsHook).toMatch(/deliveryProven: false/);
+    expect(erdsHook).toMatch(/providerArchiveProven: false/);
+    expect(erdsHook).not.toMatch(/useProgramCommunication/);
+    expect(erdsHook).not.toMatch(/BUROFAX_ERDS/);
+    expect(erdsHook).not.toMatch(/generateEvidence/);
+    expect(erdsHook).not.toMatch(/deliveryRef/);
+    expect(erdsHook).not.toMatch(/\.from\(\s*["']no_session_notificaciones["']\s*\)/);
   });
 });

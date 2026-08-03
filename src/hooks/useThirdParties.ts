@@ -2,6 +2,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
+export type CifaAssessment = {
+  q1_core: boolean;
+  q2_subcontract: boolean;
+  q3_alternatives: boolean;
+  q4_dataloss: boolean;
+  q5_concentration: boolean;
+};
+
+export type ThirdPartyPayload = Record<string, unknown> & {
+  cifa?: Partial<CifaAssessment>;
+  exit_plan_signed?: boolean;
+};
+
 export type ThirdParty = {
   id: string;
   provider: string;
@@ -15,7 +28,7 @@ export type ThirdParty = {
   next_review: string | null;
   legal_hold: boolean;
   owner: string;
-  payload: any;
+  payload: ThirdPartyPayload | null;
   created_at: string;
   updated_at: string;
 };

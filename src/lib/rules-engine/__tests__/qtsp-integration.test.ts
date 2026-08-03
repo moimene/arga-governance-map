@@ -15,19 +15,19 @@ describe('QTSP Integration', () => {
   // Test 1: verificarOCSP with valid signer ID
   // ========================================================
   describe('verificarOCSP', () => {
-    it('debería retornar GOOD para un signer ID válido', () => {
+    it('no infiere GOOD para un identificador válido', () => {
       const result = verificarOCSP('SECRETARIO-001');
 
-      expect(result.status).toBe('GOOD');
-      expect(result.detail).toContain('válido');
+      expect(result.status).toBe('UNKNOWN');
+      expect(result.detail).toContain('retirada');
       expect(result.detail).toContain('SECRETARIO-001');
     });
 
-    it('debería retornar REVOKED si el signer ID contiene "REVOKED"', () => {
+    it('no usa convenciones demo para inventar REVOKED', () => {
       const result = verificarOCSP('REVOKED-CERT');
 
-      expect(result.status).toBe('REVOKED');
-      expect(result.detail).toContain('revocado');
+      expect(result.status).toBe('UNKNOWN');
+      expect(result.detail).toContain('no se infiere validez');
     });
 
     it('debería retornar UNKNOWN si el signer ID está vacío', () => {
@@ -162,7 +162,7 @@ describe('QTSP Integration', () => {
   // Test 3: firmarDocumentoQES with valid request
   // ========================================================
   describe('firmarDocumentoQES', () => {
-    it('debería retornar ok=true con request válido', () => {
+    it('bloquea incluso un request formalmente válido', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123def456',
         signer_id: 'SECRETARIO-001',
@@ -172,18 +172,17 @@ describe('QTSP Integration', () => {
 
       const result = firmarDocumentoQES(request);
 
-      expect(result.ok).toBe(true);
-      expect(result.signature_ref).toBeTruthy();
-      expect(result.signature_ref.startsWith('QES-')).toBe(true);
+      expect(result.ok).toBe(false);
+      expect(result.signature_ref).toBe('');
       expect(result.signer_id).toBe('SECRETARIO-001');
       expect(result.signer_role).toBe('SECRETARIO');
       expect(result.document_hash).toBe('SHA256-abc123def456');
-      expect(result.ocsp_status).toBe('GOOD');
-      expect(result.x509_chain.length).toBeGreaterThan(0);
-      expect(result.errors).toHaveLength(0);
+      expect(result.ocsp_status).toBe('UNKNOWN');
+      expect(result.x509_chain).toEqual([]);
+      expect(result.errors.some(e => e.includes('firma QES está retirada'))).toBe(true);
     });
 
-    it('debería incluir signed_at en formato ISO', () => {
+    it('no fabrica signed_at', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'SECRETARIO-001',
@@ -193,8 +192,7 @@ describe('QTSP Integration', () => {
 
       const result = firmarDocumentoQES(request);
 
-      expect(result.signed_at).toBeTruthy();
-      expect(new Date(result.signed_at)).toBeInstanceOf(Date);
+      expect(result.signed_at).toBe('');
     });
 
     it('debería retornar ok=false si el documento_hash está vacío', () => {
@@ -212,7 +210,7 @@ describe('QTSP Integration', () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
-    it('debería retornar ok=false y REVOKED status si el signer está revocado', () => {
+    it('no ejecuta OCSP ni siquiera para un identificador demo REVOKED', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'REVOKED-CERT-001',
@@ -223,12 +221,12 @@ describe('QTSP Integration', () => {
       const result = firmarDocumentoQES(request);
 
       expect(result.ok).toBe(false);
-      expect(result.ocsp_status).toBe('REVOKED');
+      expect(result.ocsp_status).toBe('UNKNOWN');
       expect(result.signature_ref).toBe('');
-      expect(result.errors.some(e => e.includes('revocado'))).toBe(true);
+      expect(result.errors.some(e => e.includes('retirada'))).toBe(true);
     });
 
-    it('debería generar signature_ref determinístico para el mismo input', () => {
+    it('nunca genera signature_ref', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'SECRETARIO-001',
@@ -240,9 +238,10 @@ describe('QTSP Integration', () => {
       const result2 = firmarDocumentoQES(request);
 
       expect(result1.signature_ref).toBe(result2.signature_ref);
+      expect(result1.signature_ref).toBe('');
     });
 
-    it('debería incluir explain nodes en el resultado', () => {
+    it('conserva solo la explicación de validación y añade el bloqueo explícito', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'SECRETARIO-001',
@@ -253,14 +252,12 @@ describe('QTSP Integration', () => {
       const result = firmarDocumentoQES(request);
 
       expect(result.explain.length).toBeGreaterThan(0);
-      expect(result.explain.some(n => n.regla.includes('OCSP'))).toBe(true);
-      expect(result.explain.some(n => n.regla.includes('FIRMA_QES'))).toBe(true);
-      expect(
-        result.explain.some(n => n.regla.includes('CADENA_X509'))
-      ).toBe(true);
+      expect(result.explain.some(n => n.regla.includes('VALIDACION_HASH'))).toBe(true);
+      expect(result.explain.some(n => n.regla.includes('OCSP'))).toBe(false);
+      expect(result.errors.some(e => e.includes('retirada'))).toBe(true);
     });
 
-    it('debería aceptar todos los tipos de documento válidos', () => {
+    it('bloquea todos los tipos de documento aunque sean formalmente válidos', () => {
       const tiposValidos = [
         'ACTA',
         'CERTIFICACION',
@@ -278,11 +275,12 @@ describe('QTSP Integration', () => {
         };
 
         const result = firmarDocumentoQES(request);
-        expect(result.ok).toBe(true);
+        expect(result.ok).toBe(false);
+        expect(result.signature_ref).toBe('');
       });
     });
 
-    it('debería incluir x509_chain en el resultado', () => {
+    it('no fabrica una cadena x509', () => {
       const request: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'SECRETARIO-001',
@@ -294,10 +292,7 @@ describe('QTSP Integration', () => {
 
       expect(result.x509_chain).toBeDefined();
       expect(Array.isArray(result.x509_chain)).toBe(true);
-      expect(result.x509_chain.length).toBeGreaterThan(0);
-      result.x509_chain.forEach(cert => {
-        expect(typeof cert).toBe('string');
-      });
+      expect(result.x509_chain).toEqual([]);
     });
   });
 
@@ -317,11 +312,14 @@ describe('QTSP Integration', () => {
       const result = notificarCertificado(request);
 
       expect(result.ok).toBe(true);
-      expect(result.delivery_ref).toBeTruthy();
-      expect(result.delivery_ref.startsWith('DEL-')).toBe(true);
+      expect(result.status).toBe('PENDING');
+      expect(result.delivery_ref).toBeNull();
+      expect(result.provider_request_id).toBeNull();
       expect(result.recipient_id).toBe('PERSON-001');
-      expect(result.evidence_hash).toBeTruthy();
-      expect(result.tsq_token).toBeTruthy();
+      expect(result.local_message_fingerprint).toMatch(/^LOCAL-NONCRYPTO-/);
+      expect(result.evidence_hash).toBeNull();
+      expect(result.tsq_token).toBeNull();
+      expect(result.delivery_proven).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -337,7 +335,8 @@ describe('QTSP Integration', () => {
       const result = notificarCertificado(request);
 
       expect(result.ok).toBe(false);
-      expect(result.delivery_ref).toBe('');
+      expect(result.delivery_ref).toBeNull();
+      expect(result.delivered_at).toBeNull();
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
@@ -373,7 +372,7 @@ describe('QTSP Integration', () => {
       });
     });
 
-    it('debería generar delivery_ref determinístico para el mismo input', () => {
+    it('no debe fabricar una referencia de entrega', () => {
       const request: QTSPNotificationRequest = {
         recipient_id: 'PERSON-001',
         recipient_email: 'person@example.com',
@@ -382,13 +381,12 @@ describe('QTSP Integration', () => {
         delivery_type: 'CERTIFICADA',
       };
 
-      const result1 = notificarCertificado(request);
-      const result2 = notificarCertificado(request);
-
-      expect(result1.delivery_ref).toBe(result2.delivery_ref);
+      const result = notificarCertificado(request);
+      expect(result.delivery_ref).toBeNull();
+      expect(result.provider_request_id).toBeNull();
     });
 
-    it('debería incluir delivered_at en formato ISO', () => {
+    it('no debe fabricar delivered_at', () => {
       const request: QTSPNotificationRequest = {
         recipient_id: 'PERSON-001',
         recipient_email: 'person@example.com',
@@ -399,8 +397,8 @@ describe('QTSP Integration', () => {
 
       const result = notificarCertificado(request);
 
-      expect(result.delivered_at).toBeTruthy();
-      expect(new Date(result.delivered_at)).toBeInstanceOf(Date);
+      expect(result.delivered_at).toBeNull();
+      expect(result.delivery_proven).toBe(false);
     });
 
     it('debería incluir explain nodes en el resultado', () => {
@@ -416,9 +414,9 @@ describe('QTSP Integration', () => {
 
       expect(result.explain.length).toBeGreaterThan(0);
       expect(result.explain.some(n => n.regla.includes('NOTIFICACION_PREPARADA'))).toBe(true);
-      expect(result.explain.some(n => n.regla.includes('CANAL_ENTREGA'))).toBe(true);
-      expect(result.explain.some(n => n.regla.includes('EVIDENCIA_ENTREGA'))).toBe(true);
-      expect(result.explain.some(n => n.regla.includes('TSQ_APLICADO'))).toBe(true);
+      expect(result.explain.some(n => n.regla.includes('CANAL_SOLICITADO'))).toBe(true);
+      expect(result.explain.some(n => n.regla.includes('HASH_MENSAJE_LOCAL'))).toBe(true);
+      expect(result.explain.some(n => n.regla.includes('EARCHIVE_PENDIENTE'))).toBe(true);
     });
 
     it('debería aceptar attachments opcionales', () => {
@@ -437,10 +435,10 @@ describe('QTSP Integration', () => {
       const result = notificarCertificado(request);
 
       expect(result.ok).toBe(true);
-      expect(result.delivery_ref).toBeTruthy();
+      expect(result.status).toBe('PENDING');
     });
 
-    it('debería generar evidence_hash basado en contenido', () => {
+    it('debería generar una huella local no criptográfica basada en contenido', () => {
       const request1: QTSPNotificationRequest = {
         recipient_id: 'PERSON-001',
         recipient_email: 'person@example.com',
@@ -460,10 +458,12 @@ describe('QTSP Integration', () => {
       const result1 = notificarCertificado(request1);
       const result2 = notificarCertificado(request2);
 
-      expect(result1.evidence_hash).not.toBe(result2.evidence_hash);
+      expect(result1.local_message_fingerprint).not.toBe(result2.local_message_fingerprint);
+      expect(result1.evidence_hash).toBeNull();
+      expect(result2.evidence_hash).toBeNull();
     });
 
-    it('debería generar TSQ token determinístico para el mismo evidence_hash', () => {
+    it('no debe fabricar un token TSQ', () => {
       const request: QTSPNotificationRequest = {
         recipient_id: 'PERSON-001',
         recipient_email: 'person@example.com',
@@ -472,10 +472,9 @@ describe('QTSP Integration', () => {
         delivery_type: 'CERTIFICADA',
       };
 
-      const result1 = notificarCertificado(request);
-      const result2 = notificarCertificado(request);
-
-      expect(result1.tsq_token).toBe(result2.tsq_token);
+      const result = notificarCertificado(request);
+      expect(result.tsq_token).toBeNull();
+      expect(result.archive_status).toBe('PENDING');
     });
   });
 
@@ -483,7 +482,7 @@ describe('QTSP Integration', () => {
   // Integration tests
   // ========================================================
   describe('Integration scenarios', () => {
-    it('debería permitir flujo completo: validación → firma → notificación', () => {
+    it('separa validación y mensajería local del flujo de firma retirado', () => {
       // Pre-firma validation
       const preCheck = validarPreFirma(
         'SHA256-abc123',
@@ -500,14 +499,14 @@ describe('QTSP Integration', () => {
         document_type: 'ACTA',
       };
       const signResult = firmarDocumentoQES(signRequest);
-      expect(signResult.ok).toBe(true);
+      expect(signResult.ok).toBe(false);
 
       // Notify
       const notifyRequest: QTSPNotificationRequest = {
         recipient_id: 'PERSON-001',
         recipient_email: 'person@example.com',
-        subject: 'Acta firmada',
-        body: 'El acta ha sido firmada y está disponible',
+        subject: 'Acta disponible',
+        body: 'El acta está disponible en el expediente',
         delivery_type: 'CERTIFICADA',
       };
       const notifyResult = notificarCertificado(notifyRequest);
@@ -518,7 +517,7 @@ describe('QTSP Integration', () => {
       expect(notifyResult.explain.length).toBeGreaterThan(0);
     });
 
-    it('debería bloquear flujo si signer está revocado', () => {
+    it('bloquea siempre el adaptador de firma y no ejecuta OCSP', () => {
       const signRequest: QTSPSignRequest = {
         document_hash: 'SHA256-abc123',
         signer_id: 'REVOKED-001',
@@ -529,7 +528,7 @@ describe('QTSP Integration', () => {
       const result = firmarDocumentoQES(signRequest);
 
       expect(result.ok).toBe(false);
-      expect(result.ocsp_status).toBe('REVOKED');
+      expect(result.ocsp_status).toBe('UNKNOWN');
       // Notification should not proceed in real flow
     });
   });

@@ -6,7 +6,11 @@ export interface CertificationRegistryIntakeInput {
   resolvedPointAgreementIds?: string[] | null;
   unresolvedPointReferences?: string[] | null;
   signatureStatus?: string | null;
+  legalGateStatus?: string | null;
+  interpositionCanonicalStatus?: string | null;
   evidenceId?: string | null;
+  baseDocumentArtifactId?: string | null;
+  baseDocumentUrl?: string | null;
   gateHash?: string | null;
   entityId?: string | null;
   bodyId?: string | null;
@@ -17,7 +21,11 @@ export interface CertificationRegistryIntake {
   id: string;
   minuteId: string | null;
   signatureStatus: string;
+  legalGateStatus: string;
+  interpositionCanonicalStatus: string | null;
   evidenceId: string | null;
+  baseDocumentArtifactId: string | null;
+  baseDocumentUrl: string | null;
   gateHash: string | null;
   entityId: string | null;
   bodyId: string | null;
@@ -29,6 +37,7 @@ export interface CertificationRegistryIntake {
   pointReferences: string[];
   unresolvedPointReferences: string[];
   signed: boolean;
+  evidenced: boolean;
   hasEvidenceBundle: boolean;
   readyForRegistry: boolean;
   warnings: string[];
@@ -56,6 +65,21 @@ export function parseMeetingPointReference(value: string | null | undefined) {
   };
 }
 
+export function isCertificationEvidenced(input: {
+  signatureStatus?: string | null;
+  legalGateStatus?: string | null;
+  interpositionCanonicalStatus?: string | null;
+}) {
+  const signatureStatus = String(input.signatureStatus ?? "").toUpperCase();
+  const legalGateStatus = String(input.legalGateStatus ?? "").toUpperCase();
+  const canonicalStatus = String(input.interpositionCanonicalStatus ?? "").toUpperCase();
+  return (
+    ["EVIDENCED", "EMITTED", "SIGNED", "FIRMADA", "EMITIDA", "ISSUED", "SEALED"].includes(signatureStatus)
+    || ["INTERPOSITION_VERIFIED", "EMITTED"].includes(legalGateStatus)
+    || canonicalStatus === "CONSTANCIA_VERIFIED"
+  );
+}
+
 export function buildCertificationRegistryIntake(
   input: CertificationRegistryIntakeInput,
 ): CertificationRegistryIntake {
@@ -69,15 +93,22 @@ export function buildCertificationRegistryIntake(
   const pointReferences = references.filter((reference) => !isUuidReference(reference));
   const unresolvedPointReferences = input.unresolvedPointReferences ?? pointReferences;
   const signatureStatus = input.signatureStatus ?? "UNKNOWN";
-  const signed = signatureStatus === "SIGNED";
+  const legalGateStatus = input.legalGateStatus ?? "UNKNOWN";
+  const interpositionCanonicalStatus = input.interpositionCanonicalStatus ?? null;
+  const signed = ["SIGNED", "FIRMADA"].includes(signatureStatus.toUpperCase());
+  const evidenced = isCertificationEvidenced({
+    signatureStatus,
+    legalGateStatus,
+    interpositionCanonicalStatus,
+  });
   const hasEvidenceBundle = Boolean(input.evidenceId);
   const readyForRegistry =
-    signed &&
+    evidenced &&
     hasEvidenceBundle &&
     unresolvedPointReferences.length === 0 &&
     agreementIds.length > 0;
   const warnings = [
-    signed ? null : "certification_not_signed",
+    evidenced ? null : "certification_not_evidenced",
     hasEvidenceBundle ? null : "evidence_bundle_not_linked",
     unresolvedPointReferences.length > 0 ? "point_references_without_agreement_id" : null,
     resolvedPointAgreementIds.length > 0 ? "point_references_resolved_to_agreement_id" : null,
@@ -88,7 +119,11 @@ export function buildCertificationRegistryIntake(
     id: input.id,
     minuteId: input.minuteId ?? null,
     signatureStatus,
+    legalGateStatus,
+    interpositionCanonicalStatus,
     evidenceId: input.evidenceId ?? null,
+    baseDocumentArtifactId: input.baseDocumentArtifactId ?? null,
+    baseDocumentUrl: input.baseDocumentUrl ?? null,
     gateHash: input.gateHash ?? null,
     entityId: input.entityId ?? null,
     bodyId: input.bodyId ?? null,
@@ -100,6 +135,7 @@ export function buildCertificationRegistryIntake(
     pointReferences,
     unresolvedPointReferences,
     signed,
+    evidenced,
     hasEvidenceBundle,
     readyForRegistry,
     warnings,

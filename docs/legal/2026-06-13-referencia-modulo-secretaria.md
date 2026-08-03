@@ -1,5 +1,12 @@
 # Módulo de Secretaría Societaria — Documento de Referencia para el Equipo Legal
 
+> **Estado documental — referencia histórica, parcialmente superada desde
+> 2026-07-21.** No usar las descripciones internas de QES, QSeal, TSQ, ERDS,
+> envío o entrega como capacidades actuales. La política vigente limita EAD Trust
+> a interposición, mensajería básica y custodia/e-archiving. Para el estado UAT
+> verificado del ciclo de convocatoria, usar
+> `docs/superpowers/reviews/2026-07-21-cierre-uat-convocatoria-arga.md`.
+
 **Plataforma TGMS · Módulos Garrigues · Cliente demostrador: Grupo ARGA Seguros**
 
 ---

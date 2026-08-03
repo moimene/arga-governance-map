@@ -8,6 +8,7 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 const ESTADO_TONE: Record<string, string> = {
   BORRADOR:  "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]",
   EMITIDA:   "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]",
+  RECTIFICADA: "bg-[var(--status-warning)] text-[var(--g-text-inverse)]",
   CONVOCADA: "bg-[var(--status-info)] text-[var(--g-text-inverse)]",
   EN_CURSO:  "bg-[var(--status-error)] text-[var(--g-text-inverse)] animate-pulse",
   CELEBRADA: "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
@@ -103,7 +104,8 @@ export default function ConvocatoriasList() {
         >
           <option value="ALL">Todos los estados</option>
           <option value="BORRADOR">Borrador</option>
-          <option value="EMITIDA">Emitida</option>
+          <option value="EMITIDA">Registrada (DEMO)</option>
+          <option value="RECTIFICADA">Rectificada</option>
           <option value="CONVOCADA">Convocada</option>
           <option value="EN_CURSO">En curso</option>
           <option value="CELEBRADA">Celebrada</option>
@@ -240,7 +242,7 @@ export default function ConvocatoriasList() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-sm)" }}
                     >
-                      {statusLabel(c.estado)}
+                      {c.estado === "EMITIDA" ? "Registrada · DEMO" : statusLabel(c.estado)}
                     </span>
                   </td>
                 </tr>

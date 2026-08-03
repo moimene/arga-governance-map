@@ -113,7 +113,7 @@ describe("functional-key", () => {
     expect(matchesFunctionalKey(a, b, "t1")).toBe(true);
   });
 
-  it("colapsa aliases históricos de materia, incluido el art. 308", () => {
+  it("colapsa aliases funcionales históricos sin mezclar las identidades del art. 308", () => {
     expect(
       matchesFunctionalKey(
         baseRow({ materia: "AMPLIACION_CAPITAL" }),
@@ -127,7 +127,7 @@ describe("functional-key", () => {
         baseRow({ materia: "SUPRESION_PREFERENTE" }),
         "t1",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("normaliza aliases de órgano sin mezclar órganos distintos", () => {

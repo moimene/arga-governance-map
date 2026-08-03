@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { usePlantillasProtegidas } from "@/hooks/usePlantillasProtegidas";
 import { DocumentPreflightError, resolveProcessTemplateSelection } from "@/lib/doc-gen/process-documents";
 import type { ProcessDocumentGenerationInput } from "@/lib/doc-gen/process-documents";
+import type { ProcessDocumentGenerationResult } from "@/lib/doc-gen/process-documents";
 import {
   buildCapa3AiAllowedFields,
   finalizeProcessDocumentDraftWithMotor,
@@ -29,6 +30,7 @@ import {
   resolveAgreementDocumentTrace,
   resolveDocumentEvidencePosture,
 } from "@/lib/secretaria/agreement-document-contract";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 
 type ProcessDocxButtonInput = Omit<ProcessDocumentGenerationInput, "plantillas">;
 
@@ -38,6 +40,7 @@ interface ProcessDocxButtonProps {
   variant?: "primary" | "outline" | "ghost";
   className?: string;
   disabledReason?: string | null;
+  onGenerated?: (result: ProcessDocumentGenerationResult) => void | Promise<void>;
 }
 
 const VARIANT_CLASS = {
@@ -69,6 +72,7 @@ export function ProcessDocxButton({
   variant = "outline",
   className = "",
   disabledReason = null,
+  onGenerated,
 }: ProcessDocxButtonProps) {
   const { data: plantillas = [], isLoading } = usePlantillasProtegidas();
   const { tenantId } = useTenantContext();
@@ -115,7 +119,13 @@ export function ProcessDocxButton({
     }),
     [input.capa3Values, input.kind, input.variables, selectedTemplate],
   );
-  const capa3Fields = matrixResolution?.capa3Fields ?? [];
+  const hasAuthoritativeReviewedBody =
+    input.preserveReviewedBodyExact === true &&
+    typeof input.reviewedBodyText === "string" &&
+    input.reviewedBodyText.trim().length > 0;
+  const capa3Fields = hasAuthoritativeReviewedBody
+    ? []
+    : matrixResolution?.capa3Fields ?? [];
   const evidencePosture = useMemo(() => {
     const archiveOptions = input.archive && typeof input.archive === "object" ? input.archive : {};
     const trace = resolveAgreementDocumentTrace({
@@ -137,7 +147,7 @@ export function ProcessDocxButton({
       : generating
       ? "Generando documento Word."
       : null);
-  const isActaReviewFlow = input.kind === "ACTA";
+  const isActaReviewFlow = input.kind === "ACTA" && !hasAuthoritativeReviewedBody;
   const diffSummary = useMemo(
     () => summarizeEditableDraftDiff(composerDraftText, editableDraftText),
     [composerDraftText, editableDraftText],
@@ -264,7 +274,10 @@ export function ProcessDocxButton({
       setReviewOpen(true);
       return true;
     } catch (error) {
-      const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
+      const description = secretariaErrorMessage(
+        error,
+        "No se pudo preparar el borrador del acta.",
+      );
       toast.error("No se pudo preparar el borrador del acta", { description });
       return false;
     } finally {
@@ -302,6 +315,7 @@ export function ProcessDocxButton({
           ? { enabled: true, allowed_fields: buildCapa3AiAllowedFields(capa3Fields) }
           : null,
       });
+      await onGenerated?.(result);
       if (result.archive.archived) {
         if (result.archive.reused) {
           toast.success("Documento existente reutilizado por hash coincidente", {
@@ -341,7 +355,7 @@ export function ProcessDocxButton({
         });
         return false;
       }
-      const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
+      const description = secretariaErrorMessage(error, "No se pudo generar el documento.");
       toast.error("No se pudo generar el documento", { description });
       return false;
     } finally {
@@ -445,6 +459,7 @@ export function ProcessDocxButton({
         editedBodyText: editableDraftText,
       });
       await persistReviewDraft(preparedProcessDraft, result.composition.renderedBodyText, "DRAFT_CONFIGURED", result.contentHash);
+      await onGenerated?.(result);
 
       if (result.archive.archived) {
         if (result.archive.reused) {
@@ -468,7 +483,7 @@ export function ProcessDocxButton({
       }
       setReviewOpen(false);
     } catch (error) {
-      const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
+      const description = secretariaErrorMessage(error, "No se pudo cerrar el acta DOCX.");
       toast.error("No se pudo cerrar el acta DOCX", { description });
     } finally {
       setGenerating(false);
@@ -519,7 +534,7 @@ export function ProcessDocxButton({
         description: `${result.appliedProposals.length} propuesta(s); valida estructura legal antes del cierre.`,
       });
     } catch (error) {
-      const description = error instanceof Error ? error.message : "Inténtelo de nuevo.";
+      const description = secretariaErrorMessage(error, "No se pudo asistir la redacción.");
       setPolishMessage(description);
       toast.error("No se pudo asistir la redacción", { description });
     } finally {
@@ -634,10 +649,10 @@ export function ProcessDocxButton({
                 >
                   <div className="flex items-center gap-2 font-semibold text-[var(--g-brand-3308)]">
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Validación antes de firma
+                    Validación previa a aprobación y custodia
                   </div>
                   <p className="mt-2">
-                    El DOCX final se valida contra la estructura del acta, el orden del día, las secciones RRM y el hash canónico antes de quedar disponible.
+                    El DOCX final se valida contra la estructura del acta, el orden del día, las secciones RRM y el hash canónico antes de su aprobación y custodia documental.
                   </p>
                 </div>
 

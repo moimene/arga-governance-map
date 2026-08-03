@@ -36,6 +36,10 @@ import {
   OPERATIONAL_TEMPLATE_QUERY_STATES,
 } from "@/lib/doc-gen/template-operability";
 import { validatePostRenderDocument } from "./post-render-validation";
+import {
+  documentOutputContextFromVariables,
+  normalizeVisibleDocumentText,
+} from "@/lib/doc-gen/document-output-normalizer";
 import type {
   ComposeDocumentOptions,
   ComposeDocumentResult,
@@ -65,6 +69,8 @@ export function templateTypesForDocumentType(documentType: SecretariaDocumentTyp
       return ["INFORME_DOCUMENTAL_PRE"];
     case "INFORME_GESTION":
       return ["INFORME_GESTION", "INFORME_PRECEPTIVO", "INFORME_DOCUMENTAL_PRE"];
+    case "MODELO_ACUERDO":
+      return ["MODELO_ACUERDO"];
     case "ACUERDO_SIN_SESION":
       return ["ACTA_ACUERDO_ESCRITO", "ACTA_DECISION_CONJUNTA", "ACTA_ORGANO_ADMIN"];
     case "DECISION_UNIPERSONAL":
@@ -451,7 +457,7 @@ export async function prepareDocumentComposition(
     throw new Error(rendered.error || "Error al renderizar la plantilla.");
   }
 
-  const renderedBodyText = rendered.text.trim();
+  const renderedBodyText = normalizeVisibleDocumentText(rendered.text);
   const systemTraceText = traceFooter(req, template, normativeSnapshot);
   // BATCH 14 (ronda 2 U-E): el documento que el usuario ve y descarga
   // contiene SOLO el body legal — la sección "TRAZABILIDAD DOCUMENTAL"
@@ -468,6 +474,7 @@ export async function prepareDocumentComposition(
     agreementIds: req.agreement_ids,
     unresolvedVariables: rendered.unresolvedVariables,
     actaLegalStructure: req.document_type === "ACTA" ? actaLegalStructureFromVariables(mergedVariables) : null,
+    outputContext: documentOutputContextFromVariables(mergedVariables, options.generatedAt),
   });
   if (!postRenderValidation.ok) {
     const blocking = postRenderValidation.issues.filter((issue) => issue.severity === "BLOCKING");
@@ -550,7 +557,7 @@ async function archivePreparedDocument(
       templateTipo: prepared.template.tipo,
       templateVersion: options.templateContext?.templateVersion ?? prepared.template.version,
       contentHash,
-      signedBy: "SISTEMA",
+      archivedBy: "SISTEMA",
       archivedBufferKind: "ORIGINAL_DOCX",
       normativeSnapshotId: prepared.normativeSnapshot?.snapshot_id ?? null,
       normativeProfileId: prepared.normativeSnapshot?.profile_id ?? null,
@@ -665,7 +672,7 @@ export async function finalizeEditableDocumentDraft(
   editedBodyText: string,
   options: ComposeDocumentOptions = {},
 ): Promise<ComposeDocumentResult> {
-  const renderedBodyText = editedBodyText.trim();
+  const renderedBodyText = normalizeVisibleDocumentText(editedBodyText);
   if (!renderedBodyText) {
     throw new Error("El borrador editable esta vacio.");
   }
@@ -685,6 +692,10 @@ export async function finalizeEditableDocumentDraft(
       prepared.request.document_type === "ACTA"
         ? actaLegalStructureFromVariables(prepared.mergedVariables)
         : null,
+    outputContext: documentOutputContextFromVariables(
+      prepared.mergedVariables,
+      options.generatedAt,
+    ),
   });
   if (!postRenderValidation.ok) {
     const blocking = postRenderValidation.issues.filter((issue) => issue.severity === "BLOCKING");
@@ -712,5 +723,9 @@ export async function composeDocument(
   options: ComposeDocumentOptions = {},
 ): Promise<ComposeDocumentResult> {
   const prepared = await prepareDocumentComposition(req, capa3Values, options);
-  return buildComposeResultFromPrepared(prepared, options, true);
+  return buildComposeResultFromPrepared(
+    prepared,
+    options,
+    options.includeEditableFields ?? true,
+  );
 }

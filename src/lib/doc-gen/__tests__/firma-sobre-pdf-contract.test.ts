@@ -1,125 +1,89 @@
-import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 
 /**
- * Contrato del camino de firma: se firma un PDF generado por nosotros.
+ * Contrato histórico del antiguo camino de firma sobre PDF.
  *
- * Antes se enviaba el DOCX y el proveedor lo convertía por su cuenta, de modo
- * que se hasheaba un documento y se firmaba otro: el hash que quedaba como
- * evidencia no correspondía al artefacto firmado, y de ese artefacto no había
- * ni copia ni hash. Para un acta o una certificación eso rompe la cadena.
- *
- * Estos pines evitan que una refactorización devuelva el DOCX al camino de firma
- * sin que nadie se dé cuenta.
+ * El producto ya no inicia firma personal. Este test conserva el nombre del
+ * archivo para impedir que una regresión reactive aquel camino y separa tres
+ * hechos: generación del borrador, copia de trabajo y custodia EAD source-bound.
  */
-function read(p: string) {
-  return readFileSync(resolve(process.cwd(), p), "utf8");
+function read(path: string) {
+  return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
 const STEPPER = "src/pages/secretaria/GenerarDocumentoStepper.tsx";
 const PROXY = "supabase/functions/qtsp-proxy/index.ts";
+const SIGN_HOOK = "src/hooks/useQTSPSign.ts";
 
-describe("lo hasheado, lo archivado y lo firmado son el mismo documento", () => {
+describe("el generador no inicia firma personal", () => {
   const stepper = read(STEPPER);
 
-  it("el stepper genera el PDF antes de solicitar la firma", () => {
-    expect(stepper).toContain("const pdf = await generatePdf({");
-    expect(stepper).toContain('from "@/lib/doc-gen/pdf-generator"');
+  it("no importa ni ejecuta el adaptador genérico de firma", () => {
+    expect(stepper).not.toContain("useQTSPSign");
+    expect(stepper).not.toContain("signMutation");
+    expect(stepper).not.toContain("providerSignatureType");
+    expect(stepper).not.toContain("signatureAnchor");
+    expect(stepper).not.toContain("signedDocumentData");
   });
 
-  it("el PDF sale del MISMO texto renderizado que el DOCX", () => {
-    // Si divergieran, el PDF firmado y el DOCX de trabajo dejarían de ser el
-    // mismo documento aunque ambos se llamaran igual.
-    expect(stepper).toMatch(/generatePdf\(\{[\s\S]{0,200}renderedText:\s*compositionResult\.document\.renderedText/);
-  });
-
-  it("lo que se envía a firmar es el PDF, con extensión .pdf", () => {
-    expect(stepper).toMatch(/documentName:\s*`\$\{selectedPlantilla\.tipo\}_\$\{agreement\.id\.slice\(0, 8\)\}\.pdf`/);
-    expect(stepper).toContain("documentData: pdfBuffer,");
-    // Y ya no se manda el buffer DOCX al firmar.
-    expect(stepper).not.toMatch(/documentData:\s*docxBuffer\.buffer\.slice/);
-  });
-
-  it("el proxy respeta un PDF entrante y no lo reconvierte", () => {
-    // Si reconvirtiera, volveríamos a firmar bytes distintos de los hasheados.
-    expect(read(PROXY)).toContain('convertToPdf: !documentName.toLowerCase().endsWith(".pdf")');
+  it("presenta la custodia final como una acción exclusiva del expediente", () => {
+    expect(stepper).toMatch(/Custodia EAD Trust/);
+    expect(stepper).toMatch(/expediente autoritativo/);
+    expect(stepper).toMatch(/no atribuye ni sustituye firma, consentimiento o causa legal/);
+    expect(stepper).toMatch(/Custodia disponible desde expediente/);
   });
 });
 
-describe("el estado de firma que se muestra es el real", () => {
+describe("la copia de trabajo conserva exactamente el DOCX generado", () => {
   const stepper = read(STEPPER);
 
-  it("solo se marca firmado cuando el proveedor lo acredita", () => {
-    expect(stepper).toContain('setSigningStatus(result.signatureProduced ? "signed" : "requested")');
+  it("archiva los bytes del DOCX y mantiene su extensión", () => {
+    expect(stepper).toMatch(/\.replace\(\/\\\.docx\$\/i, ""\) \+ "\.docx"/);
+    expect(stepper).toMatch(/const archiveBuffer = docxBuffer\.buffer\.slice\(/);
+    expect(stepper).toContain('archivedBufferKind: "ORIGINAL_DOCX"');
   });
 
-  it("existe un estado propio para 'solicitada', distinto de 'firmada'", () => {
-    expect(stepper).toContain('"requested"');
-    expect(stepper).toContain("Solicitud de firma enviada — pendiente de firma");
-    expect(stepper).toContain("Documento firmado por todos los firmantes");
-  });
-
-  it("ninguna cadena de esta pantalla afirma firma cualificada", () => {
-    const visible = stepper.match(/"[^"]{4,}"|>[^<>{}]{4,}</g) ?? [];
-    const infractoras = visible.filter(
-      (t) => /\bQES\b/.test(t) || /firma\s+(electr[óo]nica\s+)?cualificada/i.test(t),
-    );
-    expect(infractoras).toEqual([]);
+  it("no adjunta referencias EAD ni rotula la copia como output del proveedor", () => {
+    expect(stepper).not.toContain("eadInterpositionRequestId");
+    expect(stepper).not.toContain("eadInterpositionStatus");
+    expect(stepper).not.toContain("eadDocumentId");
+    expect(stepper).not.toContain("eadParticipantIds");
+    expect(stepper).not.toContain("QTSP_SIGNED_PDF");
+    expect(stepper).not.toContain("QTSP_SIGNED_DOCX");
   });
 });
 
-describe("lo archivado es lo firmado (Codex adversarial)", () => {
-  const stepper = read(STEPPER);
+describe("la custodia EAD final queda cerrada hasta existir renderer autoritativo", () => {
+  const proxy = read(PROXY);
 
-  it("se conserva el PDF exacto que se envió a firmar", () => {
-    // Se enviaba el PDF a firmar y se archivaba el DOCX: la evidencia apuntaba
-    // a un artefacto distinto del firmado, que es el defecto que este camino
-    // vino a corregir, solo que desplazado un paso.
-    expect(stepper).toContain("setSignedPdfBuffer(pdfBuffer);");
+  it("retira las acciones genéricas y rechaza el candidato del navegador", () => {
+    expect(proxy).toContain("GENERIC_PROVIDER_ACTION_RETIRED");
+    expect(proxy).toContain('body.action === "archive_final_legal_artifact"');
+    expect(proxy).toContain('code: "AUTHORITATIVE_BINARY_REQUIRED"');
+    expect(proxy).toContain("un candidato del navegador no puede convertirse en artefacto legal final");
   });
 
-  it("el archivado prefiere el firmado, luego el PDF enviado, y solo al final el DOCX", () => {
-    expect(stepper).toMatch(
-      /archiveBuffer\s*=\s*qesResult\?\.signedDocumentData[\s\S]{0,220}signedPdfBuffer[\s\S]{0,220}docxBuffer/,
-    );
-  });
-
-  it("el nombre del archivo sigue al artefacto real", () => {
-    expect(stepper).toMatch(/signedPdfBuffer\s*\?\s*"\.pdf"\s*:\s*""/);
-  });
-});
-
-describe("la hora de firma nunca se fabrica (Codex adversarial)", () => {
-  const hook = read("src/hooks/useQTSPSign.ts");
-
-  it("ningún camino real sella con el reloj local", () => {
-    // El reloj del navegador no acredita cuándo se firmó. La fecha real llega
-    // del proveedor al reconciliar.
-    const camposFecha = hook.match(/signed_at:\s*[^,\n]+/g) ?? [];
-    const fabricados = camposFecha.filter((c) => c.includes("new Date()"));
-    // Solo el adaptador sandbox, que es un simulador declarado y cuya evidencia
-    // el gate degrada siempre, puede tener una fecha sintética.
-    expect(fabricados.length).toBeLessThanOrEqual(1);
-    expect(hook).toContain("signed_at: null,");
-  });
-
-  it("el camino directo también comprueba el estado antes de dar por firmada", () => {
-    expect(hook).toContain("const producidaDirecta = isSignatureProduced(result.srStatus);");
+  it("no conserva implementación alguna que lea o eleve bytes del navegador", () => {
+    const start = proxy.indexOf("async function handleArchiveFinalLegalArtifact");
+    const end = proxy.indexOf("// ─── Compatibilidad histórica", start);
+    const handler = proxy.slice(start, end);
+    expect(handler).toContain('code: "AUTHORITATIVE_BINARY_REQUIRED"');
+    expect(handler).not.toContain("documentBase64");
+    expect(handler).not.toContain("createEadEvidence(");
+    expect(handler).not.toContain("fn_secretaria_register_custodied_legal_artifact");
   });
 });
 
-describe("el sello va donde el generador dice (Codex adversarial)", () => {
-  it("el stepper propaga el ancla calculada sobre el PDF real", () => {
-    // Fijar página 1 a ciegas colocaba la firma sobre el cuerpo del acuerdo en
-    // documentos de varias páginas.
-    expect(read(STEPPER)).toContain("signatureAnchor: pdf.signatureAnchor,");
-  });
+describe("los adaptadores legacy fallan cerrados", () => {
+  const hook = read(SIGN_HOOK);
 
-  it("el cliente lo transmite al proxy", () => {
-    const client = read("src/lib/qtsp/qtsp-proxy-client.ts");
-    expect(client).toContain("signaturePage: input.signatureAnchor?.page,");
-    expect(client).toContain("signatureX: input.signatureAnchor?.x,");
-    expect(client).toContain("signatureY: input.signatureAnchor?.y,");
+  it("la firma y la mensajería genéricas siempre terminan en error controlado", () => {
+    expect(hook).toMatch(/throw new Error\(RETIRED_SIGN_MESSAGE\)/);
+    expect(hook).toMatch(/throw new Error\(CONTROLLED_MESSAGE\)/);
+    expect(hook).toContain("signed_at: null;");
+    expect(hook).toContain("signatureProduced?: false;");
+    expect(hook).not.toMatch(/signed_at:\s*new Date\(/);
   });
 });

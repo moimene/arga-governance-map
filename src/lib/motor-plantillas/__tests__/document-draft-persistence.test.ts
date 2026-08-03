@@ -123,6 +123,18 @@ describe("document-draft-persistence", () => {
     );
   });
 
+  it("invalida el draft cuando cambia la composición canónica resuelta", async () => {
+    const prepared = await preparedConvocatoria();
+    const changed = {
+      ...prepared,
+      renderedBodyText: `${prepared.renderedBodyText}\nFirmante canónico actualizado.`,
+    };
+
+    await expect(computeEditableDocumentDraftKey(prepared)).resolves.not.toBe(
+      await computeEditableDocumentDraftKey(changed),
+    );
+  });
+
   it("declara schema Cloud exacto cuando no esta disponible", () => {
     const gate = staticDocumentDraftSchemaGate();
 

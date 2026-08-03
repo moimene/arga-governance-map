@@ -6,8 +6,10 @@ import { rulePackMateriaMatches } from "@/lib/rules-engine/rule-resolution";
 import type { TipoSocial } from "@/lib/secretaria/sociedad-onboarding/types";
 import {
   MATERIA_CANONICAL_ALIAS as CANONICAL_MATERIA_ALIAS,
+  MATERIA_PRESENTATION_ALIAS as PRESENTATION_MATERIA_ALIAS,
   labelMateria,
   resolveMateriaAlias as resolveCanonicalMateriaAlias,
+  resolveMateriaPresentationAlias as resolvePresentationMateriaAlias,
 } from "./agenda-materias";
 import {
   TIPO_LABEL,
@@ -598,15 +600,19 @@ export const MATTER_GROUP_BY_MATERIA: Record<string, FunctionalMatterGroupId> = 
 };
 
 /**
- * Alias legacy de agreement_kind que coexisten en materia_catalog con su
- * materia canónica y duplicaban tarjetas en el catálogo. El colapso es SOLO
- * de presentación: las filas de BD no se tocan (los expedientes históricos
- * pueden seguir referenciándolas).
+ * Alias legacy que comparten identidad funcional con su materia canónica.
+ * La canonicalización local no modifica las filas de BD. Los sinónimos que
+ * solo comparten presentación se exponen en un mapa separado.
  */
 export const MATERIA_CANONICAL_ALIAS = CANONICAL_MATERIA_ALIAS;
+export const MATERIA_PRESENTATION_ALIAS = PRESENTATION_MATERIA_ALIAS;
 
 export function resolveMateriaAlias(code?: string | null): string {
   return resolveCanonicalMateriaAlias(code);
+}
+
+export function resolveMateriaPresentationAlias(code?: string | null): string {
+  return resolvePresentationMateriaAlias(code);
 }
 
 /**

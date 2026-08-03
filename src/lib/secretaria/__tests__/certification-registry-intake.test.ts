@@ -10,6 +10,7 @@ describe("certification registry intake", () => {
     const intake = buildCertificationRegistryIntake({
       id: "cert-1",
       signatureStatus: "SIGNED",
+      legalGateStatus: "EMITTED",
       evidenceId: "bundle-1",
       agreementId: null,
       agreementsCertified: [
@@ -31,6 +32,7 @@ describe("certification registry intake", () => {
     const intake = buildCertificationRegistryIntake({
       id: "cert-1",
       signatureStatus: "SIGNED",
+      legalGateStatus: "EMITTED",
       evidenceId: "bundle-1",
       agreementsCertified: ["meeting:meeting-1:point:2"],
       resolvedPointAgreementIds: ["5905ee89-3fb4-4a03-9cda-7523d45f75d4"],
@@ -52,6 +54,7 @@ describe("certification registry intake", () => {
     const intake = buildCertificationRegistryIntake({
       id: "cert-1",
       signatureStatus: "SIGNED",
+      legalGateStatus: "EMITTED",
       agreementsCertified: ["meeting:meeting-1:point:1"],
     });
 
@@ -61,7 +64,7 @@ describe("certification registry intake", () => {
     expect(intake.warnings).toContain("evidence_bundle_not_linked");
   });
 
-  it("no considera lista para registro una certificacion con evidencia pero sin firma", () => {
+  it("no considera lista para registro una certificacion con custodia pero sin constancia", () => {
     const intake = buildCertificationRegistryIntake({
       id: "cert-1",
       signatureStatus: "PENDING",
@@ -72,7 +75,24 @@ describe("certification registry intake", () => {
     expect(intake.signed).toBe(false);
     expect(intake.hasEvidenceBundle).toBe(true);
     expect(intake.readyForRegistry).toBe(false);
-    expect(intake.warnings).toContain("certification_not_signed");
+    expect(intake.evidenced).toBe(false);
+    expect(intake.warnings).toContain("certification_not_evidenced");
+  });
+
+  it("considera lista una certificacion evidenciada por interposicion sin exigir firma electronica", () => {
+    const intake = buildCertificationRegistryIntake({
+      id: "cert-1",
+      signatureStatus: "EVIDENCED",
+      legalGateStatus: "INTERPOSITION_VERIFIED",
+      interpositionCanonicalStatus: "CONSTANCIA_VERIFIED",
+      evidenceId: "bundle-1",
+      agreementsCertified: ["5905ee89-3fb4-4a03-9cda-7523d45f75d4"],
+    });
+
+    expect(intake.signed).toBe(false);
+    expect(intake.evidenced).toBe(true);
+    expect(intake.readyForRegistry).toBe(true);
+    expect(intake.warnings).not.toContain("certification_not_evidenced");
   });
 
   it("reconoce UUIDs v4/v5 validos", () => {

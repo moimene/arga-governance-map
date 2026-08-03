@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, FileSignature, Gavel, Link2, Loader2, Shield, Stamp, Lock, Unlock } from "lucide-react";
@@ -16,6 +16,8 @@ import { EmitirCertificacionButton } from "@/components/secretaria/EmitirCertifi
 import { useCurrentUserRole } from "@/hooks/useCurrentUser";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
+import { EADInterpositionControl } from "@/components/secretaria/EADInterpositionControl";
+import type { ProcessDocumentGenerationResult } from "@/lib/doc-gen/process-documents";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { isUuidReference } from "@/lib/secretaria/certification-registry-intake";
 import { demoReadinessMessage } from "@/lib/secretaria/entity-demo-readiness";
@@ -24,7 +26,10 @@ import { extractMeetingSourceLinks } from "@/lib/secretaria/meeting-links";
 import type { MeetingAdoptionSnapshot } from "@/lib/rules-engine";
 import { useReunionAttendees } from "@/hooks/useReunionSecretaria";
 import { bodyTypeLabel } from "@/lib/secretaria/body-labels";
-import { renderActaAgendaItemsText } from "@/lib/secretaria/acta-agenda";
+import {
+  renderActaAgendaItemsText,
+  renderCertifiedAgreementsText,
+} from "@/lib/secretaria/acta-agenda";
 import {
   buildActaLegalStructureViewModel,
   buildActaLegalTemplateVariables,
@@ -32,6 +37,25 @@ import {
   validateActaRrmStructure,
   type ActaOrganKind,
 } from "@/lib/secretaria/acta-legal-structure";
+import {
+  useMinuteBookEntry,
+  useMinuteBookRoutingIncidents,
+  useRegisterMinuteBookEntry,
+  useResolveMinuteBookDestination,
+  type ResolveMinuteBookDestinationResult,
+} from "@/hooks/useSocietaryBookEntries";
+import { useAuthorityEvidence } from "@/hooks/useAuthorityEvidence";
+import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
+import {
+  certificationSignatureForPresentation,
+  certificationLegalGateLabel,
+  DEMO_SIMULATION_NO_LEGAL_EFFECT_NOTICE,
+  minuteLegalGateLabel,
+  prependDemoSimulationNotice,
+  resolveCertificationSourceGate,
+  type CertificationLegalGateStatus,
+  type MinuteApprovalMethod,
+} from "@/lib/secretaria/authoritative-legal-state";
 
 function buildActaFallback(params: {
   body: string;
@@ -54,7 +78,7 @@ function buildCertificationFallback(params: {
   body: string;
   content?: string | null;
   agreementsCount: number;
-  signatureStatus?: string | null;
+  legalStatus?: CertificationLegalGateStatus | null;
 }) {
   return [
     "CERTIFICACIÓN DE ACUERDOS",
@@ -62,10 +86,17 @@ function buildCertificationFallback(params: {
     `Sociedad: ${params.entity}`,
     `Órgano: ${params.body}`,
     `Acuerdos certificados: ${params.agreementsCount}`,
-    `Estado de firma: ${params.signatureStatus ?? "—"}`,
+    `Estado jurídico: ${params.legalStatus ? certificationLegalGateLabel(params.legalStatus) : "Sin clasificar"}`,
     "",
     params.content ?? "Sin contenido de certificación registrado.",
   ].join("\n");
+}
+
+function canonicalDocumentTitle(content: string | null | undefined, fallback: string) {
+  return content
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find(Boolean) ?? fallback;
 }
 
 function formatVoteWeight(value: number | undefined) {
@@ -158,8 +189,10 @@ function quorumPercentage(
 
 function cityFromLocation(location?: string | null) {
   if (!location?.trim()) return "Madrid";
-  const first = location.split(/[,(]/)[0]?.trim();
-  return first || location.trim();
+  const parts = location.split(",").map((part) => part.trim()).filter(Boolean);
+  const candidate = parts.at(-1) ?? location.trim();
+  const withoutQualifier = candidate.split("(")[0]?.trim();
+  return withoutQualifier || candidate;
 }
 
 function inferActaOrganKind(value?: string | null): ActaOrganKind {
@@ -177,26 +210,54 @@ function stringFromRecord(record: Record<string, unknown> | null | undefined, ke
   return "";
 }
 
+function approvalMethodLabel(method?: MinuteApprovalMethod | null) {
+  switch (method) {
+    case "AL_FINAL_SESION":
+      return "aprobación al final de la sesión";
+    case "DENTRO_15_DIAS":
+      return "aprobación dentro de los quince días siguientes";
+    case "POR_ACTA_NOTARIAL":
+      return "aprobación documentada mediante acta notarial";
+    default:
+      return null;
+  }
+}
+
 export default function ActaDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scope = useSecretariaScope();
   const { data: acta, isLoading } = useActaById(id);
-  const { data: certs } = useCertificationsByMinute(id);
+  const { data: certs, refetch: refetchCerts } = useCertificationsByMinute(id);
   const { data: certificationPlan, isLoading: certificationPlanLoading } = useCertificationPlanForMinute(id);
   const { data: actaAgendaContract, isLoading: actaAgendaLoading } = useActaAgendaContract(acta?.meeting_id);
   const { data: attendees = [], isLoading: attendeesLoading } = useReunionAttendees(acta?.meeting_id);
   const materializeAgreement = useMaterializeMeetingPointAgreement(id);
   const { primaryRole } = useCurrentUserRole();
   const { data: readiness } = useEntityDemoReadiness(acta?.entity_id);
+  const { data: signingAuthorities = [] } = useAuthorityEvidence(acta?.entity_id);
   const requestedPlantillaId = searchParams.get("plantilla");
   const requestedTemplateType = searchParams.get("tipo");
   const [materializingPoint, setMaterializingPoint] = useState<number | null>(null);
   // W0 — edición del contenido del acta en borrador.
   const [editingActa, setEditingActa] = useState(false);
   const [draftContent, setDraftContent] = useState("");
+  const [actaCandidate, setActaCandidate] = useState<ProcessDocumentGenerationResult["candidate"] | null>(null);
+  const [certificationCandidates, setCertificationCandidates] = useState<
+    Record<string, ProcessDocumentGenerationResult["candidate"]>
+  >({});
   const updateBorrador = useUpdateActaBorrador(id);
+  const minuteBookEntry = useMinuteBookEntry(id);
+  const bookRoutingIncidents = useMinuteBookRoutingIncidents(id);
+  const resolveBookDestination = useResolveMinuteBookDestination();
+  const registerBookEntry = useRegisterMinuteBookEntry();
+  const bookEntryOperationId = useMemo(
+    () => (id ? crypto.randomUUID() : null),
+    [id],
+  );
+  const [bookRoutingResult, setBookRoutingResult] =
+    useState<ResolveMinuteBookDestinationResult | null>(null);
 
   if (isLoading) {
     return (
@@ -216,8 +277,64 @@ export default function ActaDetalle() {
   const m = acta;
   const meeting = m.meetings;
   const body = m.meetings?.governing_bodies?.name ?? "Órgano";
-  const entity = m.meetings?.governing_bodies?.entities?.common_name ?? "—";
+  const entity =
+    m.meetings?.governing_bodies?.entities?.legal_name ??
+    m.meetings?.governing_bodies?.entities?.common_name ??
+    "—";
   const jurisdiction = m.meetings?.governing_bodies?.entities?.jurisdiction ?? null;
+  const matchesSigningBody = (bodyId: string | null) => bodyId === m.body_id;
+  const meetingPresidentId = meeting?.president?.id ?? m.signed_by_president_id;
+  const meetingSecretaryId = meeting?.secretary?.id ?? m.signed_by_secretary_id;
+  const signingPresident = signingAuthorities.find(
+    (authority) =>
+      matchesSigningBody(authority.body_id) &&
+      authority.person_id === meetingPresidentId &&
+      (authority.cargo === "PRESIDENTE" || authority.cargo === "VICEPRESIDENTE"),
+  );
+  const signingSecretary = signingAuthorities.find(
+    (authority) =>
+      matchesSigningBody(authority.body_id) &&
+      authority.person_id === meetingSecretaryId &&
+      (authority.cargo === "SECRETARIO" || authority.cargo === "VICESECRETARIO"),
+  );
+  const actaEadSignatories = [
+    signingPresident
+      ? {
+          name: signingPresident.person?.full_name ?? "",
+          email: signingPresident.person?.email ?? "",
+          personId: signingPresident.person_id,
+          signerRole: "PRESIDENTE" as const,
+          authorityEvidenceId: signingPresident.id,
+          sequence: 1,
+        }
+      : null,
+    signingSecretary
+      ? {
+          name: signingSecretary.person?.full_name ?? "",
+          email: signingSecretary.person?.email ?? "",
+          personId: signingSecretary.person_id,
+          signerRole: "SECRETARIO" as const,
+          authorityEvidenceId: signingSecretary.id,
+          sequence: 2,
+        }
+      : null,
+  ].filter((signer): signer is NonNullable<typeof signer> => signer !== null);
+  const effectiveBookDestinationStatus = minuteBookEntry.data
+    ? "POSTED"
+    : bookRoutingResult?.resolved === true
+      ? "RESOLVED"
+      : (m.book_destination_status ?? "UNRESOLVED");
+  const legalGateStatus = m.legal_gate_status ?? "DRAFT";
+  const isAuthoritativelyApproved =
+    legalGateStatus === "APPROVED_SIGNED"
+    && m.approval_evidence_mode === "INTERPOSITION"
+    && m.approval_signature_claim === false
+    && m.approval_canonical_status === "APPROVED_EVIDENCED"
+    && Boolean(m.president_consent_evidence_id)
+    && Boolean(m.secretary_constancia_evidence_id);
+  const approvalBookGateReason = effectiveBookDestinationStatus !== "RESOLVED"
+    ? "Resuelva primero el libro y la sección de destino; la aprobación bloqueará el acta."
+    : null;
   const certificationRefs = certificationPlan?.refs ?? [];
   const certificationAgreementRefs = certificationPlan?.agreementRefs ?? [];
   const certificationPointRefs = certificationPlan?.pointRefs ?? [];
@@ -234,6 +351,9 @@ export default function ActaDetalle() {
       ].sort((a, b) => a.agenda_item_index - b.agenda_item_index)
     : [];
   const meetingDate = meeting?.scheduled_start ?? m.created_at;
+  const legalApprovalEffectiveAt = isAuthoritativelyApproved
+    ? m.approval_effective_at ?? null
+    : null;
   const actaPuntos = actaAgendaContract?.puntos ?? [];
   const actaValidationIssues = actaAgendaContract?.validation.blockingIssues ?? [];
   const ordenDiaTexto =
@@ -245,15 +365,20 @@ export default function ActaDetalle() {
     : ordenDiaTexto;
   const acuerdosTexto =
     actaPuntos.length > 0
-      ? actaPuntos
-          .filter((point) => point.kind === "DECISORIO")
-          .map((point) => `${point.order_number}. ${point.decisorio?.adoptedText ?? point.resolution_text ?? point.title}`)
-          .join("\n")
+      ? renderCertifiedAgreementsText(actaPuntos)
       : agreementLinesFromSnapshots(pointSnapshots) || (m.content ?? "");
   const miembrosPresentesTexto =
     attendeeLines(attendees) || "Según lista de asistentes incorporada al expediente.";
-  const presidente = meeting?.president?.full_name ?? "Presidencia del órgano";
-  const secretario = meeting?.secretary?.full_name ?? "Secretaría del órgano";
+  const presidente =
+    meeting?.president?.full_name ??
+    m.signed_president?.full_name ??
+    signingPresident?.person?.full_name ??
+    "";
+  const secretario =
+    meeting?.secretary?.full_name ??
+    m.signed_secretary?.full_name ??
+    signingSecretary?.person?.full_name ??
+    "";
   const porcentajeCapitalPresente =
     quorumPercentage(meeting?.quorum_data, pointSnapshots) || "Según snapshot de quórum incorporado al expediente";
   const isJunta = (meeting?.meeting_type ?? meeting?.governing_bodies?.body_type ?? "").toUpperCase().includes("JUNTA");
@@ -275,10 +400,10 @@ export default function ActaDetalle() {
     (isJunta && entity.toUpperCase().includes("S.A")
       ? "Publicación o comunicación de convocatoria incorporada al expediente de la sociedad."
       : "");
-  const approvalMode = m.signed_at
-    ? "aprobación y firma del acta por la Secretaría con el visto bueno de la Presidencia"
-    : "aprobación por el propio órgano al final de la reunión o por el sistema legal o estatutario documentado";
-  const approvalDate = formatDateOnly(m.signed_at ?? m.created_at) || formatDateOnly(meetingDate) || m.created_at;
+  const approvalMode = isAuthoritativelyApproved
+    ? approvalMethodLabel(m.approval_method)
+    : null;
+  const approvalDate = formatDateOnly(legalApprovalEffectiveAt) || null;
   const actaLegalStructure = buildActaLegalStructureViewModel({
     meetingId: m.meeting_id,
     minuteId: m.id,
@@ -299,7 +424,9 @@ export default function ActaDetalle() {
     attendees: attendees.map((attendee) => ({
       name: attendee.full_name ?? attendee.person_id ?? "Asistente sin identificar",
       attendance:
-        attendee.attendance_type === "REPRESENTADO"
+        Number(attendee.voting_rights) === 0
+          ? "INVITADO"
+          : attendee.attendance_type === "REPRESENTADO"
           ? "REPRESENTADO"
           : attendee.attendance_type === "AUSENTE"
             ? "AUSENTE"
@@ -350,7 +477,11 @@ export default function ActaDetalle() {
     approvalDate,
   });
   const actaLegalVariables = buildActaLegalTemplateVariables(actaLegalStructure);
-  const actaRrmIssues = actaRrmValidation.blockingIssues;
+  const actaRrmIssues = actaRrmValidation.blockingIssues.filter(
+    (issue) =>
+      isAuthoritativelyApproved ||
+      (issue.code !== "rrm_approval_mode_missing" && issue.code !== "rrm_approval_date_missing"),
+  );
   const certificationDisabledReason = certificationPlanLoading
     ? "Cargando snapshot legal de la reunión"
     : !certificationPlan?.hasPointSnapshots
@@ -362,11 +493,15 @@ export default function ActaDetalle() {
         : null;
   const certificationReadinessReason =
     readiness?.status === "reference_only" ? demoReadinessMessage(readiness) : null;
-  const actaApprovalGateReason = !m.signed_at
-    ? "No se puede emitir certificación: el acta debe estar aprobada o firmada antes de certificar acuerdos (RRM arts. 108-109). Usa «Aprobar y firmar acta»."
-    : null;
+  const certificationSourceGate = resolveCertificationSourceGate({
+    minuteLegalGateStatus: legalGateStatus,
+    bookDestinationStatus: effectiveBookDestinationStatus,
+    approvalEvidenceMode: m.approval_evidence_mode,
+    approvalSignatureClaim: m.approval_signature_claim,
+    approvalCanonicalStatus: m.approval_canonical_status,
+  });
   const certificationGateReason =
-    actaApprovalGateReason ?? certificationReadinessReason ?? certificationDisabledReason;
+    certificationSourceGate.reason ?? certificationReadinessReason ?? certificationDisabledReason;
   const actaVariables = {
     ...actaLegalVariables,
     entity_id: m.entity_id,
@@ -379,7 +514,10 @@ export default function ActaDetalle() {
     jurisdiccion: jurisdiction ?? "",
     fecha: formatDateOnly(meetingDate) || m.created_at,
     fecha_junta: formatDateOnly(meetingDate) || m.created_at,
+    fecha_reunion_iso: meetingDate,
     fecha_generacion: new Date().toISOString(),
+    fecha_emision: formatDateOnly(legalApprovalEffectiveAt ?? meetingDate) || m.created_at,
+    fecha_emision_iso: legalApprovalEffectiveAt ?? meetingDate,
     ciudad_emision: cityFromLocation(meeting?.location),
     lugar: meeting?.location ?? "Domicilio social",
     hora_inicio: formatTimeOnly(meeting?.scheduled_start) || "Hora indicada en convocatoria",
@@ -392,6 +530,13 @@ export default function ActaDetalle() {
     puntos_acta_texto: puntosActaTexto,
     canonical_minutes_hash: actaAgendaContract?.canonicalMinutesHash ?? m.canonical_minutes_hash ?? "",
     acuerdos_texto: acuerdosTexto,
+    transcripcion_acuerdos: acuerdosTexto,
+    nombre_certificante: secretario,
+    cargo_certificante: `Persona titular de la Secretaría de ${body}`,
+    cargo_certificante_vigente: "cargo vigente y en ejercicio",
+    metodo_aprobacion_acta: approvalMode ?? "",
+    fecha_aprobacion_acta: approvalDate ?? "",
+    fecha_aprobacion_acta_iso: legalApprovalEffectiveAt ?? "",
     miembros_presentes_texto: miembrosPresentesTexto,
     asistentes_texto: miembrosPresentesTexto,
     orden_dia: actaPuntos.length > 0
@@ -410,7 +555,7 @@ export default function ActaDetalle() {
           .filter((point) => point.kind === "DECISORIO")
           .map((point) => ({
             ordinal: String(point.order_number),
-            texto: point.decisorio?.adoptedText ?? point.resolution_text ?? point.title,
+            texto: point.decisorio?.adoptedText ?? point.resolution_text ?? "",
             estado: point.status,
             agreement_id: point.agreement_id,
           }))
@@ -437,16 +582,33 @@ export default function ActaDetalle() {
     snapshot_certificables: certificationPlan?.certifiableSnapshots ?? [],
     snapshot_bloqueados: certificationPlan?.blockedSnapshots ?? [],
     pactos_warnings: certificationPlan?.contractualWarnings ?? [],
-    firma_estado: m.signed_at ? "FIRMADA" : "BORRADOR",
+    firma_estado:
+      legalGateStatus === "DEMO_SIMULATION"
+        ? "SIMULACION_DEMO_SIN_EFECTOS_JURIDICOS"
+        : isAuthoritativelyApproved
+          ? "APROBADA_CON_CONSTANCIA_EAD"
+          : "BORRADOR",
+    efecto_juridico:
+      legalGateStatus === "DEMO_SIMULATION"
+        ? "SIMULACION_DEMO_SIN_EFECTOS_JURIDICOS"
+        : "SEGUN_GATE_AUTORITATIVO",
+    aviso_simulacion:
+      legalGateStatus === "DEMO_SIMULATION"
+        ? DEMO_SIMULATION_NO_LEGAL_EFFECT_NOTICE
+        : "",
+    legal_gate_status: legalGateStatus,
   };
-  const actaFallback = actaPuntos.length > 0
-    ? renderActaLegalStructureText(actaLegalStructure)
-    : buildActaFallback({
-        body,
-        entity,
-        content: m.content,
-        createdAt: m.created_at,
-      });
+  const actaFallback = prependDemoSimulationNotice(
+    actaPuntos.length > 0
+      ? renderActaLegalStructureText(actaLegalStructure)
+      : buildActaFallback({
+          body,
+          entity,
+          content: m.content,
+          createdAt: m.created_at,
+        }),
+    legalGateStatus,
+  );
 
   async function handleMaterializePoint(snapshot: MeetingAdoptionSnapshot) {
     setMaterializingPoint(snapshot.agenda_item_index);
@@ -467,6 +629,47 @@ export default function ActaDetalle() {
       toast.error("No se pudo crear el expediente Acuerdo 360", { description });
     } finally {
       setMaterializingPoint(null);
+    }
+  }
+
+  async function handleResolveBookDestination() {
+    if (!id) return;
+    try {
+      const result = await resolveBookDestination.mutateAsync(id);
+      setBookRoutingResult(result);
+      if (result.resolved === true) {
+        toast.success("Destino de libro resuelto de forma explícita");
+      } else {
+        toast.warning("El acta no tiene un destino de libro inequívoco", {
+          description: result.reason === "AMBIGUOUS"
+            ? "Se ha registrado una incidencia por destinos múltiples."
+            : "Se ha registrado una incidencia porque falta configurar la sección.",
+        });
+      }
+    } catch (error) {
+      toast.error("No se pudo resolver el destino del acta", {
+        description: secretariaErrorMessage(
+          error,
+          "No se pudo resolver el libro y la sección del acta.",
+        ),
+      });
+    }
+  }
+
+  async function handleRegisterBookEntry() {
+    if (!id || !bookEntryOperationId) return;
+    try {
+      const result = await registerBookEntry.mutateAsync({
+        minuteId: id,
+        operationId: bookEntryOperationId,
+      });
+      toast.success("Acta asentada una sola vez en el libro", {
+        description: `Asiento ${String(result.ordinal_number)} con hash persistido.`,
+      });
+    } catch (error) {
+      toast.error("No se pudo registrar el asiento del acta", {
+        description: secretariaErrorMessage(error, "No se pudo asentar el acta aprobada."),
+      });
     }
   }
 
@@ -517,9 +720,26 @@ export default function ActaDetalle() {
             {body}
           </h1>
           <p className="mt-1 text-sm text-[var(--g-text-secondary)]">{entity}</p>
-          <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
-            Evidencia de apoyo demo/operativa; no constituye evidencia final productiva.
+          <p className="mt-2 text-xs font-medium text-[var(--g-text-primary)]">
+            Estado jurídico: {minuteLegalGateLabel(legalGateStatus)}
           </p>
+          {legalGateStatus === "DEMO_SIMULATION" ? (
+            <p
+              className="mt-2 max-w-3xl border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
+              role="alert"
+            >
+              Simulación demo sin efecto jurídico: sus marcas históricas de aprobación
+              no acreditan aprobación, no habilitan asiento ni permiten certificar.
+            </p>
+          ) : legalGateStatus === "LEGACY_REVIEW" ? (
+            <p
+              className="mt-2 max-w-3xl border-l-4 border-[var(--status-warning)] bg-[var(--g-surface-muted)] px-3 py-2 text-xs text-[var(--g-text-primary)]"
+              role="alert"
+            >
+              Registro del circuito anterior pendiente de remediación probatoria.
+              No se trata como acta aprobada hasta superar el nuevo gate.
+            </p>
+          ) : null}
           {requestedPlantillaId ? (
             <p className="mt-2 text-xs text-[var(--g-text-secondary)]">
               Plantilla seleccionada:
@@ -528,36 +748,142 @@ export default function ActaDetalle() {
             </p>
           ) : null}
         </div>
-        <ProcessDocxButton
-          label={requestedPlantillaId && requestedTemplateType !== "CERTIFICACION" ? "Generar con plantilla" : "Acta DOCX"}
-          variant="primary"
-          input={{
-            kind: "ACTA",
-            recordId: m.id,
-            title: `Acta de ${body}`,
-            subtitle: entity,
-            entityName: entity,
-            templateTypes: ["ACTA_SESION", "ACTA_CONSIGNACION", "ACTA_ACUERDO_ESCRITO"],
-            variables: actaVariables,
-            templateCriteria: {
-              jurisdiction,
-              organoTipo: meeting?.governing_bodies?.body_type ?? meeting?.meeting_type,
-            },
-            preferredTemplateId: requestedTemplateType === "CERTIFICACION" ? null : requestedPlantillaId,
-            fallbackText: actaFallback,
-            filenamePrefix: "acta",
-          }}
-          disabledReason={
-            actaValidationIssues.length > 0
-              ? `Corrige la estructura legal del acta: ${actaValidationIssues[0].message}`
-              : actaRrmIssues.length > 0
-                ? `Corrige la estructura RRM del acta: ${actaRrmIssues[0].message}`
-              : certificationPlanLoading || attendeesLoading || actaAgendaLoading
-              ? "Cargando datos de reunión, asistentes y acuerdos antes de generar el acta."
-              : null
-          }
-        />
+        <div className="flex w-full max-w-[540px] flex-col items-stretch gap-3 md:items-end">
+          <ProcessDocxButton
+            label={requestedPlantillaId && requestedTemplateType !== "CERTIFICACION" ? "Generar con plantilla" : "Acta DOCX"}
+            variant="primary"
+            input={{
+              kind: "ACTA",
+              recordId: m.id,
+              title: canonicalDocumentTitle(m.content, `Acta de ${body}`),
+              subtitle: entity,
+              entityName: entity,
+              templateTypes: ["ACTA_SESION", "ACTA_CONSIGNACION", "ACTA_ACUERDO_ESCRITO"],
+              variables: actaVariables,
+              templateCriteria: {
+                jurisdiction,
+                organoTipo: meeting?.governing_bodies?.body_type ?? meeting?.meeting_type,
+              },
+              preferredTemplateId: requestedTemplateType === "CERTIFICACION" ? null : requestedPlantillaId,
+              reviewedBodyText:
+                legalGateStatus === "MANIFEST_READY" ? m.content : null,
+              preserveReviewedBodyExact: legalGateStatus === "MANIFEST_READY",
+              mandatoryVisibleNotice:
+                legalGateStatus === "DEMO_SIMULATION"
+                  ? DEMO_SIMULATION_NO_LEGAL_EFFECT_NOTICE
+                  : null,
+              fallbackText: actaFallback,
+              filenamePrefix: "acta",
+              generatedAt: (legalApprovalEffectiveAt ?? meetingDate).slice(0, 10),
+              archive: false,
+            }}
+            disabledReason={
+              legalGateStatus === "ARTIFACT_FINAL" || isAuthoritativelyApproved
+                ? "El acta ya está vinculada a un artefacto final inmutable; recupere ese binario desde su evidencia archivada."
+                : legalGateStatus === "DRAFT" && actaValidationIssues.length > 0
+                ? `Corrige la estructura legal del acta: ${actaValidationIssues[0].message}`
+                : legalGateStatus === "DRAFT" && actaRrmIssues.length > 0
+                  ? `Corrige la estructura RRM del acta: ${actaRrmIssues[0].message}`
+                : certificationPlanLoading || attendeesLoading || actaAgendaLoading
+                ? "Cargando datos de reunión, asistentes y acuerdos antes de generar el acta."
+                : null
+            }
+            onGenerated={(result) => {
+              setActaCandidate(result.candidate);
+            }}
+          />
+          <EADInterpositionControl
+            sourceDomain="MINUTE"
+            sourceId={m.id}
+            domainContentHash={m.content_hash}
+            candidate={actaCandidate}
+            signatories={actaEadSignatories}
+            label={`acta de ${body}`}
+            isDemoSimulation={legalGateStatus === "DEMO_SIMULATION"}
+          />
+        </div>
       </div>
+
+      <section
+        className="mb-6 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-5"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Asiento en libro societario</h2>
+            <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
+              El destino se resuelve desde configuración persistida; una ambigüedad genera incidencia y no inventa libro ni sección.
+            </p>
+          </div>
+          <span
+            className="bg-[var(--g-surface-muted)] px-2 py-1 text-xs font-medium text-[var(--g-text-secondary)]"
+            style={{ borderRadius: "var(--g-radius-sm)" }}
+          >
+            {statusLabel(effectiveBookDestinationStatus)}
+          </span>
+        </div>
+
+        {minuteBookEntry.data ? (
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <KV label="Libro" value={minuteBookEntry.data.book_id.slice(0, 8)} />
+            <KV label="Sección" value={minuteBookEntry.data.section_id.slice(0, 8)} />
+            <KV label="Asiento" value={minuteBookEntry.data.ordinal_number} />
+          </dl>
+        ) : minuteBookEntry.error && effectiveBookDestinationStatus === "POSTED" ? (
+          <p className="mt-4 text-sm text-[var(--status-error)]">
+            El acta figura asentada, pero no se pudo recuperar su asiento persistido.
+          </p>
+        ) : null}
+
+        {effectiveBookDestinationStatus !== "RESOLVED" &&
+        effectiveBookDestinationStatus !== "POSTED" &&
+        (bookRoutingResult?.resolved === false || (bookRoutingIncidents.data ?? []).length > 0) ? (
+          <div
+            className="mt-4 border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-3 text-sm text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-md)" }}
+            role="alert"
+          >
+            Incidencia de destino: {String(bookRoutingResult?.reason ?? bookRoutingIncidents.data?.[0]?.incident_type ?? "REVIEW")}.
+            Configure una única sección activa para el órgano y el periodo antes de reintentar.
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {effectiveBookDestinationStatus !== "POSTED" &&
+          effectiveBookDestinationStatus !== "RESOLVED" ? (
+            <button
+              type="button"
+              onClick={handleResolveBookDestination}
+              disabled={resolveBookDestination.isPending}
+              aria-busy={resolveBookDestination.isPending}
+              className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-transparent px-3 py-2 text-sm font-medium text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] disabled:opacity-50"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {resolveBookDestination.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Resolver libro y sección
+            </button>
+          ) : null}
+          {effectiveBookDestinationStatus === "RESOLVED" ? (
+            <button
+              type="button"
+              onClick={handleRegisterBookEntry}
+              disabled={
+                registerBookEntry.isPending ||
+                !isAuthoritativelyApproved ||
+                !m.is_locked ||
+                !m.president_consent_evidence_id ||
+                !m.secretary_constancia_evidence_id
+              }
+              aria-busy={registerBookEntry.isPending}
+              className="inline-flex items-center gap-2 bg-[var(--g-brand-3308)] px-3 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:bg-[var(--g-surface-muted)] disabled:text-[var(--g-text-secondary)] disabled:opacity-100"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              {registerBookEntry.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Asentar acta aprobada
+            </button>
+          ) : null}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -572,7 +898,9 @@ export default function ActaDetalle() {
                   Contenido del acta
                 </h2>
               </div>
-              {isActaBorradorEditable(m) && !editingActa ? (
+              {isActaBorradorEditable(m) &&
+              legalGateStatus === "DRAFT" &&
+              !editingActa ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -586,7 +914,8 @@ export default function ActaDetalle() {
               ) : null}
             </div>
             <div className="p-6">
-              {actaValidationIssues.length > 0 || actaRrmIssues.length > 0 ? (
+              {legalGateStatus === "DRAFT" &&
+              (actaValidationIssues.length > 0 || actaRrmIssues.length > 0) ? (
                 <div
                   className="mb-4 flex items-start gap-3 border-l-4 border-[var(--status-error)] bg-[var(--g-surface-muted)] p-4 text-xs text-[var(--g-text-secondary)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
@@ -594,10 +923,20 @@ export default function ActaDetalle() {
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-error)]" />
                   <div>
                     <p className="font-semibold text-[var(--g-text-primary)]">
-                      Acta no preparada para firma
+                      Acta no preparada para aprobación
                     </p>
                     <p className="mt-1">{(actaValidationIssues[0] ?? actaRrmIssues[0])?.message}</p>
                   </div>
+                </div>
+              ) : legalGateStatus === "MANIFEST_READY" ? (
+                <div
+                  className="mb-4 flex items-start gap-3 border-l-4 border-[var(--status-success)] bg-[var(--g-sec-100)] p-4 text-xs text-[var(--g-text-secondary)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-success)]" />
+                  <span>
+                    Texto canónico compuesto y validado en servidor desde el censo, la asistencia, el orden del día y los resultados inmutables. Cualquier corrección exige reabrir los hechos fuente antes de crear el artefacto final.
+                  </span>
                 </div>
               ) : actaPuntos.length > 0 ? (
                 <div
@@ -869,11 +1208,16 @@ export default function ActaDetalle() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
-                {id && !m.signed_at ? (
+                {id && !isAuthoritativelyApproved ? (
                   <AprobarActaButton
                     minuteId={id}
                     userRole={primaryRole}
                     hasContent={Boolean(m.content && m.content.trim().length > 0)}
+                    legalGateStatus={legalGateStatus}
+                    finalLegalArtifactId={m.final_legal_artifact_id}
+                    bookDestinationStatus={effectiveBookDestinationStatus}
+                    disabledReason={approvalBookGateReason}
+                    onApproved={handleRegisterBookEntry}
                   />
                 ) : null}
                 {id && acta.entity_id ? (
@@ -882,9 +1226,21 @@ export default function ActaDetalle() {
                     entityId={acta.entity_id}
                     bodyId={acta.body_id}
                     agreementIds={certificationAgreementRefs}
+                    certifications={certs ?? []}
+                    minuteLegalGateStatus={legalGateStatus}
+                    bookDestinationStatus={effectiveBookDestinationStatus}
+                    minuteApprovalEvidenceMode={m.approval_evidence_mode}
+                    minuteApprovalSignatureClaim={m.approval_signature_claim}
+                    minuteApprovalCanonicalStatus={m.approval_canonical_status}
                     userRole={primaryRole}
                     entidadNombre={entity}
                     organoNombre={body}
+                    certifiedAgreementsText={acuerdosTexto}
+                    actaApprovalMethod={approvalMode ?? ""}
+                    actaApprovalDateISO={
+                      legalApprovalEffectiveAt ?? ""
+                    }
+                    legalEmissionDateISO={new Date().toISOString()}
                     disabledReason={certificationGateReason}
                   />
                 ) : null}
@@ -897,13 +1253,55 @@ export default function ActaDetalle() {
                     certificationAgreementRefs[0] ??
                     [c.agreement_id, ...(c.agreements_certified ?? [])].find(isUuidReference) ??
                     null;
-                  const certFallback = buildCertificationFallback({
-                    entity,
-                    body,
-                    content: c.content,
-                    agreementsCount: c.agreements_certified?.length ?? 0,
+                  const certSignaturePresentation = certificationSignatureForPresentation({
+                    legalGateStatus: c.legal_gate_status,
                     signatureStatus: c.signature_status,
                   });
+                  const certFallback = prependDemoSimulationNotice(
+                    buildCertificationFallback({
+                      entity,
+                      body,
+                      content: c.content,
+                      agreementsCount: c.agreements_certified?.length ?? 0,
+                      legalStatus: c.legal_gate_status,
+                    }),
+                    c.legal_gate_status,
+                  );
+                  const certifierAuthority = signingAuthorities.find(
+                    (authority) =>
+                      authority.id === c.authority_evidence_id &&
+                      authority.person_id === c.certifier_id,
+                  );
+                  const vistoBuenoAuthority = c.visto_bueno_persona_id
+                    ? signingAuthorities.find(
+                        (authority) =>
+                          matchesSigningBody(authority.body_id) &&
+                          authority.person_id === c.visto_bueno_persona_id &&
+                          (authority.cargo === "PRESIDENTE" || authority.cargo === "VICEPRESIDENTE"),
+                      )
+                    : null;
+                  const certificationEadSignatories = [
+                    certifierAuthority
+                      ? {
+                          name: certifierAuthority.person?.full_name ?? "",
+                          email: certifierAuthority.person?.email ?? "",
+                          personId: certifierAuthority.person_id,
+                          signerRole: "CERTIFICANTE" as const,
+                          authorityEvidenceId: certifierAuthority.id,
+                          sequence: 1,
+                        }
+                      : null,
+                    vistoBuenoAuthority
+                      ? {
+                          name: vistoBuenoAuthority.person?.full_name ?? "",
+                          email: vistoBuenoAuthority.person?.email ?? "",
+                          personId: vistoBuenoAuthority.person_id,
+                          signerRole: "VISTO_BUENO" as const,
+                          authorityEvidenceId: vistoBuenoAuthority.id,
+                          sequence: 2,
+                        }
+                      : null,
+                  ].filter((signer): signer is NonNullable<typeof signer> => signer !== null);
                   return (
                   <div key={c.id} className="p-5">
                     <div className="flex items-start justify-between">
@@ -912,36 +1310,53 @@ export default function ActaDetalle() {
                           Certificación #{c.id.slice(0, 8)}
                         </div>
                         <div className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-                          {c.agreements_certified?.length ?? 0} acuerdo(s) certificados ·
-                          {c.requires_qualified_signature ? " firma reforzada (demo)" : " firma simple"}
+                          {c.agreements_certified?.length ?? 0}{" "}
+                          {c.legal_gate_status === "DEMO_SIMULATION"
+                            ? "acuerdo(s) incluidos en la simulación"
+                            : "acuerdo(s) certificados"}{" "}
+                          ·
+                          {c.required_ead_signature_type
+                            ? " intervención EAD prevista"
+                            : " actuación EAD pendiente"}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <div className="flex flex-wrap justify-end gap-1.5">
                           <span
                             className={`px-2 py-0.5 text-[11px] font-medium ${
-                              c.signature_status === "SIGNED"
+                              c.legal_gate_status === "EMITTED" ||
+                              c.legal_gate_status === "INTERPOSITION_VERIFIED"
                                 ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                                 : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
                             }`}
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            Firma: {statusLabel(c.signature_status)}
+                            Estado jurídico: {c.legal_gate_status
+                              ? certificationLegalGateLabel(c.legal_gate_status)
+                              : "Sin clasificar"}
                           </span>
                           <span
                             className={`px-2 py-0.5 text-[11px] font-medium ${
-                              c.evidence_id
+                              c.legal_gate_status === "DEMO_SIMULATION"
+                                ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                                : c.final_legal_artifact_id
                                 ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
                                 : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
                             }`}
                             style={{ borderRadius: "var(--g-radius-sm)" }}
                           >
-                            {c.evidence_id ? "Evidencia demo/operativa vinculada" : "Evidencia operativa pendiente"}
+                            {c.legal_gate_status === "DEMO_SIMULATION" && c.final_legal_artifact_id
+                              ? "Artefacto histórico preservado · sin efecto jurídico"
+                              : c.final_legal_artifact_id
+                              ? "Artefacto final inmutable vinculado"
+                              : "Output y e-archivo EAD pendientes"}
                           </span>
                         </div>
-                        {c.signature_status === "SIGNED" && !c.evidence_id ? (
+                        {c.legal_gate_status === "DRAFT" ? (
                           <div className="max-w-[260px] text-right text-[11px] leading-relaxed text-[var(--g-text-secondary)]">
-                            Genere la certificación DOCX para vincular evidencia demo/operativa antes de continuar la tramitación. Pendiente de controles productivos de auditoría, conservación y legal hold.
+                            Genere el candidato DOCX, solicite la interposición EAD,
+                            recupere el output y e-archive ese resultado antes de
+                            registrar el artefacto final.
                           </div>
                         ) : null}
                         <ProcessDocxButton
@@ -949,7 +1364,10 @@ export default function ActaDetalle() {
                           input={{
                             kind: "CERTIFICACION",
                             recordId: c.id,
-                            title: "Certificación de acuerdos",
+                            title: canonicalDocumentTitle(
+                              c.content,
+                              "Certificación de acuerdos",
+                            ),
                             subtitle: entity,
                             entityName: entity,
                             templateTypes: ["CERTIFICACION"],
@@ -962,17 +1380,67 @@ export default function ActaDetalle() {
                               acuerdos_certificados_count: c.agreements_certified?.length ?? 0,
                               agreement_ids: c.agreements_certified ?? [],
                               certified_agreement_ids: c.agreements_certified ?? [],
-                              signature_status: c.signature_status,
+                              signature_status: c.legal_gate_status
+                                ? certSignaturePresentation.label
+                                : "Sin clasificar",
+                              firma_estado: c.legal_gate_status === "DEMO_SIMULATION"
+                                ? "SIMULACION_DEMO_SIN_EFECTOS_JURIDICOS"
+                                : certSignaturePresentation.status,
+                              efecto_juridico: c.legal_gate_status === "DEMO_SIMULATION"
+                                ? "SIMULACION_DEMO_SIN_EFECTOS_JURIDICOS"
+                                : "SEGUN_GATE_AUTORITATIVO",
+                              aviso_simulacion: c.legal_gate_status === "DEMO_SIMULATION"
+                                ? DEMO_SIMULATION_NO_LEGAL_EFFECT_NOTICE
+                                : "",
+                              legal_gate_status: c.legal_gate_status
+                                ? certificationLegalGateLabel(c.legal_gate_status)
+                                : "Sin clasificar",
                               certification_id: c.id,
                             },
                             templateCriteria: {
                               jurisdiction,
+                              organoTipo: "DERIVADO_DEL_ACTO",
                             },
                             preferredTemplateId: requestedTemplateType === "CERTIFICACION" ? requestedPlantillaId : null,
+                            reviewedBodyText:
+                              c.legal_gate_status === "DEMO_SIMULATION" ? null : c.content,
+                            preserveReviewedBodyExact:
+                              c.legal_gate_status !== "DEMO_SIMULATION",
+                            mandatoryVisibleNotice:
+                              c.legal_gate_status === "DEMO_SIMULATION"
+                                ? DEMO_SIMULATION_NO_LEGAL_EFFECT_NOTICE
+                                : null,
                             fallbackText: certFallback,
                             filenamePrefix: "certificacion",
+                            generatedAt: c.created_at.slice(0, 10),
+                            archive: false,
+                          }}
+                          disabledReason={
+                            c.legal_gate_status &&
+                            c.legal_gate_status !== "DRAFT" &&
+                            c.legal_gate_status !== "DEMO_SIMULATION"
+                              ? "El candidato ya está vinculado al ciclo autoritativo; recupere el binario final desde la evidencia EAD."
+                              : null
+                          }
+                          onGenerated={async (result) => {
+                            setCertificationCandidates((current) => ({
+                              ...current,
+                              [c.id]: result.candidate,
+                            }));
+                            await refetchCerts();
                           }}
                         />
+                        <div className="w-full max-w-[520px]">
+                          <EADInterpositionControl
+                            sourceDomain="CERTIFICATION"
+                            sourceId={c.id}
+                            domainContentHash={c.content_hash_sha256}
+                            candidate={certificationCandidates[c.id] ?? null}
+                            signatories={certificationEadSignatories}
+                            label={`certificación ${c.id.slice(0, 8)}`}
+                            isDemoSimulation={c.legal_gate_status === "DEMO_SIMULATION"}
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -1011,26 +1479,35 @@ export default function ActaDetalle() {
           >
             <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] px-5 py-3">
               <Shield className="h-4 w-4 text-[var(--g-brand-3308)]" />
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Firma y registro</h2>
+              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Aprobación y registro</h2>
             </div>
             <div className="space-y-3 p-5 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[var(--g-text-secondary)]">Estado</span>
-                {m.signed_at && m.is_locked ? (
+                {isAuthoritativelyApproved && m.is_locked ? (
                   <span
                     className="inline-flex items-center gap-1 bg-[var(--status-success)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
                     <Lock className="h-3 w-3" />
-                    Firmada y cerrada
+                    Aprobada con evidencia EAD
                   </span>
-                ) : m.signed_at ? (
+                ) : legalGateStatus === "ARTIFACT_FINAL" ? (
                   <span
                     className="inline-flex items-center gap-1 bg-[var(--status-info)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
                     <Lock className="h-3 w-3" />
-                    Firmada
+                    Artefacto final pendiente de aprobación
+                  </span>
+                ) : legalGateStatus === "DEMO_SIMULATION" ||
+                  legalGateStatus === "LEGACY_REVIEW" ? (
+                  <span
+                    className="inline-flex items-center gap-1 bg-[var(--status-warning)] px-2 py-0.5 text-[11px] font-medium text-[var(--g-text-inverse)]"
+                    style={{ borderRadius: "var(--g-radius-sm)" }}
+                  >
+                    <Unlock className="h-3 w-3" />
+                    {minuteLegalGateLabel(legalGateStatus)}
                   </span>
                 ) : (
                   <span
@@ -1038,12 +1515,30 @@ export default function ActaDetalle() {
                     style={{ borderRadius: "var(--g-radius-sm)" }}
                   >
                     <Unlock className="h-3 w-3" />
-                    Borrador
+                    {minuteLegalGateLabel(legalGateStatus)}
                   </span>
                 )}
               </div>
-              <KV label="Firmada" value={m.signed_at ? new Date(m.signed_at).toLocaleString("es-ES") : "—"} />
-              <KV label="Registrada" value={m.registered_at ? new Date(m.registered_at).toLocaleString("es-ES") : "—"} />
+              <KV
+                label="Aprobación efectiva"
+                value={legalApprovalEffectiveAt
+                  ? new Date(legalApprovalEffectiveAt).toLocaleString("es-ES")
+                  : "—"}
+              />
+              <KV label="Sistema" value={approvalMode ?? "—"} />
+              <KV
+                label="Artefacto final"
+                value={m.final_legal_artifact_id
+                  ? m.final_legal_artifact_id.slice(0, 8)
+                  : "—"}
+              />
+              <KV
+                label="Consentimiento y constancia EAD"
+                value={m.president_consent_evidence_id && m.secretary_constancia_evidence_id
+                  ? "Presidencia y Secretaría"
+                  : "Pendientes"}
+              />
+              <KV label="Libro" value={statusLabel(effectiveBookDestinationStatus)} />
               <KV label="Creada" value={new Date(m.created_at).toLocaleString("es-ES")} />
             </div>
           </div>

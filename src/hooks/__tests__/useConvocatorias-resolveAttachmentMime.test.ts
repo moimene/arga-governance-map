@@ -72,14 +72,10 @@ describe("resolveAttachmentMime", () => {
       );
     });
 
-    it("XLSX: tipo='' + extension xlsx → MIME canónico Excel", () => {
-      expect(resolveAttachmentMime({ name: "cuentas.xlsx", type: "" })).toBe(
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      );
-    });
-
-    it("JPEG: tipo='' + extension jpg → image/jpeg", () => {
-      expect(resolveAttachmentMime({ name: "foto.jpg", type: "" })).toBe("image/jpeg");
+    it("rechaza formatos que el bucket matter-documents no admite", () => {
+      expect(() => resolveAttachmentMime({ name: "cuentas.xlsx", type: "" })).toThrow(/no admitida/i);
+      expect(() => resolveAttachmentMime({ name: "foto.jpg", type: "" })).toThrow(/no admitida/i);
+      expect(() => resolveAttachmentMime({ name: "notas.txt", type: "text/plain" })).toThrow(/no permitido/i);
     });
 
     it("Extensión en mayúsculas: PDF → application/pdf", () => {

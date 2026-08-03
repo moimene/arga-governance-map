@@ -17,12 +17,14 @@ export default function ComunicacionDetalle() {
     organo_tipo: string;
     estado: string;
     tipo_comunicacion: string;
+    nivel_certificacion_minimo: string | null;
     cuerpo_render: string;
     tiene_rebotes: boolean;
     entity_id: string | null;
     body_id: string | null;
     meeting_id: string | null;
     agreement_id: string | null;
+    metadata?: Record<string, unknown> | null;
     communication_recipients?: Array<{
       id: string;
       canal_original: string;
@@ -44,6 +46,26 @@ export default function ComunicacionDetalle() {
 
   const recipients = c.communication_recipients ?? [];
   const attachments = c.communication_attachments ?? [];
+  const metadata = c.metadata ?? {};
+  const eadService = metadata.ead_service && typeof metadata.ead_service === 'object'
+    ? metadata.ead_service as Record<string, unknown>
+    : null;
+  const source = metadata.source && typeof metadata.source === 'object'
+    ? metadata.source as Record<string, unknown>
+    : null;
+  const isEadInterpositionDraft = eadService?.mode === 'EAD_INTERPOSITION';
+  const isLegacyErds = [
+    c.nivel_certificacion_minimo,
+    ...recipients.flatMap((recipient) => [
+      recipient.canal_original,
+      recipient.canal_primario,
+      recipient.canal_usado,
+    ]),
+  ].some((channel) => ['ERDS', 'BUROFAX_ERDS'].includes((channel ?? '').trim().toUpperCase()));
+  const noSessionSourceId = source?.domain === 'NO_SESSION_RESOLUTION'
+    && typeof source.id === 'string'
+    ? source.id
+    : null;
 
   return (
     <div className="p-6 space-y-6">
@@ -58,14 +80,52 @@ export default function ComunicacionDetalle() {
         </p>
       </header>
 
+      {isEadInterpositionDraft ? (
+        <section
+          className="border border-[var(--status-info)] bg-[var(--g-surface-subtle)] p-4"
+          style={{ borderRadius: 'var(--g-radius-md)' }}
+          role="status"
+        >
+          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+            Interposición EAD registrada como borrador
+          </h2>
+          <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
+            No existe envío, programación, firma, ERDS, entrega ni interacción acreditada con el proveedor.
+            El canal EMAIL_NORMAL es únicamente un campo físico neutro y no está activado.
+          </p>
+        </section>
+      ) : isLegacyErds ? (
+        <section
+          className="border border-[var(--status-warning)] bg-[var(--g-surface-muted)] p-4"
+          style={{ borderRadius: 'var(--g-radius-md)' }}
+          role="status"
+        >
+          <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">Registro ERDS histórico · solo lectura</h2>
+          <p className="mt-1 text-sm text-[var(--g-text-secondary)]">
+            Este código se conserva por trazabilidad. Está excluido del dispatcher y no puede reutilizarse en nuevas capturas.
+          </p>
+        </section>
+      ) : null}
+
       {/* Origen — trazabilidad bidireccional al acto de origen */}
-      {(c.meeting_id || c.agreement_id || c.entity_id) && (
+      {(c.meeting_id || c.agreement_id || c.entity_id || noSessionSourceId) && (
         <section
           className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-4"
           style={{ borderRadius: 'var(--g-radius-md)' }}
         >
           <h2 className="text-lg font-medium text-[var(--g-text-primary)] mb-2">Origen</h2>
           <ul className="text-sm space-y-1">
+            {noSessionSourceId && (
+              <li className="text-[var(--g-text-secondary)]">
+                Acuerdo sin sesión:{' '}
+                <Link
+                  to={`/secretaria/acuerdos-sin-sesion/${noSessionSourceId}`}
+                  className="text-[var(--g-link)] hover:underline"
+                >
+                  Ver votación de origen
+                </Link>
+              </li>
+            )}
             {c.meeting_id && (
               <li className="text-[var(--g-text-secondary)]">
                 Reunión:{' '}
@@ -139,11 +199,17 @@ export default function ComunicacionDetalle() {
               {recipients.map((r) => {
                 const isFallback =
                   r.canal_usado && r.canal_usado !== r.canal_original;
+                const isLegacyRecipient = [r.canal_original, r.canal_primario, r.canal_usado]
+                  .some((channel) => ['ERDS', 'BUROFAX_ERDS'].includes((channel ?? '').trim().toUpperCase()));
                 return (
                   <tr key={r.id}>
                     <td className="px-4 py-2 text-[var(--g-text-secondary)]">{r.destino_primario}</td>
                     <td className="px-4 py-2 text-[var(--g-text-secondary)]">
-                      {r.canal_usado ?? r.canal_primario}
+                      {isEadInterpositionDraft
+                        ? 'Interposición EAD · borrador sin transporte'
+                        : isLegacyRecipient
+                          ? 'ERDS histórico · solo lectura'
+                          : r.canal_usado ?? r.canal_primario}
                       {isFallback && (
                         <span className="ml-2 text-xs text-[var(--status-warning)]">(fallback)</span>
                       )}
@@ -171,7 +237,9 @@ export default function ComunicacionDetalle() {
                       {r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es') : '—'}
                     </td>
                     <td className="px-4 py-2">
-                      {(r.estado_entrega === 'ERROR' || r.estado_entrega === 'REBOTADO') && (
+                      {!isEadInterpositionDraft
+                        && !isLegacyRecipient
+                        && (r.estado_entrega === 'ERROR' || r.estado_entrega === 'REBOTADO') && (
                         <button
                           type="button"
                           onClick={() => retry.mutate(r.id)}

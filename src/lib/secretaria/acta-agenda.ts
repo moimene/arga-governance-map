@@ -7,6 +7,8 @@ import {
   type AgendaItemResolutionKind,
   type AgendaReportAcceptanceVote,
 } from "@/lib/rules-engine";
+import { labelMateria } from "@/lib/secretaria/agenda-materias";
+import { isSubstantiveResolutionText } from "@/lib/secretaria/meeting-agenda";
 
 export interface ActaAgendaItemRow {
   id: string;
@@ -48,6 +50,15 @@ export interface ActaAgreementRow {
   parent_meeting_id?: string | null;
   agenda_item_id?: string | null;
   status?: string | null;
+  proposal_text?: string | null;
+  decision_text?: string | null;
+}
+
+export interface ActaAgendaDebateRow {
+  punto?: string | null;
+  notas?: string | null;
+  source_id?: string | null;
+  source_index?: number | null;
 }
 
 export interface ActaVoteResult {
@@ -99,6 +110,7 @@ export interface ActaAgendaItemViewModel {
   status: string | null;
   resolution_text: string | null;
   agreement_id: string | null;
+  deliberation: string | null;
   decisorio: ActaDecisionViewModel | null;
   constancia: ActaConstanciaViewModel | null;
 }
@@ -108,6 +120,8 @@ export interface ActaAgendaViewModelInput {
   resolutions?: ActaMeetingResolutionRow[];
   constancias?: ActaAgendaConstanciaRow[];
   snapshots?: MeetingAdoptionSnapshot[];
+  debates?: ActaAgendaDebateRow[];
+  agreementRows?: ActaAgreementRow[];
 }
 
 export interface ActaLegalStructureIssue {
@@ -293,6 +307,24 @@ export function buildActaAgendaViewModel(input: ActaAgendaViewModelInput): ActaA
     snapshotsByOrder.set(snapshot.agenda_item_index, snapshot);
   }
 
+  const agreementsById = new Map<string, ActaAgreementRow>();
+  for (const agreement of input.agreementRows ?? []) {
+    agreementsById.set(agreement.id, agreement);
+  }
+
+  const debatesByItem = new Map<string, ActaAgendaDebateRow>();
+  const debatesByOrder = new Map<number, ActaAgendaDebateRow>();
+  const debatesByTitle = new Map<string, ActaAgendaDebateRow>();
+  for (const debate of input.debates ?? []) {
+    const sourceId = normalizeString(debate.source_id);
+    if (sourceId) debatesByItem.set(sourceId, debate);
+    if (typeof debate.source_index === "number") {
+      debatesByOrder.set(debate.source_index, debate);
+    }
+    const title = normalizeString(debate.punto).toLocaleLowerCase("es");
+    if (title) debatesByTitle.set(title, debate);
+  }
+
   return [...input.agendaItems]
     .sort((a, b) => a.order_number - b.order_number)
     .map((item, index) => {
@@ -307,14 +339,26 @@ export function buildActaAgendaViewModel(input: ActaAgendaViewModelInput): ActaA
         ? normalizeResolutionKind(resolution.kind_resolution) ?? resolutionKindForAgendaItem(kind)
         : null;
       const agreementId = resolution?.agreement_id ?? snapshot?.agreement_id ?? null;
-      const resolutionText = resolution?.resolution_text ?? snapshot?.resolution_text ?? null;
+      const agreement = agreementId ? agreementsById.get(agreementId) ?? null : null;
+      const resolutionText =
+        normalizeString(agreement?.decision_text) ||
+        normalizeString(resolution?.resolution_text) ||
+        normalizeString(agreement?.proposal_text) ||
+        normalizeString(snapshot?.resolution_text) ||
+        null;
       const status = resolution?.status ?? snapshot?.status_resolucion ?? null;
+      const debate =
+        debatesByItem.get(item.id) ??
+        debatesByOrder.get(item.order_number) ??
+        debatesByTitle.get(item.title.trim().toLocaleLowerCase("es")) ??
+        null;
+      const deliberation = normalizeString(debate?.notas) || null;
       const decisorio =
         kind === "DECISORIO"
           ? {
               agreementId,
-              proposedText: item.description ?? item.title,
-              adoptedText: resolutionText ?? item.title,
+              proposedText: agreement?.proposal_text ?? item.description ?? "",
+              adoptedText: resolutionText ?? "",
               status,
               kindResolution,
               voteResult: voteResultForSnapshot(snapshot),
@@ -349,6 +393,7 @@ export function buildActaAgendaViewModel(input: ActaAgendaViewModelInput): ActaA
         status,
         resolution_text: resolutionText,
         agreement_id: agreementId,
+        deliberation,
         decisorio,
         constancia,
       };
@@ -436,6 +481,15 @@ export function validateActaLegalStructure(
   for (const point of input.puntos) {
     if (point.kind === "DECISORIO") {
       if (point.status === "ADOPTED") {
+        const adoptedText = point.decisorio?.adoptedText.trim() ?? "";
+        if (!isSubstantiveResolutionText(point.title, adoptedText)) {
+          addIssue(
+            blockingIssues,
+            "adopted_decision_without_resolutive_text",
+            "El punto aprobado necesita un texto resolutivo completo, distinto del título del orden del día.",
+            point.order_number,
+          );
+        }
         if (!point.decisorio?.voteResult) {
           addIssue(
             blockingIssues,
@@ -512,6 +566,7 @@ export function buildCanonicalMinutesPayload(params: {
       title: point.title,
       kind: point.kind,
       requires_vote: point.requiresVote,
+      deliberation: point.deliberation,
       decision: point.decisorio
         ? {
             agreement_id: point.decisorio.agreementId,
@@ -558,26 +613,47 @@ export async function computeCanonicalMinutesHash(params: {
   return sha256Hex(canonicalJson(buildCanonicalMinutesPayload(params)));
 }
 
+export function formatActaVoteWeight(value: number) {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(value);
+}
+
+export function formatActaMajorityApplied(value: string) {
+  const [matter, rule] = value.split(":");
+  if (!rule) return value.split("_").join(" ").toLocaleLowerCase("es-ES");
+  const ruleLabel: Record<string, string> = {
+    ORDINARIA: "mayoría ordinaria",
+    ESTATUTARIA: "mayoría reforzada estatutaria",
+    ESTRUCTURAL: "mayoría reforzada estructural",
+    SIMPLE: "mayoría simple",
+    ABSOLUTA: "mayoría absoluta",
+  };
+  const majority = ruleLabel[rule] ?? rule.split("_").join(" ").toLocaleLowerCase("es-ES");
+  return `${majority} para ${labelMateria(matter).toLocaleLowerCase("es-ES")}`;
+}
+
 export function renderActaAgendaItemsText(puntos: ActaAgendaItemViewModel[]) {
   return puntos
     .map((point) => {
       const lines = [`${point.order_number}. ${point.title}`];
       if (point.kind === "DECISORIO") {
+        if (point.deliberation) {
+          lines.push(`   Deliberación: ${point.deliberation}`);
+        }
         const status = point.status === "ADOPTED" ? "APROBADO" : point.status === "REJECTED" ? "RECHAZADO" : "PENDIENTE";
         lines.push(`   Resultado de votación: ${status}.`);
         if (point.decisorio?.majorityApplied) {
-          lines.push(`   Mayoría aplicada: ${point.decisorio.majorityApplied}.`);
+          lines.push(`   Mayoría aplicada: ${formatActaMajorityApplied(point.decisorio.majorityApplied)}.`);
         }
         if (point.decisorio?.voteResult) {
           const vote = point.decisorio.voteResult;
           lines.push(
-            `   Votos: a favor ${vote.favor}, en contra ${vote.contra}, abstenciones ${vote.abstenciones}, excluidos por conflicto ${vote.excluidoConflicto}.`,
+            `   Votos: a favor ${formatActaVoteWeight(vote.favor)}, en contra ${formatActaVoteWeight(vote.contra)}, abstenciones ${formatActaVoteWeight(vote.abstenciones)}, excluidos por conflicto ${formatActaVoteWeight(vote.excluidoConflicto)}.`,
           );
         }
         if (point.decisorio?.proclamation) {
           lines.push(`   ${point.decisorio.proclamation}`);
         }
-        lines.push(`   Acuerdo adoptado: ${point.decisorio?.adoptedText ?? point.resolution_text ?? point.title}`);
+        lines.push(`   Acuerdo adoptado: ${point.decisorio?.adoptedText ?? point.resolution_text ?? ""}`);
       } else {
         lines.push(`   Constancia: ${point.constancia?.text ?? defaultConstanciaText(point.kind, point.title)}`);
         if (point.constancia?.acceptanceMode === "ASSENT") {
@@ -588,5 +664,29 @@ export function renderActaAgendaItemsText(puntos: ActaAgendaItemViewModel[]) {
       }
       return lines.join("\n");
     })
-    .join("\n");
+    .join("\n\n");
+}
+
+const CERTIFICATION_ORDINALS = [
+  "PRIMERO",
+  "SEGUNDO",
+  "TERCERO",
+  "CUARTO",
+  "QUINTO",
+  "SEXTO",
+  "SÉPTIMO",
+  "OCTAVO",
+  "NOVENO",
+  "DÉCIMO",
+] as const;
+
+/** Transcripción certificable: solo acuerdos adoptados y con ordinal jurídico estable. */
+export function renderCertifiedAgreementsText(puntos: ActaAgendaItemViewModel[]) {
+  return puntos
+    .filter((point) => point.kind === "DECISORIO" && point.status === "ADOPTED")
+    .map((point, index) => {
+      const ordinal = CERTIFICATION_ORDINALS[index] ?? `${index + 1}`;
+      return `${ordinal}.- ${point.decisorio?.adoptedText ?? point.resolution_text ?? ""}`;
+    })
+    .join("\n\n");
 }

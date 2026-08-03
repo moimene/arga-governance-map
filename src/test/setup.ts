@@ -65,7 +65,16 @@ try {
   // Native Bun can load Vitest-style tests without Vitest's hoist helper.
 }
 
-const testExpect = (globalThis as { expect?: { extend?: (value: unknown) => void } }).expect;
+type ExtendableExpect = { extend?: (value: unknown) => void };
+
+let testExpect = (globalThis as { expect?: ExtendableExpect }).expect;
+if (!testExpect?.extend) {
+  try {
+    testExpect = (require("bun:test") as { expect?: ExtendableExpect }).expect;
+  } catch {
+    // Vitest exposes `expect` globally; Bun exposes it through `bun:test`.
+  }
+}
 if (testExpect?.extend) {
   testExpect.extend(matchers);
 }

@@ -1,20 +1,134 @@
 import { describe, expect, it } from "vitest";
 import type { TipoOrgano } from "@/lib/rules-engine";
 import {
+  AGENDA_INFORMATIVE_MATERIAS,
   AGENDA_MATERIAS,
   ALL_ORGANOS,
   MATERIA_ORGANOS,
   MATERIAS_LIBRES,
+  agendaItemsForDecisionEngine,
+  agendaMateriaSelectionForKind,
   agendaMateriaGroups,
+  isMateriaInformativa,
   isMateriaCompatibleWithOrgano,
   labelMateria,
   materiaDefaultForOrgano,
   resolveMateriaAlias,
+  resolveMateriaPresentationAlias,
 } from "@/lib/secretaria/agenda-materias";
 
 const ORGANOS: TipoOrgano[] = ["JUNTA_GENERAL", "CONSEJO", "COMISION_DELEGADA"];
 
 describe("agenda-materias — catálogo canónico materia × órgano", () => {
+  it("separa las dos categorías informativas del catálogo de acuerdos", () => {
+    expect(AGENDA_INFORMATIVE_MATERIAS).toEqual([
+      {
+        value: "INFORME_DIRECCION_GENERAL_MARCHA_SOCIEDAD",
+        label: "Informe de la Dirección General sobre la marcha de la sociedad",
+      },
+      {
+        value: "INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO",
+        label: "Informe de gobierno corporativo y cumplimiento",
+      },
+    ]);
+    for (const materia of AGENDA_INFORMATIVE_MATERIAS) {
+      expect(isMateriaInformativa(materia.value)).toBe(true);
+      expect(AGENDA_MATERIAS.some((candidate) => candidate.value === materia.value)).toBe(false);
+      expect(labelMateria(materia.value)).toBe(materia.label);
+      expect(MATERIA_ORGANOS[materia.value]).toEqual(ALL_ORGANOS);
+    }
+  });
+
+  it("al cambiar a INFORMATIVO sustituye una materia decisoria por la categoría visible por defecto", () => {
+    expect(
+      agendaMateriaSelectionForKind({
+        kind: "INFORMATIVO",
+        currentMateria: "APROBACION_PLAN_NEGOCIO",
+        organoTipo: "CONSEJO",
+      }),
+    ).toEqual({
+      materia: "INFORME_DIRECCION_GENERAL_MARCHA_SOCIEDAD",
+      tipo: "ORDINARIA",
+      inscribible: false,
+    });
+  });
+
+  it("conserva una categoría informativa elegida y nunca la reutiliza al volver a DECISORIO", () => {
+    expect(
+      agendaMateriaSelectionForKind({
+        kind: "DELIBERATIVO",
+        currentMateria: "INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO",
+        organoTipo: "CONSEJO",
+      }).materia,
+    ).toBe("INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO");
+
+    const decisoria = agendaMateriaSelectionForKind({
+      kind: "DECISORIO",
+      currentMateria: "INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO",
+      organoTipo: "CONSEJO",
+    });
+    expect(decisoria.materia).toBe("APROBACION_PLAN_NEGOCIO");
+    expect(isMateriaInformativa(decisoria.materia)).toBe(false);
+  });
+
+  it("el boundary del motor deja fuera toda categoría no decisoria", () => {
+    const items = [
+      { kind: "INFORMATIVO" as const, materia: "INFORME_DIRECCION_GENERAL_MARCHA_SOCIEDAD" },
+      { kind: "DELIBERATIVO" as const, materia: "INFORME_GOBIERNO_CORPORATIVO_CUMPLIMIENTO" },
+      { kind: "DECISORIO" as const, materia: "FORMULACION_CUENTAS" },
+      { materia: "APROBACION_PLAN_NEGOCIO" },
+    ];
+    expect(agendaItemsForDecisionEngine(items).map((item) => item.materia)).toEqual([
+      "FORMULACION_CUENTAS",
+    ]);
+  });
+
+  it("ofrece PODER_REPRESENTACION al Consejo sin confundirlo con delegación orgánica", () => {
+    const poder = AGENDA_MATERIAS.find((materia) => materia.value === "PODER_REPRESENTACION");
+
+    expect(poder).toMatchObject({
+      label: "Otorgamiento o modificación de poderes de representación",
+      tipo: "ORDINARIA",
+      inscribible: true,
+    });
+    expect(MATERIA_ORGANOS.PODER_REPRESENTACION).toContain("CONSEJO");
+  });
+
+  it("separa la representación del socio único en la filial del art. 212 bis LSC", () => {
+    const materia = AGENDA_MATERIAS.find(
+      (candidate) => candidate.value === "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+    );
+
+    expect(materia).toMatchObject({
+      label: "Designación de representante de la socia única en la filial",
+      tipo: "ORDINARIA",
+      inscribible: false,
+    });
+    expect(materia?.label).not.toMatch(/administradora|persona jurídica|212 bis/i);
+    expect(MATERIA_ORGANOS.DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL).toEqual([
+      "CONSEJO",
+    ]);
+    expect(
+      isMateriaCompatibleWithOrgano(
+        "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+        "COMISION_DELEGADA",
+      ),
+    ).toBe(false);
+  });
+
+  it("mantiene la representación genérica legacy como identidad distinta", () => {
+    expect(
+      AGENDA_MATERIAS.find(
+        (candidate) => candidate.value === "NOMBRAMIENTO_REPRESENTANTE_FILIAL",
+      ),
+    ).toMatchObject({
+      label: "Designación de representante de la sociedad en filial o participada",
+    });
+    expect(
+      resolveMateriaAlias("NOMBRAMIENTO_REPRESENTANTE_FILIAL"),
+    ).toBe("NOMBRAMIENTO_REPRESENTANTE_FILIAL");
+  });
+
   it("todas las materias del catálogo tienen mapeo explícito de órganos", () => {
     const sinMapeo = AGENDA_MATERIAS.filter((m) => !MATERIA_ORGANOS[m.value]);
     expect(sinMapeo.map((m) => m.value)).toEqual([]);
@@ -64,17 +178,20 @@ describe("agenda-materias — catálogo canónico materia × órgano", () => {
     expect(labelMateria("MATERIA_LEGACY_DESCONOCIDA")).toBe("Materia legacy desconocida");
   });
 
-  it("colapsa aliases solo en presentación y usa el rótulo conjunto del art. 308", () => {
+  it("separa el alias de presentación del art. 308 de la identidad funcional", () => {
     expect(resolveMateriaAlias("AMPLIACION_CAPITAL")).toBe("AUMENTO_CAPITAL");
     expect(labelMateria("AMPLIACION_CAPITAL")).toBe("Aumento de capital");
     expect(resolveMateriaAlias("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
+      "EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE",
+    );
+    expect(resolveMateriaPresentationAlias("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
       "SUPRESION_PREFERENTE",
     );
     expect(labelMateria("EXCLUSION_DERECHO_SUSCRIPCION_PREFERENTE")).toBe(
-      "Exclusión o supresión del derecho de preferencia",
+      "Exclusión del derecho de preferencia —supresión total o parcial—",
     );
     expect(labelMateria("SUPRESION_PREFERENTE", "Supresión del derecho preferente")).toBe(
-      "Exclusión o supresión del derecho de preferencia",
+      "Exclusión del derecho de preferencia —supresión total o parcial—",
     );
   });
 

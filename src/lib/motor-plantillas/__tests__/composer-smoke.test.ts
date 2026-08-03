@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import JSZip from "jszip";
 import { buildSecretariaDocumentGenerationRequest } from "@/lib/secretaria/document-generation-boundary";
 import { LEGAL_TEAM_TEMPLATE_FIXTURES } from "@/lib/secretaria/legal-template-fixtures";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
@@ -13,6 +14,13 @@ function fixture(id: string): PlantillaProtegidaRow {
   const template = LEGAL_TEAM_TEMPLATE_FIXTURES.find((item) => item.id === id);
   if (!template) throw new Error(`Fixture no encontrada: ${id}`);
   return template;
+}
+
+async function documentXml(buffer: Uint8Array) {
+  const zip = await JSZip.loadAsync(buffer);
+  const file = zip.file("word/document.xml");
+  if (!file) throw new Error("word/document.xml no encontrado");
+  return file.async("string");
 }
 
 function normativeSnapshot(): AgreementNormativeSnapshot {
@@ -108,6 +116,8 @@ async function smoke(
       fecha: "2026-06-01",
       presidente: "Antonio Rios",
       secretario: "Lucia Paredes",
+      metodo_aprobacion_acta: "aprobación por la Secretaría con el visto bueno de la Presidencia",
+      fecha_aprobacion_acta: "2 de junio de 2026",
       resultado_gate: "CONFORME",
       resultado_evaluacion: "Sin incidencias bloqueantes.",
       snapshot_hash: "hash-demo",
@@ -129,6 +139,63 @@ async function smoke(
 }
 
 describe("motor-plantillas composer smoke", () => {
+  it("registra el borrador UNSIGNED como archivado, nunca como firmado por el sistema", async () => {
+    const template = fixture("legal-fixture-convocatoria-consejo-es");
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "CONVOCATORIA",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      convocatoriaId: "conv-unsigned-archive",
+      agreementIds: [AGREEMENT_ID],
+      templateId: template.id,
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+    let capturedMetadata: Record<string, unknown> | null = null;
+
+    const result = await composeDocument(
+      request,
+      {
+        lugar: "Madrid",
+        fecha_primera_convocatoria: "2026-06-01",
+        hora_primera_convocatoria: "10:00",
+        orden_dia_texto: "Aprobacion de cuentas",
+        firma_organo_administracion: "El Presidente",
+      },
+      {
+        plantilla: template,
+        resolveCapa2: false,
+        archiveDraft: true,
+        generatedAt: "2026-05-03",
+        archiveAdapter: async ({ metadata }) => {
+          capturedMetadata = metadata;
+          return {
+            ok: true,
+            documentUrl: "evidence-bundle://unsigned-input.docx",
+            hash512: "a".repeat(128),
+            evidenceBundleId: "bundle-unsigned-input",
+          };
+        },
+        baseVariables: {
+          denominacion_social: "ARGA Seguros, S.A.",
+          cif: "A00000000",
+          domicilio_social: "Madrid",
+          registro_mercantil: "Madrid",
+          organo_nombre: "Consejo de Administracion",
+          fecha: "2026-06-01",
+          presidente: "Antonio Rios",
+          secretario: "Lucia Paredes",
+        },
+      },
+    );
+
+    expect(result.archive.archived).toBe(true);
+    expect(capturedMetadata).toMatchObject({
+      archivedBy: "SISTEMA",
+      archivedBufferKind: "ORIGINAL_DOCX",
+    });
+    expect(capturedMetadata).not.toHaveProperty("signedBy");
+  });
+
   it("incluye el marco normativo societario en la traza post-render", async () => {
     const template = fixture("legal-fixture-convocatoria-consejo-es");
     const request = await buildSecretariaDocumentGenerationRequest({
@@ -419,6 +486,44 @@ describe("motor-plantillas composer smoke", () => {
 
     // ITEM-073: el fixture de certificación se restituyó con tildes correctas.
     expect(result.renderedText).toContain("CERTIFICACIÓN");
+  });
+
+  it("permite excluir la hoja técnica Capa 3 del documento final", async () => {
+    const template = fixture("legal-fixture-certificacion-es");
+    const request = await buildSecretariaDocumentGenerationRequest({
+      documentType: "CERTIFICACION",
+      tenantId: TENANT_ID,
+      entityId: ENTITY_ID,
+      agreementIds: [AGREEMENT_ID],
+      certificationId: "cert-final",
+      templateId: template.id,
+      requestedAt: "2026-05-03T10:00:00.000Z",
+    });
+    const result = await composeDocument(
+      request,
+      {
+        nombre_certificante: "Lucia Paredes",
+        cargo_certificante: "Secretaria",
+        ciudad_emision: "Madrid",
+        fecha_emision: "2026-06-02",
+        transcripcion_acuerdos: "Se certifica el acuerdo adoptado.",
+      },
+      {
+        plantilla: template,
+        resolveCapa2: false,
+        archiveDraft: false,
+        includeEditableFields: false,
+        generatedAt: "2026-05-03",
+        baseVariables: {
+          denominacion_social: "ARGA Seguros, S.A.",
+          fecha: "2026-06-01",
+          metodo_aprobacion_acta: "aprobación por la Secretaría con el visto bueno de la Presidencia",
+          fecha_aprobacion_acta: "2 de junio de 2026",
+        },
+      },
+    );
+
+    expect(await documentXml(result.docxBuffer)).not.toContain("CAMPOS EDITABLES");
   });
 
   it("genera INFORME_PRECEPTIVO sin variables huerfanas", async () => {

@@ -36,7 +36,11 @@ function transitionProbe(operationId: string) {
 
 describe("Oleada 3A — fn_secretaria_transition_template_state", () => {
   const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      storageKey: "test-secretaria-template-transition-anon",
+    },
   });
 
   it("existe con la firma completa y deniega EXECUTE al rol anon", async () => {
@@ -86,7 +90,11 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
   beforeAll(async () => {
     try {
       client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          storageKey: "test-secretaria-template-transition-auth",
+        },
       });
       const { error } = await client.auth.signInWithPassword({
         email: DEMO_EMAIL,
@@ -102,7 +110,7 @@ describe("Oleada 3A — RBAC servidor de la transición atómica", () => {
 
   afterAll(async () => {
     try {
-      await client?.auth.signOut();
+      await client?.auth.signOut({ scope: "local" });
     } catch {
       // El cierre de sesión no altera el contrato de autorización probado.
     }

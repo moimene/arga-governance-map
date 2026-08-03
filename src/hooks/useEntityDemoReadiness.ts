@@ -64,7 +64,7 @@ export function useEntityDemoReadiness(entityId: string | null | undefined) {
       const meetingsRes = bodyIds.length > 0
         ? await supabase
             .from("meetings")
-            .select("id")
+            .select("id, status")
             .eq("tenant_id", tenantId!)
             .in("body_id", bodyIds)
         : { data: [], error: null };
@@ -74,7 +74,7 @@ export function useEntityDemoReadiness(entityId: string | null | undefined) {
       const censusRes = meetingIds.length > 0
         ? await supabase
             .from("censo_snapshot")
-            .select("id")
+            .select("id, meeting_id")
             .eq("tenant_id", tenantId!)
             .in("meeting_id", meetingIds)
         : { data: [], error: null };

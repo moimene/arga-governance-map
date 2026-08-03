@@ -87,6 +87,20 @@ export interface ComplianceResult {
   status: string;
 }
 
+/**
+ * El motor puede no emitir la regla `inscribible` en un fallback parcial. En
+ * ese caso se conserva el dato canónico materializado en `agreements`; usar
+ * `Array.some(...) ?? fallback` convertía la ausencia de regla en `false`.
+ */
+export function resolveAgreementInscribable(
+  persistedInscribable: boolean,
+  explain?: Array<{ regla?: string | null; valor?: string | number | null }> | null,
+) {
+  const explicit = explain?.find((entry) => entry.regla === "inscribible");
+  if (!explicit) return persistedInscribable;
+  return explicit.valor === 1 || String(explicit.valor).toLocaleLowerCase("es") === "true";
+}
+
 export interface AgreementFull {
   id: string;
   tenant_id: string;
@@ -554,7 +568,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
   const votEtapa = result.etapas.find((e) => e.etapa === "votacion");
   const postEtapa = result.etapas.find((e) => e.etapa === "postAcuerdo");
 
-  const inscribable = postEtapa?.explain.some((e) => e.regla === "inscribible" && e.valor === "true") ?? a.inscribable;
+  const inscribable = resolveAgreementInscribable(a.inscribable, postEtapa?.explain);
   const gates = [
     ...(agendaBoundary ? [gateFromEvaluation(agendaBoundary, { kind: "routing", label: "Punto del orden del día" })] : []),
     ...result.etapas.map((etapa) => gateFromEvaluation(etapa)),
@@ -575,7 +589,7 @@ async function evaluateV2(a: AgreementWithEntity, tenantId: string): Promise<Com
     quorum_compliant: quorumEtapa?.ok ?? true,
     conflict_handled: true,
     majority_compliant: votEtapa?.ok ?? true,
-    instrument_required: "NINGUNO",
+    instrument_required: inscribable ? "ESCRITURA" : "NINGUNO",
     registry_required: inscribable,
     publication_required: false,
     publication_channel: null,

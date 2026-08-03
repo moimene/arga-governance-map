@@ -132,12 +132,14 @@ describe("F3.G3 — UI consumers refactored", () => {
     expect(storageArchiver).toMatch(/`evidence-bundle:\/\/\$\{storagePath\}`/);
   });
 
-  it("storage-archiver uses tenant-prefix path schema (F3.G3 §5)", () => {
+  it("storage-archiver uses tenant-prefix content-addressed path with the real binary extension", () => {
     // ITEM-108: el path incluye ahora un fragmento del hash de contenido
     // (`__<hash8>`) para evitar colisiones same-day con contenido distinto.
+    // El cierre QES archiva PDF; el borrador de trabajo sigue siendo DOCX.
     expect(storageArchiver).toMatch(
-      /storagePath = `\$\{tenantId\}\/\$\{agreementId\}\/\$\{filename\}__\$\{contentFragment\}\.docx`/,
+      /storagePath = `\$\{tenantId\}\/\$\{agreementId\}\/\$\{binary\.baseFilename\}__\$\{contentFragment\}\$\{binary\.extension\}`/,
     );
+    expect(storageArchiver).toMatch(/contentType: binary\.mimeType/);
   });
 
   it("storage-archiver uses upsert:true with content-addressed path (ITEM-108)", () => {
@@ -145,5 +147,10 @@ describe("F3.G3 — UI consumers refactored", () => {
     // (reintento idempotente tras fallo parcial), sin dead-end de colisión.
     expect(storageArchiver).toMatch(/upsert: true/);
     expect(storageArchiver).toMatch(/const contentFragment = hashHex\.slice\(0, 8\)/);
+  });
+
+  it("reutiliza evidencia solo cuando coincide también el hash binario SHA-512", () => {
+    expect(storageArchiver).toContain('.eq("manifest->metadata->>contentHash", metadata.contentHash)');
+    expect(storageArchiver).toContain('.eq("hash_sha512", hashHex)');
   });
 });

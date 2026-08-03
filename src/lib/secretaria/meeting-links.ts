@@ -42,6 +42,25 @@ export function extractMeetingSourceLinks(quorumData: unknown): MeetingSourceLin
   };
 }
 
+/**
+ * El emparejamiento legacy por órgano/fecha solo es admisible cuando la
+ * reunión todavía no declara una convocatoria de origen. Si ya existe un
+ * vínculo explícito o derivado, reutilizarla para otra convocatoria mezcla
+ * expedientes distintos que simplemente coinciden en el calendario.
+ */
+export function canUseLegacyConvocatoriaFallback(
+  quorumData: unknown,
+  convocatoriaId: string,
+) {
+  const links = extractMeetingSourceLinks(quorumData);
+  const linkedIds = unique([
+    links.convocatoria_id,
+    ...(links.convocatoria_ids ?? []),
+  ]);
+
+  return linkedIds.length === 0 || linkedIds.includes(convocatoriaId);
+}
+
 export function sourceLinksFromAgendaPoints(points: MeetingAgendaPoint[]): MeetingSourceLinks {
   const convocatoriaIds = unique(
     points.map((point) => (point.source_table === "convocatorias" ? point.source_id : null))

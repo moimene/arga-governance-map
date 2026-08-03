@@ -8,9 +8,8 @@ import { useAiSystemById } from "@/hooks/useAiSystems";
 import { useAssessmentsBySystem, useComplianceChecksBySystem } from "@/hooks/useAiAssessments";
 import { useAiIncidentsBySystem } from "@/hooks/useAiIncidents";
 import { useState } from "react";
-import { useQTSPSign } from "@/hooks/useQTSPSign";
 import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
-import { useEvidenceBundlesForObject, useCreateEvidenceBundle } from "@/hooks/useEvidenceBundles";
+import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
 import { toast } from "sonner";
@@ -67,9 +66,7 @@ export default function SistemaDetalle() {
   const [signatoryEmail, setSignatoryEmail] = useState("lucia@arga-seguros.com");
 
   // V2 Integration Hooks
-  const { signMutation } = useQTSPSign();
   // Escalado cross-module = handoff read-only (navigate), sin escrituras a governance_module_*.
-  const createEvidence = useCreateEvidenceBundle();
 
   const { data: declarations = [], refetch: refetchDeclarations } = useEvidenceBundlesForObject(
     "AIMS",
@@ -141,64 +138,10 @@ export default function SistemaDetalle() {
   };
 
   const handleSignDeclaration = async () => {
-    try {
-      setSignProgress("Generando documento de conformidad…");
-      
-      const docName = `DECLARACION-CONFORMIDAD-${system.name.replace(/\s+/g, "-").toUpperCase()}-${new Date().getFullYear()}.pdf`;
-      const docData = new TextEncoder().encode(`DECLARACION DE CONFORMIDAD - EU AI ACT\nSistema: ${system.name}\nRiesgo: ${system.risk_level}\nCompliance Officer: ${signatoryName}`).buffer;
-
-      // Call EAD Trust simulation via hook
-      const signRes = await signMutation.mutateAsync({
-        documentName: docName,
-        documentData: docData,
-        signatories: [{ name: signatoryName, email: signatoryEmail }],
-        createdBy: "Compliance Officer",
-        onProgress: (step) => setSignProgress(step),
-      });
-
-      if (!signRes.ok) {
-        throw new Error(signRes.errors.join(", "));
-      }
-
-      setSignProgress("Registrando evidencia WORM en blockchain…");
-
-      // Save into WORM evidence bundle
-      await createEvidence.mutateAsync({
-        sourceModule: "AIMS",
-        sourceObjectType: "AI_SYSTEM",
-        sourceObjectId: system.id,
-        referenceCode: `DEC-CONF-${system.id.slice(0, 8).toUpperCase()}`,
-        manifest: {
-          system_id: system.id,
-          system_name: system.name,
-          risk_level: system.risk_level,
-          signatory: signatoryName,
-          email: signatoryEmail,
-          qtsp_transaction_id: signRes.srId,
-          document_hash: signRes.documentHash,
-          signed_at: signRes.signed_at
-        },
-        documentUrl: `https://hzqwefkwsxopwrmtksbg.supabase.co/storage/v1/object/public/evidence/declarations/${docName}`,
-        legalHold: false,
-        status: "SEALED",
-        sandbox: signRes.sandbox,
-        srStatus: signRes.srStatus,
-        signedBy: `${signatoryName} (${signatoryEmail})`
-      });
-
-      toast.success(
-        signRes.sandbox
-          ? "Declaración firmada en modo SANDBOX (demo) — evidencia NO sellada como final (no es una transacción EAD Trust real)."
-          : "Declaración de conformidad firmada electrónicamente y sellada en ledger WORM"
-      );
-      setShowSignModal(false);
-      refetchDeclarations();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(`Firma fallida: ${err.message || "Error desconocido"}`);
-    } finally {
-      setSignProgress(null);
-    }
+    setSignProgress(null);
+    toast.info("Firma electrónica retirada", {
+      description: "EAD Trust no firma esta declaración. Un documento obtenido externamente deberá custodiarse desde un expediente source-bound.",
+    });
   };
 
   const riskCls = RISK_COLORS[system.risk_level ?? ""] ?? "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]";
@@ -458,10 +401,10 @@ export default function SistemaDetalle() {
           )}
         </div>
 
-        {/* Right Column - Actions of Action (QES & Escalation) */}
+        {/* Right Column - custody and escalation actions */}
         <div className="space-y-6">
           
-          {/* Action Card 1: Conformity QES */}
+          {/* Action Card 1: conformity document custody */}
           <div 
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -474,7 +417,7 @@ export default function SistemaDetalle() {
             </div>
             
             <p className="text-xs text-[var(--g-text-secondary)] mb-4 leading-relaxed">
-              De acuerdo con la regulación europea de Inteligencia Artificial, los sistemas de alto riesgo requieren una declaración formal firmada electrónicamente.
+              Si la declaración exige firma, esta se obtiene fuera de EAD. EAD Trust se limita a custodiar el documento desde un expediente source-bound.
             </p>
 
             {/* Conformity Status Badge */}
@@ -493,8 +436,8 @@ export default function SistemaDetalle() {
                 </span>
                 <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
                   {finalDeclarations.length > 0 
-                    ? `Firma forense inmutable de QTSP (${finalDeclarations.length} registrada)` 
-                    : "Requiere firma electrónica del Compliance Officer"}
+                    ? `Documento conservado en el ledger (${finalDeclarations.length} registrado)`
+                    : "Pendiente de documento externo y custodia controlada"}
                 </span>
               </div>
             </div>
@@ -527,7 +470,7 @@ export default function SistemaDetalle() {
                       )}
                     </div>
                     <div className="text-[10px] text-[var(--g-text-secondary)]">
-                      <div>Firmante: {dec.signed_by}</div>
+                      <div>Responsable registrado: {dec.signed_by}</div>
                       <div>Fecha: {new Date(dec.created_at).toLocaleString("es-ES")}</div>
                     </div>
                     <div className="pt-1.5 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[9px]">
@@ -552,12 +495,13 @@ export default function SistemaDetalle() {
 
             <button
               type="button"
-              onClick={() => setShowSignModal(true)}
-              className="w-full flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] py-2 text-xs font-semibold hover:bg-[var(--g-sec-700)] transition-colors duration-150"
+              disabled
+              title="La firma genérica está retirada; use un expediente source-bound para custodiar el documento."
+              className="w-full flex items-center justify-center gap-2 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] py-2 text-xs font-semibold cursor-not-allowed opacity-70"
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <PenTool className="h-3.5 w-3.5" />
-              Firmar Conformidad
+              Custodia disponible desde expediente
             </button>
           </div>
 
@@ -622,7 +566,7 @@ export default function SistemaDetalle() {
 
       </div>
 
-      {/* MODAL 1: Signature Flow */}
+      {/* MODAL 1: legacy entry point, redirected to controlled custody */}
       {showSignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div 
@@ -632,7 +576,7 @@ export default function SistemaDetalle() {
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[var(--g-border-subtle)]">
               <ShieldCheck className="h-5 w-5 text-[var(--status-success)]" />
               <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                Firma electrónica (EAD Trust)
+                Custodia documental (EAD Trust)
               </h3>
             </div>
 
@@ -640,7 +584,7 @@ export default function SistemaDetalle() {
               <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
                 <Loader2 className="h-8 w-8 text-[var(--g-brand-3308)] animate-spin" />
                 <div>
-                  <p className="text-sm font-semibold text-[var(--g-text-primary)]">Procesando firma con EAD Trust…</p>
+                  <p className="text-sm font-semibold text-[var(--g-text-primary)]">Preparando custodia EAD Trust…</p>
                   <p className="text-xs text-[var(--g-text-secondary)] mt-1">{signProgress}</p>
                 </div>
               </div>
@@ -653,7 +597,7 @@ export default function SistemaDetalle() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
-                      Nombre del Firmante
+                      Responsable del documento
                     </label>
                     <input 
                       type="text" 
@@ -693,7 +637,7 @@ export default function SistemaDetalle() {
                     className="px-4 py-2 bg-[var(--status-success)] text-[var(--g-text-inverse)] text-xs font-semibold hover:bg-[var(--status-success)]/90"
                     style={{ borderRadius: "var(--g-radius-md)" }}
                   >
-                    Confirmar y Firmar
+                    Usar expediente de custodia
                   </button>
                 </div>
               </div>

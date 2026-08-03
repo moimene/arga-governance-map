@@ -249,7 +249,7 @@ export default function RepresentacionPuntualStepper() {
                 <input
                   value={documentoRef}
                   onChange={(event) => setDocumentoRef(event.target.value)}
-                  placeholder="Poder, delegación firmada o acta"
+                  placeholder="Poder, delegación aportada o acta"
                   className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] outline-none placeholder:text-[var(--g-text-secondary)] focus:border-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />

@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import {
+  EAD_INTERPOSITION_CHANNEL,
+  sanitizeEadInterpositionTraceValue,
+} from "@/lib/secretaria/ead-channel-semantics";
 
 export type GroupCampaignOrgan = "ADMIN" | "JUNTA" | "POST" | "COMPLIANCE";
 
@@ -329,6 +333,48 @@ function noSessionCondicion(expediente: LaunchCampaignExpediente) {
   return "MAYORIA_CONSEJEROS_ESCRITA";
 }
 
+const GROUP_CAMPAIGN_EAD_TRACE =
+  "Canal individual EAD Trust: interposición, mensajería básica y custodia/e-archiving";
+
+function usesEadInterpositionForNewCapture(materia: string, formaSocial: string) {
+  return materia === "CONVOCATORIA_JGA" && ["SL", "SLU"].includes(formaSocial.toUpperCase());
+}
+
+function campaignAlertsForNewCapture(
+  alertas: string[],
+  materia: string,
+  formaSocial: string,
+) {
+  const safeAlerts = alertas
+    .map((alert) => sanitizeEadInterpositionTraceValue(alert))
+    .filter((alert): alert is string => typeof alert === "string");
+  if (usesEadInterpositionForNewCapture(materia, formaSocial)) {
+    safeAlerts.push(GROUP_CAMPAIGN_EAD_TRACE);
+  }
+  return Array.from(new Set(safeAlerts));
+}
+
+export function campaignExplainForNewCapture(
+  explain: Record<string, unknown>,
+  materia: string,
+  formaSocial: string,
+) {
+  const sanitized = sanitizeEadInterpositionTraceValue(explain);
+  const safeExplain = sanitized && typeof sanitized === "object" && !Array.isArray(sanitized)
+    ? sanitized as Record<string, unknown>
+    : {};
+  if (!usesEadInterpositionForNewCapture(materia, formaSocial)) return safeExplain;
+  return {
+    ...safeExplain,
+    communication_channel: {
+      code: EAD_INTERPOSITION_CHANNEL,
+      owner: "EAD Trust",
+      services: ["INTERPOSITION", "BASIC_MESSAGING", "E_ARCHIVING"],
+      external_result_claim: false,
+    },
+  };
+}
+
 async function createAgreement(
   tenantId: string,
   campaignId: string,
@@ -418,7 +464,7 @@ async function createLiveRecord(
         urgente: false,
         publication_channels: expediente.formaSocial === "SA" || expediente.formaSocial === "SAU"
           ? ["WEB_CORPORATIVA", "BORME"]
-          : ["ERDS"],
+          : [EAD_INTERPOSITION_CHANNEL],
         statutory_basis: `${campaignName} · ${step.label}`,
       })
       .select("id")
@@ -825,6 +871,19 @@ export function useLaunchGroupCampaign() {
         const activeCampaignId = campaignId;
 
         await runWithConcurrency(input.expedientes, 4, async (expediente) => {
+          const expedienteMateria = expediente.rulePackCode.includes("CONVOCATORIA_JGA")
+            ? "CONVOCATORIA_JGA"
+            : "";
+          const expedienteAlertas = campaignAlertsForNewCapture(
+            expediente.alertas,
+            expedienteMateria,
+            expediente.formaSocial,
+          );
+          const expedienteExplain = campaignExplainForNewCapture(
+            expediente.explain,
+            expedienteMateria,
+            expediente.formaSocial,
+          );
           const { data: expedienteRow, error: expedienteError } = await supabase
             .from("group_campaign_expedientes")
             .insert({
@@ -841,8 +900,8 @@ export function useLaunchGroupCampaign() {
               responsable_label: "Secretaría de la sociedad",
               deadline: expediente.deadline,
               rule_pack_code: expediente.rulePackCode,
-              alertas: expediente.alertas,
-              explain: expediente.explain,
+              alertas: expedienteAlertas,
+              explain: expedienteExplain,
             })
             .select("id")
             .single();
@@ -851,7 +910,20 @@ export function useLaunchGroupCampaign() {
           const expedienteId = (expedienteRow as { id: string }).id;
 
           await runWithConcurrency(expediente.steps, 4, async (step) => {
-            const body = pickBody(bodies, expediente.entityId, step.organ);
+            const stepForNewCapture: LaunchCampaignStep = {
+              ...step,
+              alertas: campaignAlertsForNewCapture(
+                step.alertas,
+                step.materia,
+                expediente.formaSocial,
+              ),
+              explain: campaignExplainForNewCapture(
+                step.explain,
+                step.materia,
+                expediente.formaSocial,
+              ),
+            };
+            const body = pickBody(bodies, expediente.entityId, stepForNewCapture.organ);
             const bodyId = body?.id ?? null;
             const { data: stepRow, error: stepError } = await supabase
               .from("group_campaign_steps")
@@ -861,17 +933,17 @@ export function useLaunchGroupCampaign() {
                 expediente_id: expedienteId,
                 entity_id: expediente.entityId,
                 body_id: bodyId,
-                materia: step.materia,
-                label: step.label,
-                organ: step.organ,
-                dependency: step.dependency,
-                step_order: step.stepOrder,
-                status: step.status,
-                adoption_mode: step.adoptionMode,
-                rule_pack_code: step.rulePackCode,
-                deadline: step.deadline,
-                alertas: step.alertas,
-                explain: step.explain,
+                materia: stepForNewCapture.materia,
+                label: stepForNewCapture.label,
+                organ: stepForNewCapture.organ,
+                dependency: stepForNewCapture.dependency,
+                step_order: stepForNewCapture.stepOrder,
+                status: stepForNewCapture.status,
+                adoption_mode: stepForNewCapture.adoptionMode,
+                rule_pack_code: stepForNewCapture.rulePackCode,
+                deadline: stepForNewCapture.deadline,
+                alertas: stepForNewCapture.alertas,
+                explain: stepForNewCapture.explain,
               })
               .select("id")
               .single();
@@ -885,7 +957,7 @@ export function useLaunchGroupCampaign() {
               expedienteId,
               stepId,
               expediente,
-              step,
+              stepForNewCapture,
               bodyId,
             );
 

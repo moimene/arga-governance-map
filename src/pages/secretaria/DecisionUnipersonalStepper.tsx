@@ -235,7 +235,7 @@ function TextoAcuerdoStep({
   );
 }
 
-// ── Paso 3: Firma y archivo ───────────────────────────────────────────────────
+// ── Paso 3: Constancia y archivo ──────────────────────────────────────────────
 
 function FirmaArchivoStep({
   onCreate,
@@ -262,8 +262,8 @@ function FirmaArchivoStep({
               Decisión registrada y expediente creado
             </p>
             <p className="mt-0.5 text-xs text-[var(--g-text-secondary)]">
-              La decisión queda firmada en Secretaría y el acuerdo queda vinculado para generar
-              el DOCX final y su evidencia documental.
+              La decisión queda formalizada en Secretaría y el acuerdo queda vinculado para generar
+              el DOCX final, custodiarlo y registrar la constancia documental.
             </p>
           </div>
         </div>
@@ -284,7 +284,7 @@ function FirmaArchivoStep({
     <div className="space-y-5">
       <p className="text-sm text-[var(--g-text-secondary)]">
         La plataforma registrará la decisión, creará el expediente de acuerdo vinculado y dejará
-        preparado el documento final para firma electrónica y evidencia documental.
+        preparado el documento final para interposición EAD, custodia y evidencia documental.
       </p>
 
       <div
@@ -293,7 +293,7 @@ function FirmaArchivoStep({
       >
         <div className="flex items-center gap-2 text-sm font-medium text-[var(--g-text-primary)]">
           <AlertTriangle className="h-4 w-4 text-[var(--status-warning)]" />
-          Verificación pre-firma
+          Verificación previa a la formalización
         </div>
         <ul className="mt-2 space-y-1.5 text-xs text-[var(--g-text-secondary)]">
           <li className="flex items-center gap-2">
@@ -302,7 +302,7 @@ function FirmaArchivoStep({
           </li>
           <li className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
-            Firma electrónica y verificación EAD Trust: pendientes — se ejecutan al generar el documento desde el detalle (postura sandbox/reference)
+            Interposición y custodia EAD Trust: pendientes — se ejecutan al generar el documento desde el detalle, sin atribuir firma electrónica
           </li>
           <li className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-[var(--status-warning)]" />
@@ -468,8 +468,8 @@ export default function DecisionUnipersonalStepper() {
     },
     {
       n: 3,
-      label: "Firma y registro",
-      hint: "Crea y firma la decisión; el documento se genera después desde el detalle",
+      label: "Aprobación y registro",
+      hint: "Crea y aprueba la decisión; cualquier firma externa legalmente exigible se incorpora aparte, sin atribuirla a EAD Trust",
       body: (
         <FirmaArchivoStep
           onCreate={handleCreate}

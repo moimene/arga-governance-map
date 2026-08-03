@@ -701,6 +701,25 @@ describe('evaluarConvocatoria', () => {
       // Override del pack (8) gana sobre default de CdA (5).
       expect(result.antelacionDiasRequerida).toBe(8);
     });
+
+    it('el plazo vigente del reglamento del Consejo prevalece sobre un payload legacy de Junta', () => {
+      const legacyPack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          antelacionDias: {
+            SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+            SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', organoNoticeDays: 3 },
+        [legacyPack],
+        [],
+      );
+
+      expect(result.antelacionDiasRequerida).toBe(3);
+    });
   });
 
   // ================================================================
@@ -803,7 +822,7 @@ describe('evaluarConvocatoria', () => {
       expect(result.canalesExigidos).toContain('EMAIL_SIMPLE');
     });
 
-    it('CdA: filtra NOTIFICACION_GENERICA y NOTIFICACION_DIRECTA', () => {
+    it('CdA: filtra códigos abstractos y normaliza la capacidad histórica a interposición EAD', () => {
       const pack = createTestPack({
         convocatoria: {
           ...createTestPack().convocatoria,
@@ -820,7 +839,8 @@ describe('evaluarConvocatoria', () => {
       );
       expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
       expect(result.canalesExigidos).not.toContain('NOTIFICACION_DIRECTA');
-      expect(result.canalesExigidos).toContain('ERDS');
+      expect(result.canalesExigidos).toContain('EAD_INTERPOSITION');
+      expect(result.canalesExigidos).not.toContain('ERDS');
     });
 
     it('JGA: NO filtra códigos del pack (sólo aplica filtro a non-junta)', () => {
@@ -843,9 +863,9 @@ describe('evaluarConvocatoria', () => {
       expect(result.canalesExigidos).toContain('WEB_SOCIEDAD');
     });
 
-    // Codex P2 round 15 PR #3: fallback ERDS cuando filtro deja non-
-    // junta sin canales concretos.
-    it('CdA con pack 100% abstracto: fallback ERDS añadido (ES default)', () => {
+    // Una captura nueva usa el fallback de interposición EAD cuando el pack
+    // deja al órgano no junta sin canales concretos.
+    it('CdA con pack 100% abstracto: fallback EAD_INTERPOSITION (ES default)', () => {
       const pack = createTestPack({
         convocatoria: {
           ...createTestPack().convocatoria,
@@ -862,10 +882,12 @@ describe('evaluarConvocatoria', () => {
       );
       expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
       expect(result.canalesExigidos).not.toContain('NOTIFICACION_GENERICA');
-      expect(result.canalesExigidos).toContain('ERDS');
-      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      expect(result.canalesExigidos).toContain('EAD_INTERPOSITION');
+      expect(result.canalesExigidos).not.toContain('ERDS');
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback EAD_INTERPOSITION'));
       expect(fallbackNode).toBeDefined();
       expect(fallbackNode?.fuente).toBe('SISTEMA');
+      expect(fallbackNode?.mensaje).toContain('opción concreta de preparación');
     });
 
     // Codex P2 round 17 PR #3: fallback por jurisdicción.
@@ -907,7 +929,7 @@ describe('evaluarConvocatoria', () => {
       expect(result.canalesExigidos).not.toContain('ERDS');
     });
 
-    it('CdA sin jurisdiction (legacy): asume ES → ERDS', () => {
+    it('CdA sin jurisdiction: asume ES y usa interposición EAD para la nueva captura', () => {
       const pack = createTestPack({
         convocatoria: {
           ...createTestPack().convocatoria,
@@ -922,7 +944,8 @@ describe('evaluarConvocatoria', () => {
         [pack],
         [],
       );
-      expect(result.canalesExigidos).toContain('ERDS');
+      expect(result.canalesExigidos).toContain('EAD_INTERPOSITION');
+      expect(result.canalesExigidos).not.toContain('ERDS');
     });
 
     it('CdA con pack que ya tiene canal concreto: no añade fallback', () => {
@@ -942,8 +965,31 @@ describe('evaluarConvocatoria', () => {
       );
       expect(result.canalesExigidos).toContain('BUROFAX');
       expect(result.canalesExigidos).not.toContain('CONVOCATORIA_CONSEJO');
-      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback ERDS'));
+      const fallbackNode = result.explain.find((n) => n.regla.includes('fallback EAD_INTERPOSITION'));
       expect(fallbackNode).toBeUndefined();
+    });
+
+    it('la traza activa no atribuye acuse legal, entrega ni capacidad certificada a EAD', () => {
+      const pack = createTestPack({
+        convocatoria: {
+          ...createTestPack().convocatoria,
+          canales: {
+            SA: ['CONVOCATORIA_CONSEJO'],
+            SL: ['CONVOCATORIA_CONSEJO'],
+          },
+        },
+      });
+      const result = evaluarConvocatoria(
+        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'ES' },
+        [pack],
+        [],
+      );
+      const trace = JSON.stringify({
+        canales: result.canalesExigidos,
+        explain: result.explain,
+      });
+      expect(trace).toContain('EAD_INTERPOSITION');
+      expect(trace).not.toMatch(/acuse legal|entrega certificada|evidencia certificada|trazabilidad QTSP/i);
     });
   });
 

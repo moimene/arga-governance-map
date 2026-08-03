@@ -1,9 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  canUseLegacyConvocatoriaFallback,
   extractMeetingSourceLinks,
   patchQuorumDataSourceLinks,
   sourceLinksFromAgendaPoints,
 } from "../meeting-links";
+
+describe("canUseLegacyConvocatoriaFallback", () => {
+  it("rechaza una reunión vinculada a otra convocatoria aunque coincidan órgano y fecha", () => {
+    expect(canUseLegacyConvocatoriaFallback({
+      source_links: {
+        convocatoria_id: "convocatoria-anterior",
+        convocatoria_ids: ["convocatoria-anterior"],
+      },
+    }, "convocatoria-nueva")).toBe(false);
+  });
+
+  it("permite el fallback para reuniones legacy sin vínculo documental", () => {
+    expect(canUseLegacyConvocatoriaFallback({}, "convocatoria-nueva")).toBe(true);
+  });
+
+  it("permite reutilizar la reunión ya vinculada a la propia convocatoria", () => {
+    expect(canUseLegacyConvocatoriaFallback({
+      source_links: { convocatoria_ids: ["convocatoria-nueva"] },
+    }, "convocatoria-nueva")).toBe(true);
+  });
+});
 
 describe("meeting source links", () => {
   it("extracts explicit links from quorum_data", () => {

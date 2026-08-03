@@ -209,7 +209,7 @@ describe("legal-template-review", () => {
     expect(rows[0].duplicateKey).toBe(rows[1].duplicateKey);
   });
 
-  it("aplica el alias de presentación del art. 308 al detectar duplicados", () => {
+  it("no usa el alias de presentación del art. 308 para detectar duplicados funcionales", () => {
     const rows = buildLegalTemplateReviewRows([
       template({
         id: "art308-exclusion",
@@ -222,7 +222,7 @@ describe("legal-template-review", () => {
         materia_acuerdo: "SUPRESION_PREFERENTE",
       }),
     ]);
-    expect(rows.every((row) => row.flags.duplicateMatter)).toBe(true);
+    expect(rows.every((row) => row.flags.duplicateMatter === false)).toBe(true);
   });
 
   it("no enfrenta una plantilla ACTIVA con su histórico archivado", () => {

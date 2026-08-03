@@ -11,6 +11,8 @@ export interface AgreementListRow {
   matter_class: string;
   inscribable: boolean;
   adoption_mode: string;
+  proposal_text: string | null;
+  decision_text: string | null;
   decision_date: string | null;
   status: string;
   created_at: string;

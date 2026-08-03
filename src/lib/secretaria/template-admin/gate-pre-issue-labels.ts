@@ -43,11 +43,15 @@ export const GATE_PRE_ISSUE_LABEL: Record<string, string> = {
 
   // Capas 1-3 (gate-pre.ts)
   CAPA1_LENGTH: "El texto de la plantilla es demasiado corto",
+  CAPA1_MACHINE_LITERAL: "El texto contiene un valor técnico sin traducción jurídica",
+  CAPA1_METADATA_LEAK: "El texto expone metadatos internos del expediente",
   CAPA2_HELPER_PROHIBIDO: "El texto usa una instrucción de plantilla no permitida",
   CAPA2_VAR_NO_CATALOGADA: "El texto usa una variable no declarada",
   ENTITY_REF_FORBIDDEN: "Referencia directa a la sociedad no permitida en variables",
   CAPA3_PREFIJO_PROTEGIDO: "Campo editable con prefijo reservado del sistema",
   CAPA2_UNUSED_VARIABLE: "Variable declarada que no se usa en el texto",
+  CAPA2_ORPHAN_VARIABLE: "Variable automática escalar sin uso en el texto",
+  CAPA2_CAPA3_SOURCE_CONFLICT: "Un campo tiene a la vez origen automático y edición manual",
   CAPA2_VARIABLE_REQUIRED: "Variable automática sin identificador",
   LEGACY_FUENTE_ENTIDAD: "Fuente de datos antigua: migrar a la fuente actual",
   GEN_IF_COUNT: "Exceso de ramas condicionales: valorar desdoblar la plantilla",

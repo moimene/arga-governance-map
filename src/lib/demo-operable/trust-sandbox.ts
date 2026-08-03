@@ -15,8 +15,8 @@ export interface DemoTrustCenter {
   apiReady: true;
   productiveCallsAllowed: false;
   credentialBoundary: "server-side QTSP proxy required";
-  signature: {
-    level: "QES_SANDBOX";
+  interposition: {
+    mode: "INTERPOSITION_SANDBOX";
     status: "SIMULATED_READY" | "SKIPPED_BY_GATE";
     requestRef: string;
   };
@@ -51,33 +51,8 @@ export const qtspApiContract = {
     "OKTA_CLIENT_SECRET",
     "OKTA_SCOPE",
     "API_BASE_URL",
-    "SIGNATURE_API_BASE_URL",
   ],
   endpoints: [
-    {
-      id: "create-signature-request",
-      method: "POST",
-      path: "/api/v1/private/signature-requests",
-      purpose: "Crear solicitud de firma",
-    },
-    {
-      id: "add-document",
-      method: "POST",
-      path: "/api/v1/private/signature-requests/{srId}/documents",
-      purpose: "Añadir documento y hash a la solicitud",
-    },
-    {
-      id: "add-signatory",
-      method: "POST",
-      path: "/api/v1/private/signature-requests/{srId}/documents/{documentId}/signatories",
-      purpose: "Añadir firmante",
-    },
-    {
-      id: "activate-signature-request",
-      method: "POST",
-      path: "/api/v1/private/signature-requests/{srId}/activate",
-      purpose: "Activar circuito de firma",
-    },
     {
       id: "create-evidence",
       method: "POST",
@@ -108,8 +83,8 @@ export function buildDemoTrustCenter(run: DemoScenarioRunResult): DemoTrustCente
     apiReady: true,
     productiveCallsAllowed: false,
     credentialBoundary: "server-side QTSP proxy required",
-    signature: {
-      level: "QES_SANDBOX",
+    interposition: {
+      mode: "INTERPOSITION_SANDBOX",
       status: run.outcome === "ADOPTADO" ? "SIMULATED_READY" : "SKIPPED_BY_GATE",
       requestRef: `qtsp:sandbox:${run.scenarioRunId}`,
     },

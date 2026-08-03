@@ -11,7 +11,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
  *  - an authenticated user with SECRETARIO or ADMIN_TENANT role.
  * Anon callers are rejected with 401/403.
  */
-async function triggerDispatcher(): Promise<void> {
+export async function triggerDispatcher(): Promise<void> {
   if (!SUPABASE_URL) return;
   const { data: sessionResult } = await supabase.auth.getSession();
   const token = sessionResult.session?.access_token;
@@ -41,11 +41,9 @@ export function useCancelCommunication() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('communications')
-        .update({ estado: 'CANCELADA', updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('estado', 'PROGRAMADA');
+      const { error } = await supabase.rpc('fn_cancel_communication', {
+        p_communication_id: id,
+      });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['communications'] }),
@@ -56,30 +54,11 @@ export function useRetryRecipient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (recipientId: string) => {
-      // ITEM-127: NO resetear intento_reenvio_n a 0. La clave de idempotencia del
-      // dispatcher (Resend Idempotency-Key y discriminador ERDS) deriva de
-      // `${recipientId}-${cuerpo_hash}-${intento_reenvio_n}`; resetear a 0 regenera
-      // la clave del intento original, que puede caer en la ventana de deduplicación
-      // de Resend (~24h) y suprimir silenciosamente un reenvío legítimo. Conservamos
-      // el contador y lo incrementamos para que la clave cambie en cada reenvío manual.
-      const { data: current, error: readError } = await supabase
-        .from('communication_recipients')
-        .select('intento_reenvio_n')
-        .eq('id', recipientId)
-        .in('estado_entrega', ['ERROR', 'REBOTADO'])
-        .maybeSingle();
-      if (readError) throw readError;
-      if (!current) return; // ya no está en ERROR/REBOTADO: nada que reenviar
-      const { error } = await supabase
-        .from('communication_recipients')
-        .update({
-          estado_entrega: 'PENDIENTE',
-          intento_reenvio_n: (current.intento_reenvio_n ?? 0) + 1,
-          ultimo_error: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', recipientId)
-        .in('estado_entrega', ['ERROR', 'REBOTADO']);
+      // La RPC hace lock, RBAC y transición FSM. La clave del proveedor sigue
+      // siendo estable para el mismo envío lógico; nunca depende del contador.
+      const { error } = await supabase.rpc('fn_retry_communication_recipient', {
+        p_recipient_id: recipientId,
+      });
       if (error) throw error;
       await triggerDispatcher();
     },
@@ -91,13 +70,16 @@ export function useProgramCommunication() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('communications')
-        .update({ estado: 'PROGRAMADA', updated_at: new Date().toISOString() })
-        .eq('id', id);
+      const { data, error } = await supabase.rpc('fn_program_communication', {
+        p_communication_id: id,
+      });
       if (error) throw error;
+      if (!data) throw new Error('La comunicación no superó el gate de programación.');
       await triggerDispatcher();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['communications'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['communications'] });
+      void qc.invalidateQueries({ queryKey: ['communication'] });
+    },
   });
 }

@@ -119,7 +119,7 @@ export default function DecisionesUnipersonales() {
         >
           <option value="ALL">Todos los estados</option>
           <option value="BORRADOR">Borrador</option>
-          <option value="FIRMADA">Firmada</option>
+          <option value="FIRMADA">Formalizada</option>
           <option value="ANULADA">Anulada</option>
         </select>
         {filterStatus !== "ALL" && (

@@ -11,7 +11,7 @@ P1 schema + library + Edge Functions + hooks + UI están **escritos y verificado
 
 - El trigger `tg_communications_validate_plazo` está en modo **permissive** (no bloquea INSERT cuando las GUCs no están configuradas).
 - El pg_cron job `comms-dispatch-tick` está **registrado pero INACTIVO**.
-- Los webhooks de Resend y EAD Trust están en modo **dev** (saltan HMAC verify si el secret está vacío).
+- Los webhooks de Resend y EAD Trust quedan **fail-closed** si falta su secreto HMAC.
 - `PasoEnvioMiembros` puede crear comms en estado `BORRADOR`/`PROGRAMADA`, pero el dispatcher no procesará nada hasta que se habiliten las secrets.
 
 ---
@@ -33,10 +33,16 @@ P1 schema + library + Edge Functions + hooks + UI están **escritos y verificado
 ## 2. EAD Trust contract + credenciales (Garrigues Ops, ~ 1-2 días)
 
 - [ ] Confirmar volumen mensual incluido en contrato EAD Trust (OQ5).
-- [ ] Recibir API URL → guardar como `EAD_TRUST_API_URL` (típicamente `https://api.eadtrust.eu`).
-- [ ] Recibir API key → guardar como `EAD_TRUST_API_KEY`.
+- [ ] Recibir la URL **completa y contractual** de envío de Notice Manager → guardar como `EAD_NOTICE_MANAGER_SEND_URL`. No derivar un endpoint de mensajería desde la URL de Evidence Manager.
+- [ ] Recibir la credencial de Notice Manager → guardar como `EAD_NOTICE_MANAGER_API_KEY`.
+- [ ] Si se activa el canal separado de sello de tiempo, guardar su base y credencial como `EAD_TRUST_API_URL` y `EAD_TRUST_API_KEY`.
+- [ ] Confirmar que la respuesta de Notice Manager incluye `requestId`, estado `REQUESTED`/`DELIVERED` y timestamps del proveedor; si informa e-archive de Evidence Manager, debe incluir estado, `evidenceId` y `archivedAt`.
 - [ ] Registrar webhook URL en EAD Trust: `https://hzqwefkwsxopwrmtksbg.supabase.co/functions/v1/webhook-ead-trust`.
 - [ ] Generar webhook signing secret → guardar como `EAD_TRUST_WEBHOOK_SECRET`.
+
+> Evidence Manager acredita custodia/e-archive; no acredita por sí solo solicitud
+> ni entrega del mensaje. Esos estados solo nacen de Notice Manager y se guardan
+> con los identificadores y timestamps devueltos por el proveedor.
 
 ## 3. Supabase secrets + Edge Function deploy (DevOps, ~ 15 min)
 
@@ -47,15 +53,17 @@ cd /Users/moisesmenendez/Dropbox/DESARROLLO/arga-governance-map
 bunx supabase secrets set \
   RESEND_API_KEY="re_xxx" \
   RESEND_WEBHOOK_SECRET="whsec_xxx" \
-  EAD_TRUST_API_URL="https://api.eadtrust.eu" \
-  EAD_TRUST_API_KEY="ead_xxx" \
+  EAD_NOTICE_MANAGER_SEND_URL="https://<endpoint-contractual-notice-manager>" \
+  EAD_NOTICE_MANAGER_API_KEY="ead_notice_xxx" \
+  EAD_TRUST_API_URL="https://<endpoint-contractual-timestamp>" \
+  EAD_TRUST_API_KEY="ead_timestamp_xxx" \
   EAD_TRUST_WEBHOOK_SECRET="ead_whsec_xxx" \
   REMITENTE_NOMBRE="Secretaría TGMS" \
   REMITENTE_EMAIL="secretaria@arga-seguros.com" \
   --linked
 
 # Deploy all 5 Edge Functions
-bunx supabase functions deploy comms-dispatcher --no-verify-jwt
+bunx supabase functions deploy comms-dispatcher
 bunx supabase functions deploy webhook-resend --no-verify-jwt
 bunx supabase functions deploy webhook-ead-trust --no-verify-jwt
 bunx supabase functions deploy validate-comm-plazo --no-verify-jwt

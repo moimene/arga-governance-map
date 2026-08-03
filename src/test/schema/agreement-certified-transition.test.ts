@@ -31,7 +31,7 @@ describe("ITEM-042 — invariante: cert SIGNED implica agreement CERTIFIED (o po
   }, 30_000);
 
   afterAll(async () => {
-    try { await client?.auth.signOut(); } catch { /* noop */ }
+    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
   });
 
   it("ningún agreement ADOPTED figura en una certificación SIGNED", async () => {

@@ -3,6 +3,7 @@ import {
   buildPrototypeMeetingRulePackFallback,
   resolveCloudMeetingRulePacksStrict,
   resolvePrototypeMeetingRulePacks,
+  resolveMeetingRulePackContextForSpec,
   uniqueMeetingRuleSpecs,
 } from "../prototype-rule-pack-fallback";
 import type { RulePack, RuleResolution } from "@/lib/rules-engine";
@@ -115,5 +116,31 @@ describe("prototype-rule-pack-fallback", () => {
     expect(result.packs).toEqual([resolvedPack]);
     expect(result.missingSpecs).toEqual([{ materia: "NOMBRAMIENTO_CONSEJERO", clase: "ORDINARIA" }]);
     expect(result.warnings).toContain("missing_cloud_rule_pack:CONSEJO:NOMBRAMIENTO_CONSEJERO:ORDINARIA");
+  });
+
+  it("isolates fallback by agenda point so an OTROS_LIBRE gap does not contaminate a resolved agreement", () => {
+    const allResolutions = [resolution(resolvedPack), resolution(null)];
+    const accounts = resolveMeetingRulePackContextForSpec(
+      { materia: "APROBACION_CUENTAS", clase: "ORDINARIA" },
+      allResolutions,
+      "CONSEJO",
+    );
+    const freeMatter = resolveMeetingRulePackContextForSpec(
+      { materia: "OTROS_LIBRE", clase: "ORDINARIA" },
+      allResolutions,
+      "CONSEJO",
+    );
+
+    expect(accounts.operational.hasFallback).toBe(false);
+    expect(accounts.operational.fallbackPackIds).toEqual([]);
+    expect(accounts.strict.missingSpecs).toEqual([]);
+
+    expect(freeMatter.operational.hasFallback).toBe(true);
+    expect(freeMatter.operational.fallbackPackIds).toEqual([
+      "prototype-meeting-CONSEJO-OTROS_LIBRE-ORDINARIA",
+    ]);
+    expect(freeMatter.strict.missingSpecs).toEqual([
+      { materia: "OTROS_LIBRE", clase: "ORDINARIA" },
+    ]);
   });
 });

@@ -73,7 +73,7 @@ export function useCreateEvidenceBundle() {
       sourceObjectType: string;
       sourceObjectId: string;
       referenceCode: string;
-      manifest: Record<string, any>;
+      manifest: Record<string, unknown>;
       documentUrl?: string;
       legalHold?: boolean;
       status?: string;

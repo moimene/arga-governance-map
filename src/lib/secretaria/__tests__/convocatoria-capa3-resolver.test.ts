@@ -44,10 +44,52 @@ describe("convocatoria-capa3-resolver", () => {
     );
 
     expect(result.values.orden_del_dia_resumen).toBe(
-      "1. Formulación de cuentas (FORMULACION_CUENTAS)\n2. Ruegos y preguntas",
+      "1. Formulación de cuentas (Acuerdo · Formulación de cuentas)\n2. Ruegos y preguntas",
     );
     expect(result.values.canal_convocatoria).toBe("Email simple, Notificación ERDS");
     expect(result.fields.every((field) => field.readonly)).toBe(true);
+  });
+
+  it("preserves the authoritative agenda projection with validated representation identities", () => {
+    const summary =
+      "1. Designación de representante — Filial: ARGA Digital Services, S.L.; " +
+      "representante propuesta: Dña. Carmen Delgado Ortiz " +
+      "(Acuerdo · Designación de representante de la socia única en la filial)";
+    const result = buildConvocatoriaCapa3Resolution(
+      fields(["orden_del_dia_resumen", "orden_dia_texto"]),
+      {
+        agendaSummaryText: summary,
+        agendaItems: [
+          {
+            titulo: "Designación de representante",
+            kind: "DECISORIO",
+            materia: "DESIGNACION_REPRESENTANTE_SOCIO_UNICO_FILIAL",
+          },
+        ],
+      },
+    );
+
+    expect(result.values.orden_del_dia_resumen).toBe(summary);
+    expect(result.values.orden_dia_texto).toBe(summary);
+  });
+
+  it("prefills the document channel and human attachment index from step 6", () => {
+    const result = buildConvocatoriaCapa3Resolution(
+      fields(["canal_documentacion", "indice_documentacion_ref"]),
+      {
+        attachmentAliases: [
+          "Balance de situación 2025 — simulación demo",
+          "Propuesta de poder general mercantil — simulación demo",
+        ],
+      },
+    );
+
+    expect(result.values.canal_documentacion).toContain("Expediente electrónico de Secretaría Societaria");
+    expect(result.values.indice_documentacion_ref).toBe(
+      "Balance de situación 2025 — simulación demo · Propuesta de poder general mercantil — simulación demo",
+    );
+    expect(result.fields.every((field) => field.readonly)).toBe(true);
+    expect(result.fields.every((field) => field.sourceLabel === "Paso 6")).toBe(true);
   });
 
   it("prefills listed-company status from entity context", () => {
@@ -61,5 +103,38 @@ describe("convocatoria-capa3-resolver", () => {
       es_cotizada: "Sí",
     });
     expect(result.fields.every((field) => field.readonly)).toBe(true);
+  });
+
+  it("keeps the convener identity read-only because it comes from authority evidence", () => {
+    const result = buildConvocatoriaCapa3Resolution(
+      fields(["nombre_convocante", "cargo_convocante"]),
+      {
+        convocanteNombre: "Antonio Ríos",
+        convocanteCargo: "PRESIDENTE",
+      },
+    );
+
+    expect(result.values).toEqual({
+      nombre_convocante: "Antonio Ríos",
+      cargo_convocante: "PRESIDENTE",
+    });
+    expect(result.fields.every((field) => field.readonly)).toBe(true);
+    expect(result.fields.every((field) => field.sourceLabel === "Autoridad vigente")).toBe(true);
+  });
+
+  it("derives the second-call switch from step 2 instead of asking the user twice", () => {
+    const enabled = buildConvocatoriaCapa3Resolution(
+      fields(["hay_segunda_convocatoria"]),
+      { haySegundaConvocatoria: true },
+    );
+    const disabled = buildConvocatoriaCapa3Resolution(
+      fields(["hay_segunda_convocatoria"]),
+      { haySegundaConvocatoria: false },
+    );
+
+    expect(enabled.values.hay_segunda_convocatoria).toBe("Sí");
+    expect(disabled.values.hay_segunda_convocatoria).toBe("No");
+    expect(enabled.fields[0]?.readonly).toBe(true);
+    expect(enabled.fields[0]?.sourceLabel).toBe("Paso 2");
   });
 });

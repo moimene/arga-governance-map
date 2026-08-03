@@ -11,15 +11,23 @@ import * as __realModule8 from "../tab-guards";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { PlantillaProtegidaRow } from "@/hooks/usePlantillasProtegidas";
-import { CORE_V1_MATERIAS_COUNT } from "@/lib/secretaria/template-admin";
 import { DashboardTab } from "../DashboardTab";
 
-const mockNavigate = vi.fn();
-const mockValidate = vi.fn();
-let mockOrphanCount = 0;
-let mockRows: PlantillaProtegidaRow[] = [];
-let mockCanImport = true;
-let mockSearchParams = new URLSearchParams();
+if (typeof vi.hoisted !== "function") {
+  (vi as { hoisted?: <T>(factory: () => T) => T }).hoisted = <T,>(factory: () => T) => factory();
+}
+
+const mockState = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  validate: vi.fn(),
+  orphanCount: 0,
+  rows: [] as PlantillaProtegidaRow[],
+  canImport: true,
+  searchParams: new URLSearchParams(),
+}));
+
+const mockNavigate = mockState.navigate;
+const mockValidate = mockState.validate;
 
 const __realModulesForRestore: Array<[string, Record<string, unknown>]> = [
   ["@tanstack/react-query", { ...__realModule0 }],
@@ -40,12 +48,8 @@ __afterAllRestore(() => {
 });
 
 vi.mock("@tanstack/react-query", () => ({
-  ...__realModule0,
   useQuery: ({ queryKey }: { queryKey: string[] }) => ({
-    data:
-      queryKey[1] === "coverage"
-        ? { covered: CORE_V1_MATERIAS_COUNT, gaps: [] }
-        : mockOrphanCount,
+    data: queryKey[1] === "coverage" ? { covered: 14, gaps: [] } : mockState.orphanCount,
     isError: false,
     isLoading: false,
     isFetching: false,
@@ -54,13 +58,11 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("react-router-dom", () => ({
-  ...__realModule1,
-  useNavigate: () => mockNavigate,
-  useSearchParams: () => [mockSearchParams, vi.fn()],
+  useNavigate: () => mockState.navigate,
+  useSearchParams: () => [mockState.searchParams, vi.fn()],
 }));
 
 vi.mock("@/context/TenantContext", () => ({
-  ...__realModule2,
   useTenantContext: () => ({
     tenantId: "tenant-1",
     entityId: null,
@@ -71,9 +73,8 @@ vi.mock("@/context/TenantContext", () => ({
 }));
 
 vi.mock("@/hooks/usePlantillasProtegidas", () => ({
-  ...__realModule3,
   usePlantillasProtegidas: () => ({
-    data: mockRows,
+    data: mockState.rows,
     isError: false,
     isLoading: false,
     isFetching: false,
@@ -82,7 +83,6 @@ vi.mock("@/hooks/usePlantillasProtegidas", () => ({
 }));
 
 vi.mock("@/hooks/secretaria/usePlantillaChangelog", () => ({
-  ...__realModule4,
   usePlantillaChangelog: () => ({
     data: [],
     isError: false,
@@ -93,24 +93,24 @@ vi.mock("@/hooks/secretaria/usePlantillaChangelog", () => ({
 }));
 
 vi.mock("@/lib/secretaria/legal-template-coverage", () => ({
-  ...__realModule5,
   buildLegalTemplateCoverage: () => [],
 }));
 
 vi.mock("@/lib/secretaria/legal-template-review", () => ({
-  ...__realModule6,
   buildLegalTemplateReviewRows: () => [],
 }));
 
 vi.mock("@/lib/secretaria/template-admin", () => ({
-  ...__realModule7,
-  validateTemplateForActivation: (...args: unknown[]) => mockValidate(...args),
+  CORE_V1_MATERIAS_COUNT: 14,
+  KNOWN_P0_TEMPLATE_IDS: [],
+  computeCoreCoverage: vi.fn(),
+  countOrphanTemplates: vi.fn(),
+  validateTemplateForActivation: (...args: unknown[]) => mockState.validate(...args),
 }));
 
 vi.mock("../tab-guards", () => ({
-  ...__realModule8,
   useTabAccess: () => ({
-    canAccess: (tab: string) => tab !== "importar" || mockCanImport,
+    canAccess: (tab: string) => tab !== "importar" || mockState.canImport,
     visibleTabs: [],
     isLoading: false,
   }),
@@ -157,14 +157,14 @@ describe("DashboardTab", () => {
       issues: [],
       summary: { blocking: 0, warning: 0, info: 0 },
     });
-    mockOrphanCount = 0;
-    mockRows = [activeTemplate()];
-    mockCanImport = true;
-    mockSearchParams = new URLSearchParams();
+    mockState.orphanCount = 0;
+    mockState.rows = [activeTemplate()];
+    mockState.canImport = true;
+    mockState.searchParams = new URLSearchParams();
   });
 
   it("trata las plantillas sin changelog como advertencia y enlaza su auditoría", () => {
-    mockOrphanCount = 73;
+    mockState.orphanCount = 73;
     render(<DashboardTab />);
 
     expect(screen.getByText("Con advertencias")).toBeTruthy();
@@ -181,7 +181,7 @@ describe("DashboardTab", () => {
   });
 
   it("normaliza shapes legacy para Gate PRE y abre la primera plantilla exacta", () => {
-    mockRows = [
+    mockState.rows = [
       activeTemplate({
         id: "tpl-legacy",
         capa2_variables: [{ name: "entities.name", source: "entities.*", display: "Siempre" }],
@@ -219,8 +219,8 @@ describe("DashboardTab", () => {
   });
 
   it("conserva el contexto al abrir una incidencia", () => {
-    mockOrphanCount = 1;
-    mockSearchParams = new URLSearchParams(
+    mockState.orphanCount = 1;
+    mockState.searchParams = new URLSearchParams(
       "tab=dashboard&scope=sociedad&entity=arga&materia=FUSION&q=acta&modo=legal",
     );
 
@@ -234,8 +234,8 @@ describe("DashboardTab", () => {
   });
 
   it("no ofrece importar en el estado vacío sin permiso", () => {
-    mockRows = [];
-    mockCanImport = false;
+    mockState.rows = [];
+    mockState.canImport = false;
 
     render(<DashboardTab />);
 
