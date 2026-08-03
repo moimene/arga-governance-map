@@ -1,0 +1,89 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B, vertiente B1). Un fichero por sociedad. Procedencia: BORME_CITADO = acto real con anuncio nº + datos registrales (2 de ellos verificados con texto literal directo en boe.es); AGREGADOR = ficha agregada sin cita de anuncio concreto. Fuentes usadas: axesor.es (tabla completa de actos BORME), datoscif.es (tabla de cargos vigentes), iberinform.es (cargos, parcial), boe.es (texto literal de 2 anuncios), empresia.es (ficha de cargos por persona de Roberto Delgado Gil, cruzada). Consultado 2026-08-03.",
+  "slug": "ead-trust-sl",
+  "denominacion": "EAD Trust European Agency of Digital Trust, S.L.",
+  "nif": "B85626240",
+  "situacion": "Activa",
+  "forma": "Sociedad Limitada",
+  "cnae": "6209",
+  "provincia": "Madrid",
+  "domicilio": "Calle Méntrida, 6, Local (Madrid)",
+  "capital_social_vigente_eur": 3445.0,
+  "capital_nota": "Constituida 29/01/2009. Capital social exacto (3.445 €) según datoscif.es; otras fichas (axesor, iberinform) solo dan un rango '1-3.500 €' o '3.000-30.000 €'. No se ha localizado un acto BORME 2024-2026 de ampliación de capital, así que se toma el valor puntual más preciso disponible.",
+  "fuente_captura": "https://www.axesor.es/Informes-Empresas/5569790/EAD_TRUST_EUROPEAN_AGENCY_OF_DIGITAL_TRUST_SL.html ; https://www.datoscif.es/empresa/ead-trust-european-agency-of-digital-trust-sl ; https://www.iberinform.es/empresa/3683533/ead-trust-european-agency-of-digital-trust ; https://www.empresia.es/persona/delgado-gil-roberto/ ; boe.es (BORME-A-2026-123-28, BORME-A-2024-239-28) — todo consultado 2026-08-03",
+  "cargos_vigentes": [
+    { "cargo": "Presidente", "persona": "Inza Aldaz, Julián Ramón", "desde": "PENDIENTE" },
+    { "cargo": "Consejero", "persona": "Inza Aldaz, Julián Ramón", "desde": "PENDIENTE" },
+    { "cargo": "Vicepresidente", "persona": "Abad Valdenebro, Eduardo", "desde": "PENDIENTE" },
+    { "cargo": "Consejero", "persona": "Abad Valdenebro, Eduardo", "desde": "PENDIENTE" },
+    { "cargo": "Consejero Delegado", "persona": "Inza Blasco, Eduardo", "desde": "2023-05-03" },
+    { "cargo": "Consejero", "persona": "Inza Blasco, Eduardo", "desde": "PENDIENTE" },
+    { "cargo": "Consejero", "persona": "Menéndez Andrés, Moisés", "desde": "PENDIENTE" },
+    { "cargo": "Consejero", "persona": "Mesa Sánchez, Cristina", "desde": "PENDIENTE" },
+    { "cargo": "Secretario no Consejero", "persona": "Delgado Gil, Roberto", "desde": "2023-04-20" },
+    { "cargo": "Vicesecretario no Consejero", "persona": "Aguayo, Belén", "desde": "PENDIENTE" },
+    { "cargo": "Auditor", "persona": "Lillo Auditores Asociados SL", "desde": "2023-07-20" },
+    { "cargo": "Apoderado", "persona": "Abad Valdenebro, Eduardo", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Delgado Gil, Roberto", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Delgado Quirós, Manuel", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Inza Blasco, Eduardo", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Inza Aldaz, Julián", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Menéndez Andrés, Moisés", "desde": "2024-12-04" },
+    { "cargo": "Apoderado", "persona": "Mesa Sánchez, Cristina", "desde": "2024-12-04" }
+  ],
+  "cargos_vigentes_nota": "Consejo de Administración confirmado con NOMBRE COMPLETO para las 7 personas esperadas por la fuente interna (presidente, consejero delegado, 3 consejeros más, secretario no consejero, vicesecretaria), vía datoscif.es (tabla explícita de cargo+nombre) y boe.es (texto literal del anuncio 539136/2024 que lista los 7 apoderados con apellidos completos). ÚNICA EXCEPCIÓN: el apellido completo de 'Belén Aguayo' (vicesecretaria) NO se confirmó letra por letra en ninguna fuente que pude leer sin login — iberinform.es solo mostraba 'BELEN A...' (redactado). El nombre coincide con la expectativa interna del usuario (nombre + inicial de apellido), pero se marca aquí como confirmación PARCIAL, no plena. Los campos 'desde' sin fecha concreta (marcados PENDIENTE) es porque las fuentes muestran el cargo vigente pero no siempre la fecha de nombramiento — sólo se pudo fechar el Consejero Delegado (03/05/2023, coincide con acto BORME de esa fecha) y el Secretario no Consejero (20/04/2023, confirmado independientemente vía ficha de cargos por persona de Roberto Delgado Gil en empresia.es). Hallazgo adicional no anticipado por la fuente interna: Eduardo Abad Valdenebro consta como VICEPRESIDENTE, no solo consejero.",
+  "actos": [
+    {
+      "fecha": "2026-06-23",
+      "tipo": "REELECCION",
+      "cargo": "Auditor",
+      "persona": "Lillo Auditores Asociados SL",
+      "provenance": "BORME_CITADO",
+      "anuncio": "308769/2026",
+      "registral": "S 8, H M-475828, I/A 11",
+      "cve": "BORME-A-2026-123-28",
+      "nota": "Texto literal verificado directamente en boe.es: 'Reelecciones. Auditor: LILLO AUDITORES ASOCIADOS SL. Datos registrales. S 8, H M 475828, I/A 11 (23.06.26).'"
+    },
+    {
+      "fecha": "2025-07-01",
+      "tipo": "REELECCION",
+      "detalle": "Reelección de cargo(s) — naturaleza exacta no confirmada con texto literal",
+      "provenance": "BORME_CITADO",
+      "anuncio": "308013/2025",
+      "registral": "S 8, H M-475828, I/A 10"
+    },
+    {
+      "fecha": "2024-12-04",
+      "tipo": "NOMBRAMIENTO",
+      "cargo": "Apoderado",
+      "detalle": "Nombramiento de 7 apoderados: Abad Valdenebro Eduardo, Menéndez Andrés Moisés, Mesa Sánchez Cristina, Delgado Gil Roberto, Delgado Quirós Manuel, Inza Blasco Eduardo, Inza Aldaz Julián",
+      "provenance": "BORME_CITADO",
+      "anuncio": "539136/2024",
+      "registral": "S 8, H M-475828, I/A 9",
+      "cve": "BORME-A-2024-239-28",
+      "nota": "Texto literal verificado directamente en boe.es."
+    },
+    {
+      "fecha": "2024-08-05",
+      "tipo": "REELECCION",
+      "detalle": "Reelección de cargo(s) — naturaleza exacta no confirmada con texto literal",
+      "provenance": "BORME_CITADO",
+      "anuncio": "354636/2024",
+      "registral": "S 8, H M-475828, I/A 8"
+    },
+    {
+      "fecha": "2024-06-23",
+      "tipo": "NOMBRAMIENTO",
+      "detalle": "Nombramiento de cargo(s) — naturaleza exacta no confirmada con texto literal (intento de verificación en boe.es BORME-A-2024-124-28 no localizó la entrada — el mapeo boletín→CVE puede no ser lineal, no se fuerza el dato)",
+      "provenance": "BORME_CITADO",
+      "anuncio": "292708/2024",
+      "registral": "S 8, H M-475828, I/A 7"
+    }
+  ],
+  "actos_nota": "Fuera de la ventana 2024-2026 pero relevante para fechar el consejo: actos de 2023 (20/04/2023 ceses/nombramientos I/A 4, 03/05/2023 revocaciones/nombramientos I/A 5, 20/07/2023 nombramientos I/A 6) según axesor.es — no incluidos como 'actos' por estar fuera de alcance, pero explican las fechas 'desde' de Secretario no Consejero y Consejero Delegado arriba.",
+  "boletines": [
+    { "cve": "BORME-A-2026-123-28", "fecha": "2026-06-30" },
+    { "cve": "BORME-A-2024-239-28", "fecha": "2024-12-12" }
+  ],
+  "boletines_nota": "Solo se incluyen los 2 CVE verificados directamente contra boe.es. Los otros 3 actos de 2024-2025 tienen nº de boletín/anuncio citados por el agregador (axesor.es) pero el CVE no se ha podido resolver por intento directo (un intento de construir BORME-A-2024-124-28 no encontró la entrada esperada, indicando que el nº de boletín del agregador no mapea linealmente al sufijo del CVE oficial) — no se fuerza ni se inventa el CVE para esos 3."
+}

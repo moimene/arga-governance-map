@@ -1,0 +1,30 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B). Un fichero por sociedad. Procedencia: BORME_CITADO = acto real con anuncio nº y/o CVE citable (incluye cita de agregador tipo 'Boletín X, Ref. Y', igual que en el ejemplo jya-garrigues-slp.json); AGREGADOR = dato de ficha agregada sin anuncio concreto citable. Esta captura combina einforma.com como fuente primaria con axesor.es, empresite.eleconomista.es, iberinform.es e infonif.economia3.com como cruce, más verificación de texto oficial en boe.es/diario_borme para la mayoría de los actos 2024-2026 (CVE citados en 'boletines'). Capturado 2026-08-03. Contenido documental NO incluido: el BORME publica extractos; cualquier contenido inferido se etiquetará INFERIDO en capas posteriores.",
+  "slug": "garrigues-ip-slp",
+  "denominacion": "Garrigues IP, S.L.P.",
+  "nif": "B78523123",
+  "situacion": "Activa",
+  "forma": "Sociedad Limitada Profesional",
+  "cnae": "7022",
+  "provincia": "Madrid",
+  "domicilio": "Plaza De Colon 2 (Madrid)",
+  "capital_social_vigente_eur": 162000.0,
+  "capital_nota": "Capital social 162.000 € según einforma (iberinform sitúa el tramo en 120.000-300.000 €, consistente; infonif no publica cifra). CNAE: 7022 (einforma y axesor coinciden); iberinform/infonif indican 7020 (variante de agregación del mismo grupo CNAE); infoempresa indica '69 - Actividades jurídicas y de contabilidad' (clasificación más genérica, discrepante). Fecha de constitución 24/06/1987 coincide en einforma, axesor e iberinform; infonif indica en cambio 31/12/1994 (posible fecha placeholder de esa fuente, no conciliado). Denominación anterior: 'Garrigues Agencia De Propiedad Industrial E Intelectual SLP' / '...SL'. Sociedad matriz confirmada por infonif: J & A Garrigues SLP (B81709081) — el NIF de Garrigues IP fue además corroborado de forma independiente por otro carril de este mismo proyecto vía infonif (ficha de participadas de J&A Garrigues SLP), sin discrepancia. Estatus de sociedad unipersonal y porcentaje de participación de J & A Garrigues SLP: PENDIENTE — ninguna fuente pública consultada (einforma/axesor/iberinform/infonif/infoempresa) afirma 'Sociedad Unipersonal' ni cita un %; el Registro Mercantil/BORME no publica cap table. El 100% y esUnipersonal=true del catálogo interno permanecen sin verificación registral pública en este barrido.",
+  "fuente_captura": "einforma.com/informacion-empresa/garrigues-ip-slp (consulta 2026-08-03); cruzado con axesor.es/Informes-Empresas/73084/GARRIGUES_IP_SLP.html, empresite.eleconomista.es/GARRIGUES-IP-SLP.html, iberinform.es/empresa/565619/garrigues-ip, infonif.economia3.com/ficha-empresa/garrigues-ip-slp e infoempresa.com/es-es/es/empresa/garrigues-agencia-de-propiedad-industrial-e-intelectual-slp (consultas 2026-08-03). Actos 2024-2025 verificados directamente en texto oficial boe.es/diario_borme (BORME-A-2025-88-28, BORME-A-2025-40-28, BORME-A-2024-78-28; consultas 2026-08-03).",
+  "cargos_vigentes": [
+    { "cargo": "Adm. Unico", "persona": "J & A Garrigues SLP", "desde": "2008-07-15" }
+  ],
+  "cargos_vigentes_nota": "einforma cita el nombramiento del Adm. Único (15/07/2008) con representante persona física 'Alonso Puig, Jose Maria'; iberinform/infonif citan en cambio a 'Vives Ruiz, Fernando' (el actual Adm. Único de la propia matriz J & A Garrigues SLP, ver jya-garrigues-slp.json) como representante/'cargo directivo', sin fecha ni anuncio BORME propio citable para ese cambio de representante — PENDIENTE confirmar si hubo una inscripción posterior no capturada en este barrido, o si es una etiqueta aproximada del agregador. einforma indica además '26 Administradores en funciones' sin detalle individual (contenido tras muro de pago) — presumiblemente incluye Soc.Prof./Apoderados históricos al estilo de J&A Garrigues SLP; no se ha podido completar el listado. Ningún auditor propio reportado por las fuentes consultadas para esta sociedad (PENDIENTE).",
+  "actos": [
+    { "fecha": "2025-05-05", "tipo": "CAMBIO_DOMICILIO", "detalle": "Traslado del domicilio social a Plaza de Colón 2 (Madrid); domicilio anterior Calle Hermosilla 3, 28001 Madrid", "provenance": "BORME_CITADO", "anuncio": "212169/2025", "registral": "S 8, H M-121814, I/A 81" },
+    { "fecha": "2025-02-27", "tipo": "TRANSMISION_AUTOCARTERA", "detalle": "Monica Arizti Acha transmite una participación de la clase B a la propia sociedad", "provenance": "BORME_CITADO", "anuncio": "97506/2025", "registral": "S 8, H M-121814, I/A 79" },
+    { "fecha": "2025-02-27", "tipo": "REVOCACION", "cargo": "Apoderado", "persona": "Arizti Acha, Monica", "provenance": "BORME_CITADO", "anuncio": "97507/2025", "registral": "S 8, H M-121814, I/A 80" },
+    { "fecha": "2024-04-15", "tipo": "MODIFICACION_ESTATUTARIA", "detalle": "Modificados los artículos 8 y 9 de los estatutos sociales", "provenance": "BORME_CITADO", "anuncio": "190017/2024", "registral": "T 31717, F 179, S 8, H M-121814, I/A 78" }
+  ],
+  "boletines": [
+    { "cve": "BORME-A-2025-88-28", "fecha": "2025-05-12" },
+    { "cve": "BORME-A-2025-40-28", "fecha": "2025-02-27" },
+    { "cve": "BORME-A-2024-78-28", "fecha": "2024-04-22" }
+  ],
+  "boletines_nota": "Lista limitada a boletines 2024-2026 verificados directamente en boe.es (texto oficial confirmado acto a acto). einforma reporta un histórico de 140 actos BORME desde 1990 y muestra en su tabla propia (sin verificación BOE independiente en este barrido) entradas adicionales: 10/07/2023 anuncio 310490 (modificación estatutaria), 15/02/2022 anuncio 68177 (nombramientos), 28/12/2021 anuncio 561685 (otros conceptos), 19/11/2021 anuncio 504778 (nombramientos), 12/07/2019 anuncio 301135 (modificación estatutaria) — todas fuera del alcance 2024-2026 solicitado, no resueltas a CVE en este barrido."
+}

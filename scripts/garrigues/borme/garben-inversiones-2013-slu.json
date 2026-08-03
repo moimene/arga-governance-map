@@ -1,0 +1,50 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B, vertiente B1). El slug de fichero se mantiene como 'garben-inversiones-2013-slu' (coincide con el slug ya usado en scripts/garrigues/entities-catalog.ts, que esta vertiente NO debe modificar), pero el campo 'denominacion' recoge la forma real que localicé en fuentes públicas, que difiere del nombre asumido. Fuentes: infonif.economia3.com (ficha directa de la sociedad + ficha de participadas de J&A Garrigues SLP y de G-Advisory SLP), empresite.eleconomista.es (título de página, sin fetch completo por rate-limit), empresia.es (ficha de cargos por persona de Roberto Delgado Gil). Consultado 2026-08-03.",
+  "slug": "garben-inversiones-2013-slu",
+  "denominacion": "Garmen Inversiones 2013, S.L.",
+  "denominacion_resolucion_nota": "POSIBLE CORRECCIÓN AL CATÁLOGO: el nombre que usa el catálogo interno y la tarea es 'Garben Inversiones 2013', pero la única sociedad localizable en fuentes públicas con este perfil (mismo grupo societario, año 2013, NIF B86825437) se llama consistentemente 'GARMEN INVERSIONES 2013 SL' — con M, no con B. Esta grafía aparece IDÉNTICA en tres consultas: la ficha propia/directa de la sociedad en infonif, la ficha de participadas de J&A Garrigues SLP, y la ficha de participadas de G-Advisory SLP; y el título de una página de empresite.eleconomista.es ('Garmen-Inversiones-2013.html', vista solo en snippet de búsqueda, no se pudo hacer fetch completo por HTTP 429) apunta en la misma dirección. LIMITACIÓN HONESTA: igual que con EWCH/EWOH, la confirmación por fetch directo descansa esencialmente en UNA sola base de datos subyacente (red economia3.com/infonif) consultada 3 veces, más el indicio adicional (no verificado con fetch) de empresite. No puedo descartar que 'Garben' sea la grafía correcta y 'Garmen' un error del agregador — pero dado que NINGUNA búsqueda ('Garben Inversiones 2013') devolvió resultados y TODAS las búsquedas de 'Garmen Inversiones 2013' sí, la hipótesis más consistente con la evidencia disponible es que 'Garben' es la lectura OCR incorrecta del cuadro IDC (B↔M es una confusión de OCR menos común que O↔C, pero plausible en tipografías pequeñas o cursivas). Recomiendo verificación adicional directa (Registro Mercantil de Madrid o búsqueda BORME por NIF B86825437) antes de renombrar el catálogo.",
+  "nif": "B86825437",
+  "situacion": "Activa",
+  "forma": "Sociedad Limitada",
+  "forma_nota": "El catálogo interno asume 'S.L.U.' (Sociedad Limitada Unipersonal, socio único) por inferencia aritmética del IDC. Ninguna de las fuentes consultadas en esta vertiente confirma explícitamente el carácter unipersonal (no vi mención de 'sociedad unipersonal' ni de socio único) — se deja PENDIENTE, no se afirma.",
+  "cnae": "PENDIENTE (sector descrito como 'Intermediarios financieros' en el agregador; código CNAE numérico no confirmado — nótese que es un sector DISTINTO al de Violet/EWOH, que aparecen como 'Consultoría empresarial y otros')",
+  "provincia": "Madrid",
+  "domicilio": "Plaza de Colón, 2 (Madrid)",
+  "capital_social_vigente_eur": 73000.0,
+  "capital_nota": "Constituida 26/09/2013. Capital ampliado de 70.000 € a 73.000 € (inscripción 28/01/2026, acto/anuncio 000044669) — a diferencia de Violet y EWOH, esta sociedad SÍ tuvo una ampliación de capital reciente. El importe de constitución exacto (¿los 70.000 € eran ya la cifra original, o hubo ampliaciones previas no localizadas?) queda PENDIENTE.",
+  "fuente_captura": "https://infonif.economia3.com/ficha-empresa/garmen-inversiones-2013-sl ; https://infonif.economia3.com/ficha-empresa/j-a-garrigues-slp ; https://infonif.economia3.com/ficha-empresa/g-advisory-consultoria-tecnica-economica-y-estrategica-slp ; https://www.empresia.es/persona/delgado-gil-roberto/ — consultado 2026-08-03",
+  "titular_directo_nota": "Igual salvedad que en Violet y EWOH: infonif.economia3.com etiqueta 'Empresa Matriz: J & A GARRIGUES SLP (B81709081)' en la ficha directa de esta sociedad. El catálogo interno infiere en cambio que el padre directo sería G-Advisory SLP (75% de J&A Garrigues) por pura aritmética de porcentajes del IDC ('~75% indirecta de J&A... 100% vía G-Advisory'). NINGUNA fuente consultada confirma o descarta esa cadena concreta — el campo 'Empresa Matriz' del agregador parece ser la cabecera última del grupo (aparece igual en fichas de sociedades con distinto % de participación conocido), no el accionista inmediato. La hipótesis del catálogo (G-Advisory como padre directo) sigue siendo razonable pero NO CONFIRMADA; tampoco se puede descartar que el padre directo sea J&A Garrigues SLP mismo, como parecen sugerir sus hermanas Violet/EWOH.",
+  "cargos_vigentes": [
+    { "cargo": "Representante", "persona": "Delgado Quirós, Manuel", "desde": "PENDIENTE" },
+    { "cargo": "Apoderado", "persona": "Delgado Gil, Roberto", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Ordúñez Pérez, María José", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Chapinal Martín, Laura", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "De Pedro Martín, Víctor Manuel", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Sastre Gallego, María de las Mercedes", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "García Temprano, Mahey", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "González Pindado, Ana", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Vadillo Rebollo, María Luisa", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Fernández Ruiz, Ana", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Otal Soria, Laura", "desde": "2021-11-12" }
+  ],
+  "cargos_vigentes_nota": "Mismo patrón que Violet/EWOH: administrador persona jurídica representado por Manuel Delgado Quirós (no se nombró explícitamente la razón social del administrador en la ficha de esta sociedad — se deja PENDIENTE si es 'Rino Asesores SLP' como en Violet), y los mismos 10 apoderados nombrados el mismo día (12/11/2021) en las tres sociedades hermanas. DATO RELEVANTE (2026-08-03): 'Rino Asesores, S.L.P.' es la antigua denominación (hasta 02/01/2018) de 'Garrigues Letrados de Soporte, S.L.P.' (NIF B81552671) — uno de los otros objetivos de este mismo encargo. Sigue sin confirmar si es específicamente ella la administradora de esta sociedad en concreto.",
+  "actos": [
+    {
+      "fecha": "2026-01-28",
+      "tipo": "AMPLIACION_CAPITAL",
+      "detalle": "Ampliación de capital de 70.000 € a 73.000 €",
+      "provenance": "BORME_CITADO",
+      "anuncio": "44669/2026",
+      "registral": "PENDIENTE (nº de boletín no citado por la fuente para este acto concreto)"
+    },
+    {
+      "fecha": "2025-05-08",
+      "tipo": "OTROS",
+      "detalle": "Cambio de domicilio social a Plaza de Colón, 2 (Madrid)",
+      "provenance": "AGREGADOR",
+      "nota": "La ficha de infonif data este cambio pero NO cita nº de anuncio/boletín para esta sociedad en concreto (a diferencia de Violet, cuyo cambio de domicilio análogo sí tenía anuncio 209471/2025 citado por axesor.es) — se marca como AGREGADOR, no BORME_CITADO, siguiendo la política estricta de procedencia."
+    }
+  ],
+  "boletines": [],
+  "boletines_nota": "No se ha localizado ningún CVE oficial BORME para esta sociedad."
+}

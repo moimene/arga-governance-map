@@ -1,0 +1,35 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B). Un fichero por sociedad. Compañía Digital NewLaw, S.L.U. es la matriz directa esperada de EAD Trust European Agency of Digital Trust, S.L. (participación ~51% esperada según catálogo interno) — este fichero NO verifica esa participación: las sociedades participadas normalmente no aparecen en el BORME de la propia matriz, solo en el BORME de la participada, y auditar el BORME de EAD Trust queda fuera del alcance de este fichero. Todos los actos con provenance BORME_CITADO fueron verificados por lectura DIRECTA del PDF oficial en boe.es el 2026-08-03 (no solo agregador): se localizó primero la referencia exacta de anuncio vía el índice alfabético del boletín correspondiente (sección '-99' del mismo número BORME) y después se confirmó visualmente la página exacta del PDF de Madrid (sección '-28'), igual que para el resto de sociedades de este carril. Contenido documental NO incluido.",
+  "slug": "cia-digital-newlaw-slu",
+  "denominacion": "Compañía Digital NewLaw, S.L.U.",
+  "nif": "B72893035",
+  "situacion": "Activa",
+  "forma": "Sociedad de Responsabilidad Limitada Unipersonal (S.L.U.)",
+  "cnae": "PENDIENTE",
+  "provincia": "Madrid",
+  "domicilio": "Plaza De Colon, Numero 2 (Madrid)",
+  "capital_social_vigente_eur": 1578000.0,
+  "capital_nota": "Historial de ampliaciones reconstruido cruzando agregadores (empresia.es, infonif.economia3.com, librebor.me) y BORME directo: capital inicial 20.000 € (constitución, comienzo de operaciones 16/12/2022) → +1.000.000 € (ampliación de marzo/abril de 2023, según agregador, SIN cita BORME directa localizada por este carril) → resultante 1.066.000 € tras +46.000 € (ampliación de enero de 2024, según agregador, SIN cita BORME directa localizada) → resultante 1.178.000 € tras +112.000 € inscrita el 09/07/2024 (BORME_CITADO, anuncio 316453/2024, coincide exactamente con la cifra de agregador) → resultante 1.578.000 € VIGENTE tras +400.000 € inscrita el 06/08/2025 (BORME_CITADO, anuncio 368733/2025, coincide exactamente con la cifra de agregador). Aritmética internamente consistente en toda la cadena.",
+  "fuente_captura": "empresia.es/empresa/compania-digital-newlaw/ e infonif.economia3.com/ficha-empresa/compania-digital-newlaw-sl (consulta 2026-08-03); actos citados abajo verificados por lectura directa del PDF oficial en boe.es (BORME-A-2024-136-28, BORME-A-2025-86-28, BORME-A-2025-153-28), consulta 2026-08-03",
+  "cargos_vigentes": [
+    { "cargo": "Socio Unico y Adm. Unico", "persona": "J & A Garrigues SLP", "desde": "2022-12-28" },
+    { "cargo": "Representante persona física del Adm. Unico", "persona": "Vives Ruiz, Fernando", "desde": "2022-12-28" },
+    { "cargo": "Apoderado", "persona": "Delgado Quiros, Manuel", "desde": "2022-12-28" },
+    { "cargo": "Apoderado", "persona": "Delgado Gil, Roberto", "desde": "2022-12-28", "nota": "Según hallazgo de otro carril de esta misma investigación, esta persona es también Apoderado Mancomunado de Garrigues Portugal SLP desde 2018 — persona compartida entre sociedades del grupo, mismo patrón de apoderados/socios cruzados observado también entre J & A Garrigues SLP y Garrigues Portugal SLP." }
+  ],
+  "cargos_vigentes_nota": "Fuente agregada (empresia.es) menciona '7 apoderados adicionales' desde la misma fecha de constitución sin desglosar sus nombres — listado truncado en la fuente, no completado por este carril. Todas las fechas 'desde' de esta sección proceden de agregador (empresia.es), no de cita BORME directa de cada nombramiento individual.",
+  "actos": [
+    { "fecha": "2025-08-06", "tipo": "AMPLIACION_CAPITAL", "detalle": "Ampliación de capital de 400.000,00 € (resultante suscrito 1.578.000,00 €)", "provenance": "BORME_CITADO", "anuncio": "368733/2025", "registral": "S 8, H M 783768, I/A 8" },
+    { "fecha": "2025-04-29", "tipo": "CAMBIO_DOMICILIO", "detalle": "Cambio de domicilio social a Plaza De Colon, Numero 2 (Madrid)", "provenance": "BORME_CITADO", "anuncio": "206055/2025", "registral": "S 8, H M 783768, I/A 7" },
+    { "fecha": "2024-07-09", "tipo": "AMPLIACION_CAPITAL", "detalle": "Ampliación de capital de 112.000,00 € (resultante suscrito 1.178.000,00 €)", "provenance": "BORME_CITADO", "anuncio": "316453/2024", "registral": "S 8, H M 783768, I/A 6" },
+    { "fecha": "2024-01-16", "tipo": "AMPLIACION_CAPITAL", "detalle": "Ampliación de capital de 46.000,00 € (resultante suscrito 1.066.000,00 €)", "provenance": "AGREGADOR", "nota": "Fecha y cifra según librebor.me/infonif; sin cita de número de anuncio ni datos registrales, no verificado por lectura directa de BORME por este carril." },
+    { "fecha": "2023-03-30", "tipo": "AMPLIACION_CAPITAL", "detalle": "Ampliación de capital de 1.000.000,00 €", "provenance": "AGREGADOR", "nota": "Fecha según librebor.me (infonif la sitúa en 'abril 2023', discrepancia menor de días entre agregadores); sin cita de número de anuncio ni datos registrales, no verificado por lectura directa de BORME por este carril." },
+    { "fecha": "2022-12-16", "tipo": "OTROS", "detalle": "Constitución. Objeto social: desarrollo de actividades y prestación de servicios relacionados con nuevas tecnologías, telecomunicaciones, informática, sociedad de la información, comercio electrónico, Internet y otras redes. Capital inicial 20.000,00 €. Domicilio inicial C/ Hermosilla 3 (Madrid). Socio único y administrador único: J & A Garrigues SLP.", "provenance": "AGREGADOR", "nota": "Según librebor.me/infonif; sin cita de número de anuncio ni datos registrales, no verificado por lectura directa de BORME por este carril." }
+  ],
+  "boletines": [
+    { "cve": "BORME-A-2025-153-28", "fecha": "2025-08-13" },
+    { "cve": "BORME-A-2025-86-28", "fecha": "2025-05-08" },
+    { "cve": "BORME-A-2024-136-28", "fecha": "2024-07-16" }
+  ],
+  "boletines_nota": "Solo se listan los boletines cuyo anuncio fue verificado por lectura directa del PDF oficial (provenance BORME_CITADO en 'actos'). No se ha localizado ni verificado el boletín de constitución (16/12/2022) ni los de las ampliaciones de 2023 y enero de 2024, que en este fichero quedan con provenance AGREGADOR."
+}

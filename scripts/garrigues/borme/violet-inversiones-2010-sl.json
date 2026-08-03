@@ -1,0 +1,44 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B, vertiente B1). Fuentes: infonif.economia3.com (ficha directa + ficha de participadas de J&A Garrigues SLP), empresia.es (ficha directa + ficha de cargos por persona de Roberto Delgado Gil y Manuel Delgado Quirós), axesor.es (tabla de actos BORME). Consultado 2026-08-03.",
+  "slug": "violet-inversiones-2010-sl",
+  "denominacion": "Violet Inversiones 2010, S.L.",
+  "nif": "B85944411",
+  "situacion": "Activa",
+  "forma": "Sociedad Limitada",
+  "cnae": "7022",
+  "provincia": "Madrid",
+  "domicilio": "Plaza de Colón, 2 (Madrid)",
+  "capital_social_vigente_eur": 3012.0,
+  "capital_nota": "Constituida 29/04/2010, capital desembolsado 04/05/2010 (3.012 €). No se ha localizado ampliación de capital posterior en las fuentes consultadas (a diferencia de Garmen Inversiones 2013 SL, que sí amplió capital en enero 2026).",
+  "fuente_captura": "https://infonif.economia3.com/ficha-empresa/violet-inversiones-2010-sl ; https://www.empresia.es/empresa/violet-inversiones-2010/ ; https://www.axesor.es/Informes-Empresas/6529160/VIOLET_INVERSIONES_2010_SL.html ; https://www.empresia.es/persona/delgado-gil-roberto/ — consultado 2026-08-03",
+  "titular_directo_nota": "RESUELTO (con matiz): infonif.economia3.com etiqueta explícitamente 'Empresa Matriz: J & A GARRIGUES SLP (B81709081)' en la ficha de Violet. Esto resuelve la incidencia del catálogo interno ('100% indirecta según IDC con titular directo ilegible — parent sin asignar'), PERO con una salvedad importante: el mismo agregador pone idéntica etiqueta 'Empresa Matriz: J & A GARRIGUES SLP' en la ficha de G-Advisory SLP, sociedad que el propio IDC 2025 describe como 75% (no 100%) participada — es decir, el campo 'Empresa Matriz' de este agregador parece señalar la CABECERA ÚLTIMA del grupo societario completo, no necesariamente el ACCIONISTA DIRECTO/INMEDIATO. Por tanto: hay evidencia pública sólida de que Violet pertenece al grupo J&A Garrigues, pero NO hay evidencia pública (BORME no publica habitualmente el libro de socios) de si J&A Garrigues SLP es accionista DIRECTO de Violet o si hay un vehículo intermedio. Se recomienda tratar 'parentSlug: jya-garrigues-slp' como razonablemente probable pero no 100% CONFIRMADO a nivel de accionariado directo.",
+  "cargos_vigentes": [
+    { "cargo": "Adm. Unico", "persona": "Rino Asesores SLP", "desde": "2010-05-04" },
+    { "cargo": "Representante (de Rino Asesores SLP)", "persona": "Delgado Quirós, Manuel", "desde": "PENDIENTE" },
+    { "cargo": "Apoderado", "persona": "Otal Soria, Laura", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Fernández Ruiz, Ana", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Vadillo Rebollo, María Luisa", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "González Pindado, Ana", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "García Temprano, Mahey", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Sastre Gallego, María de las Mercedes", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "De Pedro Martín, Víctor Manuel", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Ordúñez Pérez, María José", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Chapinal Martín, Laura", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "Delgado Gil, Roberto", "desde": "2021-11-12" }
+  ],
+  "cargos_vigentes_nota": "El administrador único es una persona jurídica (Rino Asesores SLP), representada por Manuel Delgado Quirós — patrón idéntico al de EWOH Inversiones 2010 SL y Garmen Inversiones 2013 SL (mismos 10 apoderados nombrados el mismo día 12/11/2021 en las tres sociedades). González Pindado, Ana: el apellido 'Pindado' se corrigió el 28/12/2021 (BORME) tras figurar erróneamente como 'Pintado' en el nombramiento original — se usa aquí la forma corregida. HALLAZGO IMPORTANTE (2026-08-03, cruzado con el carril que investigó Garrigues Letrados de Soporte SLP): 'Rino Asesores, S.L.P.' cambió de denominación a 'Garrigues Letrados de Soporte, S.L.P.' el 02/01/2018 (NIF B81552671, confirmado vía einforma.com/guiaempresas.universia.es/pymes.com). Es decir, el Adm. Único de Violet nombrado en 2010 bajo el nombre 'Rino Asesores SLP' es, con toda probabilidad, la MISMA persona jurídica que hoy se llama Garrigues Letrados de Soporte SLP — uno de los otros 11 objetivos de este mismo encargo. Esto refuerza (más allá de la etiqueta genérica 'Empresa Matriz' del agregador) que Violet está administrada por una filial instrumental del propio grupo Garrigues, no por un tercero externo. No he verificado si el Registro Mercantil sigue mostrando 'Rino Asesores SLP' como denominación vigente del administrador en la hoja registral de Violet (es decir, si el cambio de nombre de 2018 se reflejó automáticamente en la inscripción del cargo en Violet, o si requeriría un acto de actualización aparte) — se deja como nota, no como campo re-etiquetado, para no sobreclaim.",
+  "actos": [
+    {
+      "fecha": "2025-04-30",
+      "tipo": "OTROS",
+      "detalle": "Cambio de domicilio social: de Paseo de la Castellana, 10 a Plaza de Colón, 2 (Madrid)",
+      "provenance": "BORME_CITADO",
+      "anuncio": "209471/2025",
+      "registral": "Boletín 87",
+      "nota": "Fecha de inscripción 30/04/2025 según axesor.es; otra ficha agregadora (empresia.es) data el mismo acto (mismo nº de referencia 209471) el 09/05/2025 — probablemente la diferencia es fecha de inscripción vs. fecha de publicación en el boletín, no una discrepancia real de fondo."
+    }
+  ],
+  "actos_nota": "Fuera de la ventana 2024-2026 pero documentado por axesor.es (tabla completa): 21/12/2021 Otros Conceptos (corrección apellido, boletín 247 ref 561688), 12/11/2021 Nombramientos (10 apoderados, boletín 222 ref 504792), y una serie de Nombramientos/Revocaciones entre 2015 y 2018 (bajas y altas de apoderados anteriores). No se listan aquí por estar fuera de alcance.",
+  "boletines": [],
+  "boletines_nota": "No se ha logrado resolver ningún CVE oficial BORME para esta sociedad (un intento de verificación directa en boe.es para el boletín 87/2025 con el sufijo de provincia de Madrid no localizó la entrada — el nº de boletín del agregador no mapea linealmente al CVE oficial). Los números de boletín y de anuncio citados en 'actos' provienen de axesor.es/empresia.es, no de BOE directo."
+}

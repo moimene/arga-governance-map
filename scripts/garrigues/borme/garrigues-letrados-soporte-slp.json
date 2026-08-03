@@ -1,0 +1,41 @@
+{
+  "$schema_nota": "Carril B (spec 2026-08-02 §Carril B). Un fichero por sociedad. einforma.com devolvió HTTP 429 (rate limit) en los 2 intentos realizados el 2026-08-03, por lo que NO pudo usarse como fuente directa pese a ser la fuente primaria sugerida; se usaron en su lugar axesor.es, datoscif.es, infonif.economia3.com, empresia.es (grupo elEconomista) e infoempresa.com, todos consultados el 2026-08-03. Los números de anuncio/referencia BORME citados están cruzados en ≥2 agregadores independientes salvo donde se indica explícitamente lo contrario en el campo 'nota' del acto. Ningún dato de hoja/tomo/folio registral (S/H/I-A) estuvo disponible en los agregadores consultados para esta sociedad — todos los campos 'registral' quedan PENDIENTE; esto NO es una omisión, es la constancia explícita de que ese dato concreto no se localizó. Cruce con catálogo interno: confirma NIF (antes null), confirma matriz J&A Garrigues SLP (NIF B81709081) y confirma explícitamente 'Administrador Único: J & A Garrigues SLP' (persona jurídica) en 2 fuentes independientes (datoscif.es e infonif.economia3.com) — consistente con formaAdministracion=ADMINISTRADOR_UNICO del catálogo. No se ha encontrado ningún socio profesional (Soc.Prof.) entre los cargos vigentes, solo Apoderados/Apoderado Solidario — consistente con esUnipersonal=true y con el rol de filial instrumental (no despacho profesional con base de socios propia como J&A Garrigues SLP).",
+  "slug": "garrigues-letrados-soporte-slp",
+  "denominacion": "Garrigues Letrados de Soporte, S.L.P.",
+  "nif": "B81552671",
+  "situacion": "Activa",
+  "forma": "Sociedad Limitada Profesional",
+  "cnae": "6920",
+  "provincia": "Madrid",
+  "domicilio": "Plaza De Colon 2 (Madrid)",
+  "capital_social_vigente_eur": null,
+  "capital_nota": "PENDIENTE — ningún agregador consultado publica el importe exacto. axesor.es e infoempresa.com muestran solo un rango genérico de visualización ('1 - 3.500 €', bucket de la plataforma, no un dato registral verificado); datoscif.es e infonif.economia3.com indican expresamente que el capital social exacto y las últimas cuentas requieren acceso Premium o no están publicados en BORME. No se ha inventado ninguna cifra.",
+  "fuente_captura": "axesor.es (https://www.axesor.es/Informes-Empresas/1038018/GARRIGUES_LETRADOS_DE_SOPORTE_SLP.html), datoscif.es (https://www.datoscif.es/empresa/garrigues-letrados-de-soporte-slp), infonif.economia3.com (https://infonif.economia3.com/ficha-empresa/garrigues-letrados-de-soporte-slp), empresia.es (https://www.empresia.es/empresa/garrigues-letrados-de-soporte/) e infoempresa.com (https://www.infoempresa.com/es-es/es/empresa/garrigues-letrados-de-soporte-slp), todos consultados el 2026-08-03. einforma.com (https://www.einforma.com/informacion-empresa/rino-asesores-slp) intentado 2 veces, HTTP 429 ambas — no usado.",
+  "cargos_vigentes": [
+    { "cargo": "Adm. Unico", "persona": "J & A Garrigues, S.L.P.", "desde": "PENDIENTE" },
+    { "cargo": "Apoderado", "persona": "Semprun Bouwknecht, Teresa", "desde": "2024-02-13" },
+    { "cargo": "Apoderado Solidario", "persona": "Semprun Bouwknecht, Teresa", "desde": "2024-02-12" },
+    { "cargo": "Apoderado Solidario", "persona": "Abad Valdenebro, Eduardo", "desde": "2024-02-12" },
+    { "cargo": "Apoderado", "persona": "Delgado Gil, Roberto", "desde": "2022-02-08" },
+    { "cargo": "Apoderado", "persona": "Delgado Quiros, Manuel", "desde": "2022-02-08" },
+    { "cargo": "Apoderado", "persona": "Ramos Banus, Lourdes", "desde": "2022-02-08" },
+    { "cargo": "Apoderado", "persona": "Chapinal Martin, Laura", "desde": "2021-11-12" },
+    { "cargo": "Apoderado", "persona": "De Pedro Martin, Victor Manuel", "desde": "2021-11-12" }
+  ],
+  "cargos_vigentes_nota": "axesor.es indica 40 cargos vigentes en total e infoempresa.com indica 74 (cifras agregadas genéricas, no necesariamente comparables entre sí); el listado detallado queda truncado tras muro 'Ver más'/Premium en todas las fuentes consultadas. Solo se han podido confirmar con nombre y fecha 'desde' los 9 cargos anteriores. El Administrador Único (J & A Garrigues, S.L.P., persona jurídica) no tiene fecha 'desde' publicada en ninguna fuente consultada, ni se ha localizado el nombre de su representante persona física para ESTA sociedad concreta (a diferencia de Garrigues Human Capital Services SLP, donde sí aparece un 'Representante' — Vives Ruiz Fernando — sin que ninguna fuente confirme de qué cargo; ver ficha hermana). Es plausible que sea la misma persona dado el patrón del grupo, pero NO está confirmado para esta sociedad y no se incluye por no inventar el dato.",
+  "actos": [
+    { "fecha": "2025-05-05", "tipo": "OTROS", "detalle": "Cambio de domicilio social", "provenance": "BORME_CITADO", "anuncio": "212100/2025", "registral": "PENDIENTE", "nota": "Ref. 212100 confirmada de forma independiente por axesor.es e infonif.economia3.com (\"Acto 000212100\"); publicado en BORME el 12/05/2025 (Boletín 88), mismo boletín que el cambio de domicilio de Garrigues Human Capital Services SLP (anuncio 212384/2025) — posible traslado de sede coordinado del grupo." },
+    { "fecha": "2024-08-01", "tipo": "REVOCACION", "cargo": "Apoderado", "persona": "Ribalta Noguera, Cristina", "provenance": "BORME_CITADO", "anuncio": "351532/2024", "registral": "PENDIENTE", "nota": "Ref. 351532 confirmada de forma independiente por axesor.es e infonif.economia3.com (\"Acto 000351532\"); publicado en BORME el 08/08/2024 (Boletín 152). La misma persona ya había tenido una revocación previa como Apoderado Solidario el 18/03/2021 según un resumen de búsqueda no verificado directamente — no incluida como acto separado por falta de cita directa de anuncio." },
+    { "fecha": "2024-02-12", "tipo": "NOMBRAMIENTO", "cargo": "Apoderado Solidario", "persona": "Abad Valdenebro, Eduardo", "provenance": "BORME_CITADO", "anuncio": "85097/2024", "registral": "PENDIENTE", "nota": "Nombramiento conjunto con Semprun Bouwknecht, Teresa (mismo anuncio); publicado BORME 19/02/2024 (Boletín 35). Fuente: infonif.economia3.com (\"Acto 000085097\")." },
+    { "fecha": "2024-02-12", "tipo": "NOMBRAMIENTO", "cargo": "Apoderado Solidario", "persona": "Semprun Bouwknecht, Teresa", "provenance": "BORME_CITADO", "anuncio": "85097/2024", "registral": "PENDIENTE", "nota": "Nombramiento conjunto con Abad Valdenebro, Eduardo; publicado BORME 19/02/2024 (Boletín 35)." },
+    { "fecha": "2024-02-13", "tipo": "NOMBRAMIENTO", "cargo": "Apoderado", "persona": "Semprun Bouwknecht, Teresa", "provenance": "BORME_CITADO", "anuncio": "87796/2024", "registral": "PENDIENTE", "nota": "Nombramiento individual adicional (no solidario), distinto del anuncio 85097/2024 del día anterior; publicado BORME 20/02/2024 (Boletín 36). Fuente: infonif.economia3.com (\"Acto 000087796\") + datoscif.es (cita independiente de BORME-A-2024-36-28 para el mismo hecho)." },
+    { "fecha": "2018-01-02", "tipo": "MODIFICACION_ESTATUTARIA", "detalle": "Cambio de denominación social de 'Rino Asesores, S.L.P.' a 'Garrigues Letrados de Soporte, S.L.P.'", "provenance": "AGREGADOR", "nota": "Fecha según empresia.es e infonif.economia3.com (ambos coinciden en la denominación anterior 'Rino Asesores SLP' y en esta fecha), pero ninguna de las dos fuentes cita número de anuncio ni CVE BORME para este acto concreto, por lo que NO se marca BORME_CITADO." }
+  ],
+  "boletines": [
+    { "cve": "BORME-A-2025-88-28", "fecha": "2025-05-12" },
+    { "cve": "BORME-A-2024-152-28", "fecha": "2024-08-08" },
+    { "cve": "BORME-A-2024-36-28", "fecha": "2024-02-20" },
+    { "cve": "BORME-A-2024-35-28", "fecha": "2024-02-19" }
+  ],
+  "boletines_nota": "Lista limitada a los boletines directamente asociados a los actos citados en este fichero (no se ha reconstruido el historial BORME completo de la sociedad; los agregadores consultados no expusieron una lista cruda de boletines equivalente a la de la ficha hermana jya-garrigues-slp.json). Se intentó verificar directamente contra el PDF oficial https://www.boe.es/borme/dias/2025/05/12/pdfs/BORME-A-2025-88-28.pdf pero la herramienta de fetch solo pudo acceder a la estructura binaria del PDF, no al texto; no se repitió el intento para no forzar scraping agresivo del PDF oficial."
+}
