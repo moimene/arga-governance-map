@@ -12,6 +12,8 @@ import {
 } from "@/lib/secretaria/normative-framework";
 import { TIPO_SOCIAL_OPTIONS } from "@/pages/secretaria/sociedad-nueva/StepIdentificacionLegal";
 import { TIPO_SOCIAL_LABEL, tipoSocialLabel } from "@/lib/secretaria/template-admin/labels";
+import { tipoSocialLabel as sociedadDetalleTipoSocialLabel } from "@/pages/secretaria/SociedadDetalle";
+import { tipoSocialLabel as sociedadesListTipoSocialLabel } from "@/pages/secretaria/SociedadesList";
 
 // Nota de adaptación (task-1-brief.md §Step 1): el brief original usaba
 // `buildPrototypeRulePack("SLP")` y campos `quorumPrimeraConvocatoria` como
@@ -105,5 +107,16 @@ describe("Identidad visible de SLP en superficies UI (Task 2 Step 3b)", () => {
     expect(displaySocietyLegalForm({ jurisdiction: "ES", tipoSocial: "SLP" })).toBe(
       "Sociedad Limitada Profesional",
     );
+  });
+
+  // Fix round 1 (hallazgos [M] del review adversarial): dos normalizaciones
+  // de presentación más, locales a cada página, con el mismo patrón de
+  // fallback a código crudo que las de arriba.
+  it("SociedadDetalle.tipoSocialLabel (rama ES) no cae a código crudo para SLP", () => {
+    expect(sociedadDetalleTipoSocialLabel("SLP", "ES")).toBe("Sociedad Limitada Profesional");
+  });
+
+  it("SociedadesList.tipoSocialLabel no cae a código crudo para SLP", () => {
+    expect(sociedadesListTipoSocialLabel("SLP")).toBe("Sociedad Limitada Profesional");
   });
 });

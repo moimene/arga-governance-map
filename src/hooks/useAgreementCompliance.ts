@@ -335,6 +335,20 @@ export function useAgreement(agreementId?: string) {
 /** Mapea legal_form normalizado a TipoSocial del motor V2. */
 function toTipoSocial(companyForm: string | null): TipoSocial {
   if (companyForm === "SA" || companyForm === "SA_CV") return "SA";
+  // SLP reutiliza primitivos SL; la identidad visible vive en
+  // labels/deriveTipoSocial, no aquí. Colapso deliberado: "SLP" ya caía en
+  // el "return 'SL'" genérico de abajo (como cualquier valor que no sea
+  // SA/SA_CV), así que esta rama explícita NO cambia el comportamiento
+  // observable — solo documenta la intención en vez de dejarla accidental.
+  //
+  // NO delegar en deriveTipoSocial: esta función es una tercera
+  // normalización paralela (junto a tipo-social.ts y normative-framework.ts)
+  // que hoy manda SAU/SLU de ARGA por la misma rama "SL" del motor de
+  // validez vía este fallback catch-all. deriveTipoSocial les daría
+  // identidad propia y cambiaría ese comportamiento — prohibido (cero
+  // cambio ARGA). Unificar las 3 normalizaciones es deuda pre-G3 que afecta
+  // la semántica SAU/SLU de ARGA; decisión fuera de este alcance.
+  if (companyForm === "SLP") return "SL";
   return "SL";
 }
 
