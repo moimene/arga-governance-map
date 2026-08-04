@@ -125,6 +125,29 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
   { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false, lmvCotizada: true },
 
+  // SLP — Junta de Socios (G3 Garrigues, 2026-08-03/04). Las 6 materias
+  // exigidas por los 12 puntos reales de la Junta de Socios 2026
+  // (docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md).
+  // Criterio vinculante del Comité Legal: las 4 de socio son ESTATUTARIA —
+  // NUNCA ESPECIAL. ESPECIAL las excluiría de filterAgreementCompatibleMaterias
+  // y del selector genérico, y el gate de informe preceptivo (Task 7) nunca
+  // preguntaría por el informe del Consejo de Socios (falso negativo
+  // silencioso: una Junta que acuerda sin que el sistema pregunte nunca).
+  { value: "ADMISION_SOCIO_CUOTA", label: "Admisión de socio de cuota", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  // Retiro a los 60 (art. 21.1.e Estatutos) — exclusión estatutaria vía Junta
+  // (art. 15 Ley 2/2007), distinta de EXCLUSION_SOCIO (art. 351 LSC, ESPECIAL,
+  // cauce judicial) ya existente en el catálogo.
+  { value: "EXCLUSION_SOCIO_ESTATUTARIA", label: "Exclusión estatutaria de socio (retiro a los 60)", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false },
+  { value: "CONTINUIDAD_SOCIO_POST_60", label: "Continuidad del socio tras los 60", tipo: "ESTATUTARIA", inscribible: false, lmvCotizada: false },
+  { value: "RETRIBUCION_PRESTACIONES_ACCESORIAS", label: "Retribución de prestaciones accesorias", tipo: "ESTATUTARIA", inscribible: false, lmvCotizada: false },
+  // ESTRUCTURAL (no ESTATUTARIA): aumento de capital + supresión del derecho
+  // de preferencia (art. 308 LSC) para incorporar un despacho como socio.
+  { value: "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA", label: "Integración de despacho (aumento sin derecho de preferencia)", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false },
+  // Punto 1.2 real de la Junta 2026 (cese + reelección de Vives, BORME I/A
+  // 960). Identidad nueva: no colisiona con NOMBRAMIENTO_CONSEJERO/AUDITOR/
+  // CESE_CONSEJERO/NOMBRAMIENTO_REPRESENTANTE_FILIAL.
+  { value: "NOMBRAMIENTO_ADMINISTRADOR_UNICO", label: "Nombramiento de administrador único", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false },
+
   // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
   // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
   // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
@@ -175,6 +198,13 @@ export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   DISOLUCION: JUNTA_ONLY,
   CESION_GLOBAL: JUNTA_ONLY,
   AUTORIZACION_OPERACION_ESTRUCTURAL: JUNTA_ONLY,
+  // SLP — Junta de Socios (G3 Garrigues): las 6 son propias de la Junta.
+  ADMISION_SOCIO_CUOTA: JUNTA_ONLY,
+  EXCLUSION_SOCIO_ESTATUTARIA: JUNTA_ONLY,
+  CONTINUIDAD_SOCIO_POST_60: JUNTA_ONLY,
+  RETRIBUCION_PRESTACIONES_ACCESORIAS: JUNTA_ONLY,
+  INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA: JUNTA_ONLY,
+  NOMBRAMIENTO_ADMINISTRADOR_UNICO: JUNTA_ONLY,
   OTROS_LIBRE: ALL_ORGANOS,
 };
 
