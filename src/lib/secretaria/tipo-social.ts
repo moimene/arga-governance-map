@@ -21,7 +21,7 @@ export function deriveTipoSocial(
   const raw = String(source?.tipo_social ?? source?.legal_form ?? "SL")
     .toUpperCase()
     .trim();
-  if (raw === "SA" || raw === "SL" || raw === "SLU" || raw === "SAU") return raw;
+  if (raw === "SA" || raw === "SL" || raw === "SLU" || raw === "SAU" || raw === "SLP") return raw;
   if (
     raw.includes("ANONIMA") ||
     raw.includes("ANÓNIMA") ||

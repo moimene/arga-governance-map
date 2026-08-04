@@ -767,6 +767,7 @@ const LEGAL_FORM_LABELS_BY_JURISDICTION: Record<string, Record<string, string>> 
     SL: "S.L.",
     SLU: "S.L.U.",
     SRL: "S.L.",
+    SLP: "Sociedad Limitada Profesional",
   },
   DE: {
     AG: "AG",
