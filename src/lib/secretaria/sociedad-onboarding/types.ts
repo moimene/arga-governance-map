@@ -1,4 +1,4 @@
-export type TipoSocial = "SA" | "SL" | "SAU" | "SLU";
+export type TipoSocial = "SA" | "SL" | "SAU" | "SLU" | "SLP";
 
 export type TipoOrganoAdmin =
   | "ADMIN_UNICO"

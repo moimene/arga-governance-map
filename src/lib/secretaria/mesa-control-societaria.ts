@@ -744,6 +744,18 @@ export const LEGAL_BASELINE_BY_TIPO_SOCIAL: Record<TipoSocial, LegalBaseline> = 
     secondQuorumPct: 100,
     legalReference: "Socio único; decisiones consignadas en acta y libro correspondiente",
   },
+  SLP: {
+    // SLP: primitivos de la familia limitada (participaciones, quórum SL) con
+    // identidad profesional. La divergencia real (transmisión/exclusión de socio
+    // profesional, mayoría de socios profesionales) vive en los rule packs, no aquí.
+    tipoSocial: "SLP",
+    noticeDays: 15,
+    ordinaryMajorityPct: 50,
+    reinforcedMajorityPct: 66.67,
+    firstQuorumPct: 33.34,
+    secondQuorumPct: 0,
+    legalReference: "Ley 2/2007 de sociedades profesionales; LSC supletoria",
+  },
 };
 
 const ES_FORMS = new Set(["SA", "SAU", "SL", "SLU", "SRL"]);

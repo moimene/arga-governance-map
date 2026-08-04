@@ -1181,9 +1181,13 @@ export default function ConvocatoriasStepper() {
   const { data: plantillasProtegidas = [] } = usePlantillasProtegidas();
   // ITEM-119: DL-4 resuelta por el motor (resolverPlantillaConvocatoria /
   // tiposPlantillaConvocatoriaPreferidos), no reimplementada inline. El motor
-  // mapea régimen (SAU→SA, SLU→SL) y cubre los 4 tipos sociales.
+  // mapea régimen (SAU→SA, SLU→SL) y cubre los 4 tipos sociales de DL-4
+  // (SA/SL/SAU/SLU); DL-4 no se ha reabierto para SLP (G3 Task 1 es solo el
+  // sweep de tipos). SLP reutiliza aquí el régimen SL (notificación
+  // individual) por ser familia limitada, igual que en
+  // LEGAL_BASELINE_BY_TIPO_SOCIAL.SLP — sin tocar el motor DL-4.
   const convocatoriaTemplateTypes = useMemo(
-    () => tiposPlantillaConvocatoriaPreferidos(tipoSocial),
+    () => tiposPlantillaConvocatoriaPreferidos(tipoSocial === "SLP" ? "SL" : tipoSocial),
     [tipoSocial],
   );
   const autoSelectedTemplate = useMemo<PlantillaProtegidaRow | null>(() => {

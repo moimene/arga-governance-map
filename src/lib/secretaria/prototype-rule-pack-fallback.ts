@@ -34,7 +34,7 @@ export interface MeetingRulePackContextForSpec {
   strict: CloudMeetingRulePackStrictResolution;
 }
 
-const tipoSocialValues: TipoSocial[] = ["SA", "SAU", "SL", "SLU"];
+const tipoSocialValues: TipoSocial[] = ["SA", "SAU", "SL", "SLU", "SLP"];
 
 function param<T>(valor: T, referencia: string): ReglaParametro<T> {
   return {
@@ -111,6 +111,9 @@ export function buildPrototypeMeetingRulePackFallback(
         SAU: param(30, reference),
         SL: param(15, reference),
         SLU: param(15, reference),
+        // Comité Legal 2026-08-04: la referencia de antelación SLP NUNCA cita
+        // la Ley 2/2007 (no regula plazos de convocatoria); solo LSC supletoria.
+        SLP: param(15, "art. 176 LSC (supletoria)"),
       },
       canales: Object.fromEntries(tipoSocialValues.map((tipo) => [tipo, []])) as Record<TipoSocial, string[]>,
       contenidoMinimo: [],
