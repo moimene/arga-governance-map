@@ -58,7 +58,9 @@ if (!SUPABASE_URL.includes("hzqwefkwsxopwrmtksbg")) fail(`Target inesperado (${S
 // concreta que sostiene el campo (art. 210/15 LSC para la base de la
 // atribución unipersonal; el overlay Ley 2/2007 completo para la Junta de
 // Socios) se usa fuente 'LEY' con su referencia exacta a nivel de artículo
-// (nunca apartado en strings visibles — Comité Legal 2026-08-04).
+// (nunca apartado en NINGÚN string visible — ni `referencia` ni `redaccion`
+// — Comité Legal 2026-08-04; el desglose por apartado, cuando aporta algo,
+// vive solo en comentarios de código fuente como este, tras fix round 1).
 
 const DECISION_ADMIN_UNICO_PAYLOAD = {
   id: "GARR_DECISION_ADMIN_UNICO",
@@ -139,12 +141,17 @@ const JUNTA_SOCIOS_PAYLOAD = {
       // `alcance` dice expresamente que esto NO es la mayoría general de la
       // Junta: la doble mayoría del art. 15 Ley 2/2007 rige SOLO la exclusión
       // (Comité Legal 2026-08-04, Decisión 2, regla transversal 3).
+      // Fix round 1 (M-1): "; reembolso ex art. 16" retirado de `redaccion` —
+      // esa cláusula NO está en la celda "Redacción para el sistema" del
+      // registro legal (docs/legal/2026-08-04-...), venía de una paráfrasis
+      // del plan. `referencia` sigue citando "arts. 15 y 16 Ley 2/2007" (el
+      // reembolso del art. 16 queda cubierto por la cita, no narrado).
       sociosProfesionalesExclusion: {
         fuente: "LEY",
         formula: "mayoria_capital_y_mayoria_socios_profesionales",
         referencia: "arts. 15 y 16 Ley 2/2007",
         alcance: "EXCLUSION_SOCIO_PROFESIONAL_UNICAMENTE — no es la mayoría general de acuerdos de la Junta",
-        redaccion: "Acuerdo motivado de la Junta, por causas legales o estatutarias; doble mayoría de capital y de socios profesionales; reembolso ex art. 16",
+        redaccion: "Acuerdo motivado de la Junta, por causas legales o estatutarias; doble mayoría de capital y de socios profesionales",
       },
     },
     abstenciones: "no_cuentan",
@@ -190,14 +197,20 @@ const JUNTA_SOCIOS_PAYLOAD = {
     ],
     ventanaDisponibilidad: { dias: 15, fuente: "LEY" },
   },
+  // Fix round 1 (C-1): el art. 8 Ley 2/2007 OBLIGA a inscribir los cambios de
+  // socios/administradores, pero no fija ningún plazo de días — el plazo (1
+  // mes) es de derecho registral general. Mismo patrón que el pack hermano
+  // ya aprobado por el Comité (20260612210000_item054_rule_packs_garrigues.sql):
+  // la obligación cita Ley 2/2007 (ver overlay INSCRIBIBILIDAD_CAMBIO_SOCIOS
+  // más abajo); el plazo cita "art. 83 RRM (1 mes)".
   postAcuerdo: {
     inscribible: true,
     instrumentoRequerido: "ESCRITURA",
     publicacionRequerida: true,
-    plazoInscripcion: { dias: 30, fuente: "LEY", referencia: "art. 8 Ley 2/2007" },
+    plazoInscripcion: { dias: 30, fuente: "LEY", referencia: "art. 83 RRM (1 mes)" },
   },
   plazosMateriales: {
-    inscripcion: { plazo_dias: 30, fuente: "LEY", referencia: "art. 8 Ley 2/2007" },
+    inscripcion: { plazo_dias: 30, fuente: "LEY", referencia: "art. 83 RRM" },
     publicacion: ["BORME"],
   },
   reglaEspecifica: {
@@ -205,10 +218,10 @@ const JUNTA_SOCIOS_PAYLOAD = {
     // 2026-08-04 (Decisión 2). "concentración": la rama SLP de
     // normative-framework.ts ("Ley 2/2007 + LSC supletoria") sigue siendo el
     // punto único del marco general; esto remite a esas 5 citas puntuales sin
-    // repetir el framing general. "granularidad": referencia = artículo
-    // únicamente; los apartados (4.2/4.3) solo aparecen dentro de
-    // `redaccion` porque son parte del texto VERBATIM aprobado por el Comité
-    // para ese parámetro — no una cita nueva fabricada aquí.
+    // repetir el framing general. "granularidad" (fix round 1, I-1): tanto
+    // `referencia` como `redaccion` quedan a nivel de artículo — el apartado
+    // 4.2/4.3 del art. 4 Ley 2/2007 NO aparece en ningún string del payload,
+    // solo en el comentario de ese parámetro más abajo.
     overlayLey2007: [
       {
         parametro: "TRANSMISION_PARTICIPACION_SOCIO_PROFESIONAL",
@@ -223,25 +236,38 @@ const JUNTA_SOCIOS_PAYLOAD = {
         redaccion: "Separación libre en sociedad de duración indefinida, eficaz desde la notificación, conforme a la buena fe",
       },
       {
+        // Fix round 1 (M-1): "; reembolso ex art. 16" retirado de
+        // `redaccion` — no está en la celda "Redacción para el sistema" del
+        // registro legal, venía de una paráfrasis del plan. `referencia`
+        // sigue citando "arts. 15 y 16 Ley 2/2007".
         parametro: "EXCLUSION_SOCIO_PROFESIONAL",
         referencia: "arts. 15 y 16 Ley 2/2007",
         fuente: "LEY",
-        redaccion: "Acuerdo motivado de la Junta, por causas legales o estatutarias; doble mayoría de capital y de socios profesionales; reembolso ex art. 16",
+        redaccion: "Acuerdo motivado de la Junta, por causas legales o estatutarias; doble mayoría de capital y de socios profesionales",
         alcance: "La doble mayoría también se anida en votacion.mayoria.sociosProfesionalesExclusion para la ficha del acuerdo de exclusión",
       },
       {
+        // Fix round 1 (I-1): `redaccion`/`alcance` retiran los apartados
+        // "(4.2)"/"(4.3)" — quedan a nivel de artículo. Desglose (solo aquí,
+        // en código fuente, nunca en un string del payload): el art. 4 Ley
+        // 2/2007 tiene dos apartados relevantes — 4.2 exige que la mayoría
+        // de capital y votos pertenezca a socios profesionales; 4.3 exige
+        // que el administrador único de una SLP sea socio profesional.
         parametro: "MAYORIA_SOCIOS_PROFESIONALES",
         referencia: "art. 4 Ley 2/2007",
         fuente: "LEY",
-        redaccion: "La mayoría del capital y votos ha de pertenecer a socios profesionales (4.2); el administrador único de una SLP ha de ser socio profesional (4.3); la doble mayoría se exige señaladamente en la exclusión",
-        alcance: "COMPOSICION_ORGANO_Y_JUNTA — invariante sondable (art. 4.3: el administrador único figura también en el censo de socios), NO mayoría general de acuerdos de la Junta",
+        redaccion: "La mayoría del capital y votos ha de pertenecer a socios profesionales; el administrador único de una SLP ha de ser socio profesional; la doble mayoría se exige señaladamente en la exclusión",
+        alcance: "COMPOSICION_ORGANO_Y_JUNTA — invariante sondable (el administrador único figura también en el censo de socios), NO mayoría general de acuerdos de la Junta",
       },
       {
+        // Fix round 1 (C-1): `alcance` ya no reclama sostener
+        // `plazoInscripcion` — ese campo ahora cita "art. 83 RRM (1 mes)"
+        // (el art. 8 Ley 2/2007 obliga a inscribir, no fija plazo de días).
         parametro: "INSCRIBIBILIDAD_CAMBIO_SOCIOS",
         referencia: "art. 8 Ley 2/2007",
         fuente: "LEY",
         redaccion: "Los cambios de socios y administradores constan en escritura pública y se inscriben",
-        alcance: "Sostiene postAcuerdo.inscribible=true y el plazoInscripcion de este pack",
+        alcance: "Sostiene postAcuerdo.inscribible=true; el plazo de inscripción cita art. 83 RRM (Ley 2/2007 obliga a inscribir, no fija días)",
       },
     ],
     canalAcuseLey2007: {
@@ -339,11 +365,24 @@ const CONSEJO_EAD_PAYLOAD = {
       CONSEJO: { valor: "mayoria_miembros", fuente: "LEY", referencia: "art. 247.1 LSC" },
     },
   },
+  // Fix round 1 (C-2): la convocatoria original citaba art. 176.1 LSC (que
+  // regula EXCLUSIVAMENTE la Junta General) con antelación 30/15 días y
+  // canales públicos (BORME, WEB_INSCRITA) — modelaba el Consejo como si
+  // fuera una Junta. El Consejo se rige por el art. 246 LSC: lo convoca el
+  // presidente, sin plazo mínimo legal, y la notificación es individual a
+  // cada consejero, nunca pública. Reescrita solo esta sección; el resto del
+  // payload (mayoría/quórum art. 247.1, voto de calidad no asumido) no
+  // cambia.
   convocatoria: {
-    canales: { SA: ["BORME", "WEB_INSCRITA"], SL: ["COMUNICACION_INDIVIDUAL_ESCRITA"] },
+    canales: { SA: ["COMUNICACION_INDIVIDUAL_CON_ACUSE"], SL: ["COMUNICACION_INDIVIDUAL_CON_ACUSE"] },
     antelacionDias: {
-      SA: { valor: 30, fuente: "LEY", referencia: "art. 176.1 LSC" },
-      SL: { valor: 15, fuente: "LEY", referencia: "art. 176.1 LSC" },
+      // Sin piso legal (art. 246 LSC no fija plazo mínimo): valor práctico
+      // de referencia, no una cita de mínimo legal. `fuente: 'ESTATUTOS'`
+      // (no 'PRACTICA_SOCIETARIA' — ese valor no existe en el tipo cerrado
+      // `Fuente` de rules-engine/types.ts; 'ESTATUTOS' es la alternativa
+      // válida ya prevista para este caso).
+      SA: { valor: 5, fuente: "ESTATUTOS", referencia: "art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente" },
+      SL: { valor: 5, fuente: "ESTATUTOS", referencia: "art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente" },
     },
     contenidoMinimo: ["Fecha hora y lugar", "Orden del día"],
     documentosObligatorios: [
@@ -363,6 +402,14 @@ const CONSEJO_EAD_PAYLOAD = {
   },
   plazosMateriales: {
     publicacion: [],
+  },
+  reglaEspecifica: {
+    canalAcuseConsejo: {
+      codigo: "COMUNICACION_INDIVIDUAL_CON_ACUSE",
+      referencia: "art. 246 LSC — convocatoria del presidente a cada consejero",
+      semanticaAcuse: "EAD_INTERPOSICION_ETIQUETADA",
+      nota: "El acuse usa la semántica de interposición EAD Trust; no se afirma como capacidad de entrega/acuse probada (política 2026-07-21).",
+    },
   },
 };
 
