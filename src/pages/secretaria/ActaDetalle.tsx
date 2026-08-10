@@ -45,6 +45,7 @@ import {
   type ResolveMinuteBookDestinationResult,
 } from "@/hooks/useSocietaryBookEntries";
 import { useAuthorityEvidence } from "@/hooks/useAuthorityEvidence";
+import { isAdminUnicoCertificante } from "@/lib/secretaria/certificacion-admin-unico";
 import { secretariaErrorMessage } from "@/lib/secretaria/supabase-error-message";
 import {
   certificationSignatureForPresentation,
@@ -297,6 +298,13 @@ export default function ActaDetalle() {
       authority.person_id === meetingSecretaryId &&
       (authority.cargo === "SECRETARIO" || authority.cargo === "VICESECRETARIO"),
   );
+  // RRM art. 109: sociedades de administrador único (p. ej. la matriz SLP de
+  // Garrigues) certifican sin Vº Bº de presidencia. Reusa signingAuthorities
+  // (ya cargado arriba, sin query nueva) — ver certificacion-admin-unico.ts
+  // para el detalle del criterio (COMITE consultivo no descalifica) y su
+  // test. Para ARGA (presidente/secretario del CdA real) esto es siempre
+  // false → cero cambio.
+  const isAdminUnicoEntity = isAdminUnicoCertificante(signingAuthorities);
   const actaEadSignatories = [
     signingPresident
       ? {
@@ -1232,6 +1240,7 @@ export default function ActaDetalle() {
                     minuteApprovalEvidenceMode={m.approval_evidence_mode}
                     minuteApprovalSignatureClaim={m.approval_signature_claim}
                     minuteApprovalCanonicalStatus={m.approval_canonical_status}
+                    certificanteRole={isAdminUnicoEntity ? "ADMIN_UNICO" : undefined}
                     userRole={primaryRole}
                     entidadNombre={entity}
                     organoNombre={body}

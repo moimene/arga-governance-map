@@ -646,6 +646,7 @@ function TramitadorNuevo() {
   // panel podían mostrar las reglas del órgano equivocado.
   const { data: agreementBodies = [] } = useBodiesByEntity(
     selectedAgreement?.entity_id ?? undefined,
+    { adoptingOnly: true },
   );
   // Se usa el resolver canónico del proyecto (organo-resolver), que ya conoce
   // que CDA es umbrella diferenciada por config.organo_tipo y que COMITE sigue

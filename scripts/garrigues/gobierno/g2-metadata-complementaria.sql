@@ -10,7 +10,7 @@ WHERE tenant_id = '00000000-0000-0000-0000-000000000002' AND tipo_condicion = 'A
   AND person_id = (SELECT id FROM persons WHERE tenant_id='00000000-0000-0000-0000-000000000002' AND full_name='Fernando Vives Ruiz');
 
 UPDATE condiciones_persona SET
-  metadata = COALESCE(metadata,'{}'::jsonb) || '{"cargo":"SENIOR_PARTNER","nota":"Preside el Consejo de Socios (art. 29 Estatutos); supervisa PPD y PBC/FT"}'::jsonb
+  metadata = COALESCE(metadata,'{}'::jsonb) || '{"cargo":"SENIOR_PARTNER","nota":"Preside el Consejo de Socios (art. 39.2 Estatutos) y la Junta de Socios (art. 29.2); supervisa PPD y PBC/FT (art. 38.5.d)"}'::jsonb
 WHERE tenant_id = '00000000-0000-0000-0000-000000000002' AND tipo_condicion = 'SOCIO' AND body_id IS NULL
   AND person_id = (SELECT id FROM persons WHERE tenant_id='00000000-0000-0000-0000-000000000002' AND full_name='Rosa Zarza Jimeno');
 

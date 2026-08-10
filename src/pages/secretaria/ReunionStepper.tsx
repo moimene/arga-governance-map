@@ -18,6 +18,7 @@ import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
 import {
   AGENDA_MATERIAS,
   MATERIAS_LIBRES,
+  isMateriaVisibleForTipoSocial,
   labelMateria,
   resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
@@ -233,6 +234,10 @@ function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
 
 function toTipoSocial(value: unknown): TipoSocial {
   const raw = String(value ?? "").toUpperCase();
+  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
+  // profesional a SL (mismo bug que ConvocatoriasStepper — verificación
+  // viva G3 Task 9; la unificación de normalizadores es deuda post-G3).
+  if (raw.includes("SLP")) return "SLP";
   if (raw.includes("SLU")) return "SLU";
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";
@@ -1871,10 +1876,23 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     [existingQD?.debates],
   );
   const meetingRaw = meeting as
-    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | {
+        governing_bodies?: {
+          body_type?: string | null;
+          config?: Record<string, unknown> | null;
+          entities?: { legal_form?: string | null; tipo_social?: string | null } | null;
+        } | null;
+      }
     | null
     | undefined;
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
+  // Fix round 1 G3 Task 4, I-1: mismo patrón que AsistentesStep/QuorumStep
+  // (toTipoSocial sobre governing_bodies.entities) para poder pasarlo al
+  // filtro fail-closed de materias soloTipoSocial (las 6 SLP).
+  const tipoSocial = toTipoSocial(
+    meetingRaw?.governing_bodies?.entities?.tipo_social ??
+      meetingRaw?.governing_bodies?.entities?.legal_form,
+  );
   const universalLabel = universalMeetingLabel(organoTipo);
   const universalNamespace = universalMeetingNamespace(organoTipo);
   const isUniversalMeeting = isUniversalMeetingQuorumData(existingQD);
@@ -2189,7 +2207,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                       className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
-                      {AGENDA_MATERIAS.map((materia) => (
+                      {/* Fix round 1 G3 Task 4, I-1: fail-closed por tipoSocial
+                          (las 6 materias SLP no se ofrecen fuera de una SLP).
+                          Se conserva el resto de la lista sin filtro de
+                          órgano (comportamiento previo, sin cambios). */}
+                      {AGENDA_MATERIAS.filter((materia) => isMateriaVisibleForTipoSocial(materia, tipoSocial)).map((materia) => (
                         <option key={materia.value} value={materia.value}>
                           {materia.label}
                         </option>
@@ -4464,7 +4486,7 @@ function UniversalMeetingIntake() {
   );
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(searchParams.get("body"));
   const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
-  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined, { adoptingOnly: true });
   const selectedBody = bodies.find((body) => body.id === selectedBodyId) ?? null;
   const selectedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
   const selectedNamespace = universalMeetingNamespace(selectedOrganoTipo);

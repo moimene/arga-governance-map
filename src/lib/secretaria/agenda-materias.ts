@@ -1,4 +1,4 @@
-import type { TipoOrgano } from "@/lib/rules-engine";
+import type { TipoOrgano, TipoSocial } from "@/lib/rules-engine";
 import type { AgendaItemKind } from "@/lib/secretaria/agenda-kind";
 
 /**
@@ -18,6 +18,14 @@ export interface AgendaMateriaDef {
   inscribible: boolean;
   /** Especialidades LMV/CNMV aplicables si la entidad es SA cotizada. */
   lmvCotizada: boolean;
+  /**
+   * Restringe la materia a determinados `TipoSocial` (p.ej. las 6 materias de
+   * la Junta de Socios SLP — G3 Garrigues, fix round 1 del review adversarial
+   * de Task 4). Ausente = genérica, visible para cualquier tipo social (sin
+   * cambio de comportamiento). Ver `isMateriaVisibleForTipoSocial`: fail-closed
+   * — sin `tipoSocial` conocido, una materia restringida NO se ofrece.
+   */
+  soloTipoSocial?: readonly TipoSocial[];
 }
 
 export interface AgendaInformativeMateriaDef {
@@ -125,6 +133,34 @@ export const AGENDA_MATERIAS: readonly AgendaMateriaDef[] = [
   { value: "CESION_GLOBAL", label: "Cesión global de activo y pasivo", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: true },
   { value: "AUTORIZACION_OPERACION_ESTRUCTURAL", label: "Autorización operación estructural intragrupo", tipo: "ESTRUCTURAL", inscribible: false, lmvCotizada: true },
 
+  // SLP — Junta de Socios (G3 Garrigues, 2026-08-03/04). Las 6 materias
+  // exigidas por los 12 puntos reales de la Junta de Socios 2026
+  // (docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md).
+  // Criterio vinculante del Comité Legal: las 4 de socio son ESTATUTARIA —
+  // NUNCA ESPECIAL. ESPECIAL las excluiría de filterAgreementCompatibleMaterias
+  // y del selector genérico, y el gate de informe preceptivo (Task 7) nunca
+  // preguntaría por el informe del Consejo de Socios (falso negativo
+  // silencioso: una Junta que acuerda sin que el sistema pregunte nunca).
+  // `soloTipoSocial: ["SLP"]` (fix round 1, I-1): sin esto las 6 aparecían en
+  // el selector de CUALQUIER tenant, incluida una Junta General de ARGA (SA).
+  { value: "ADMISION_SOCIO_CUOTA", label: "Admisión de socio de cuota", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+  // Retiro a los 60 (art. 21.1.e Estatutos) — exclusión estatutaria vía Junta
+  // (art. 15 Ley 2/2007), distinta de EXCLUSION_SOCIO (art. 351 LSC, ESPECIAL,
+  // cauce judicial) ya existente en el catálogo.
+  { value: "EXCLUSION_SOCIO_ESTATUTARIA", label: "Exclusión estatutaria de socio (retiro a los 60)", tipo: "ESTATUTARIA", inscribible: true, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+  { value: "CONTINUIDAD_SOCIO_POST_60", label: "Continuidad del socio tras los 60", tipo: "ESTATUTARIA", inscribible: false, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+  // Fix round 1, contraorden sobre I-2: Estatutos REALES art. 12.6 — acuerdo
+  // ANUAL de la Junta (propuesta del Órgano de Administración, previo informe
+  // del Consejo de Socios), no modificación estatutaria. NO inscribible.
+  { value: "RETRIBUCION_PRESTACIONES_ACCESORIAS", label: "Retribución de prestaciones accesorias", tipo: "ESTATUTARIA", inscribible: false, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+  // ESTRUCTURAL (no ESTATUTARIA): aumento de capital + supresión del derecho
+  // de preferencia (art. 308 LSC) para incorporar un despacho como socio.
+  { value: "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA", label: "Integración de despacho (aumento sin derecho de preferencia)", tipo: "ESTRUCTURAL", inscribible: true, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+  // Punto 1.2 real de la Junta 2026 (cese + reelección de Vives, BORME I/A
+  // 960). Identidad nueva: no colisiona con NOMBRAMIENTO_CONSEJERO/AUDITOR/
+  // CESE_CONSEJERO/NOMBRAMIENTO_REPRESENTANTE_FILIAL.
+  { value: "NOMBRAMIENTO_ADMINISTRADOR_UNICO", label: "Nombramiento de administrador único", tipo: "ORDINARIA", inscribible: true, lmvCotizada: false, soloTipoSocial: ["SLP"] },
+
   // BATCH 8.3 (ronda 2 U-A): opción "OTROS — acuerdo libre" para puntos
   // que no encajan en el catálogo predefinido. NO dispara motor V2 (se
   // filtra en agendaRuleSpecs) — es responsabilidad del secretario indicar
@@ -175,6 +211,13 @@ export const MATERIA_ORGANOS: Record<string, TipoOrgano[]> = {
   DISOLUCION: JUNTA_ONLY,
   CESION_GLOBAL: JUNTA_ONLY,
   AUTORIZACION_OPERACION_ESTRUCTURAL: JUNTA_ONLY,
+  // SLP — Junta de Socios (G3 Garrigues): las 6 son propias de la Junta.
+  ADMISION_SOCIO_CUOTA: JUNTA_ONLY,
+  EXCLUSION_SOCIO_ESTATUTARIA: JUNTA_ONLY,
+  CONTINUIDAD_SOCIO_POST_60: JUNTA_ONLY,
+  RETRIBUCION_PRESTACIONES_ACCESORIAS: JUNTA_ONLY,
+  INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA: JUNTA_ONLY,
+  NOMBRAMIENTO_ADMINISTRADOR_UNICO: JUNTA_ONLY,
   OTROS_LIBRE: ALL_ORGANOS,
 };
 
@@ -323,6 +366,45 @@ export function isMateriaCompatibleWithOrgano(materia: string, organoTipo: TipoO
   return organos.includes(organoTipo);
 }
 
+/**
+ * Fail-closed (fix round 1, I-1): una materia restringida a determinados
+ * tipos sociales (`soloTipoSocial`, p.ej. las 6 materias SLP de la Junta de
+ * Socios) solo se ofrece cuando `tipoSocial` es conocido y está en esa lista.
+ * Sin `tipoSocial` conocido, las restringidas quedan fuera del selector — el
+ * lado seguro es ocultar, nunca mostrar de más. Una materia sin
+ * `soloTipoSocial` (todo el catálogo previo a G3) no cambia nunca: sigue
+ * visible para cualquier tipo social, con o sin `tipoSocial` conocido.
+ */
+export function isMateriaVisibleForTipoSocial(
+  materia: Pick<AgendaMateriaDef, "soloTipoSocial">,
+  tipoSocial?: TipoSocial,
+): boolean {
+  if (!materia.soloTipoSocial) return true;
+  return tipoSocial !== undefined && materia.soloTipoSocial.includes(tipoSocial);
+}
+
+/**
+ * Filtra filas de `materia_catalog` (forma BD — código en el campo
+ * `materia`) por la misma restricción `soloTipoSocial` de AGENDA_MATERIAS.
+ * Única fuente de verdad para consumidores que leen `materia_catalog`
+ * directamente en vez de pasar por `agendaMateriaGroups` (review final G3
+ * I-1: el catálogo de materias societario y el desplegable de decisión
+ * unipersonal ofrecían las 6 materias SLP también a ARGA). Fail-closed
+ * idéntico a `isMateriaVisibleForTipoSocial`: sin `tipoSocial` conocido, las
+ * restringidas quedan fuera; un código sin entrada en AGENDA_MATERIAS (o sin
+ * `soloTipoSocial`) no está restringido y no cambia de comportamiento.
+ */
+export function filterMateriaRowsForTipoSocial<T extends { materia: string }>(
+  rows: readonly T[],
+  tipoSocial?: string | null,
+): T[] {
+  const known = (tipoSocial ?? undefined) as TipoSocial | undefined;
+  return rows.filter((row) => {
+    const def = AGENDA_MATERIAS.find((m) => m.value === row.materia);
+    return isMateriaVisibleForTipoSocial({ soloTipoSocial: def?.soloTipoSocial }, known);
+  });
+}
+
 export function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
   return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }
@@ -413,9 +495,17 @@ const PROPIAS_LABEL: Record<TipoOrgano, string> = {
  * para el orden del día: propias del órgano convocante, transversales a
  * cualquier órgano y el punto libre. La partición es exhaustiva y disjunta
  * sobre las materias compatibles con el órgano.
+ *
+ * `tipoSocial` (fix round 1, I-1) aplica el gate fail-closed de
+ * `isMateriaVisibleForTipoSocial` además del filtro de órgano: una materia
+ * `soloTipoSocial` (p.ej. las 6 SLP) no aparece si `tipoSocial` no se pasa o
+ * no coincide. El resto del catálogo (sin `soloTipoSocial`) es idéntico con o
+ * sin este parámetro — cero cambio de comportamiento para ARGA.
  */
-export function agendaMateriaGroups(organoTipo: TipoOrgano): AgendaMateriaGroup[] {
-  const compatibles = AGENDA_MATERIAS.filter((m) => isMateriaCompatibleWithOrgano(m.value, organoTipo));
+export function agendaMateriaGroups(organoTipo: TipoOrgano, tipoSocial?: TipoSocial): AgendaMateriaGroup[] {
+  const compatibles = AGENDA_MATERIAS.filter(
+    (m) => isMateriaCompatibleWithOrgano(m.value, organoTipo) && isMateriaVisibleForTipoSocial(m, tipoSocial),
+  );
   const esTransversal = (value: string) => (MATERIA_ORGANOS[value] ?? ALL_ORGANOS).length >= ALL_ORGANOS.length;
 
   const groups: AgendaMateriaGroup[] = [

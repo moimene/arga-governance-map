@@ -21,3 +21,18 @@ export function isOperationalSecretariaBody(body: OperationalBodyLike) {
 
   return true;
 }
+
+/**
+ * G3 Task 7 — selectores de ADOPCIÓN (Convocatorias, Reuniones, Tramitador,
+ * AcuerdoSinSesion): un órgano consultivo informa, no acuerda
+ * (`config.naturaleza='CONSULTIVO'`, G2/G3) — nunca puede ser el órgano que
+ * adopta un acuerdo. Distinto de `isOperationalSecretariaBody`: ese filtro
+ * también alimenta listados donde los consultivos SÍ deben seguir
+ * apareciendo (p.ej. /organos, fichas de entidad) — no tocarlo. ARGA no
+ * tiene `config.naturaleza` en ningún órgano → cero cambio.
+ */
+export function isAdoptingBody(body: OperationalBodyLike) {
+  if (!isOperationalSecretariaBody(body)) return false;
+  const config = body.config ?? {};
+  return (config as { naturaleza?: string }).naturaleza !== "CONSULTIVO";
+}

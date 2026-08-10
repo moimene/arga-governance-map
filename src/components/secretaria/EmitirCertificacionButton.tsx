@@ -319,8 +319,14 @@ export function EmitirCertificacionButton({
             tipo: "ACUERDO",
             agreementIds: validAgreementRefs,
             certificanteRole: effectiveCertificanteRole,
-            vistoBuenoPersonaId:
-              vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
+            // Fix round 1 (M1): flujoConVistoBueno es el proxy exacto de la
+            // condición que exige la RPC (VºBº ⇔ certificante SECRETARIO).
+            // Cubre también PRESIDENTE (rama muerta hoy del union) con la
+            // misma garantía que ADMIN_UNICO/ADMIN_SOLIDARIO — ningún rol
+            // salvo SECRETARIO envía vistoBuenoPersonaId no nulo.
+            vistoBuenoPersonaId: flujoConVistoBueno
+              ? vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null
+              : null,
           });
         toast.success("Borrador de certificación preparado", {
           description:

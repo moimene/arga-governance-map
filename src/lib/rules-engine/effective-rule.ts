@@ -86,7 +86,7 @@ export function buildEffectiveRuleProjection(params: {
   });
   mergeResolution(trace, quorum);
 
-  const majorityBase = pack.votacion.mayoria[tipoSocial === 'SAU' ? 'SA' : tipoSocial === 'SLU' ? 'SL' : tipoSocial] ??
+  const majorityBase = pack.votacion.mayoria[tipoSocial === 'SAU' ? 'SA' : tipoSocial === 'SLU' || tipoSocial === 'SLP' ? 'SL' : tipoSocial] ??
     pack.votacion.mayoria.SL ??
     pack.votacion.mayoria.SA;
   const majorityRule: ReglaParametro<string> | null = majorityBase

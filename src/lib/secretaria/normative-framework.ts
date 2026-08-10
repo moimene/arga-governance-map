@@ -225,6 +225,11 @@ export function normalizeSocietyFormForNormative(
   if (raw.includes("SAU")) return "SAU";
   if (raw === "SA" || raw.includes("SOCIEDADANONIMA")) return "SA";
   if (raw.includes("SLU")) return "SLU";
+  // SLP (sociedad limitada profesional) debe comprobarse ANTES que el genérico
+  // "SOCIEDADLIMITADA": el texto libre "Sociedad Limitada Profesional" (ver
+  // legalFormFromTipo) también contiene ese substring y, sin esta rama,
+  // colapsaría a "SL" perdiendo la identidad profesional propia.
+  if (raw === "SLP" || raw.includes("SOCIEDADLIMITADAPROFESIONAL")) return "SLP";
   if (raw === "SL" || raw === "SRL" || raw.includes("SOCIEDADLIMITADA")) return "SL";
   return raw;
 }
@@ -232,7 +237,10 @@ export function normalizeSocietyFormForNormative(
 export function normalizeSocietyFormForRuleSet(value?: string | null, options: { listed?: boolean | null } = {}) {
   const normalized = normalizeSocietyFormForNormative(value, options);
   if (normalized === "SA_COTIZADA" || normalized === "SAU") return "SA";
-  if (normalized === "SLU") return "SL";
+  // SLP no tiene jurisdiction_rule_sets propios: Ley 2/2007 + LSC supletoria
+  // significa que el régimen consultable (quórum/mayoría/convocatoria) es el
+  // de SL, igual que el resto del motor (tipo-social.ts, effective-rule.ts).
+  if (normalized === "SLU" || normalized === "SLP") return "SL";
   return normalized;
 }
 

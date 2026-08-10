@@ -64,7 +64,17 @@ export function StepReglas({
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <BaselineCard label="Convocatoria" value={`${baseline.noticeDays} días`} />
+          <BaselineCard
+            label="Convocatoria"
+            value={`${baseline.noticeDays} días`}
+            // Comité Legal 2026-08-04: la Ley 2/2007 no regula plazos de
+            // convocatoria. En SLP, el pie general de esta sección cita "Ley
+            // 2/2007 de sociedades profesionales; LSC supletoria" (marco
+            // societario general), que quedaría yuxtapuesto a esta tarjeta si
+            // no se aclara aquí que el plazo concreto remite solo a la LSC
+            // supletoria (art. 176 LSC), nunca a la Ley 2/2007.
+            note={tipoSocial === "SLP" ? "Cita del plazo: art. 176 LSC (supletoria), no Ley 2/2007" : undefined}
+          />
           <BaselineCard label="Mayoría ordinaria" value={`${baseline.ordinaryMajorityPct}%`} />
           <BaselineCard label="Mayoría reforzada" value={`${baseline.reinforcedMajorityPct}%`} />
           <BaselineCard label="Quórum referencia" value={`${baseline.firstQuorumPct}%`} />
@@ -236,11 +246,14 @@ export function StepReglas({
     </div>
   );
 }
-function BaselineCard({ label, value }: { label: string; value: string }) {
+function BaselineCard({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-3" style={{ borderRadius: "var(--g-radius-md)" }}>
       <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">{label}</div>
       <div className="mt-1 text-sm font-semibold text-[var(--g-text-primary)]">{value}</div>
+      {note ? (
+        <div className="mt-1 text-[11px] leading-4 text-[var(--g-text-secondary)]">{note}</div>
+      ) : null}
     </div>
   );
 }

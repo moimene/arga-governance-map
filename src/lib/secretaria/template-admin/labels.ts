@@ -108,6 +108,7 @@ export const TIPO_SOCIAL_LABEL: Record<string, string> = {
   SL: "S.L.",
   SLU: "S.L.U.",
   SRL: "S.L.",
+  SLP: "Sociedad Limitada Profesional",
 };
 
 export const JURISDICTION_LABEL: Record<string, string> = {

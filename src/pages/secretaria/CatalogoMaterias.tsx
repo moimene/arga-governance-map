@@ -69,6 +69,7 @@ import {
   type TemplateDocumentBinding,
   type TemplateDocumentStage,
 } from "@/lib/secretaria/mesa-control-societaria";
+import { filterMateriaRowsForTipoSocial } from "@/lib/secretaria/agenda-materias";
 import type { MateriaCatalogRow } from "@/hooks/useMateriaConfig";
 import type { RuleParamOverrideRow } from "@/hooks/useRulePacks";
 import type { PactoParasocial } from "@/lib/rules-engine/pactos-engine";
@@ -368,8 +369,14 @@ export default function CatalogoMaterias() {
   const normativeRole = normativeRoleFromAppRole(primaryRole);
 
   const materias = useMemo(
-    () => buildMateriaCatalogRows(materiasQuery.data ?? []),
-    [materiasQuery.data],
+    // Review final G3 I-1: materia_catalog es global y no filtraba por
+    // tipoSocial — ARGA (SA) veía las 6 materias SLP de la Junta de Socios
+    // de Garrigues. Mismo gate fail-closed que T4 (agendaMateriaGroups).
+    () => filterMateriaRowsForTipoSocial(
+      buildMateriaCatalogRows(materiasQuery.data ?? []),
+      selectedTipoSocialForRules,
+    ),
+    [materiasQuery.data, selectedTipoSocialForRules],
   );
   const [localSelected, setLocalSelected] = useState<string>("");
   const catalogMatterCodes = materias.map((materia) => materia.materia);

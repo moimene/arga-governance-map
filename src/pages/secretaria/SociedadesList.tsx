@@ -23,7 +23,9 @@ function entityStatusLabel(status: string | null): string {
   )[status] ?? status.replace(/_/g, " ");
 }
 
-function tipoSocialLabel(s: string | null): string {
+// Exportado para permitir su verificación directa en test (no cae a código
+// crudo para formas nuevas como SLP).
+export function tipoSocialLabel(s: string | null): string {
   if (!s) return "—";
   return (
     {
@@ -31,6 +33,7 @@ function tipoSocialLabel(s: string | null): string {
       SL: "S.L.",
       SLU: "S.L.U. (unipersonal)",
       SAU: "S.A.U. (unipersonal)",
+      SLP: "Sociedad Limitada Profesional",
     } as Record<string, string>
   )[s] ?? s;
 }

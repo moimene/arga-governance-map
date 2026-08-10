@@ -4,11 +4,14 @@ import { Field } from "./shared/Field";
 import { SelectField } from "./shared/SelectField";
 import { issueForField } from "./shared/issues";
 
-const TIPO_SOCIAL_OPTIONS = [
+// Exportado para permitir su verificación directa en test (identidad visible
+// de cada forma social en el dropdown de alta, sin caer a código crudo).
+export const TIPO_SOCIAL_OPTIONS = [
   { value: "SA", label: "S.A. - Sociedad Anonima" },
   { value: "SL", label: "S.L. - Sociedad Limitada" },
   { value: "SAU", label: "S.A.U. - Sociedad Anonima unipersonal" },
   { value: "SLU", label: "S.L.U. - Sociedad Limitada unipersonal" },
+  { value: "SLP", label: "Sociedad Limitada Profesional" },
 ];
 
 export function StepIdentificacionLegal({

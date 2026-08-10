@@ -5,7 +5,7 @@ import type {
   TipoSocial,
 } from "./types";
 
-export const TIPO_SOCIAL_VALUES: TipoSocial[] = ["SA", "SL", "SAU", "SLU"];
+export const TIPO_SOCIAL_VALUES: TipoSocial[] = ["SA", "SL", "SAU", "SLU", "SLP"];
 
 export const ADMIN_BY_TIPO_ORGANO: Record<TipoOrganoAdmin, FormaAdministracion> = {
   ADMIN_UNICO: "ADMINISTRADOR_UNICO",
@@ -29,6 +29,7 @@ export function legalFormFromTipo(tipo: TipoSocial) {
       SAU: "S.A.U.",
       SL: "S.L.",
       SLU: "S.L.U.",
+      SLP: "Sociedad Limitada Profesional",
     } as Record<TipoSocial, string>
   )[tipo];
 }

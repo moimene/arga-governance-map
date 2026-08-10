@@ -314,6 +314,10 @@ function isRulePackPayload(payload: unknown): payload is RulePack {
 
 function toTipoSocial(value: unknown): TipoSocial {
   const raw = String(value ?? "").toUpperCase();
+  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
+  // profesional a SL, ocultando las materias soloTipoSocial:["SLP"] del
+  // orden del día (bug cazado en la verificación viva de G3 Task 9).
+  if (raw.includes("SLP")) return "SLP";
   if (raw.includes("SLU")) return "SLU";
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";
@@ -622,7 +626,7 @@ export default function ConvocatoriasStepper() {
     isLoading: bodiesLoading,
     isFetching: bodiesFetching,
     error: bodiesError,
-  } = useBodiesByEntity(bodyQueryEntityId);
+  } = useBodiesByEntity(bodyQueryEntityId, { adoptingOnly: true });
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
   const { data: convocanteAuthority } = usePresidenteVigente(
     selectedEntityId ?? undefined,
@@ -1181,9 +1185,13 @@ export default function ConvocatoriasStepper() {
   const { data: plantillasProtegidas = [] } = usePlantillasProtegidas();
   // ITEM-119: DL-4 resuelta por el motor (resolverPlantillaConvocatoria /
   // tiposPlantillaConvocatoriaPreferidos), no reimplementada inline. El motor
-  // mapea régimen (SAU→SA, SLU→SL) y cubre los 4 tipos sociales.
+  // mapea régimen (SAU→SA, SLU→SL) y cubre los 4 tipos sociales de DL-4
+  // (SA/SL/SAU/SLU); DL-4 no se ha reabierto para SLP (G3 Task 1 es solo el
+  // sweep de tipos). SLP reutiliza aquí el régimen SL (notificación
+  // individual) por ser familia limitada, igual que en
+  // LEGAL_BASELINE_BY_TIPO_SOCIAL.SLP — sin tocar el motor DL-4.
   const convocatoriaTemplateTypes = useMemo(
-    () => tiposPlantillaConvocatoriaPreferidos(tipoSocial),
+    () => tiposPlantillaConvocatoriaPreferidos(tipoSocial === "SLP" ? "SL" : tipoSocial),
     [tipoSocial],
   );
   const autoSelectedTemplate = useMemo<PlantillaProtegidaRow | null>(() => {
@@ -3466,7 +3474,10 @@ export default function ConvocatoriasStepper() {
                   // de un borrador previo se conserva visible en su propio
                   // grupo para no perder el valor, pero no se ofrece el resto
                   // del catálogo incompatible.
-                  const materiaGroups = agendaMateriaGroups(organoTipo)
+                  // Fix round 1 G3 Task 4, I-1: se pasa `tipoSocial` (ya
+                  // computado arriba) para que las materias `soloTipoSocial`
+                  // (las 6 SLP) no aparezcan en una convocatoria de ARGA (SA).
+                  const materiaGroups = agendaMateriaGroups(organoTipo, tipoSocial)
                     .map((group) => ({
                       ...group,
                       materias: group.materias.filter(

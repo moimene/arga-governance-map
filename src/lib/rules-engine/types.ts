@@ -13,7 +13,7 @@ export type Fuente =
   | 'OVERRIDE_INTERNO'
   | 'SISTEMA';
 
-export type TipoSocial = 'SA' | 'SL' | 'SLU' | 'SAU';
+export type TipoSocial = 'SA' | 'SL' | 'SLU' | 'SAU' | 'SLP';
 
 export type TipoOrgano = 'JUNTA_GENERAL' | 'CONSEJO' | 'COMISION_DELEGADA';
 

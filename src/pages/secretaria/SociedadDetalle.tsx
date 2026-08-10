@@ -47,7 +47,9 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "marco",            label: "Marco normativo",     icon: Scale },
 ];
 
-function tipoSocialLabel(value: string | null | undefined, jurisdiction?: string | null, legalForm?: string | null) {
+// Exportado para permitir su verificación directa en test (no cae a código
+// crudo para formas nuevas como SLP).
+export function tipoSocialLabel(value: string | null | undefined, jurisdiction?: string | null, legalForm?: string | null) {
   if (!value) return "Tipo social pendiente";
   if (jurisdiction && jurisdiction !== "ES") {
     return displaySocietyLegalForm({ jurisdiction, tipoSocial: value, legalForm });
@@ -58,6 +60,7 @@ function tipoSocialLabel(value: string | null | undefined, jurisdiction?: string
       SAU: "Sociedad Anónima Unipersonal",
       SL: "Sociedad Limitada",
       SLU: "Sociedad Limitada Unipersonal",
+      SLP: "Sociedad Limitada Profesional",
     } as Record<string, string>
   )[value] ?? value;
 }

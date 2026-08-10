@@ -236,7 +236,7 @@ export default function AcuerdoSinSesionStepper() {
   }, [appliedMateriaParam, requestedMateriaParam]);
 
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
-  const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined, { adoptingOnly: true });
   const eligibleBodies = useMemo(
     () => bodies.filter((body) => supportsGovernedNoSessionFlow(body.body_type)),
     [bodies],
