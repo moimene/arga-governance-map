@@ -36,3 +36,20 @@ describe("isAdoptingBody", () => {
     expect(isAdoptingBody(e2eBody)).toBe(false);
   });
 });
+
+describe("isOperationalSecretariaBody — camino default (adoptingOnly ausente)", () => {
+  // Fix round 1 (Task 7): useBodiesByEntity(entityId) sin opts usa este
+  // filtro, NO isAdoptingBody — CatalogoOrganos, useSidebarVisibilityContext
+  // y ActivarMarcoNormativo dependen de que un consultivo siga apareciendo
+  // aquí (CatalogoOrganos necesita listar los 19 COMITE de Garrigues para
+  // poder gestionar su reglamento/miembros/vinculaciones).
+  it("un órgano consultivo SÍ pasa el filtro por defecto — solo isAdoptingBody lo excluye", () => {
+    const consultivo = {
+      slug: "garrigues-consejo-de-socios",
+      name: "Consejo de Socios",
+      config: { naturaleza: "CONSULTIVO" },
+    };
+    expect(isOperationalSecretariaBody(consultivo)).toBe(true);
+    expect(isAdoptingBody(consultivo)).toBe(false);
+  });
+});

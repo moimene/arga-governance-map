@@ -382,19 +382,30 @@ function normalizeBodySlim(row: BodySlim): BodySlim {
 }
 
 /**
- * Selector de órgano para los steppers de ADOPCIÓN/convocatoria
- * (Convocatorias, Reuniones, Tramitador, AcuerdoSinSesion). Usa
- * `isAdoptingBody`, no `isOperationalSecretariaBody`: los consultivos
- * (`config.naturaleza='CONSULTIVO'`, p.ej. el Consejo de Socios de Garrigues)
- * informan pero no adoptan, y no deben ofertarse aquí — sí siguen
- * apareciendo en /organos y en las fichas de entidad, que usan el filtro
- * base sin este añadido.
+ * Lista de órganos de una entidad. Por defecto (`adoptingOnly` ausente o
+ * `false`) devuelve todos los órganos operacionales — comportamiento
+ * histórico, usado por `CatalogoOrganos.tsx` (gestión de reglamento/
+ * miembros/vinculaciones, debe seguir listando los 19 COMITE consultivos de
+ * Garrigues), `useSidebarVisibilityContext.ts` y `ActivarMarcoNormativo.tsx`.
+ *
+ * `{ adoptingOnly: true }` aplica además `isAdoptingBody`: excluye los
+ * consultivos (`config.naturaleza='CONSULTIVO'`, p.ej. el Consejo de Socios
+ * de Garrigues) porque informan pero no adoptan. Úsalo SOLO en el selector
+ * de órgano de los 6 steppers de adopción/convocatoria (Convocatorias,
+ * Reuniones, Tramitador, AcuerdoSinSesion, Solidario, CoAprobacion) — fue
+ * el comportamiento por defecto hasta que un review detectó que rompía los
+ * otros 3 consumidores (Task 7 fix round 1); ahora es opt-in explícito para
+ * que un futuro consumidor no herede el filtro sin pedirlo.
  */
-export function useBodiesByEntity(entityId: string | undefined) {
+export function useBodiesByEntity(
+  entityId: string | undefined,
+  opts?: { adoptingOnly?: boolean },
+) {
   const { tenantId } = useTenantContext();
+  const adoptingOnly = opts?.adoptingOnly ?? false;
   return useQuery({
     enabled: !!entityId && !!tenantId,
-    queryKey: ["governing_bodies", "byEntity", entityId, tenantId],
+    queryKey: ["governing_bodies", "byEntity", entityId, tenantId, adoptingOnly],
     queryFn: async (): Promise<BodySlim[]> => {
       const { data, error } = await supabase
         .from("governing_bodies")
@@ -403,7 +414,8 @@ export function useBodiesByEntity(entityId: string | undefined) {
         .eq("tenant_id", tenantId!)
         .order("name");
       if (error) throw error;
-      return ((data ?? []) as BodySlim[]).map(normalizeBodySlim).filter(isAdoptingBody);
+      const rows = ((data ?? []) as BodySlim[]).map(normalizeBodySlim);
+      return adoptingOnly ? rows.filter(isAdoptingBody) : rows.filter(isOperationalSecretariaBody);
     },
   });
 }

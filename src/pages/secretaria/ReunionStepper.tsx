@@ -4482,7 +4482,7 @@ function UniversalMeetingIntake() {
   );
   const [selectedBodyId, setSelectedBodyId] = useState<string | null>(searchParams.get("body"));
   const selectedEntity = entities.find((entity) => entity.id === selectedEntityId) ?? null;
-  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const { data: bodies = [], isLoading: bodiesLoading } = useBodiesByEntity(selectedEntityId ?? undefined, { adoptingOnly: true });
   const selectedBody = bodies.find((body) => body.id === selectedBodyId) ?? null;
   const selectedOrganoTipo = selectedBody ? resolveOrganoTipo(selectedBody) : null;
   const selectedNamespace = universalMeetingNamespace(selectedOrganoTipo);

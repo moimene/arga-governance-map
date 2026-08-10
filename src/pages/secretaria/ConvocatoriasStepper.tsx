@@ -622,7 +622,7 @@ export default function ConvocatoriasStepper() {
     isLoading: bodiesLoading,
     isFetching: bodiesFetching,
     error: bodiesError,
-  } = useBodiesByEntity(bodyQueryEntityId);
+  } = useBodiesByEntity(bodyQueryEntityId, { adoptingOnly: true });
   const selectedBody = bodies.find((b) => b.id === selectedBodyId) ?? null;
   const { data: convocanteAuthority } = usePresidenteVigente(
     selectedEntityId ?? undefined,

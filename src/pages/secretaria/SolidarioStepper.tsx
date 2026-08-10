@@ -408,7 +408,7 @@ export default function SolidarioStepper() {
     () => coarseAdoptionMateria(searchParams.get("materia")) ?? "",
   );
   const [texto, setTexto] = useState("");
-  const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined);
+  const { data: bodies = [] } = useBodiesByEntity(selectedEntityId ?? undefined, { adoptingOnly: true });
   const { data: readiness } = useEntityDemoReadiness(selectedEntityId);
   const readinessBlocked = readiness?.status === "reference_only";
 
