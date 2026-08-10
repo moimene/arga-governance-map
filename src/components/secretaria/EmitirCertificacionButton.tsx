@@ -160,6 +160,14 @@ export function EmitirCertificacionButton({
   // (SA + VºBº). Para ADMIN_UNICO/ADMIN_SOLIDARIO la certificación es propia,
   // sin visto bueno de presidente.
   const flujoConVistoBueno = certificanteRole === "SECRETARIO";
+  // RRM art. 109 + art. 31.3 Estatutos (Garrigues): el administrador único o
+  // solidario certifica por sí mismo sin Vº Bº. Sin este guard, un PRESIDENTE
+  // vigente de la sociedad (p. ej. una SA con presidente y secretario) se
+  // colaba como vistoBuenoPersonaId vía el fallback de abajo y la RPC
+  // rechazaba con RAISE ("unexpected approval person for non-secretary
+  // certifier").
+  const esAdminUnico =
+    certificanteRole === "ADMIN_UNICO" || certificanteRole === "ADMIN_SOLIDARIO";
 
   const certificanteAE = useMemo<AuthorityEvidenceDetailRow | null>(() => {
     if (!flujoConVistoBueno) return null;
@@ -319,8 +327,9 @@ export function EmitirCertificacionButton({
             tipo: "ACUERDO",
             agreementIds: validAgreementRefs,
             certificanteRole: effectiveCertificanteRole,
-            vistoBuenoPersonaId:
-              vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
+            vistoBuenoPersonaId: esAdminUnico
+              ? null
+              : vistoBuenoAE?.person_id ?? presidenteAE?.person_id ?? null,
           });
         toast.success("Borrador de certificación preparado", {
           description:

@@ -297,6 +297,16 @@ export default function ActaDetalle() {
       authority.person_id === meetingSecretaryId &&
       (authority.cargo === "SECRETARIO" || authority.cargo === "VICESECRETARIO"),
   );
+  // RRM art. 109: sociedades de administrador único (p. ej. la matriz SLP de
+  // Garrigues) certifican sin Vº Bº de presidencia. Reusa signingAuthorities
+  // (ya cargado arriba, sin query nueva) — ADMIN_UNICO vigente y ausencia de
+  // órgano colegiado (PRESIDENTE/SECRETARIO). Para ARGA (SA con presidente y
+  // secretario) esto es siempre false → cero cambio.
+  const isAdminUnicoEntity =
+    signingAuthorities.some((authority) => authority.cargo === "ADMIN_UNICO") &&
+    !signingAuthorities.some(
+      (authority) => authority.cargo === "PRESIDENTE" || authority.cargo === "SECRETARIO",
+    );
   const actaEadSignatories = [
     signingPresident
       ? {
@@ -1232,6 +1242,7 @@ export default function ActaDetalle() {
                     minuteApprovalEvidenceMode={m.approval_evidence_mode}
                     minuteApprovalSignatureClaim={m.approval_signature_claim}
                     minuteApprovalCanonicalStatus={m.approval_canonical_status}
+                    certificanteRole={isAdminUnicoEntity ? "ADMIN_UNICO" : undefined}
                     userRole={primaryRole}
                     entidadNombre={entity}
                     organoNombre={body}
