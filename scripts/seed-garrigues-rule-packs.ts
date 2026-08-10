@@ -477,6 +477,133 @@ const CONSEJO_EAD_PAYLOAD = {
   },
 };
 
+// G3 Task 3 fix round 2 (hallazgo de la verificación viva de T9): el panel
+// "Reglas aplicables" del ConvocatoriasStepper resuelve por MATERIA
+// (rule-resolution.ts:310-317 — match estricto materia===materia/packId,
+// sin fallback a órgano). Los 4 packs de arriba tienen materia=GARR_* y
+// nunca cubren ese camino: las 6 materias SLP mostraban "No existe rule
+// pack" en rojo bloqueante en la convocatoria real de la Junta 2026.
+// Aliasarlas al pack de Junta habría enseñado mayorías equivocadas —
+// inaceptable. Fix: un pack POR MATERIA (pack_id = materia), clon
+// estructural de GARR_JUNTA_SOCIOS v1.1.0 (misma convocatoria/quórum/acta/
+// documentacion/reglaEspecifica.canalAcuseLey2007 — pasa `isRulePackPayload`
+// gratis, hereda de un payload que ya lo cumple) cambiando solo materia,
+// clase (del catálogo, materia_catalog.matter_class), la mayoría real de
+// `votacion.mayoria.SL` (la rama que effective-rule.ts lee para SLP) según
+// los Estatutos, y postAcuerdo/plazosMateriales cuando la materia no es
+// inscribible. Los 4 packs de órgano de arriba NO se tocan — siguen
+// sirviendo el camino Tramitador/órgano.
+const NO_APLICABLE_SLP = "materia exclusiva de la forma SLP — rama no aplicable";
+
+function buildSlpMateriaPayload(opts: {
+  materia: string;
+  clase: string;
+  mayoriaSL: { formula: string; referencia: string };
+  inscribible: boolean;
+  extraDocumentoObligatorio?: { id: string; nombre: string; condicion: string };
+  keepSociosProfesionalesExclusion?: boolean;
+}) {
+  const mayoria: Record<string, unknown> = {
+    // SA/CONSEJO: misma fórmula que SL (shape válido, Record cerrado), pero
+    // referencia explícita de "no aplicable" — esta materia solo existe para
+    // la forma SLP, nunca se evalúa como SA o vía Consejo.
+    SA: { fuente: "SISTEMA", formula: opts.mayoriaSL.formula, referencia: NO_APLICABLE_SLP },
+    SL: { fuente: "LEY", formula: opts.mayoriaSL.formula, referencia: opts.mayoriaSL.referencia },
+    CONSEJO: { fuente: "SISTEMA", formula: opts.mayoriaSL.formula, referencia: NO_APLICABLE_SLP },
+  };
+  if (opts.keepSociosProfesionalesExclusion) {
+    mayoria.sociosProfesionalesExclusion = JUNTA_SOCIOS_V110_PAYLOAD.votacion.mayoria.sociosProfesionalesExclusion;
+  }
+
+  return {
+    ...JUNTA_SOCIOS_V110_PAYLOAD,
+    id: opts.materia,
+    materia: opts.materia,
+    clase: opts.clase,
+    votacion: { ...JUNTA_SOCIOS_V110_PAYLOAD.votacion, mayoria },
+    convocatoria: {
+      ...JUNTA_SOCIOS_V110_PAYLOAD.convocatoria,
+      documentosObligatorios: opts.extraDocumentoObligatorio
+        ? [...JUNTA_SOCIOS_V110_PAYLOAD.convocatoria.documentosObligatorios, opts.extraDocumentoObligatorio]
+        : JUNTA_SOCIOS_V110_PAYLOAD.convocatoria.documentosObligatorios,
+    },
+    postAcuerdo: opts.inscribible
+      ? JUNTA_SOCIOS_V110_PAYLOAD.postAcuerdo
+      : { inscribible: false, instrumentoRequerido: "NINGUNO", publicacionRequerida: false },
+    plazosMateriales: opts.inscribible
+      ? JUNTA_SOCIOS_V110_PAYLOAD.plazosMateriales
+      : { publicacion: [] },
+    // Clon deliberadamente parcial de reglaEspecifica: solo canalAcuseLey2007
+    // (semántica de acuse EAD). overlayLey2007 y antelacionAmpliada quedan en
+    // GARR_JUNTA_SOCIOS — no se piden aquí y duplicarlos en 6 packs más no
+    // aporta nada que la cita directa en votacion.mayoria.SL no dé ya.
+    reglaEspecifica: {
+      canalAcuseLey2007: JUNTA_SOCIOS_V110_PAYLOAD.reglaEspecifica.canalAcuseLey2007,
+    },
+  };
+}
+
+// Citas FIRMES cotejadas con los Estatutos (fuente: coordinador, fix round 2).
+// NOTA: `materia_catalog.referencia_legal` (migración 20260804080000) cita
+// artículos distintos para varias de estas materias (p. ej. EXCLUSION cita
+// "art. 21.1.e Estatutos" en el catálogo vs. "art. 30.2.g) Estatutos" aquí).
+// No concilio esa discrepancia — es una cuestión de contenido legal para el
+// Comité, no de ingeniería; uso la cita del cotejo más reciente indicada
+// para este fix, tal cual se dio.
+const SLP_MATERIA_PACKS: Record<string, ReturnType<typeof buildSlpMateriaPayload>> = {
+  ADMISION_SOCIO_CUOTA: buildSlpMateriaPayload({
+    materia: "ADMISION_SOCIO_CUOTA",
+    clase: "ESTATUTARIA",
+    mayoriaSL: { formula: "favor >= 4/5_votos_totales", referencia: "art. 30.3.b) Estatutos (80% de los votos)" },
+    inscribible: true,
+  }),
+  EXCLUSION_SOCIO_ESTATUTARIA: buildSlpMateriaPayload({
+    materia: "EXCLUSION_SOCIO_ESTATUTARIA",
+    clase: "ESTATUTARIA",
+    mayoriaSL: {
+      formula: "favor >= 2/3_votos_totales + mayoria_socios_profesionales",
+      referencia: "arts. 30.2.g) Estatutos y 15 Ley 2/2007 (doble mayoría)",
+    },
+    inscribible: true,
+    keepSociosProfesionalesExclusion: true,
+  }),
+  CONTINUIDAD_SOCIO_POST_60: buildSlpMateriaPayload({
+    materia: "CONTINUIDAD_SOCIO_POST_60",
+    clase: "ESTATUTARIA",
+    mayoriaSL: { formula: "favor >= 2/3_votos_totales", referencia: "arts. 21.1.e) y 30.2.m) Estatutos" },
+    inscribible: false,
+  }),
+  NOMBRAMIENTO_ADMINISTRADOR_UNICO: buildSlpMateriaPayload({
+    materia: "NOMBRAMIENTO_ADMINISTRADOR_UNICO",
+    clase: "ORDINARIA",
+    mayoriaSL: { formula: "favor >= 2/3_votos_totales", referencia: "art. 30.2.a) Estatutos" },
+    inscribible: true,
+  }),
+  RETRIBUCION_PRESTACIONES_ACCESORIAS: buildSlpMateriaPayload({
+    materia: "RETRIBUCION_PRESTACIONES_ACCESORIAS",
+    clase: "ESTATUTARIA",
+    mayoriaSL: {
+      formula: "favor >= 2/3_votos_totales",
+      referencia: "arts. 30.2.j) Estatutos y 12.6 (previo informe del Consejo de Socios)",
+    },
+    inscribible: false,
+  }),
+  INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA: buildSlpMateriaPayload({
+    materia: "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA",
+    clase: "ESTRUCTURAL",
+    mayoriaSL: {
+      formula: "favor >= 2/3_votos_totales",
+      referencia: "art. 30.2.c) Estatutos; art. 308 LSC (supresión del derecho de preferencia — informe del órgano de administración)",
+    },
+    inscribible: true,
+    extraDocumentoObligatorio: {
+      id: "informe_administrador_308",
+      nombre: "Informe del administrador único sobre la supresión del derecho de preferencia (art. 308 LSC)",
+      condicion: "SIEMPRE",
+    },
+  }),
+};
+
 export const PACKS: Array<{ id: string; organoTipo: string; descripcion: string; payload: Record<string, unknown> }> = [
   {
     id: "GARR_DECISION_ADMIN_UNICO",
@@ -501,6 +628,43 @@ export const PACKS: Array<{ id: string; organoTipo: string; descripcion: string;
     organoTipo: "CONSEJO",
     descripcion: "Garrigues G3 — Consejo de Administración colegiado de EAD Trust",
     payload: CONSEJO_EAD_PAYLOAD,
+  },
+  // Fix round 2 — 6 packs por-materia (id = materia), ver buildSlpMateriaPayload.
+  {
+    id: "ADMISION_SOCIO_CUOTA",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Admisión de socio de cuota (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.ADMISION_SOCIO_CUOTA,
+  },
+  {
+    id: "EXCLUSION_SOCIO_ESTATUTARIA",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Exclusión estatutaria de socio (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.EXCLUSION_SOCIO_ESTATUTARIA,
+  },
+  {
+    id: "CONTINUIDAD_SOCIO_POST_60",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Continuidad del socio tras los 60 (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.CONTINUIDAD_SOCIO_POST_60,
+  },
+  {
+    id: "NOMBRAMIENTO_ADMINISTRADOR_UNICO",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Nombramiento de administrador único (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.NOMBRAMIENTO_ADMINISTRADOR_UNICO,
+  },
+  {
+    id: "RETRIBUCION_PRESTACIONES_ACCESORIAS",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Retribución de prestaciones accesorias (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.RETRIBUCION_PRESTACIONES_ACCESORIAS,
+  },
+  {
+    id: "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA",
+    organoTipo: "JUNTA_GENERAL",
+    descripcion: "Garrigues G3 — Integración de despacho, aumento sin preferencia (materia, clon GARR_JUNTA_SOCIOS v1.1.0)",
+    payload: SLP_MATERIA_PACKS.INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA,
   },
 ];
 

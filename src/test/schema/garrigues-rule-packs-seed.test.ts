@@ -1,8 +1,9 @@
 // src/test/schema/garrigues-rule-packs-seed.test.ts
-// G3 Task 3 gate de datos: el tenant Garrigues tiene sus 4 rule packs núcleo
-// (GARR_*) bajo RLS per-tenant, y ARGA queda intacta y aislada de ellos.
-// Patrón graceful-skip de garrigues-gobierno-seed.test.ts (post-fix, con
-// cliente `arga` propio y flag `argaAuthed` independiente).
+// G3 Task 3 gate de datos: el tenant Garrigues tiene sus 4 rule packs de
+// órgano (GARR_*) + (fix round 2) 6 rule packs por-materia bajo RLS
+// per-tenant, y ARGA queda intacta y aislada de los 10. Patrón graceful-skip
+// de garrigues-gobierno-seed.test.ts (post-fix, con cliente `arga` propio y
+// flag `argaAuthed` independiente).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
@@ -21,6 +22,19 @@ const GARR_PACK_IDS = [
   "GARR_CONSEJO_EAD",
 ] as const;
 
+// Fix round 2 — 6 packs POR MATERIA (pack_id = materia), añadidos porque el
+// panel "Reglas aplicables" del ConvocatoriasStepper resuelve por materia,
+// sin fallback a órgano (rule-resolution.ts:310-317); los 4 GARR_* de arriba
+// nunca cubrían ese camino.
+const MATERIA_PACK_IDS = [
+  "ADMISION_SOCIO_CUOTA",
+  "EXCLUSION_SOCIO_ESTATUTARIA",
+  "CONTINUIDAD_SOCIO_POST_60",
+  "NOMBRAMIENTO_ADMINISTRADOR_UNICO",
+  "RETRIBUCION_PRESTACIONES_ACCESORIAS",
+  "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA",
+] as const;
+
 describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant, aislamiento ARGA)", () => {
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
@@ -37,6 +51,11 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
   // existentes (aislamiento ARGA, invariante art. 4.3 de G2) se ejecutan
   // igual, con red, desde el primer momento.
   let packsSeeded = false;
+  // Fix round 2: mismo patrón, gate independiente — la migración de los 6
+  // packs por-materia es posterior a la de los 4 GARR_*, así que
+  // `packsSeeded` (ya en true desde que el controller aplicó el Step 4
+  // original) no sirve para saber si ESTOS 6 existen todavía.
+  let materiaPacksSeeded = false;
 
   beforeAll(async () => {
     try {
@@ -52,6 +71,16 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
         packsSeeded = (probe ?? []).length > 0;
         if (!packsSeeded) {
           console.warn("[g3-rule-packs-seed] packs GARR_* aún no existen en Cloud — Step 4 (controller) pendiente; tests dependientes en skip.");
+        }
+
+        const { data: materiaProbe } = await garr
+          .from("rule_packs")
+          .select("id")
+          .eq("id", "ADMISION_SOCIO_CUOTA")
+          .limit(1);
+        materiaPacksSeeded = (materiaProbe ?? []).length > 0;
+        if (!materiaPacksSeeded) {
+          console.warn("[g3-rule-packs-seed] packs por-materia (fix round 2) aún no existen en Cloud — tests dependientes en skip.");
         }
       }
 
@@ -96,12 +125,76 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
     expect(eGarr).toBeNull();
     expect((garrRows ?? []).length).toBe(0);
 
+    // Fix round 2: los 6 packs por-materia no llevan prefijo GARR_ (pack_id =
+    // materia), así que necesitan su propio chequeo de aislamiento — el
+    // filtro .like("GARR_%") de arriba no los alcanzaría aunque existieran.
+    const { data: materiaRows, error: eMateria } = await arga
+      .from("rule_packs")
+      .select("id")
+      .in("id", [...MATERIA_PACK_IDS]);
+    expect(eMateria).toBeNull();
+    expect((materiaRows ?? []).length).toBe(0);
+
     // RLS (rule_packs_tenant_isolation: tenant_id = fn_current_tenant_id())
     // ya garantiza que solo se ven filas del propio tenant; esto verifica
-    // además que el recuento no se movió con la migración de Garrigues.
+    // además que el recuento no se movió con las migraciones de Garrigues.
     const { data: allArga, error: eAll } = await arga.from("rule_packs").select("id").limit(200);
     expect(eAll).toBeNull();
     expect((allArga ?? []).length).toBe(59);
+  });
+
+  it("Garrigues ve además sus 6 packs por-materia (fix round 2), organo_tipo=JUNTA_GENERAL, y suma 10 packs propios", async () => {
+    if (!authed || !garr || !materiaPacksSeeded) { expect(true).toBe(true); return; }
+    const { data, error } = await garr.from("rule_packs").select("id, organo_tipo").in("id", [...MATERIA_PACK_IDS]);
+    expect(error).toBeNull();
+    const ids = (data ?? []).map((r) => r.id);
+    expect(ids).toEqual(expect.arrayContaining([...MATERIA_PACK_IDS]));
+    expect((data ?? []).every((r) => r.organo_tipo === "JUNTA_GENERAL")).toBe(true);
+
+    // 4 packs de órgano (GARR_*) + 6 packs por-materia = 10 packs propios de
+    // Garrigues; los 4 de órgano no se tocan (mismo test 1 de arriba, aquí
+    // solo se suma el total).
+    const { data: allGarr, error: eAll } = await garr.from("rule_packs").select("id").limit(200);
+    expect(eAll).toBeNull();
+    expect((allGarr ?? []).length).toBe(10);
+  });
+
+  it("los 6 packs por-materia pasan invariantes: nunca Ley 2/2007 en el plazo de convocatoria, y la mayoría real vive en votacion.mayoria.SL", async () => {
+    if (!authed || !garr || !materiaPacksSeeded) { expect(true).toBe(true); return; }
+    const { data, error } = await garr
+      .from("rule_pack_versions")
+      .select("pack_id, payload, is_active")
+      .in("pack_id", [...MATERIA_PACK_IDS])
+      .eq("is_active", true);
+    expect(error).toBeNull();
+    expect((data ?? []).length).toBe(6);
+
+    for (const row of data ?? []) {
+      const payload = row.payload;
+      // Invariante transversal (Comité Legal 2026-08-04): la antelación de
+      // convocatoria nunca cita Ley 2/2007 — igual que GARR_JUNTA_SOCIOS, del
+      // que estos 6 son clon estructural.
+      const antelacionSL = payload?.convocatoria?.antelacionDias?.SL?.referencia ?? "";
+      expect(antelacionSL).not.toContain("Ley 2/2007");
+      // Cada pack tiene mayoría real (LEY) en SL, y las ramas SA/CONSEJO
+      // declaradas explícitamente "no aplicable" — nunca 'LEY' en esas dos.
+      expect(payload?.votacion?.mayoria?.SL?.fuente).toBe("LEY");
+      expect(payload?.votacion?.mayoria?.SA?.referencia).toContain("no aplicable");
+      expect(payload?.votacion?.mayoria?.CONSEJO?.referencia).toContain("no aplicable");
+    }
+
+    // Spot-check de las 2 citas más sensibles de la tabla del coordinador.
+    const byId = new Map((data ?? []).map((r) => [r.pack_id, r.payload]));
+    expect(byId.get("ADMISION_SOCIO_CUOTA")?.votacion?.mayoria?.SL?.formula).toBe("favor >= 4/5_votos_totales");
+    expect(byId.get("EXCLUSION_SOCIO_ESTATUTARIA")?.votacion?.mayoria?.sociosProfesionalesExclusion?.referencia).toBe(
+      "arts. 15 y 16 Ley 2/2007",
+    );
+    // Las otras 5 materias NO deben llevar la rama de exclusión — es
+    // exclusiva de EXCLUSION_SOCIO_ESTATUTARIA.
+    for (const id of MATERIA_PACK_IDS) {
+      if (id === "EXCLUSION_SOCIO_ESTATUTARIA") continue;
+      expect(byId.get(id)?.votacion?.mayoria?.sociosProfesionalesExclusion).toBeUndefined();
+    }
   });
 
   it("GARR_JUNTA_SOCIOS tiene versión ACTIVA con el overlay Ley 2/2007 (5 citas) y la doble mayoría de exclusión anidada en votacion.mayoria", async () => {
