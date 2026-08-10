@@ -127,12 +127,12 @@ const TEMPLATES: TemplateSeed[] = [
     materia: "GARR_DECISION_ADMIN_UNICO",
     organo_tipo: "ADMIN_UNICO",
     adoption_mode: "UNIPERSONAL_ADMIN",
-    referencia_legal: "art. 210 LSC (administrador único); art. 31.3 Estatutos",
+    referencia_legal: "art. 210 LSC; arts. 25 y 32.1.d) Estatutos",
     capa1_inmutable: `DECISIÓN DEL ADMINISTRADOR ÚNICO
 
 {{ENTIDAD.denominacion_social}}, {{ENTIDAD.tipo_social}}
 
-En {{ENTIDAD.domicilio_social}}, en mi condición de administrador único de la sociedad, y en ejercicio de la facultad de organizar la administración de forma unipersonal que reconocen el artículo 210 de la Ley de Sociedades de Capital y el artículo 31.3 de los Estatutos Sociales, adopto la presente decisión sobre el asunto de referencia, que sustituye a la deliberación colegiada al no existir en la sociedad órgano de administración plural.
+En {{ENTIDAD.domicilio_social}}, en mi condición de administrador único de la sociedad, y en ejercicio de la facultad de organizar la administración de forma unipersonal que reconocen el artículo 210 de la Ley de Sociedades de Capital y los artículos 25 y 32.1.d) de los Estatutos Sociales, adopto la presente decisión sobre el asunto de referencia, que sustituye a la deliberación colegiada al no existir en la sociedad órgano de administración plural.
 
 ASUNTO
 
@@ -152,12 +152,12 @@ ${DISCLAIMER}`,
     materia: "ACTA_CONSIGNACION_ADMIN_UNICO_SLP",
     organo_tipo: "ADMIN_UNICO",
     adoption_mode: "UNIPERSONAL_ADMIN",
-    referencia_legal: "art. 210 LSC (administrador único); art. 31.3 Estatutos",
+    referencia_legal: "art. 210 LSC; arts. 25 y 32.1.d) Estatutos",
     capa1_inmutable: `ACTA DE CONSIGNACIÓN DE DECISIÓN DEL ADMINISTRADOR ÚNICO
 
 {{ENTIDAD.denominacion_social}}
 
-En {{ENTIDAD.domicilio_social}}, a {{SISTEMA.fecha_emision}}, el administrador único de la sociedad, en ejercicio de la facultad prevista en el artículo 210 de la Ley de Sociedades de Capital y en el artículo 31.3 de los Estatutos Sociales, deja constancia por escrito de la decisión adoptada, que se consigna en el libro correspondiente conforme al régimen legal y estatutario propio de las sociedades con administrador único.
+En {{ENTIDAD.domicilio_social}}, a {{SISTEMA.fecha_emision}}, el administrador único de la sociedad, en ejercicio de la facultad prevista en el artículo 210 de la Ley de Sociedades de Capital y en los artículos 25 y 32.1.d) de los Estatutos Sociales, deja constancia por escrito de la decisión adoptada, que se consigna en el libro correspondiente conforme al régimen legal y estatutario propio de las sociedades con administrador único.
 
 DECISIÓN CONSIGNADA
 
@@ -190,7 +190,7 @@ ORDEN DEL DÍA
 
 De no alcanzarse el quórum de constitución en primera convocatoria, la Junta se celebrará en segunda convocatoria {{#if REUNION.segunda_convocatoria}}el {{REUNION.fecha_segunda_convocatoria}}, a las {{REUNION.hora_segunda_convocatoria}}, en el mismo lugar{{else}}en la fecha y lugar que se le comunique con la misma antelación{{/if}}.
 
-La presente convocatoria se le remite de forma individualizada por escrito, con acuse de recibo, conforme al artículo 27.3 de los Estatutos Sociales, con la antelación mínima prevista en el artículo 27.4 de los Estatutos Sociales y, supletoriamente, en el artículo 176 de la Ley de Sociedades de Capital.
+La presente convocatoria se le remite por medio de comunicación individualizada y por escrito que asegura la recepción (art. 27.3 de los Estatutos Sociales), con la antelación mínima prevista en el artículo 27.4 de los Estatutos Sociales y, supletoriamente, en el artículo 176 de la Ley de Sociedades de Capital.
 
 Un cordial saludo,
 
@@ -243,7 +243,7 @@ ${DISCLAIMER}`,
     materia: "INFORME_PRECEPTIVO_CONSEJO_SOCIOS_SLP",
     organo_tipo: "JUNTA_GENERAL",
     adoption_mode: null,
-    referencia_legal: "art. 39.5.b Estatutos; LSC (arts. 160 y 225 — régimen del órgano de administración)",
+    referencia_legal: "art. 39.5.b Estatutos; art. 225 LSC (deber de diligencia)",
     // Vars planas sin punto (fundamento_legal, materia_acuerdo, organo_nombre,
     // objeto_informe, comprobaciones_texto, conclusion_informe,
     // denominacion_social, fecha) las resuelve `buildRequirementBaseVariables`
