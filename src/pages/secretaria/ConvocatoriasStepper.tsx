@@ -3470,7 +3470,10 @@ export default function ConvocatoriasStepper() {
                   // de un borrador previo se conserva visible en su propio
                   // grupo para no perder el valor, pero no se ofrece el resto
                   // del catálogo incompatible.
-                  const materiaGroups = agendaMateriaGroups(organoTipo)
+                  // Fix round 1 G3 Task 4, I-1: se pasa `tipoSocial` (ya
+                  // computado arriba) para que las materias `soloTipoSocial`
+                  // (las 6 SLP) no aparezcan en una convocatoria de ARGA (SA).
+                  const materiaGroups = agendaMateriaGroups(organoTipo, tipoSocial)
                     .map((group) => ({
                       ...group,
                       materias: group.materias.filter(

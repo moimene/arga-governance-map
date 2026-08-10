@@ -18,6 +18,7 @@ import { readMeetingHandoff } from "@/lib/secretaria/cross-module-handoff";
 import {
   AGENDA_MATERIAS,
   MATERIAS_LIBRES,
+  isMateriaVisibleForTipoSocial,
   labelMateria,
   resolveMateriaAlias,
 } from "@/lib/secretaria/agenda-materias";
@@ -1871,10 +1872,23 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
     [existingQD?.debates],
   );
   const meetingRaw = meeting as
-    | { governing_bodies?: { body_type?: string | null; config?: Record<string, unknown> | null } | null }
+    | {
+        governing_bodies?: {
+          body_type?: string | null;
+          config?: Record<string, unknown> | null;
+          entities?: { legal_form?: string | null; tipo_social?: string | null } | null;
+        } | null;
+      }
     | null
     | undefined;
   const organoTipo = resolveOrganoTipo(meetingRaw?.governing_bodies);
+  // Fix round 1 G3 Task 4, I-1: mismo patrón que AsistentesStep/QuorumStep
+  // (toTipoSocial sobre governing_bodies.entities) para poder pasarlo al
+  // filtro fail-closed de materias soloTipoSocial (las 6 SLP).
+  const tipoSocial = toTipoSocial(
+    meetingRaw?.governing_bodies?.entities?.tipo_social ??
+      meetingRaw?.governing_bodies?.entities?.legal_form,
+  );
   const universalLabel = universalMeetingLabel(organoTipo);
   const universalNamespace = universalMeetingNamespace(organoTipo);
   const isUniversalMeeting = isUniversalMeetingQuorumData(existingQD);
@@ -2189,7 +2203,11 @@ function DebatesStep({ meetingId }: { meetingId?: string }) {
                       className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
-                      {AGENDA_MATERIAS.map((materia) => (
+                      {/* Fix round 1 G3 Task 4, I-1: fail-closed por tipoSocial
+                          (las 6 materias SLP no se ofrecen fuera de una SLP).
+                          Se conserva el resto de la lista sin filtro de
+                          órgano (comportamiento previo, sin cambios). */}
+                      {AGENDA_MATERIAS.filter((materia) => isMateriaVisibleForTipoSocial(materia, tipoSocial)).map((materia) => (
                         <option key={materia.value} value={materia.value}>
                           {materia.label}
                         </option>

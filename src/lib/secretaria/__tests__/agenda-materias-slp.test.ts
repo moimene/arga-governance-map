@@ -25,6 +25,7 @@ import {
   MATERIA_ORGANOS,
   agendaMateriaGroups,
   isMateriaCompatibleWithOrgano,
+  isMateriaVisibleForTipoSocial,
   labelMateria,
 } from "@/lib/secretaria/agenda-materias";
 import { filterAgreementCompatibleMaterias } from "@/lib/secretaria/matter-class";
@@ -41,6 +42,8 @@ const SLP_MATERIAS_ESPERADAS: readonly SlpMateriaExpectation[] = [
   { value: "ADMISION_SOCIO_CUOTA", tipo: "ESTATUTARIA", inscribible: true },
   { value: "EXCLUSION_SOCIO_ESTATUTARIA", tipo: "ESTATUTARIA", inscribible: true },
   { value: "CONTINUIDAD_SOCIO_POST_60", tipo: "ESTATUTARIA", inscribible: false },
+  // Fix round 1, contraorden sobre I-2: Estatutos reales art. 12.6 — acuerdo
+  // anual de la Junta, no modificación estatutaria. NO inscribible.
   { value: "RETRIBUCION_PRESTACIONES_ACCESORIAS", tipo: "ESTATUTARIA", inscribible: false },
   { value: "INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA", tipo: "ESTRUCTURAL", inscribible: true },
   { value: "NOMBRAMIENTO_ADMINISTRADOR_UNICO", tipo: "ORDINARIA", inscribible: true },
@@ -121,18 +124,78 @@ describe("agenda-materias — SLP (G3 Task 4, 12 puntos Junta de Socios 2026)", 
     }
   });
 
-  it("las 6 aparecen en el grupo 'propias' de la Junta y no filtran hacia otros órganos", () => {
-    const propiasJunta = agendaMateriaGroups("JUNTA_GENERAL").find((g) => g.key === "propias")!;
+  it("con tipoSocial SLP, las 6 aparecen en el grupo 'propias' de la Junta y no filtran hacia otros órganos", () => {
+    const propiasJunta = agendaMateriaGroups("JUNTA_GENERAL", "SLP").find((g) => g.key === "propias")!;
     const valoresPropios = propiasJunta.materias.map((m) => m.value);
     for (const esperado of SLP_MATERIAS_ESPERADAS) {
       expect(valoresPropios).toContain(esperado.value);
     }
-    const groupsConsejo = agendaMateriaGroups("CONSEJO").flatMap((g) => g.materias.map((m) => m.value));
-    const groupsComision = agendaMateriaGroups("COMISION_DELEGADA").flatMap((g) => g.materias.map((m) => m.value));
+    // Con tipoSocial SLP (pasa el gate I-1), el filtro de órgano sigue
+    // excluyendo Consejo/Comisión — las 6 son JUNTA_ONLY independientemente.
+    const groupsConsejo = agendaMateriaGroups("CONSEJO", "SLP").flatMap((g) => g.materias.map((m) => m.value));
+    const groupsComision = agendaMateriaGroups("COMISION_DELEGADA", "SLP").flatMap((g) => g.materias.map((m) => m.value));
     for (const esperado of SLP_MATERIAS_ESPERADAS) {
       expect(groupsConsejo).not.toContain(esperado.value);
       expect(groupsComision).not.toContain(esperado.value);
     }
+  });
+
+  it("las 6 declaran soloTipoSocial: ['SLP'] en AGENDA_MATERIAS", () => {
+    for (const esperado of SLP_MATERIAS_ESPERADAS) {
+      const materia = AGENDA_MATERIAS.find((m) => m.value === esperado.value);
+      expect(materia?.soloTipoSocial).toEqual(["SLP"]);
+    }
+  });
+
+  describe("fix round 1, I-1 — gate fail-closed por tipoSocial (agendaMateriaGroups)", () => {
+    const genericas = ["APROBACION_CUENTAS", "MODIFICACION_ESTATUTOS", "NOMBRAMIENTO_CONSEJERO"];
+    const slpValues = SLP_MATERIAS_ESPERADAS.map((m) => m.value);
+    const valuesFor = (tipoSocial?: "SA" | "SL" | "SLU" | "SAU" | "SLP") =>
+      agendaMateriaGroups("JUNTA_GENERAL", tipoSocial).flatMap((g) => g.materias.map((m) => m.value));
+
+    it("con tipoSocial SA (ARGA) las 6 materias SLP NO aparecen — el error letal en espejo", () => {
+      const values = valuesFor("SA");
+      for (const value of slpValues) {
+        expect(values).not.toContain(value);
+      }
+    });
+
+    it("con tipoSocial SLP las 6 materias SÍ aparecen", () => {
+      const values = valuesFor("SLP");
+      for (const value of slpValues) {
+        expect(values).toContain(value);
+      }
+    });
+
+    it("sin tipoSocial conocido (undefined) las 6 quedan fuera — fail-closed", () => {
+      const values = valuesFor(undefined);
+      for (const value of slpValues) {
+        expect(values).not.toContain(value);
+      }
+    });
+
+    it("las materias genéricas (sin soloTipoSocial) son idénticas con SA, con SLP y sin tipoSocial", () => {
+      const withSA = valuesFor("SA").filter((v) => !slpValues.includes(v)).sort();
+      const withSLP = valuesFor("SLP").filter((v) => !slpValues.includes(v)).sort();
+      const withoutTipoSocial = valuesFor(undefined).filter((v) => !slpValues.includes(v)).sort();
+      expect(withSA).toEqual(withoutTipoSocial);
+      expect(withSLP).toEqual(withoutTipoSocial);
+      for (const materia of genericas) {
+        expect(withSA).toContain(materia);
+        expect(withSLP).toContain(materia);
+        expect(withoutTipoSocial).toContain(materia);
+      }
+    });
+
+    it("isMateriaVisibleForTipoSocial: fail-closed unitario", () => {
+      const restringida = { soloTipoSocial: ["SLP"] as const };
+      const generica = { soloTipoSocial: undefined };
+      expect(isMateriaVisibleForTipoSocial(restringida, "SLP")).toBe(true);
+      expect(isMateriaVisibleForTipoSocial(restringida, "SA")).toBe(false);
+      expect(isMateriaVisibleForTipoSocial(restringida, undefined)).toBe(false);
+      expect(isMateriaVisibleForTipoSocial(generica, "SA")).toBe(true);
+      expect(isMateriaVisibleForTipoSocial(generica, undefined)).toBe(true);
+    });
   });
 
   it("las 6 tienen etiqueta jurídica en castellano (labelMateria no exhibe el código crudo)", () => {
@@ -172,6 +235,17 @@ describe("agenda-materias — SLP (G3 Task 4, 12 puntos Junta de Socios 2026)", 
 
     it("criterio vinculante a nivel Cloud: ninguna fila de datos usa matter_class='ESPECIAL'", () => {
       expect(valuesSection).not.toMatch(/'ESPECIAL'/);
+    });
+
+    it("fix round 1, contraorden I-2: RETRIBUCION_PRESTACIONES_ACCESORIAS NO inscribible (art. 12.6 Estatutos: acuerdo anual de la Junta, no modificación estatutaria)", () => {
+      expect(valuesSection).toMatch(
+        /'RETRIBUCION_PRESTACIONES_ACCESORIAS'\s*,\s*'[^']*'\s*,\s*false\s*,\s*false\s*,\s*false\s*,\s*'ESTATUTARIA'/,
+      );
+    });
+
+    it("referencia_legal cita los Estatutos reales aportados por el usuario", () => {
+      expect(valuesSection).toContain("arts. 9.2, 30.3.b) y 39.5.b) Estatutos (mayoría 80%); arts. 13 y 8 Ley 2/2007");
+      expect(valuesSection).toContain("arts. 10.7, 12 y 30.2.j) Estatutos; art. 89 LSC");
     });
 
     it("el bloque de autocomprobación SÍ verifica activamente la ausencia de ESPECIAL (no es un check vacío)", () => {

@@ -230,6 +230,24 @@ export const MATERIA_USAGE_NOTES: Record<string, MateriaUsageNote> = {
     avoidWhen: "No la uses si el texto que cambia forma parte de los estatutos sociales.",
     related: [{ materia: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos" }],
   },
+  // Fix round 1 G3 Task 4 (I-2, contraorden — Estatutos reales art. 12.6):
+  // RETRIBUCION_PRESTACIONES_ACCESORIAS es el acuerdo ANUAL de retribución,
+  // no una modificación estatutaria — desambiguada de PRESTACIONES_ACCESORIAS.
+  RETRIBUCION_PRESTACIONES_ACCESORIAS: {
+    title: "Acuerdo anual de retribución de las prestaciones accesorias (SLP)",
+    useWhen: "Acuerdo anual de retribución de las prestaciones accesorias (art. 12.6 Estatutos: propuesta del Órgano de Administración + informe previo del Consejo de Socios; no inscribible).",
+    avoidWhen: "Para crear o modificar el régimen estatutario de las prestaciones accesorias, usar PRESTACIONES_ACCESORIAS / MODIFICACION_ESTATUTOS (escritura + registro).",
+    related: [
+      { materia: "PRESTACIONES_ACCESORIAS", label: "Creación, modificación o supresión de prestaciones accesorias" },
+      { materia: "MODIFICACION_ESTATUTOS", label: "Modificación de estatutos" },
+    ],
+  },
+  PRESTACIONES_ACCESORIAS: {
+    title: "Régimen general de prestaciones accesorias",
+    useWhen: "Usa esta materia para crear, modificar o suprimir el régimen estatutario de prestaciones accesorias (escritura pública e inscripción).",
+    avoidWhen: "No la uses para el acuerdo anual de retribución de una prestación accesoria ya existente en una SLP — usa RETRIBUCION_PRESTACIONES_ACCESORIAS (no inscribible).",
+    related: [{ materia: "RETRIBUCION_PRESTACIONES_ACCESORIAS", label: "Retribución de prestaciones accesorias" }],
+  },
 };
 
 function relatedToGenericStatutes(specificUse: string): MateriaUsageNote {

@@ -23,8 +23,16 @@
 --     inscribible (art. 8 Ley 2/2007 — escritura pública + inscripción).
 --   - CONTINUIDAD_SOCIO_POST_60 / RETRIBUCION_PRESTACIONES_ACCESORIAS: no
 --     cambian el círculo de socios ni la administración inscrita — no
---     inscribibles (mismo patrón que el resto del catálogo: inscribable=false
---     implica requires_notary=false y requires_registry=false).
+--     inscribibles (inscribable=false implica requires_notary=false y
+--     requires_registry=false, patrón del resto del catálogo).
+--     RETRIBUCION_PRESTACIONES_ACCESORIAS (fix round 1, contraorden sobre
+--     I-2): cotejados los Estatutos REALES de la SLP, el art. 12.6 configura
+--     la retribución de las prestaciones accesorias como acuerdo ANUAL de la
+--     Junta de Socios (propuesta del Órgano de Administración, previo informe
+--     del Consejo de Socios) — no es modificación estatutaria, no exige
+--     escritura ni registro. Distinta de su hermana PRESTACIONES_ACCESORIAS
+--     (true/true/true), que cubre crear/modificar el régimen estatutario
+--     (arts. 86-89 LSC → art. 30.2.f Estatutos).
 --   - INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA: ESTRUCTURAL (no
 --     ESTATUTARIA) — aumento de capital con supresión del derecho de
 --     preferencia (art. 308 LSC) para incorporar un despacho como socio.
@@ -51,10 +59,10 @@ INSERT INTO public.materia_catalog (
   referencia_legal
 )
 VALUES
-  ('ADMISION_SOCIO_CUOTA', 'Admisión de socio de cuota', true, true, true, 'ESTATUTARIA', 'REFORZADA_2_3', false, 30, 'art. 21.1 Estatutos; art. 8 Ley 2/2007 (inscribibilidad); art. 83 RRM (plazo)'),
+  ('ADMISION_SOCIO_CUOTA', 'Admisión de socio de cuota', true, true, true, 'ESTATUTARIA', 'REFORZADA_2_3', false, 30, 'arts. 9.2, 30.3.b) y 39.5.b) Estatutos (mayoría 80%); arts. 13 y 8 Ley 2/2007'),
   ('EXCLUSION_SOCIO_ESTATUTARIA', 'Exclusión estatutaria de socio (retiro a los 60)', true, true, true, 'ESTATUTARIA', 'REFORZADA_2_3', false, 30, 'art. 21.1.e Estatutos; arts. 15 y 16 Ley 2/2007; art. 83 RRM (plazo)'),
   ('CONTINUIDAD_SOCIO_POST_60', 'Continuidad del socio tras los 60', false, false, false, 'ESTATUTARIA', 'REFORZADA_2_3', false, null, 'art. 21.1.e Estatutos'),
-  ('RETRIBUCION_PRESTACIONES_ACCESORIAS', 'Retribución de prestaciones accesorias', false, false, false, 'ESTATUTARIA', 'REFORZADA_2_3', false, null, 'art. 89 LSC'),
+  ('RETRIBUCION_PRESTACIONES_ACCESORIAS', 'Retribución de prestaciones accesorias', false, false, false, 'ESTATUTARIA', 'REFORZADA_2_3', false, null, 'arts. 10.7, 12 y 30.2.j) Estatutos; art. 89 LSC'),
   ('INTEGRACION_DESPACHO_AUMENTO_SIN_PREFERENCIA', 'Integración de despacho (aumento sin derecho de preferencia)', true, true, true, 'ESTRUCTURAL', 'REFORZADA_2_3', true, 30, 'art. 296 LSC (aumento de capital); art. 308 LSC (supresión del derecho de preferencia)'),
   ('NOMBRAMIENTO_ADMINISTRADOR_UNICO', 'Nombramiento de administrador único', true, true, true, 'ORDINARIA', 'SIMPLE', false, 30, 'art. 210 LSC; art. 8 Ley 2/2007 (escritura pública e inscripción); art. 83 RRM (plazo)')
 ON CONFLICT (materia) DO UPDATE SET
@@ -75,6 +83,7 @@ DECLARE
   v_socios_estatutaria integer;
   v_estructural integer;
   v_ordinaria integer;
+  v_retribucion_no_inscribible integer;
 BEGIN
   SELECT count(*) INTO v_total
     FROM public.materia_catalog
@@ -138,6 +147,19 @@ BEGIN
 
   IF v_ordinaria <> 1 THEN
     RAISE EXCEPTION 'g3 slp materias: NOMBRAMIENTO_ADMINISTRADOR_UNICO debe ser ORDINARIA e inscribable';
+  END IF;
+
+  -- Fix round 1, contraorden sobre I-2: art. 12.6 Estatutos reales — acuerdo
+  -- ANUAL de la Junta, no modificación estatutaria. NO inscribible.
+  SELECT count(*) INTO v_retribucion_no_inscribible
+    FROM public.materia_catalog
+   WHERE materia = 'RETRIBUCION_PRESTACIONES_ACCESORIAS'
+     AND inscribable = false
+     AND requires_notary = false
+     AND requires_registry = false;
+
+  IF v_retribucion_no_inscribible <> 1 THEN
+    RAISE EXCEPTION 'g3 slp materias: RETRIBUCION_PRESTACIONES_ACCESORIAS NO debe ser inscribable (art. 12.6 Estatutos: acuerdo anual de la Junta, no modificación estatutaria)';
   END IF;
 
   IF EXISTS (

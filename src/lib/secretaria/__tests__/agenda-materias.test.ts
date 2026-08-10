@@ -11,6 +11,7 @@ import {
   agendaMateriaGroups,
   isMateriaInformativa,
   isMateriaCompatibleWithOrgano,
+  isMateriaVisibleForTipoSocial,
   labelMateria,
   materiaDefaultForOrgano,
   resolveMateriaAlias,
@@ -136,9 +137,13 @@ describe("agenda-materias — catálogo canónico materia × órgano", () => {
 
   it("los grupos particionan exactamente las materias compatibles (sin duplicados ni huecos)", () => {
     for (const organo of ORGANOS) {
-      const compatibles = AGENDA_MATERIAS.filter((m) => isMateriaCompatibleWithOrgano(m.value, organo)).map(
-        (m) => m.value,
-      );
+      // G3 fix round 1 (I-1): agendaMateriaGroups sin tipoSocial también
+      // aplica el gate fail-closed de isMateriaVisibleForTipoSocial (oculta
+      // las materias soloTipoSocial, p.ej. las 6 SLP) — la referencia debe
+      // filtrar lo mismo para seguir siendo la partición exacta.
+      const compatibles = AGENDA_MATERIAS.filter(
+        (m) => isMateriaCompatibleWithOrgano(m.value, organo) && isMateriaVisibleForTipoSocial(m, undefined),
+      ).map((m) => m.value);
       const agrupadas = agendaMateriaGroups(organo).flatMap((g) => g.materias.map((m) => m.value));
       expect([...agrupadas].sort()).toEqual([...compatibles].sort());
       expect(new Set(agrupadas).size).toBe(agrupadas.length);
