@@ -234,6 +234,10 @@ function uniqueOverrides(overrides: RuleParamOverride[]): RuleParamOverride[] {
 
 function toTipoSocial(value: unknown): TipoSocial {
   const raw = String(value ?? "").toUpperCase();
+  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
+  // profesional a SL (mismo bug que ConvocatoriasStepper — verificación
+  // viva G3 Task 9; la unificación de normalizadores es deuda post-G3).
+  if (raw.includes("SLP")) return "SLP";
   if (raw.includes("SLU")) return "SLU";
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";

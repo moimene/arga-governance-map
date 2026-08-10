@@ -314,6 +314,10 @@ function isRulePackPayload(payload: unknown): payload is RulePack {
 
 function toTipoSocial(value: unknown): TipoSocial {
   const raw = String(value ?? "").toUpperCase();
+  // SLP antes que SL: "SLP".includes("SL") es true y colapsaría la forma
+  // profesional a SL, ocultando las materias soloTipoSocial:["SLP"] del
+  // orden del día (bug cazado en la verificación viva de G3 Task 9).
+  if (raw.includes("SLP")) return "SLP";
   if (raw.includes("SLU")) return "SLU";
   if (raw.includes("SAU")) return "SAU";
   if (raw.includes("SL")) return "SL";
