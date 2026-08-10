@@ -123,10 +123,23 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
     // campo de primer nivel del payload (el extractor legacy no la lee).
     expect(payload?.votacion?.mayoria?.sociosProfesionalesExclusion?.referencia).toBe("arts. 15 y 16 Ley 2/2007");
     expect(payload?.votacion?.mayoria?.sociosProfesionalesExclusion?.alcance).toContain("EXCLUSION_SOCIO_PROFESIONAL_UNICAMENTE");
-    // Corrección de cita obligada: la antelación de 15 días para SL/SLP cita
-    // SIEMPRE "art. 176 LSC (supletoria)", nunca Ley 2/2007.
-    expect(payload?.convocatoria?.antelacionDias?.SL?.referencia).toBe("art. 176 LSC (supletoria)");
-    expect(payload?.convocatoria?.antelacionDias?.SLP?.referencia).toBe("art. 176 LSC (supletoria)");
+    // Corrección de cita obligada: la antelación de 15 días para SL/SLP
+    // SIEMPRE menciona "176 LSC (supletoria)" y NUNCA cita Ley 2/2007 (que no
+    // regula plazos de convocatoria). No se pina el string exacto: esta
+    // sonda corre contra Cloud, donde a fecha de este commit la versión
+    // ACTIVA de GARR_JUNTA_SOCIOS sigue siendo v1.0.0 ("art. 176 LSC
+    // (supletoria)"; Comité Legal 2026-08-04). La migración G3 Task 5
+    // (20260805100000_g3_junta_socios_pack_v110.sql) sube el pack a v1.1.0
+    // ("arts. 27.4 Estatutos y 176 LSC (supletoria)" — cotejo con Estatutos
+    // 2026-08-05), pero aplicarla en Cloud es el Step 4 del controller, no
+    // este commit. El `toContain` tolera ambas versiones sin romper el gate
+    // en ningún punto del rollout.
+    const antelacionSL = payload?.convocatoria?.antelacionDias?.SL?.referencia ?? "";
+    const antelacionSLP = payload?.convocatoria?.antelacionDias?.SLP?.referencia ?? "";
+    expect(antelacionSL).toContain("176 LSC (supletoria)");
+    expect(antelacionSL).not.toContain("Ley 2/2007");
+    expect(antelacionSLP).toContain("176 LSC (supletoria)");
+    expect(antelacionSLP).not.toContain("Ley 2/2007");
   });
 
   // Sonda extra recomendada por el brief (art. 4.3 Ley 2/2007): el

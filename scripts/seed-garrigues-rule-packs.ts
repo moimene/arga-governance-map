@@ -27,6 +27,13 @@
  *   - GARR_CONSEJO_EAD           — Consejo de Administración colegiado de EAD
  *     Trust (el único órgano colegiado real del perímetro Garrigues).
  *
+ * G3 Task 5 (2026-08-05, post-cotejo con los Estatutos vigentes — ver
+ * docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md, sección
+ * "COTEJO CON EL TEXTO VIGENTE"): GARR_JUNTA_SOCIOS sube además a v1.1.0
+ * (referencias estatutarias FIRMES de convocatoria, arts. 27.3/27.4),
+ * espejo idempotente de `<ts>_g3_junta_socios_pack_v110.sql`. v1.0.0 queda
+ * intacta (ya aplicada) y solo se desactiva; nunca se muta su payload.
+ *
  * Uso: bun run scripts/seed-garrigues-rule-packs.ts [--commit]
  * Dry-run por defecto (solo imprime lo que haría). --commit ejecuta contra
  * Cloud. Requiere una service-role key en el entorno.
@@ -117,7 +124,7 @@ const DECISION_ADMIN_UNICO_PAYLOAD = {
   },
 };
 
-const JUNTA_SOCIOS_PAYLOAD = {
+export const JUNTA_SOCIOS_PAYLOAD = {
   id: "GARR_JUNTA_SOCIOS",
   materia: "GARR_JUNTA_SOCIOS",
   clase: "ESTATUTARIA",
@@ -275,6 +282,63 @@ const JUNTA_SOCIOS_PAYLOAD = {
       referencia: "LSC supletoria + art. 27.3 Estatutos",
       semanticaAcuse: "EAD_INTERPOSICION_ETIQUETADA",
       nota: "El acuse usa la semántica de interposición EAD Trust; no se afirma como capacidad de entrega/acuse probada (política 2026-07-21).",
+    },
+  },
+};
+
+// G3 Task 5 — GARR_JUNTA_SOCIOS v1.1.0 (docs/legal/2026-08-04-decisiones-
+// comite-legal-slp-garrigues.md, sección "COTEJO CON EL TEXTO VIGENTE",
+// 2026-08-05). v1.0.0 (arriba) ya está APLICADA en Cloud y NUNCA se muta: esta
+// es una fila de versión nueva, derivada por spread para que todo lo no
+// tocado quede byte-idéntico a v1.0.0. Cuatro cambios exactos:
+//   1. convocatoria.antelacionDias.SL / .SLP → fuente 'ESTATUTOS' (el plazo
+//      de 15 días es ahora también estatutario firme, no solo LSC
+//      supletoria), referencia "arts. 27.4 Estatutos y 176 LSC (supletoria)".
+//      valor se mantiene en 15.
+//   2. convocatoria.canales.SLP — clave nueva. v1.0.0 solo traía SA/SL;
+//      calcularCanales (convocatoria-engine.ts) indexa
+//      pack.convocatoria.canales[input.tipoSocial], así que una Junta SLP
+//      sin esta clave no recibía ningún canal de este pack. Mismo canal que
+//      SL (comunicación individualizada — art. 27.3 Estatutos).
+//   3. reglaEspecifica.antelacionAmpliada — clave nueva y puramente
+//      documental: el motor NO la lee todavía (reglaEspecifica no lo
+//      consume ningún engine hoy). Registra que el art. 27.4 Estatutos
+//      amplía el plazo a un mes cuando el orden del día incluye modificación
+//      estructural (la materia INTEGRACION, clase ESTRUCTURAL, la
+//      dispararía). `valor: 30` es la misma aproximación de display que ya
+//      usa el motor para "un mes" en la junta SA por defecto
+//      (convocatoria-engine.ts calcularAntelacion/restarUnMes). Vive en
+//      reglaEspecifica y no como clave hermana de ReglaConvocatoria para no
+//      ensanchar ese tipo con un campo que el motor aún no aplica.
+//   4. reglaEspecifica.canalAcuseLey2007.referencia — cita completa con el
+//      texto estatutario literal ("art. 27.3 Estatutos... LSC supletoria"
+//      en vez de "LSC supletoria + art. 27.3 Estatutos"). codigo,
+//      semanticaAcuse y nota (cautela EAD, política 2026-07-21) intactos.
+export const JUNTA_SOCIOS_V110_PAYLOAD = {
+  ...JUNTA_SOCIOS_PAYLOAD,
+  convocatoria: {
+    ...JUNTA_SOCIOS_PAYLOAD.convocatoria,
+    canales: {
+      ...JUNTA_SOCIOS_PAYLOAD.convocatoria.canales,
+      SLP: ["COMUNICACION_INDIVIDUAL_CON_ACUSE"],
+    },
+    antelacionDias: {
+      ...JUNTA_SOCIOS_PAYLOAD.convocatoria.antelacionDias,
+      SL: { valor: 15, fuente: "ESTATUTOS", referencia: "arts. 27.4 Estatutos y 176 LSC (supletoria)" },
+      SLP: { valor: 15, fuente: "ESTATUTOS", referencia: "arts. 27.4 Estatutos y 176 LSC (supletoria)" },
+    },
+  },
+  reglaEspecifica: {
+    ...JUNTA_SOCIOS_PAYLOAD.reglaEspecifica,
+    antelacionAmpliada: {
+      valor: 30,
+      condicion: "MODIFICACION_ESTRUCTURAL_EN_ORDEN_DEL_DIA",
+      fuente: "ESTATUTOS",
+      referencia: "art. 27.4 Estatutos (el plazo se amplía a un mes si el orden del día incluye modificación estructural u otro asunto que legalmente lo exija)",
+    },
+    canalAcuseLey2007: {
+      ...JUNTA_SOCIOS_PAYLOAD.reglaEspecifica.canalAcuseLey2007,
+      referencia: "art. 27.3 Estatutos (comunicación individualizada y por escrito que asegure la recepción; también entrega en mano contra recibí); LSC supletoria",
     },
   },
 };
@@ -486,8 +550,56 @@ async function ensureRulePack(admin: ReturnType<typeof createClient>, pack: (typ
   }
 }
 
+// G3 Task 5 — sube GARR_JUNTA_SOCIOS de v1.0.0 a v1.1.0 (espejo idempotente
+// de la migración `<ts>_g3_junta_socios_pack_v110.sql`). NUNCA muta la fila
+// v1.0.0 ya aplicada: (a) inserta v1.1.0 activa si no existe, (b) desactiva
+// v1.0.0 solo si sigue activa. Ambos pasos son no-op en una segunda pasada.
+const JUNTA_SOCIOS_V110_VERSION = "1.1.0";
+
+async function ensureJuntaSociosV110Upgrade(admin: ReturnType<typeof createClient>) {
+  const packId = "GARR_JUNTA_SOCIOS";
+
+  const { data: existingV110, error: eSelV110 } = await admin
+    .from("rule_pack_versions")
+    .select("id")
+    .eq("pack_id", packId)
+    .eq("version", JUNTA_SOCIOS_V110_VERSION)
+    .maybeSingle();
+  if (eSelV110) fail(`rule_pack_versions select '${packId}@${JUNTA_SOCIOS_V110_VERSION}': ${eSelV110.message}`);
+
+  if (!existingV110) {
+    const { error: eInsV110 } = await admin.from("rule_pack_versions").insert({
+      pack_id: packId,
+      version: JUNTA_SOCIOS_V110_VERSION,
+      payload: JUNTA_SOCIOS_V110_PAYLOAD,
+      is_active: true,
+      status: "ACTIVE",
+      effective_from: new Date().toISOString().slice(0, 10),
+    });
+    if (eInsV110) fail(`rule_pack_versions insert '${packId}@${JUNTA_SOCIOS_V110_VERSION}': ${eInsV110.message}`);
+    console.log(`✓ rule_pack_versions ${packId}@${JUNTA_SOCIOS_V110_VERSION} creada`);
+  } else {
+    console.log(`… rule_pack_versions ${packId}@${JUNTA_SOCIOS_V110_VERSION} ya existía`);
+  }
+
+  const { data: deactivated, error: eDeact } = await admin
+    .from("rule_pack_versions")
+    .update({ is_active: false, status: "DEPRECATED" })
+    .eq("pack_id", packId)
+    .eq("version", VERSION)
+    .eq("is_active", true)
+    .select("id");
+  if (eDeact) fail(`rule_pack_versions deactivate '${packId}@${VERSION}': ${eDeact.message}`);
+  console.log(
+    (deactivated ?? []).length > 0
+      ? `✓ rule_pack_versions ${packId}@${VERSION} desactivada (DEPRECATED)`
+      : `… rule_pack_versions ${packId}@${VERSION} ya estaba desactivada`,
+  );
+}
+
 async function main() {
   console.table(PACKS.map((p) => ({ id: p.id, organo_tipo: p.organoTipo, materia: p.payload.materia })));
+  console.log(`G3 Task 5: GARR_JUNTA_SOCIOS también sube a v${JUNTA_SOCIOS_V110_VERSION} (desactiva v${VERSION}).`);
 
   if (!COMMIT) {
     console.log("Dry-run. Añade --commit para ejecutar contra Cloud.");
@@ -497,7 +609,8 @@ async function main() {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   for (const pack of PACKS) await ensureRulePack(admin, pack);
-  console.log("✓ Seed completado (idempotente) — 4 rule packs núcleo de Garrigues.");
+  await ensureJuntaSociosV110Upgrade(admin);
+  console.log("✓ Seed completado (idempotente) — 4 rule packs núcleo de Garrigues + GARR_JUNTA_SOCIOS v1.1.0.");
 }
 
 main();
