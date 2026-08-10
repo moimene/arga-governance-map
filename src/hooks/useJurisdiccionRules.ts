@@ -247,7 +247,7 @@ export function checkNoticePeriodByType(params: {
   // ITEM-032: art. 176.1 LSC — SA un mes (≈30 días en V1), SL 15 días.
   // El 30 plano para toda junta ES producía falsos incumplimientos en SL
   // (15-29 días son legales) y divergencia V1/V2 permanente.
-  const isSlFamily = params.tipoSocial === "SL" || params.tipoSocial === "SLU";
+  const isSlFamily = params.tipoSocial === "SL" || params.tipoSocial === "SLU" || params.tipoSocial === "SLP";
   const esJuntaDays = isSlFamily ? 15 : 30;
   const minDays: Record<string, Record<string, number>> = {
     ES: { ORDINARIA: esJuntaDays, EXTRAORDINARIA: esJuntaDays },

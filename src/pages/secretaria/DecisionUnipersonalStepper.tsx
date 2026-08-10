@@ -13,7 +13,7 @@ import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { EntityReadinessNotice } from "@/components/secretaria/EntityReadinessNotice";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { deriveTipoSocial } from "@/lib/secretaria/tipo-social";
-import { resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
+import { filterMateriaRowsForTipoSocial, resolveMateriaAlias } from "@/lib/secretaria/agenda-materias";
 
 type DecisionType = "SOCIO_UNICO" | "ADMINISTRADOR_UNICO";
 
@@ -337,11 +337,18 @@ function FirmaArchivoStep({
 export default function DecisionUnipersonalStepper() {
   const scope = useSecretariaScope();
   const { data: entities = [] } = useEntitiesList({ sociedadesOnly: true });
-  const { data: materias = [], isLoading: materiasLoading } = useMateriaCatalog();
+  const { data: materiasCatalog = [], isLoading: materiasLoading } = useMateriaCatalog();
   const createDecision = useCreateUnipersonalDecision();
   const [tipo, setTipo] = useState<DecisionType>("SOCIO_UNICO");
   const [materia, setMateria] = useState("");
   const [selectedEntityId, setSelectedEntityId] = useState(scope.selectedEntity?.id ?? "");
+  // Review final G3 I-1: el desplegable leía materia_catalog global sin
+  // gate por tipoSocial — ARGA (SA) veía las 6 materias SLP de Garrigues.
+  // Mismo criterio fail-closed que T4 (agendaMateriaGroups): sin sociedad
+  // seleccionada, deriveTipoSocial cae a "SL" y las restringidas a SLP
+  // quedan fuera.
+  const selectedEntityForMateria = entities.find((entity) => entity.id === selectedEntityId) ?? null;
+  const materias = filterMateriaRowsForTipoSocial(materiasCatalog, deriveTipoSocial(selectedEntityForMateria));
   const [texto, setTexto] = useState("");
   const [fundamentoLegal, setFundamentoLegal] = useState("");
   const [createdDecisionId, setCreatedDecisionId] = useState<string | null>(null);

@@ -24,6 +24,7 @@ import {
   AGENDA_MATERIAS,
   MATERIA_ORGANOS,
   agendaMateriaGroups,
+  filterMateriaRowsForTipoSocial,
   isMateriaCompatibleWithOrgano,
   isMateriaVisibleForTipoSocial,
   labelMateria,
@@ -195,6 +196,44 @@ describe("agenda-materias — SLP (G3 Task 4, 12 puntos Junta de Socios 2026)", 
       expect(isMateriaVisibleForTipoSocial(restringida, undefined)).toBe(false);
       expect(isMateriaVisibleForTipoSocial(generica, "SA")).toBe(true);
       expect(isMateriaVisibleForTipoSocial(generica, undefined)).toBe(true);
+    });
+  });
+
+  describe("review final G3 I-1 — filterMateriaRowsForTipoSocial (fuente única para los consumidores que leen materia_catalog directamente: CatalogoMaterias y DecisionUnipersonalStepper)", () => {
+    const catalogRows = () => [
+      { materia: "APROBACION_CUENTAS" },
+      ...SLP_MATERIAS_ESPERADAS.map((m) => ({ materia: m.value })),
+    ];
+
+    it("con tipoSocial SA (ARGA) las 6 materias SLP quedan fuera del catálogo BD; las genéricas permanecen", () => {
+      const filtered = filterMateriaRowsForTipoSocial(catalogRows(), "SA").map((r) => r.materia);
+      expect(filtered).toContain("APROBACION_CUENTAS");
+      for (const value of SLP_MATERIAS_ESPERADAS.map((m) => m.value)) {
+        expect(filtered).not.toContain(value);
+      }
+    });
+
+    it("con tipoSocial SLP las 6 materias SÍ aparecen en el catálogo BD", () => {
+      const filtered = filterMateriaRowsForTipoSocial(catalogRows(), "SLP").map((r) => r.materia);
+      expect(filtered).toContain("APROBACION_CUENTAS");
+      for (const value of SLP_MATERIAS_ESPERADAS.map((m) => m.value)) {
+        expect(filtered).toContain(value);
+      }
+    });
+
+    it("sin tipoSocial conocido (undefined/null) las 6 quedan fuera — fail-closed, mismo criterio que agendaMateriaGroups", () => {
+      const withoutTipoSocial = filterMateriaRowsForTipoSocial(catalogRows(), undefined).map((r) => r.materia);
+      const withNull = filterMateriaRowsForTipoSocial(catalogRows(), null).map((r) => r.materia);
+      for (const value of SLP_MATERIAS_ESPERADAS.map((m) => m.value)) {
+        expect(withoutTipoSocial).not.toContain(value);
+        expect(withNull).not.toContain(value);
+      }
+    });
+
+    it("un código sin entrada en AGENDA_MATERIAS (materia solo de materia_catalog, p.ej. PACTO_PARASOCIAL) no está restringido y sobrevive con cualquier tipoSocial", () => {
+      const rows = [{ materia: "PACTO_PARASOCIAL" }];
+      expect(filterMateriaRowsForTipoSocial(rows, "SA").map((r) => r.materia)).toEqual(["PACTO_PARASOCIAL"]);
+      expect(filterMateriaRowsForTipoSocial(rows, undefined).map((r) => r.materia)).toEqual(["PACTO_PARASOCIAL"]);
     });
   });
 

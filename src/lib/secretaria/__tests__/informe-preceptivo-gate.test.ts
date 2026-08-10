@@ -16,8 +16,14 @@ const CONFIG: BodyConfigWithInformePreceptivo = {
       firmeza: "FIRME",
     },
     {
+      // Review final G3 M-3: el slug real (post-cotejo Estatutos) es
+      // "garrigues-consejo-de-socios" para las 4 entradas (ver migración
+      // 20260805110000_g3_informe_preceptivo_gate.sql). Este segundo
+      // informante es deliberadamente ficticio — solo prueba que el helper
+      // lee `organo_informante` de cada entrada y no lo hardcodea; no debe
+      // leerse como un slug operativo real.
       materia: "NOMBRAMIENTO_ADMINISTRADOR_UNICO",
-      organo_informante: "garrigues-comite-nominaciones",
+      organo_informante: "organo-informante-ficticio-test",
       fuente: "ESTATUTOS",
       firmeza: "FIRME",
     },
@@ -37,7 +43,7 @@ describe("resolveInformePreceptivo", () => {
       resolveInformePreceptivo("NOMBRAMIENTO_ADMINISTRADOR_UNICO", "JUNTA", CONFIG),
     ).toEqual({
       requerido: true,
-      organoInformante: "garrigues-comite-nominaciones",
+      organoInformante: "organo-informante-ficticio-test",
     });
   });
 

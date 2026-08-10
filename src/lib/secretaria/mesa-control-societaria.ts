@@ -758,7 +758,7 @@ export const LEGAL_BASELINE_BY_TIPO_SOCIAL: Record<TipoSocial, LegalBaseline> = 
   },
 };
 
-const ES_FORMS = new Set(["SA", "SAU", "SL", "SLU", "SRL"]);
+const ES_FORMS = new Set(["SA", "SAU", "SL", "SLU", "SLP", "SRL"]);
 
 const LEGAL_FORM_LABELS_BY_JURISDICTION: Record<string, Record<string, string>> = {
   ES: {

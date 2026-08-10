@@ -383,6 +383,28 @@ export function isMateriaVisibleForTipoSocial(
   return tipoSocial !== undefined && materia.soloTipoSocial.includes(tipoSocial);
 }
 
+/**
+ * Filtra filas de `materia_catalog` (forma BD — código en el campo
+ * `materia`) por la misma restricción `soloTipoSocial` de AGENDA_MATERIAS.
+ * Única fuente de verdad para consumidores que leen `materia_catalog`
+ * directamente en vez de pasar por `agendaMateriaGroups` (review final G3
+ * I-1: el catálogo de materias societario y el desplegable de decisión
+ * unipersonal ofrecían las 6 materias SLP también a ARGA). Fail-closed
+ * idéntico a `isMateriaVisibleForTipoSocial`: sin `tipoSocial` conocido, las
+ * restringidas quedan fuera; un código sin entrada en AGENDA_MATERIAS (o sin
+ * `soloTipoSocial`) no está restringido y no cambia de comportamiento.
+ */
+export function filterMateriaRowsForTipoSocial<T extends { materia: string }>(
+  rows: readonly T[],
+  tipoSocial?: string | null,
+): T[] {
+  const known = (tipoSocial ?? undefined) as TipoSocial | undefined;
+  return rows.filter((row) => {
+    const def = AGENDA_MATERIAS.find((m) => m.value === row.materia);
+    return isMateriaVisibleForTipoSocial({ soloTipoSocial: def?.soloTipoSocial }, known);
+  });
+}
+
 export function materiaDefaultForOrgano(organoTipo: TipoOrgano) {
   return AGENDA_MATERIAS.find((materia) => isMateriaCompatibleWithOrgano(materia.value, organoTipo)) ?? AGENDA_MATERIAS[0];
 }

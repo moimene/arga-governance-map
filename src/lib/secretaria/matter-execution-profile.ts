@@ -404,7 +404,10 @@ function overrideReference(context: BuildMatterExecutionProfileContext, key: str
 function legalNoticeMinimumDays(tipoSocial: string) {
   const normalized = normalizeCode(tipoSocial);
   if (normalized === "SA" || normalized === "SAU") return 30;
-  if (normalized === "SL" || normalized === "SLU") return 15;
+  // SLP: art. 176 LSC supletoria (Ley 2/2007 no regula plazos de
+  // convocatoria — Decisión 2, docs/legal/2026-08-04-decisiones-comite-
+  // legal-slp-garrigues.md). Misma familia de 15 días que SL/SLU.
+  if (normalized === "SL" || normalized === "SLU" || normalized === "SLP") return 15;
   return undefined;
 }
 

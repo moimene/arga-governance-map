@@ -60,6 +60,36 @@ describe("checkNoticePeriodByType — dispatch por organoTipo", () => {
     });
   });
 
+  // Review final G3 C-1: SLP quedaba fuera de isSlFamily y heredaba los 30
+  // días de SA en vez de los 15 días LSC supletorios (art. 176; Ley 2/2007
+  // no regula plazos de convocatoria — decisión 2 del Comité Legal,
+  // docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md).
+  describe("Junta SLP (LSC art. 176 supletoria — Ley 2/2007 no regula plazos)", () => {
+    it("Junta SLP con 15 días → OK (familia SL, no 30 de SA)", () => {
+      expect(
+        checkNoticePeriodByType({
+          meetingDate: futureDate(15),
+          jurisdiction: "ES",
+          convocationType: "ORDINARIA",
+          tipoSocial: "SLP",
+          organoTipo: "JGA",
+        }),
+      ).toBe(true);
+    });
+
+    it("Junta SLP con 5 días → falla (< 15)", () => {
+      expect(
+        checkNoticePeriodByType({
+          meetingDate: futureDate(5),
+          jurisdiction: "ES",
+          convocationType: "ORDINARIA",
+          tipoSocial: "SLP",
+          organoTipo: "JGA",
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("CdA (art. 246 LSC / reglamento)", () => {
     it("CdA SA con 5 días → OK", () => {
       expect(
