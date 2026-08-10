@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
-import { isOperationalSecretariaBody } from "@/lib/secretaria/operational-bodies";
+import { isOperationalSecretariaBody, isAdoptingBody } from "@/lib/secretaria/operational-bodies";
 
 export interface BodyListRow {
   id: string;
@@ -381,6 +381,15 @@ function normalizeBodySlim(row: BodySlim): BodySlim {
   };
 }
 
+/**
+ * Selector de órgano para los steppers de ADOPCIÓN/convocatoria
+ * (Convocatorias, Reuniones, Tramitador, AcuerdoSinSesion). Usa
+ * `isAdoptingBody`, no `isOperationalSecretariaBody`: los consultivos
+ * (`config.naturaleza='CONSULTIVO'`, p.ej. el Consejo de Socios de Garrigues)
+ * informan pero no adoptan, y no deben ofertarse aquí — sí siguen
+ * apareciendo en /organos y en las fichas de entidad, que usan el filtro
+ * base sin este añadido.
+ */
 export function useBodiesByEntity(entityId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -394,7 +403,7 @@ export function useBodiesByEntity(entityId: string | undefined) {
         .eq("tenant_id", tenantId!)
         .order("name");
       if (error) throw error;
-      return ((data ?? []) as BodySlim[]).map(normalizeBodySlim).filter(isOperationalSecretariaBody);
+      return ((data ?? []) as BodySlim[]).map(normalizeBodySlim).filter(isAdoptingBody);
     },
   });
 }
