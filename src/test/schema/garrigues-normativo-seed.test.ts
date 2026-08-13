@@ -16,6 +16,12 @@ const SUPABASE_ANON_KEY =
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 
+// OBLIGATORIO en toda sonda con más de un cliente: el preload de bun test monta
+// un JSDOM con localStorage, así que supabase-js usa la MISMA storageKey para
+// todos los clientes y el último login pisa a los anteriores. Sin esto, el
+// cliente "Garrigues" acaba autenticado como ARGA y la sonda miente en verde.
+const PERSIST_OFF = { auth: { persistSession: false } } as const;
+
 describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta", () => {
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
@@ -25,13 +31,13 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
 
   beforeAll(async () => {
     if (!SUPABASE_ANON_KEY) return;
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) {
       garr = g; authed = true;
       const { count } = await g.from("policies").select("id", { count: "exact", head: true });
       seeded = (count ?? 0) >= 38;
     }
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) {
       arga = a; argaAuthed = true;
     }

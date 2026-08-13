@@ -14,13 +14,20 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 
+// OBLIGATORIO incluso con un solo cliente: bun test comparte proceso entre
+// ficheros y el preload monta un JSDOM con localStorage, así que un login de
+// OTRO fichero de la suite (misma storageKey) puede pisar esta sesión si no
+// se desactiva persistSession (mismo patrón que garrigues-rule-packs-seed.test.ts
+// y garrigues-normativo-seed.test.ts).
+const PERSIST_OFF = { auth: { persistSession: false } } as const;
+
 describe("G4 Task 1 — esquema de ownership normativo", () => {
   let garr: SupabaseClient | null = null;
   let authed = false;
 
   beforeAll(async () => {
     if (!SUPABASE_ANON_KEY) return;
-    const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     const { error } = await c.auth.signInWithPassword({
       email: GARRIGUES_DEMO_EMAIL,
       password: DEMO_PASSWORD,
