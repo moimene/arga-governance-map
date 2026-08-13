@@ -14,6 +14,15 @@ export interface PolicyRow {
   effective_date: string | null;
   next_review_date: string | null;
   current_version: number | null;
+  // G4 Task 1/3: apartado "Objeto" y índice del documento fuente. NULL/[] en
+  // las 3 filas Garrigues citadas-no-incorporadas (PPD-01/02/CAT); siempre
+  // NULL en ARGA (columna nunca sembrada para ese tenant).
+  summary?: string | null;
+  content_outline?: string[] | null;
+  // Procedencia del dato — mismo patrón que entities.data_provenance (G1),
+  // pero forma distinta ({origen, fuente, ownership_acreditado}). NULL en
+  // ARGA = sin badge (ver PoliticaDetalle.tsx).
+  data_provenance?: unknown;
 }
 
 export interface PolicyWithBody extends PolicyRow {
@@ -28,6 +37,9 @@ export interface ObligationRow {
   criticality: string | null;
   policy_id: string | null;
   country_scope: string[] | null;
+  // G4 Task 1/4: artículo concreto de la norma. `source` sigue siendo el
+  // marco. NULL en las 5 filas de ARGA (columna nunca sembrada).
+  legal_reference?: string | null;
 }
 
 export interface ObligationWithPolicy extends ObligationRow {

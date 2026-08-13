@@ -16,8 +16,28 @@ import {
   type ObligationWithPolicy,
   type ControlWithOwner,
 } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck } from "lucide-react";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// G4 Task 4/7: dos filas de obligations son EXCLUSIONES (no sujeción /
+// excepción legal), no obligaciones cubiertas. El seed las marca abriendo el
+// título por "Exención"/"Excepción" — no hay columna propia. Detectarlas así
+// evita pintarlas como "CUBIERTA" y sacarlas del recuento de obligaciones.
+const EXCLUSION_RE = /^(Exención|Excepción)\b/i;
+const isExclusion = (o: ObligationWithPolicy) => EXCLUSION_RE.test(o.title);
+
+// El seed de Task 4 embebe la cautela de firmeza pendiente de confirmación
+// del Comité Legal dentro del título (no hay columna `firmeza`, es solo
+// auditoría interna del catálogo). Se extrae para no filtrar el token de
+// enum DEMO_PILOTO a una pantalla que lee un abogado, y para acortar el
+// título en el catálogo.
+const FIRMEZA_RE = /\s*\(criterio DEMO_PILOTO,\s*([^)]+)\)\s*$/i;
+function splitFirmeza(title: string): { title: string; pending: string | null } {
+  const m = FIRMEZA_RE.exec(title);
+  if (!m) return { title, pending: null };
+  return { title: title.slice(0, m.index).trim(), pending: m[1].trim() };
+}
 
 interface KpiProps { label: string; value: number; icon: typeof ClipboardList; tone: "primary" | "success" | "warning" | "critical"; }
 const toneMap = {
@@ -44,9 +64,18 @@ export default function ObligacionesList() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
 
-  const { data: obligations = [], isLoading } = useObligationsList();
-  const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
+  const { data: allObligations = [], isLoading } = useObligationsList();
+  const obligationIds = useMemo(() => allObligations.map((o) => o.id), [allObligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+  // G4 Task 7: aviso de postura demo sobre los estados de control, gateado
+  // por tenant (branding NULL = ARGA = sin aviso nuevo). No hay columna que
+  // distinga postura demo de real, así que el gate es el tenant.
+  const branding = useTenantBranding();
+
+  // Las exclusiones (no sujeción / excepción legal) no son obligaciones
+  // cubiertas: fuera del recuento y de la tabla principal, tratamiento propio.
+  const obligations = useMemo(() => allObligations.filter((o) => !isExclusion(o)), [allObligations]);
+  const exclusions = useMemo(() => allObligations.filter(isExclusion), [allObligations]);
 
   const ctrlsByObl = useMemo(() => {
     const m = new Map<string, typeof controls>();
@@ -62,27 +91,47 @@ export default function ObligacionesList() {
   const obligationStatus = useCallback((o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
     const cs = ctrlsByObl.get(o.id) ?? [];
     if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
-    if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
+    // CHECK real de controls.status: Efectivo | Parcial | Inefectivo (nunca "Deficiente").
+    if (cs.some((c) => c.status === "Inefectivo")) return { label: "INEFECTIVO", tone: "critical", pulse: false };
     if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
     if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
     return { label: "EN PROCESO", tone: "warning", pulse: false };
   }, [ctrlsByObl]);
 
+  // Marcos derivados del dato: reemplaza los 3 grupos cableados (dora/sol/others)
+  // y el <Select> DORA/Solv/GDPR/LGPD fijo. Para Garrigues da 1 marco real
+  // (PBC/FT — Ley 10/2010); para ARGA da sus 5 `source` reales tal cual están.
+  const frameworks = useMemo(() => {
+    const set = new Set(obligations.map((o) => o.source).filter((s): s is string => !!s));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [obligations]);
+
   const filtered = useMemo(() => obligations.filter((o) => {
     const st = obligationStatus(o);
-    return (framework === "all" || (o.source ?? "").toLowerCase().startsWith(framework.toLowerCase())) &&
+    return (framework === "all" || o.source === framework) &&
       (status === "all" || st.label === status) &&
       (search === "" || o.title.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase()));
   }), [obligations, framework, obligationStatus, status, search]);
 
-  const dora = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("dora"));
-  const sol = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("solv"));
-  const others = filtered.filter((o) => !dora.includes(o) && !sol.includes(o));
+  const groupedBySource = useMemo(() => {
+    const order: string[] = [];
+    const map = new Map<string, ObligationWithPolicy[]>();
+    for (const o of filtered) {
+      const key = o.source ?? "Sin marco";
+      if (!map.has(key)) { map.set(key, []); order.push(key); }
+      map.get(key)!.push(o);
+    }
+    return order.map((source) => ({ source, rows: map.get(source)! }));
+  }, [filtered]);
 
   const kpis = {
     total: obligations.length,
     cubiertas: obligations.filter((o) => obligationStatus(o).label === "CUBIERTA").length,
-    parcial: obligations.filter((o) => ["EN REMEDIACIÓN", "EN PROCESO"].includes(obligationStatus(o).label)).length,
+    // INEFECTIVO entra aquí: verificado en vivo que ARGA tiene un control real
+    // con ese status (CTR-008) — antes cayó por defecto en "EN PROCESO" (el
+    // bucket "Deficiente" nunca se activaba) y ahora, corregido, se quedaba
+    // fuera de las 4 tarjetas si no se sumaba aquí (1+2+1 ≠ 5 total).
+    parcial: obligations.filter((o) => ["EN REMEDIACIÓN", "EN PROCESO", "INEFECTIVO"].includes(obligationStatus(o).label)).length,
     sin: obligations.filter((o) => obligationStatus(o).label === "SIN CONTROL").length,
   };
 
@@ -119,16 +168,27 @@ export default function ObligacionesList() {
         </div>
       )}
 
+      {branding && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-warning">Postura de demostración</div>
+            <div className="mt-1 text-xs text-status-warning/90">
+              Los estados de control ("Efectivo" / "En remediación") son una postura de demostración sobre controles reales de la firma, no el resultado de una auditoría verificada.
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-3 gap-3">
           <Select value={framework} onValueChange={setFramework}>
             <SelectTrigger><SelectValue placeholder="Marco" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los marcos</SelectItem>
-              <SelectItem value="DORA">DORA</SelectItem>
-              <SelectItem value="Solv">Solvencia II</SelectItem>
-              <SelectItem value="GDPR">GDPR</SelectItem>
-              <SelectItem value="LGPD">LGPD</SelectItem>
+              {frameworks.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={setStatus}>
@@ -138,7 +198,7 @@ export default function ObligacionesList() {
               <SelectItem value="CUBIERTA">Cubierta</SelectItem>
               <SelectItem value="EN REMEDIACIÓN">En remediación</SelectItem>
               <SelectItem value="SIN CONTROL">Sin control</SelectItem>
-              <SelectItem value="DEFICIENTE">Deficiente</SelectItem>
+              <SelectItem value="INEFECTIVO">Inefectivo</SelectItem>
             </SelectContent>
           </Select>
           <Input placeholder="Buscar obligación..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -147,34 +207,65 @@ export default function ObligacionesList() {
 
       <Card className="overflow-hidden">
         {isLoading && <div className="p-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>}
-        {!isLoading && dora.length > 0 && (
-          <>
-            <div className="border-b bg-accent/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-              DORA — Resiliencia Operativa Digital
+        {!isLoading && groupedBySource.map((g) => (
+          <div key={g.source}>
+            <div className="border-b bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {g.source}
             </div>
-            <ObligationTable rows={dora} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
-        {!isLoading && sol.length > 0 && (
-          <>
-            <div className="border-y bg-status-warning-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-status-warning">
-              Solvencia II
-            </div>
-            <ObligationTable rows={sol} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
-        {!isLoading && others.length > 0 && (
-          <>
-            <div className="border-y bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Otros marcos
-            </div>
-            <ObligationTable rows={others} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
+            <ObligationTable rows={g.rows} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
+          </div>
+        ))}
         {!isLoading && filtered.length === 0 && (
           <div className="p-8 text-center text-sm text-muted-foreground">No hay obligaciones que coincidan con los filtros.</div>
         )}
       </Card>
+
+      {exclusions.length > 0 && (
+        <Card className="mt-5 overflow-hidden">
+          <div className="border-b bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Exenciones y excepciones — no son obligaciones cubiertas
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-32">Código</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="w-32">Marco</TableHead>
+                <TableHead className="w-28">Tipo</TableHead>
+                <TableHead className="w-40">Control asociado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {exclusions.map((o) => {
+                const kind = EXCLUSION_RE.exec(o.title)?.[1] ?? "Exclusión";
+                const { title: cleanTitle, pending } = splitFirmeza(o.title);
+                const cs = ctrlsByObl.get(o.id) ?? [];
+                return (
+                  <TableRow key={o.id}>
+                    <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
+                    <TableCell>
+                      <Link to={`/obligaciones/${o.code}`} title={o.title} className="block max-w-md truncate text-sm font-medium hover:text-primary">
+                        {cleanTitle}
+                      </Link>
+                      {pending && (
+                        <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" className="mt-1" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {o.source ?? "—"}
+                      {o.legal_reference && <div className="mt-0.5 text-[10px] text-muted-foreground/80">{o.legal_reference}</div>}
+                    </TableCell>
+                    <TableCell><StatusBadge label={kind} tone="neutral" /></TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {cs.length === 0 ? <span className="text-muted-foreground">(ninguno)</span> : cs.map((c) => c.code).join(", ")}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }
@@ -208,8 +299,15 @@ function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTable
           return (
             <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg hover:bg-status-critical-bg", warn && "bg-status-warning-bg/60 hover:bg-status-warning-bg")}>
               <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
-              <TableCell><Link to={`/obligaciones/${o.code}`} className="text-sm font-medium hover:text-primary">{o.title}</Link></TableCell>
-              <TableCell className="text-xs text-muted-foreground">{o.source ?? "—"}</TableCell>
+              <TableCell>
+                <Link to={`/obligaciones/${o.code}`} title={o.title} className="block max-w-md truncate text-sm font-medium hover:text-primary">
+                  {o.title}
+                </Link>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {o.source ?? "—"}
+                {o.legal_reference && <div className="mt-0.5 text-[10px] text-muted-foreground/80">{o.legal_reference}</div>}
+              </TableCell>
               <TableCell>{o.criticality && <StatusBadge label={o.criticality} tone={obligationCriticalityTone(o.criticality)} />}</TableCell>
               <TableCell>
                 {o.policy_code ? (
