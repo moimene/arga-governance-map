@@ -1107,6 +1107,8 @@ Mostrar además la procedencia leyendo `policy.data_provenance`, **gateada por l
 
 En `ObligacionesList.tsx`, sustituir los tres grupos cableados (`dora`, `sol`, `others` en las líneas 78-80, y sus encabezados "DORA — Resiliencia Operativa Digital" / "Solvencia II" / "Otros marcos" en 150-173) por una agrupación calculada sobre los `source` presentes en el dato. Sustituir el `<Select>` de marco (líneas 124-133), hoy con `DORA`/`Solv`/`GDPR`/`LGPD` fijos, por las opciones derivadas de esos mismos `source` distintos.
 
+**Y pintar el artículo desde `legal_reference`.** `source` es el **marco** (`DORA`, `GDPR`, `PBC/FT — Ley 10/2010`) y es lo único que la lista lee hoy; el artículo concreto vive en `legal_reference`, que la Task 4 puebla y que **ninguna superficie lee todavía**. Sin este cambio, el trabajo de verificación jurídica de la Task 4 queda invisible en pantalla. Mostrarlo en la fila de la lista o en la cabecera de `ObligacionDetalle` — donde ya se pintan `source` y `criticality`. Con `legal_reference` NULL (todas las de ARGA) no se pinta nada: cero cambio.
+
 Aprovechar para eliminar el bucket muerto: la línea 64 compara `c.status === "Deficiente"`, valor que el CHECK de `controls.status` **prohíbe**, así que nunca se activa; y el `<SelectItem value="DEFICIENTE">` filtra por un estado inalcanzable. Alinear con los valores reales `Efectivo|Parcial|Inefectivo`.
 
 - [ ] **Step 4: Verificar gates**
