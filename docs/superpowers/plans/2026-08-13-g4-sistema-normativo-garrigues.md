@@ -129,13 +129,19 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 
+// OBLIGATORIO en toda sonda con más de un cliente: el preload de bun test monta
+// un JSDOM con localStorage, así que supabase-js usa la MISMA storageKey para
+// todos los clientes y el último login pisa a los anteriores. Sin esto, el
+// cliente "Garrigues" acaba autenticado como ARGA y la sonda miente en verde.
+const PERSIST_OFF = { auth: { persistSession: false } } as const;
+
 describe("G4 Task 1 — esquema de ownership normativo", () => {
   let garr: SupabaseClient | null = null;
   let authed = false;
 
   beforeAll(async () => {
     if (!SUPABASE_ANON_KEY) return;
-    const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     const { error } = await c.auth.signInWithPassword({
       email: GARRIGUES_DEMO_EMAIL,
       password: DEMO_PASSWORD,
@@ -545,6 +551,12 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
+
+// OBLIGATORIO en toda sonda con más de un cliente: el preload de bun test monta
+// un JSDOM con localStorage, así que supabase-js usa la MISMA storageKey para
+// todos los clientes y el último login pisa a los anteriores. Sin esto, el
+// cliente "Garrigues" acaba autenticado como ARGA y la sonda miente en verde.
+const PERSIST_OFF = { auth: { persistSession: false } } as const;
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 
 describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta", () => {
@@ -556,13 +568,13 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
 
   beforeAll(async () => {
     if (!SUPABASE_ANON_KEY) return;
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) {
       garr = g; authed = true;
       const { count } = await g.from("policies").select("id", { count: "exact", head: true });
       seeded = (count ?? 0) >= 38;
     }
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) {
       arga = a; argaAuthed = true;
     }
@@ -734,6 +746,12 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
+
+// OBLIGATORIO en toda sonda con más de un cliente: el preload de bun test monta
+// un JSDOM con localStorage, así que supabase-js usa la MISMA storageKey para
+// todos los clientes y el último login pisa a los anteriores. Sin esto, el
+// cliente "Garrigues" acaba autenticado como ARGA y la sonda miente en verde.
+const PERSIST_OFF = { auth: { persistSession: false } } as const;
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 
 describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
@@ -743,13 +761,13 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
 
   beforeAll(async () => {
     if (!SUPABASE_ANON_KEY) return;
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) {
       garr = g; authed = true;
       const { count } = await g.from("obligations").select("id", { count: "exact", head: true });
       seeded = (count ?? 0) >= 12;
     }
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) {
       arga = a; argaAuthed = true;
     }
