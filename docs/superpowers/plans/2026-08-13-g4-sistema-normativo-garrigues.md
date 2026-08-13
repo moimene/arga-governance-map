@@ -1182,7 +1182,10 @@ Expected: PASS con las 7 tablas en ambas direcciones.
 
 `GlobalSearch.tsx:430` construye `/politicas/${p.id}` con el **UUID**, pero la ruta resuelve por `policy_code` (`PoliticaDetalle.tsx:58-59` → `usePolicyByCode`). Todo resultado de política cae hoy en "Política no encontrada". Cambiar a `/politicas/${p.policy_code}` y asegurar que la query selecciona `policy_code`.
 
-- [ ] **Step 6: Desacoplar el botón de GRC y el e2e**
+- [ ] **Step 6: Desacoplar el botón de GRC, el enlace de reuniones y el e2e**
+
+Además del botón, `src/pages/secretaria/ReunionesLista.tsx:211` enlaza a board-pack sin gatear. **Gotcha de método:** ese enlace se construye con template literal (`` `/secretaria/reuniones/${m.id}/board-pack` ``), así que un `grep` de la ruta literal completa **no lo encuentra** — así se escapó en la Task 6. Busca por **sufijo** de ruta (`board-pack`, `/grc/m/dora`, `/grc/packs`), no por la cadena entera. Ninguno de los dos es fuga funcional (las rutas destino ya están gateadas y redirigen), pero son enlaces vivos hacia módulos oficialmente ocultos.
+
 
 `ObligacionDetalle.tsx:129` navega fijo a `/grc/m/dora/operate/incidents?obligation=…`. Bajo Garrigues, DORA está oculto por D-5: apuntar a `/grc/risk-360` o esconder el botón cuando `isModuleEnabled(branding, "dora")` es falso. En `e2e/02-shell.spec.ts:34-39`, sustituir el acoplamiento al prefijo `PR-` por un selector que valga para ambos tenants.
 
