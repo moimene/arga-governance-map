@@ -1,5 +1,6 @@
 import { useGrcKpis } from "@/hooks/useGrcDashboard";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   GRC_COMPLIANCE_AREAS,
@@ -328,6 +329,9 @@ export default function GrcDashboard() {
       : "Vista Grupo: señales agregadas de todas las sociedades.";
   const { data: kpis, isLoading } = useGrcKpis(scopedEntityId);
   const readiness = getGrcP0ReadinessSummary();
+  const visibleP0Domains = GRC_P0_DOMAINS.filter(
+    (domain) => domain.id !== "dora-ict" || isModuleEnabled(branding, "dora")
+  );
   const screenSummary = getGrcScreenPostureSummary();
   const highlightedScreens = GRC_SCREEN_POSTURES.filter((screen) => screen.accessMode !== "backlog").slice(0, 8);
   const priorityItems = [
@@ -565,7 +569,7 @@ export default function GrcDashboard() {
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {GRC_P0_DOMAINS.map((domain) => (
+          {visibleP0Domains.map((domain) => (
             <ReadinessDomainCard key={domain.id} domain={domain} scope={scope} />
           ))}
         </div>

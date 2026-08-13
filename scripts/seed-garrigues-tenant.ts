@@ -27,6 +27,7 @@ const SERVICE_KEY_NAMES = [
   "SERVICE_ROLE_KEY",
   "SUPABASE_SERVICE_ROLE",
   "SB_SERVICE_ROLE_KEY",
+  "SERVICE_ROLE_SECRET",
 ];
 const SERVICE_KEY = SERVICE_KEY_NAMES.map((n) => process.env[n]).find(Boolean) ?? "";
 const COMMIT = process.argv.includes("--commit");
@@ -42,11 +43,19 @@ const USERS = [
 
 // Paleta Garrigues (CLAUDE.md §Design Systems, valores verbatim) mapeada a los
 // tokens --t-* del shell + overrides shadcn/sidebar de :root (src/index.css).
+// D-5 — lista blanca de módulos del tenant Garrigues (spec G4 §8). "dora",
+// "country-packs" y "board-pack" quedan fuera a propósito. ARGA no declara
+// `modules`, así que isModuleEnabled() falla abierto y lo ve todo.
 const BRANDING = {
   nombre: "Garrigues",
   shell_label: "GARRIGUES GOBERNANZA",
   scope_label: "Grupo Garrigues",
   sii_org_label: "Garrigues",
+  modules: [
+    "secretaria", "grc", "ai-governance", "sii",
+    "politicas", "obligaciones", "delegaciones", "hallazgos", "conflictos",
+    "governance-map", "entidades", "organos",
+  ],
   tokens: {
     "--t-brand": "#004438",
     "--t-brand-hover": "#007362",

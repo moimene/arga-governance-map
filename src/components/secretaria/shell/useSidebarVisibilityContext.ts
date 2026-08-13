@@ -4,6 +4,8 @@ import { useCapabilityMatrix } from "@/hooks/useCapabilityMatrix";
 import { useEntityDemoReadiness } from "@/hooks/useEntityDemoReadiness";
 import { useSociedad } from "@/hooks/useSociedades";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import {
   entityHasCollegiateBody,
   isMancomunadoAdmin,
@@ -72,6 +74,11 @@ export function useSidebarVisibility(
   const capabilityRows = capabilityQ.data;
   const readiness = readinessQ.data;
   const { roles, permissions } = userRole;
+  const branding = useTenantBranding();
+  const featureFlags = useMemo(
+    () => ({ "board-pack": isModuleEnabled(branding, "board-pack") }),
+    [branding]
+  );
 
   const entity: EntityContext | null = useMemo(() => {
     if (!sociedad) return null;
@@ -188,6 +195,7 @@ export function useSidebarVisibility(
       readiness: readinessCtx,
       roles,
       permissions,
+      featureFlags,
     }),
     [
       scope.mode,
@@ -200,6 +208,7 @@ export function useSidebarVisibility(
       readinessCtx,
       roles,
       permissions,
+      featureFlags,
     ]
   );
 
