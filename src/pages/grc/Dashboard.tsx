@@ -36,6 +36,17 @@ import {
   Waypoints,
 } from "lucide-react";
 
+// D-5 — visibilidad por ruta destino, compartida por las 3 superficies de
+// este dashboard que enlazan a un módulo gateado (Readiness P0, Monitor de
+// cumplimiento, Contexto técnico/contratos). Filtra siempre en el consumidor
+// — los registros de dashboard-readiness.ts quedan intactos a propósito
+// (dashboard-readiness.test.ts asierta su contenido completo).
+function isGrcRouteVisible(branding, route: string) {
+  if (route.startsWith("/grc/m/dora")) return isModuleEnabled(branding, "dora");
+  if (route.startsWith("/grc/packs")) return isModuleEnabled(branding, "country-packs");
+  return true;
+}
+
 function KpiCard({
   icon: Icon,
   label,
@@ -171,7 +182,9 @@ function ComplianceMonitorRow({
 }
 
 function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController }) {
-  const summary = getGrcComplianceMonitorSummary();
+  const branding = useTenantBranding();
+  const visibleMonitors = GRC_COMPLIANCE_MONITORS.filter((monitor) => isGrcRouteVisible(branding, monitor.route));
+  const summary = getGrcComplianceMonitorSummary(visibleMonitors);
 
   return (
     <section
@@ -220,7 +233,7 @@ function ComplianceMonitorPanel({ scope }: { scope: SecretariaScopeController })
 
       <div className="grid grid-cols-1 divide-y divide-[var(--g-border-subtle)] lg:grid-cols-2 lg:divide-x lg:divide-y-0 xl:grid-cols-4">
         {GRC_COMPLIANCE_AREAS.map((area) => {
-          const monitors = GRC_COMPLIANCE_MONITORS.filter((monitor) => monitor.area === area);
+          const monitors = visibleMonitors.filter((monitor) => monitor.area === area);
           return (
             <div key={area} className="min-w-0">
               <div className="border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3">
@@ -328,12 +341,11 @@ export default function GrcDashboard() {
       ? "Vista Sociedad: riesgos filtrados por entidad y señales GRC relacionadas."
       : "Vista Grupo: señales agregadas de todas las sociedades.";
   const { data: kpis, isLoading } = useGrcKpis(scopedEntityId);
-  const readiness = getGrcP0ReadinessSummary();
-  const visibleP0Domains = GRC_P0_DOMAINS.filter(
-    (domain) => domain.id !== "dora-ict" || isModuleEnabled(branding, "dora")
-  );
-  const screenSummary = getGrcScreenPostureSummary();
-  const highlightedScreens = GRC_SCREEN_POSTURES.filter((screen) => screen.accessMode !== "backlog").slice(0, 8);
+  const visibleP0Domains = GRC_P0_DOMAINS.filter((domain) => isGrcRouteVisible(branding, domain.route));
+  const readiness = getGrcP0ReadinessSummary(visibleP0Domains);
+  const visibleScreens = GRC_SCREEN_POSTURES.filter((screen) => isGrcRouteVisible(branding, screen.route));
+  const screenSummary = getGrcScreenPostureSummary(visibleScreens);
+  const highlightedScreens = visibleScreens.filter((screen) => screen.accessMode !== "backlog").slice(0, 8);
   const priorityItems = [
     {
       label: "Riesgos críticos",
@@ -800,7 +812,9 @@ export default function GrcDashboard() {
               { label: "Incidentes DORA",              to: "/grc/m/dora/operate/incidents" },
               { label: "Excepciones",                  to: "/grc/excepciones" },
               { label: "Alertas de deadline",          to: "/grc/alertas" },
-            ].map((link) => (
+            ]
+              .filter((link) => isGrcRouteVisible(branding, link.to))
+              .map((link) => (
               <Link
                 key={link.to}
                 to={scope.createScopedTo(link.to)}
@@ -827,7 +841,9 @@ export default function GrcDashboard() {
               { label: "GDPR / Datos",         to: "/grc/m/gdpr",  sub: "3 ítems activos" },
               { label: "Ciberseguridad",       to: "/grc/m/cyber", sub: "3 CVEs abiertos" },
               { label: "Auditoría Interna",    to: "/grc/m/audit", sub: "Hallazgos vinculados" },
-            ].map((mod) => (
+            ]
+              .filter((mod) => isGrcRouteVisible(branding, mod.to))
+              .map((mod) => (
               <Link
                 key={mod.to}
                 to={scope.createScopedTo(mod.to)}
