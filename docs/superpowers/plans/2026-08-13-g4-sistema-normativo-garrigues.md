@@ -121,7 +121,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+// Fallback con la clave publicable (mismo patrón que
+// garrigues-rule-packs-seed.test.ts). Sin él el test se salta SIEMPRE y el
+// gate queda verde sin asertar nada.
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 
 describe("G4 Task 1 — esquema de ownership normativo", () => {
@@ -533,7 +538,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+// Fallback con la clave publicable (mismo patrón que
+// garrigues-rule-packs-seed.test.ts). Sin él el test se salta SIEMPRE y el
+// gate queda verde sin asertar nada.
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 
@@ -717,7 +727,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+// Fallback con la clave publicable (mismo patrón que
+// garrigues-rule-packs-seed.test.ts). Sin él el test se salta SIEMPRE y el
+// gate queda verde sin asertar nada.
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 
