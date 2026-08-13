@@ -72,9 +72,16 @@ function run(cmd: string[]): string {
   return new TextDecoder().decode(p.stdout);
 }
 
-/** Texto de las primeras HEAD_PAGES páginas: basta para edición, objeto e índice. */
+/**
+ * Texto de las primeras HEAD_PAGES páginas: basta para edición, objeto e
+ * índice. `-layout` es imprescindible: sin él, poppler serializa tablas e
+ * índices en columnas separadas por posición, y el texto sale entrelazado
+ * con los números de página fuera de orden (detectado por el coordinador
+ * en PI-11/24 y el Manual PBC/FT — no era un problema de regex, era el
+ * texto de entrada). Con `-layout` el índice sale tabulado y en orden.
+ */
 function pdfHead(path: string): string {
-  return run(["pdftotext", "-f", "1", "-l", String(HEAD_PAGES), path, "-"]);
+  return run(["pdftotext", "-layout", "-f", "1", "-l", String(HEAD_PAGES), path, "-"]);
 }
 
 /**
@@ -139,6 +146,15 @@ function headingNumber(l: string): string {
  * haber sido ya listada en el índice compacto (PI-01, PI-05, PI-13, PI-18,
  * PI-21: índices de solo 2 entradas donde ambas señales conviven).
  */
+// Con `-layout`, cada línea de índice trae "N.   Título   <núm. página>"
+// tabulado — el número de página va separado del título por 2+ espacios
+// (a diferencia de un guarismo que forme parte real del título). Se retira
+// por línea, ANTES de fundir continuaciones, porque en una entrada
+// envuelta en 2 líneas el número de página solo va al final de la última.
+function stripTrailingPageNumber(l: string): string {
+  return l.replace(/\s{2,}\d{1,4}\s*$/, "").trim();
+}
+
 function parseOutline(text: string): string[] {
   // Sin \b: JS no considera "í" carácter de palabra, así que \bíndice\b
   // nunca casa (bug detectado en dry-run — los 38 documentos salían sin
@@ -148,7 +164,7 @@ function parseOutline(text: string): string[] {
   const lines = text
     .slice(start)
     .split("\n")
-    .map((l) => l.trim());
+    .map((l) => stripTrailingPageNumber(l.trim()));
 
   const entries: string[] = [];
   const seenNumbers = new Set<string>();
@@ -174,33 +190,50 @@ function parseOutline(text: string): string[] {
         continue;
       }
       if (isHeadingLine(next)) break;
+      // "1" suelto sin punto ni título: número de página de pie de página
+      // (aquí, el de la propia página 1, justo antes de que empiece el
+      // cuerpo) — no es continuación del título, se ignora sin fundirlo.
+      if (/^\d{1,4}$/.test(next)) {
+        i++;
+        continue;
+      }
       entry = `${entry} ${next}`.trim();
       i++;
     }
     // Limpieza cosmética: los índices con "líder de puntos" (p.ej. PI-26,
-    // LGTBI-01) dejan el número de página de esa línea pegado al final del
-    // título ("Introducción ..... 2"); se retira si es un resto numérico
-    // suelto al final, sin tocar títulos que legítimamente terminan en cifra.
-    entries.push(
-      entry
-        .replace(/\s+/g, " ")
-        .replace(/(\.{2,}\s*|\s)\d{1,4}$/, ""),
-    );
+    // que además lo usa como carácter Unicode "…" repetido, no solo ".")
+    // dejan el número de página de esa línea pegado al final del título
+    // ("Introducción……….2"); se retira si es un resto de 2+ separadores
+    // (puntos/elipsis/espacios) seguido de dígitos al final, sin tocar
+    // títulos que legítimamente terminan en cifra tras un solo espacio. En
+    // bucle porque una entrada envuelta en 2 líneas puede arrastrar dos
+    // restos numéricos seguidos (uno por línea fundida).
+    let cleaned = entry.replace(/\s+/g, " ").trim();
+    let prev: string;
+    do {
+      prev = cleaned;
+      cleaned = cleaned.replace(/[.…\s]{2,}\d{1,4}$/, "").trim();
+    } while (cleaned !== prev);
+    entries.push(cleaned);
   }
   return entries;
 }
 
 /**
  * Concatena líneas desde `startIdx` hasta que `stopTest` casa una línea (el
- * siguiente apartado real) o se supera `maxChars`. Las líneas que casan
- * `skipTest` se omiten del texto pero no cortan la captura (numeración de
- * cláusula interna, p.ej. los "1." "2." de cada Artículo del Código Ético).
+ * siguiente apartado real) o se supera `maxChars`. `transform` puede quitar
+ * ruido de cada línea antes de incluirla (p.ej. la numeración de cláusula
+ * interna "1.   Este documento…" de cada Artículo del Código Ético — con
+ * `-layout` el número y el texto van en la MISMA línea, así que hay que
+ * pelar el número y conservar el texto, no descartar la línea entera como
+ * antes de `-layout`, cuando el número iba suelto). Devolver `null` desde
+ * `transform` sí descarta la línea (numeración suelta sin texto).
  */
 function captureUntilHeading(
   lines: string[],
   startIdx: number,
   stopTest: (l: string) => boolean,
-  skipTest: (l: string) => boolean = () => false,
+  transform: (l: string) => string | null = (l) => l,
   maxChars = 3000,
 ): string | null {
   const out: string[] = [];
@@ -209,9 +242,10 @@ function captureUntilHeading(
     const l = lines[i];
     if (!l) continue;
     if (stopTest(l)) break;
-    if (skipTest(l)) continue;
-    out.push(l);
-    total += l.length + 1;
+    const t = transform(l);
+    if (t === null) continue;
+    out.push(t);
+    total += t.length + 1;
     if (total > maxChars) break;
   }
   const joined = out.join(" ").replace(/\s+/g, " ").trim();
@@ -239,6 +273,14 @@ function findArabicObjeto(lines: string[]): string | null {
   return null;
 }
 
+// Marcador de cláusula interna con `-layout`: "N.   Texto…" — un único
+// nivel, punto y 2+ espacios antes del texto. Deliberadamente más estricto
+// que matchArabicHeading: una cita legal envuelta en dos líneas ("…el
+// artículo\n10.4 de sus estatutos…") también empieza por un número, pero es
+// multinivel ("10.4"), sin punto final y con un solo espacio — no debe
+// pelarse o se pierde la cita.
+const CLAUSE_MARKER = /^(\d+)\.\s{2,}(\S.*)$/;
+
 /** Cabecera "Artículo N.- Finalidad" (Código Ético; sin apartado "Objeto"). */
 function findArticuloFinalidad(lines: string[]): string | null {
   for (let i = 0; i < lines.length; i++) {
@@ -247,7 +289,14 @@ function findArticuloFinalidad(lines: string[]): string | null {
       lines,
       i + 1,
       (l) => ARTICULO_HEADING.test(l) || ROMAN_HEADING.test(l),
-      (l) => matchArabicHeading(l) !== null, // numeración de cláusula interna del artículo
+      (l) => {
+        // Numeración de cláusula interna del artículo ("1.   Este documento…"):
+        // pela el "1." y conserva el texto; si va suelta sin texto, la descarta.
+        const clause = l.match(CLAUSE_MARKER);
+        if (clause) return clause[2];
+        if (/^\d+\.$/.test(l)) return null; // "1." suelta, sin texto
+        return l;
+      },
     );
     if (body) return body;
   }
