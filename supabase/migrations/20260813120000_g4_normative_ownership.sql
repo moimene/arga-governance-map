@@ -59,11 +59,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_policies_tenant_code
 --    tg_sync_obligation_to_backbone FKea contra grc_modules(tenant_id, id) y su
 --    fallback a 'risk' no re-comprueba existencia. Se siembran las tres claves
 --    que la función puede elegir para que cualquier rama encuentre destino.
-INSERT INTO public.grc_modules (tenant_id, id, name)
+--    description y owner son NOT NULL sin default: hay que darlos explícitos.
+INSERT INTO public.grc_modules (tenant_id, id, name, description, owner)
 VALUES
-  ('00000000-0000-0000-0000-000000000002', 'aml',    'PBC/FT'),
-  ('00000000-0000-0000-0000-000000000002', 'ethics', 'Ética y canal interno'),
-  ('00000000-0000-0000-0000-000000000002', 'risk',   'Riesgos penales y operacionales')
+  ('00000000-0000-0000-0000-000000000002', 'aml', 'PBC/FT',
+   'Diligencia debida, examen especial, comunicaciones al SEPBLAC y conservación documental.',
+   'Comité de Análisis y Control Interno (CACI)'),
+  ('00000000-0000-0000-0000-000000000002', 'ethics', 'Ética y Canal Interno de Información',
+   'Código Ético, Canal Interno de Información (Ley 2/2023) e investigaciones internas.',
+   'Departamento de Compliance'),
+  ('00000000-0000-0000-0000-000000000002', 'risk', 'Riesgos penales',
+   'Programa de Prevención de Delitos: mapa de riesgos penales, plan de acción y seguimiento.',
+   'Comité de Prevención de Delitos')
 ON CONFLICT (tenant_id, id) DO NOTHING;
 
 COMMIT;
