@@ -16,6 +16,7 @@ export interface TenantBranding {
 }
 
 const TenantBrandContext = createContext<TenantBranding | null>(null);
+const TenantBrandLoadingContext = createContext<boolean>(false);
 
 /** Aplica tokens CSS custom (--*) sobre `el` y devuelve el cleanup exacto. */
 export function applyBrandTokens(
@@ -37,7 +38,7 @@ export function applyBrandTokens(
 export function TenantBrandProvider({ children }: { children: ReactNode }) {
   const { tenantId } = useTenantContext();
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["tenant-branding", tenantId],
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
@@ -56,6 +57,7 @@ export function TenantBrandProvider({ children }: { children: ReactNode }) {
   });
 
   const branding = data ?? null;
+  const brandingLoading = !!tenantId && isLoading;
 
   useEffect(
     () => applyBrandTokens(document.documentElement, branding?.tokens),
@@ -64,11 +66,20 @@ export function TenantBrandProvider({ children }: { children: ReactNode }) {
 
   return (
     <TenantBrandContext.Provider value={branding}>
-      {children}
+      <TenantBrandLoadingContext.Provider value={brandingLoading}>
+        {children}
+      </TenantBrandLoadingContext.Provider>
     </TenantBrandContext.Provider>
   );
 }
 
 export function useTenantBranding(): TenantBranding | null {
   return useContext(TenantBrandContext) ?? null;
+}
+
+/** true mientras la query de branding está en vuelo. Necesario para los
+ *  guards de ruta: useTenantBranding() devuelve null tanto para ARGA como
+ *  durante la carga, y redirigir con esa ambigüedad produce parpadeo. */
+export function useTenantBrandingLoading(): boolean {
+  return useContext(TenantBrandLoadingContext);
 }
