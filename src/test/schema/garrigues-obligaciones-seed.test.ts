@@ -69,14 +69,45 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     expect(count).toBe(0);
   });
 
-  it("la exención de abogados aparece en el dato", async () => {
+  // Las dos exclusiones han de estar ETIQUETADAS COMO TALES en el título: es
+  // el requisito, no la mera presencia del artículo. Si solo se comprobara
+  // `legal_reference`, una fila titulada como obligación exigible pasaría el
+  // gate, que es justo el error que se quiere impedir.
+  it("la exención de abogados aparece etiquetada como exclusión", async () => {
     if (!authed || !garr || !seeded) return;
     const { data } = await garr.from("obligations").select("code, title, legal_reference");
     const hit = (data ?? []).some(
       (o: Record<string, unknown>) =>
-        /exenci|no sujec/i.test(String(o.title)) || /art\.?\s*22/i.test(String(o.legal_reference)),
+        /art\.?\s*22/i.test(String(o.legal_reference)) &&
+        /exenci|excepci|exclusi|no sujec/i.test(String(o.title)),
     );
-    expect(hit, "la exención del art. 22 no está representada").toBe(true);
+    expect(hit, "la exención del art. 22 no está etiquetada como exclusión en el título").toBe(true);
+  });
+
+  it("la comunicación sistemática está como excepción, no como obligación exigible", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { data } = await garr.from("obligations").select("code, title, legal_reference");
+    const rows = (data ?? []) as Record<string, unknown>[];
+    // No puede quedar ninguna fila que afirme la comunicación sistemática como
+    // deber del despacho: el RD 304/2014 art. 27.3 exceptúa al art. 2.1.ñ.
+    for (const o of rows) {
+      if (!/sistem[áa]tica/i.test(String(o.title))) continue;
+      expect(String(o.title), `${o.code} afirma la comunicación sistemática como exigible`).toMatch(
+        /exenci|excepci|exclusi|no sujec|no es exigible/i,
+      );
+    }
+    const hit = rows.some(
+      (o) => /27\.3/.test(String(o.legal_reference)) && /excepci|exclusi|no es exigible/i.test(String(o.title)),
+    );
+    expect(hit, "la excepción del RD 304/2014 art. 27.3 no está representada").toBe(true);
+
+    // Ningún control puede afirmar que el despacho remite comunicaciones
+    // sistemáticas: el seed retira los que lo hacían.
+    const { data: ctr } = await garr.from("controls").select("code, name");
+    const falso = (ctr ?? []).find((c: Record<string, unknown>) =>
+      /comunicaci[óo]n sistem[áa]tica/i.test(String(c.name)) && !/vigencia|excepci/i.test(String(c.name)),
+    );
+    expect(falso?.code, `${falso?.code} afirma una comunicación sistemática que el despacho no ejecuta`).toBeUndefined();
   });
 
   it("los controles usan solo estados admitidos por el CHECK", async () => {

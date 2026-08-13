@@ -76,6 +76,15 @@ export type ObligacionPbcFt = {
   criticality: "Crítico" | "Alto" | "Medio" | "Bajo";
   periodicity: ObligationPeriodicity;
   owner_slug: OwnerSlug;
+  /**
+   * Firmeza del criterio, patrón del Comité Legal
+   * (`docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md`).
+   * Ausente = FIRME: literal del texto consolidado del BOE. `DEMO_PILOTO`
+   * marca lo que el Comité Legal debe confirmar antes de tratarlo como firme;
+   * cuando está presente, el título DEBE llevar la cautela en pantalla (el
+   * seed lo verifica). Solo auditoría — no va a base de datos.
+   */
+  firmeza?: "DEMO_PILOTO";
   /** Literal del BOE que respalda la cita. Solo auditoría — no va a base de datos. */
   quote: string;
 };
@@ -200,16 +209,45 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
       "Los sujetos obligados se abstendrán de ejecutar cualquier operación de las señaladas en el artículo precedente.",
   },
   {
+    // SEGUNDA EXCLUSIÓN ETIQUETADA. El art. 20 de la Ley remite la
+    // comunicación sistemática al reglamento, y el reglamento excluye
+    // expresamente a los sujetos del art. 2.1.k) a y) — donde cae la ñ) por la
+    // que Garrigues es sujeto obligado. La declaración negativa semestral vive
+    // en el art. 27.1 del RD, del que también quedan exceptuados.
+    //
+    // Corroboración interna, la que más pesa: el Manual PBC/FT v.10 del
+    // despacho NO tiene sección de comunicación sistemática (su §7 va 7.1
+    // examen especial → 7.2 procedimiento → 7.3 abstención → 7.4 revelación →
+    // 7.5 colaboración → 7.6 infracciones → 7.7 conservación) y la expresión
+    // no aparece ni una vez en el cuerpo del Manual.
+    //
+    // Por eso NO se modela como obligación exigible: afirmarla sería atribuir
+    // al despacho una obligación que no le aplica y un control que no ejecuta.
+    //
+    // firmeza DEMO_PILOTO: la copia del RD que obra en el expediente es la de
+    // 2014 y puede tener modificaciones posteriores. Pendiente de confirmación
+    // por el Comité Legal.
     code: "OBL-PBC-11",
-    // La periodicidad concreta la fija el reglamento (RD 304/2014), no la Ley:
-    // por eso `periodicity` es SEGUN_REGLAMENTO y no un intervalo inventado.
-    title: "Comunicación sistemática al Servicio Ejecutivo, incluida la comunicación negativa",
-    legal_reference: "Ley 10/2010, de 28 de abril, art. 20",
+    title:
+      "Excepción — la comunicación sistemática no es exigible al despacho como sujeto obligado del art. 2.1.ñ (criterio DEMO_PILOTO, pendiente de confirmación del Comité Legal)",
+    legal_reference: "RD 304/2014, de 5 de mayo, art. 27.3 (excepción al art. 20 de la Ley 10/2010)",
+    criticality: "Bajo",
+    periodicity: "PUNTUAL",
+    owner_slug: "garrigues-caci",
+    firmeza: "DEMO_PILOTO",
+    quote:
+      "Quedan exceptuados de la obligación de comunicación sistemática los corredores de seguros a los que se refiere el artículo 2.1 b) de la Ley 10/2010, de 28 de abril, las empresas de asesoramiento financiero y los sujetos obligados mencionados en los párrafos k) a y), ambos inclusive, del artículo 2.1 de la misma ley.",
+  },
+  {
+    code: "OBL-PBC-20",
+    title:
+      "Colaboración con la Comisión de Prevención del Blanqueo de Capitales y sus órganos de apoyo, y sistemas de respuesta a sus requerimientos",
+    legal_reference: "Ley 10/2010, de 28 de abril, art. 21",
     criticality: "Alto",
-    periodicity: "SEGUN_REGLAMENTO",
+    periodicity: "PUNTUAL",
     owner_slug: "garrigues-caci",
     quote:
-      "En todo caso los sujetos obligados comunicarán al Servicio Ejecutivo de la Comisión con la periodicidad que se determine las operaciones que se establezcan reglamentariamente. […] De no existir operaciones susceptibles de comunicación los sujetos obligados comunicarán esta circunstancia al Servicio Ejecutivo de la Comisión.",
+      "Los sujetos obligados facilitarán la documentación e información que la Comisión de Prevención del Blanqueo de Capitales e Infracciones Monetarias o sus órganos de apoyo les requieran para el ejercicio de sus competencias. […] Los sujetos obligados establecerán, en el marco de las medidas de control interno a que se refiere el artículo 26, sistemas que les permitan responder de forma completa y diligente a las solicitudes de información…",
   },
   {
     code: "OBL-PBC-12",
@@ -397,7 +435,7 @@ export const CONTROLES_PPD: ControlPpd[] = [
     status: "Efectivo",
     obligation_code: "OBL-PBC-08",
     owner_slug: "garrigues-caci",
-    source_doc: "Manual PBC/FT v.10, §7.1.2 y §8.1.3",
+    source_doc: "Manual PBC/FT v.10, §7.2 (procedimiento de examen especial); detección previa en §7.1",
   },
   {
     code: "CTR-GARR-09",
@@ -424,12 +462,25 @@ export const CONTROLES_PPD: ControlPpd[] = [
     source_doc: "Manual PBC/FT v.10, §7",
   },
   {
-    code: "CTR-GARR-22",
-    name: "Remisión de la comunicación sistemática al Servicio Ejecutivo, incluida la comunicación negativa cuando no hay operativa reportable",
+    // No es "hacer la comunicación sistemática" — el despacho está exceptuado.
+    // Es verificar que la excepción sigue vigente al actualizar el Manual, que
+    // es lo único que cabe controlar sobre una no sujeción. Sin este control,
+    // la fila saldría en /obligaciones como "SIN CONTROL — acción inmediata
+    // requerida", leyéndose como un hueco de cumplimiento que no existe.
+    code: "CTR-GARR-24",
+    name: "Verificación de la vigencia de la excepción a la comunicación sistemática en la revisión del Manual PBC/FT",
     status: "Efectivo",
     obligation_code: "OBL-PBC-11",
     owner_slug: "garrigues-caci",
-    source_doc: "Manual PBC/FT v.10, §7",
+    source_doc: "RD 304/2014, art. 27.3; Manual PBC/FT v.10, control de versiones",
+  },
+  {
+    code: "CTR-GARR-23",
+    name: "Sistema de respuesta a los requerimientos de la Comisión y de sus órganos de apoyo, con plazo controlado",
+    status: "Efectivo",
+    obligation_code: "OBL-PBC-20",
+    owner_slug: "garrigues-caci",
+    source_doc: "Manual PBC/FT v.10, §7.5",
   },
   {
     code: "CTR-GARR-12",
@@ -437,7 +488,7 @@ export const CONTROLES_PPD: ControlPpd[] = [
     status: "Efectivo",
     obligation_code: "OBL-PBC-13",
     owner_slug: "garrigues-departamento-compliance",
-    source_doc: "Manual PBC/FT v.10, §8",
+    source_doc: "Manual PBC/FT v.10, §7.7",
   },
   {
     code: "CTR-GARR-13",
@@ -453,7 +504,7 @@ export const CONTROLES_PPD: ControlPpd[] = [
     status: "Efectivo",
     obligation_code: "OBL-PBC-14",
     owner_slug: "garrigues-caci",
-    source_doc: "PI-01, que reproduce el §7.2 del Manual PBC/FT",
+    source_doc: "Manual PBC/FT v.10, §5.3; el Manual incorpora el apartado 2 de PI-01 como su Anexo 1",
   },
   {
     code: "CTR-GARR-15",
@@ -461,7 +512,7 @@ export const CONTROLES_PPD: ControlPpd[] = [
     status: "Efectivo",
     obligation_code: "OBL-PBC-16",
     owner_slug: "garrigues-caci",
-    source_doc: "Manual PBC/FT v.10, §8.1.3",
+    source_doc: "Manual PBC/FT v.10, §8.1.2 (representante ante el SEPBLAC) y §8.1.3 (CACI)",
   },
   {
     code: "CTR-GARR-16",
@@ -505,11 +556,16 @@ export const CONTROLES_PPD: ControlPpd[] = [
     source_doc: "PPD-01 §5.1 y §8.2; Código Ético §1.6",
   },
   {
+    // Reanclado al art. 26 (procedimientos documentados de control interno,
+    // que el propio artículo extiende a la conservación de documentos) y NO al
+    // art. 25: la retención decenal del PPD lo es por el plazo de prescripción
+    // penal (PPD-01 §8.3), no por el art. 25. Coincide el número de años, no
+    // el fundamento.
     code: "CTR-GARR-21",
-    name: "PPD — Archivo centralizado en la herramienta de gestión y retención decenal de la evidencia del programa",
+    name: "PPD — Control de documentos e inventario del programa en la herramienta de gestión, con archivo centralizado",
     status: "Efectivo",
-    obligation_code: "OBL-PBC-13",
+    obligation_code: "OBL-PBC-14",
     owner_slug: "garrigues-comite-prevencion-delitos",
-    source_doc: "PPD-01 §8.3 y §8.4",
+    source_doc: "PPD-01 §8.3 (control de documentos) y §8.4 (herramienta de soporte)",
   },
 ];

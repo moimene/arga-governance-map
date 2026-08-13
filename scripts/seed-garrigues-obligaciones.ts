@@ -50,6 +50,24 @@ const SERVICE_KEY = SERVICE_KEY_NAMES.map((n) => process.env[n]).find(Boolean) ?
 const COMMIT = process.argv.includes("--commit");
 
 const POLICY_CODE_PBCFT = "PBC-FT-10";
+
+/**
+ * Filas sembradas por una versión anterior de este catálogo que hay que
+ * RETIRAR de Cloud, no solo dejar de sembrar. El seed es upsert: sin esto, una
+ * fila retirada del catálogo sobrevive en el dato y sigue pintándose.
+ *
+ * `CTR-GARR-22` afirmaba «Remisión de la comunicación sistemática al Servicio
+ * Ejecutivo, incluida la comunicación negativa». El despacho está exceptuado
+ * de esa obligación (RD 304/2014, art. 27.3) y no la ejecuta: dejar el control
+ * vivo sería mantener en pantalla una afirmación falsa sobre el cliente.
+ *
+ * Solo se borra dentro del tenant Garrigues y solo con los prefijos de esta
+ * tarea; nunca puede alcanzar a ARGA ni a filas de otro origen.
+ */
+const CODIGOS_RETIRADOS = {
+  obligations: [] as string[],
+  controls: ["CTR-GARR-22"],
+};
 // CHECK reales en Cloud. Repetidos aquí para que el catálogo reviente en el
 // dry-run y no en el INSERT.
 const CRITICALITY_OK = new Set(["Crítico", "Alto", "Medio", "Bajo"]);
@@ -87,6 +105,11 @@ function validateCatalog() {
     // valor para todas: /obligaciones deriva de él sus secciones y su filtro.
     if (!/art\. \d/.test(o.legal_reference)) fail(`${o.code}: legal_reference sin artículo.`);
     if (!o.quote.trim()) fail(`${o.code}: sin literal del BOE que respalde la cita.`);
+    // Un criterio no confirmado por el Comité Legal no puede llegar a pantalla
+    // sin la cautela: `title` es lo que se pinta.
+    if (o.firmeza === "DEMO_PILOTO" && !o.title.includes("DEMO_PILOTO")) {
+      fail(`${o.code}: firmeza DEMO_PILOTO sin la cautela en el título.`);
+    }
   }
   const ctrCodes = new Set<string>();
   for (const c of CONTROLES_PPD) {
@@ -95,6 +118,14 @@ function validateCatalog() {
     ctrCodes.add(c.code);
     if (!STATUS_OK.has(c.status)) fail(`${c.code}: status "${c.status}" fuera del CHECK.`);
     if (!oblCodes.has(c.obligation_code)) fail(`${c.code}: cubre "${c.obligation_code}", que no está en el catálogo.`);
+  }
+  for (const c of CODIGOS_RETIRADOS.controls) {
+    if (ctrCodes.has(c)) fail(`${c}: está a la vez en el catálogo y en CODIGOS_RETIRADOS.`);
+    if (!c.startsWith("CTR-GARR-")) fail(`${c}: código retirado fuera del prefijo de esta tarea.`);
+  }
+  for (const o of CODIGOS_RETIRADOS.obligations) {
+    if (oblCodes.has(o)) fail(`${o}: está a la vez en el catálogo y en CODIGOS_RETIRADOS.`);
+    if (!o.startsWith("OBL-PBC-")) fail(`${o}: código retirado fuera del prefijo de esta tarea.`);
   }
   const sinControl = OBLIGACIONES_PBCFT.filter((o) => !CONTROLES_PPD.some((c) => c.obligation_code === o.code));
   if (sinControl.length > 0) {
@@ -169,13 +200,14 @@ async function buildControlRow(c: ControlPpd, owners: Map<string, Body>) {
 async function main() {
   validateCatalog();
   console.log(
-    `G4 Task 4 — PBC/FT Garrigues: ${OBLIGACIONES_PBCFT.length} obligaciones (1 exención etiquetada) y ${CONTROLES_PPD.length} controles.`,
+    `G4 Task 4 — PBC/FT Garrigues: ${OBLIGACIONES_PBCFT.length} filas en obligations (2 exclusiones etiquetadas: art. 22 y RD 304/2014 art. 27.3) y ${CONTROLES_PPD.length} controles.`,
   );
   console.log(`Marco único en obligations.source: "${MARCO_PBCFT}" (1 valor distinto para las ${OBLIGACIONES_PBCFT.length} filas).`);
   console.table(
     OBLIGACIONES_PBCFT.map((o) => ({
       code: o.code,
       articulo: o.legal_reference.replace("Ley 10/2010, de 28 de abril, ", ""),
+      firmeza: o.firmeza ?? "FIRME",
       criticidad: o.criticality,
       periodicidad: o.periodicity,
       comite: o.owner_slug,
@@ -203,6 +235,22 @@ async function main() {
   const controlRows = await Promise.all(CONTROLES_PPD.map((c) => buildControlRow(c, owners)));
   const { error: ctrErr } = await admin.from("controls").upsert(controlRows, { onConflict: "id" });
   if (ctrErr) fail(`controls upsert: ${ctrErr.message}`);
+
+  // Retirada de filas de versiones anteriores del catálogo. Va después del
+  // upsert para no dejar una obligación sin control en el intervalo.
+  for (const [table, codes] of [
+    ["controls", CODIGOS_RETIRADOS.controls],
+    ["obligations", CODIGOS_RETIRADOS.obligations],
+  ] as const) {
+    if (codes.length === 0) continue;
+    const { error, count } = await admin
+      .from(table)
+      .delete({ count: "exact" })
+      .eq("tenant_id", GARRIGUES_TENANT)
+      .in("code", codes);
+    if (error) fail(`${table} delete de retirados: ${error.message}`);
+    console.log(`✓ Retiradas ${count ?? 0} fila(s) de ${table}: ${codes.join(", ")}`);
+  }
 
   console.log(`✓ Seed completado (idempotente) — ${obligationRows.length} obligaciones, ${controlRows.length} controles.`);
 }
