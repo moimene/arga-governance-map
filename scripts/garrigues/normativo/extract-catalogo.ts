@@ -123,7 +123,14 @@ function matchArabicHeading(line: string): { number: string; title: string } | n
 function isArabicHeading(l: string): boolean {
   return matchArabicHeading(l) !== null;
 }
-const ARTICULO_HEADING = /^Art[íi]culo\s+\d+\.-?/i;
+// Sin /i: "Artículo" siempre va en mayúscula inicial cuando es cabecera real
+// (verificado: 0 apariciones en minúscula como cabecera en los 38
+// documentos). Con /i, una cita legal en prosa ("…la letra "o" del
+// artículo 2.1 de la Ley 10/2010)…") que por el ajuste de línea de
+// `-layout` cae al principio de una línea envuelta se confundía con una
+// cabecera real y cortaba el resumen de PBC-FT-10 a media frase — no era
+// el maxChars, era este falso positivo.
+const ARTICULO_HEADING = /^Art[íi]culo\s+\d+\.-?/;
 const ROMAN_HEADING = /^[IVXLCDM]+\.(\s|$)/;
 function isHeadingLine(l: string): boolean {
   return isArabicHeading(l) || ARTICULO_HEADING.test(l) || ROMAN_HEADING.test(l);
@@ -220,15 +227,51 @@ function parseOutline(text: string): string[] {
 }
 
 /**
- * Concatena líneas desde `startIdx` hasta que `stopTest` casa una línea (el
- * siguiente apartado real) o se supera `maxChars`. `transform` puede quitar
- * ruido de cada línea antes de incluirla (p.ej. la numeración de cláusula
- * interna "1.   Este documento…" de cada Artículo del Código Ético — con
- * `-layout` el número y el texto van en la MISMA línea, así que hay que
- * pelar el número y conservar el texto, no descartar la línea entera como
- * antes de `-layout`, cuando el número iba suelto). Devolver `null` desde
- * `transform` sí descarta la línea (numeración suelta sin texto).
+ * Corta en el último límite de frase (". " o ") ", p.ej. el cierre de un
+ * ítem de enumeración "(iii) …") que quepa dentro de `maxChars`, en vez de
+ * cortar a ciegas por conteo de caracteres — una frase colgando a media
+ * preposición se ve al instante en un resumen legal. Si no hay ningún
+ * límite de frase, mejor cortar en el último espacio (sin partir palabras)
+ * que dejarla colgando.
  */
+function truncateAtSentence(text: string, maxChars: number): string {
+  const slice = text.slice(0, maxChars);
+  const cut = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf(") "));
+  if (cut > 0) return slice.slice(0, cut + 1).trim();
+  const lastSpace = slice.lastIndexOf(" ");
+  return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).trim();
+}
+
+/**
+ * Concatena líneas desde `startIdx` hasta que `stopTest` casa una línea (el
+ * siguiente apartado real). `transform` puede quitar ruido de cada línea
+ * antes de incluirla (p.ej. la numeración de cláusula interna "1.   Este
+ * documento…" de cada Artículo del Código Ético — con `-layout` el número y
+ * el texto van en la MISMA línea, así que hay que pelar el número y
+ * conservar el texto). Devolver `null` desde `transform` sí descarta la
+ * línea (numeración suelta sin texto).
+ *
+ * Dos filtros universales se aplican ANTES de `transform`, para cualquier
+ * llamador, no solo el que los pidió — así no hace falta duplicarlos en
+ * cada `transform` a medida (root cause, no parche por caso):
+ * - Un número suelto sin punto ni título ("2", "18") es casi siempre un
+ *   número de página de pdftotext, nunca contenido real.
+ * - Una línea de 20+ caracteres que se repite MUCHAS veces en TODO el
+ *   documento es una cabecera o pie de página que se repite en cada hoja
+ *   (p.ej. "Sistema normativo interno-Código Ético" / "Edición 04,
+ *   noviembre 2023" en el Código Ético: ~19-20 apariciones en 20 páginas).
+ *   El umbral es 4, no 2: una cláusula de contenido legítima puede
+ *   citarse literalmente dos veces en el mismo documento (comprobado en
+ *   LGTBI-01, cuyo párrafo antidiscriminación se repite exacto en dos
+ *   apartados) sin ser cabecera de página — un `>= 2` ingenuo lo borraba
+ *   por error, dejando el resumen con un hueco a media frase.
+ *
+ * El corte por `maxChars` ya no trunca a ciegas dentro del bucle: se junta
+ * todo el texto hasta `stopTest` y solo si excede `maxChars` se recorta al
+ * final, en el último límite de frase (`truncateAtSentence`).
+ */
+const RUNNING_HEADER_MIN_REPEATS = 4;
+
 function captureUntilHeading(
   lines: string[],
   startIdx: number,
@@ -236,20 +279,26 @@ function captureUntilHeading(
   transform: (l: string) => string | null = (l) => l,
   maxChars = 3000,
 ): string | null {
+  const freq = new Map<string, number>();
+  for (const l of lines) {
+    if (l.length < 20) continue;
+    freq.set(l, (freq.get(l) ?? 0) + 1);
+  }
+
   const out: string[] = [];
-  let total = 0;
   for (let i = startIdx; i < lines.length; i++) {
     const l = lines[i];
     if (!l) continue;
     if (stopTest(l)) break;
+    if (/^\d{1,4}$/.test(l)) continue; // número de página suelto
+    if ((freq.get(l) ?? 0) >= RUNNING_HEADER_MIN_REPEATS) continue; // cabecera/pie repetido en cada página
     const t = transform(l);
     if (t === null) continue;
     out.push(t);
-    total += t.length + 1;
-    if (total > maxChars) break;
   }
   const joined = out.join(" ").replace(/\s+/g, " ").trim();
-  return joined.length >= 40 ? joined : null;
+  if (joined.length < 40) return null;
+  return joined.length > maxChars ? truncateAtSentence(joined, maxChars) : joined;
 }
 
 /** Cabecera arábiga "N. Objeto…" (compacta) o "N." + "Objeto…" (partida). */
