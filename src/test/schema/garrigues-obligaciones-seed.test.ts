@@ -48,11 +48,18 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     for (const o of data ?? []) {
       expect(o.legal_reference, `${o.code} sin artículo`).toBeTruthy();
       expect(String(o.legal_reference)).toMatch(/Ley 10\/2010/);
-      // `source` es el único campo con el artículo que las lecturas vivas de
-      // /obligaciones pintan hoy: si el artículo no está aquí, no está en
-      // pantalla.
-      expect(String(o.source), `${o.code} no muestra el artículo`).toMatch(/art\. \d/);
+      expect(String(o.legal_reference), `${o.code} sin artículo`).toMatch(/art\. \d/);
     }
+  });
+
+  it("source es el marco normativo, no el artículo", async () => {
+    if (!authed || !garr || !seeded) return;
+    // /obligaciones deriva sus secciones y su filtro de `source`. Un `source`
+    // por artículo produciría una sección por fila.
+    const { data } = await garr.from("obligations").select("code, source");
+    const marcos = new Set((data ?? []).map((o: Record<string, unknown>) => String(o.source)));
+    expect(marcos.size, `demasiados marcos: ${[...marcos].join(" · ")}`).toBeLessThanOrEqual(2);
+    for (const m of marcos) expect(m, `"${m}" parece un artículo, no un marco`).not.toMatch(/art\. \d/);
   });
 
   it("toda obligación tiene comité responsable", async () => {

@@ -33,6 +33,7 @@ import { GARRIGUES_TENANT } from "./garrigues/entities-catalog";
 import {
   OBLIGACIONES_PBCFT,
   CONTROLES_PPD,
+  MARCO_PBCFT,
   type ObligacionPbcFt,
   type ControlPpd,
 } from "./garrigues/normativo/obligaciones-pbcft";
@@ -82,7 +83,9 @@ function validateCatalog() {
     oblCodes.add(o.code);
     if (!CRITICALITY_OK.has(o.criticality)) fail(`${o.code}: criticality "${o.criticality}" fuera del CHECK.`);
     if (!o.legal_reference.includes("Ley 10/2010")) fail(`${o.code}: legal_reference sin cita a la Ley 10/2010.`);
-    if (!/art\. \d/.test(o.source)) fail(`${o.code}: source sin artículo visible.`);
+    // El artículo va en legal_reference. `source` es el marco y es un único
+    // valor para todas: /obligaciones deriva de él sus secciones y su filtro.
+    if (!/art\. \d/.test(o.legal_reference)) fail(`${o.code}: legal_reference sin artículo.`);
     if (!o.quote.trim()) fail(`${o.code}: sin literal del BOE que respalde la cita.`);
   }
   const ctrCodes = new Set<string>();
@@ -141,7 +144,7 @@ async function buildObligationRow(o: ObligacionPbcFt, owners: Map<string, Body>,
     tenant_id: GARRIGUES_TENANT,
     code: o.code,
     title: o.title,
-    source: o.source,
+    source: MARCO_PBCFT,
     legal_reference: o.legal_reference,
     criticality: o.criticality,
     periodicity: o.periodicity,
@@ -168,10 +171,11 @@ async function main() {
   console.log(
     `G4 Task 4 — PBC/FT Garrigues: ${OBLIGACIONES_PBCFT.length} obligaciones (1 exención etiquetada) y ${CONTROLES_PPD.length} controles.`,
   );
+  console.log(`Marco único en obligations.source: "${MARCO_PBCFT}" (1 valor distinto para las ${OBLIGACIONES_PBCFT.length} filas).`);
   console.table(
     OBLIGACIONES_PBCFT.map((o) => ({
       code: o.code,
-      articulo: o.source,
+      articulo: o.legal_reference.replace("Ley 10/2010, de 28 de abril, ", ""),
       criticidad: o.criticality,
       periodicidad: o.periodicity,
       comite: o.owner_slug,

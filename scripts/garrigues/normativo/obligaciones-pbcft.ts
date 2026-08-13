@@ -19,8 +19,15 @@
 // docs/legal/2026-08-04-decisiones-comite-legal-slp-garrigues.md fijó que la
 // cita que se MUESTRA es a nivel de artículo. Los apartados, cuando importan,
 // viven en comentario interno de este fichero y nunca en la interfaz. Por eso
-// `source` y `legal_reference` dicen "art. 7" y el matiz del apartado 7.3 está
-// en el comentario de la exención, no en pantalla.
+// `legal_reference` dice "art. 7" y el matiz del apartado 7.3 está en el
+// comentario de la exención, no en pantalla.
+//
+// ─── `source` es el MARCO, no el artículo ─────────────────────────────────
+// `obligations.source` es la columna de marco normativo: en ARGA vale DORA,
+// GDPR, LGPD o SolvenciaII, y de ella deriva la agrupación por secciones de
+// /obligaciones. Un `source` por artículo produciría 20 secciones de una fila.
+// Por eso hay UN solo valor, `MARCO_PBCFT`, y el artículo vive en
+// `legal_reference`, que es la columna que lo representa.
 //
 // ─── Sujeción del despacho ────────────────────────────────────────────────
 // Garrigues es sujeto obligado por el art. 2.1.ñ (VERIFICADO, no supuesto):
@@ -53,12 +60,17 @@ export type OwnerSlug =
   | "garrigues-departamento-compliance"
   | "garrigues-comite-prevencion-delitos";
 
+/**
+ * Marco normativo único de este bloque. Va a `obligations.source`, la columna
+ * de la que /obligaciones deriva sus secciones y su filtro de marco: un solo
+ * valor para las 20 filas. El artículo NO va aquí, va en `legal_reference`.
+ */
+export const MARCO_PBCFT = "PBC/FT — Ley 10/2010";
+
 export type ObligacionPbcFt = {
   /** Prefijo OBL-PBC- (no colisiona con los prefijos que mapea el trigger de backbone). */
   code: string;
   title: string;
-  /** Se PINTA en /obligaciones (columna "Marco") y en el detalle. Lleva el artículo. */
-  source: string;
   /** Columna estructurada de Task 1. Cita canónica verificada contra el BOE. */
   legal_reference: string;
   criticality: "Crítico" | "Alto" | "Medio" | "Bajo";
@@ -90,7 +102,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-01",
     title: "Identificación formal del cliente y comprobación de su identidad mediante documento fehaciente",
-    source: "Ley 10/2010, art. 3",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 3",
     criticality: "Crítico",
     periodicity: "POR_OPERACION",
@@ -101,7 +112,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-02",
     title: "Identificación del titular real y de la estructura de propiedad y control del cliente",
-    source: "Ley 10/2010, art. 4",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 4",
     criticality: "Crítico",
     periodicity: "POR_OPERACION",
@@ -112,7 +122,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-03",
     title: "Obtención de información sobre el propósito e índole prevista de la relación de negocios",
-    source: "Ley 10/2010, art. 5",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 5",
     criticality: "Alto",
     periodicity: "POR_OPERACION",
@@ -123,7 +132,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-04",
     title: "Seguimiento continuo de la relación de negocios y actualización del expediente del cliente",
-    source: "Ley 10/2010, art. 6",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 6",
     criticality: "Alto",
     periodicity: "CONTINUA",
@@ -134,7 +142,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-05",
     title: "Aplicación de las medidas de diligencia debida en función del riesgo, con análisis de riesgo escrito",
-    source: "Ley 10/2010, art. 7",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 7",
     criticality: "Crítico",
     periodicity: "ANUAL",
@@ -145,7 +152,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-06",
     title: "Medidas reforzadas de diligencia debida en situaciones de alto riesgo",
-    source: "Ley 10/2010, art. 11",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 11",
     criticality: "Alto",
     periodicity: "POR_OPERACION",
@@ -156,7 +162,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-07",
     title: "Medidas reforzadas respecto de personas con responsabilidad pública",
-    source: "Ley 10/2010, art. 14",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 14",
     criticality: "Alto",
     periodicity: "POR_OPERACION",
@@ -167,7 +172,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-08",
     title: "Examen especial de hechos u operaciones y reseña por escrito de su resultado",
-    source: "Ley 10/2010, art. 17",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 17",
     criticality: "Crítico",
     periodicity: "POR_OPERACION",
@@ -178,7 +182,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-09",
     title: "Comunicación por indicio al Servicio Ejecutivo de la Comisión (SEPBLAC)",
-    source: "Ley 10/2010, art. 18",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 18",
     criticality: "Crítico",
     periodicity: "PUNTUAL",
@@ -189,7 +192,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-10",
     title: "Abstención de ejecución de la operación comunicada",
-    source: "Ley 10/2010, art. 19",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 19",
     criticality: "Crítico",
     periodicity: "PUNTUAL",
@@ -202,7 +204,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     // La periodicidad concreta la fija el reglamento (RD 304/2014), no la Ley:
     // por eso `periodicity` es SEGUN_REGLAMENTO y no un intervalo inventado.
     title: "Comunicación sistemática al Servicio Ejecutivo, incluida la comunicación negativa",
-    source: "Ley 10/2010, art. 20",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 20",
     criticality: "Alto",
     periodicity: "SEGUN_REGLAMENTO",
@@ -213,7 +214,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-12",
     title: "Prohibición de revelar al cliente o a terceros la comunicación o el examen de una operación",
-    source: "Ley 10/2010, art. 24",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 24",
     criticality: "Crítico",
     periodicity: "CONTINUA",
@@ -224,7 +224,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-13",
     title: "Conservación de la documentación durante diez años",
-    source: "Ley 10/2010, art. 25",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 25",
     criticality: "Alto",
     periodicity: "CONTINUA",
@@ -235,7 +234,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-14",
     title: "Aprobación por escrito de políticas y procedimientos de control interno y manual de prevención actualizado",
-    source: "Ley 10/2010, art. 26",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 26",
     criticality: "Crítico",
     periodicity: "ANUAL",
@@ -246,7 +244,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-15",
     title: "Procedimiento interno de comunicación de potenciales incumplimientos",
-    source: "Ley 10/2010, art. 26 bis",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 26 bis",
     criticality: "Alto",
     periodicity: "CONTINUA",
@@ -257,7 +254,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-16",
     title: "Órgano de control interno y representante ante el Servicio Ejecutivo de la Comisión",
-    source: "Ley 10/2010, art. 26 ter",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 26 ter",
     criticality: "Crítico",
     periodicity: "CONTINUA",
@@ -268,7 +264,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-17",
     title: "Examen anual de las medidas y órganos de control interno por experto externo",
-    source: "Ley 10/2010, art. 28",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 28",
     criticality: "Alto",
     periodicity: "ANUAL",
@@ -279,7 +274,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   {
     code: "OBL-PBC-18",
     title: "Formación de empleados conforme a plan anual aprobado por el órgano de control interno",
-    source: "Ley 10/2010, art. 29",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 29",
     criticality: "Alto",
     periodicity: "ANUAL",
@@ -291,7 +285,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     code: "OBL-PBC-19",
     title:
       "Confidencialidad de la identidad de quien comunica y estándares éticos en la contratación de empleados, directivos y agentes",
-    source: "Ley 10/2010, art. 30",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 30",
     criticality: "Medio",
     periodicity: "CONTINUA",
@@ -301,9 +294,10 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
   },
   {
     // EXCLUSIÓN ETIQUETADA, no una obligación más. El título dice "Exención"
-    // en primera posición precisamente porque las dos lecturas vivas de
-    // /obligaciones (lista y detalle) pintan `title` y `source` — así el
-    // abogado ve que es una no sujeción sin abrir nada.
+    // en primera posición precisamente porque `title` es lo primero que
+    // pintan las dos lecturas de /obligaciones (lista y detalle) — así el
+    // abogado ve que es una no sujeción sin abrir nada. El artículo lo pinta
+    // la ficha desde `legal_reference` (Task 7).
     //
     // Apartado (comentario interno, NO va a pantalla por el criterio del
     // Comité Legal): la no sujeción del art. 22 alcanza exactamente a los
@@ -312,7 +306,6 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     code: "OBL-PBC-EX-22",
     title:
       "Exención — no sujeción de los abogados respecto de la información obtenida al determinar la posición jurídica del cliente o en el ejercicio de su defensa",
-    source: "Ley 10/2010, art. 22",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 22 (no sujeción)",
     criticality: "Bajo",
     periodicity: "PUNTUAL",
