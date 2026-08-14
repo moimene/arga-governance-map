@@ -246,7 +246,7 @@ export default function ObligacionesList() {
                   <TableRow key={o.id}>
                     <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
                     <TableCell>
-                      <Link to={`/obligaciones/${o.code}`} title={o.title} className="block max-w-md truncate text-sm font-medium hover:text-primary">
+                      <Link to={`/obligaciones/${o.code}`} title={cleanTitle} className="block max-w-md truncate text-sm font-medium hover:text-primary">
                         {cleanTitle}
                       </Link>
                       {pending && (
@@ -302,7 +302,7 @@ function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTable
             <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg hover:bg-status-critical-bg", warn && "bg-status-warning-bg/60 hover:bg-status-warning-bg")}>
               <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
               <TableCell>
-                <Link to={`/obligaciones/${o.code}`} title={o.title} className="block max-w-md truncate text-sm font-medium hover:text-primary">
+                <Link to={`/obligaciones/${o.code}`} title={o.title} className="block line-clamp-2 text-sm font-medium hover:text-primary">
                   {o.title}
                 </Link>
               </TableCell>

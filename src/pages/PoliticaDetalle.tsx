@@ -17,7 +17,7 @@ import {
   controlStatusLabel,
   controlStatusTone,
 } from "@/hooks/usePoliciesObligations";
-import { Brain, Check, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
+import { Brain, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -205,7 +205,7 @@ export default function PoliticaDetalle() {
       <Tabs defaultValue="contenido" className="mt-6">
         <TabsList className="grid w-full max-w-3xl grid-cols-6">
           <TabsTrigger value="contenido">Contenido</TabsTrigger>
-          <TabsTrigger value="aplicabilidad">Aplicabilidad</TabsTrigger>
+          <TabsTrigger value="aplicabilidad">Entidades del grupo</TabsTrigger>
           <TabsTrigger value="obligaciones">Obligaciones</TabsTrigger>
           <TabsTrigger value="aprobaciones">Aprobaciones</TabsTrigger>
           <TabsTrigger value="versiones">Versiones</TabsTrigger>
@@ -266,20 +266,18 @@ export default function PoliticaDetalle() {
                 <TableRow>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Jurisdicción</TableHead>
-                  <TableHead className="w-20">Aplica</TableHead>
                   <TableHead>Excepción</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {applicableEntities.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">Sin entidades registradas para este tenant.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin entidades registradas para este tenant.</TableCell></TableRow>
                 )}
                 {applicableEntities.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.common_name}</TableCell>
                     <TableCell className="text-sm">{formatJurisdiction(e.jurisdiction)}</TableCell>
-                    <TableCell><Check className="h-4 w-4 text-status-active" /></TableCell>
                     <TableCell />
                     <TableCell className="text-xs text-muted-foreground" />
                   </TableRow>
