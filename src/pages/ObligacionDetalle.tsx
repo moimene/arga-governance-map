@@ -337,12 +337,16 @@ export default function ObligacionDetalle() {
                   {linkedIncidents.map((inc) => (
                     <TableRow key={inc.id}>
                       <TableCell>
-                        <Link
-                          to={`/grc/m/dora/operate/incidents/${inc.id}`}
-                          className="font-mono text-xs text-primary hover:underline"
-                        >
-                          {inc.code}
-                        </Link>
+                        {doraEnabled ? (
+                          <Link
+                            to={`/grc/m/dora/operate/incidents/${inc.id}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {inc.code}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground">{inc.code}</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
                         {inc.title}

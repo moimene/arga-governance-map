@@ -126,7 +126,7 @@ export const tourSteps: TourStep[] = [
     badges: [
       { label: "PR-008", tone: "pending" },
       { label: "OBL-DORA-003 SIN COBERTURA", tone: "critical" },
-      { label: "25 entidades", tone: "neutral" },
+      { label: "31 entidades", tone: "neutral" },
     ],
     highlightId: "tour-policy-stepper",
     available: true,
