@@ -1182,6 +1182,10 @@ Expected: PASS con las 7 tablas en ambas direcciones.
 
 `GlobalSearch.tsx:430` construye `/politicas/${p.id}` con el **UUID**, pero la ruta resuelve por `policy_code` (`PoliticaDetalle.tsx:58-59` → `usePolicyByCode`). Todo resultado de política cae hoy en "Política no encontrada". Cambiar a `/politicas/${p.policy_code}` y asegurar que la query selecciona `policy_code`.
 
+- [ ] **Step 5a: Copy del tour guiado desfasado**
+
+`src/context/TourContext.tsx:123` (paso `available: true`, ruta `/politicas/PR-008`) dice *«Tab Aplicabilidad: 25 entidades del grupo con ARGA Turquía marcada con excepción vencida ⚠»*. Es falso por partida doble desde la Task 7: el caso cableado de Turquía y su enlace a `HALL-010` se eliminaron, y la pestaña ya no se llama «Aplicabilidad» sino «Entidades del grupo». Es copy visible en el tour de ARGA. Actualizarlo a lo que la pantalla muestra de verdad.
+
 - [ ] **Step 5b: La contradicción de la exclusión no puede sobrevivir a un clic**
 
 La Task 7 sacó las dos exclusiones del recuento de obligaciones y les dio tarjeta propia en la lista. Pero esa tarjeta enlaza a `/obligaciones/OBL-PBC-EX-22` y `/obligaciones/OBL-PBC-11`, y `ObligacionDetalle.tsx:86-107` calcula `coverageLabel` sobre los controles: como ambas tienen un control `Efectivo` (`CTR-GARR-18`, `CTR-GARR-24`), la ficha las pinta **"COMPLETA" en verde**. La lista dice «esto no es una obligación cubierta» y el detalle contiguo dice lo contrario — es exactamente la lectura que la Task 7 quería impedir, movida una pantalla más allá. Detectar la exclusión por el mismo criterio que usa la lista y darle cabecera propia, sin badge de cobertura. Aprovechar para limpiar el título crudo de 169 caracteres que hoy se pinta como H1 con el token `DEMO_PILOTO` dentro.
