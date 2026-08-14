@@ -71,13 +71,10 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     expect(data?.role_code).toBe("SECRETARIO");
   });
 
-  // GATE PARCIAL POR SECUENCIACIÓN (G0): el tenant Garrigues aún no tiene filas
-  // de dominio (las siembra G1). Por eso los `it("ARGA no ve filas Garrigues…")`
-  // son de momento vacuamente verdaderos (vacío-contra-vacío) y NO prueban aún
-  // esa dirección del aislamiento. La dirección de riesgo real —Garrigues NO ve
-  // el dato de ARGA— SÍ queda probada aquí porque ARGA tiene datos. Estos 4
-  // tests pasan a ser aserciones reales, sin tocar este código, en cuanto G1
-  // siembre dato de dominio para GARRIGUES_TENANT.
+  // Ambas direcciones son aserciones reales (no vacío-contra-vacío): las 7
+  // tablas tienen filas en los dos tenants desde G1 (entities/agreements/...)
+  // y G4 (policies/obligations/controls, añadidas en Task 8). El bucle genera
+  // 14 tests (7 tablas × 2 direcciones), más los 5 fijos de más abajo = 19.
   for (const table of DOMAIN_TABLES) {
     it(`Garrigues no ve filas ARGA en ${table}`, async () => {
       if (!authed || !garr) { expect(true).toBe(true); return; }

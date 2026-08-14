@@ -214,8 +214,9 @@ export function usePolicyObligations(policyId: string | undefined) {
 }
 
 export function useObligationsList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["obligations", "list"],
+    queryKey: ["obligations", "list", tenantId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obligations")
@@ -233,8 +234,9 @@ export function useObligationsList() {
 }
 
 export function useObligationByCode(code: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["obligations", "byCode", code],
+    queryKey: ["obligations", "byCode", tenantId, code],
     enabled: !!code,
     queryFn: async () => {
       const { data, error } = await supabase
