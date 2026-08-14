@@ -1182,6 +1182,10 @@ Expected: PASS con las 7 tablas en ambas direcciones.
 
 `GlobalSearch.tsx:430` construye `/politicas/${p.id}` con el **UUID**, pero la ruta resuelve por `policy_code` (`PoliticaDetalle.tsx:58-59` → `usePolicyByCode`). Todo resultado de política cae hoy en "Política no encontrada". Cambiar a `/politicas/${p.policy_code}` y asegurar que la query selecciona `policy_code`.
 
+- [ ] **Step 5b: La contradicción de la exclusión no puede sobrevivir a un clic**
+
+La Task 7 sacó las dos exclusiones del recuento de obligaciones y les dio tarjeta propia en la lista. Pero esa tarjeta enlaza a `/obligaciones/OBL-PBC-EX-22` y `/obligaciones/OBL-PBC-11`, y `ObligacionDetalle.tsx:86-107` calcula `coverageLabel` sobre los controles: como ambas tienen un control `Efectivo` (`CTR-GARR-18`, `CTR-GARR-24`), la ficha las pinta **"COMPLETA" en verde**. La lista dice «esto no es una obligación cubierta» y el detalle contiguo dice lo contrario — es exactamente la lectura que la Task 7 quería impedir, movida una pantalla más allá. Detectar la exclusión por el mismo criterio que usa la lista y darle cabecera propia, sin badge de cobertura. Aprovechar para limpiar el título crudo de 169 caracteres que hoy se pinta como H1 con el token `DEMO_PILOTO` dentro.
+
 - [ ] **Step 6: Desacoplar el botón de GRC, el enlace de reuniones y el e2e**
 
 Además del botón, `src/pages/secretaria/ReunionesLista.tsx:211` enlaza a board-pack sin gatear. **Gotcha de método:** ese enlace se construye con template literal (`` `/secretaria/reuniones/${m.id}/board-pack` ``), así que un `grep` de la ruta literal completa **no lo encuentra** — así se escapó en la Task 6. Busca por **sufijo** de ruta (`board-pack`, `/grc/m/dora`, `/grc/packs`), no por la cadena entera. Ninguno de los dos es fuga funcional (las rutas destino ya están gateadas y redirigen), pero son enlaces vivos hacia módulos oficialmente ocultos.
