@@ -215,8 +215,9 @@ export function useEntityBodies(entityId: string | undefined) {
 }
 
 export function useAllPolicies() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["policies", "all"],
+    queryKey: ["policies", "all", tenantId],
     queryFn: async (): Promise<PolicyRow[]> => {
       const { data, error } = await supabase
         .from("policies")

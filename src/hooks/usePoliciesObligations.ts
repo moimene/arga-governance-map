@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface PolicyRow {
   id: string;
@@ -158,8 +159,9 @@ export const evidenceStatusTone = (s: string | null | undefined) => {
 // ───────── Queries ─────────
 
 export function usePoliciesList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["policies", "list"],
+    queryKey: ["policies", "list", tenantId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("policies")
@@ -176,8 +178,9 @@ export function usePoliciesList() {
 }
 
 export function usePolicyByCode(code: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["policies", "byCode", code],
+    queryKey: ["policies", "byCode", tenantId, code],
     enabled: !!code,
     queryFn: async () => {
       const { data, error } = await supabase

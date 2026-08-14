@@ -427,7 +427,7 @@ async function runSearch(query: string, tenantId?: string | null, entityId?: str
         label: [p.policy_code, p.title].filter(Boolean).join(" — ") || "Política",
         sublabel: p.status,
         kind: "policy",
-        nav_to: `/politicas/${p.id}`,
+        nav_to: `/politicas/${p.policy_code}`,
       });
     });
   }

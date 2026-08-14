@@ -23,12 +23,24 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
   return `${day}/${m}/${y}`;
 };
+
+// G4 Task 8/Step 5b: mismo criterio que usa la lista (ObligacionesList.tsx,
+// EXCLUSION_RE/splitFirmeza) para detectar las dos EXCLUSIONES (no sujeción /
+// excepción legal) de PBC/FT — el título abre por "Exención"/"Excepción" y
+// puede llevar embebida la cautela de firmeza pendiente del Comité Legal
+// `(criterio DEMO_PILOTO, ...)`. Sin esto, la ficha pinta "COMPLETA" en verde
+// porque las dos tienen un control Efectivo asociado, contradiciendo a la
+// lista, que ya las trata como no cubiertas.
+const EXCLUSION_TITLE_RE = /^(Exención|Excepción)\b/i;
+const FIRMEZA_SUFFIX_RE = /\s*\(criterio DEMO_PILOTO,\s*([^)]+)\)\s*$/i;
 
 export default function ObligacionDetalle() {
   const { id } = useParams();
@@ -67,6 +79,8 @@ export default function ObligacionDetalle() {
     },
   });
   const navigate = useNavigate();
+  const branding = useTenantBranding();
+  const doraEnabled = isModuleEnabled(branding, "dora");
 
   const openIncidents = linkedIncidents.filter(
     (i) => i.status !== "Cerrado" && i.status !== "Resuelto",
@@ -82,6 +96,12 @@ export default function ObligacionDetalle() {
   }
 
   if (!obligation) return <div className="p-6">Obligación no encontrada.</div>;
+
+  const isExclusion = EXCLUSION_TITLE_RE.test(obligation.title);
+  const exclusionKind = EXCLUSION_TITLE_RE.exec(obligation.title)?.[1] ?? "Exclusión";
+  const firmezaMatch = FIRMEZA_SUFFIX_RE.exec(obligation.title);
+  const displayTitle = firmezaMatch ? obligation.title.slice(0, firmezaMatch.index).trim() : obligation.title;
+  const firmezaPending = firmezaMatch?.[1]?.trim() ?? null;
 
   const noCoverage = controls.length === 0;
   const coverageLabel = noCoverage
@@ -99,10 +119,17 @@ export default function ObligacionDetalle() {
           { label: "Obligaciones y Controles", to: "/obligaciones" },
           { label: obligation.code },
         ]}
-        title={obligation.title}
+        title={displayTitle}
         badges={
           <>
-            <StatusBadge label={coverageLabel} tone={coverageTone} pulse={noCoverage} />
+            {isExclusion ? (
+              <>
+                <StatusBadge label={exclusionKind} tone="neutral" />
+                {firmezaPending && <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" />}
+              </>
+            ) : (
+              <StatusBadge label={coverageLabel} tone={coverageTone} pulse={noCoverage} />
+            )}
             {obligation.source && <StatusBadge label={obligation.source} tone="info" />}
             {obligation.criticality && <StatusBadge label={obligation.criticality} tone={obligationCriticalityTone(obligation.criticality)} />}
           </>
@@ -126,14 +153,32 @@ export default function ObligacionDetalle() {
           variant="outline"
           size="sm"
           className="gap-1"
-          onClick={() => navigate(`/grc/m/dora/operate/incidents?obligation=${obligation.code}`)}
+          onClick={() =>
+            navigate(
+              doraEnabled
+                ? `/grc/m/dora/operate/incidents?obligation=${obligation.code}`
+                : `/grc/risk-360?obligation=${obligation.code}`,
+            )
+          }
         >
           <ShieldCheck className="h-4 w-4" />
           Gestionar en GRC
         </Button>
       </div>
 
-      {noCoverage && (
+      {isExclusion && (
+        <div className="mt-4 flex items-start gap-3 rounded-md border border-border border-l-4 border-l-muted-foreground bg-muted/40 p-4">
+          <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold">{exclusionKind} — no es una obligación cubierta</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              No sujeción o excepción legal: no cuenta como obligación pendiente de cobertura, aunque tenga un control asociado.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isExclusion && noCoverage && (
         <div className="mt-4 flex items-start gap-3 rounded-md border border-status-critical/30 border-l-4 border-l-status-critical bg-status-critical-bg p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
           <div className="flex-1 text-sm">
@@ -162,7 +207,7 @@ export default function ObligacionDetalle() {
         <TabsContent value="descripcion" className="mt-4">
           <Card className="p-6 space-y-5">
             <p className="text-sm leading-relaxed text-foreground">
-              {obligation.title}. Obligación derivada del marco regulatorio {obligation.source ?? "—"}
+              {displayTitle}. Obligación derivada del marco regulatorio {obligation.source ?? "—"}
               {obligation.policy_title ? `, vinculada a la política «${obligation.policy_title}» (${obligation.policy_code}).` : "."}
             </p>
 

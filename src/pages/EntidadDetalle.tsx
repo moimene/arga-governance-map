@@ -178,7 +178,7 @@ export default function EntidadDetalle() {
 
         <TabsContent value="normativa" className="mt-4">
           <Card>
-            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Políticas aplicables ({policies.length})</div>
+            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Políticas del grupo ({policies.length})</div>
             <Table>
               <TableHeader>
                 <TableRow>
