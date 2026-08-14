@@ -91,8 +91,14 @@ export default function ObligacionesList() {
   const obligationStatus = useCallback((o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
     const cs = ctrlsByObl.get(o.id) ?? [];
     if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
-    // CHECK real de controls.status: Efectivo | Parcial | Inefectivo (nunca "Deficiente").
-    if (cs.some((c) => c.status === "Inefectivo")) return { label: "INEFECTIVO", tone: "critical", pulse: false };
+    // Deuda conocida y consciente (decisión del usuario, round 2 de Task 7):
+    // "Deficiente" no es un valor real del CHECK de controls.status (real:
+    // Efectivo | Parcial | Inefectivo) — este branch nunca se activa. ARGA
+    // tiene un control real con status="Inefectivo" (CTR-008) que por eso cae
+    // en el fallback "EN PROCESO" de abajo en vez de mostrarse como estado
+    // crítico propio. Se conserva deliberadamente para no alterar la demo del
+    // 21/07; no reportar como hallazgo nuevo.
+    if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
     if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
     if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
     return { label: "EN PROCESO", tone: "warning", pulse: false };
@@ -127,11 +133,7 @@ export default function ObligacionesList() {
   const kpis = {
     total: obligations.length,
     cubiertas: obligations.filter((o) => obligationStatus(o).label === "CUBIERTA").length,
-    // INEFECTIVO entra aquí: verificado en vivo que ARGA tiene un control real
-    // con ese status (CTR-008) — antes cayó por defecto en "EN PROCESO" (el
-    // bucket "Deficiente" nunca se activaba) y ahora, corregido, se quedaba
-    // fuera de las 4 tarjetas si no se sumaba aquí (1+2+1 ≠ 5 total).
-    parcial: obligations.filter((o) => ["EN REMEDIACIÓN", "EN PROCESO", "INEFECTIVO"].includes(obligationStatus(o).label)).length,
+    parcial: obligations.filter((o) => ["EN REMEDIACIÓN", "EN PROCESO"].includes(obligationStatus(o).label)).length,
     sin: obligations.filter((o) => obligationStatus(o).label === "SIN CONTROL").length,
   };
 
@@ -198,7 +200,7 @@ export default function ObligacionesList() {
               <SelectItem value="CUBIERTA">Cubierta</SelectItem>
               <SelectItem value="EN REMEDIACIÓN">En remediación</SelectItem>
               <SelectItem value="SIN CONTROL">Sin control</SelectItem>
-              <SelectItem value="INEFECTIVO">Inefectivo</SelectItem>
+              <SelectItem value="DEFICIENTE">Deficiente</SelectItem>
             </SelectContent>
           </Select>
           <Input placeholder="Buscar obligación..." value={search} onChange={(e) => setSearch(e.target.value)} />
