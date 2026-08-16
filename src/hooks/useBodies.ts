@@ -86,8 +86,14 @@ export interface AgendaItemRow {
 }
 
 export function useBodiesList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["governing_bodies", "list"],
+    // El tenant va en la clave y `enabled` espera a que resuelva: sin ambas
+    // cosas, `OrganosList` de un tenant sirve desde caché los órganos del
+    // anterior tras un cambio de sesión dentro de la SPA (RLS protege la BD,
+    // no la caché de TanStack Query).
+    enabled: !!tenantId,
+    queryKey: ["governing_bodies", "list", tenantId],
     queryFn: async (): Promise<BodyListRow[]> => {
       // F6.1: miembros vienen de condiciones_persona (SSOT canónica),
       // no de mandates. Filtro por estado='VIGENTE' (equivalente al
@@ -97,6 +103,7 @@ export function useBodiesList() {
         .select(
           "*, entity:entity_id(common_name, slug), condiciones_persona(id, estado)"
         )
+        .eq("tenant_id", tenantId!)
         .order("name", { ascending: true });
       if (error) throw error;
       type BodyRaw = BodyListRow & {
@@ -118,13 +125,18 @@ export function useBodiesList() {
 }
 
 export function useBodyBySlug(slug: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!slug,
-    queryKey: ["governing_bodies", "bySlug", slug],
+    // `slug` es clave natural, no UUID: nada garantiza que no colisione entre
+    // tenants (hoy no colisiona, verificado en Cloud). Se scopea igual que
+    // `useEntityBySlug` para que la caché no pueda cruzar tenants.
+    enabled: !!slug && !!tenantId,
+    queryKey: ["governing_bodies", "bySlug", tenantId, slug],
     queryFn: async (): Promise<BodyRow | null> => {
       const { data, error } = await supabase
         .from("governing_bodies")
         .select("*, entity:entity_id(id, common_name, slug, legal_name)")
+        .eq("tenant_id", tenantId!)
         .eq("slug", slug!)
         .maybeSingle();
       if (error) throw error;
@@ -197,13 +209,16 @@ export function useBodyMeetings(bodyId: string | undefined) {
 }
 
 export function useMeetingBySlug(meetingSlug: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    enabled: !!meetingSlug,
-    queryKey: ["meetings", "bySlug", meetingSlug],
+    // Misma razón que `useBodyBySlug`: clave natural, no UUID.
+    enabled: !!meetingSlug && !!tenantId,
+    queryKey: ["meetings", "bySlug", tenantId, meetingSlug],
     queryFn: async (): Promise<MeetingRow | null> => {
       const { data, error } = await supabase
         .from("meetings")
         .select("*, president:president_id(full_name), secretary:secretary_id(full_name)")
+        .eq("tenant_id", tenantId!)
         .eq("slug", meetingSlug!)
         .maybeSingle();
       if (error) throw error;

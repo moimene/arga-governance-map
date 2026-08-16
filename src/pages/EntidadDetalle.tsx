@@ -11,13 +11,13 @@ import {
   useEntityChildren,
   useEntityParent,
   useEntityBodies,
-  useAllPolicies,
   useEntityDelegations,
   useEntityFindings,
   formatJurisdiction,
   formatMateriality,
   formatEntityStatus,
 } from "@/hooks/useEntities";
+import { usePoliciesList } from "@/hooks/usePoliciesObligations";
 import { Brain, ChevronRight, Download, Edit3, ExternalLink, Network } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 
@@ -32,7 +32,9 @@ export default function EntidadDetalle() {
   const { data: children = [] } = useEntityChildren(entity?.id);
   const { data: parent } = useEntityParent(entity?.parent_entity_id);
   const { data: bodies = [] } = useEntityBodies(entity?.id);
-  const { data: policies = [] } = useAllPolicies();
+  // usePoliciesList (no useAllPolicies) porque trae la FK owner_body_id
+  // resuelta: sin ella la columna "Owner" solo puede pintar texto libre.
+  const { data: policies = [] } = usePoliciesList();
   const { data: delegations = [] } = useEntityDelegations(entity?.id);
   const { data: entityFindings = [] } = useEntityFindings(entity?.id);
   const { data: allAiSystems = [] } = useAiSystemsList();
@@ -178,7 +180,7 @@ export default function EntidadDetalle() {
 
         <TabsContent value="normativa" className="mt-4">
           <Card>
-            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Políticas aplicables ({policies.length})</div>
+            <div className="border-b border-border px-5 py-3 text-sm font-semibold">Políticas del grupo ({policies.length})</div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -194,7 +196,11 @@ export default function EntidadDetalle() {
                   <TableRow key={p.id}>
                     <TableCell className="font-mono text-xs">{p.policy_code}</TableCell>
                     <TableCell>{p.title}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p.owner_function ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.owner_body_slug ? (
+                        <Link to={`/organos/${p.owner_body_slug}`} className="text-primary hover:underline">{p.owner_body_name}</Link>
+                      ) : (p.owner_function ?? "—")}
+                    </TableCell>
                     <TableCell><StatusBadge label={p.status} /></TableCell>
                     <TableCell className="font-mono text-xs">{p.next_review_date ?? "—"}</TableCell>
                   </TableRow>

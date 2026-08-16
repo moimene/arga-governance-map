@@ -3,12 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ObjectHeader } from "@/components/ObjectHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WorkflowStepper } from "@/components/WorkflowStepper";
-import { entities } from "@/data/entities";
+import { useEntitiesList, formatJurisdiction } from "@/hooks/useEntities";
 import {
   usePolicyByCode,
   usePolicyObligations,
@@ -17,8 +16,11 @@ import {
   policyStatusToStep,
   controlStatusLabel,
   controlStatusTone,
+  isExclusionTitle,
+  exclusionKind,
+  splitFirmeza,
 } from "@/hooks/usePoliciesObligations";
-import { Brain, Check, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
+import { Brain, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,16 +29,25 @@ import { useTenantContext } from "@/context/TenantContext";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { Link as RouterLink } from "react-router-dom";
 
-const PR008_SECTIONS = [
-  { title: "Objeto y ámbito de aplicación", body: "La presente Política establece el marco de gestión de la resiliencia operativa digital del Grupo ARGA Seguros, en cumplimiento del Reglamento (UE) 2022/2554 (DORA). Es de aplicación a todas las entidades del Grupo y a sus proveedores TIC críticos." },
-  { title: "Marco regulatorio de referencia", body: "DORA · Reglamento (UE) 2022/2554 · Directrices EIOPA sobre Sistema de Gobernanza · ISO 22301 — Continuidad de Negocio · Solvencia II Art. 41 (Sistema de Gobernanza)." },
-  { title: "Principios de resiliencia digital", body: "1) Identificación continua de riesgos TIC. 2) Protección proporcional al riesgo. 3) Detección temprana de incidentes. 4) Respuesta y recuperación documentadas. 5) Aprendizaje y mejora continua." },
-  { title: "Gestión del riesgo TIC", body: "El CIO mantiene un registro actualizado de activos TIC clasificados por criticidad. Se realizan análisis de riesgo trimestrales. Reporte semestral a la Comisión de Riesgos." },
-  { title: "Proveedores TIC críticos", body: "Clasificación inicial y revisión anual. Cláusulas contractuales DORA obligatorias. Registro centralizado en la Función de Cumplimiento. (OBL-DORA-001, OBL-DORA-002)" },
-  { title: "Pruebas de resiliencia", body: "Pruebas anuales de continuidad para sistemas críticos. Pruebas avanzadas (TLPT) cada tres años para entidades significativas. (OBL-DORA-003)" },
-  { title: "Notificación de incidentes", body: "Incidentes graves notificados al supervisor en un máximo de 4 horas tras clasificación. Procedimiento detallado en el anexo I." },
-  { title: "Revisión y actualización", body: "Revisión anual o ante cambios regulatorios significativos. Aprobación por el Consejo de Administración." },
-];
+// G4 Task 3: forma de policies.data_provenance, distinta de
+// entities.data_provenance (G1, src/lib/entity-provenance.ts) — por eso no
+// se reutiliza ese helper. NULL en ARGA = sin badge.
+interface PolicyProvenance {
+  origen?: "PDF_EXTRAIDO" | "CITADO_NO_INCORPORADO";
+  fuente?: string;
+}
+
+function policyProvenanceBadge(p: unknown): { label: string; title?: string } | null {
+  if (!p || typeof p !== "object" || Array.isArray(p)) return null;
+  const prov = p as PolicyProvenance;
+  if (prov.origen === "CITADO_NO_INCORPORADO") {
+    return { label: "Citado en el sistema normativo, no incorporado", title: prov.fuente };
+  }
+  if (prov.origen === "PDF_EXTRAIDO") {
+    return { label: "Extraído del documento fuente", title: prov.fuente };
+  }
+  return null;
+}
 
 const WORKFLOW_STEPS = [
   { label: "Borrador" },
@@ -124,6 +135,9 @@ export default function PoliticaDetalle() {
     },
   });
 
+  // G4 Task 7: entidades reales del tenant, no el array estático de ARGA.
+  const { data: applicableEntities = [] } = useEntitiesList();
+
   // AI systems related to this policy (match by use_case or policy title)
   const { data: allAiSystems = [] } = useAiSystemsList();
   const relatedAiSystems = useMemo(() => {
@@ -151,7 +165,6 @@ export default function PoliticaDetalle() {
     return <div className="p-10 text-center text-sm text-muted-foreground">Política no encontrada. <Link to="/politicas" className="text-primary underline">Volver</Link></div>;
   }
 
-  const isPR008 = policy.policy_code === "PR-008";
   const currentStep = policyStatusToStep(policy.status);
   const stepCaption =
     policy.status === "Approval Pending"
@@ -174,7 +187,22 @@ export default function PoliticaDetalle() {
             {policy.scope_level && <StatusBadge label={policy.scope_level} tone="info" />}
           </>
         }
-        metadata={<>Código: <span className="font-mono text-xs">{policy.policy_code}</span> · Propietario: {policy.owner_function ?? "—"}{policy.approval_body_name ? ` · Aprobación: ${policy.approval_body_name}` : ""}</>}
+        metadata={
+          <>
+            Código: <span className="font-mono text-xs">{policy.policy_code}</span> · Propietario:{" "}
+            {/* Con FK al comité, el propietario navega a su ficha (y de ahí a
+                sus miembros). Sin FK — las 25 políticas de ARGA — se sigue
+                pintando el texto libre `owner_function`, igual que antes. */}
+            {policy.owner_body_slug ? (
+              <Link to={`/organos/${policy.owner_body_slug}`} className="text-primary hover:underline">
+                {policy.owner_body_name}
+              </Link>
+            ) : (
+              policy.owner_function ?? "—"
+            )}
+            {policy.approval_body_name ? ` · Aprobación: ${policy.approval_body_name}` : ""}
+          </>
+        }
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5"><History className="h-3.5 w-3.5" />Ver historial</Button>
@@ -195,7 +223,7 @@ export default function PoliticaDetalle() {
       <Tabs defaultValue="contenido" className="mt-6">
         <TabsList className="grid w-full max-w-3xl grid-cols-6">
           <TabsTrigger value="contenido">Contenido</TabsTrigger>
-          <TabsTrigger value="aplicabilidad">Aplicabilidad</TabsTrigger>
+          <TabsTrigger value="aplicabilidad">Entidades del grupo</TabsTrigger>
           <TabsTrigger value="obligaciones">Obligaciones</TabsTrigger>
           <TabsTrigger value="aprobaciones">Aprobaciones</TabsTrigger>
           <TabsTrigger value="versiones">Versiones</TabsTrigger>
@@ -210,16 +238,49 @@ export default function PoliticaDetalle() {
         </TabsList>
 
         <TabsContent value="contenido" className="mt-4">
-          <Card className="p-6">
-            <Accordion type="multiple" className="w-full" defaultValue={["s0"]}>
-              {(isPR008 ? PR008_SECTIONS : []).map((s, i) => (
-                <AccordionItem key={i} value={`s${i}`}>
-                  <AccordionTrigger className="text-sm font-semibold">{i + 1}. {s.title}</AccordionTrigger>
-                  <AccordionContent className="text-sm leading-relaxed text-muted-foreground">{s.body}</AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-            {!isPR008 && <p className="text-sm text-muted-foreground">El contenido íntegro de esta política está disponible para descarga.</p>}
+          <Card className="p-6 space-y-5">
+            {(() => {
+              const provenance = policyProvenanceBadge(policy.data_provenance);
+              return provenance ? (
+                <span
+                  title={provenance.title}
+                  className="inline-flex w-fit items-center rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  {provenance.label}
+                </span>
+              ) : null;
+            })()}
+
+            {policy.summary ? (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Objeto</div>
+                <p className="text-sm leading-relaxed text-muted-foreground">{policy.summary}</p>
+              </div>
+            ) : null}
+
+            {policy.content_outline && policy.content_outline.length > 0 ? (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Índice del documento</div>
+                <ol className="space-y-1 text-sm text-muted-foreground">
+                  {policy.content_outline.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+
+            {!policy.summary && (!policy.content_outline || policy.content_outline.length === 0) && (
+              <p className="text-sm text-muted-foreground">
+                {/* "Citado en el sistema normativo" es un hecho acreditado por
+                    data_provenance y un concepto del catálogo de Garrigues. En
+                    ARGA no hay procedencia (25/25 NULL) y esa afirmación sería
+                    falsa: solo consta que el texto no está cargado. Tampoco se
+                    ofrece descarga — el botón "Exportar" no descarga nada. */}
+                {policy.data_provenance
+                  ? "Documento citado en el sistema normativo; su texto no se ha incorporado a este entorno."
+                  : "El texto íntegro de esta política no está cargado en este entorno."}
+              </p>
+            )}
           </Card>
         </TabsContent>
 
@@ -230,30 +291,21 @@ export default function PoliticaDetalle() {
                 <TableRow>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Jurisdicción</TableHead>
-                  <TableHead className="w-20">Aplica</TableHead>
-                  <TableHead>Excepción</TableHead>
-                  <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entities.map((e) => {
-                  const isTurkey = e.id === "arga-turquia" && isPR008;
-                  return (
-                    <TableRow key={e.id} className={cn(isTurkey && "bg-status-warning-bg")}>
-                      <TableCell className="font-medium">{e.commonName}</TableCell>
-                      <TableCell className="text-sm">{e.jurisdiction}</TableCell>
-                      <TableCell><Check className="h-4 w-4 text-status-active" /></TableCell>
-                      <TableCell>
-                        {isTurkey && <StatusBadge label="EXCEPCIÓN REGULATORIA" tone="warning" />}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {isTurkey && (
-                          <>Marco local no compatible con artículo 12. Excepción aprobada — VENCIDA 22/04/2026. <Link to="/hallazgos/HALL-010" className="text-primary hover:underline">HALL-010</Link></>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {/* "Excepción" y "Notas" se retiran: no hay modelo de
+                    excepciones en BD y sus celdas se renderizaban siempre
+                    vacías para los dos tenants. */}
+                {applicableEntities.length === 0 && (
+                  <TableRow><TableCell colSpan={2} className="text-center text-sm text-muted-foreground py-8">Sin entidades registradas para este tenant.</TableCell></TableRow>
+                )}
+                {applicableEntities.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-medium">{e.common_name}</TableCell>
+                    <TableCell className="text-sm">{formatJurisdiction(e.jurisdiction)}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </Card>
@@ -277,16 +329,29 @@ export default function PoliticaDetalle() {
                 {obligations.map((o) => {
                   const obCtrls = controls.filter((c) => c.obligation_id === o.id);
                   const noCoverage = obCtrls.length === 0;
+                  // Mismo criterio que la lista y la ficha de obligación: una
+                  // exclusión (no sujeción / excepción legal) no es una
+                  // obligación cubierta aunque tenga control asociado, y el
+                  // token interno DEMO_PILOTO del título no va a pantalla.
+                  const excl = isExclusionTitle(o.title);
+                  const { title: cleanTitle, pending } = splitFirmeza(o.title);
                   return (
-                    <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg")}>
+                    <TableRow key={o.id} className={cn(noCoverage && !excl && "bg-status-critical-bg")}>
                       <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
-                      <TableCell className="text-sm">{o.title}</TableCell>
+                      <TableCell className="text-sm">
+                        {cleanTitle}
+                        {pending && (
+                          <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" className="mt-1" />
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">
                         {obCtrls.length === 0 ? <span className="text-muted-foreground">(ninguno)</span> :
                           obCtrls.map((c) => c.code).join(", ")}
                       </TableCell>
                       <TableCell>
-                        {noCoverage
+                        {excl
+                          ? <StatusBadge label={`${exclusionKind(o.title)} — no cubierta`} tone="neutral" />
+                          : noCoverage
                           ? <StatusBadge label="SIN COBERTURA" tone="critical" />
                           : <StatusBadge label={controlStatusLabel(obCtrls[0].status)} tone={controlStatusTone(obCtrls[0].status)} />}
                       </TableCell>

@@ -61,3 +61,10 @@ test-results/
 
 # External skill/MCP material (EAD Trust, etc.)
 skill y MCP EAD TRUST/
+
+# G4 sistema normativo Garrigues — los documentos normativos REALES del despacho
+# (32 políticas internas, Código Ético, PPD y Manual PBC/FT entre otros),
+# material fuente no versionado (docs/superpowers G4 Task 2). Nunca se han
+# commiteado; esto cierra la ventana para que un `git add` general no las
+# cuele por accidente.
+version garrigues/

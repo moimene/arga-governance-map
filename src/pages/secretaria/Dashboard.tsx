@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { groupPortfolioLabel, scopeLabel } from "@/lib/tenant-brand-labels";
 import { useAutoScanVacanciasPresidencia } from "@/hooks/useNotifications";
 import { useSecretariaScope } from "@/components/secretaria/shell";
@@ -729,6 +730,12 @@ export default function SecretariaDashboard() {
   const pendingDocs = (docArtifacts ?? []).filter((doc) => REVIEWABLE_STATUSES.has(doc.status));
   const navigateSecretaria = (to: string) => navigate(scope.createScopedTo(to));
   const flowSummary = summarizeSecretariaSanitizedFlows();
+  // D-5 — Board Pack es el único flujo de este panel gateado por módulo;
+  // filtra en el consumidor, el registro (sanitized-flow-contracts.ts) queda
+  // intacto para no romper su test.
+  const visibleFlowContracts = SECRETARIA_SANITIZED_FLOW_CONTRACTS.filter(
+    (flow) => flow.id !== "board-pack" || isModuleEnabled(branding, "board-pack")
+  );
 
   const nextAgenda = agenda?.[0];
   const openAttention = attentionCount(kpis);
@@ -1087,7 +1094,7 @@ export default function SecretariaDashboard() {
           </div>
         </div>
         <div className="grid divide-y divide-[var(--g-border-subtle)] md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
-          {SECRETARIA_SANITIZED_FLOW_CONTRACTS.map((flow) => (
+          {visibleFlowContracts.map((flow) => (
             <button
               key={flow.id}
               type="button"

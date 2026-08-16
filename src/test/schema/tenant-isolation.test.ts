@@ -21,8 +21,14 @@ const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 
 // Tablas de dominio representativas de cada superficie (Secretaría, motor,
-// plantillas, expedientes). Todas tienen tenant_id NOT NULL.
-const DOMAIN_TABLES = ["entities", "document_templates", "rule_packs", "agreements"];
+// plantillas, expedientes, sistema normativo GRC). Todas tienen tenant_id
+// NOT NULL. G4 Task 8: añadidas policies/obligations/controls — las tres
+// tablas que la fase G4 ha poblado con dato real de Garrigues (38/21/23
+// filas) y que antes no cubría este gate.
+const DOMAIN_TABLES = [
+  "entities", "document_templates", "rule_packs", "agreements",
+  "policies", "obligations", "controls",
+];
 
 function anonClient(): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -65,13 +71,20 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     expect(data?.role_code).toBe("SECRETARIO");
   });
 
-  // GATE PARCIAL POR SECUENCIACIÓN (G0): el tenant Garrigues aún no tiene filas
-  // de dominio (las siembra G1). Por eso los `it("ARGA no ve filas Garrigues…")`
-  // son de momento vacuamente verdaderos (vacío-contra-vacío) y NO prueban aún
-  // esa dirección del aislamiento. La dirección de riesgo real —Garrigues NO ve
-  // el dato de ARGA— SÍ queda probada aquí porque ARGA tiene datos. Estos 4
-  // tests pasan a ser aserciones reales, sin tocar este código, en cuanto G1
-  // siembre dato de dominio para GARRIGUES_TENANT.
+  // Las dos direcciones NO tienen la misma fuerza, y el gate no finge que sí:
+  //  - "Garrigues no ve filas ARGA": aserción real en las 7 tablas, porque
+  //    ARGA tiene filas en todas. Es además la dirección de riesgo real (el
+  //    dato histórico y sensible es el de ARGA).
+  //  - "ARGA no ve filas Garrigues": vacua en las tablas donde Garrigues aún
+  //    no tiene dato propio — al 2026-08-16, `document_templates` (0 filas) y
+  //    `agreements` (0 filas). Ahí se comprueba que ARGA no ve algo que no
+  //    existe.
+  // NO se siembran filas falsas para cerrar ese hueco: un gate honesto y más
+  // débil vale más que uno fuerte de mentira. En vez de eso, cada iteración
+  // pregunta a Garrigues si tiene dato propio y DECLARA la vacuidad en la
+  // salida del runner, de modo que el aviso desaparece solo el día que la
+  // tabla se siembre (el comentario no se queda desfasado).
+  // El bucle genera 14 tests (7 tablas × 2 direcciones), más los 5 fijos = 19.
   for (const table of DOMAIN_TABLES) {
     it(`Garrigues no ve filas ARGA en ${table}`, async () => {
       if (!authed || !garr) { expect(true).toBe(true); return; }
@@ -82,11 +95,19 @@ describe("G0 — aislamiento RLS bidireccional ARGA ⇄ Garrigues", () => {
     });
 
     it(`ARGA no ve filas Garrigues en ${table}`, async () => {
-      if (!authed || !arga) { expect(true).toBe(true); return; }
+      if (!authed || !arga || !garr) { expect(true).toBe(true); return; }
       const { data, error } = await arga.from(table).select("tenant_id").limit(500);
       expect(error).toBeNull();
       const foreign = (data ?? []).filter((r) => r.tenant_id === GARRIGUES_TENANT);
       expect(foreign).toEqual([]);
+
+      const own = await garr.from(table).select("tenant_id").limit(1);
+      if (!own.error && (own.data ?? []).length === 0) {
+        console.warn(
+          `[tenant-isolation] dirección VACUA: Garrigues no tiene filas en ${table}, ` +
+            "así que esta aserción no prueba aislamiento (la inversa sí).",
+        );
+      }
     });
   }
 

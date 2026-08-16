@@ -40,7 +40,7 @@ interface SecretariaSidebarContentProps {
  * Esto produce un skeleton menor o igual que el render final, sin saltos
  * estructurales hacia arriba al hidratar.
  */
-function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?: boolean; requiresUnipersonalAdmin?: boolean; requiresCotizada?: boolean; excludesIfCotizada?: boolean; requiresBodyType?: string[]; requiresAdoptionMode?: string[]; requiresCapability?: string; excludesIfReferenceOnly?: boolean } }): boolean {
+function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?: boolean; requiresUnipersonalAdmin?: boolean; requiresCotizada?: boolean; excludesIfCotizada?: boolean; requiresBodyType?: string[]; requiresAdoptionMode?: string[]; requiresCapability?: string; excludesIfReferenceOnly?: boolean; requiresFeatureFlag?: string } }): boolean {
   const v = item.visibility;
   if (!v) return true;
   if (v.requiresCollegiateBody) return false;
@@ -51,6 +51,7 @@ function isEntityIndependentItem(item: { visibility?: { requiresCollegiateBody?:
   if (v.requiresAdoptionMode && v.requiresAdoptionMode.length > 0) return false;
   if (v.requiresCapability) return false;
   if (v.excludesIfReferenceOnly) return false;
+  if (v.requiresFeatureFlag) return false;
   return true;
 }
 

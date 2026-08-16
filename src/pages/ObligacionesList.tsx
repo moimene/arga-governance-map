@@ -13,11 +13,20 @@ import {
   controlStatusLabel,
   controlStatusTone,
   obligationCriticalityTone,
+  isExclusionTitle,
+  exclusionKind,
+  splitFirmeza,
   type ObligationWithPolicy,
   type ControlWithOwner,
 } from "@/hooks/usePoliciesObligations";
-import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck } from "lucide-react";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// El criterio de exclusión y la extracción de la cautela de firmeza viven en
+// el hook (usePoliciesObligations), compartidos con la ficha de obligación y
+// con la pestaña "Obligaciones" de la ficha de política.
+const isExclusion = (o: ObligationWithPolicy) => isExclusionTitle(o.title);
 
 interface KpiProps { label: string; value: number; icon: typeof ClipboardList; tone: "primary" | "success" | "warning" | "critical"; }
 const toneMap = {
@@ -44,9 +53,18 @@ export default function ObligacionesList() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
 
-  const { data: obligations = [], isLoading } = useObligationsList();
-  const obligationIds = useMemo(() => obligations.map((o) => o.id), [obligations]);
+  const { data: allObligations = [], isLoading } = useObligationsList();
+  const obligationIds = useMemo(() => allObligations.map((o) => o.id), [allObligations]);
   const { data: controls = [] } = useAllControlsByObligationIds(obligationIds);
+  // G4 Task 7: aviso de postura demo sobre los estados de control, gateado
+  // por tenant (branding NULL = ARGA = sin aviso nuevo). No hay columna que
+  // distinga postura demo de real, así que el gate es el tenant.
+  const branding = useTenantBranding();
+
+  // Las exclusiones (no sujeción / excepción legal) no son obligaciones
+  // cubiertas: fuera del recuento y de la tabla principal, tratamiento propio.
+  const obligations = useMemo(() => allObligations.filter((o) => !isExclusion(o)), [allObligations]);
+  const exclusions = useMemo(() => allObligations.filter(isExclusion), [allObligations]);
 
   const ctrlsByObl = useMemo(() => {
     const m = new Map<string, typeof controls>();
@@ -62,22 +80,44 @@ export default function ObligacionesList() {
   const obligationStatus = useCallback((o: ObligationWithPolicy): { label: string; tone: "active" | "warning" | "critical"; pulse: boolean } => {
     const cs = ctrlsByObl.get(o.id) ?? [];
     if (cs.length === 0) return { label: "SIN CONTROL", tone: "critical", pulse: true };
+    // Deuda conocida y consciente (decisión del usuario, round 2 de Task 7):
+    // "Deficiente" no es un valor real del CHECK de controls.status (real:
+    // Efectivo | Parcial | Inefectivo) — este branch nunca se activa. ARGA
+    // tiene un control real con status="Inefectivo" (CTR-008) que por eso cae
+    // en el fallback "EN PROCESO" de abajo en vez de mostrarse como estado
+    // crítico propio. Se conserva deliberadamente para no alterar la demo del
+    // 21/07; no reportar como hallazgo nuevo.
     if (cs.some((c) => c.status === "Deficiente")) return { label: "DEFICIENTE", tone: "critical", pulse: false };
     if (cs.some((c) => c.status === "Parcial")) return { label: "EN REMEDIACIÓN", tone: "warning", pulse: false };
     if (cs.every((c) => c.status === "Efectivo")) return { label: "CUBIERTA", tone: "active", pulse: false };
     return { label: "EN PROCESO", tone: "warning", pulse: false };
   }, [ctrlsByObl]);
 
+  // Marcos derivados del dato: reemplaza los 3 grupos cableados (dora/sol/others)
+  // y el <Select> DORA/Solv/GDPR/LGPD fijo. Para Garrigues da 1 marco real
+  // (PBC/FT — Ley 10/2010); para ARGA da sus 5 `source` reales tal cual están.
+  const frameworks = useMemo(() => {
+    const set = new Set(obligations.map((o) => o.source).filter((s): s is string => !!s));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [obligations]);
+
   const filtered = useMemo(() => obligations.filter((o) => {
     const st = obligationStatus(o);
-    return (framework === "all" || (o.source ?? "").toLowerCase().startsWith(framework.toLowerCase())) &&
+    return (framework === "all" || o.source === framework) &&
       (status === "all" || st.label === status) &&
       (search === "" || o.title.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase()));
   }), [obligations, framework, obligationStatus, status, search]);
 
-  const dora = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("dora"));
-  const sol = filtered.filter((o) => (o.source ?? "").toLowerCase().startsWith("solv"));
-  const others = filtered.filter((o) => !dora.includes(o) && !sol.includes(o));
+  const groupedBySource = useMemo(() => {
+    const order: string[] = [];
+    const map = new Map<string, ObligationWithPolicy[]>();
+    for (const o of filtered) {
+      const key = o.source ?? "Sin marco";
+      if (!map.has(key)) { map.set(key, []); order.push(key); }
+      map.get(key)!.push(o);
+    }
+    return order.map((source) => ({ source, rows: map.get(source)! }));
+  }, [filtered]);
 
   const kpis = {
     total: obligations.length,
@@ -119,16 +159,27 @@ export default function ObligacionesList() {
         </div>
       )}
 
+      {branding && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-status-warning/30 border-l-4 border-l-status-warning bg-status-warning-bg p-4">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+          <div className="flex-1 text-sm">
+            <div className="font-semibold text-status-warning">Postura de demostración</div>
+            <div className="mt-1 text-xs text-status-warning/90">
+              Los estados de control ("Efectivo" / "En remediación") y la criticidad asignada a cada obligación ("Crítico" / "Alto" / "Medio") son una postura de demostración sobre obligaciones y controles reales de la firma, no el resultado de una auditoría verificada ni un juicio de riesgo.
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card className="mb-5 p-4">
         <div className="grid grid-cols-3 gap-3">
           <Select value={framework} onValueChange={setFramework}>
             <SelectTrigger><SelectValue placeholder="Marco" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los marcos</SelectItem>
-              <SelectItem value="DORA">DORA</SelectItem>
-              <SelectItem value="Solv">Solvencia II</SelectItem>
-              <SelectItem value="GDPR">GDPR</SelectItem>
-              <SelectItem value="LGPD">LGPD</SelectItem>
+              {frameworks.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={setStatus}>
@@ -147,34 +198,70 @@ export default function ObligacionesList() {
 
       <Card className="overflow-hidden">
         {isLoading && <div className="p-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>}
-        {!isLoading && dora.length > 0 && (
-          <>
-            <div className="border-b bg-accent/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-              DORA — Resiliencia Operativa Digital
+        {!isLoading && groupedBySource.map((g) => (
+          <div key={g.source}>
+            <div className="border-b bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {g.source}
             </div>
-            <ObligationTable rows={dora} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
-        {!isLoading && sol.length > 0 && (
-          <>
-            <div className="border-y bg-status-warning-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-status-warning">
-              Solvencia II
-            </div>
-            <ObligationTable rows={sol} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
-        {!isLoading && others.length > 0 && (
-          <>
-            <div className="border-y bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Otros marcos
-            </div>
-            <ObligationTable rows={others} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
-          </>
-        )}
+            <ObligationTable rows={g.rows} ctrlsByObl={ctrlsByObl} obligationStatus={obligationStatus} />
+          </div>
+        ))}
         {!isLoading && filtered.length === 0 && (
           <div className="p-8 text-center text-sm text-muted-foreground">No hay obligaciones que coincidan con los filtros.</div>
         )}
       </Card>
+
+      {exclusions.length > 0 && (
+        <Card className="mt-5 overflow-hidden">
+          <div className="border-b bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Exenciones y excepciones — no son obligaciones cubiertas
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-32">Código</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="w-32">Marco</TableHead>
+                <TableHead className="w-28">Tipo</TableHead>
+                <TableHead className="w-40">Control asociado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {exclusions.map((o) => {
+                const kind = exclusionKind(o.title);
+                const { title: cleanTitle, pending } = splitFirmeza(o.title);
+                const cs = ctrlsByObl.get(o.id) ?? [];
+                return (
+                  <TableRow key={o.id}>
+                    <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
+                    <TableCell>
+                      <Link to={`/obligaciones/${o.code}`} title={cleanTitle} className="block max-w-md truncate text-sm font-medium hover:text-primary">
+                        {cleanTitle}
+                      </Link>
+                      {pending && (
+                        <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" className="mt-1" />
+                      )}
+                      {o.owner_body_slug && (
+                        <Link to={`/organos/${o.owner_body_slug}`} className="mt-0.5 block text-[11px] text-muted-foreground hover:text-primary hover:underline">
+                          Comité responsable: {o.owner_body_name}
+                        </Link>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {o.source ?? "—"}
+                      {o.legal_reference && <div className="mt-0.5 text-[10px] text-muted-foreground/80">{o.legal_reference}</div>}
+                    </TableCell>
+                    <TableCell><StatusBadge label={kind} tone="neutral" /></TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {cs.length === 0 ? <span className="text-muted-foreground">(ninguno)</span> : cs.map((c) => c.code).join(", ")}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }
@@ -208,8 +295,23 @@ function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTable
           return (
             <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg hover:bg-status-critical-bg", warn && "bg-status-warning-bg/60 hover:bg-status-warning-bg")}>
               <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
-              <TableCell><Link to={`/obligaciones/${o.code}`} className="text-sm font-medium hover:text-primary">{o.title}</Link></TableCell>
-              <TableCell className="text-xs text-muted-foreground">{o.source ?? "—"}</TableCell>
+              <TableCell>
+                <Link to={`/obligaciones/${o.code}`} title={o.title} className="block line-clamp-2 text-sm font-medium hover:text-primary">
+                  {o.title}
+                </Link>
+                {/* Ownership navegable por FK, en sublínea (mismo patrón que
+                    legal_reference bajo Marco): como columna propia estrujaba
+                    el título de la obligación. Sin FK — ARGA — no se pinta. */}
+                {o.owner_body_slug && (
+                  <Link to={`/organos/${o.owner_body_slug}`} className="mt-0.5 block text-[11px] text-muted-foreground hover:text-primary hover:underline">
+                    Comité responsable: {o.owner_body_name}
+                  </Link>
+                )}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {o.source ?? "—"}
+                {o.legal_reference && <div className="mt-0.5 text-[10px] text-muted-foreground/80">{o.legal_reference}</div>}
+              </TableCell>
               <TableCell>{o.criticality && <StatusBadge label={o.criticality} tone={obligationCriticalityTone(o.criticality)} />}</TableCell>
               <TableCell>
                 {o.policy_code ? (

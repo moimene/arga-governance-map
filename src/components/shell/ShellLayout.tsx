@@ -24,6 +24,7 @@ import { TourPanel } from "@/components/tour/TourPanel";
 import { NotificationsBell } from "@/components/shell/NotificationsBell";
 import { useTour } from "@/context/TourContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { brandName, scopeLabel, shellLabel } from "@/lib/tenant-brand-labels";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
@@ -32,27 +33,28 @@ interface NavItem {
   to: string;
   icon: LucideIcon;
   module?: boolean;
+  moduleKey?: string;
 }
 
 const govItems: NavItem[] = [
   { label: "Dashboard", to: "/", icon: LayoutDashboard },
-  { label: "Governance Map", to: "/governance-map", icon: Network },
-  { label: "Entidades", to: "/entidades", icon: Building2 },
-  { label: "Órganos", to: "/organos", icon: Users2 },
-  { label: "Políticas", to: "/politicas", icon: FileText },
-  { label: "Obligaciones", to: "/obligaciones", icon: Scale },
-  { label: "Delegaciones", to: "/delegaciones", icon: GitBranch },
-  { label: "Hallazgos", to: "/hallazgos", icon: AlertTriangle },
-  { label: "Conflictos", to: "/conflictos", icon: AlertOctagon },
+  { label: "Governance Map", to: "/governance-map", icon: Network, moduleKey: "governance-map" },
+  { label: "Entidades", to: "/entidades", icon: Building2, moduleKey: "entidades" },
+  { label: "Órganos", to: "/organos", icon: Users2, moduleKey: "organos" },
+  { label: "Políticas", to: "/politicas", icon: FileText, moduleKey: "politicas" },
+  { label: "Obligaciones", to: "/obligaciones", icon: Scale, moduleKey: "obligaciones" },
+  { label: "Delegaciones", to: "/delegaciones", icon: GitBranch, moduleKey: "delegaciones" },
+  { label: "Hallazgos", to: "/hallazgos", icon: AlertTriangle, moduleKey: "hallazgos" },
+  { label: "Conflictos", to: "/conflictos", icon: AlertOctagon, moduleKey: "conflictos" },
 ];
 
 const moduleItems: NavItem[] = [
-  { label: "GRC Compass", to: "/grc", icon: Compass, module: true },
-  { label: "Secretaría", to: "/secretaria", icon: ClipboardList, module: true },
-  { label: "AI Governance", to: "/ai-governance", icon: Brain, module: true },
+  { label: "GRC Compass", to: "/grc", icon: Compass, module: true, moduleKey: "grc" },
+  { label: "Secretaría", to: "/secretaria", icon: ClipboardList, module: true, moduleKey: "secretaria" },
+  { label: "AI Governance", to: "/ai-governance", icon: Brain, module: true, moduleKey: "ai-governance" },
 ];
 
-const siiItem: NavItem = { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon };
+const siiItem: NavItem = { label: "SII — Canal Interno", to: "/sii", icon: AlertOctagon, moduleKey: "sii" };
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -168,19 +170,25 @@ function ShellSidebarContent({
       {/* Gobernanza */}
       <SectionLabel>Gobernanza</SectionLabel>
       <nav className="space-y-[1px] mb-3">
-        {govItems.map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
+        {govItems
+          .filter((it) => !it.moduleKey || isModuleEnabled(branding, it.moduleKey))
+          .map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
       </nav>
 
       {/* Módulos */}
       <SectionLabel>Módulos</SectionLabel>
       <nav className="space-y-[1px] mb-3">
-        {moduleItems.map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
+        {moduleItems
+          .filter((it) => !it.moduleKey || isModuleEnabled(branding, it.moduleKey))
+          .map((it) => <NavRow key={it.to} item={it} onNavigate={onNavigate} />)}
       </nav>
 
       {/* SII — zona segregada */}
       <SectionLabel>Canal interno</SectionLabel>
       <nav className="space-y-[1px]">
-        <NavRow item={siiItem} onNavigate={onNavigate} />
+        {(!siiItem.moduleKey || isModuleEnabled(branding, siiItem.moduleKey)) && (
+          <NavRow item={siiItem} onNavigate={onNavigate} />
+        )}
       </nav>
 
       {/* Spacer empuja la sección de ayuda al final */}

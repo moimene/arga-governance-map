@@ -19,6 +19,7 @@ import { ScopeSwitcher } from "@/components/secretaria/shell/ScopeSwitcher";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
 
 interface NavItem {
@@ -47,6 +48,7 @@ function GrcSidebarContent({
   onNavigate?: () => void;
 }) {
   const navigate = useNavigate();
+  const branding = useTenantBranding();
 
   return (
     <>
@@ -67,7 +69,9 @@ function GrcSidebarContent({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navegación de GRC Compass">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => item.to !== "/grc/packs" || isModuleEnabled(branding, "country-packs"))
+          .map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

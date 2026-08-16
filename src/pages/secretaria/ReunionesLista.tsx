@@ -4,6 +4,8 @@ import { Users, Plus, FileText, FolderOpen, Loader2 } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
 import { statusLabel } from "@/lib/secretaria/status-labels";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 
 const MEETING_TYPE_LABEL: Record<string, string> = {
   ORDINARIA:     "Ordinaria",
@@ -26,6 +28,8 @@ const SELECT_CLASS =
 export default function ReunionesLista() {
   const navigate = useNavigate();
   const scope = useSecretariaScope();
+  const branding = useTenantBranding();
+  const boardPackEnabled = isModuleEnabled(branding, "board-pack");
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const { data, isLoading } = useReunionesList(scopedEntityId);
 
@@ -206,7 +210,7 @@ export default function ReunionesLista() {
                     </span>
                   </td>
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    {(m.status === "CONVOCADA" || m.status === "CELEBRADA" || m.status === "EN_CURSO") && (
+                    {boardPackEnabled && (m.status === "CONVOCADA" || m.status === "CELEBRADA" || m.status === "EN_CURSO") && (
                       <Link
                         to={scope.createScopedTo(`/secretaria/reuniones/${m.id}/board-pack`)}
                         className="inline-flex items-center gap-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"

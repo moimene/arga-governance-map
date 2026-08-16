@@ -50,15 +50,6 @@ export interface GoverningBodyRow {
   config?: Record<string, unknown> | null;
 }
 
-export interface PolicyRow {
-  id: string;
-  policy_code: string;
-  title: string;
-  owner_function: string | null;
-  status: string;
-  next_review_date: string | null;
-}
-
 export interface DelegationRow {
   id: string;
   code: string;
@@ -214,19 +205,8 @@ export function useEntityBodies(entityId: string | undefined) {
   });
 }
 
-export function useAllPolicies() {
-  return useQuery({
-    queryKey: ["policies", "all"],
-    queryFn: async (): Promise<PolicyRow[]> => {
-      const { data, error } = await supabase
-        .from("policies")
-        .select("id, policy_code, title, owner_function, status, next_review_date")
-        .order("policy_code", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as PolicyRow[];
-    },
-  });
-}
+// useAllPolicies eliminado: su único consumidor (EntidadDetalle) pasó a usePoliciesList,
+// que resuelve la FK owner_body_id y permite enlazar el comité responsable.
 
 export function useEntityDelegations(entityId: string | undefined) {
   return useQuery({

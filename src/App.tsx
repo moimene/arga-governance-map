@@ -9,7 +9,8 @@ import { TourProvider } from "@/context/TourContext";
 import { ScopeProvider } from "@/context/ScopeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
-import { TenantBrandProvider } from "@/context/TenantBrandContext";
+import { TenantBrandProvider, useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { ProtectedShell, RequireAuth } from "@/components/RequireAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
@@ -157,6 +158,28 @@ function ReglasToCatalogoMateriasRedirect() {
   return <Navigate to={`/secretaria/catalogo-materias${query ? `?${query}` : ""}`} replace />;
 }
 
+// D-5 — guard de ruta por módulo. Espera a que el branding cargue antes de
+// decidir: useTenantBranding() devuelve null tanto para ARGA como durante la
+// carga, y redirigir con esa ambigüedad produce parpadeo/falso negativo.
+function RequireModule({ moduleKey, children }: { moduleKey: string; children: React.ReactNode }) {
+  const branding = useTenantBranding();
+  const loading = useTenantBrandingLoading();
+  if (loading) return <ModuleFallback />;
+  if (!isModuleEnabled(branding, moduleKey)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+// Guard explícito y hardcodeado para el módulo DORA dentro de la ruta dinámica
+// /grc/m/:moduleId. NO se generaliza a `moduleKey={moduleId}`: eso evaluaría
+// la lista blanca de Garrigues contra cualquier moduleId (gdpr, cyber, audit,
+// ...) y los ocultaría todos — fuera del alcance de esta tarea (D-5 solo
+// decide dora/country-packs/board-pack).
+function RequireDoraModule({ children }: { children: React.ReactNode }) {
+  const { moduleId } = useParams();
+  if (moduleId !== "dora") return <>{children}</>;
+  return <RequireModule moduleKey="dora">{children}</RequireModule>;
+}
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -253,9 +276,9 @@ const App = () => (
                   <Route path="/secretaria/certificaciones" element={<Suspense fallback={<ModuleFallback />}><CertificacionesAutonomas /></Suspense>} />
                   <Route path="/secretaria/certificaciones/nueva" element={<Suspense fallback={<ModuleFallback />}><CertificacionesAutonomas /></Suspense>} />
                   <Route path="/secretaria/certificaciones/:id" element={<Suspense fallback={<ModuleFallback />}><CertificacionesAutonomas /></Suspense>} />
-                  <Route path="/secretaria/reuniones/:id/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense>} />
-                  <Route path="/secretaria/board-pack" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
-                  <Route path="/secretaria/board-pack/:id" element={<Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense>} />
+                  <Route path="/secretaria/reuniones/:id/board-pack" element={<RequireModule moduleKey="board-pack"><Suspense fallback={<ModuleFallback />}><BoardPackPreview /></Suspense></RequireModule>} />
+                  <Route path="/secretaria/board-pack" element={<RequireModule moduleKey="board-pack"><Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense></RequireModule>} />
+                  <Route path="/secretaria/board-pack/:id" element={<RequireModule moduleKey="board-pack"><Suspense fallback={<ModuleFallback />}><BoardPack /></Suspense></RequireModule>} />
                   <Route path="/secretaria/multi-jurisdiccion" element={<Suspense fallback={<ModuleFallback />}><MatrizJurisdiccional /></Suspense>} />
                   <Route path="/secretaria/catalogo-materias" element={<Suspense fallback={<ModuleFallback />}><CatalogoMaterias /></Suspense>} />
                   <Route path="/secretaria/catalogo-organos" element={<Suspense fallback={<ModuleFallback />}><CatalogoOrganos /></Suspense>} />
@@ -294,8 +317,8 @@ const App = () => (
                   <Route path="/grc/risk-360/nuevo"       element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
                   <Route path="/grc/risk-360/:id/editar"  element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
                   <Route path="/grc/penal-anticorrupcion" element={<Suspense fallback={<ModuleFallback />}><PenalAnticorrupcion /></Suspense>} />
-                  <Route path="/grc/packs"                element={<Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense>} />
-                  <Route path="/grc/packs/:countryCode"   element={<Suspense fallback={<ModuleFallback />}><PackDetalle /></Suspense>} />
+                  <Route path="/grc/packs"                element={<RequireModule moduleKey="country-packs"><Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense></RequireModule>} />
+                  <Route path="/grc/packs/:countryCode"   element={<RequireModule moduleKey="country-packs"><Suspense fallback={<ModuleFallback />}><PackDetalle /></Suspense></RequireModule>} />
                   <Route path="/grc/incidentes"           element={<Suspense fallback={<ModuleFallback />}><IncidentesList /></Suspense>} />
                   <Route path="/grc/incidentes/nuevo"     element={<Suspense fallback={<ModuleFallback />}><IncidenteStepper /></Suspense>} />
                   <Route path="/grc/incidentes/:id"       element={<Suspense fallback={<ModuleFallback />}><IncidenteDetalle /></Suspense>} />
@@ -303,7 +326,7 @@ const App = () => (
                   <Route path="/grc/alertas"              element={<Suspense fallback={<ModuleFallback />}><Alertas /></Suspense>} />
                   <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
                   <Route path="/grc/tprm"                 element={<Suspense fallback={<ModuleFallback />}><TPRM /></Suspense>} />
-                  <Route path="/grc/m/:moduleId" element={<Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense>}>
+                  <Route path="/grc/m/:moduleId" element={<RequireDoraModule><Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense></RequireDoraModule>}>
                     <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path=":section/:viewKey" element={<Suspense fallback={<ModuleFallback />}><SectionRouter /></Suspense>} />

@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { useCommunicationsList, type CommunicationsFilters } from '@/hooks/useCommunicationsList';
 import { useCancelCommunication } from '@/hooks/useCommunicationActions';
+import { useTenantBranding } from '@/context/TenantBrandContext';
+import { isModuleEnabled } from '@/lib/tenant-modules';
 
 type EstadoFilter = 'all' | 'borrador' | 'programada' | 'enviando' | 'enviada' | 'errores';
 
@@ -49,6 +51,8 @@ const TIPO_LABELS: Record<string, string> = {
 };
 
 export default function Comunicaciones() {
+  const branding = useTenantBranding();
+  const boardPackEnabled = isModuleEnabled(branding, 'board-pack');
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as EstadoFilter | null) ?? 'all';
   const activeTab = ESTADO_TABS.find((t) => t.key === tab) ?? ESTADO_TABS[0];
@@ -144,14 +148,16 @@ export default function Comunicaciones() {
             distribuir un Board Pack o emitir una convocatoria. Desde aquí se consulta su
             estado de entrega y se gestionan reintentos.
           </p>
-          <Link
-            to="/secretaria/board-pack"
-            className="mt-4 inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
-            style={{ borderRadius: 'var(--g-radius-md)' }}
-          >
-            <Send className="h-4 w-4" />
-            Ir al Board Pack para distribuir
-          </Link>
+          {boardPackEnabled && (
+            <Link
+              to="/secretaria/board-pack"
+              className="mt-4 inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors"
+              style={{ borderRadius: 'var(--g-radius-md)' }}
+            >
+              <Send className="h-4 w-4" />
+              Ir al Board Pack para distribuir
+            </Link>
+          )}
         </div>
       ) : (
         <div

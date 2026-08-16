@@ -33,9 +33,9 @@ test.describe('TGMS Shell', () => {
 
   test('ruta /politicas muestra lista de políticas', async ({ page }) => {
     await page.goto('/politicas');
-    await expect(
-      page.getByText('Política').or(page.getByText('PR-')).first()
-    ).toBeVisible({ timeout: 10_000 });
+    // Selector agnóstico de tenant: ARGA usa códigos "PR-", Garrigues "PI-"/"PN-".
+    // "Política" está en el H1 ("Políticas y Normativa") en ambos tenants.
+    await expect(page.getByText('Política').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('ruta /obligaciones muestra lista de obligaciones', async ({ page }) => {
