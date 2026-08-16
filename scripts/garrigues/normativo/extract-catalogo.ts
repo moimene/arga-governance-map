@@ -44,10 +44,24 @@
  *   índice, cuyo "cuerpo" es ya la cabecera siguiente); se devuelve el
  *   primer cuerpo no vacío encontrado recorriendo el documento en orden.
  *
+ * No todas las fuentes son PDF. PPD-01 y el Catálogo ejemplificativo (PPD-CAT)
+ * están en la carpeta como `.md` (volcado de la página de SharePoint del
+ * Sistema Normativo Interno), no como PDF. Antes se cableaban con `file: null`
+ * y salían etiquetados "citado en fuente, no incorporado" TENIENDO su texto
+ * delante: eso es afirmar en pantalla algo que la fuente desmiente.
+ * `readSourceText` normaliza el markdown a la misma forma que `pdftotext -layout`
+ * (cabeceras sin `#`, sin énfasis, sin escapes de pandoc) para que los mismos
+ * parsers valgan para ambos formatos, sin una segunda ruta paralela.
+ *
+ * El valor de procedencia sigue llamándose `PDF_EXTRAIDO` por compatibilidad
+ * con el dato ya sembrado y con el badge de `PoliticaDetalle`, cuya etiqueta
+ * — "Extraído del documento fuente" — ya es agnóstica del formato. El fichero
+ * real viaja en `source_file` y se muestra en el tooltip.
+ *
  * Uso: bun run scripts/garrigues/normativo/extract-catalogo.ts [--write]
  * Sin --write imprime un resumen y no toca el JSON.
  */
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -82,6 +96,44 @@ function run(cmd: string[]): string {
  */
 function pdfHead(path: string): string {
   return run(["pdftotext", "-layout", "-f", "1", "-l", String(HEAD_PAGES), path, "-"]);
+}
+
+/**
+ * Markdown → la misma forma de texto plano que produce `pdftotext -layout`,
+ * para que `parseEdicion`/`parseOutline`/`parseObjeto` funcionen sin una
+ * segunda implementación. Quita cabeceras `#`, énfasis `**`/`*` y los escapes
+ * de pandoc (`1\.` → `1.`), que si no impiden que `matchArabicHeading`
+ * reconozca los apartados.
+ *
+ * Además retira dos cosas que NO son contenido del documento sino cromo de la
+ * impresión del navegador desde SharePoint, y que se cuelan en el resumen
+ * porque el volcado de PPD-CAT trae el documento entero en UNA sola línea:
+ * las URL y el bloque de cabecera de impresión completo
+ * ("2/8/26, 11:48 <título> https://… 1/11"), tratado como una unidad para no
+ * dejar el número de página suelto.
+ */
+function mdToText(raw: string): string {
+  const scrubbed = raw
+    .replace(/\r/g, "")
+    .replace(/\d{1,2}\/\d{1,2}\/\d{2},\s*\d{1,2}:\d{2}[\s\S]{0,400}?\d{1,3}\/\d{1,3}(?=\s)/g, " ")
+    .replace(/https?:\/\/\S+/g, " ");
+  return scrubbed
+    .split("\n")
+    .map((l) =>
+      l
+        .replace(/^\s{0,3}#{1,6}\s*/, "")
+        .replace(/\*\*|__|\*/g, "")
+        .replace(/\\([.\-*_[\]])/g, "$1")
+        .replace(/\t/g, "  ")
+        .trimEnd(),
+    )
+    .join("\n");
+}
+
+/** Texto de la fuente, sea PDF o volcado markdown. */
+function readSourceText(path: string): string {
+  if (/\.md$/i.test(path)) return mdToText(readFileSync(path, "utf8"));
+  return pdfHead(path);
 }
 
 /**
@@ -162,21 +214,54 @@ function stripTrailingPageNumber(l: string): string {
   return l.replace(/\s{2,}\d{1,4}\s*$/, "").trim();
 }
 
+/**
+ * Líneas que se repiten MUCHAS veces en todo el documento: son la cabecera o
+ * el pie que aparece en cada hoja (p.ej. "Sistema normativo interno-Código
+ * Ético"), nunca contenido. El umbral es 4, no 2: una cláusula legítima puede
+ * citarse literalmente dos veces en el mismo documento (comprobado en
+ * LGTBI-01) sin ser cabecera de página — un `>= 2` ingenuo la borraba y dejaba
+ * el resumen con un hueco a media frase.
+ */
+const RUNNING_HEADER_MIN_REPEATS = 4;
+
+function runningHeaders(lines: string[]): Set<string> {
+  const freq = new Map<string, number>();
+  for (const l of lines) {
+    if (l.length < 20) continue;
+    freq.set(l, (freq.get(l) ?? 0) + 1);
+  }
+  const out = new Set<string>();
+  for (const [l, n] of freq) if (n >= RUNNING_HEADER_MIN_REPEATS) out.add(l);
+  return out;
+}
+
 function parseOutline(text: string): string[] {
   // Sin \b: JS no considera "í" carácter de palabra, así que \bíndice\b
   // nunca casa (bug detectado en dry-run — los 38 documentos salían sin
   // índice pese a que el texto sí lo trae).
   const start = text.search(/índice/i);
   if (start < 0) return [];
-  const lines = text
-    .slice(start)
-    .split("\n")
-    .map((l) => stripTrailingPageNumber(l.trim()));
+  const normalize = (l: string) => stripTrailingPageNumber(l.trim());
+  const allLines = text.split("\n").map(normalize);
+  // Mismas cabeceras/pies repetidos en cada hoja que ya filtra
+  // `captureUntilHeading`. Aquí hacen falta porque un índice que salta de
+  // página trae la cabecera EN MEDIO de las entradas, y el bucle de
+  // continuación la fundía en el título anterior ("Artículo 28.- Redes
+  // sociales… Sistema normativo interno-Código Ético Edición 04, noviembre
+  // 2023" — visible en el catálogo generado antes de este arreglo).
+  const running = runningHeaders(allLines);
+  const lines = text.slice(start).split("\n").map(normalize);
 
   const entries: string[] = [];
   const seenNumbers = new Set<string>();
   let i = 1; // línea 0 es la propia palabra "Índice"
-  outer: while (i < lines.length && entries.length < 40) {
+  // Sin tope artificial de entradas: el índice termina donde lo dice el
+  // documento (prosa real, o un número de apartado que se repite porque ya
+  // empezó el cuerpo). Un tope de 40 truncaba en silencio los dos índices
+  // largos — PBC-FT-10 (62 entradas, se perdía todo el §8 de medidas de
+  // control interno) y el Código Ético (51, se perdía el capítulo VI del
+  // Canal Interno de Información) — y la pantalla los presentaba completos.
+  outer: while (i < lines.length) {
     const line = lines[i];
     if (!line) {
       i++;
@@ -201,6 +286,10 @@ function parseOutline(text: string): string[] {
       // (aquí, el de la propia página 1, justo antes de que empiece el
       // cuerpo) — no es continuación del título, se ignora sin fundirlo.
       if (/^\d{1,4}$/.test(next)) {
+        i++;
+        continue;
+      }
+      if (running.has(next)) {
         i++;
         continue;
       }
@@ -256,22 +345,14 @@ function truncateAtSentence(text: string, maxChars: number): string {
  * cada `transform` a medida (root cause, no parche por caso):
  * - Un número suelto sin punto ni título ("2", "18") es casi siempre un
  *   número de página de pdftotext, nunca contenido real.
- * - Una línea de 20+ caracteres que se repite MUCHAS veces en TODO el
- *   documento es una cabecera o pie de página que se repite en cada hoja
- *   (p.ej. "Sistema normativo interno-Código Ético" / "Edición 04,
+ * - Una línea que `runningHeaders` marca como cabecera o pie repetido en
+ *   cada hoja (p.ej. "Sistema normativo interno-Código Ético" / "Edición 04,
  *   noviembre 2023" en el Código Ético: ~19-20 apariciones en 20 páginas).
- *   El umbral es 4, no 2: una cláusula de contenido legítima puede
- *   citarse literalmente dos veces en el mismo documento (comprobado en
- *   LGTBI-01, cuyo párrafo antidiscriminación se repite exacto en dos
- *   apartados) sin ser cabecera de página — un `>= 2` ingenuo lo borraba
- *   por error, dejando el resumen con un hueco a media frase.
  *
  * El corte por `maxChars` ya no trunca a ciegas dentro del bucle: se junta
  * todo el texto hasta `stopTest` y solo si excede `maxChars` se recorta al
  * final, en el último límite de frase (`truncateAtSentence`).
  */
-const RUNNING_HEADER_MIN_REPEATS = 4;
-
 function captureUntilHeading(
   lines: string[],
   startIdx: number,
@@ -279,11 +360,7 @@ function captureUntilHeading(
   transform: (l: string) => string | null = (l) => l,
   maxChars = 3000,
 ): string | null {
-  const freq = new Map<string, number>();
-  for (const l of lines) {
-    if (l.length < 20) continue;
-    freq.set(l, (freq.get(l) ?? 0) + 1);
-  }
+  const running = runningHeaders(lines);
 
   const out: string[] = [];
   for (let i = startIdx; i < lines.length; i++) {
@@ -291,7 +368,7 @@ function captureUntilHeading(
     if (!l) continue;
     if (stopTest(l)) break;
     if (/^\d{1,4}$/.test(l)) continue; // número de página suelto
-    if ((freq.get(l) ?? 0) >= RUNNING_HEADER_MIN_REPEATS) continue; // cabecera/pie repetido en cada página
+    if (running.has(l)) continue; // cabecera/pie repetido en cada página
     const t = transform(l);
     if (t === null) continue;
     out.push(t);
@@ -301,19 +378,27 @@ function captureUntilHeading(
   return joined.length > maxChars ? truncateAtSentence(joined, maxChars) : joined;
 }
 
-/** Cabecera arábiga "N. Objeto…" (compacta) o "N." + "Objeto…" (partida). */
+/**
+ * Cabecera arábiga "N. Objeto…" (compacta) o "N." + "Objeto…" (partida).
+ *
+ * También "Finalidad": es el mismo apartado con otro rótulo, como ya
+ * reconocía `findArticuloFinalidad` para el Código Ético. PPD-01 lo numera en
+ * arábigo ("2.1 Finalidad") y sin esto se quedaba sin objeto.
+ */
+const OBJETO_HEADING = /^(Objeto|Finalidad)\b/i;
+
 function findArabicObjeto(lines: string[]): string | null {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     let bodyStart = -1;
     const arabic = matchArabicHeading(line);
-    if (arabic && /^Objeto\b/i.test(arabic.title)) {
+    if (arabic && OBJETO_HEADING.test(arabic.title)) {
       bodyStart = i + 1;
     } else if (arabic && !arabic.title) {
       let j = i + 1;
       while (j < lines.length && !lines[j]) j++;
-      if (j < lines.length && /^Objeto\b/i.test(lines[j])) bodyStart = j + 1;
+      if (j < lines.length && OBJETO_HEADING.test(lines[j])) bodyStart = j + 1;
     }
     if (bodyStart < 0) continue;
     const body = captureUntilHeading(lines, bodyStart, isArabicHeading);
@@ -358,21 +443,55 @@ function findArticuloFinalidad(lines: string[]): string | null {
  * aplicación objetivo"), reconocible por la frase "tiene como objeto" o
  * "El objeto de est(e|a) …".
  */
-function findObjetoSentence(lines: string[]): string | null {
+function findObjetoSentence(lines: string[], pattern: RegExp, maxChars?: number): string | null {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     if (!l) continue;
-    if (/tiene como objeto\b/i.test(l) || /^El objeto de est[ae]\b/i.test(l)) {
-      const body = captureUntilHeading(lines, i, (ll) => isArabicHeading(ll) || ARTICULO_HEADING.test(ll) || ROMAN_HEADING.test(ll));
-      if (body) return body;
-    }
+    const at = l.search(pattern);
+    if (at < 0) continue;
+    // Comienzo de la FRASE que contiene el patrón, no de la línea. En los PDF
+    // con `-layout` una línea es una línea visual y la frase suele empezarla
+    // (offset 0, comportamiento idéntico al anterior); un volcado markdown de
+    // SharePoint trae el documento entero en UNA línea y arrancar desde su
+    // inicio se llevaría por delante toda la cabecera de la página.
+    const before = l.slice(0, at);
+    const cut = Math.max(before.lastIndexOf(". "), before.lastIndexOf("? "), before.lastIndexOf("! "));
+    const head = cut < 0 ? l : l.slice(cut + 2);
+    const body = captureUntilHeading(
+      [head, ...lines.slice(i + 1)],
+      0,
+      (ll) => isArabicHeading(ll) || ARTICULO_HEADING.test(ll) || ROMAN_HEADING.test(ll),
+      (ll) => ll,
+      maxChars,
+    );
+    if (body) return body;
   }
   return null;
 }
 
+// Frase que declara el objeto cuando no hay apartado que lo rotule. Los dos
+// primeros patrones son los históricos (PI-26 lo dice bajo "2. Objetivos"; el
+// Manual PBC/FT bajo "3.1 Ámbito de aplicación objetivo").
+const OBJETO_FRASE = /tiene como objeto\b|^El objeto de est[ae]\b/i;
+// Apertura normativa estándar, probada en SEGUNDA pasada para no cambiar el
+// resumen de ningún documento que ya resolvía con los patrones anteriores.
+const OBJETO_FRASE_DEBIL = /El presente documento\b/i;
+// Una fuente sin apartados numerados (volcado de SharePoint en una sola línea)
+// no tiene "siguiente cabecera" donde parar, así que el único límite posible
+// es de longitud, recortado al último final de frase. 900 deja en PPD-CAT su
+// declaración de propósito y su párrafo de alcance ("meramente
+// ejemplificativo… no es una lista cerrada"), que es justo lo que un abogado
+// necesita leer antes del catálogo, y corta antes de que empiece el contenido.
+const OBJETO_SIN_ESTRUCTURA_MAX = 900;
+
 function parseObjeto(text: string): string | null {
   const lines = text.split("\n").map((l) => l.trim());
-  return findArabicObjeto(lines) ?? findArticuloFinalidad(lines) ?? findObjetoSentence(lines);
+  return (
+    findArabicObjeto(lines) ??
+    findArticuloFinalidad(lines) ??
+    findObjetoSentence(lines, OBJETO_FRASE) ??
+    findObjetoSentence(lines, OBJETO_FRASE_DEBIL, OBJETO_SIN_ESTRUCTURA_MAX)
+  );
 }
 
 type Entry = {
@@ -394,14 +513,58 @@ const TITLE_OVERRIDES: Record<string, string> = {
 };
 
 // Núcleo no-PI. `file` null ⇒ citado en fuente, no incorporado.
+//
+// PPD-01 y PPD-CAT SÍ están en la carpeta, en `.md` (volcado de SharePoint).
+// Estuvieron cableados a null y se sembraron como "no incorporados" teniendo
+// su texto delante. De los tres documentos citados-no-incorporados solo
+// quedan los dos que realmente lo están: PPD-02 (identificado como documento
+// independiente en PPD-01 §3) y el Código de Conducta del Socio, que el
+// Código Ético cita dos veces —en su art. 1 ("Cuando quien incurra en dicha
+// vulneración sea un socio, será aplicable el régimen disciplinario previsto
+// en el Código de Conducta del Socio") y en su art. 2— y PI-30 §7 repite.
+// Ninguno de los dos está en la carpeta, en ningún formato.
 const NUCLEO: Array<{ code: string; title: string; tier: Entry["normative_tier"]; file: string | null }> = [
   { code: "CE-2023",   title: "Código Ético", tier: "POLITICA", file: "Codigo-Etico-2023-ES.pdf" },
-  { code: "PPD-01",    title: "Manual del Sistema de Gestión de Riesgos Penales", tier: "NORMA", file: null },
+  { code: "PPD-01",    title: "Manual del Sistema de Gestión de Riesgos Penales", tier: "NORMA", file: "PPD-01. Manual del Sistema de Gestión de Riesgos Penales.md" },
   { code: "PPD-02",    title: "Modelo Organizativo del Programa de Prevención de Delitos", tier: "NORMA", file: null },
   { code: "PBC-FT-10", title: "Manual de Prevención del Blanqueo de Capitales y de la Financiación del Terrorismo", tier: "NORMA", file: "Manual PBC_FT v.10 noviembre 2025.pdf" },
-  { code: "PPD-CAT",   title: "Catálogo ejemplificativo de situaciones susceptibles de generar riesgos penales", tier: "DOCUMENTO", file: null },
+  { code: "PPD-CAT",   title: "Catálogo ejemplificativo de situaciones susceptibles de generar riesgos penales", tier: "DOCUMENTO", file: "Catálogo ejemplificativo de situaciones susceptibles de generar riesgos penales Dentro de los elementos de ejecución de la prevención del Programa de Prevención de Delitos (en adelante, “PPD”) de Garrigues, los responsables de Depart.md" },
+  { code: "CCS",       title: "Código de Conducta del Socio", tier: "POLITICA", file: null },
   { code: "LGTBI-01",  title: "Medidas para la igualdad de las personas LGTBI y protocolo", tier: "PROCEDIMIENTO", file: "Medidas_para_la_igualdad_de_las_personas_LGTBI_y_protocolo.pdf" },
 ];
+
+/**
+ * Erratas DEL DOCUMENTO FUENTE que se reproducen fielmente en el resumen.
+ *
+ * No se corrigen en silencio: eso falsearía la cita del documento. Se anotan
+ * con la convención editorial "[sic]" — el corchete deja claro que la
+ * aclaración es de la consola y que el error es del original.
+ *
+ * PBC-FT-10 §3.1 data la Ley 10/2010 el "18 de abril"; la Ley es de 28 de
+ * abril («BOE» núm. 103, de 29/04/2010) y el propio Manual la cita bien en
+ * otros dos puntos. La extracción es correcta: el fallo está en el PDF.
+ *
+ * `find` debe existir; si una reedición del documento lo corrige, el
+ * extractor aborta en vez de aplicar la nota a ciegas o dejar de aplicarla
+ * sin avisar.
+ */
+const ERRATAS_FUENTE: Record<string, { find: string; replace: string }> = {
+  "PBC-FT-10": {
+    find: "Ley 10/2010, de 18 de abril, de prevención",
+    replace:
+      "Ley 10/2010, de 18 [sic en el documento fuente: la Ley 10/2010 es de 28 de abril] de abril, de prevención",
+  },
+};
+
+function applyErrata(code: string, summary: string | null): string | null {
+  const errata = ERRATAS_FUENTE[code];
+  if (!errata || !summary) return summary;
+  if (!summary.includes(errata.find)) {
+    console.error(`✗ ${code}: la errata registrada ("${errata.find}") ya no aparece en el resumen extraído. Revisa ERRATAS_FUENTE contra el documento.`);
+    process.exit(1);
+  }
+  return summary.replace(errata.find, errata.replace);
+}
 
 function main() {
   if (!existsSync(ZIP)) {
@@ -420,7 +583,7 @@ function main() {
     const f = raw.normalize("NFC");
     const m = f.match(/^PI-(\d{2})[.\s]\s*(.+?)\.pdf$/i);
     if (!m) continue;
-    const text = pdfHead(join(dir, raw));
+    const text = readSourceText(join(dir, raw));
     const { edicion, version, date } = parseEdicion(text);
     const code = `PI-${m[1]}`;
     const filenameTitle = m[2].replace(/\s*\.{3,}\s*$/, "").trim();
@@ -438,13 +601,20 @@ function main() {
 
   for (const n of NUCLEO) {
     const path = n.file ? join(ROOT, n.file) : null;
-    if (path && existsSync(path)) {
-      const text = pdfHead(path);
+    // Un fichero declarado que no existe NO puede degradar en silencio a
+    // "citado, no incorporado": esa etiqueta afirma en pantalla que el
+    // despacho no aportó el documento. Si falta, es un error de ruta.
+    if (path && !existsSync(path)) {
+      console.error(`✗ ${n.code}: declara la fuente "${n.file}" y no existe en ${ROOT}.`);
+      process.exit(1);
+    }
+    if (path) {
+      const text = readSourceText(path);
       const { edicion, version, date } = parseEdicion(text);
       entries.push({
         policy_code: n.code, title: n.title, normative_tier: n.tier,
         edicion, effective_date: date, current_version: version,
-        summary: parseObjeto(text), content_outline: parseOutline(text),
+        summary: applyErrata(n.code, parseObjeto(text)), content_outline: parseOutline(text),
         source_file: n.file, provenance: "PDF_EXTRAIDO",
       });
     } else {

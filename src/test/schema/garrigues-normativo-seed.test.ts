@@ -1,5 +1,5 @@
 // src/test/schema/garrigues-normativo-seed.test.ts
-// G4 Task 3 gate de datos: 38 documentos normativos del tenant Garrigues con
+// G4 Task 3 gate de datos: 39 documentos normativos del tenant Garrigues con
 // ownership resuelto a órganos REALES, y ARGA intacta. Patrón graceful-skip
 // con clientes independientes por tenant (garrigues-rule-packs-seed.test.ts).
 import { beforeAll, describe, expect, it } from "vitest";
@@ -35,7 +35,7 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) {
       garr = g; authed = true;
       const { count } = await g.from("policies").select("id", { count: "exact", head: true });
-      seeded = (count ?? 0) >= 38;
+      seeded = (count ?? 0) >= 39;
     }
     const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) {
@@ -43,11 +43,11 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     }
   });
 
-  it("Garrigues ve exactamente 38 documentos normativos", async () => {
+  it("Garrigues ve exactamente 39 documentos normativos", async () => {
     if (!authed || !garr || !seeded) return;
     const { count, error } = await garr.from("policies").select("id", { count: "exact", head: true });
     expect(error).toBeNull();
-    expect(count).toBe(38);
+    expect(count).toBe(39);
   });
 
   it("las 32 PI están completas", async () => {
@@ -61,7 +61,7 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     const { data } = await garr
       .from("policies")
       .select("policy_code, owner_body:owner_body_id(slug)")
-      .in("policy_code", ["PI-30", "PI-14", "PBC-FT-10", "PPD-01"]);
+      .in("policy_code", ["PI-30", "PI-14", "PBC-FT-10"]);
     const bySlug = Object.fromEntries(
       (data ?? []).map((r: Record<string, unknown>) => [
         r.policy_code as string,
@@ -71,21 +71,51 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     expect(bySlug["PI-30"]).toBe("garrigues-comite-gobernanza-ia");
     expect(bySlug["PI-14"]).toBe("garrigues-comite-editorial-global");
     expect(bySlug["PBC-FT-10"]).toBe("garrigues-caci");
-    expect(bySlug["PPD-01"]).toBe("garrigues-comite-practica-profesional");
   });
 
-  it("no inventa ownership: hay documentos con owner_body_id NULL", async () => {
-    if (!authed || !garr || !seeded) return;
-    const { count } = await garr
-      .from("policies").select("id", { count: "exact", head: true }).is("owner_body_id", null);
-    expect(count).toBeGreaterThan(0);
-  });
-
-  it("PPD-02 queda etiquetado sin contenido", async () => {
+  // El Comité de Práctica Profesional AUXILIA al Senior Partner en el PPD
+  // (PPD-01 §8.1) e INFORMA en el Código Ético (art. 43.1); no es el
+  // responsable en ninguno de los dos. Y el Catálogo ejemplificativo no
+  // menciona comité alguno. Atribuírselos era sustituir al responsable que la
+  // fuente nombra por un órgano parecido que sí estaba modelado.
+  it("no se atribuye al comité que solo auxilia o informa", async () => {
     if (!authed || !garr || !seeded) return;
     const { data } = await garr
-      .from("policies").select("summary, content_outline").eq("policy_code", "PPD-02").maybeSingle();
-    expect(data?.summary).toBeNull();
+      .from("policies")
+      .select("policy_code, owner_body_id, owner_function")
+      .in("policy_code", ["PPD-01", "PPD-02", "PPD-CAT", "CE-2023", "PI-31"]);
+    expect((data ?? []).length).toBe(5);
+    for (const p of data ?? []) {
+      expect(p.owner_body_id, `${p.policy_code} atribuido a un órgano que la fuente no hace responsable`).toBeNull();
+      // El responsable que la fuente SÍ nombra es un cargo, y se dice.
+      expect(p.owner_function, `${p.policy_code} sin el cargo responsable de la fuente`).toBeTruthy();
+    }
+  });
+
+  it("solo 3 documentos tienen órgano responsable; el resto queda NULL", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { count } = await garr
+      .from("policies").select("id", { count: "exact", head: true }).not("owner_body_id", "is", null);
+    expect(count).toBe(3);
+  });
+
+  it("PPD-02 y el Código de Conducta del Socio quedan etiquetados sin contenido", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { data } = await garr
+      .from("policies").select("policy_code, summary, content_outline").in("policy_code", ["PPD-02", "CCS"]);
+    expect((data ?? []).length).toBe(2);
+    for (const p of data ?? []) expect(p.summary, `${p.policy_code} no debería traer objeto`).toBeNull();
+  });
+
+  // Contracara del anterior: PPD-01 tiene su texto en la carpeta y debe
+  // llegar con objeto e índice, no como documento "citado, no incorporado".
+  it("PPD-01 llega con su objeto y su índice", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { data } = await garr
+      .from("policies").select("summary, content_outline, current_version").eq("policy_code", "PPD-01").maybeSingle();
+    expect(data?.summary).toBeTruthy();
+    expect((data?.content_outline as unknown[] | null)?.length ?? 0).toBeGreaterThan(15);
+    expect(data?.current_version).toBe(3);
   });
 
   it("ARGA sigue con sus 25 políticas y sin ownership por órgano", async () => {

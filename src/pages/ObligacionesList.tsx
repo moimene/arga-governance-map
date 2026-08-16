@@ -13,6 +13,9 @@ import {
   controlStatusLabel,
   controlStatusTone,
   obligationCriticalityTone,
+  isExclusionTitle,
+  exclusionKind,
+  splitFirmeza,
   type ObligationWithPolicy,
   type ControlWithOwner,
 } from "@/hooks/usePoliciesObligations";
@@ -20,24 +23,10 @@ import { useTenantBranding } from "@/context/TenantBrandContext";
 import { AlertTriangle, CheckCircle, AlertCircle, XCircle, ClipboardList, ShieldCheck, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// G4 Task 4/7: dos filas de obligations son EXCLUSIONES (no sujeción /
-// excepción legal), no obligaciones cubiertas. El seed las marca abriendo el
-// título por "Exención"/"Excepción" — no hay columna propia. Detectarlas así
-// evita pintarlas como "CUBIERTA" y sacarlas del recuento de obligaciones.
-const EXCLUSION_RE = /^(Exención|Excepción)\b/i;
-const isExclusion = (o: ObligationWithPolicy) => EXCLUSION_RE.test(o.title);
-
-// El seed de Task 4 embebe la cautela de firmeza pendiente de confirmación
-// del Comité Legal dentro del título (no hay columna `firmeza`, es solo
-// auditoría interna del catálogo). Se extrae para no filtrar el token de
-// enum DEMO_PILOTO a una pantalla que lee un abogado, y para acortar el
-// título en el catálogo.
-const FIRMEZA_RE = /\s*\(criterio DEMO_PILOTO,\s*([^)]+)\)\s*$/i;
-function splitFirmeza(title: string): { title: string; pending: string | null } {
-  const m = FIRMEZA_RE.exec(title);
-  if (!m) return { title, pending: null };
-  return { title: title.slice(0, m.index).trim(), pending: m[1].trim() };
-}
+// El criterio de exclusión y la extracción de la cautela de firmeza viven en
+// el hook (usePoliciesObligations), compartidos con la ficha de obligación y
+// con la pestaña "Obligaciones" de la ficha de política.
+const isExclusion = (o: ObligationWithPolicy) => isExclusionTitle(o.title);
 
 interface KpiProps { label: string; value: number; icon: typeof ClipboardList; tone: "primary" | "success" | "warning" | "critical"; }
 const toneMap = {
@@ -176,7 +165,7 @@ export default function ObligacionesList() {
           <div className="flex-1 text-sm">
             <div className="font-semibold text-status-warning">Postura de demostración</div>
             <div className="mt-1 text-xs text-status-warning/90">
-              Los estados de control ("Efectivo" / "En remediación") son una postura de demostración sobre controles reales de la firma, no el resultado de una auditoría verificada.
+              Los estados de control ("Efectivo" / "En remediación") y la criticidad asignada a cada obligación ("Crítico" / "Alto" / "Medio") son una postura de demostración sobre obligaciones y controles reales de la firma, no el resultado de una auditoría verificada ni un juicio de riesgo.
             </div>
           </div>
         </div>
@@ -239,7 +228,7 @@ export default function ObligacionesList() {
             </TableHeader>
             <TableBody>
               {exclusions.map((o) => {
-                const kind = EXCLUSION_RE.exec(o.title)?.[1] ?? "Exclusión";
+                const kind = exclusionKind(o.title);
                 const { title: cleanTitle, pending } = splitFirmeza(o.title);
                 const cs = ctrlsByObl.get(o.id) ?? [];
                 return (
@@ -251,6 +240,11 @@ export default function ObligacionesList() {
                       </Link>
                       {pending && (
                         <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" className="mt-1" />
+                      )}
+                      {o.owner_body_slug && (
+                        <Link to={`/organos/${o.owner_body_slug}`} className="mt-0.5 block text-[11px] text-muted-foreground hover:text-primary hover:underline">
+                          Comité responsable: {o.owner_body_name}
+                        </Link>
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -305,6 +299,14 @@ function ObligationTable({ rows, ctrlsByObl, obligationStatus }: ObligationTable
                 <Link to={`/obligaciones/${o.code}`} title={o.title} className="block line-clamp-2 text-sm font-medium hover:text-primary">
                   {o.title}
                 </Link>
+                {/* Ownership navegable por FK, en sublínea (mismo patrón que
+                    legal_reference bajo Marco): como columna propia estrujaba
+                    el título de la obligación. Sin FK — ARGA — no se pinta. */}
+                {o.owner_body_slug && (
+                  <Link to={`/organos/${o.owner_body_slug}`} className="mt-0.5 block text-[11px] text-muted-foreground hover:text-primary hover:underline">
+                    Comité responsable: {o.owner_body_name}
+                  </Link>
+                )}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {o.source ?? "—"}

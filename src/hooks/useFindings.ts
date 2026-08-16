@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface FindingRow {
   id: string;
@@ -116,12 +117,19 @@ const mapRow = (row: FindingRaw): FindingFull => ({
 });
 
 export function useFindingsList() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["findings", "list"],
+    // El tenant va en la clave y `enabled` espera a que resuelva: sin ambas
+    // cosas, `HallazgosList` sirve desde caché los hallazgos del tenant
+    // anterior tras un cambio de sesión dentro de la SPA (RLS protege la BD,
+    // no la caché de TanStack Query).
+    queryKey: ["findings", "list", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("findings")
         .select(SELECT)
+        .eq("tenant_id", tenantId!)
         .order("code");
       if (error) throw error;
       return ((data ?? []) as FindingRaw[]).map(mapRow);
@@ -130,13 +138,17 @@ export function useFindingsList() {
 }
 
 export function useFindingByCode(code: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["findings", "byCode", code],
-    enabled: !!code,
+    // `code` (HALL-010, …) es clave natural por tenant, no UUID: se scopea
+    // igual que la lista para que la caché no pueda cruzar tenants.
+    queryKey: ["findings", "byCode", tenantId, code],
+    enabled: !!code && !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("findings")
         .select(SELECT)
+        .eq("tenant_id", tenantId!)
         .eq("code", code!)
         .maybeSingle();
       if (error) throw error;

@@ -141,7 +141,19 @@ export default function OrganoDetalle() {
                 <TableBody>
                   {members.map((m) => (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.full_name ?? "—"}</TableCell>
+                      {/* Último eslabón del criterio nº4 de G4: política → comité → personas.
+                          Sin esto la cadena llegaba al listado de miembros pero no a su ficha.
+                          person_id viene de condiciones_persona y es el mismo id que resuelve
+                          usePersonaCanonical, así que vale para ambos tenants. */}
+                      <TableCell className="font-medium">
+                        {m.person_id ? (
+                          <Link to={`/secretaria/personas/${m.person_id}`} className="text-primary hover:underline">
+                            {m.full_name ?? "—"}
+                          </Link>
+                        ) : (
+                          m.full_name ?? "—"
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{m.role ?? "—"}</TableCell>
                       <TableCell className="text-sm">{m.type ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{formatDate(m.start_date)}</TableCell>

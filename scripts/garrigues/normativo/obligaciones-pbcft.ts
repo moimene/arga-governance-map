@@ -74,7 +74,13 @@ export type ObligacionPbcFt = {
   /** Columna estructurada de Task 1. Cita canónica verificada contra el BOE. */
   legal_reference: string;
   criticality: "Crítico" | "Alto" | "Medio" | "Bajo";
-  periodicity: ObligationPeriodicity;
+  /**
+   * SOLO cuando la norma la fija, tal como declara el COMMENT de la columna.
+   * `null` no es "no lo sabemos": es que el artículo no impone cadencia
+   * (art. 7, análisis de riesgo por escrito; art. 26, manual "que se mantendrá
+   * actualizado"). Inventar un ANUAL crea un vencimiento que la ley no exige.
+   */
+  periodicity: ObligationPeriodicity | null;
   owner_slug: OwnerSlug;
   /**
    * Firmeza del criterio, patrón del Comité Legal
@@ -153,7 +159,10 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     title: "Aplicación de las medidas de diligencia debida en función del riesgo, con análisis de riesgo escrito",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 7",
     criticality: "Crítico",
-    periodicity: "ANUAL",
+    // El art. 7 exige que el análisis de riesgo "en todo caso deberá constar
+    // por escrito" y no le fija periodicidad alguna. `periodicity` solo se
+    // rellena cuando la norma la fija (COMMENT de la columna): NULL, no ANUAL.
+    periodicity: null,
     owner_slug: "garrigues-caci",
     quote:
       "Los sujetos obligados deberán estar en condiciones de demostrar a las autoridades competentes que las medidas adoptadas tienen el alcance adecuado en vista del riesgo de blanqueo de capitales o de financiación del terrorismo mediante un previo análisis de riesgo que en todo caso deberá constar por escrito.",
@@ -224,17 +233,26 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     // Por eso NO se modela como obligación exigible: afirmarla sería atribuir
     // al despacho una obligación que no le aplica y un control que no ejecuta.
     //
-    // firmeza DEMO_PILOTO: la copia del RD que obra en el expediente es la de
-    // 2014 y puede tener modificaciones posteriores. Pendiente de confirmación
-    // por el Comité Legal.
+    // FIRMEZA (2026-08-16): el criterio nació DEMO_PILOTO porque la copia del
+    // RD que obra en el expediente es la original de 2014. Cotejado ya contra
+    // el TEXTO CONSOLIDADO del BOE (BOE-A-2014-4742, última actualización
+    // publicada el 24/04/2024), el art. 27.3 vigente es IDÉNTICO palabra por
+    // palabra al `quote` de abajo, y el artículo no arrastra ninguna nota de
+    // modificación. Verificado además que el alcance de la excepción sigue
+    // cubriendo al despacho: en el texto consolidado de la Ley 10/2010
+    // (BOE-A-2010-6737, última actualización publicada el 21/03/2026) la letra
+    // ñ) del art. 2.1 sigue siendo "Los abogados, procuradores u otros
+    // profesionales independientes cuando participen…", dentro del rango
+    // k) a y) que el art. 27.3 exceptúa. Criterio FIRME; la fecha de la
+    // versión cotejada va en `legal_reference` para que se vea en pantalla.
     code: "OBL-PBC-11",
     title:
-      "Excepción — la comunicación sistemática no es exigible al despacho como sujeto obligado del art. 2.1.ñ (criterio DEMO_PILOTO, pendiente de confirmación del Comité Legal)",
-    legal_reference: "RD 304/2014, de 5 de mayo, art. 27.3 (excepción al art. 20 de la Ley 10/2010)",
+      "Excepción — la comunicación sistemática no es exigible al despacho como sujeto obligado del art. 2.1.ñ",
+    legal_reference:
+      "RD 304/2014, de 5 de mayo, art. 27.3 — texto consolidado del BOE de 24/04/2024 (excepción al art. 20 de la Ley 10/2010)",
     criticality: "Bajo",
     periodicity: "PUNTUAL",
     owner_slug: "garrigues-caci",
-    firmeza: "DEMO_PILOTO",
     quote:
       "Quedan exceptuados de la obligación de comunicación sistemática los corredores de seguros a los que se refiere el artículo 2.1 b) de la Ley 10/2010, de 28 de abril, las empresas de asesoramiento financiero y los sujetos obligados mencionados en los párrafos k) a y), ambos inclusive, del artículo 2.1 de la misma ley.",
   },
@@ -274,7 +292,10 @@ export const OBLIGACIONES_PBCFT: ObligacionPbcFt[] = [
     title: "Aprobación por escrito de políticas y procedimientos de control interno y manual de prevención actualizado",
     legal_reference: "Ley 10/2010, de 28 de abril, art. 26",
     criticality: "Crítico",
-    periodicity: "ANUAL",
+    // El art. 26.5 exige un manual "que se mantendrá actualizado": obligación
+    // permanente, sin plazo ni cadencia. Tampoco los apartados 1 y 2 fijan
+    // periodicidad para la aprobación de políticas y procedimientos. NULL.
+    periodicity: null,
     owner_slug: "garrigues-caci",
     quote:
       "Los sujetos obligados aprobarán por escrito y aplicarán políticas y procedimientos adecuados en materia de diligencia debida, información, conservación de documentos, control interno, evaluación y gestión de riesgos […]. Los sujetos obligados deberán aprobar un manual adecuado de prevención del blanqueo de capitales y de la financiación del terrorismo, que se mantendrá actualizado.",

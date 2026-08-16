@@ -120,7 +120,9 @@ export const tourSteps: TourStep[] = [
       "Una política en TGMS no es un PDF estático: tiene ciclo de vida completo con 7 estados, historial de versiones y trazabilidad directa a las obligaciones y controles que activa.",
     bullets: [
       "WorkflowStepper: PR-008 está en paso 5 de 7 — pendiente del CdA del 22/04/2026.",
-      "Tab Entidades del grupo: lista las entidades del tenant a las que aplica la política.",
+      // No decir "a las que aplica la política": no hay modelo de aplicabilidad en BD, y por eso
+      // la Task 7 retiró la columna "Aplica". El tab lista las entidades del tenant, sin más.
+      "Tab Entidades del grupo: lista las entidades del tenant.",
       "Tab Obligaciones vinculadas: OBL-DORA-003 sin cobertura — el eslabón débil de la cadena.",
     ],
     badges: [

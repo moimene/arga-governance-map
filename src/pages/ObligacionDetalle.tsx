@@ -15,6 +15,9 @@ import {
   evidenceStatusLabel,
   evidenceStatusTone,
   obligationCriticalityTone,
+  isExclusionTitle,
+  exclusionKind,
+  splitFirmeza,
 } from "@/hooks/usePoliciesObligations";
 import { AlertTriangle, ShieldOff, Plus, ShieldCheck, Siren, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -32,15 +35,11 @@ const fmtDate = (d: string | null | undefined) => {
   return `${day}/${m}/${y}`;
 };
 
-// G4 Task 8/Step 5b: mismo criterio que usa la lista (ObligacionesList.tsx,
-// EXCLUSION_RE/splitFirmeza) para detectar las dos EXCLUSIONES (no sujeción /
-// excepción legal) de PBC/FT — el título abre por "Exención"/"Excepción" y
-// puede llevar embebida la cautela de firmeza pendiente del Comité Legal
-// `(criterio DEMO_PILOTO, ...)`. Sin esto, la ficha pinta "COMPLETA" en verde
-// porque las dos tienen un control Efectivo asociado, contradiciendo a la
-// lista, que ya las trata como no cubiertas.
-const EXCLUSION_TITLE_RE = /^(Exención|Excepción)\b/i;
-const FIRMEZA_SUFFIX_RE = /\s*\(criterio DEMO_PILOTO,\s*([^)]+)\)\s*$/i;
+// G4 Task 8/Step 5b: el criterio de exclusión (no sujeción / excepción legal)
+// y la extracción de la cautela de firmeza viven en el hook, compartidos con
+// la lista y con la pestaña "Obligaciones" de la ficha de política. Sin este
+// tratamiento la ficha pinta "COMPLETA" en verde porque las dos exclusiones
+// tienen un control Efectivo asociado.
 
 export default function ObligacionDetalle() {
   const { id } = useParams();
@@ -97,11 +96,9 @@ export default function ObligacionDetalle() {
 
   if (!obligation) return <div className="p-6">Obligación no encontrada.</div>;
 
-  const isExclusion = EXCLUSION_TITLE_RE.test(obligation.title);
-  const exclusionKind = EXCLUSION_TITLE_RE.exec(obligation.title)?.[1] ?? "Exclusión";
-  const firmezaMatch = FIRMEZA_SUFFIX_RE.exec(obligation.title);
-  const displayTitle = firmezaMatch ? obligation.title.slice(0, firmezaMatch.index).trim() : obligation.title;
-  const firmezaPending = firmezaMatch?.[1]?.trim() ?? null;
+  const isExclusion = isExclusionTitle(obligation.title);
+  const kind = exclusionKind(obligation.title);
+  const { title: displayTitle, pending: firmezaPending } = splitFirmeza(obligation.title);
 
   const noCoverage = controls.length === 0;
   const coverageLabel = noCoverage
@@ -124,7 +121,7 @@ export default function ObligacionDetalle() {
           <>
             {isExclusion ? (
               <>
-                <StatusBadge label={exclusionKind} tone="neutral" />
+                <StatusBadge label={kind} tone="neutral" />
                 {firmezaPending && <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" />}
               </>
             ) : (
@@ -142,6 +139,11 @@ export default function ObligacionDetalle() {
             )}
             {obligation.country_scope && obligation.country_scope.length > 0 && (
               <> · Ámbito: {obligation.country_scope.join(", ")}</>
+            )}
+            {/* Ownership navegable: FK real a governing_bodies. NULL en las 5
+                obligaciones de ARGA — ahí no se pinta nada nuevo. */}
+            {obligation.owner_body_slug && (
+              <> · Comité responsable: <Link to={`/organos/${obligation.owner_body_slug}`} className="text-primary hover:underline">{obligation.owner_body_name}</Link></>
             )}
           </>
         }
@@ -170,7 +172,7 @@ export default function ObligacionDetalle() {
         <div className="mt-4 flex items-start gap-3 rounded-md border border-border border-l-4 border-l-muted-foreground bg-muted/40 p-4">
           <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div className="flex-1 text-sm">
-            <div className="font-semibold">{exclusionKind} — no es una obligación cubierta</div>
+            <div className="font-semibold">{kind} — no es una obligación cubierta</div>
             <div className="mt-1 text-xs text-muted-foreground">
               No sujeción o excepción legal: no cuenta como obligación pendiente de cobertura, aunque tenga un control asociado.
             </div>
@@ -207,9 +209,24 @@ export default function ObligacionDetalle() {
         <TabsContent value="descripcion" className="mt-4">
           <Card className="p-6 space-y-5">
             <p className="text-sm leading-relaxed text-foreground">
-              {displayTitle}. Obligación derivada del marco regulatorio {obligation.source ?? "—"}
+              {displayTitle}.{" "}
+              {/* Una exclusión no es una obligación derivada del marco: decirlo
+                  contradecía al badge y al aviso que la propia pantalla pinta
+                  encima. */}
+              {isExclusion
+                ? `${kind} prevista en el marco regulatorio ${obligation.source ?? "—"}`
+                : `Obligación derivada del marco regulatorio ${obligation.source ?? "—"}`}
               {obligation.policy_title ? `, vinculada a la política «${obligation.policy_title}» (${obligation.policy_code}).` : "."}
             </p>
+
+            {/* El artículo cotejado solo se veía en la lista, no en la ficha a
+                la que se entra precisamente a comprobar la cita. NULL en ARGA. */}
+            {obligation.legal_reference && (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Referencia legal</div>
+                <p className="text-sm text-muted-foreground">{obligation.legal_reference}</p>
+              </div>
+            )}
 
             {obligation.country_scope && obligation.country_scope.length > 0 && (
               <div>

@@ -110,6 +110,49 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     expect(falso?.code, `${falso?.code} afirma una comunicación sistemática que el despacho no ejecuta`).toBeUndefined();
   });
 
+  // `periodicity` solo se rellena cuando la NORMA la fija (COMMENT de la
+  // columna). El art. 7 exige un análisis de riesgo "que en todo caso deberá
+  // constar por escrito" y el art. 26.5 un manual "que se mantendrá
+  // actualizado": ninguno impone cadencia. Ponerles ANUAL crea un vencimiento
+  // que la ley no exige. Los art. 28 ("examen anual") y 29 ("plan anual") sí
+  // son literales y deben conservarla.
+  it("la periodicidad solo aparece donde el artículo la fija", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { data } = await garr.from("obligations").select("code, legal_reference, periodicity");
+    const byArt = (art: string) =>
+      (data ?? []).find((o: Record<string, unknown>) => String(o.legal_reference).endsWith(`art. ${art}`)) as
+        | Record<string, unknown>
+        | undefined;
+    for (const art of ["7", "26"]) {
+      const row = byArt(art);
+      expect(row, `no encuentro la obligación del art. ${art}`).toBeTruthy();
+      expect(row!.periodicity, `art. ${art}: la norma no fija periodicidad`).toBeNull();
+    }
+    for (const art of ["28", "29"]) {
+      const row = byArt(art);
+      expect(row, `no encuentro la obligación del art. ${art}`).toBeTruthy();
+      expect(row!.periodicity, `art. ${art}: la norma dice "anual" y debe conservarse`).toBe("ANUAL");
+    }
+  });
+
+  // Cotejado contra el texto consolidado del BOE (RD 304/2014, última
+  // actualización publicada el 24/04/2024): el art. 27.3 vigente es idéntico
+  // al del expediente y la excepción sigue alcanzando al art. 2.1.ñ. El
+  // criterio deja de ser DEMO_PILOTO, y a cambio la cita que llega a pantalla
+  // tiene que decir en qué versión se apoya.
+  it("la excepción del art. 27.3 ya no es un criterio pendiente y cita la versión cotejada", async () => {
+    if (!authed || !garr || !seeded) return;
+    const { data } = await garr.from("obligations").select("code, title, legal_reference");
+    const row = (data ?? []).find((o: Record<string, unknown>) => /27\.3/.test(String(o.legal_reference))) as
+      | Record<string, unknown>
+      | undefined;
+    expect(row, "no encuentro la excepción del RD 304/2014 art. 27.3").toBeTruthy();
+    expect(String(row!.title)).not.toMatch(/DEMO_PILOTO|pendiente de confirmaci/i);
+    expect(String(row!.legal_reference), "la cita no dice sobre qué versión consolidada se apoya").toMatch(
+      /consolidad\w*\s+del BOE de \d{2}\/\d{2}\/\d{4}/i,
+    );
+  });
+
   it("los controles usan solo estados admitidos por el CHECK", async () => {
     if (!authed || !garr || !seeded) return;
     const { data } = await garr.from("controls").select("code, status, owner_body_id, obligation_id");

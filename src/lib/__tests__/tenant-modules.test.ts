@@ -19,8 +19,17 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled(b, "country-packs")).toBe(false);
   });
 
-  it("modules vacío deshabilita todo lo gateado", () => {
-    expect(isModuleEnabled({ modules: [] }, "dora")).toBe(false);
+  it("modules vacío falla abierto (seed a medio escribir no deja el tenant sin navegación)", () => {
+    expect(isModuleEnabled({ modules: [] }, "dora")).toBe(true);
+    expect(isModuleEnabled({ modules: [] }, "secretaria")).toBe(true);
+    expect(isModuleEnabled({ nombre: "X", modules: [] }, "board-pack")).toBe(true);
+  });
+
+  it("una lista blanca con un solo módulo sí gatea el resto", () => {
+    // Contraprueba de la regla anterior: lo que falla abierto es la lista
+    // vacía, no cualquier lista corta.
+    expect(isModuleEnabled({ modules: ["secretaria"] }, "secretaria")).toBe(true);
+    expect(isModuleEnabled({ modules: ["secretaria"] }, "dora")).toBe(false);
   });
 
   it("modules mal formado se ignora y falla abierto", () => {

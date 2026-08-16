@@ -16,6 +16,9 @@ import {
   policyStatusToStep,
   controlStatusLabel,
   controlStatusTone,
+  isExclusionTitle,
+  exclusionKind,
+  splitFirmeza,
 } from "@/hooks/usePoliciesObligations";
 import { Brain, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -184,7 +187,22 @@ export default function PoliticaDetalle() {
             {policy.scope_level && <StatusBadge label={policy.scope_level} tone="info" />}
           </>
         }
-        metadata={<>Código: <span className="font-mono text-xs">{policy.policy_code}</span> · Propietario: {policy.owner_function ?? "—"}{policy.approval_body_name ? ` · Aprobación: ${policy.approval_body_name}` : ""}</>}
+        metadata={
+          <>
+            Código: <span className="font-mono text-xs">{policy.policy_code}</span> · Propietario:{" "}
+            {/* Con FK al comité, el propietario navega a su ficha (y de ahí a
+                sus miembros). Sin FK — las 25 políticas de ARGA — se sigue
+                pintando el texto libre `owner_function`, igual que antes. */}
+            {policy.owner_body_slug ? (
+              <Link to={`/organos/${policy.owner_body_slug}`} className="text-primary hover:underline">
+                {policy.owner_body_name}
+              </Link>
+            ) : (
+              policy.owner_function ?? "—"
+            )}
+            {policy.approval_body_name ? ` · Aprobación: ${policy.approval_body_name}` : ""}
+          </>
+        }
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5"><History className="h-3.5 w-3.5" />Ver historial</Button>
@@ -253,7 +271,14 @@ export default function PoliticaDetalle() {
 
             {!policy.summary && (!policy.content_outline || policy.content_outline.length === 0) && (
               <p className="text-sm text-muted-foreground">
-                Documento citado en el sistema normativo; su texto no se ha incorporado a este entorno.
+                {/* "Citado en el sistema normativo" es un hecho acreditado por
+                    data_provenance y un concepto del catálogo de Garrigues. En
+                    ARGA no hay procedencia (25/25 NULL) y esa afirmación sería
+                    falsa: solo consta que el texto no está cargado. Tampoco se
+                    ofrece descarga — el botón "Exportar" no descarga nada. */}
+                {policy.data_provenance
+                  ? "Documento citado en el sistema normativo; su texto no se ha incorporado a este entorno."
+                  : "El texto íntegro de esta política no está cargado en este entorno."}
               </p>
             )}
           </Card>
@@ -266,20 +291,19 @@ export default function PoliticaDetalle() {
                 <TableRow>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Jurisdicción</TableHead>
-                  <TableHead>Excepción</TableHead>
-                  <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* "Excepción" y "Notas" se retiran: no hay modelo de
+                    excepciones en BD y sus celdas se renderizaban siempre
+                    vacías para los dos tenants. */}
                 {applicableEntities.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">Sin entidades registradas para este tenant.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={2} className="text-center text-sm text-muted-foreground py-8">Sin entidades registradas para este tenant.</TableCell></TableRow>
                 )}
                 {applicableEntities.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.common_name}</TableCell>
                     <TableCell className="text-sm">{formatJurisdiction(e.jurisdiction)}</TableCell>
-                    <TableCell />
-                    <TableCell className="text-xs text-muted-foreground" />
                   </TableRow>
                 ))}
               </TableBody>
@@ -305,16 +329,29 @@ export default function PoliticaDetalle() {
                 {obligations.map((o) => {
                   const obCtrls = controls.filter((c) => c.obligation_id === o.id);
                   const noCoverage = obCtrls.length === 0;
+                  // Mismo criterio que la lista y la ficha de obligación: una
+                  // exclusión (no sujeción / excepción legal) no es una
+                  // obligación cubierta aunque tenga control asociado, y el
+                  // token interno DEMO_PILOTO del título no va a pantalla.
+                  const excl = isExclusionTitle(o.title);
+                  const { title: cleanTitle, pending } = splitFirmeza(o.title);
                   return (
-                    <TableRow key={o.id} className={cn(noCoverage && "bg-status-critical-bg")}>
+                    <TableRow key={o.id} className={cn(noCoverage && !excl && "bg-status-critical-bg")}>
                       <TableCell><Link to={`/obligaciones/${o.code}`} className="font-mono text-xs text-primary hover:underline">{o.code}</Link></TableCell>
-                      <TableCell className="text-sm">{o.title}</TableCell>
+                      <TableCell className="text-sm">
+                        {cleanTitle}
+                        {pending && (
+                          <StatusBadge label="Pendiente confirmación Comité Legal" tone="warning" className="mt-1" />
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">
                         {obCtrls.length === 0 ? <span className="text-muted-foreground">(ninguno)</span> :
                           obCtrls.map((c) => c.code).join(", ")}
                       </TableCell>
                       <TableCell>
-                        {noCoverage
+                        {excl
+                          ? <StatusBadge label={`${exclusionKind(o.title)} — no cubierta`} tone="neutral" />
+                          : noCoverage
                           ? <StatusBadge label="SIN COBERTURA" tone="critical" />
                           : <StatusBadge label={controlStatusLabel(obCtrls[0].status)} tone={controlStatusTone(obCtrls[0].status)} />}
                       </TableCell>

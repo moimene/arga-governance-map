@@ -142,7 +142,13 @@ export default function PoliticasList() {
                       </span>
                     ) : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{p.owner_function ?? "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {/* Con FK al comité responsable, enlaza a su ficha; sin
+                        ella (las 25 de ARGA) se pinta el texto libre. */}
+                    {p.owner_body_slug ? (
+                      <Link to={`/organos/${p.owner_body_slug}`} className="hover:text-primary hover:underline">{p.owner_body_name}</Link>
+                    ) : (p.owner_function ?? "—")}
+                  </TableCell>
                   <TableCell><StatusBadge label={policyStatusLabel(p.status)} /></TableCell>
                   <TableCell className="font-mono text-xs">{fmtDate(p.effective_date) ?? "—"}</TableCell>
                   <TableCell className={cn("font-mono text-xs", overdue && "text-status-critical font-semibold")}>
