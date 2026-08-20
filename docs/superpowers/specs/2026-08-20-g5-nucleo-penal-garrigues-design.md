@@ -97,9 +97,12 @@ Dos trampas de la extracción, ya identificadas y resueltas en la prueba:
     colisionar con los de ARGA.
 13. `findings.severity TEXT CHECK (severity IN ('Crítico','Alto','Medio','Bajo'))` —
     nullable; un CHECK no rechaza NULL.
-14. `action_plans.finding_id UUID NOT NULL REFERENCES findings(id)` y la tabla **no tiene
-    `tenant_id`**: se scopea únicamente a través del hallazgo. Sin hallazgos no hay planes,
-    estructuralmente.
+14. `action_plans.finding_id UUID NOT NULL REFERENCES findings(id)`: sin hallazgos no hay
+    planes, estructuralmente. La tabla **sí** tiene `tenant_id`, pero se añadió después
+    (`20260419173010_b1_rls_all_domain_tables.sql:238`) **con `DEFAULT '…0001'`, el tenant
+    de ARGA**. Un INSERT sin tenant explícito aterriza en ARGA: es un vector de
+    contaminación latente que G5 deja cerrado por no sembrar nada aquí, pero que hay que
+    tener presente el día que se siembre.
 15. `fn_sync_risk_to_backbone` (`20260521140000_grc_legacy_sync_triggers.sql:79`) replica
     cada `risks` a `grc_risks` y **traduce el score a una banda con nombre**:
     `>= 15 → 'Critico'`, `>= 10 → 'Alto'`, `>= 5 → 'Medio'`, **`ELSE → 'Bajo'`**.

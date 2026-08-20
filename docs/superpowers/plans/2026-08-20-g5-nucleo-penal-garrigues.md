@@ -1077,6 +1077,8 @@ migracion 20260820120000 impide rellenarlos."
 
 **Por qué `action_plans` se queda vacío.** PPD-01 §246 describe el mecanismo pero no publica la lista, y `action_plans.finding_id` es NOT NULL: colgar algo de ahí exigiría fabricar antes el hallazgo del que colgarlo. Lo que sí está literal es el Plan de seguimiento de §350-356, y son controles.
 
+**GOTCHA si algún día se siembra.** `action_plans.tenant_id` se añadió después de la tabla (`20260419173010_b1_rls_all_domain_tables.sql:238`) **con `DEFAULT '00000000-0000-0000-0000-000000000001'`, que es ARGA**. Un INSERT sin `tenant_id` explícito aterriza en ARGA y contamina el tenant que el programa entero se compromete a no tocar.
+
 - [ ] **Step 1: Escribir el test que falla**
 
 Añade al describe de Cloud:
@@ -1111,7 +1113,8 @@ Añade al describe de Cloud:
 
   it("action_plans sigue vacío para Garrigues: la fuente no publica la lista", async () => {
     if (!garr) return;
-    // action_plans no tiene tenant_id; se scopea por el hallazgo.
+    // action_plans SÍ tiene tenant_id, pero con DEFAULT ARGA: por eso se
+    // consulta por finding_id, que es lo que ata el plan a este tenant.
     const { data } = await garr.from("findings").select("id").like("code", "FND-GARR-PEN-%");
     const ids = ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
     if (ids.length === 0) return;
