@@ -1,3 +1,14 @@
+-- RENUMERADA de 20260829130000 a 20260829140000 el 2026-08-29.
+-- Motivo: `20260829130000` la tomó otra migración de un carril paralelo
+-- (`aims_close_technical_file_sin_atribucion`). Mi INSERT de registro llevaba
+-- `ON CONFLICT (version) DO NOTHING`, que ante una clave ya ocupada es un
+-- no-op SILENCIOSO: devuelve éxito y cero filas, exactamente igual que un
+-- registro correcto. Lo leí como aplicado. El DDL sí se aplicó; la fila de
+-- registro nunca llegó a existir.
+-- Lección, ya norma de programa: tras registrar una versión hay que LEER la
+-- fila y comprobar que el `name` es el propio. `max(version)` no dice de quién
+-- es la versión — ese fue justo mi error de lectura en el post-probe.
+--
 -- C1 — el art. 7 de los Estatutos de J&A Garrigues, S.L.P. define DOS clases con
 -- nominales distintos (A: 16.000 €, B: 1 €). `share_classes` no tenía dónde
 -- guardarlo y `entity_capital_profile.valor_nominal` es único por entidad.
