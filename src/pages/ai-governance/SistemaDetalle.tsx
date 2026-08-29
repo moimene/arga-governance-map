@@ -828,9 +828,16 @@ export default function SistemaDetalle() {
                     Este sistema no tiene evaluación de impacto en derechos fundamentales registrada
                   </h2>
                   <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
-                    El artículo 27 del Reglamento (UE) 2024/1689 exige esta evaluación al desplegador
-                    antes de poner en servicio determinados sistemas de alto riesgo. Mientras no se
-                    registre, esta consola no puede afirmar que exista ni que se haya notificado.
+                    El artículo 27 del Reglamento (UE) 2024/1689 no obliga a todo desplegador. Exige
+                    dos condiciones a la vez: que el sistema sea de alto riesgo del anexo III, y que
+                    quien lo despliega sea un organismo de Derecho público, una entidad privada que
+                    preste servicios públicos, o desplegador de los sistemas del anexo III, punto 5,
+                    letras b) y c).
+                  </p>
+                  <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
+                    Ninguna de las dos consta acreditada aquí, así que esta consola no afirma que la
+                    evaluación sea exigible ni que falte. Determinarlo es cuestión jurídica, no de
+                    configuración.
                   </p>
                 </>
               )}

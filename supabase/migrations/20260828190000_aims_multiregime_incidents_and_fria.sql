@@ -1,12 +1,35 @@
 -- ============================================================
 -- Migration 20260828_190000 — AIMS 360 Multiregime Incidents & FRIA
 -- ============================================================
--- Implements:
--- 1. Multiregime Incident Subcases (incident_regime_case) with Closure Isolation
--- 2. Regulatory Clocks (RIA 15d/2d/10d, GDPR 72h, DORA 4h/24h/72h/1m)
--- 3. Incident Notification Reports and Authority Acknowledgments
--- 4. Fundamental Rights Impact Assessment (FRIA - Art. 27 RIA) 6 components
--- 5. FRIA - DPIA Cross References with hash binding (Art. 27.4 RIA & Art. 35 GDPR)
+-- REESCRITA EL 2026-08-29 (carril C2, fase B) ANTES DE SU PRIMERA APLICACIÓN.
+-- La versión anterior estaba commiteada pero nunca aplicada, así que se corrige
+-- en su sitio en vez de encadenar una migración de arreglo: dejar dos ficheros,
+-- uno de los cuales no debe aplicarse jamás, es una trampa para quien ejecute
+-- `db push`. Lo corregido:
+--
+--   * P0 — las diez políticas RLS HARDCODEABAN el tenant de ARGA
+--     (`tenant_id = '00000000-…-0001'`). Aplicada así, el tenant Garrigues
+--     habría quedado FUERA de sus propias tablas: la migración que debía
+--     habilitar el módulo era la que se lo impedía. Ahora usan
+--     `public.fn_current_tenant_id()`, que es el patrón del repo, y se crean
+--     `TO authenticated` en vez de contra `PUBLIC`.
+--   * Se retiran `qseal_token` y `tsq_token` de los informes y de la FRIA, y el
+--     canal `ERDS_EADTRUST`: el módulo AIMS no llama a ningún prestador de
+--     confianza (0 imports de cliente, 0 fetch, 0 functions.invoke, medido), y
+--     la política del proyecto prohíbe afirmar firma, sello, ERDS, envío o
+--     entrega en capturas nuevas. Hornearlo en el schema lo daba por hecho.
+--   * `governance_body_id` pasa a ser FK real contra `governing_bodies`. Antes
+--     era `text NOT NULL DEFAULT 'COMITE_RIESGOS'`: un ownership en texto libre
+--     con un valor por defecto de otro tenant. Es el mismo defecto que la
+--     review de G4 marcó como P0 — el propietario pintado como rótulo en vez de
+--     como arista.
+--
+-- Contenido:
+-- 1. Subexpedientes por régimen con aislamiento de cierres
+-- 2. Relojes regulatorios (RIA 15d/2d/10d, RGPD 72h, DORA 4h/24h/72h/1 mes)
+-- 3. Informes de notificación a la autoridad
+-- 4. Evaluación de impacto en derechos fundamentales (art. 27 RIA)
+-- 5. Referencias cruzadas FRIA ⟷ EIPD (art. 27.4 RIA y art. 35 RGPD)
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -19,7 +42,12 @@ CREATE TABLE IF NOT EXISTS aims_incident_regimes (
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   incident_id uuid NOT NULL REFERENCES ai_incidents(id) ON DELETE CASCADE,
   entity_id uuid REFERENCES entities(id) ON DELETE CASCADE,
-  regime_code text NOT NULL, -- 'RIA', 'GDPR', 'DORA'
+  -- 'RIA' | 'GDPR' | 'DORA'. El enum se deja abierto a propósito: para el
+  -- perfil despacho, DORA queda FUERA DEL ALCANCE DECLARADO y no se siembra
+  -- (`branding.modules` ya lo oculta en ese tenant, y el análisis de G6
+  -- concluyó que el sujeto obligado no es el despacho). No se retira del
+  -- modelo porque otros tenants sí pueden serlo.
+  regime_code text NOT NULL,
   status text NOT NULL DEFAULT 'OPEN', -- 'OPEN', 'IN_INVESTIGATION', 'NOTIFIED', 'NOT_APPLICABLE_JUSTIFIED', 'CLOSED'
   applicability_rationale text,
   target_authority text NOT NULL, -- 'AESIA', 'AEPD', 'DGSFP_BCE', 'CSIRT'
@@ -58,13 +86,13 @@ CREATE TABLE IF NOT EXISTS aims_incident_reports (
   report_type text NOT NULL, -- 'INITIAL', 'INTERMEDIATE', 'FINAL', 'DELAY_JUSTIFICATION', 'NON_APPLICABILITY'
   authority text NOT NULL,
   sent_at timestamptz,
-  submission_channel text, -- 'AESIA_SEDE', 'AEPD_SEDE', 'DGSFP_SEDE', 'ERDS_EADTRUST'
+  submission_channel text, -- 'AESIA_SEDE', 'AEPD_SEDE', 'DGSFP_SEDE'
   acknowledgment_ref text,
   is_complete boolean NOT NULL DEFAULT true,
   content_summary text,
   manifest_hash text,
-  qseal_token text,
-  tsq_token text,
+  -- Sin `qseal_token`/`tsq_token`: este módulo no interviene ningún prestador
+  -- de confianza. La integridad la da el hash del manifiesto, y nada más.
   evidence_refs jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -90,8 +118,6 @@ CREATE TABLE IF NOT EXISTS aims_fria_assessments (
   fria_summary text,
   market_surveillance_notified boolean NOT NULL DEFAULT false,
   notification_date timestamptz,
-  qseal_token text,
-  tsq_token text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -159,7 +185,10 @@ CREATE TABLE IF NOT EXISTS aims_fria_remediation_governance (
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
   trigger_event text NOT NULL,
-  governance_body text NOT NULL DEFAULT 'COMITE_RIESGOS',
+  -- Arista real. Antes era texto libre con un default de otro tenant, que es
+  -- el P0 de ownership que la review de G4 identificó: el propietario pintado
+  -- como rótulo nunca demuestra la relación.
+  governance_body_id uuid REFERENCES governing_bodies(id) ON DELETE SET NULL,
   complaint_channel text NOT NULL,
   redress_procedure text NOT NULL,
   rollback_strategy text,
@@ -201,7 +230,13 @@ CREATE INDEX IF NOT EXISTS idx_aims_fria_assessments_system ON aims_fria_assessm
 CREATE INDEX IF NOT EXISTS idx_aims_fria_xref_fria ON aims_fria_dpia_cross_references (fria_id);
 
 -- ---------------------------------------------------------------------------
--- RLS Tenant Isolation (00000000-0000-0000-0000-000000000001)
+-- Aislamiento por tenant.
+--
+-- P0 CORREGIDO: estas diez políticas hardcodeaban el UUID de ARGA, de modo que
+-- el tenant Garrigues no habría podido leer NI escribir en ninguna de sus
+-- propias tablas. Además se creaban sin cláusula `TO`, es decir contra
+-- `PUBLIC`. Ahora resuelven el tenant de la sesión y se limitan a
+-- `authenticated`, que es el patrón del resto del repo.
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE aims_incident_regimes ENABLE ROW LEVEL SECURITY;
@@ -216,41 +251,51 @@ ALTER TABLE aims_fria_remediation_governance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE aims_fria_dpia_cross_references ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY aims_incident_regimes_tenant_isolation ON aims_incident_regimes
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_regulatory_clocks_tenant_isolation ON aims_regulatory_clocks
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_incident_reports_tenant_isolation ON aims_incident_reports
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_assessments_tenant_isolation ON aims_fria_assessments
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_process_map_tenant_isolation ON aims_fria_process_map
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_use_profile_tenant_isolation ON aims_fria_use_profile
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_affected_groups_tenant_isolation ON aims_fria_affected_groups
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_fundamental_rights_risks_tenant_isolation ON aims_fria_fundamental_rights_risks
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_remediation_governance_tenant_isolation ON aims_fria_remediation_governance
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
 CREATE POLICY aims_fria_dpia_cross_references_tenant_isolation ON aims_fria_dpia_cross_references
-  FOR ALL USING (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid)
-  WITH CHECK (tenant_id = '00000000-0000-0000-0000-000000000001'::uuid);
+  FOR ALL TO authenticated
+  USING (tenant_id = public.fn_current_tenant_id())
+  WITH CHECK (tenant_id = public.fn_current_tenant_id());

@@ -386,3 +386,16 @@ describe("A6 — ninguna acción afirma un efecto que no produce", () => {
       "la ficha de incidente afirma un hash que no existe").toBe(false);
   });
 });
+
+describe("La puerta de entrada no promete lo que el producto oculta", () => {
+  it("el acceso de Garrigues no anuncia DORA", () => {
+    // Era la primera pantalla que veía ese usuario, ofreciéndole un régimen
+    // que `branding.modules` le oculta por dentro desde D-5 y que, por el
+    // análisis de G6, no le alcanza. Un producto no puede prometer en la
+    // puerta lo que niega en el pasillo.
+    const src = readFileSync("src/lib/login-brands.ts", "utf8");
+    const garrigues = src.slice(src.indexOf("garrigues"));
+    expect(/DORA/.test(garrigues.slice(0, 1400)),
+      "el acceso de Garrigues sigue anunciando DORA").toBe(false);
+  });
+});
