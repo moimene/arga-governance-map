@@ -656,7 +656,7 @@ describe('evaluarConvocatoria', () => {
     };
 
     it('Junta General SA: 30 días (LSC art. 176.1) — fuente LEY', () => {
-      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'JGA' }, [], []);
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'JUNTA_GENERAL' }, [], []);
       expect(result.antelacionDiasRequerida).toBe(30);
       expect(result.explain.find((n) => n.regla === 'Antelación requerida')?.fuente).toBe('LEY');
     });
@@ -671,7 +671,7 @@ describe('evaluarConvocatoria', () => {
     });
 
     it('CdA: 5 días (default reglamento, NO 30) — fuente REGLAMENTO', () => {
-      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [], []);
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CONSEJO' }, [], []);
       expect(result.antelacionDiasRequerida).toBe(5);
       // Jerarquía: LEY → ESTATUTOS → REGLAMENTO. El plazo de CdA NO es
       // estatutos (art. 285-290 LSC), sino reglamento del consejo
@@ -681,7 +681,7 @@ describe('evaluarConvocatoria', () => {
 
     it('CONSEJO_ADMINISTRACION: fuente REGLAMENTO (matching liberal)', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [],
         [],
       );
@@ -699,7 +699,7 @@ describe('evaluarConvocatoria', () => {
 
     it('CONSEJO_ADMINISTRACION: 5 días (matching liberal por substring)', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [],
         [],
       );
@@ -716,7 +716,7 @@ describe('evaluarConvocatoria', () => {
     });
 
     it('Comité: 3 días', () => {
-      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'COMITE' }, [], []);
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'COMISION_DELEGADA' }, [], []);
       expect(result.antelacionDiasRequerida).toBe(3);
     });
 
@@ -733,7 +733,7 @@ describe('evaluarConvocatoria', () => {
           },
         },
       });
-      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CDA' }, [pack], []);
+      const result = evaluarConvocatoria({ ...baseInput, organoTipo: 'CONSEJO' }, [pack], []);
       // Override del pack (8) gana sobre default de CdA (5).
       expect(result.antelacionDiasRequerida).toBe(8);
     });
@@ -752,7 +752,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', organoNoticeDays: 3 },
+        { ...baseInput, organoTipo: 'CONSEJO', organoNoticeDays: 3 },
         [legacyPack],
         [],
       );
@@ -779,7 +779,7 @@ describe('evaluarConvocatoria', () => {
 
     it('CdA SA con web inscrita: NO añade WEB_SOCIEDAD (art. 246 LSC)', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', webInscrita: true },
+        { ...baseInput, organoTipo: 'CONSEJO', webInscrita: true },
         [],
         [],
       );
@@ -790,7 +790,7 @@ describe('evaluarConvocatoria', () => {
 
     it('CdA SA sin web inscrita: NO añade BORME ni DIARIO_OFICIAL', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', webInscrita: false },
+        { ...baseInput, organoTipo: 'CONSEJO', webInscrita: false },
         [],
         [],
       );
@@ -801,7 +801,7 @@ describe('evaluarConvocatoria', () => {
 
     it('CdA: explain node menciona notificación directa al miembro', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CONSEJO_ADMINISTRACION' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [],
         [],
       );
@@ -822,7 +822,7 @@ describe('evaluarConvocatoria', () => {
 
     it('Junta SA con web inscrita: SÍ añade WEB_SOCIEDAD (caso original LSC art. 179)', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        { ...baseInput, organoTipo: 'JUNTA_GENERAL', webInscrita: true },
         [],
         [],
       );
@@ -831,7 +831,7 @@ describe('evaluarConvocatoria', () => {
 
     it('Junta SA sin web inscrita: SÍ añade BORME + DIARIO_OFICIAL', () => {
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'JGA', webInscrita: false },
+        { ...baseInput, organoTipo: 'JUNTA_GENERAL', webInscrita: false },
         [],
         [],
       );
@@ -854,7 +854,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [packWithAbstractCode],
         [],
       );
@@ -878,7 +878,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [pack],
         [],
       );
@@ -902,7 +902,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'JGA', webInscrita: true },
+        { ...baseInput, organoTipo: 'JUNTA_GENERAL', webInscrita: true },
         [pack],
         [],
       );
@@ -927,7 +927,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'ES' },
+        { ...baseInput, organoTipo: 'CONSEJO', jurisdiction: 'ES' },
         [pack],
         [],
       );
@@ -956,7 +956,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'BR' },
+        { ...baseInput, organoTipo: 'CONSEJO', jurisdiction: 'BR' },
         [pack],
         [],
       );
@@ -978,7 +978,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'MX' },
+        { ...baseInput, organoTipo: 'CONSEJO', jurisdiction: 'MX' },
         [pack],
         [],
       );
@@ -1000,7 +1000,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA' /* sin jurisdiction */ },
+        { ...baseInput, organoTipo: 'CONSEJO' /* sin jurisdiction */ },
         [pack],
         [],
       );
@@ -1022,7 +1022,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA' },
+        { ...baseInput, organoTipo: 'CONSEJO' },
         [pack],
         [],
       );
@@ -1046,7 +1046,7 @@ describe('evaluarConvocatoria', () => {
         },
       });
       const result = evaluarConvocatoria(
-        { ...baseInput, organoTipo: 'CDA', jurisdiction: 'ES' },
+        { ...baseInput, organoTipo: 'CONSEJO', jurisdiction: 'ES' },
         [pack],
         [],
       );
@@ -1110,5 +1110,47 @@ describe('evaluarConvocatoria', () => {
       expect(result.warnings.length).toBe(0);
       expect(result.explain.some((n) => n.regla === 'Antelación cumplida')).toBe(false);
     });
+  });
+});
+
+/**
+ * El default de `organoTipo` decide QUÉ FUENTE LEGAL imprime el motor.
+ *
+ * `convocatoria-engine.ts:132` hace `input.organoTipo ?? 'JGA'`, y esa rama
+ * decide si el explain node cita **art. 176 LSC** (régimen de junta) o
+ * **art. 246.2 LSC / reglamento del órgano** (consejo y comisiones).
+ *
+ * Ningún test lo cubría: una mutación del default a `'CONSEJO'` —que voltea
+ * `isJunta` y cambia la cita— pasaba los 655 tests del motor sin romper nada.
+ * O sea que la fuente legal que el producto imprime cuando nadie declara el
+ * órgano estaba sin proteger, y cualquier "limpieza" del default la habría
+ * cambiado en silencio.
+ *
+ * Se asierta LA CITA, no que compile. Y el campo es obligatorio en el tipo, así
+ * que hay que omitirlo con un cast deliberado: esa discrepancia entre el tipo
+ * y el runtime es parte del hallazgo, no un descuido del test.
+ */
+describe('Convocatoria — el default de organoTipo decide la fuente legal citada', () => {
+  const inputSinOrgano: ConvocatoriaInput = {
+    tipoSocial: 'SA',
+    organoTipo: 'JUNTA_GENERAL',
+    adoptionMode: 'MEETING',
+    fechaJunta: '2026-12-31',
+    esCotizada: false,
+    webInscrita: false,
+    primeraConvocatoria: true,
+    esJuntaUniversal: false,
+    materias: [],
+  };
+
+  it('sin organoTipo declarado, cita LEY / art. 176 LSC (régimen de junta)', () => {
+    const sinOrgano = { ...inputSinOrgano };
+    delete (sinOrgano as Partial<ConvocatoriaInput>).organoTipo;
+
+    const result = evaluarConvocatoria(sinOrgano, [], []);
+    const nodo = result.explain.find((n) => n.regla === 'Antelación requerida');
+
+    expect(nodo?.fuente).toBe('LEY');
+    expect(nodo?.referencia).toBe('art. 176 LSC');
   });
 });
