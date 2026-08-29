@@ -4,7 +4,7 @@
 // aislamiento G0 deja de ser vacua (ver nota de secuenciación en tenant-isolation).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { DEMO_TENANT, GARRIGUES_TENANT, GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, GARRIGUES_TENANT, GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 import {
   GARRIGUES_ENTITIES,
   GARRIGUES_MATRIZ_UUID,
@@ -22,20 +22,17 @@ describe("G1 — el perímetro Garrigues en Cloud refleja el catálogo", () => {
 
   beforeAll(async () => {
     try {
-      garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await garr.auth.signInWithPassword({
-        email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      authed = !error;
-      if (error) console.warn(`[g1-seed] login Garrigues falló: ${error.message}`);
+      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+      garr = await sesionDe("GARRIGUES");
+      authed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a las sondas posteriores, y el síntoma serían consultas vacías
+  // en un fichero que no ha hecho nada mal.
 
   it("hay exactamente tantas entidades como entradas del catálogo, todas del tenant", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }

@@ -6,7 +6,7 @@
 // flag `argaAuthed` independiente).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -60,12 +60,9 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
 
   beforeAll(async () => {
     try {
-      garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await garr.auth.signInWithPassword({
-        email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      authed = !error;
-      if (error) console.warn(`[g3-rule-packs-seed] login Garrigues falló: ${error.message}`);
+      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+      garr = await sesionDe("GARRIGUES");
+      authed = true;
 
       if (authed && garr) {
         const { data: probe } = await garr.from("rule_packs").select("id").like("id", "GARR_%").limit(1);
@@ -87,21 +84,16 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
 
       // ARGA client para verificar aislamiento RLS — cliente e idempotencia
       // de login independientes del cliente Garrigues.
-      arga = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error: argaError } = await arga.auth.signInWithPassword({
-        email: DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      argaAuthed = !argaError;
-      if (argaError) console.warn(`[g3-rule-packs-seed] login ARGA falló: ${argaError.message}`);
+      arga = await sesionDe("ARGA");
+      argaAuthed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a las sondas posteriores, y el síntoma serían consultas vacías
+  // en un fichero que no ha hecho nada mal.
 
   it("Garrigues ve sus 4 packs núcleo bajo su tenant (RLS per-tenant)", async () => {
     if (!authed || !garr || !packsSeeded) { expect(true).toBe(true); return; }

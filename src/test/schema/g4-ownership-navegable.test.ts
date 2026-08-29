@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 import { isExclusionTitle, exclusionKind, splitFirmeza } from "@/hooks/usePoliciesObligations";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
@@ -39,10 +39,8 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
   let arga: SupabaseClient | null = null;
 
   beforeAll(async () => {
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) garr = g;
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) arga = a;
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
   });
 
   it("el embed doble a governing_bodies resuelve (dos FK a la misma tabla)", async () => {
