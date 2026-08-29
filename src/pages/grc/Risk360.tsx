@@ -84,10 +84,13 @@ function matchesScoreFilter(risk: RiskRow, filter: string) {
     if (filter === "medios") return score >= 10 && score < 15;
     if (filter === "bajos") return score < 10;
   } else if (risk.assessed_band) {
-    if (filter === "criticos") return risk.assessed_band === "ROJO";
-    if (filter === "altos") return risk.assessed_band === "NARANJA";
-    if (filter === "medios") return risk.assessed_band === "AMARILLO";
-    if (filter === "bajos") return risk.assessed_band === "VERDE" || risk.assessed_band === "NO_EVALUADA";
+    // Los riesgos evaluados por banda ordinal NO entran en el filtro de score.
+    // La escala de la fuente es ordinal y SIN NOMBRES (D-2 del diseño de G5):
+    // mapearla a Crítico/Alto/Medio/Bajo inventa una leyenda que la fuente no
+    // publica —el PPD-01 tampoco la documenta—, y agrupaba NO_EVALUADA con las
+    // bandas bajas, que es afirmar que un delito sin evaluar es de riesgo bajo.
+    // Se filtran por su propia tira de bandas, más abajo en esta pantalla.
+    return filter === FILTER_ALL;
   }
   return true;
 }
@@ -300,13 +303,16 @@ export default function Risk360() {
     grid[5 - impact][probability - 1].push(risk);
   });
 
+  // Los KPI de severidad se calculan SOLO sobre score, como promete §10 del
+  // diseño de G5: "los riesgos sin score no entran ni suman". Sumar aquí las
+  // bandas les ponía nombre castellano por la puerta de atrás.
   const criticalCount = risksForContext.filter((risk) => {
     const s = riskScore(risk);
-    return (s !== null && s >= 20) || risk.assessed_band === "ROJO";
+    return s !== null && s >= 20;
   }).length;
   const highCount = risksForContext.filter((risk) => {
     const s = riskScore(risk);
-    return (s !== null && s >= 15 && s < 20) || risk.assessed_band === "NARANJA";
+    return s !== null && s >= 15 && s < 20;
   }).length;
   const linkedFindings = risksForContext.filter((risk) => !!risk.findings?.code).length;
   const hasFilters = moduleFilter !== FILTER_ALL || scoreFilter !== FILTER_ALL;

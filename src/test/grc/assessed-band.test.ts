@@ -72,3 +72,31 @@ describe("G5 — el detalle del riesgo lee el desglose, no solo la banda", () =>
     expect(src).toContain("NOTA_ESCALA");
   });
 });
+
+describe("D-2 — ninguna superficie GRC nombra las bandas del mapa penal", () => {
+  const RISK360 = read("src/pages/grc/Risk360.tsx");
+
+  it("Risk360 no asocia assessed_band con un nombre castellano de severidad", () => {
+    // El defecto real de G5: `risk.assessed_band === "ROJO"` dentro de la rama
+    // del filtro "criticos". La escala de la fuente es ORDINAL Y SIN NOMBRES
+    // (D-2): mapearla a Crítico/Alto/Medio/Bajo inventa la leyenda que la
+    // fuente no publica. El test mira la SUPERFICIE que comete el defecto, no
+    // la constante de al lado — que estaba bien y daba verde igualmente.
+    const infractoras = RISK360.split("\n").filter(
+      (l) =>
+        /assessed_band/.test(l) &&
+        /"(criticos|altos|medios|bajos)"|Crítico|Alto|Medio|Bajo/.test(l),
+    );
+    expect(infractoras).toEqual([]);
+  });
+
+  it("NO_EVALUADA no se agrupa nunca con una banda evaluada", () => {
+    // Contar los 11 delitos NO_EVALUADA como "bajos" es la cuarta afirmación
+    // falsa del §4 del diseño, resucitada en pantalla justo donde el trigger
+    // dejó de decirla.
+    const agrupada = RISK360.split("\n").filter(
+      (l) => /NO_EVALUADA/.test(l) && /\|\|/.test(l),
+    );
+    expect(agrupada).toEqual([]);
+  });
+});
