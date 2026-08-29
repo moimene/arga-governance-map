@@ -89,3 +89,36 @@ está en `BORRADOR` porque la plataforma no sabe emitir Juntas.
 para que C3 arregle el gate de tipos. Lo que la sustituye: los controles discriminantes de arriba
 —ejecutados por el controller contra Cloud— y el hecho de que la propia implementación cazó los dos
 errores del plan y se negó a rellenar tres huecos. **No es equivalente y no se presenta como tal.**
+
+---
+
+## Addendum — el conteo pinado que rompí, y el barrido que no me había hecho
+
+`garrigues-rule-packs-seed.test.ts:160` fijaba `expect(allGarr.length).toBe(10)` y mis 3 packs lo
+pasaron a 13. **Falla en frío y aislado: no es el 429.** C2 lo separó del ruido.
+
+Es literalmente la advertencia que yo le había dado a C2 para `evidence_bundles` —*cuando entren filas
+nuevas, toda cifra histórica cambia de significado; barre los conteos pinados antes*—. La precaución era
+buena; el que mordía era `rule_packs`, y lo mordió quien la formuló.
+
+**No se actualizó a 13.** Un inventario que se corrige a mano vuelve a romperse a la siguiente. La
+aserción se sustituye por lo que el describe existe para probar:
+
+1. **Los 10 packs de G3 siguen presentes** (`arrayContaining` de los 4 de órgano + los 6 por materia).
+   Si alguien borra uno, cae — cosa que un total **no** distinguiría de «añadieron uno y borraron otro».
+2. **Ninguno de los que ve Garrigues es de otro tenant.** Ésa es la invariante de aislamiento, y **no
+   caduca** cuando se añaden packs legítimos.
+
+`toBe(59)` para ARGA se conserva: ARGA no ha cambiado y ese número sí sigue significando lo mismo.
+
+**Barrido, ahora sí hecho**, sobre los tests que leen las tablas que C1 tocó (`rule_packs`, `agreements`,
+`agenda_items`, `meeting_attendees`, `censo_snapshot`, `capital_holdings`, `share_classes`):
+
+```
+garrigues-gobierno-seed + canonical-functions + admin-unico-certificacion + convocation-agenda-binding
+   17 pass · 9 skip · 0 fail
+tenant-isolation + garrigues-rule-packs-seed + garrigues-capital-firme
+   38 pass · 0 fail
+```
+
+No hay ningún otro conteo desfasado por Task 5 ni por Task 6.
