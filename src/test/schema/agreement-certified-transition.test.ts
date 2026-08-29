@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sesionDe } from "../helpers/supabase-test-client";
 
 // ITEM-042 [P1] loop estabilización Secretaría (2026-06-11).
 // La vía de certificación desde acta (golden path) no transicionaba los
@@ -22,17 +23,19 @@ describe("ITEM-042 — invariante: cert SIGNED implica agreement CERTIFIED (o po
 
   beforeAll(async () => {
     try {
-      client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await client.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      authed = !error;
+      // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
+      // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
+      client = await sesionDe("ARGA");
+      authed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a todas las sondas que corran después — y el síntoma no es un
+  // error de login, son consultas que devuelven vacío y aserciones que fallan
+  // en un fichero que no ha hecho nada mal.
 
   it("ningún agreement ADOPTED figura en una certificación SIGNED", async () => {
     if (!authed || !client) {

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sesionDe } from "../helpers/supabase-test-client";
 
 // ITEM-029/043 [P1] loop estabilización Secretaría (2026-06-11).
 // authority_evidence arrastraba 12 cargos fantasma VIGENTES (AE sin
@@ -23,17 +24,19 @@ describe("authority_evidence — integridad de cargos VIGENTES (ITEM-029/043)", 
 
   beforeAll(async () => {
     try {
-      client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await client.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      authed = !error;
+      // Sesión COMPARTIDA: la suite entera hace 2 logins en vez de ~40, y cada
+      // cuenta lleva storageKey propio. `sesionDe` lanza si no autentica.
+      client = await sesionDe("ARGA");
+      authed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await client?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a todas las sondas que corran después — y el síntoma no es un
+  // error de login, son consultas que devuelven vacío y aserciones que fallan
+  // en un fichero que no ha hecho nada mal.
 
   it("ningún órgano de ARGA tiene PRESIDENTE ni SECRETARIO VIGENTE duplicado", async () => {
     if (!authed || !client) {

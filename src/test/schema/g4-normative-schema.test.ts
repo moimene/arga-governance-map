@@ -3,7 +3,7 @@
 // graceful-skip de garrigues-rule-packs-seed.test.ts.
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 // Fallback con la clave publicable (mismo patrón que
@@ -26,13 +26,9 @@ describe("G4 Task 1 — esquema de ownership normativo", () => {
   let authed = false;
 
   beforeAll(async () => {
-    if (!SUPABASE_ANON_KEY) return;
-    const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    const { error } = await c.auth.signInWithPassword({
-      email: GARRIGUES_DEMO_EMAIL,
-      password: DEMO_PASSWORD,
-    });
-    if (!error) { garr = c; authed = true; }
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    garr = await sesionDe("GARRIGUES");
+    authed = true;
   });
 
   it("policies expone owner_body_id, summary y content_outline", async () => {

@@ -15,7 +15,7 @@
 // cuando exista acta apta. Patrón graceful-skip de garrigues-gobierno-seed.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -32,20 +32,17 @@ describe("G3 — contrato RPC de certificación del administrador único", () =>
 
   beforeAll(async () => {
     try {
-      garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await garr.auth.signInWithPassword({
-        email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      authed = !error;
-      if (error) console.warn(`[g3-cert] login Garrigues falló: ${error.message}`);
+      // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+      garr = await sesionDe("GARRIGUES");
+      authed = true;
     } catch {
       authed = false;
     }
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a las sondas posteriores, y el síntoma serían consultas vacías
+  // en un fichero que no ha hecho nada mal.
 
   it("ADMIN_UNICO con VºBº NULL no es rechazado por VºBº (falla por acta, nunca por 'approval')", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }

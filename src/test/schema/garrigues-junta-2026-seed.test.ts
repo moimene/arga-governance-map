@@ -352,12 +352,8 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
   let meetingId: string | null = null;
 
   beforeAll(async () => {
-    garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eGarr } = await garr.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD });
-    if (eGarr) throw new Error(`login Garrigues falló: ${eGarr.message}`);
-    arga = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eArga } = await arga.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD });
-    if (eArga) throw new Error(`login ARGA falló: ${eArga.message}`);
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
 
     const { data, error } = await garr.from("governing_bodies").select("id").eq("slug", ORGANO_SLUG).maybeSingle();
     if (error) throw new Error(`governing_bodies ${ORGANO_SLUG}: ${error.message}`);
@@ -370,10 +366,10 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
     meetingId = m?.id ?? null;
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a todas las sondas que corran después — y el síntoma no es un
+  // error de login, son consultas que devuelven vacío y aserciones que fallan
+  // en un fichero que no ha hecho nada mal.
 
   it("la reunión existe con la mesa real del acta y en un estado que no afirma de más", async () => {
     const { data, error } = await garr.from("meetings")
@@ -672,12 +668,8 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
   let acuerdos: Acuerdo[] = [];
 
   beforeAll(async () => {
-    garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eGarr } = await garr.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD });
-    if (eGarr) throw new Error(`login Garrigues falló: ${eGarr.message}`);
-    arga = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eArga } = await arga.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD });
-    if (eArga) throw new Error(`login ARGA falló: ${eArga.message}`);
+    // Sesión COMPARTIDA: 2 logins en toda la suite, storageKey por cuenta.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
 
     const { data: m } = await garr.from("meetings").select("id").eq("slug", MEETING_SLUG).maybeSingle();
     meetingId = m?.id ?? null;
@@ -689,10 +681,10 @@ describe("C1 — los 9 acuerdos de la Junta en Cloud", () => {
     acuerdos = data ?? [];
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA. Cerrarla aquí dejaría sin
+  // autenticar a todas las sondas que corran después — y el síntoma no es un
+  // error de login, son consultas que devuelven vacío y aserciones que fallan
+  // en un fichero que no ha hecho nada mal.
 
   it("hay 9 acuerdos, son los 9 puntos con materia y ninguno es la modificación bloqueada", () => {
     expect(acuerdos).toHaveLength(9);
