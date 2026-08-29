@@ -2,10 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
   Activity, ArrowRight, FileText, PlusCircle, Scale, ShieldCheck, 
-  ChevronDown, ChevronUp, AlertTriangle, PenTool, ExternalLink, HelpCircle, Loader2, CheckCircle2, Lock
+  ChevronDown, ChevronUp, ChevronRight, AlertTriangle, PenTool, ExternalLink, HelpCircle, Loader2, CheckCircle2, Lock
 } from "lucide-react";
 import { useRisks, type RiskRow } from "@/hooks/useRisks";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSecretariaScope } from "@/components/secretaria/shell";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   controlStatusLabel,
   type ControlRow,
@@ -90,7 +93,7 @@ const DELITOS_TAXONOMY: DelitoCategory[] = [
     description: "Previene sobornos, dádivas o favores a funcionarios públicos o entre particulares en relaciones comerciales.",
     keywords: ["cohecho", "corrupcion", "corrupción", "soborno", "regalo", "hospitalidad", "penal", "anticorrup"],
     fallbackRisks: [
-      { id: "RSK-PEN-001", code: "RSK-PEN-001", title: "Pagos de facilitación y sobornos a intermediarios comerciales", description: "Riesgo de que agentes o socios comerciales realicen pagos ilícitos en nombre de ARGA Seguros para retener cuentas corporativas.", status: "Abierto", probability: 3, impact: 4, inherent_score: 12, residual_score: 6 },
+      { id: "RSK-PEN-001", code: "RSK-PEN-001", title: "Pagos de facilitación y sobornos a intermediarios comerciales", description: "Riesgo de que agentes o socios comerciales realicen pagos ilícitos en nombre de la entidad para retener cuentas corporativas.", status: "Abierto", probability: 3, impact: 4, inherent_score: 12, residual_score: 6 },
       { id: "RSK-PEN-002", code: "RSK-PEN-002", title: "Aceptación de regalos y hospitalidades fuera de política", description: "Riesgo de que empleados clave acepten invitaciones, viajes o obsequios de proveedores críticos comprometiendo la imparcialidad.", status: "En Tratamiento", probability: 2, impact: 3, inherent_score: 6, residual_score: 2 }
     ],
     fallbackControls: [
@@ -159,12 +162,14 @@ const DELITOS_TAXONOMY: DelitoCategory[] = [
 ];
 
 export default function PenalAnticorrupcion() {
+  const { user } = useCurrentUser();
+  const branding = useTenantBranding();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const scopeLabel =
     scope.mode === "sociedad" && scope.selectedEntity
       ? scope.selectedEntity.legalName
-      : "Grupo ARGA Seguros";
+      : groupFullLabel(branding);
 
   // Data queries
   const { data: risks = [], isLoading: loadingRisks, refetch: refetchRisks } = useRisks({ entityId: scopedEntityId });
@@ -192,8 +197,8 @@ export default function PenalAnticorrupcion() {
     delitoId: string;
   } | null>(null);
 
-  const [auditorName, setAuditorName] = useState("Lucía Martín");
-  const [auditorEmail, setAuditorEmail] = useState("lucia@arga-seguros.com");
+  const [auditorName, setAuditorName] = useState("Auditor de Cumplimiento");
+  const [auditorEmail, setAuditorEmail] = useState(() => user?.email || "auditor@empresa.com");
   const [evidenceDocName, setEvidenceDocName] = useState("");
   const [signingProgress, setSigningProgress] = useState<string | null>(null);
 
@@ -327,6 +332,38 @@ export default function PenalAnticorrupcion() {
             </div>
           );
         })}
+      </div>
+
+      {/* Banner de Integración con el Sistema Interno de Información (SII - Ley 2/2023) */}
+      <div 
+        className="p-5 bg-[var(--g-surface-subtle)] border border-[var(--g-brand-3308)]/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+        style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+      >
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] rounded-md shrink-0">
+            <Lock className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
+                Canal Interno de Información / Denuncias (Ley 2/2023 & CP Art. 31 bis)
+              </h3>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--status-success)] text-[var(--g-text-inverse)] rounded-full">
+                SLA 7D / 3M ACTIVO
+              </span>
+            </div>
+            <p className="text-xs text-[var(--g-text-secondary)] mt-1 max-w-2xl leading-relaxed">
+              Consola de recepción omnicanal, Safe Inbox anónimo, subexpedientes autónomos, acuse de recibo en 7 días naturales, investigación en 3 meses y Libro-Registro oficial con custodia EAD Trust WORM.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          to="/sii"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] text-xs font-bold rounded-md hover:bg-[var(--g-sec-700)] transition-colors shrink-0"
+        >
+          Acceder al Canal SII <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Interactive Compliance Matrix */}

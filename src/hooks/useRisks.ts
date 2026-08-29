@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
+import type { Banda } from "@/lib/grc/assessed-band";
 
 export type RiskRow = {
   id: string;
@@ -16,6 +17,9 @@ export type RiskRow = {
   status: string | null;
   obligation_id: string | null;
   finding_id: string | null;
+  assessed_band: Banda | null;
+  assessment_breakdown: Record<string, Record<string, { color?: string; nivel?: null; motivo?: string }>> | null;
+  assessment_provenance: Record<string, unknown> | null;
   obligations?: { code?: string | null; title?: string | null } | null;
   findings?: { code?: string | null; title?: string | null } | null;
 };
@@ -32,6 +36,9 @@ export type RiskWriteInput = {
   finding_id?: string | null;
   entity_id?: string | null;
   owner_id?: string | null;
+  assessed_band?: Banda | null;
+  assessment_breakdown?: Record<string, unknown> | null;
+  assessment_provenance?: Record<string, unknown> | null;
 };
 
 export function useRisks(filters?: { moduleId?: string; entityId?: string | null }) {
@@ -43,7 +50,7 @@ export function useRisks(filters?: { moduleId?: string; entityId?: string | null
       let q = supabase
         .from("risks")
         .select(
-          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
+          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, assessed_band, assessment_breakdown, assessment_provenance, obligations:obligation_id(code, title), findings:finding_id(code, title)"
         )
         .eq("tenant_id", tenantId!)
         .order("code");
@@ -71,7 +78,7 @@ export function useRiskById(id?: string) {
       const { data, error } = await supabase
         .from("risks")
         .select(
-          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, obligations:obligation_id(code, title), findings:finding_id(code, title)"
+          "id, code, title, description, probability, impact, inherent_score, residual_score, entity_id, module_id, status, obligation_id, finding_id, assessed_band, assessment_breakdown, assessment_provenance, obligations:obligation_id(code, title), findings:finding_id(code, title)"
         )
         .eq("tenant_id", tenantId!)
         .eq("id", id!)

@@ -4,14 +4,24 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Activity, Pencil, PlusCircle, Route } from "lucide-react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
+import { ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes } from "@/lib/grc/assessed-band";
 
 const FILTER_ALL = "Todos";
 
-const SCORE_BG = (score: number) => {
-  if (score >= 20) return "bg-[var(--status-error)]";
-  if (score >= 15) return "bg-[var(--status-error)]/80";
-  if (score >= 10) return "bg-[var(--status-warning)]";
-  if (score >= 5) return "bg-[var(--g-sec-300)]";
+const SCORE_BG = (score: number | null, band?: string | null) => {
+  if (score !== null) {
+    if (score >= 20) return "bg-[var(--status-error)]";
+    if (score >= 15) return "bg-[var(--status-error)]/80";
+    if (score >= 10) return "bg-[var(--status-warning)]";
+    if (score >= 5) return "bg-[var(--g-sec-300)]";
+    return "bg-[var(--g-surface-muted)]";
+  }
+  if (band === "ROJO") return "bg-[var(--status-error)]";
+  if (band === "NARANJA") return "bg-[var(--status-warning)]";
+  if (band === "AMARILLO") return "bg-[var(--status-warning)]/70";
+  if (band === "VERDE") return "bg-[var(--status-success)]";
   return "bg-[var(--g-surface-muted)]";
 };
 
@@ -26,6 +36,8 @@ const MODULE_LABEL: Record<string, string> = {
   AUDIT: "Auditoría",
   penal: "Cumplimiento penal",
   PENAL: "Cumplimiento penal",
+  risk: "Riesgos penales",
+  RISK: "Riesgos penales",
 };
 
 const SCORE_FILTERS = [
@@ -36,11 +48,15 @@ const SCORE_FILTERS = [
   { value: "bajos", label: "Bajos" },
 ];
 
-function riskScore(risk: RiskRow) {
-  return Math.max(1, risk.probability ?? 1) * Math.max(1, risk.impact ?? 1);
+function riskScore(risk: RiskRow): number | null {
+  return tieneEjes(risk) ? risk.probability! * risk.impact! : null;
 }
 
-function scoreLabel(score: number) {
+function scoreLabel(score: number | null, risk?: RiskRow) {
+  if (score === null) {
+    if (risk?.assessed_band) return ETIQUETA_BANDA[risk.assessed_band];
+    return "Sin evaluar";
+  }
   if (score >= 20) return "Crítico";
   if (score >= 15) return "Alto";
   if (score >= 10) return "Medio";
@@ -60,12 +76,19 @@ function moduleLabel(value?: string | null) {
 }
 
 function matchesScoreFilter(risk: RiskRow, filter: string) {
-  const score = riskScore(risk);
   if (filter === FILTER_ALL) return true;
-  if (filter === "criticos") return score >= 20;
-  if (filter === "altos") return score >= 15 && score < 20;
-  if (filter === "medios") return score >= 10 && score < 15;
-  if (filter === "bajos") return score < 10;
+  const score = riskScore(risk);
+  if (score !== null) {
+    if (filter === "criticos") return score >= 20;
+    if (filter === "altos") return score >= 15 && score < 20;
+    if (filter === "medios") return score >= 10 && score < 15;
+    if (filter === "bajos") return score < 10;
+  } else if (risk.assessed_band) {
+    if (filter === "criticos") return risk.assessed_band === "ROJO";
+    if (filter === "altos") return risk.assessed_band === "NARANJA";
+    if (filter === "medios") return risk.assessed_band === "AMARILLO";
+    if (filter === "bajos") return risk.assessed_band === "VERDE" || risk.assessed_band === "NO_EVALUADA";
+  }
   return true;
 }
 
@@ -127,26 +150,48 @@ function RiskCard({
         <div className="min-w-0">
           <div className="font-mono text-xs text-[var(--g-text-secondary)]">{risk.code}</div>
           <h2 className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--g-text-primary)]">
-            {risk.title}
+            <Link
+              to={scope.createScopedTo(`/grc/risk-360/${risk.id}`)}
+              className="hover:text-[var(--g-link)] hover:underline"
+            >
+              {risk.title}
+            </Link>
           </h2>
         </div>
         <span
-          className={`inline-flex shrink-0 items-center px-2 py-0.5 text-xs font-semibold ${SCORE_BG(score)} ${
-            score >= 10 ? "text-[var(--g-text-inverse)]" : "text-[var(--g-text-primary)]"
+          className={`inline-flex shrink-0 items-center px-2 py-0.5 text-xs font-semibold ${SCORE_BG(score, risk.assessed_band)} ${
+            (score !== null && score >= 10) || risk.assessed_band === "ROJO"
+              ? "text-[var(--g-text-inverse)]"
+              : "text-[var(--g-text-primary)]"
           }`}
           style={{ borderRadius: "var(--g-radius-full)" }}
         >
-          {scoreLabel(score)}
+          {scoreLabel(score, risk)}
         </span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span
-          className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)]"
-          style={{ borderRadius: "var(--g-radius-full)" }}
-        >
-          Prob. {risk.probability ?? 1} · Impacto {risk.impact ?? 1}
-        </span>
+        {tieneEjes(risk) ? (
+          <span
+            className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+          >
+            Prob. {risk.probability} · Impacto {risk.impact}
+          </span>
+        ) : risk.assessed_band ? (
+          <span
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+            style={{ borderRadius: "var(--g-radius-full)" }}
+            title={NOTA_ESCALA}
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block h-2.5 w-2.5 border border-[var(--g-border-subtle)]"
+              style={{ backgroundColor: COLOR_BANDA[risk.assessed_band], borderRadius: "var(--g-radius-sm)" }}
+            />
+            {ETIQUETA_BANDA[risk.assessed_band]}
+          </span>
+        ) : null}
         {risk.residual_score !== null && (
           <span
             className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
@@ -181,8 +226,14 @@ function RiskCard({
           </Link>
         )}
         <Link
-          to={scope.createScopedTo(`/grc/risk-360/${risk.id}/editar`)}
+          to={scope.createScopedTo(`/grc/risk-360/${risk.id}`)}
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--g-link)] hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
+        >
+          Ver detalle
+        </Link>
+        <Link
+          to={scope.createScopedTo(`/grc/risk-360/${risk.id}/editar`)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--g-text-secondary)] hover:text-[var(--g-link-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
         >
           <Pencil className="h-3 w-3" aria-hidden="true" />
           Editar
@@ -194,12 +245,13 @@ function RiskCard({
 
 export default function Risk360() {
   const [params] = useSearchParams();
+  const branding = useTenantBranding();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const scopeLabel =
     scope.mode === "sociedad" && scope.selectedEntity
       ? scope.selectedEntity.legalName
-      : "Grupo ARGA Seguros";
+      : groupFullLabel(branding);
   const findingFilter = params.get("finding");
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");
@@ -229,19 +281,32 @@ export default function Risk360() {
     [risksForContext, moduleFilter, scoreFilter],
   );
 
+  const conEjes = useMemo(() => risks.filter(tieneEjes), [risks]);
+  const porBanda = useMemo(
+    () =>
+      ORDEN_BANDAS.map((b) => ({
+        banda: b,
+        items: risks.filter((r) => !tieneEjes(r) && r.assessed_band === b),
+      })).filter((g) => g.items.length > 0),
+    [risks],
+  );
+
   const grid: RiskRow[][][] = Array.from({ length: 5 }, () =>
     Array.from({ length: 5 }, () => [] as RiskRow[]),
   );
-  risks.forEach((risk) => {
-    const probability = Math.min(5, Math.max(1, risk.probability ?? 1));
-    const impact = Math.min(5, Math.max(1, risk.impact ?? 1));
+  conEjes.forEach((risk) => {
+    const probability = Math.min(5, Math.max(1, risk.probability!));
+    const impact = Math.min(5, Math.max(1, risk.impact!));
     grid[5 - impact][probability - 1].push(risk);
   });
 
-  const criticalCount = risksForContext.filter((risk) => riskScore(risk) >= 20).length;
+  const criticalCount = risksForContext.filter((risk) => {
+    const s = riskScore(risk);
+    return (s !== null && s >= 20) || risk.assessed_band === "ROJO";
+  }).length;
   const highCount = risksForContext.filter((risk) => {
-    const score = riskScore(risk);
-    return score >= 15 && score < 20;
+    const s = riskScore(risk);
+    return (s !== null && s >= 15 && s < 20) || risk.assessed_band === "NARANJA";
   }).length;
   const linkedFindings = risksForContext.filter((risk) => !!risk.findings?.code).length;
   const hasFilters = moduleFilter !== FILTER_ALL || scoreFilter !== FILTER_ALL;
@@ -295,12 +360,14 @@ export default function Risk360() {
           <div className="flex min-w-0 items-start gap-3">
             <Route className="mt-0.5 h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Entrada desde AIMS
-              </h2>
-              <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
-                Se recibe la señal de {handoffLabel(handoff)} para decidir si procede abrir riesgo, control o plan de acción en GRC.
-              </p>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
+                  Entrada desde AIMS
+                </h2>
+                <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
+                  Se recibe la señal de {handoffLabel(handoff)} para decidir si procede abrir riesgo, control o plan de acción en GRC.
+                </p>
+              </div>
             </div>
           </div>
           <Link
@@ -380,75 +447,141 @@ export default function Risk360() {
           style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           aria-label="Mapa de calor de riesgos"
         >
-          <div className="mb-3 text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
-            Mapa de calor: probabilidad por impacto
-          </div>
-          {isLoading ? (
-            <div className="py-8 text-center text-sm text-[var(--g-text-secondary)] animate-pulse">
-              Cargando riesgos...
-            </div>
-          ) : (
-            <div className="min-w-0 overflow-hidden">
-              <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-1">
-                <div />
-                {[1, 2, 3, 4, 5].map((probability) => (
-                  <div
-                    key={`ph-${probability}`}
-                    className="pb-1 text-center text-xs text-[var(--g-text-secondary)]"
-                  >
-                    P {probability}
+          {conEjes.length > 0 && (
+            <>
+              <div className="mb-3 text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
+                Mapa de calor: probabilidad por impacto
+              </div>
+              {isLoading ? (
+                <div className="py-8 text-center text-sm text-[var(--g-text-secondary)] animate-pulse">
+                  Cargando riesgos...
+                </div>
+              ) : (
+                <div className="min-w-0 overflow-hidden">
+                  <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-1">
+                    <div />
+                    {[1, 2, 3, 4, 5].map((probability) => (
+                      <div
+                        key={`ph-${probability}`}
+                        className="pb-1 text-center text-xs text-[var(--g-text-secondary)]"
+                      >
+                        P {probability}
+                      </div>
+                    ))}
+                    {grid.map((row, rowIndex) => (
+                      <div key={`row-${rowIndex}`} className="contents">
+                        <div className="self-center pr-1 text-right text-xs text-[var(--g-text-secondary)]">
+                          I {5 - rowIndex}
+                        </div>
+                        {row.map((cell, columnIndex) => {
+                          const score = (5 - rowIndex) * (columnIndex + 1);
+                          const hasRisks = cell.length > 0;
+                          return (
+                            <div
+                              key={`cell-${rowIndex}-${columnIndex}`}
+                              title={
+                                hasRisks
+                                  ? cell.map((risk) => `${risk.code}: ${risk.title}`).join("\n")
+                                  : `Score ${score}`
+                              }
+                              className={`flex aspect-square min-h-10 items-center justify-center text-sm font-semibold transition-all ${
+                                hasRisks
+                                  ? `${SCORE_BG(score)} ${score >= 10 ? "text-[var(--g-text-inverse)]" : "text-[var(--g-text-primary)]"} hover:opacity-80`
+                                  : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
+                              }`}
+                              style={{ borderRadius: "var(--g-radius-sm)" }}
+                            >
+                              {hasRisks ? cell.length : "·"}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                {[
+                  { label: "Crítico", cls: "bg-[var(--status-error)]" },
+                  { label: "Alto", cls: "bg-[var(--status-error)]/80" },
+                  { label: "Medio", cls: "bg-[var(--status-warning)]" },
+                  { label: "Bajo", cls: "bg-[var(--g-sec-300)]" },
+                  { label: "Mínimo", cls: "bg-[var(--g-surface-muted)]" },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-1">
+                    <div
+                      className={`h-3 w-3 ${item.cls}`}
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    />
+                    <span className="text-xs text-[var(--g-text-secondary)]">{item.label}</span>
                   </div>
                 ))}
-                {grid.map((row, rowIndex) => (
-                  <div key={`row-${rowIndex}`} className="contents">
-                    <div className="self-center pr-1 text-right text-xs text-[var(--g-text-secondary)]">
-                      I {5 - rowIndex}
+              </div>
+            </>
+          )}
+
+          {porBanda.length > 0 && (
+            <div className={conEjes.length > 0 ? "mt-6 pt-6 border-t border-[var(--g-border-subtle)]" : ""}>
+              <div className="mb-1 text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
+                Mapa de riesgos evaluados por bandas
+              </div>
+              <p className="mb-4 text-xs leading-5 text-[var(--g-text-secondary)]">
+                {NOTA_ESCALA}
+              </p>
+              <div className="space-y-4">
+                {porBanda.map((grupo) => (
+                  <div
+                    key={grupo.banda}
+                    className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-page)] p-3"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 border border-[var(--g-border-subtle)]"
+                          style={{
+                            backgroundColor: COLOR_BANDA[grupo.banda],
+                            borderRadius: "var(--g-radius-sm)",
+                          }}
+                        />
+                        <span className="text-xs font-bold text-[var(--g-text-primary)]">
+                          {ETIQUETA_BANDA[grupo.banda]}
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-[var(--g-text-secondary)]">
+                        {grupo.items.length} {grupo.items.length === 1 ? "delito" : "delitos"}
+                      </span>
                     </div>
-                    {row.map((cell, columnIndex) => {
-                      const score = (5 - rowIndex) * (columnIndex + 1);
-                      const hasRisks = cell.length > 0;
-                      return (
-                        <div
-                          key={`cell-${rowIndex}-${columnIndex}`}
-                          title={
-                            hasRisks
-                              ? cell.map((risk) => `${risk.code}: ${risk.title}`).join("\n")
-                              : `Score ${score}`
-                          }
-                          className={`flex aspect-square min-h-10 items-center justify-center text-sm font-semibold transition-all ${
-                            hasRisks
-                              ? `${SCORE_BG(score)} ${score >= 10 ? "text-[var(--g-text-inverse)]" : "text-[var(--g-text-primary)]"} hover:opacity-80`
-                              : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]"
-                          }`}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                      {grupo.items.slice(0, 6).map((item) => (
+                        <Link
+                          key={item.id}
+                          to={scope.createScopedTo(`/grc/risk-360/${item.id}`)}
+                          className="flex items-center justify-between p-2 text-xs bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] hover:bg-[var(--g-surface-subtle)]"
                           style={{ borderRadius: "var(--g-radius-sm)" }}
                         >
-                          {hasRisks ? cell.length : "·"}
-                        </div>
-                      );
-                    })}
+                          <span className="truncate text-[var(--g-text-primary)] font-medium mr-2">
+                            {item.title}
+                          </span>
+                          <span className="font-mono text-[10px] text-[var(--g-text-secondary)] shrink-0">
+                            {item.code}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    {grupo.items.length > 6 && (
+                      <div className="mt-2 text-right">
+                        <span className="text-[11px] text-[var(--g-text-secondary)]">
+                          +{grupo.items.length - 6} más en la lista lateral
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            {[
-              { label: "Crítico", cls: "bg-[var(--status-error)]" },
-              { label: "Alto", cls: "bg-[var(--status-error)]/80" },
-              { label: "Medio", cls: "bg-[var(--status-warning)]" },
-              { label: "Bajo", cls: "bg-[var(--g-sec-300)]" },
-              { label: "Mínimo", cls: "bg-[var(--g-surface-muted)]" },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-1">
-                <div
-                  className={`h-3 w-3 ${item.cls}`}
-                  style={{ borderRadius: "var(--g-radius-sm)" }}
-                />
-                <span className="text-xs text-[var(--g-text-secondary)]">{item.label}</span>
-              </div>
-            ))}
-          </div>
         </section>
 
         <section
@@ -472,7 +605,16 @@ export default function Risk360() {
           <div className="max-h-none space-y-2 overflow-y-visible xl:max-h-[520px] xl:overflow-y-auto">
             {risks
               .slice()
-              .sort((a, b) => riskScore(b) - riskScore(a))
+              .sort((a, b) => {
+                const sa = riskScore(a);
+                const sb = riskScore(b);
+                if (sa !== null && sb !== null) return sb - sa;
+                if (sa !== null) return -1;
+                if (sb !== null) return 1;
+                const oa = ORDEN_BANDAS.indexOf(a.assessed_band ?? "NO_EVALUADA");
+                const ob = ORDEN_BANDAS.indexOf(b.assessed_band ?? "NO_EVALUADA");
+                return oa - ob;
+              })
               .map((risk) => (
                 <RiskCard key={risk.id} risk={risk} scope={scope} />
               ))}
