@@ -100,6 +100,12 @@ import {
   convocatoriaText,
   puntosQueMaterializan,
   puntosSinMateriaAcreditada,
+  NOTA_PUNTO_BLOQUEADO,
+  PUNTO_BLOQUEADO,
+  ordinalEnOrdenDelDia,
+  puntosConAcuerdo,
+  textoAcuerdo,
+  type PuntoOrdenDia,
 } from "./garrigues/junta-2026/orden-del-dia";
 import { votingRightsFromCapitalHolding } from "../src/lib/secretaria/meeting-census";
 
@@ -430,6 +436,170 @@ export function censoPrecondicion(socios: SocioCenso[]): {
   };
 }
 
+
+// ────────────────────────────── Task 6: los 9 acuerdos, con su regla y su punto ──
+
+/**
+ * La regla que sirve un acuerdo: el pack POR MATERIA del tenant Garrigues.
+ *
+ * `mayoriaSL` es la rama que `effective-rule.ts:89` lee para `tipoSocial='SLP'`.
+ * De ella sale también el `statutory_basis` del acuerdo: **este seed no escribe
+ * ni una cita legal a mano**, las copia del pack, que es donde el Comité Legal
+ * las mantiene.
+ */
+export type PackResuelto = {
+  packId: string;
+  version: string;
+  materia: string;
+  mayoriaSL: Record<string, unknown>;
+};
+
+export type AgendaRow = {
+  tenant_id: string;
+  meeting_id: string;
+  order_number: number;
+  title: string;
+  description: string;
+  kind: "DECISORIO";
+  matter_code: string;
+  proposal_text: string;
+};
+
+export type AgreementRow = {
+  tenant_id: string;
+  entity_id: string;
+  body_id: string;
+  code: string;
+  agreement_kind: string;
+  matter_class: string;
+  inscribable: boolean;
+  adoption_mode: "MEETING";
+  status: "ADOPTED";
+  decision_date: string;
+  parent_meeting_id: string;
+  agenda_item_id: string;
+  rule_pack_id: string;
+  rule_pack_version: string;
+  statutory_basis: string;
+  proposal_text: string;
+  decision_text: string;
+  compliance_explain: Record<string, unknown>;
+};
+
+/**
+ * El punto celebrado.
+ *
+ * **`order_number` es el ordinal del punto dentro de la convocatoria**, no un
+ * contador propio: es el mismo entero que la plataforma pondría en
+ * `agenda_items.source_convocatoria_item_index`. Ese vínculo por FK no se puede
+ * escribir aquí —`fn_secretaria_guard_convocation_agenda_binding` exige una
+ * convocatoria EMITIDA e inmutable y ésta está en BORRADOR—, así que las tres
+ * columnas `source_convocatoria_*` quedan a NULL, que es lo que el CHECK
+ * `agenda_items_convocation_source_binding_complete` exige cuando no hay
+ * vínculo: las tres o ninguna.
+ */
+export function buildAgendaRow(meetingId: string, p: PuntoOrdenDia): AgendaRow {
+  if (!p.materia) throw new Error(`agenda: el punto ${p.numero} no tiene materia`);
+  return {
+    tenant_id: GARRIGUES_TENANT,   // la columna tiene DEFAULT al tenant de ARGA: hay que darla
+    meeting_id: meetingId,
+    order_number: ordinalEnOrdenDelDia(p.numero),
+    title: p.titulo,
+    // El "1.2" del certificado no cabe en un integer: se conserva aquí, que es
+    // donde la ficha del punto lo enseña.
+    description: `Punto ${p.numero} del orden del día de la Junta General de Socios de ${FECHA_JUNTA}.`,
+    kind: "DECISORIO",             // `agreement_requires_decisorio` lo exige
+    matter_code: p.materia,
+    proposal_text: textoAcuerdo(p.numero).propuesta,
+  };
+}
+
+/**
+ * El acuerdo.
+ *
+ * - `matter_class` e `inscribable` salen de `materia_catalog`. Duplicarlos aquí
+ *   sería una segunda copia de la clasificación que mentiría el día que el
+ *   catálogo cambiara.
+ * - `agenda_item_id` es la **arista real** punto ↔ acuerdo: un uuid con FK a
+ *   `agenda_items`, no el número del punto ni una coincidencia de título.
+ * - `required_majority_code` se deja **NULL a propósito**. El vocabulario de esa
+ *   columna es la escalera de `fn_majority_level` (SIMPLE < REFORZADA_2_3 <
+ *   UNANIMIDAD) y ninguno de esos tres valores expresa la base de cómputo del
+ *   art. 30.1 de los Estatutos —mayoría de los votos DEL CAPITAL, no de los
+ *   emitidos ni del capital presente—. Escribir SIMPLE afirmaría otra regla, y
+ *   además el trigger `fn_agreements_majority_check` lo rechazaría en las
+ *   materias cuyo mínimo de catálogo es REFORZADA_2_3. La mayoría aplicable vive
+ *   en el rule pack, que es su sitio, y se copia a `compliance_explain`.
+ */
+export function buildAgreementRow(args: {
+  meetingId: string;
+  bodyId: string;
+  agendaItemId: string;
+  punto: PuntoOrdenDia;
+  clase: ClaseMateria;
+  pack: PackResuelto;
+}): AgreementRow {
+  const { meetingId, bodyId, agendaItemId, punto, clase, pack } = args;
+  if (!punto.materia) throw new Error(`acuerdo: el punto ${punto.numero} no tiene materia`);
+  if (clase.materia !== punto.materia) {
+    throw new Error(`acuerdo: clase de ${clase.materia} aplicada al punto ${punto.numero} (${punto.materia})`);
+  }
+  if (pack.materia !== punto.materia) {
+    throw new Error(`acuerdo: el pack ${pack.packId} sirve la materia ${pack.materia} y el punto ${punto.numero} es ${punto.materia}`);
+  }
+  const texto = textoAcuerdo(punto.numero);
+  const referencia = String(pack.mayoriaSL.referencia ?? "");
+  if (!referencia) throw new Error(`acuerdo: el pack ${pack.packId} no trae referencia de mayoría`);
+
+  return {
+    tenant_id: GARRIGUES_TENANT,
+    entity_id: GARRIGUES_MATRIZ_UUID,
+    body_id: bodyId,
+    code: `JGS-${FECHA_JUNTA}-${punto.numero}`,
+    agreement_kind: punto.materia,
+    matter_class: clase.matter_class,
+    inscribable: clase.inscribable,
+    adoption_mode: "MEETING",
+    status: "ADOPTED",
+    decision_date: FECHA_JUNTA,
+    parent_meeting_id: meetingId,
+    agenda_item_id: agendaItemId,
+    rule_pack_id: pack.packId,
+    rule_pack_version: pack.version,
+    // Derivado del pack, no redactado aquí.
+    statutory_basis: referencia,
+    proposal_text: texto.propuesta,
+    decision_text: texto.decision,
+    compliance_explain: {
+      c1_junta_socios_2026: {
+        punto: punto.numero,
+        orden_del_dia_ordinal: ordinalEnOrdenDelDia(punto.numero),
+        titulo: punto.titulo,
+        contenido_acuerdo: texto.contenido,
+        rule_pack: {
+          pack_id: pack.packId,
+          version: pack.version,
+          materia: pack.materia,
+          resolucion: "POR_MATERIA",
+          tenant: "GARRIGUES",
+        },
+        mayoria: pack.mayoriaSL,
+        required_majority_code: {
+          valor: null,
+          motivo:
+            "El vocabulario de required_majority_code (SIMPLE < REFORZADA_2_3 < UNANIMIDAD, fn_majority_level) no expresa la base de cómputo del art. 30.1 de los Estatutos, que es la mayoría de los votos del capital social y no la de los votos emitidos. Escribir un código de esa escalera afirmaría otra regla; la aplicable es la del rule pack y está copiada aquí al lado.",
+        },
+        texto_del_acuerdo:
+          texto.contenido === "ACREDITADO"
+            ? "Contenido acreditado en fuente externa; la redacción es reconstrucción: el certificado del acta no transcribe el literal."
+            : "INFERIDO: el certificado recoge el punto pero no lo que se decidió. El texto no identifica a ninguna persona.",
+        alcance:
+          "Reconstrucción demo sin efecto jurídico. El expediente real consta en el Registro Mercantil de Madrid; la plataforma lo reproduce, no lo sustituye.",
+      },
+    },
+  };
+}
+
 async function main() {
   if (!SUPABASE_URL.includes("hzqwefkwsxopwrmtksbg")) fail(`Target inesperado (${SUPABASE_URL}).`);
 
@@ -442,6 +612,18 @@ async function main() {
   if (new Set(ORDEN_DEL_DIA.map((p) => p.numero)).size !== ORDEN_DEL_DIA.length) {
     fail("preflight: hay números de punto repetidos; Task 6 no podría enlazar el acuerdo con su punto.");
   }
+
+  // Task 6: 9 acuerdos, no 10. El punto 1.1 está bloqueado (ver PUNTO_BLOQUEADO).
+  const conAcuerdo = puntosConAcuerdo();
+  if (conAcuerdo.length !== 9) fail(`preflight: ${conAcuerdo.length} puntos con acuerdo, esperados 9.`);
+  if (conAcuerdo.some((p) => p.numero === PUNTO_BLOQUEADO)) {
+    fail(`preflight: el punto ${PUNTO_BLOQUEADO} está bloqueado y no puede materializar acuerdo.`);
+  }
+  for (const p of conAcuerdo) textoAcuerdo(p.numero);   // lanza si falta un texto
+  // Los ordinales son los de la convocatoria: si dos coincidieran, dos acuerdos
+  // colgarían del mismo punto y el índice único de agenda_items lo rechazaría.
+  const ordinales = conAcuerdo.map((p) => ordinalEnOrdenDelDia(p.numero));
+  if (new Set(ordinales).size !== ordinales.length) fail("preflight: ordinales de punto repetidos.");
 
   if (!SERVICE_KEY) fail(`Falta la service-role key (${SERVICE_KEY_NAMES.join(" | ")}).`);
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -460,6 +642,63 @@ async function main() {
   if (eCat) fail(`materia_catalog: ${eCat.message}`);
   const faltan = materias.filter((m) => !(cat ?? []).some((c) => c.materia === m));
   if (faltan.length) fail(`materias sin fila en materia_catalog: ${faltan.join(", ")} — Task 6 no podría resolver el pack.`);
+
+  // Task 6 — el pack de cada acuerdo se resuelve POR MATERIA y POR TENANT, que es
+  // exactamente lo que hace `useRulePackForMateria` (join !inner contra
+  // rule_packs filtrando tenant_id + materia). No se resuelve por `pack_id`:
+  // `rule_packs.id` es PK global y los 3 packs nuevos llevan prefijo GARR_
+  // porque los ids sin prefijo ya son de ARGA. Y NO se consulta
+  // `rule_pack_versions` a secas: esa tabla tiene un SELECT abierto
+  // (`rule_pack_versions_read`, qual=true) y devolvería también los de ARGA.
+  const materiasAcuerdo = conAcuerdo.map((p) => p.materia!);
+  const { data: packsGarr, error: ePacks } = await admin
+    .from("rule_packs")
+    .select("id, materia, organo_tipo, tenant_id, rule_pack_versions!inner(version, is_active, status, payload)")
+    .eq("tenant_id", GARRIGUES_TENANT)
+    .in("materia", materiasAcuerdo)
+    .eq("rule_pack_versions.is_active", true);
+  if (ePacks) fail(`rule_packs Garrigues: ${ePacks.message}`);
+
+  type PackPayload = {
+    materia?: string;
+    votacion?: { mayoria?: { SL?: Record<string, unknown> } };
+  };
+  const packPorMateria = new Map<string, PackResuelto>();
+  for (const rp of packsGarr ?? []) {
+    const versiones = (rp.rule_pack_versions ?? []) as Array<{ version: string; payload: PackPayload }>;
+    if (versiones.length !== 1) {
+      fail(`rule_packs ${rp.id}: ${versiones.length} versiones activas, esperada 1.`);
+    }
+    if (packPorMateria.has(rp.materia)) {
+      // Dos packs activos de la misma materia dejarían la elección al azar, y de
+      // ahí sale la mayoría que se le enseña al abogado.
+      fail(`rule_packs: la materia ${rp.materia} tiene más de un pack activo en Garrigues.`);
+    }
+    const payload: PackPayload = versiones[0].payload ?? {};
+    const mayoriaSL = payload?.votacion?.mayoria?.SL;
+    if (!mayoriaSL?.referencia) {
+      fail(`rule_packs ${rp.id}: la rama SL de votacion.mayoria no trae referencia; es la que lee effective-rule para SLP.`);
+    }
+    if (payload?.materia && payload.materia !== rp.materia) {
+      fail(`rule_packs ${rp.id}: materia del payload (${payload.materia}) ≠ materia de la relación (${rp.materia}).`);
+    }
+    packPorMateria.set(rp.materia, {
+      packId: rp.id,
+      version: String(versiones[0].version),
+      materia: rp.materia,
+      mayoriaSL,
+    });
+  }
+  const sinPack = materiasAcuerdo.filter((m) => !packPorMateria.has(m));
+  if (sinPack.length) {
+    // Fail-closed **al escribir**: un acuerdo sin regla no se siembra. En dry-run
+    // no se muere: un ensayo que revienta sin enseñar qué falta no sirve de nada.
+    const msg =
+      `materias sin rule pack del tenant Garrigues: ${sinPack.join(", ")}. ` +
+      `Aplica antes supabase/migrations/20260829170000_c1_packs_materias_junta.sql.`;
+    if (COMMIT) fail(msg);
+    console.log(`\n⚠ ${msg}\n  El dry-run continúa para enseñar el resto; con --commit para aquí.`);
+  }
 
   // Cierre del bucle del plazo: la antelación derivada de las dos fechas del acta
   // contra la que exige el pack. Sin literales: si divergen, el seed no corre.
@@ -669,6 +908,48 @@ async function main() {
     );
   }
 
+  // ───────────────────────────────── Task 6: acuerdos, puntos celebrados y gate ──
+
+  // El gate del informe preceptivo NO se decide aquí: lo decide
+  // `governing_bodies.config.informe_preceptivo_de` del órgano, que lee
+  // `fn_refresh_agreement_document_requirements`. Se lee para poder ANUNCIAR en
+  // qué acuerdos va a disparar, y después se contrasta con lo que la RPC escribió.
+  const { data: bodyCfg, error: eCfg } = await admin.from("governing_bodies")
+    .select("config").eq("id", body.id).single();
+  if (eCfg) fail(`governing_bodies config: ${eCfg.message}`);
+  const materiasConGate = new Set<string>(
+    ((bodyCfg?.config?.informe_preceptivo_de ?? []) as Array<{ materia?: string }>)
+      .map((e) => String(e.materia ?? "")).filter(Boolean),
+  );
+
+  const claseporMateria = new Map((cat ?? []).map((c) => [c.materia, c as ClaseMateria]));
+
+  console.log("\n── Task 6 · los 9 acuerdos, su punto y su regla ──");
+  console.table(conAcuerdo.map((p) => {
+    const pack = packPorMateria.get(p.materia!);
+    const clase = claseporMateria.get(p.materia!)!;
+    return {
+      punto: p.numero,
+      ordinal: ordinalEnOrdenDelDia(p.numero),
+      materia: p.materia,
+      clase: `${clase.matter_class}${clase.inscribable ? " · inscribible" : ""}`,
+      pack: pack ? `${pack.packId} v${pack.version}` : "FALTA — migración sin aplicar",
+      mayoria: pack ? `${pack.mayoriaSL.fuente} · ${pack.mayoriaSL.formula}` : "—",
+      referencia: pack ? String(pack.mayoriaSL.referencia).slice(0, 52) : "—",
+      texto: textoAcuerdo(p.numero).contenido,
+      gate: materiasConGate.has(p.materia!) ? "INFORME_PRECEPTIVO_ORGANO" : "—",
+    };
+  }));
+  console.log(
+    [
+      `Punto ${PUNTO_BLOQUEADO} SIN acuerdo — ${NOTA_PUNTO_BLOQUEADO}`,
+      `Gate del informe preceptivo previsto en ${conAcuerdo.filter((p) => materiasConGate.has(p.materia!)).length} de ${conAcuerdo.length} acuerdos.`,
+      `Arista punto ↔ acuerdo: agenda_items.order_number (ordinal de la convocatoria) → agreements.agenda_item_id (uuid, FK).`,
+      `source_convocatoria_id queda a NULL: el guard exige convocatoria EMITIDA e inmutable y ésta está en ${ESTADO}.`,
+      `required_majority_code queda a NULL a propósito: la escalera SIMPLE/REFORZADA_2_3/UNANIMIDAD no expresa la base del art. 30.1.`,
+    ].join("\n"),
+  );
+
   if (!COMMIT) { console.log("\nDry-run. Nada escrito. Añade --commit para aplicar."); return; }
 
   if ((prev ?? []).length === 1) {
@@ -763,6 +1044,106 @@ async function main() {
     }
     console.log(`✓ payload verificado: ${creado.total_partes} partes · Σ voting_weight=${suma.toFixed(6)} · ratio ${ratio.toFixed(2)} (art. 7)`);
   }
+
+  // ── Task 6 · los 9 acuerdos ──────────────────────────────────────────────
+
+  // 1) El punto celebrado. Índice único (meeting_id, order_number): la clave de
+  //    idempotencia es el ordinal, y NO se borra y reinserta — un agenda_item
+  //    nuevo cambiaría de id y dejaría huérfano el agreements.agenda_item_id.
+  const { data: prevAgenda, error: ePrevAgenda } = await admin.from("agenda_items")
+    .select("id, meeting_id, order_number, title, description, kind, matter_code, proposal_text, tenant_id")
+    .eq("meeting_id", meetingId);
+  if (ePrevAgenda) fail(`agenda_items lookup: ${ePrevAgenda.message}`);
+  const agendaPorOrdinal = new Map((prevAgenda ?? []).map((a) => [a.order_number, a]));
+
+  const idPorPunto = new Map<string, string>();
+  for (const punto of conAcuerdo) {
+    const fila = buildAgendaRow(meetingId, punto);
+    const previo = agendaPorOrdinal.get(fila.order_number);
+    if (!previo) {
+      const { data, error } = await admin.from("agenda_items").insert(fila).select("id").single();
+      if (error) fail(`agenda_items insert punto ${punto.numero}: ${error.message}`);
+      idPorPunto.set(punto.numero, data.id);
+      console.log(`✓ punto ${punto.numero} creado (ordinal ${fila.order_number})`);
+      continue;
+    }
+    if (previo.tenant_id !== GARRIGUES_TENANT) {
+      fail(`agenda_items ordinal ${fila.order_number} pertenece a otro tenant.`);
+    }
+    idPorPunto.set(punto.numero, previo.id);
+    const sinCambios = Object.entries(fila).every(([k, v]) => canonical((previo as Record<string, unknown>)[k]) === canonical(v));
+    if (sinCambios) { console.log(`= punto ${punto.numero} sin cambios`); continue; }
+    const { error } = await admin.from("agenda_items").update(fila).eq("id", previo.id);
+    if (error) fail(`agenda_items update punto ${punto.numero}: ${error.message}`);
+    console.log(`✓ punto ${punto.numero} actualizado`);
+  }
+
+  // 2) El acuerdo. Idempotente por `ux_agreements_agenda_item_id`
+  //    (tenant_id, agenda_item_id) WHERE adoption_mode='MEETING': la arista real
+  //    es también la clave.
+  const { data: prevAgreements, error: ePrevAg } = await admin.from("agreements")
+    .select("id, tenant_id, agenda_item_id, agreement_kind, matter_class, inscribable, status, rule_pack_id, rule_pack_version, statutory_basis, proposal_text, decision_text, code, decision_date, adoption_mode, body_id, entity_id, parent_meeting_id, compliance_explain")
+    .eq("tenant_id", GARRIGUES_TENANT).eq("parent_meeting_id", meetingId);
+  if (ePrevAg) fail(`agreements lookup: ${ePrevAg.message}`);
+  const agreementPorAgenda = new Map((prevAgreements ?? []).map((a) => [a.agenda_item_id, a]));
+
+  const idsAcuerdo: Array<{ id: string; punto: string; materia: string }> = [];
+  for (const punto of conAcuerdo) {
+    const fila = buildAgreementRow({
+      meetingId,
+      bodyId: body.id,
+      agendaItemId: idPorPunto.get(punto.numero)!,
+      punto,
+      clase: claseporMateria.get(punto.materia!)!,
+      pack: packPorMateria.get(punto.materia!)!,
+    });
+    const previo = agreementPorAgenda.get(fila.agenda_item_id);
+    if (!previo) {
+      const { data, error } = await admin.from("agreements").insert(fila).select("id").single();
+      if (error) fail(`agreements insert punto ${punto.numero}: ${error.message}`);
+      idsAcuerdo.push({ id: data.id, punto: punto.numero, materia: fila.agreement_kind });
+      console.log(`✓ acuerdo ${punto.numero} (${fila.agreement_kind}) creado`);
+      continue;
+    }
+    idsAcuerdo.push({ id: previo.id, punto: punto.numero, materia: fila.agreement_kind });
+    const sinCambios = Object.entries(fila).every(([k, v]) => canonical((previo as Record<string, unknown>)[k]) === canonical(v));
+    if (sinCambios) { console.log(`= acuerdo ${punto.numero} sin cambios`); continue; }
+    const { error } = await admin.from("agreements").update(fila).eq("id", previo.id);
+    if (error) fail(`agreements update punto ${punto.numero}: ${error.message}`);
+    console.log(`✓ acuerdo ${punto.numero} actualizado`);
+  }
+
+  // Un acuerdo del expediente que ya no esté en el orden del día es un residuo:
+  // no se borra en silencio, se dice.
+  const huerfanos = (prevAgreements ?? []).filter((a) => !idsAcuerdo.some((x) => x.id === a.id));
+  if (huerfanos.length) {
+    console.log(`⚠ ${huerfanos.length} acuerdo(s) de esta reunión fuera del orden del día actual: ${huerfanos.map((a) => a.agreement_kind).join(", ")}. No se tocan: decidir a mano.`);
+  }
+
+  // 3) Los requisitos documentales. NO se escriben a mano: los genera
+  //    `fn_refresh_agreement_document_requirements`, que es quien decide si el
+  //    gate INFORME_PRECEPTIVO_ORGANO aplica leyendo el config del órgano.
+  //    Escribirlos desde el seed convertiría el gate en decorado.
+  for (const a of idsAcuerdo) {
+    const { error } = await admin.rpc("fn_refresh_agreement_document_requirements", { p_agreement_id: a.id });
+    if (error) fail(`fn_refresh_agreement_document_requirements (${a.punto}): ${error.message}`);
+  }
+
+  // Verificación posterior: qué escribió de verdad la RPC, contra lo previsto.
+  const { data: reqs, error: eReqs } = await admin.from("agreement_document_requirements")
+    .select("agreement_id, requirement_code, blocking_policy, fase")
+    .in("agreement_id", idsAcuerdo.map((a) => a.id))
+    .eq("requirement_code", "INFORME_PRECEPTIVO_ORGANO");
+  if (eReqs) fail(`agreement_document_requirements: ${eReqs.message}`);
+  const conGate = new Set((reqs ?? []).map((r) => idsAcuerdo.find((a) => a.id === r.agreement_id)?.materia));
+  const previstas = new Set(conAcuerdo.map((p) => p.materia!).filter((m) => materiasConGate.has(m)));
+  if (canonical([...conGate].sort()) !== canonical([...previstas].sort())) {
+    fail(`el gate del informe preceptivo disparó en {${[...conGate].join(", ")}} y el config del órgano dice {${[...previstas].join(", ")}}.`);
+  }
+  if ((reqs ?? []).some((r) => r.blocking_policy !== "BLOCKING" || r.fase !== "PRE_CONVOCATORIA")) {
+    fail("el gate del informe preceptivo se escribió sin BLOCKING/PRE_CONVOCATORIA.");
+  }
+  console.log(`✓ ${idsAcuerdo.length} acuerdos con requisitos refrescados · gate INFORME_PRECEPTIVO_ORGANO en ${conGate.size}: ${[...conGate].join(", ")}`);
 }
 
 if (import.meta.main) main();

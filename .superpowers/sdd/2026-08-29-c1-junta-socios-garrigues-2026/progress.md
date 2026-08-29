@@ -56,7 +56,7 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | 3 | Capital de la matriz a FIRME en Cloud | **COMPLETA** ([informe](task-3-report.md)) | 2 P1 + 9 P2; 4 mutantes escapaban, los 4 cerrados | 46 pass / 0 fail en los 4 ficheros de capital; suite completa en el reporte de merge |
 | 4 | Convocatoria 21/04 → 06/05 con los 12 puntos reales | **COMPLETA** ([informe](task-4-report.md)) — en `BORRADOR`: `fn_emit_convocatoria` es CDA-only | 4 P1 (todos de superficie) + 5 de 11 mutantes escapando | 15 pass / 0 fail en su sonda · lint 0 · tsc 0 · build OK |
 | 5 | Reunión, asistencia y censo WORM | **COMPLETA EN LO APLICABLE** ([informe](task-5-report.md)): 1 reunión + 346 asistentes, 150 votos presenciales. **El censo WORM no se crea**: `fn_crear_censo_snapshot` lleva la fórmula vieja en línea y la tabla es inmutable | 4 errores del plan cazados antes de aplicar, uno de ellos irreversible | 25 pass / 0 fail · lint 0 · tsc 0 |
-| 6 | Los 10 acuerdos con resolución por materia | pendiente | — | — |
+| 6 | Los acuerdos con resolución por materia | **COMPLETA con 9 de 10** ([informe](task-6-report.md)). El décimo (`MODIFICACION_ESTATUTOS`) bloqueado: el art. 36 no existe en los Estatutos entregados | sin ronda separada, por instrucción de cierre — declarado en el informe | 42 pass / 0 fail en su sonda · lint 0 · tsc 0 |
 | 7 | Resoluciones y votaciones | pendiente | — | — |
 | 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
 | 9 | Ciclo registral (13/07/2026, anuncios 960 y 961) | pendiente | — | — |
