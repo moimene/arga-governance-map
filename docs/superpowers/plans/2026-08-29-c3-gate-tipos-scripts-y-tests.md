@@ -90,6 +90,27 @@ cuando lleguen en mitad de una cola de 176.
 
 ---
 
+## Constraints que NO viven junto al código — los que un barrido no encuentra
+
+El cruce «errores × marcadores de decisión en el fichero» localiza lo que está escrito **al lado del
+código** (así se cazó `TipoSocialConvocatoria`, cuya razón está en el comentario contiguo). **No
+encuentra las decisiones que solo viven en un documento.** Estas tocan esta tarea y salen de barrer
+`CLAUDE.md`, no el árbol:
+
+| Constraint | Dónde vive | Por qué me afecta |
+|---|---|---|
+| **El gate real es `tsc -b`**, no `tsc --noEmit`, porque el `tsconfig.json` raíz **referencia proyectos** | `CLAUDE.md:253` — **cero huella en los `tsconfig`, que no tienen ni un comentario** | Los 176 se midieron con un proyecto suelto. **Hay que remedirlos con el gate real** (T1 Step 3) |
+| `execute_sql` **no está expuesto** en este proyecto: tests y scripts usan PostgREST + joins en cliente | `CLAUDE.md` | Si un error de tipos «se arregla» llamando a `execute_sql`, el arreglo compila y falla en ejecución |
+| **No** `import crypto from "crypto"` — usar `globalThis.crypto.subtle` | `CLAUDE.md` | Es una sugerencia típica de TypeScript ante un tipo que falta |
+| **No** `DEMO_TENANT` hardcodeado; los hooks usan `useTenantContext()` | `CLAUDE.md` | Un fixture puede «arreglarse» inyectando el literal |
+
+**Deuda de programa, no de esta tarea:** ninguno de los cuatro tiene huella junto al código que
+protege. Un barrido de árbol —el mío o el de cualquiera— no los ve. Si una decisión debe sobrevivir a
+quien no ha leído el documento, **tiene que estar escrita junto al código**, como hizo G3 con
+`ITEM-119 / DL-4`.
+
+---
+
 ## Hechos medidos (no citados)
 
 Medición con un tsconfig que extiende el real —mismas `compilerOptions`— e incluye `src` + `scripts`
@@ -172,13 +193,23 @@ En `tsconfig.app.json`:
 "exclude": []
 ```
 
-- [ ] **Step 3: Medir y confirmar la cifra**
+- [ ] **Step 3: Medir con el GATE REAL, no con el proyecto ad-hoc**
 
 ```bash
-bunx tsc -b --pretty false 2>&1 | grep -c "error TS"     # esperado: 176
-bunx tsc -b --pretty false 2>&1 | grep -c "bun:test"     # esperado: 0
+bun run typecheck 2>&1 | grep -c "error TS"     # esperado: 176
+bun run typecheck 2>&1 | grep -c "bun:test"     # esperado: 0
 ```
-Si no da 176, **parar**: la configuración no es la que se midió.
+
+> ⚠️ **Los 176 se midieron con `bunx tsc -p tsconfig.medicion.json`**, un proyecto suelto. **El gate
+> del repo es `bun run typecheck` → `tsc -b`, en modo build con referencias**, y `CLAUDE.md:253` lo
+> dice expresamente: *«Gate real TypeScript (`tsc -b`); no usar `bunx tsc --noEmit` como señal verde
+> porque el `tsconfig.json` raíz referencia proyectos.»*
+>
+> **La cifra no se da por transferida: se vuelve a medir con `tsc -b`.** Si difiere de 176, la que
+> vale es la de `tsc -b` y hay que entender la diferencia antes de seguir — puede haber ficheros que
+> un proyecto suelto compila y el modo build no, o al revés.
+
+Si no cuadra, **parar** y entender por qué antes de tocar un solo error.
 
 - [ ] **Step 4: Commit** (el gate queda ROJO a propósito hasta T5; se dice en el mensaje)
 
