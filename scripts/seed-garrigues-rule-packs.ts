@@ -398,6 +398,10 @@ const SOCIO_UNICO_FILIAL_PAYLOAD = {
   },
 };
 
+// C1 Task 1 — GARR_CONSEJO_EAD va por delante del resto de packs: su payload
+// gana reglaEspecifica.antelacionConsejo (decisión del usuario 2026-08-29).
+const CONSEJO_EAD_VERSION = "1.1.0";
+
 const CONSEJO_EAD_PAYLOAD = {
   id: "GARR_CONSEJO_EAD",
   materia: "GARR_CONSEJO_EAD",
@@ -440,11 +444,18 @@ const CONSEJO_EAD_PAYLOAD = {
   convocatoria: {
     canales: { SA: ["COMUNICACION_INDIVIDUAL_CON_ACUSE"], SL: ["COMUNICACION_INDIVIDUAL_CON_ACUSE"] },
     antelacionDias: {
-      // Sin piso legal (art. 246 LSC no fija plazo mínimo): valor práctico
-      // de referencia, no una cita de mínimo legal. `fuente: 'ESTATUTOS'`
-      // (no 'PRACTICA_SOCIETARIA' — ese valor no existe en el tipo cerrado
-      // `Fuente` de rules-engine/types.ts; 'ESTATUTOS' es la alternativa
-      // válida ya prevista para este caso).
+      // El art. 246 LSC no fija plazo mínimo de convocatoria del Consejo, de
+      // modo que estos 5 días no son suelo legal y la `referencia` no puede
+      // presentarse como cita de plazo: sigue diciendo literalmente que no
+      // hay mínimo. Lo que sí cambió el 2026-08-29 es su naturaleza — dejan
+      // de ser un valor de referencia sin verificar y pasan a ser práctica
+      // societaria acreditada de EAD Trust, confirmada por su propio
+      // consejero (registro: docs/legal/2026-08-29-decisiones-capital-firme-
+      // y-consejo-ead.md, Decisión A; detalle en
+      // reglaEspecifica.antelacionConsejo). `fuente: 'ESTATUTOS'` se
+      // mantiene, no por convicción sino por el tipo: 'PRACTICA_SOCIETARIA'
+      // no existe en el tipo cerrado `Fuente` de rules-engine/types.ts y
+      // 'ESTATUTOS' es la alternativa válida ya prevista para este caso.
       SA: { valor: 5, fuente: "ESTATUTOS", referencia: "art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente" },
       SL: { valor: 5, fuente: "ESTATUTOS", referencia: "art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente" },
     },
@@ -473,6 +484,23 @@ const CONSEJO_EAD_PAYLOAD = {
       referencia: "art. 246 LSC — convocatoria del presidente a cada consejero",
       semanticaAcuse: "EAD_INTERPOSICION_ETIQUETADA",
       nota: "El acuse usa la semántica de interposición EAD Trust; no se afirma como capacidad de entrega/acuse probada (política 2026-07-21).",
+    },
+    // C1 Task 1 (v1.1.0) — clave nueva y puramente documental: `reglaEspecifica`
+    // es `Record<string, unknown>` en rules-engine/types.ts y ningún engine la
+    // lee (mismo hueco que usó G3 Task 5 para `antelacionAmpliada`). Registra
+    // por qué el 5 de convocatoria.antelacionDias no es un plazo legal.
+    // Espejo de 20260829120000_g3_consejo_ead_pack_v110.sql.
+    // La atribución nominal de la confirmación y la ruta al registro legal NO
+    // viven aquí: `rule_pack_versions` no tiene RLS por tenant (deuda
+    // pre-existente; el aislamiento real lo da `rule_packs`), así que ARGA lee
+    // este payload. Solo va el hecho operativo. El quién y el dónde están en la
+    // cabecera de 20260829120000_g3_consejo_ead_pack_v110.sql y en
+    // docs/legal/2026-08-29-decisiones-capital-firme-y-consejo-ead.md.
+    antelacionConsejo: {
+      valorDias: 5,
+      naturaleza: "PRACTICA_SOCIETARIA_CONFIRMADA",
+      fechaConfirmacion: "2026-08-29",
+      nota: "El art. 246 LSC no fija plazo mínimo de convocatoria del Consejo. Los 5 días son práctica acreditada de la entidad titular de este pack, no suelo legal.",
     },
   },
 };
@@ -604,7 +632,15 @@ const SLP_MATERIA_PACKS: Record<string, ReturnType<typeof buildSlpMateriaPayload
   }),
 };
 
-export const PACKS: Array<{ id: string; organoTipo: string; descripcion: string; payload: Record<string, unknown> }> = [
+export const PACKS: Array<{
+  id: string;
+  organoTipo: string;
+  descripcion: string;
+  payload: Record<string, unknown>;
+  // Versión que el seed escribe para este pack. Por defecto VERSION ('1.0.0');
+  // GARR_CONSEJO_EAD la sobrescribe a '1.1.0' (C1 Task 1).
+  version?: string;
+}> = [
   {
     id: "GARR_DECISION_ADMIN_UNICO",
     organoTipo: "CONSEJO",
@@ -628,6 +664,12 @@ export const PACKS: Array<{ id: string; organoTipo: string; descripcion: string;
     organoTipo: "CONSEJO",
     descripcion: "Garrigues G3 — Consejo de Administración colegiado de EAD Trust",
     payload: CONSEJO_EAD_PAYLOAD,
+    // C1 Task 1: el payload gana reglaEspecifica.antelacionConsejo, así que la
+    // versión sube. En Cloud la transición 1.0.0 → 1.1.0 (INSERT de la nueva +
+    // DEPRECATED de la vieja) la hace la migración
+    // 20260829120000_g3_consejo_ead_pack_v110.sql; aquí el seed solo escribe ya
+    // la versión correcta y es no-op si la migración se aplicó antes.
+    version: CONSEJO_EAD_VERSION,
   },
   // Fix round 2 — 6 packs por-materia (id = materia), ver buildSlpMateriaPayload.
   {
@@ -690,27 +732,46 @@ async function ensureRulePack(admin: ReturnType<typeof createClient>, pack: (typ
     console.log(`… rule_packs ${pack.id} ya existía`);
   }
 
+  const version = pack.version ?? VERSION;
+
   const { data: existingVersion, error: eSelVer } = await admin
     .from("rule_pack_versions")
     .select("id")
     .eq("pack_id", pack.id)
-    .eq("version", VERSION)
+    .eq("version", version)
     .maybeSingle();
-  if (eSelVer) fail(`rule_pack_versions select '${pack.id}@${VERSION}': ${eSelVer.message}`);
+  if (eSelVer) fail(`rule_pack_versions select '${pack.id}@${version}': ${eSelVer.message}`);
 
   if (!existingVersion) {
     const { error: eInsVer } = await admin.from("rule_pack_versions").insert({
       pack_id: pack.id,
-      version: VERSION,
+      version,
       payload: pack.payload,
       is_active: true,
       status: "ACTIVE",
       effective_from: new Date().toISOString().slice(0, 10),
     });
-    if (eInsVer) fail(`rule_pack_versions insert '${pack.id}@${VERSION}': ${eInsVer.message}`);
-    console.log(`✓ rule_pack_versions ${pack.id}@${VERSION} creada`);
+    if (eInsVer) fail(`rule_pack_versions insert '${pack.id}@${version}': ${eInsVer.message}`);
+    console.log(`✓ rule_pack_versions ${pack.id}@${version} creada`);
   } else {
-    console.log(`… rule_pack_versions ${pack.id}@${VERSION} ya existía`);
+    console.log(`… rule_pack_versions ${pack.id}@${version} ya existía`);
+  }
+
+  // Un pack que declara `version` propia ha subido de versión: cualquier otra
+  // versión suya queda archivada. Sin esto, correr el seed contra una BD donde
+  // la migración de subida NO se ha aplicado deja DOS versiones activas, y los
+  // lectores no desempatan — useAgreementCompliance usa `.find()` sin ORDER BY,
+  // useRulePackForMateria toma `versions[0]`. Mismo efecto que hace
+  // ensureJuntaSociosV110Upgrade para GARR_JUNTA_SOCIOS.
+  if (pack.version) {
+    const { data: archivadas, error: eDeact } = await admin
+      .from("rule_pack_versions")
+      .update({ is_active: false, status: "DEPRECATED" })
+      .eq("pack_id", pack.id)
+      .neq("version", version)
+      .select("version");
+    if (eDeact) fail(`rule_pack_versions deprecate '${pack.id}' != ${version}: ${eDeact.message}`);
+    for (const row of archivadas ?? []) console.log(`✓ rule_pack_versions ${pack.id}@${row.version} archivada (DEPRECATED)`);
   }
 }
 
