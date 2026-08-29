@@ -11,6 +11,7 @@ import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.ANON_PUBLIC ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const DEMO_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
@@ -233,6 +234,75 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
     expect(antelacionSL).not.toContain("Ley 2/2007");
     expect(antelacionSLP).toContain("176 LSC (supletoria)");
     expect(antelacionSLP).not.toContain("Ley 2/2007");
+  });
+
+  // C1 Task 1 — GARR_CONSEJO_EAD sube a v1.1.0 (decisión del usuario
+  // 2026-08-29, docs/legal/2026-08-29-decisiones-capital-firme-y-consejo-
+  // ead.md, Decisión A). Estos dos tests NO llevan el guard `packsSeeded`
+  // vacuo: la migración 20260829120000 la aplica el controller, y hasta
+  // entonces deben salir en ROJO, no en verde silencioso. Un skip aquí sería
+  // un gate que no asierta nada.
+  it("GARR_CONSEJO_EAD tiene v1.1.0 activa con la práctica de 5 días confirmada y sin cita legal de plazo", async () => {
+    const { data, error } = await garr
+      .from("rule_pack_versions")
+      .select("version, payload, is_active, status")
+      .eq("pack_id", "GARR_CONSEJO_EAD")
+      .eq("is_active", true);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    const row = data[0];
+    expect(row.version).toBe("1.1.0");
+
+    const antelacion = row.payload?.reglaEspecifica?.antelacionConsejo;
+    expect(antelacion).toBeDefined();
+    expect(antelacion.valorDias).toBe(5);
+    expect(antelacion.naturaleza).toBe("PRACTICA_SOCIETARIA_CONFIRMADA");
+    expect(antelacion.nota).toContain("no fija plazo mínimo");
+
+    // El 5 NO se convierte en cita legal de plazo: la referencia sigue negando el mínimo.
+    for (const forma of ["SA", "SL"]) {
+      const dias = row.payload.convocatoria.antelacionDias[forma];
+      expect(dias.valor).toBe(5);
+      expect(dias.fuente).toBe("ESTATUTOS");
+      expect(dias.referencia).toBe("art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente");
+    }
+  });
+
+  it("la v1.0.0 de GARR_CONSEJO_EAD queda archivada, no mutada", async () => {
+    const { data: todas, error } = await garr
+      .from("rule_pack_versions")
+      .select("version, is_active, status, payload")
+      .eq("pack_id", "GARR_CONSEJO_EAD");
+    expect(error).toBeNull();
+
+    // Invariante que se exige SIEMPRE, venga el pack de migración o de seed:
+    // exactamente una versión activa, y es la 1.1.0.
+    const activas = todas.filter((v) => v.is_active);
+    expect(activas).toHaveLength(1);
+    expect(activas[0].version).toBe("1.1.0");
+
+    // Este Cloud se provisiona por migraciones, así que la v1.0.0 existe y
+    // debe quedar archivada. (Un entorno provisionado solo por seed nunca
+    // llega a crearla: el seed escribe ya la 1.1.0. Por eso el gate duro es la
+    // invariante de arriba y no la existencia de la fila vieja.)
+    const v100 = todas.find((v) => v.version === "1.0.0");
+    expect(v100).toBeDefined();
+    expect(v100.is_active).toBe(false);
+    expect(v100.status).toBe("DEPRECATED");
+
+    // "No mutada" se comprueba por contenido POSITIVO, no por ausencia de la
+    // clave nueva: `toBeUndefined()` a secas pasaría igual con el payload
+    // vaciado, a null o sustituido por otro pack (hallazgo P1 de la review).
+    expect(v100.payload?.id).toBe("GARR_CONSEJO_EAD");
+    expect(v100.payload?.votacion?.mayoria?.CONSEJO?.referencia).toBe("art. 247.1 LSC");
+    expect(v100.payload?.convocatoria?.antelacionDias?.SA?.referencia).toBe(
+      "art. 246 LSC — sin plazo legal mínimo; convocatoria por el presidente",
+    );
+    expect(v100.payload?.reglaEspecifica?.canalAcuseConsejo?.semanticaAcuse).toBe(
+      "EAD_INTERPOSICION_ETIQUETADA",
+    );
+    // Y la clave nueva NO se le ha colado.
+    expect(v100.payload?.reglaEspecifica?.antelacionConsejo).toBeUndefined();
   });
 
   // Sonda extra recomendada por el brief (art. 4.3 Ley 2/2007): el
