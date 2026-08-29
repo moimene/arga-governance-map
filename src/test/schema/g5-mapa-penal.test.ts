@@ -107,7 +107,16 @@ describe("G5 — catálogo penal congelado", () => {
 });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+// GOTCHA: `VITE_SUPABASE_ANON_KEY` NO EXISTE en este repo — el .env nombra la
+// clave `ANON_PUBLIC`/`PUBLISHABLE_KEY`. 17 de las 19 sondas del proyecto viven
+// del literal de reserva de la 3ª rama; G5 y G6 copiaron la línea SIN el `||` y
+// su bloque Cloud entero pasaba en verde SIN ASERTAR NADA: medido, 1213 de 1807
+// aserciones desaparecían en silencio. No quitar ninguna de las tres ramas.
+// La clave anon es pública por diseño (quien protege es RLS); no es un secreto.
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.ANON_PUBLIC ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 const PERSIST_OFF = { auth: { persistSession: false } } as const;
@@ -117,11 +126,15 @@ describe("G5 — datos penales en Cloud (Supabase)", () => {
   let arga: SupabaseClient | null = null;
 
   beforeAll(async () => {
-    if (!SUPABASE_ANON_KEY) return;
     const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) garr = g;
     const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
     if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) arga = a;
+    // Fallar aquí es lo correcto: sin sesión no se puede afirmar nada de Cloud,
+    // y los `if (!garr) return;` de cada `it` convierten eso en verde mudo. Un
+    // gate que "pasa" sin poder mirar es peor que uno rojo.
+    expect(garr, "sin sesión Garrigues el bloque Cloud sería vacuo").not.toBeNull();
+    expect(arga, "sin sesión ARGA el control discriminante sería vacuo").not.toBeNull();
   });
 
   it("las 3 columnas nuevas existen y se pueden seleccionar", async () => {

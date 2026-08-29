@@ -305,7 +305,14 @@ export const GARRIGUES_ENTITIES: GarriguesEntitySeed[] = [
     provenance: {
       fuentes: [IDC, INV, "Contrato interno NewLaw (51,001%)"], confianza: "A_CONFIRMAR", cobertura_motor: true,
       incidencias: ["Variación nominal del % entre fuentes: 51,00 (IDC, indirecta, titular directo ilegible) vs 51,001 (contrato) — incidencia 7 de la spec"],
-      notas: ["Único consejo de administración colegiado del perímetro operativo", "QTSP del ecosistema: solo interposición, mensajería básica y custodia (política 2026-07-21)"],
+      notas: [
+        "Único consejo de administración colegiado del perímetro operativo",
+        "QTSP del ecosistema: solo interposición, mensajería básica y custodia (política 2026-07-21)",
+        // La CUALIFICACIÓN como prestador de servicios de confianza sí queda acreditada; el
+        // PORCENTAJE de participación no. Son dos afirmaciones distintas y `confianza` de arriba
+        // se refiere solo a la segunda, que sigue A_CONFIRMAR con su incidencia abierta.
+        "Condición de prestador CUALIFICADO acreditada 2026-08-29 contra la Trusted List española (tsl.digital.gob.es, seq. 188 de 2026-08-06, alcanzada desde la LOTL de la Comisión): servicios CA/QC y TSA/QTST en estado granted desde 2020-10-05. Sin EDS/Q (QERDS) ni PSES/Q (preservación cualificada), lo que corrobora por fuente pública la política de no afirmar ERDS. Detalle: docs/legal/2026-08-29-tsl-ead-trust-servicios-cualificados.md",
+      ],
     },
   },
   {
