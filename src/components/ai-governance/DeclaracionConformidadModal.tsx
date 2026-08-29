@@ -1,5 +1,7 @@
 import { useRef } from "react";
 import { AiSystem } from "@/hooks/useAiSystems";
+import { useTenantBranding, useTenantBrandingLoading } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import {
   CheckCircle2,
   Download,
@@ -22,6 +24,17 @@ export default function DeclaracionConformidadModal({
   onClose,
 }: DeclaracionConformidadModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const branding = useTenantBranding();
+  const brandingLoading = useTenantBrandingLoading();
+  // La entidad sale del tenant. Antes se declaraba una aseguradora concreta con
+  // dirección real en un documento que el usuario descarga.
+  // `groupFullLabel(null)` devuelve el grupo de ARGA, y `useTenantBranding()`
+  // también devuelve null MIENTRAS CARGA: sin este guard, un sistema de otro
+  // tenant descargado antes de resolver el branding se declararía de ARGA.
+  const entidad = brandingLoading ? "[entidad por resolver]" : groupFullLabel(branding);
+  // Sin clasificación no se declara ninguna: un falso positivo regulatorio en un
+  // papel con membrete del art. 47 es tan indefendible como un falso verde.
+  const clasificacion = system.risk_level || "No clasificado";
 
   if (!isOpen) return null;
 
@@ -38,35 +51,37 @@ DECLARACIÓN DE CONFORMIDAD UE (REGLAMENTO UE 2024/1689 - ARTÍCULO 47)
 1. IDENTIFICACIÓN DEL SISTEMA DE IA:
    - Nombre: ${system.name}
    - Código Interno: ${system.aims_reference_code || system.id}
-   - Tipo de Sistema: ${system.system_type || "Sistema de Machine Learning / IA"}
-   - Clasificación de Riesgo: ${system.risk_level || "ALTO RIESGO (Anexo III)"}
+   - Tipo de Sistema: ${system.system_type || "No declarado"}
+   - Clasificación de Riesgo: ${clasificacion}
 
 2. PROVEEDOR RESPONSABLE:
-   - Entidad: Entidad Aseguradora Responsable
-   - Dirección: Paseo de la Castellana 259, Madrid, España
-   - Persona / Cargo Responsable: Director de Cumplimiento & AI Officer
+   - Entidad: ${entidad}
+   - Persona / Cargo Responsable: [por completar antes de la emisión]
 
 3. DECLARACIÓN DE RESPONSABILIDAD:
    La presente declaración de conformidad se expide bajo la exclusiva 
    responsabilidad del proveedor identificado anteriormente.
 
 4. FINALIDAD PREVISTA:
-   ${system.use_case || system.description || "Uso operativo y toma de decisiones automatizada conforme a especificaciones técnicas."}
+   ${system.use_case || system.description || "No declarada."}
 
-5. NORMAS ARMONIZADAS Y ESPECIFICACIONES TÉCNICAS APLICADAS:
+5. MARCOS NORMATIVOS DE REFERENCIA (su aplicación efectiva se acredita con las
+   evaluaciones registradas del sistema, no con esta enumeración):
    - Reglamento (UE) 2024/1689 del Parlamento Europeo y del Consejo (AI Act)
    - Guías Técnicas de la Agencia Española de Supervisión de IA (AESIA Guías 1 a 16)
    - UNE-EN ISO/IEC 42001:2023 - Sistema de Gestión de Inteligencia Artificial
    - Real Decreto 817/2023 - Entorno Controlado de Pruebas (Sandbox IA España)
 
 6. INTEGRIDAD Y CUSTODIA PROBATORIA:
-   - Manifiesto Técnico Precintado: WORM SHA-512 Verificado
-   - Capa de Interposición y Archivo: EAD Trust Digital Trust Infrastructure
-   - Estado del Expediente: CONFORME Y VALIDADO
+   - Registro del manifiesto técnico: interno, con hash SHA-512
+   - Estado del expediente técnico: no se determina desde esta vista
+   - Sin sello ni preservación cualificada: no interviene prestador de confianza
 
 Fecha de Emisión: ${new Date().toLocaleDateString("es-ES")}
-Lugar: Madrid, España
-Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
+Firmante: [sin firma; documento no firmado electrónicamente]
+
+BORRADOR SIN EFECTO JURÍDICO. Este documento se genera en un entorno de
+validación funcional y no constituye una declaración de conformidad emitida.
 ================================================================================
 `;
     const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
@@ -108,7 +123,7 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
           <div className="text-center pb-4 border-b border-[var(--g-border-subtle)] space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-[var(--g-surface-subtle)] border border-[var(--g-brand-3308)]/30 text-[var(--g-brand-3308)] text-xs font-bold uppercase tracking-wider mb-2" style={{ borderRadius: "var(--g-radius-sm)" }}>
               <FileCheck className="w-4 h-4" />
-              <span>Documento Oficial de Conformidad Técnica</span>
+              <span>Borrador · sin efecto jurídico</span>
             </div>
             <h1 className="text-xl font-bold text-[var(--g-text-primary)] uppercase tracking-wide">
               Declaración de Conformidad UE
@@ -131,11 +146,11 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
               </div>
               <div>
                 <span className="font-semibold text-[var(--g-text-secondary)] block">Nivel de Riesgo Declarado:</span>
-                <span className="font-bold">{system.risk_level || "ALTO RIESGO"}</span>
+                <span className="font-bold">{clasificacion}</span>
               </div>
               <div>
                 <span className="font-semibold text-[var(--g-text-secondary)] block">Proveedor Responsable:</span>
-                <span>{system.vendor || "Desarrollo Propio Corporativo"}</span>
+                <span>{system.vendor || "No declarado"}</span>
               </div>
             </div>
 
@@ -144,13 +159,13 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
                 1. Finalidad Prevista y Ámbito de Uso
               </h3>
               <p className="text-[var(--g-text-secondary)] bg-[var(--g-surface-card)] p-3 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                {system.use_case || system.description || "Sistema empleado para el procesamiento analítico y apoyo a la toma de decisiones en el ámbito asegurador."}
+                {system.use_case || system.description || "Finalidad no declarada."}
               </p>
             </div>
 
             <div className="space-y-2">
               <h3 className="font-bold text-xs uppercase tracking-wider text-[var(--g-text-secondary)]">
-                2. Normas Armonizadas y Marcos Técnicos Evaluados
+                2. Marcos Normativos de Referencia
               </h3>
               <ul className="list-disc list-inside space-y-1 text-[var(--g-text-secondary)] pl-1">
                 <li>Reglamento (UE) 2024/1689 (Artículos 9 a 17, 72 y 73).</li>
@@ -165,7 +180,9 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
                 3. Declaración de Cumplimiento y Responsabilidad
               </h3>
               <p className="text-[var(--g-text-secondary)]">
-                El proveedor declara solemnemente que el sistema de IA descrito cumple con todos los requisitos esenciales de seguridad, transparencia, supervisión humana, gobernanza del dato y ciberseguridad establecidos en la normativa aplicable, habiéndose elaborado y archivado el correspondiente Expediente Técnico (Art. 11).
+                Espacio reservado a la declaración de responsabilidad del proveedor (art. 47 RIA).
+                Su contenido debe redactarse y asumirse antes de la emisión: esta consola no puede
+                declarar por el proveedor el cumplimiento de los requisitos del Reglamento.
               </p>
             </div>
 
@@ -174,13 +191,12 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
               <div className="space-y-1">
                 <span className="font-semibold text-[var(--g-text-secondary)] block">Lugar y Fecha:</span>
                 <span>Madrid, a {new Date().toLocaleDateString("es-ES")}</span>
-                <span className="font-semibold text-[var(--g-text-secondary)] block pt-2">Custodia Probatoria:</span>
-                <span className="font-mono text-[10px] text-[var(--g-brand-3308)]">EAD Trust QTSP • Hash SHA-512 WORM</span>
+                <span className="font-semibold text-[var(--g-text-secondary)] block pt-2">Custodia:</span>
+                <span className="font-mono text-[10px] text-[var(--g-brand-3308)]">Registro interno · hash SHA-512</span>
               </div>
               <div className="border border-dashed border-[var(--g-border-default)] p-3 text-center space-y-1 flex flex-col justify-center" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <CheckCircle2 className="w-5 h-5 text-[var(--status-success)] mx-auto" />
-                <span className="font-bold text-[11px] text-[var(--g-text-primary)]">Firma Validada del AI Officer</span>
-                <span className="text-[10px] text-[var(--g-text-secondary)]">Gobernanza Corporativa de IA</span>
+<span className="font-bold text-[11px] text-[var(--g-text-primary)]">Espacio reservado para firma</span>
+                <span className="text-[10px] text-[var(--g-text-secondary)]">Documento no firmado electrónicamente</span>
               </div>
             </div>
           </div>
@@ -202,7 +218,7 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Descargar Ficha</span>
+              <span>Descargar borrador</span>
             </button>
             <button
               onClick={handlePrint}
@@ -210,7 +226,7 @@ Firma Electrónica: Responsable de Gobernanza de IA / Secretaría General
               style={{ borderRadius: "var(--g-radius-md)" }}
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Certificado</span>
+              <span>Imprimir borrador</span>
             </button>
           </div>
         </div>

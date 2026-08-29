@@ -48,14 +48,14 @@ export default function AiIncidenteDetalle() {
 
   // Sincronizar estado inicial al cargar
   const currentStatus = isEditing ? status : incident?.status || "ABIERTO";
-  const currentSeverity = isEditing ? severity : incident?.severity || "MEDIA";
+  const currentSeverity = isEditing ? severity : incident?.severity || "";
   const currentRootCause = isEditing ? rootCause : incident?.root_cause || "";
   const currentCorrectiveAction = isEditing ? correctiveAction : incident?.corrective_action || "";
 
   const handleStartEdit = () => {
     if (!incident) return;
     setStatus(incident.status);
-    setSeverity(incident.severity || "MEDIA");
+    setSeverity(incident.severity || "");
     setRootCause(incident.root_cause || "");
     setCorrectiveAction(incident.corrective_action || "");
     setIsEditing(true);
@@ -84,12 +84,25 @@ export default function AiIncidenteDetalle() {
   };
 
   const handleCloseRegimeSubcase = async (regimeCode: "RIA" | "GDPR" | "DORA") => {
+    const fila = dbRegimes.find((r) => r.regime_code === regimeCode);
+    if (!fila) {
+      // No se puede cerrar lo que no existe. Antes se lanzaba el toast igual.
+      toast.error(`No hay subexpediente ${regimeCode} registrado que cerrar`);
+      return;
+    }
     try {
-      toast.success(`Subexpediente ${regimeCode} notificado y archivado con acuse`, {
-        description: "Principio de Aislamiento de Cierres aplicado: los demás regímenes continúan su curso legal independiente.",
+      await updateRegimeMutation.mutateAsync({
+        id: fila.id,
+        updates: { status: "CLOSED", closed_at: new Date().toISOString() },
+      });
+      toast.success(`Subexpediente ${regimeCode} cerrado`, {
+        description:
+          "El cierre no arrastra a los demás regímenes. No constituye notificación " +
+          "a la autoridad ni acuse de recibo: sólo cierra el subexpediente interno.",
       });
     } catch (err) {
-      toast.error("Error al actualizar subexpediente");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`No se pudo cerrar el subexpediente ${regimeCode}: ${msg}`);
     }
   };
 
@@ -128,6 +141,11 @@ export default function AiIncidenteDetalle() {
   const clocks = evaluateMultiregimeIncident({
     knowledgeDate: incident.reported_at,
     isAiRelated: true,
+    // El art. 73 alcanza a sistemas de alto riesgo: se toma del sistema
+    // asociado, no se presupone. Antes todo incidente activaba el plazo.
+    isAiHighRisk: /^(alto|high|inaceptable|unacceptable)$/i.test(
+      incident.ai_systems?.risk_level ?? "",
+    ),
     riaSeverity: riaSeverity,
     affectsPersonalData: affectsPii,
     isHighRiskToSubjects: highRiskPii,
@@ -294,9 +312,6 @@ export default function AiIncidenteDetalle() {
               Relojes Regulatorios Paralelos
             </h2>
           </div>
-          <span className="text-xs text-[var(--g-text-secondary)] italic">
-            Custodia documental (EAD Trust) • Registro WORM
-          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -319,8 +334,15 @@ export default function AiIncidenteDetalle() {
               )}
             </div>
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
-              {clocks.ria?.ruleDescription}
+              {clocks.ria?.ruleDescription ??
+                "El sistema asociado consta clasificado fuera del alto riesgo, así que el art. 73 no le alcanza: no hay plazo que contar."}
             </p>
+            {clocks.ria?.highRiskUnconfirmed && (
+              <p className="text-[11px] text-[var(--status-warning)] leading-relaxed">
+                El sistema asociado no tiene clasificación de riesgo registrada: no consta que el
+                art. 73 le alcance. El plazo se muestra por prudencia, no como obligación acreditada.
+              </p>
+            )}
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
               <span className="text-[var(--g-text-secondary)]">Vencimiento:</span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
@@ -350,6 +372,12 @@ export default function AiIncidenteDetalle() {
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
               {clocks.gdpr?.ruleDescription}
             </p>
+            {clocks.gdpr?.dataSubjectNoticeArticleRef && (
+              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
+                Además, comunicación al interesado ({clocks.gdpr.dataSubjectNoticeArticleRef}) sin
+                dilación indebida: no tiene plazo de 72 h.
+              </p>
+            )}
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
               <span className="text-[var(--g-text-secondary)]">Vencimiento 72h:</span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
@@ -366,7 +394,7 @@ export default function AiIncidenteDetalle() {
             <div className="flex justify-between items-start">
               <div>
                 <span className="font-mono text-[10px] font-bold bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  DORA (Art. 19 / RD 2025/301)
+                  DORA (Art. 19 · Rgto. Delegado 2025/301)
                 </span>
                 <h3 className="text-sm font-bold text-[var(--g-text-primary)] mt-1.5">Supervisor Financiero (DGSFP)</h3>
               </div>
@@ -379,8 +407,18 @@ export default function AiIncidenteDetalle() {
             <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
               {clocks.dora?.ruleDescription}
             </p>
+            {clocks.dora?.assumesPriorReportsAtDeadline && (
+              <p className="text-[11px] text-[var(--g-text-secondary)] leading-relaxed">
+                Los hitos intermedio y final se calculan sobre el vencimiento del anterior, no sobre
+                su envío real: son los últimos permisibles si cada informe se presenta justo en plazo.
+              </p>
+            )}
             <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
-              <span className="text-[var(--g-text-secondary)]">Informe Inicial (4h/24h):</span>
+              <span className="text-[var(--g-text-secondary)]">
+                {clocks.dora?.initialRule === "24H_CAP_FROM_KNOWLEDGE"
+                  ? "Informe inicial (tope 24 h desde conocimiento):"
+                  : "Informe inicial (4 h desde clasificación):"}
+              </span>
               <span className="font-mono font-bold text-[var(--g-text-primary)]">
                 {clocks.dora?.initialDeadlineDate ? new Date(clocks.dora.initialDeadlineDate).toLocaleString("es-ES") : "—"}
               </span>
@@ -450,14 +488,21 @@ export default function AiIncidenteDetalle() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCloseRegimeSubcase(reg.code as "RIA" | "GDPR" | "DORA")}
-                  className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-semibold transition-colors flex items-center gap-1.5"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                >
-                  <FileCheck className="w-3.5 h-3.5" />
-                  <span>Notificar / Sellar Acuse</span>
-                </button>
+                {dbRegimes.some((r) => r.regime_code === reg.code) ? (
+                  <button
+                    onClick={() => handleCloseRegimeSubcase(reg.code as "RIA" | "GDPR" | "DORA")}
+                    disabled={updateRegimeMutation.isPending}
+                    className="px-3 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <FileCheck className="w-3.5 h-3.5" />
+                    <span>Cerrar subexpediente</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-[var(--g-text-secondary)]">
+                    Sin subexpediente registrado
+                  </span>
+                )}
               </div>
             </div>
           ))}

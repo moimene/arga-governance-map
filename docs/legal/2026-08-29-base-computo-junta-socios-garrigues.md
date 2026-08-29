@@ -69,3 +69,64 @@ El emparejamiento **socio ↔ participación numerada** no consta: el Anexo 2 de
 ## 6. Alcance del artefacto
 
 Reconstrucción demo sin efecto jurídico. El expediente real de la Junta de 06/05/2026 existe en el Registro Mercantil; la plataforma lo reproduce, no lo sustituye.
+
+---
+
+## 7. Addendum (2026-08-29) — qué magnitud guarda `parte_votante_current`
+
+Descubierto al aplicar la estructura del art. 7, y **anterior a este carril**: la proyección
+`parte_votante_current` **no guarda votos**. La RPC que la construye,
+`fn_refresh_parte_votante_entity` (`20260421122159_…_t10_hardening_lateral_tiebreaker.sql:20-24`),
+calcula:
+
+```
+voting_weight = porcentaje_capital × votes_per_title
+```
+
+Con **una sola clase** de participaciones eso es proporcional a `títulos × votos/título` y las dos
+magnitudes coinciden salvo constante — por eso el defecto ha sido invisible desde que existe la tabla.
+Con las **dos clases** del art. 7, de nominal 16.000 € y 1 €, dejan de coincidir:
+
+| | % de capital | × votos/título | `voting_weight` |
+|---|---|---|---|
+| Socio de cuota (2 × A) | 0,28818423 % | × 25 | **7,2046** |
+| Socio de clase B (1 × B) | 0,00000901 % | × 1 | **0,0000090** |
+
+Ratio real **1 : 800.000**, donde el art. 7 dice **1 : 50**. La proyección deja a la clase B sin voto
+de facto, justo lo contrario de lo que declara el §4 de este documento.
+
+### Criterio declarado
+
+**`parte_votante_current.voting_weight` es una magnitud de capital ponderada por clase, no un recuento
+de votos.** Se nombra así en el código y en las sondas. **La base de voto de la Junta no sale de ahí.**
+
+La base de voto del expediente se calcula por **títulos × votos/título**, que es lo que hace
+`votingRightsFromCapitalHolding` (`src/lib/secretaria/meeting-census.ts:123-132`) y lo que
+`ReunionStepper` escribe en `meeting_attendees.voting_rights`. Ese camino sí reproduce el art. 7:
+50 votos por socio de cuota, 1 por socio de clase B, y **150 para los tres presenciales**, verificado
+contra Cloud (`garrigues-capital-firme.test.ts`, caso "REGRESIÓN DEL ACTA").
+
+### Por qué no se corrige la RPC
+
+Medido en solo lectura sobre el tenant ARGA, comparando el peso **relativo** actual de cada titular con
+el que daría la ponderación por títulos:
+
+```
+44 holdings · 30 entidades
+11 filas cambiarían de peso relativo
+delta relativo máximo = 0,2984  (≈ 30 puntos porcentuales en un titular)
+9 holdings tienen numero_titulos NULL o 0 y ningún share_class_id
+   → bajo ponderación por títulos quedarían con peso CERO: perderían el voto
+```
+
+**No es un arreglo limpio.** Cambiar la RPC alteraría la proyección de 11 titularidades de ARGA y
+silenciaría otras 9. Es una decisión con radio propio, del usuario, y queda **fuera del alcance de este
+carril**.
+
+### Límite del criterio
+
+Documentar una mezcla de magnitudes es aceptable en una proyección **recalculable**. **No lo es en un
+registro WORM.** `fn_crear_censo_snapshot` congela `capital_total_base = SUM(denominator_weight)`
+—porcentaje de capital— en un artefacto inmutable cuyo propósito es que la Junta sea auditable. Por eso
+**no se crea ningún `censo_snapshot` de la Junta de 2026 mientras esto no esté resuelto**, y la decisión
+queda pendiente antes de materializar la reunión.

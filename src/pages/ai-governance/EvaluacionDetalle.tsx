@@ -206,7 +206,10 @@ export default function EvaluacionDetalle() {
         </div>
 
         {/* Handoff callout if gaps exist */}
-        {assessment.status !== "CONFORME" && (
+        {/* Sólo cuando consta una brecha. `BORRADOR` significa que no se ha
+            evaluado: afirmar "no conformidades detectadas" ahí es tan falso
+            como afirmar conformidad, sólo que en la otra dirección. */}
+        {["CON_GAPS", "NO_CONFORME"].includes(assessment.status ?? "") && (
           <div
             className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] flex flex-wrap items-center justify-between gap-3 print:hidden"
             style={{ borderRadius: "var(--g-radius-sm)" }}

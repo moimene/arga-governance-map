@@ -488,7 +488,12 @@ export default function AiDashboard() {
       body: "Cerrar evaluación AI Act antes de presentar el sistema como controlado.",
       to: "/ai-governance/evaluaciones",
       icon: ClipboardCheck,
-      tone: altosNoEvaluados > 0 ? "text-[var(--status-error)]" : "text-[var(--status-success)]",
+      tone:
+        altosNoEvaluados > 0
+          ? "text-[var(--status-error)]"
+          : systems.length === 0
+            ? "text-[var(--g-text-secondary)]"
+            : "text-[var(--status-success)]",
     },
     {
       label: "Incidentes materiales de IA",
@@ -496,7 +501,13 @@ export default function AiDashboard() {
       body: "Revisar severidad, causa raíz y posible handoff a GRC o Secretaría.",
       to: "/ai-governance/incidentes",
       icon: AlertTriangle,
-      tone: materialIncidents > 0 ? "text-[var(--status-warning)]" : "text-[var(--status-success)]",
+      // Con cero incidentes registrados el cero no es bueno ni malo: no consta.
+      tone:
+        materialIncidents > 0
+          ? "text-[var(--status-warning)]"
+          : incidents.length === 0
+            ? "text-[var(--g-text-secondary)]"
+            : "text-[var(--status-success)]",
     },
     {
       label: "Inventario activo",
