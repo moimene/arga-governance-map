@@ -182,3 +182,53 @@ Task 2: FRAGILIDAD INTRODUCIDA POR MÍ Y CORREGIDA. El fallo ruidoso de la Task 
   NOTA sobre la varianza de expects entre corridas: no es ruido inocuo. Son los ficheros de la
   era G4 que graceful-skipean bajo 429 y por tanto asertan menos sin ponerse rojos — el mismo
   defecto que el orquestador catalogó en 4 ficheros y que queda en cola detrás de esta tarea.
+
+Task 2: VERIFICACIÓN VIVA con control discriminante. TRAMPA EVITADA: `preview_start` levantó el
+  servidor con la configuración del ÁRBOL COMPARTIDO, no del worktree — se habría "verificado en
+  vivo" código que no contiene el cambio. Detectado, y NO resuelto mirando el proceso (cuyo cwd es
+  el compartido aunque el root de vite sea otro) sino POR CONTENIDO: se le pidió al servidor
+  `src/lib/sii/tenant-scope.ts`, módulo que solo existe en esta rama, y lo devolvió.
+  Garrigues (sesión demo@garrigues-demo.dev leída en la MISMA llamada que el contenido):
+    EXPEDIENTES TOTALES = 0, tabla vacía, clave `sii_whistleblowing_cases_v2:…0002`,
+    cero rastro de `arga_sii_whistleblowing_cases_v1`.
+  ARGA (demo@arga-seguros.com, mismo navegador): sus 3 expedientes intactos.
+  LA ARISTA, no el rótulo — los dos buckets conviviendo en el mismo localStorage:
+    sii_whistleblowing_cases_v2:…0001 => 3 expedientes
+    sii_whistleblowing_cases_v2:…0002 => 0 expedientes
+  Residuo: servidor parado, configuración de preview retirada, worktree limpio.
+
+Task 3: BASE 998eca1. Retirada de afirmaciones no sostenidas. TODO lo que se retira se VIO EN
+  PANTALLA en la verificación viva de Task 2, no se dedujo leyendo código.
+  - Cita: art. 34 -> art. 26, cotejado contra BOE-A-2023-4513. Premio: el art. 26.1 usa
+    LITERALMENTE el término "libro-registro", así que el NOMBRE era correcto desde el principio y
+    solo fallaba el número; y la retención de 10 años mapea limpiamente 34.2 -> 26.2.
+  - `hashSha512` del SII: cambia de NOMBRE (`referenciaInterna`), no de valor, porque el valor
+    nunca fue un digest — era `Math.random()` bajo un prefijo que afirmaba integridad. Los campos
+    homónimos de Secretaría SÍ son SHA-512 reales (computeSha512) y NO se tocan: la distinción se
+    comprobó antes de renombrar nada.
+  - `qtspSealed`/`qtspSealedAt` eliminados del tipo y de los fixtures; badges y columnas fuera.
+  - "Cifrado de extremo a extremo" sobre mensajes en claro; "100% anónimo"/"anonimato técnico" ->
+    confidencialidad reforzada (PI-31 Anexo 1 §3.c reserva el anónimo a la vía postal);
+    "admitido a trámite" al recibir cuando el estado escrito es RECIBIDO.
+  - Identidad cableada de una investigadora de ARGA que se mostraba TAMBIÉN en la sesión de
+    Garrigues: contaminación cruzada de identidad en la primera pantalla del canal de denuncias.
+    Ahora muestra el usuario real y NO afirma el rol, que PI-31 §4 designa por cargo.
+  - KPI: un "100%" en verde sobre CERO expedientes y otro literal que no calculaba nada. El
+    primero pasa a "—" con "no hay cumplimiento que medir"; el segundo cuenta expedientes con
+    medida anti-represalias registrada.
+  - Banner de Penal (texto firmado por la orquestación): los plazos son EXIGENCIA legal, no nivel
+    de servicio en vigor; cae la mención a custodia de un tercero, que la TSL no acredita como
+    cualificada y que además el módulo no realiza (guarda en localStorage, en claro).
+  El test lleva ASERCIONES EN SENTIDO CONTRARIO: falla si DESAPARECE la cita del art. 36 (correcta,
+  y que un auditor propuso cambiar por error) o la del art. 26, o los plazos 9.2.c/9.2.d.
+  GOTCHA propio: los primeros comentarios que escribí CITABAN las cadenas prohibidas y el guard los
+  cazó. Tiene razón en no distinguir comentario de código; se reescribieron los comentarios.
+
+MEDICIÓN EN VENTANA SERIALIZADA concedida por la orquestación, tras integrar el merge de C1:
+  Base vinculante (eb4f117, medida por la orquestación): 3503 / 152 / 0 · 17549 expects · 3655 tests.
+  Modo A: **3526 pass / 152 skip / 0 fail** · 17583 expects · 3678 tests.
+  Modo B: **3522 pass / 157 skip / 0 fail** · 17164 expects · 3679 tests.
+  typecheck 0 · lint 0 · build 0.
+  DELTA SIN RESIDUO: +23 pass y +23 tests = 9 (sii-tenant-scope) + 14 (sii-afirmaciones).
+  Expects +34 = 16 + 17 de los dos ficheros nuevos + 1 de la aserción añadida al test del engine.
+  Con la varianza aislada en ~29, este delta cuadra al dígito y es señal, no ruido.
