@@ -86,6 +86,41 @@ export const STATUTORY_BASIS =
 export const LUGAR_JUNTA = "Domicilio social: Plaza de Colón, 2, 28046 Madrid";
 
 /**
+ * Identidad lógica de la reunión materializada. `meetings.slug` SÍ existe y es
+ * UNIQUE global, así que este valor es la clave de idempotencia del seed de la
+ * reunión — a diferencia de la convocatoria, que no tiene columna `slug`.
+ */
+export const MEETING_SLUG = "garrigues-junta-socios-06-05-2026";
+
+/**
+ * Mesa de la Junta (spec §3.6, del certificado del acta).
+ *
+ * Ninguno de los dos es un cargo permanente del órgano: la Presidenta lo es
+ * **como socia y senior partner** (art. 29.2 de los Estatutos) y el Secretario
+ * fue **elegido por unanimidad de los asistentes en la propia sesión**. Por eso
+ * no existe —ni se fabrica— `authority_evidence` de la Junta para ninguno de
+ * los dos: la mesa de una Junta se constituye en la sesión, no viene de un
+ * nombramiento previo inscrito.
+ */
+export const MESA_PRESIDENTA = "Rosa Zarza Jimeno";
+export const MESA_SECRETARIO = "Roberto Delgado Gil";
+
+/**
+ * Los 3 socios que asistieron con presencia física, y el único representante.
+ *
+ * El certificado dice literalmente que «los socios que asistieron representados
+ * lo fueron por el socio D. Roberto Delgado Gil», que exhibió las cartas de
+ * delegación a la Presidenta. Son 343 delegaciones a **una misma persona**, no
+ * un reparto entre varios representantes.
+ *
+ * Estos nombres se contrastan en el preflight del seed contra la transcripción
+ * `scripts/garrigues/censo/socios-acta-2026-05-06.json` y contra los titulares
+ * reales de `capital_holdings` en Cloud: tres fuentes que deben coincidir.
+ */
+export const SOCIOS_PRESENCIALES = ["Fernando Vives Ruiz", MESA_PRESIDENTA, MESA_SECRETARIO];
+export const REPRESENTANTE_UNICO = MESA_SECRETARIO;
+
+/**
  * La hora **no consta** en la fuente disponible, y esta constante no puede
  * hacerla constar: `fecha_1` es `timestamptz` y toda la UI pinta algo.
  *
@@ -298,4 +333,150 @@ export function convocatoriaText(): string {
     "",
     "Registro técnico realizado por la Secretaría Societaria en el entorno DEMO. No constituye una convocatoria emitida ni evidencia final productiva. Esta reconstrucción no produce remisión, entrega ni acuse, y no afirma ninguna actuación, interposición, mensajería ni custodia de EAD Trust sobre este documento.",
   ].join("\n");
+}
+
+// ─────────────────────────────────────────── Task 6: los acuerdos y su regla ──
+
+/**
+ * El punto 1.1 **no materializa acuerdo**, y no es una omisión: está bloqueado.
+ *
+ * El acuerdo real modificó el **artículo 36** de los Estatutos, y ese artículo
+ * **no existe en el texto entregado**: la numeración salta de 35 a 37. Además, la
+ * mayoría reforzada de 2/3 del art. 30.2.f) está tasada para la modificación de
+ * **quince artículos enumerados** (1, 2, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21,
+ * 26, 42 y 47) — no hay categoría abstracta de «artículos nucleares» a la que
+ * adscribir el 36. Sin artículo que cotejar no hay mayoría que citar, y afirmar
+ * una sería inventarla.
+ *
+ * El punto sigue **en el orden del día** (`materializa: true` no se toca: es el
+ * contrato de Task 4 y el punto se deliberó). Lo que no existe es su acuerdo.
+ * Desbloquearlo es dictamen del Comité Legal, no seed.
+ */
+export const PUNTO_BLOQUEADO = "1.1";
+
+export const NOTA_PUNTO_BLOQUEADO =
+  "Punto deliberado sin acuerdo materializado: modifica el art. 36 de los Estatutos, artículo que no consta en el texto entregado (la secuencia salta de 35 a 37), y la mayoría reforzada del art. 30.2.f) está tasada para quince artículos enumerados entre los que no figura. Pendiente de dictamen del Comité Legal.";
+
+/**
+ * Los 9 puntos que SÍ producen un `agreements` en Task 6: los 10 que
+ * materializan menos el bloqueado. **9, no 10.**
+ */
+export const puntosConAcuerdo = (): PuntoOrdenDia[] =>
+  puntosQueMaterializan().filter((p) => p.numero !== PUNTO_BLOQUEADO);
+
+/**
+ * Ordinal 1-based del punto dentro de `ORDEN_DEL_DIA`.
+ *
+ * Es el mismo entero que la plataforma usaría en
+ * `agenda_items.source_convocatoria_item_index` para apuntar al elemento del
+ * array `convocatorias.agenda_items`. Aquí ese vínculo por FK **no puede
+ * escribirse** —`fn_secretaria_guard_convocation_agenda_binding` exige que la
+ * convocatoria esté EMITIDA e inmutable y ésta está en BORRADOR—, así que el
+ * ordinal se conserva en `agenda_items.order_number`, que es la columna que la
+ * arista real (`agreements.agenda_item_id`) alcanza.
+ *
+ * Los huecos (1, 6, 9, 10, 14) son los puntos sin acuerdo: no se renumera, para
+ * que el ordinal siga apuntando al mismo elemento de la convocatoria.
+ */
+export function ordinalEnOrdenDelDia(numero: string): number {
+  const idx = ORDEN_DEL_DIA.findIndex((p) => p.numero === numero);
+  if (idx < 0) throw new Error(`ordinal: el punto ${numero} no está en el orden del día`);
+  return idx + 1;
+}
+
+/**
+ * Texto del acuerdo por punto.
+ *
+ * `contenido` califica **el contenido del acuerdo**, no su redacción: ningún
+ * literal del certificado obra en el repo, así que los 9 textos son
+ * reconstrucción y todos lo dicen.
+ *
+ *  - `ACREDITADO` — lo decidido consta en fuente externa (tabla vinculante del
+ *    plan, confirmada por BORME para 1.2, 6 y 10; art. 31.3 de los Estatutos
+ *    para el 12).
+ *  - `INFERIDO` — el certificado recoge el punto pero no lo que se decidió.
+ *    Estos textos **no identifican a ninguna persona**: nombrar a un socio
+ *    excluido o admitido a partir de un punto del orden del día sería inventar
+ *    el contenido de un acuerdo sobre una persona concreta.
+ */
+export type TextoAcuerdo = {
+  contenido: "ACREDITADO" | "INFERIDO";
+  propuesta: string;
+  decision: string;
+};
+
+const DISCLAIMER =
+  "Reconstrucción demo sin efecto jurídico: el certificado del acta no transcribe el literal del acuerdo.";
+
+export const TEXTOS_ACUERDO: Record<string, TextoAcuerdo> = {
+  "1.2": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Cesar y reelegir a D. Fernando Vives Ruiz como Administrador Único de J&A Garrigues, S.L.P., con mandato hasta el 30 de junio de 2032, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda el cese y la reelección de D. Fernando Vives Ruiz como Administrador Único de J&A Garrigues, S.L.P., con mandato hasta el 30 de junio de 2032. ${DISCLAIMER}`,
+  },
+  "2": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Declarar la exclusión estatutaria de los socios incursos en la causa de retiro por edad del artículo 21.1.e de los Estatutos, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la exclusión estatutaria de los socios afectados por la causa del artículo 21.1.e de los Estatutos. El certificado no transcribe el acuerdo ni identifica a los socios afectados, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "3": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Aprobar la continuidad como socios de quienes han alcanzado la edad de retiro, a propuesta del Órgano de Administración y previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la continuidad de los socios afectados conforme al artículo 21.1.e de los Estatutos. El certificado no transcribe el acuerdo ni identifica a los socios afectados, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "4": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Admitir como Socios de Cuota a los profesionales propuestos por el Órgano de Administración, previo informe preceptivo del Consejo de Socios.",
+    decision:
+      `Se acuerda la admisión como Socios de Cuota de los profesionales propuestos. El certificado no transcribe el acuerdo ni identifica a los admitidos, y este texto no los identifica. ${DISCLAIMER}`,
+  },
+  "6": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Aprobar la integración del despacho BSVV mediante aumento del capital social con supresión del derecho de preferencia, previo informe del Administrador Único sobre la supresión.",
+    decision:
+      `Se acuerda la integración del despacho BSVV mediante aumento del capital social con supresión del derecho de preferencia. ${DISCLAIMER}`,
+  },
+  "7": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Examinar y aprobar las cuentas anuales individuales y consolidadas del ejercicio 2025.",
+    decision:
+      `Se acuerda aprobar las cuentas anuales individuales y consolidadas del ejercicio 2025. El certificado del acta se expidió para el depósito de esas cuentas, pero no transcribe el acuerdo ni su aplicación del resultado. ${DISCLAIMER}`,
+  },
+  "10": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Reelegir a Lillo Auditores Asociados, S.L. como auditor de cuentas de la sociedad.",
+    decision:
+      `Se acuerda la reelección de Lillo Auditores Asociados, S.L. como auditor de cuentas. ${DISCLAIMER}`,
+  },
+  "11": {
+    contenido: "INFERIDO",
+    propuesta:
+      "Aprobar la retribución de las prestaciones accesorias del ejercicio, a propuesta del Órgano de Administración y previo informe del Consejo de Socios.",
+    decision:
+      `Se acuerda la retribución de las prestaciones accesorias. El certificado no transcribe el acuerdo ni sus importes, y este texto no los reconstruye. ${DISCLAIMER}`,
+  },
+  "12": {
+    contenido: "ACREDITADO",
+    propuesta:
+      "Delegar las facultades necesarias para elevar a instrumento público los acuerdos adoptados.",
+    decision:
+      `Se acuerda delegar las facultades para elevar a instrumento público los acuerdos adoptados. Es un acuerdo de cobertura: conforme al artículo 31.3 de los Estatutos, la elevación corresponde a quien tiene facultad de certificar y «también podrá realizarse por cualquiera de los administradores sin necesidad de delegación expresa», de modo que con Administrador Único que además certifica la delegación no es necesaria. ${DISCLAIMER}`,
+  },
+};
+
+/** El texto del punto, o error: un acuerdo sin texto no se escribe en blanco. */
+export function textoAcuerdo(numero: string): TextoAcuerdo {
+  const t = TEXTOS_ACUERDO[numero];
+  if (!t) throw new Error(`texto de acuerdo: falta el punto ${numero}`);
+  return t;
 }
