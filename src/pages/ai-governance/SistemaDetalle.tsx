@@ -829,9 +829,10 @@ export default function SistemaDetalle() {
                   </h2>
                   <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
                     El artículo 27 del Reglamento (UE) 2024/1689 no obliga a todo desplegador. Exige
-                    dos condiciones a la vez: que el sistema sea de alto riesgo del anexo III, y que
-                    quien lo despliega sea un organismo de Derecho público, una entidad privada que
-                    preste servicios públicos, o desplegador de los sistemas del anexo III, punto 5,
+                    dos condiciones a la vez: que el sistema sea de alto riesgo del anexo III
+                    —salvo los de su punto 2, que el propio artículo excluye—, y que quien lo
+                    despliega sea un organismo de Derecho público, una entidad privada que preste
+                    servicios públicos, o desplegador de los sistemas del anexo III, punto 5,
                     letras b) y c).
                   </p>
                   <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">

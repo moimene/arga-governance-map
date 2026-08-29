@@ -37,10 +37,26 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- 1. Multiregime Incident Cases & Clocks
 -- ---------------------------------------------------------------------------
 
+-- Claves compuestas en los padres preexistentes de la superficie AIMS. `id` ya
+-- es clave primaria en las tres, así que estas restricciones no pueden violarse:
+-- su único cometido es permitir FK con coherencia de tenant desde las tablas
+-- nuevas. Sin ellas, un tenant puede colgar sus filas del padre de otro.
+ALTER TABLE ai_incidents
+  ADD CONSTRAINT ai_incidents_tenant_id_key UNIQUE (tenant_id, id);
+ALTER TABLE ai_systems
+  ADD CONSTRAINT ai_systems_tenant_id_key UNIQUE (tenant_id, id);
+ALTER TABLE aims_system_versions
+  ADD CONSTRAINT aims_system_versions_tenant_id_key UNIQUE (tenant_id, id);
+
 CREATE TABLE IF NOT EXISTS aims_incident_regimes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  incident_id uuid NOT NULL REFERENCES ai_incidents(id) ON DELETE CASCADE,
+  incident_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, incident_id)
+    REFERENCES ai_incidents(tenant_id, id) ON DELETE CASCADE,
+  -- DEUDA DECLARADA: FK de una sola columna. `entities` no tiene
+  -- UNIQUE(tenant_id, id) y es superficie compartida (G1), así que la coherencia
+  -- de tenant no puede cerrarse desde aquí sin autorización.
   entity_id uuid REFERENCES entities(id) ON DELETE CASCADE,
   -- 'RIA' | 'GDPR' | 'DORA'. El enum se deja abierto a propósito: para el
   -- perfil despacho, DORA queda FUERA DEL ALCANCE DECLARADO y no se siembra
@@ -54,11 +70,17 @@ CREATE TABLE IF NOT EXISTS aims_incident_regimes (
   lead_role text NOT NULL, -- 'AI_OFFICER', 'DPO', 'CISO', 'LEGAL'
   closed_at timestamptz,
   closure_reason text,
+  -- DEUDA DECLARADA: igual que `entity_id`. `evidence_bundles` es la espina
+  -- dorsal compartida de Secretaría.
   evidence_bundle_id uuid REFERENCES evidence_bundles(id) ON DELETE SET NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, incident_id, regime_code)
+  UNIQUE (tenant_id, incident_id, regime_code),
+  -- Habilita la FK compuesta de las hijas. `id` ya es único por PK, así que
+  -- esta restricción no puede violarse: su único cometido es permitir que
+  -- `(tenant_id, id)` sea referenciable.
+  UNIQUE (tenant_id, id)
 );
 
 COMMENT ON TABLE aims_incident_regimes IS 'Independent subcases per regulatory regime for an incident (Closure Isolation principle).';
@@ -66,7 +88,9 @@ COMMENT ON TABLE aims_incident_regimes IS 'Independent subcases per regulatory r
 CREATE TABLE IF NOT EXISTS aims_regulatory_clocks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  incident_regime_id uuid NOT NULL REFERENCES aims_incident_regimes(id) ON DELETE CASCADE,
+  incident_regime_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, incident_regime_id)
+    REFERENCES aims_incident_regimes(tenant_id, id) ON DELETE CASCADE,
   clock_type text NOT NULL, -- 'RIA_ORDINARY_15D', 'RIA_URGENT_2D', 'RIA_DEATH_10D', 'GDPR_72H', 'GDPR_SUBJECT_NOTICE', 'DORA_INITIAL_4H', 'DORA_INTERMEDIATE_72H', 'DORA_FINAL_30D'
   trigger_at timestamptz NOT NULL DEFAULT now(),
   deadline_at timestamptz NOT NULL,
@@ -82,7 +106,9 @@ COMMENT ON TABLE aims_regulatory_clocks IS 'Calculated per-regime deadlines and 
 CREATE TABLE IF NOT EXISTS aims_incident_reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  incident_regime_id uuid NOT NULL REFERENCES aims_incident_regimes(id) ON DELETE CASCADE,
+  incident_regime_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, incident_regime_id)
+    REFERENCES aims_incident_regimes(tenant_id, id) ON DELETE CASCADE,
   report_type text NOT NULL, -- 'INITIAL', 'INTERMEDIATE', 'FINAL', 'DELAY_JUSTIFICATION', 'NON_APPLICABILITY'
   authority text NOT NULL,
   sent_at timestamptz,
@@ -107,8 +133,12 @@ COMMENT ON TABLE aims_incident_reports IS 'Formal regulatory notification report
 CREATE TABLE IF NOT EXISTS aims_fria_assessments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  system_id uuid NOT NULL REFERENCES ai_systems(id) ON DELETE CASCADE,
-  version_id uuid REFERENCES aims_system_versions(id) ON DELETE SET NULL,
+  system_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, system_id)
+    REFERENCES ai_systems(tenant_id, id) ON DELETE CASCADE,
+  version_id uuid,
+  FOREIGN KEY (tenant_id, version_id)
+    REFERENCES aims_system_versions(tenant_id, id) ON DELETE SET NULL,
   title text NOT NULL,
   status text NOT NULL DEFAULT 'DRAFT', -- 'DRAFT', 'IN_REVIEW', 'APPROVED', 'SUPERSEDED'
   version_number int NOT NULL DEFAULT 1,
@@ -119,7 +149,9 @@ CREATE TABLE IF NOT EXISTS aims_fria_assessments (
   market_surveillance_notified boolean NOT NULL DEFAULT false,
   notification_date timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- Ver la nota de `aims_incident_regimes`: habilita la FK compuesta.
+  UNIQUE (tenant_id, id)
 );
 
 COMMENT ON TABLE aims_fria_assessments IS 'Header for Art. 27 RIA Fundamental Rights Impact Assessments.';
@@ -128,7 +160,9 @@ COMMENT ON TABLE aims_fria_assessments IS 'Header for Art. 27 RIA Fundamental Ri
 CREATE TABLE IF NOT EXISTS aims_fria_process_map (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   business_process text NOT NULL,
   intended_purpose text NOT NULL,
   decision_point text NOT NULL,
@@ -141,7 +175,9 @@ CREATE TABLE IF NOT EXISTS aims_fria_process_map (
 CREATE TABLE IF NOT EXISTS aims_fria_use_profile (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   planned_start_date date,
   planned_end_date date,
   usage_frequency text NOT NULL, -- 'CONTINUOUS', 'BATCH_DAILY', 'ON_DEMAND', 'SEASONAL'
@@ -154,7 +190,9 @@ CREATE TABLE IF NOT EXISTS aims_fria_use_profile (
 CREATE TABLE IF NOT EXISTS aims_fria_affected_groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   group_name text NOT NULL,
   group_description text,
   impact_type text NOT NULL DEFAULT 'DIRECT', -- 'DIRECT', 'INDIRECT'
@@ -168,7 +206,9 @@ CREATE TABLE IF NOT EXISTS aims_fria_affected_groups (
 CREATE TABLE IF NOT EXISTS aims_fria_fundamental_rights_risks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   fundamental_right text NOT NULL, -- 'NON_DISCRIMINATION', 'HUMAN_DIGNITY', 'PRIVACY', 'FAIR_TRIAL', 'FREEDOM_EXPRESSION', 'CONSUMER_PROTECTION'
   harm_scenario text NOT NULL,
   provider_info_ref text,
@@ -183,11 +223,17 @@ CREATE TABLE IF NOT EXISTS aims_fria_fundamental_rights_risks (
 CREATE TABLE IF NOT EXISTS aims_fria_remediation_governance (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   trigger_event text NOT NULL,
   -- Arista real. Antes era texto libre con un default de otro tenant, que es
   -- el P0 de ownership que la review de G4 identificó: el propietario pintado
   -- como rótulo nunca demuestra la relación.
+  -- DEUDA DECLARADA, y es la más incómoda: esta FK se introdujo para que el
+  -- ownership fuera una ARISTA y no un rótulo, pero puede apuntar al órgano de
+  -- otro tenant. `governing_bodies` es superficie compartida (G2) y no tiene
+  -- UNIQUE(tenant_id, id); cerrarlo exige autorización sobre esa tabla.
   governance_body_id uuid REFERENCES governing_bodies(id) ON DELETE SET NULL,
   complaint_channel text NOT NULL,
   redress_procedure text NOT NULL,
@@ -203,7 +249,9 @@ CREATE TABLE IF NOT EXISTS aims_fria_remediation_governance (
 CREATE TABLE IF NOT EXISTS aims_fria_dpia_cross_references (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  fria_id uuid NOT NULL REFERENCES aims_fria_assessments(id) ON DELETE CASCADE,
+  fria_id uuid NOT NULL,
+  FOREIGN KEY (tenant_id, fria_id)
+    REFERENCES aims_fria_assessments(tenant_id, id) ON DELETE CASCADE,
   dpia_ref_id text NOT NULL, -- Reference ID to GRC / Privacy DPIA document
   ria_obligation_point text NOT NULL, -- 'ART_27_1_A', 'ART_27_1_C', 'ART_27_1_D', 'ART_27_1_F'
   dpia_section text NOT NULL,
@@ -250,51 +298,61 @@ ALTER TABLE aims_fria_fundamental_rights_risks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE aims_fria_remediation_governance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE aims_fria_dpia_cross_references ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS aims_incident_regimes_tenant_isolation ON aims_incident_regimes;
 CREATE POLICY aims_incident_regimes_tenant_isolation ON aims_incident_regimes
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_regulatory_clocks_tenant_isolation ON aims_regulatory_clocks;
 CREATE POLICY aims_regulatory_clocks_tenant_isolation ON aims_regulatory_clocks
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_incident_reports_tenant_isolation ON aims_incident_reports;
 CREATE POLICY aims_incident_reports_tenant_isolation ON aims_incident_reports
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_assessments_tenant_isolation ON aims_fria_assessments;
 CREATE POLICY aims_fria_assessments_tenant_isolation ON aims_fria_assessments
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_process_map_tenant_isolation ON aims_fria_process_map;
 CREATE POLICY aims_fria_process_map_tenant_isolation ON aims_fria_process_map
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_use_profile_tenant_isolation ON aims_fria_use_profile;
 CREATE POLICY aims_fria_use_profile_tenant_isolation ON aims_fria_use_profile
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_affected_groups_tenant_isolation ON aims_fria_affected_groups;
 CREATE POLICY aims_fria_affected_groups_tenant_isolation ON aims_fria_affected_groups
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_fundamental_rights_risks_tenant_isolation ON aims_fria_fundamental_rights_risks;
 CREATE POLICY aims_fria_fundamental_rights_risks_tenant_isolation ON aims_fria_fundamental_rights_risks
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_remediation_governance_tenant_isolation ON aims_fria_remediation_governance;
 CREATE POLICY aims_fria_remediation_governance_tenant_isolation ON aims_fria_remediation_governance
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
   WITH CHECK (tenant_id = public.fn_current_tenant_id());
 
+DROP POLICY IF EXISTS aims_fria_dpia_cross_references_tenant_isolation ON aims_fria_dpia_cross_references;
 CREATE POLICY aims_fria_dpia_cross_references_tenant_isolation ON aims_fria_dpia_cross_references
   FOR ALL TO authenticated
   USING (tenant_id = public.fn_current_tenant_id())
