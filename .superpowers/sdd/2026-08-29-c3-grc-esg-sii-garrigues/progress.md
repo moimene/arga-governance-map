@@ -136,3 +136,99 @@ Task 1: fix round 1/1. El arreglo NO es endurecer el regex —es una carrera arm
     Base restaurada -> 19 pass / 0 fail.
   GATES: modo A **3469 pass / 152 skip / 0 fail** (17395 expects) · modo B **3465 / 157 / 0**
   (16976 expects) · typecheck 0 · lint 0 · build 0. Base 3461/3457: +8 y +8 = los 8 tests nuevos.
+
+MERGE nº2 del programa: C3 entró en main tras C2. `main` 27d1479 == origin/main. Medición del
+  orquestador en el árbol COMPARTIDO: 3476 / 152 / 0, 17453 expects, 3628 tests — clava la del
+  worktree hasta el número de expects. Delta +8 sobre la referencia post-C2 (3468): los 8 tests.
+  El gotcha que frenó a C2 (copia untracked del plan en el compartido bloqueando el merge) no me
+  afectó: al montar el worktree devolví el compartido a HEAD con `git restore` + `rm` en vez de
+  dejar copias.
+
+Task 2: BASE 27d1479 (main con C2 integrado). Aislamiento por tenant del canal interno.
+  DEFECTO: `SII_STORAGE_KEY = "arga_sii_whistleblowing_cases_v1"` — bucket ÚNICO para todos los
+  tenants, 4 queryKeys literales sin tenant, 0 usos de useTenantContext, y las 5 rutas /sii/* sin
+  RequireModule pese a que `branding.modules` de Garrigues sí incluye "sii". Un usuario de
+  Garrigues veía las tres denuncias de ARGA bajo la cabecera "SII · Garrigues". La fuga es por
+  navegador (localStorage), no de servidor: grave para la demo y para la coherencia del producto,
+  no un incidente con terceros afectados.
+  LAS TRES PUERTAS (la 3ª la levantó el orquestador, yo solo había visto dos): getStoredReports
+  devolvía INITIAL_SII_REPORTS por (1) guard de SSR, (2) bucket vacío -> siembra y devuelve, y
+  (3) `catch` de JSON corrupto -> devuelve SIN sembrar, y por eso no deja rastro en localStorage y
+  es la más difícil de reproducir. Cambiar solo la clave habría DUPLICADO la fuga en vez de
+  cerrarla: con bucket propio, Garrigues habría estrenado uno vacío y el código le habría copiado
+  dentro los casos de ARGA.
+  HECHO: src/lib/sii/tenant-scope.ts (módulo hoja; siiStorageKey LANZA sin tenant, para que no
+  exista firma que reintroduzca el bucket compartido); initialReportsFor(tenantId) como ÚNICO
+  sitio donde se elige la siembra, por el que pasan las tres puertas; 11 lecturas y 7 escrituras
+  con tenant explícito; 4 queryKeys por siiQueryKey() con el tenant en 2ª posición y
+  `enabled: !!tenantId` en las 4; 7 invalidaciones scoped; las 5 rutas envueltas en RequireModule.
+  El patrón NO es nuevo: SociedadNuevaStepper.tsx:120 ya construía `${PREFIJO}:${tenantId}`.
+  Se aplica al SII lo que Secretaría ya hacía bien, sin introducir un segundo sabor.
+
+Task 2: FRAGILIDAD INTRODUCIDA POR MÍ Y CORREGIDA. El fallo ruidoso de la Task 1 puso la suite
+  completa a depender del login vivo: modo B dio 2 fail y luego modo A dio 1 fail, de forma NO
+  determinista, mientras los ficheros aislados pasaban siempre. En vez de añadir reintentos a
+  ciegas se midió la causa: sonda de 8 logins concurrentes -> **6 responden HTTP 429 "Request
+  rate limit reached"** y 2 pasan. Es estrangulamiento de Supabase Auth por IP, no un fallo del
+  gate. ARREGLO: reintento con espera creciente (800/2000/4500 ms) SOLO ante 429; cualquier otro
+  error (clave rotada, credencial mala, Cloud caído) no se reintenta, se propaga y el beforeAll
+  falla ruidoso con el status y el mensaje en la aserción. Más una aserción DETERMINISTA de que
+  la credencial está configurada, que es la que caza el defecto original (la variable no existía).
+  Deuda de fondo, ya catalogada y no de esta tarea: 19 sondas resuelven credenciales por su
+  cuenta y abren ~38 logins, mientras existe src/test/helpers/supabase-test-client.ts que ya usan
+  27 ficheros. Unificarlas es el arreglo real del 429.
+  GATES: modo A **3485 / 152 / 0** en DOS corridas seguidas (17469 y 17189 expects) · modo B
+  **3481 / 157 / 0** (16770) · typecheck 0 · lint 0 · build 0.
+  NOTA sobre la varianza de expects entre corridas: no es ruido inocuo. Son los ficheros de la
+  era G4 que graceful-skipean bajo 429 y por tanto asertan menos sin ponerse rojos — el mismo
+  defecto que el orquestador catalogó en 4 ficheros y que queda en cola detrás de esta tarea.
+
+Task 2: VERIFICACIÓN VIVA con control discriminante. TRAMPA EVITADA: `preview_start` levantó el
+  servidor con la configuración del ÁRBOL COMPARTIDO, no del worktree — se habría "verificado en
+  vivo" código que no contiene el cambio. Detectado, y NO resuelto mirando el proceso (cuyo cwd es
+  el compartido aunque el root de vite sea otro) sino POR CONTENIDO: se le pidió al servidor
+  `src/lib/sii/tenant-scope.ts`, módulo que solo existe en esta rama, y lo devolvió.
+  Garrigues (sesión demo@garrigues-demo.dev leída en la MISMA llamada que el contenido):
+    EXPEDIENTES TOTALES = 0, tabla vacía, clave `sii_whistleblowing_cases_v2:…0002`,
+    cero rastro de `arga_sii_whistleblowing_cases_v1`.
+  ARGA (demo@arga-seguros.com, mismo navegador): sus 3 expedientes intactos.
+  LA ARISTA, no el rótulo — los dos buckets conviviendo en el mismo localStorage:
+    sii_whistleblowing_cases_v2:…0001 => 3 expedientes
+    sii_whistleblowing_cases_v2:…0002 => 0 expedientes
+  Residuo: servidor parado, configuración de preview retirada, worktree limpio.
+
+Task 3: BASE 998eca1. Retirada de afirmaciones no sostenidas. TODO lo que se retira se VIO EN
+  PANTALLA en la verificación viva de Task 2, no se dedujo leyendo código.
+  - Cita: art. 34 -> art. 26, cotejado contra BOE-A-2023-4513. Premio: el art. 26.1 usa
+    LITERALMENTE el término "libro-registro", así que el NOMBRE era correcto desde el principio y
+    solo fallaba el número; y la retención de 10 años mapea limpiamente 34.2 -> 26.2.
+  - `hashSha512` del SII: cambia de NOMBRE (`referenciaInterna`), no de valor, porque el valor
+    nunca fue un digest — era `Math.random()` bajo un prefijo que afirmaba integridad. Los campos
+    homónimos de Secretaría SÍ son SHA-512 reales (computeSha512) y NO se tocan: la distinción se
+    comprobó antes de renombrar nada.
+  - `qtspSealed`/`qtspSealedAt` eliminados del tipo y de los fixtures; badges y columnas fuera.
+  - "Cifrado de extremo a extremo" sobre mensajes en claro; "100% anónimo"/"anonimato técnico" ->
+    confidencialidad reforzada (PI-31 Anexo 1 §3.c reserva el anónimo a la vía postal);
+    "admitido a trámite" al recibir cuando el estado escrito es RECIBIDO.
+  - Identidad cableada de una investigadora de ARGA que se mostraba TAMBIÉN en la sesión de
+    Garrigues: contaminación cruzada de identidad en la primera pantalla del canal de denuncias.
+    Ahora muestra el usuario real y NO afirma el rol, que PI-31 §4 designa por cargo.
+  - KPI: un "100%" en verde sobre CERO expedientes y otro literal que no calculaba nada. El
+    primero pasa a "—" con "no hay cumplimiento que medir"; el segundo cuenta expedientes con
+    medida anti-represalias registrada.
+  - Banner de Penal (texto firmado por la orquestación): los plazos son EXIGENCIA legal, no nivel
+    de servicio en vigor; cae la mención a custodia de un tercero, que la TSL no acredita como
+    cualificada y que además el módulo no realiza (guarda en localStorage, en claro).
+  El test lleva ASERCIONES EN SENTIDO CONTRARIO: falla si DESAPARECE la cita del art. 36 (correcta,
+  y que un auditor propuso cambiar por error) o la del art. 26, o los plazos 9.2.c/9.2.d.
+  GOTCHA propio: los primeros comentarios que escribí CITABAN las cadenas prohibidas y el guard los
+  cazó. Tiene razón en no distinguir comentario de código; se reescribieron los comentarios.
+
+MEDICIÓN EN VENTANA SERIALIZADA concedida por la orquestación, tras integrar el merge de C1:
+  Base vinculante (eb4f117, medida por la orquestación): 3503 / 152 / 0 · 17549 expects · 3655 tests.
+  Modo A: **3526 pass / 152 skip / 0 fail** · 17583 expects · 3678 tests.
+  Modo B: **3522 pass / 157 skip / 0 fail** · 17164 expects · 3679 tests.
+  typecheck 0 · lint 0 · build 0.
+  DELTA SIN RESIDUO: +23 pass y +23 tests = 9 (sii-tenant-scope) + 14 (sii-afirmaciones).
+  Expects +34 = 16 + 17 de los dos ficheros nuevos + 1 de la aserción añadida al test del engine.
+  Con la varianza aislada en ~29, este delta cuadra al dígito y es señal, no ruido.

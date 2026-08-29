@@ -1,7 +1,10 @@
 // ============================================================
 // SISTEMA INTERNO DE INFORMACIÓN (SII) — MOTOR REGULATORIO & CASOS
 // Conforme a Ley 2/2023, Directiva (UE) 2019/1937, CP Art. 31 bis,
-// RGPD, DORA, AIMS 360 y Servicios Cualificados de Confianza (QTSP).
+// RGPD, DORA y AIMS 360. NO hay servicio cualificado de confianza detrás:
+// el módulo no sella, no firma y no cifra. Ver docs/legal/2026-08-29-tsl-
+// ead-trust-servicios-cualificados.md — EAD Trust no consta como prestador
+// cualificado de entrega certificada ni de preservación en la Trusted List.
 // ============================================================
 
 import { addCalendarMonths } from "@/lib/grc/regulatory-clocks";
@@ -123,9 +126,14 @@ export interface WhistleblowingEvidence {
   reportId: string;
   title: string;
   type: "DOCUMENTO_SANEADO" | "AUDIO_TRANSCRIPCION" | "ACTA_ENTREVISTA" | "INFORME_FORENSE" | "DICTAMEN_JURIDICO";
-  hashSha512: string;
-  qtspSealed: boolean;
-  qtspSealedAt?: string;
+  /**
+   * Referencia interna del adjunto. NO es un hash criptográfico: se llamaba
+   * `hashSha512` y se rellenaba con `Math.random()` bajo un prefijo que
+   * afirmaba una integridad criptográfica que el módulo no calcula. Los campos
+   * homónimos de Secretaría SÍ son reales (computeSha512); este no lo era, y
+   * por eso cambia de NOMBRE en vez de cambiar de valor.
+   */
+  referenciaInterna: string;
   confidentiality: "RESTRINGIDO_SII" | "SECRETO_SUMARIAL" | "CONFIDENCIAL";
   sanitized: boolean;
   uploadedAt: string;
@@ -147,7 +155,8 @@ export interface WhistleblowingLibroRegistroEntry {
   closureDate?: string | null;
   resultOutcome?: string | null;
   retentionLimitDate: string; // max 10 años
-  immutableProofHash: string;
+  /** Referencia del asiento. Ver `referenciaInterna`: no es prueba criptográfica. */
+  referenciaAsiento: string;
 }
 
 export interface WhistleblowingReport {
@@ -207,7 +216,7 @@ export interface WhistleblowingReport {
  * - Acuse de recibo: 7 días naturales exactos desde la recepción (Art. 9.2.c).
  * - Plazo ordinario de respuesta: 3 meses de calendario desde el acuse o desde el día 7 tras la recepción (Art. 9.2.d).
  * - Prórroga motivada: Hasta 3 meses adicionales (máximo 6 meses) por especial complejidad.
- * - Retención límite en Libro-Registro: 10 años (Art. 34.2).
+ * - Retención límite en Libro-Registro: 10 años (Art. 26.2).
  */
 export function computeWhistleblowingDeadlines(
   intakeDateInput: Date | string,
@@ -656,7 +665,7 @@ export function validateCaseCloseoutGuard(
   };
 }
 
-// ─── Generador de Asiento en Libro-Registro Oficial (Art. 34 Ley 2/2023) ───────
+// ─── Generador de Asiento en Libro-Registro Oficial (Art. 26 Ley 2/2023) ───────
 
 export function generateLibroRegistroEntry(
   report: WhistleblowingReport,
@@ -668,14 +677,14 @@ export function generateLibroRegistroEntry(
   const retentionLimitDate = new Date(report.intakeDate);
   retentionLimitDate.setFullYear(retentionLimitDate.getFullYear() + 10);
 
-  // Hash inmutable del asiento
+  // Referencia del asiento. Hash JS de 32 bits: sirve para identificar, NO para probar.
   const rawPayload = `${recordNumber}|${report.code}|${report.intakeDate}|${report.category}|${report.anonymityMode}|${report.assignedInvestigatorName}`;
   let hash = 0;
   for (let i = 0; i < rawPayload.length; i++) {
     hash = ((hash << 5) - hash) + rawPayload.charCodeAt(i);
     hash |= 0;
   }
-  const immutableProofHash = `SHA512:SII:${Math.abs(hash).toString(16).padStart(16, "0")}:${Date.now().toString(16)}`;
+  const referenciaAsiento = `REF-SII-${Math.abs(hash).toString(16).padStart(16, "0")}-${Date.now().toString(16)}`;
 
   return {
     recordNumber,
@@ -692,6 +701,6 @@ export function generateLibroRegistroEntry(
     closureDate: report.closedAt ?? (closureDetails ? now.toISOString() : null),
     resultOutcome: closureDetails?.outcome ?? (report.closedAt ? "Expediente instruido y archivado con medidas" : "En tramitación"),
     retentionLimitDate: retentionLimitDate.toISOString(),
-    immutableProofHash,
+    referenciaAsiento,
   };
 }

@@ -230,8 +230,8 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
     });
   });
 
-  describe("7. Official Libro-Registro Generator (Art. 34 Ley 2/2023)", () => {
-    it("generates an official register entry with immutable SHA-512 proof hash and 10-year limit", () => {
+  describe("7. Official Libro-Registro Generator (Art. 26 Ley 2/2023)", () => {
+    it("genera el asiento con referencia propia y límite de retención de 10 años", () => {
       const mockReport: WhistleblowingReport = {
         id: "rep-101",
         code: "SII-2026-08-009",
@@ -266,7 +266,11 @@ describe("Whistleblowing Engine — Ley 2/2023 & Harvey Mandate", () => {
 
       expect(entry.recordNumber).toBe("REG-SII-2026-08-009");
       expect(entry.reportCode).toBe("SII-2026-08-009");
-      expect(entry.immutableProofHash).toContain("SHA512:SII:");
+      // El asiento lleva una REFERENCIA, no una prueba criptográfica. El campo
+      // se llamaba `immutableProofHash` y su valor iba prefijado como si fuera
+      // un digest, cuando lo produce un hash JS de 32 bits: identifica, no prueba.
+      expect(entry.referenciaAsiento).toContain("REF-SII-");
+      expect(entry.referenciaAsiento).not.toMatch(/SHA/i);
       expect(entry.retentionLimitDate.slice(0, 4)).toBe("2036");
     });
   });

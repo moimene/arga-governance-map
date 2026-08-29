@@ -93,7 +93,7 @@ export default function SiiSafeInbox() {
               Acceso al Safe Inbox del Informante
             </h1>
             <p className="text-xs text-[var(--t-text-secondary)] mt-1 leading-relaxed max-w-md mx-auto">
-              Introduzca su <strong>Token de Acceso Seguro</strong> proporcionado al registrar la comunicación. Este acceso es 100% anónimo y no registra direcciones IP ni metadatos de sesión.
+              Introduzca su <strong>Token de Acceso Seguro</strong> proporcionado al registrar la comunicación. Este acceso se rige por <strong>confidencialidad reforzada</strong>: su identidad solo es conocida por el Responsable del Sistema y la persona instructora. No es anonimato — PI-31 Anexo 1 §3.c reserva esa vía a la comunicación postal.
             </p>
           </div>
 
@@ -244,10 +244,10 @@ export default function SiiSafeInbox() {
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-[var(--t-brand)]" />
                 <span className="font-bold text-[var(--t-text-primary)]">
-                  Canal de Diálogo Bidireccional Cifrado (Ley 2/2023 Art. 9)
+                  Canal de Diálogo Bidireccional (Ley 2/2023 Art. 9)
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-[var(--t-text-secondary)]">EAD QSeal Protected</span>
+              <span className="text-[10px] font-mono text-[var(--t-text-secondary)]">Entorno de validación funcional</span>
             </div>
 
             {/* Mensajes */}
