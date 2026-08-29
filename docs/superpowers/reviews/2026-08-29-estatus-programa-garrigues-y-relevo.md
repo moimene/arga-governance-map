@@ -111,11 +111,13 @@ Los tres carriles se abren **desde `main` ya consolidado**, con superficie delib
 
 ---
 
-## 7. Decisiones pendientes del usuario
+## 7. Decisiones del usuario — RESUELTAS el 2026-08-29
 
-1. **Antelación real del CdA de EAD Trust** — hoy hay un placeholder etiquetado de 5 días (el art. 246 LSC no fija mínimo). El usuario es consejero de la entidad.
-2. **Capital G2 → FIRME con el art. 7 de los Estatutos** — 694 participaciones clase A (16.000 €, 25 votos) + 8 clase B (1 €, 1 voto); Socio de Cuota = 2A; autocartera 18A = 450/17.358 = **2,59 % exacto**, que cuadra el acta al voto. Hoy los pesos individuales están `INFERIDO`. Pase corto, no ejecutado.
-3. **Alcance del caso canónico:** ¿los 12 puntos completos o un subconjunto que ejercite las materias SLP y el gate preceptivo?
+Registro canónico: `docs/legal/2026-08-29-decisiones-capital-firme-y-consejo-ead.md`. **Ambas las ejecuta el carril C1.**
+
+1. **Antelación del CdA de EAD Trust: 5 días, CONFIRMADOS** por el propio consejero. Deja de ser placeholder; se retiran las notas de "no verificado" del payload. La `fuente` sigue siendo `ESTATUTOS` y la referencia sigue diciendo que el art. 246 LSC no fija plazo mínimo: el 5 es práctica de la entidad, **no** suelo legal. Sube versión del pack (nunca mutar una aplicada).
+2. **Capital de la matriz → FIRME: AUTORIZADO.** Art. 7 de los Estatutos: 694 participaciones clase A (16.000 €, 25 votos) + 8 clase B (1 €, 1 voto); Socio de Cuota = 2A. **Cuatro fuentes independientes cuadran al decimal:** capital 11.104.008 € (= registral), autocartera 18A = 450/17.358 = **2,5925 %** (= el 2,59 % del acta) y **338 + 8 = 346 socios** (= el censo exacto). La estructura deja de ser `INFERIDO`; el emparejamiento socio↔participación numerada sigue sin ser público y continúa etiquetado. Regresión obligatoria: los 3 presenciales deben seguir sumando 0,8875 %.
+3. **Alcance del caso canónico:** pendiente de decidir con el usuario dentro de C1 — los 12 puntos completos o el subconjunto que ejercite las materias SLP y el gate preceptivo.
 
 ---
 
