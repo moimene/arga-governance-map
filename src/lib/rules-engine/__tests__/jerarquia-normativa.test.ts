@@ -38,6 +38,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 30,
         fuente: 'ESTATUTOS',
         referencia: 'Art. 12 Estatutos Sociales',
@@ -66,6 +70,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 20,
         fuente: 'ESTATUTOS',
         referencia: 'Art. 12 Estatutos (Intento Inválido)',
@@ -96,6 +104,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 28,
         fuente: 'PACTO_PARASOCIAL',
         referencia: 'Pacto Sindicales s.a., cláusula 4.2',
@@ -126,11 +138,19 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 30,
         fuente: 'ESTATUTOS',
         referencia: 'Art. 12 Estatutos',
       },
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 35,
         fuente: 'PACTO_PARASOCIAL',
         referencia: 'Cláusula 4 Pacto',
@@ -239,6 +259,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: ['Certificación Legal', 'Anexos'], // Anexos es duplicado
         fuente: 'ESTATUTOS',
         referencia: 'Art. 8 Estatutos',
@@ -268,11 +292,19 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: ['B', 'C'],
         fuente: 'ESTATUTOS',
         referencia: 'Estatutos',
       },
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: ['C', 'D'],
         fuente: 'PACTO_PARASOCIAL',
         referencia: 'Pacto',
@@ -301,6 +333,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: true,
         fuente: 'ESTATUTOS',
         referencia: 'Art. 15 Estatutos',
@@ -328,6 +364,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 'VIGENCIA_LIMITADA_5_AÑOS',
         fuente: 'REGLAMENTO',
         referencia: 'Reglamento Nuevo v2.0',
@@ -376,11 +416,19 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 30,
         fuente: 'ESTATUTOS',
         referencia: 'Art. 12 Estatutos',
       },
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 35,
         fuente: 'PACTO_PARASOCIAL',
         referencia: 'Cláusula Pacto',
@@ -470,6 +518,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 35,
         fuente: 'REGLAMENTO',
         referencia: 'Art. 25 Reglamento',
@@ -499,11 +551,19 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 30,
         fuente: 'FUENTE_INEXISTENTE' as unknown as Fuente,
         referencia: 'Ref',
       },
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 35,
         fuente: 'ESTATUTOS',
         referencia: 'Ref2',
@@ -531,6 +591,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 30,
         fuente: 'ESTATUTOS',
         referencia: 'Estatutos',
@@ -561,6 +625,10 @@ describe('resolverReglaEfectiva', () => {
 
     const overrides: RuleParamOverride[] = [
       {
+        id: 'ovr-prueba',
+        entity_id: 'ent-prueba',
+        materia: 'PRUEBA',
+        clave: 'parametro.prueba',
         valor: 'ESPAÑA_MADRID',
         fuente: 'ESTATUTOS',
         referencia: 'Art. 10 Estatutos',

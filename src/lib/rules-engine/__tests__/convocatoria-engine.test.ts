@@ -29,10 +29,16 @@ function createTestPack(overrides?: Partial<RulePack>): RulePack {
       antelacionDias: {
         SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
         SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+        SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+        SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
       },
       canales: {
         SA: ['BORME', 'WEB_SOCIEDAD'],
         SL: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SAU: ['BORME', 'WEB_SOCIEDAD'],
+        SLU: ['BUROFAX', 'EMAIL_CERTIFICADO'],
+        SLP: ['BUROFAX', 'EMAIL_CERTIFICADO'],
       },
       contenidoMinimo: [
         'Orden del día',
@@ -152,6 +158,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
         },
       },
     });
@@ -179,6 +188,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
         },
       },
     });
@@ -224,6 +236,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
         },
       },
     });
@@ -236,6 +251,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 60, fuente: 'ESTATUTOS', referencia: 'Estatutos art. 12' },
           SL: { valor: 30, fuente: 'ESTATUTOS', referencia: 'Estatutos art. 12' },
+          SAU: { valor: 60, fuente: 'ESTATUTOS', referencia: 'Estatutos art. 12' },
+          SLU: { valor: 30, fuente: 'ESTATUTOS', referencia: 'Estatutos art. 12' },
+          SLP: { valor: 30, fuente: 'ESTATUTOS', referencia: 'Estatutos art. 12' },
         },
       },
     });
@@ -264,6 +282,9 @@ describe('evaluarConvocatoria', () => {
         canales: {
           SA: [],
           SL: [],
+          SAU: [],
+          SLU: [],
+          SLP: [],
         },
       },
     });
@@ -292,6 +313,9 @@ describe('evaluarConvocatoria', () => {
         canales: {
           SA: [],
           SL: [],
+          SAU: [],
+          SLU: [],
+          SLP: [],
         },
       },
     });
@@ -319,6 +343,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
         },
       },
     });
@@ -349,6 +376,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
         },
       },
     });
@@ -475,6 +505,9 @@ describe('evaluarConvocatoria', () => {
         antelacionDias: {
           SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
           SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+          SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+          SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
         },
       },
     });
@@ -694,6 +727,9 @@ describe('evaluarConvocatoria', () => {
           antelacionDias: {
             SA: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
             SL: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+            SAU: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+            SLU: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
+            SLP: { valor: 8, fuente: 'ESTATUTOS', referencia: 'Reglamento CdA art. 7' },
           },
         },
       });
@@ -709,6 +745,9 @@ describe('evaluarConvocatoria', () => {
           antelacionDias: {
             SA: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
             SL: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+            SAU: { valor: 30, fuente: 'LEY', referencia: 'art. 176.1 LSC' },
+            SLU: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
+            SLP: { valor: 15, fuente: 'LEY', referencia: 'art. 176.2 LSC' },
           },
         },
       });
@@ -808,6 +847,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
             SL: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+            SAU: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+            SLU: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
+            SLP: ['CONVOCATORIA_CONSEJO', 'EMAIL_SIMPLE'],
           },
         },
       });
@@ -829,6 +871,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['NOTIFICACION_GENERICA', 'NOTIFICACION_DIRECTA', 'ERDS'],
             SL: ['NOTIFICACION_GENERICA', 'ERDS'],
+            SAU: ['NOTIFICACION_GENERICA', 'NOTIFICACION_DIRECTA', 'ERDS'],
+            SLU: ['NOTIFICACION_GENERICA', 'ERDS'],
+            SLP: ['NOTIFICACION_GENERICA', 'ERDS'],
           },
         },
       });
@@ -850,6 +895,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['NOTIFICACION_GENERICA', 'WEB_SOCIEDAD'],
             SL: ['NOTIFICACION_GENERICA'],
+            SAU: ['NOTIFICACION_GENERICA', 'WEB_SOCIEDAD'],
+            SLU: ['NOTIFICACION_GENERICA'],
+            SLP: ['NOTIFICACION_GENERICA'],
           },
         },
       });
@@ -872,6 +920,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO', 'NOTIFICACION_GENERICA'],
             SL: ['CONVOCATORIA_CONSEJO'],
+            SAU: ['CONVOCATORIA_CONSEJO', 'NOTIFICACION_GENERICA'],
+            SLU: ['CONVOCATORIA_CONSEJO'],
+            SLP: ['CONVOCATORIA_CONSEJO'],
           },
         },
       });
@@ -898,6 +949,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO'],
             SL: ['CONVOCATORIA_CONSEJO'],
+            SAU: ['CONVOCATORIA_CONSEJO'],
+            SLU: ['CONVOCATORIA_CONSEJO'],
+            SLP: ['CONVOCATORIA_CONSEJO'],
           },
         },
       });
@@ -917,6 +971,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO'],
             SL: ['CONVOCATORIA_CONSEJO'],
+            SAU: ['CONVOCATORIA_CONSEJO'],
+            SLU: ['CONVOCATORIA_CONSEJO'],
+            SLP: ['CONVOCATORIA_CONSEJO'],
           },
         },
       });
@@ -936,6 +993,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO'],
             SL: ['CONVOCATORIA_CONSEJO'],
+            SAU: ['CONVOCATORIA_CONSEJO'],
+            SLU: ['CONVOCATORIA_CONSEJO'],
+            SLP: ['CONVOCATORIA_CONSEJO'],
           },
         },
       });
@@ -955,6 +1015,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO', 'BUROFAX'],
             SL: ['BUROFAX'],
+            SAU: ['CONVOCATORIA_CONSEJO', 'BUROFAX'],
+            SLU: ['BUROFAX'],
+            SLP: ['BUROFAX'],
           },
         },
       });
@@ -976,6 +1039,9 @@ describe('evaluarConvocatoria', () => {
           canales: {
             SA: ['CONVOCATORIA_CONSEJO'],
             SL: ['CONVOCATORIA_CONSEJO'],
+            SAU: ['CONVOCATORIA_CONSEJO'],
+            SLU: ['CONVOCATORIA_CONSEJO'],
+            SLP: ['CONVOCATORIA_CONSEJO'],
           },
         },
       });
