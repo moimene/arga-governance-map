@@ -41,15 +41,21 @@ La estructura de clases **no** es el problema: capital 11.104.008 € = registra
 
 Reportado al orquestador y elevado al usuario, que decidió la base de clase A **documentada**, sin afirmar que la clase B carezca de voto.
 
+## Trabajo transversal
+
+| Qué | Estado |
+|---|---|
+| Opción (2) — `parte_votante_current` ponderada por títulos | **APLICADA** ([informe](task-formula-report.md)). ARGA ±0,0125 pp; ratio A/B de Garrigues 800.000 → 50; WORM de ARGA intacto y enseñado; rama CARGO sin tocar |
+
 ## Tareas
 
 | # | Tarea | Estado | Review adversarial | Gates |
 |---|---|---|---|---|
 | 1 | `GARR_CONSEJO_EAD` → v1.1.0 | **COMPLETA** ([informe](task-1-report.md)) | 4 P1 + 9 P2; los 4 P1 corregidos | 3468/152/0 · lint 0 · tsc 0 · build OK, en `/private/tmp/c1-secretaria` con carpetas fuente |
 | 2 | Estructura art. 7 como módulo puro + regresión | **COMPLETA** ([informe](task-2-report.md)) | 12 mutantes, 2 escapaban (ambos cerrados) + 1 P1 + 5 P2 | 20 pass / 0 fail en el fichero; suite completa en el reporte de merge |
-| 3 | Capital de la matriz a FIRME en Cloud | pendiente | — | — |
-| 4 | Convocatoria 21/04 → 06/05 con los 12 puntos reales | pendiente | — | — |
-| 5 | Reunión, asistencia y censo WORM | pendiente | — | — |
+| 3 | Capital de la matriz a FIRME en Cloud | **COMPLETA** ([informe](task-3-report.md)) | 2 P1 + 9 P2; 4 mutantes escapaban, los 4 cerrados | 46 pass / 0 fail en los 4 ficheros de capital; suite completa en el reporte de merge |
+| 4 | Convocatoria 21/04 → 06/05 con los 12 puntos reales | **COMPLETA** ([informe](task-4-report.md)) — en `BORRADOR`: `fn_emit_convocatoria` es CDA-only | 4 P1 (todos de superficie) + 5 de 11 mutantes escapando | 15 pass / 0 fail en su sonda · lint 0 · tsc 0 · build OK |
+| 5 | Reunión, asistencia y censo WORM | **BLOQUEADA** — no se crea `censo_snapshot` hasta resolver la magnitud de `parte_votante_current` (ver `docs/legal/…-base-computo…` §7) | — | — |
 | 6 | Los 10 acuerdos con resolución por materia | pendiente | — | — |
 | 7 | Resoluciones y votaciones | pendiente | — | — |
 | 8 | Acta por RPC + certificación sin VºBº | pendiente | — | — |
