@@ -68,9 +68,21 @@ describe("política de producto EAD Trust · interposición, mensajería y e-arc
   });
 
   it("retira la promesa de firma también de GRC y AI Governance", () => {
+    // A3 (2026-08-29) — ASERCIÓN ENDURECIDA, no relajada.
+    // Este test nació para degradar "firma" a "custodia documental (EAD Trust)"
+    // en AI Governance. Medido después: el módulo AIMS **no llama nunca** a EAD
+    // Trust — 0 imports de cliente QTSP, 0 `fetch`, 0 `functions.invoke` en
+    // `src/pages/ai-governance`, `src/components/ai-governance`, `src/lib/aims` y
+    // `src/hooks/useAims*`; y `fn_aims_close_technical_file` es PL/pgSQL puro sin
+    // llamada saliente. Atribuirle custodia era falso, aunque menos falso que
+    // prometer firma. Ahora se exige que no haya NI firma NI atribución.
+    // Solo se endurece `aiSystemDetail`, que es AI Governance. Secretaría y GRC,
+    // que no se han medido aquí, quedan como estaban.
+    // GRC (`src/pages/grc/IncidenteDetalle.tsx`) NO se toca: es superficie de otro
+    // carril y su relación con EAD Trust no se ha medido aquí.
     expect(incidentDetail).toContain("Custodia documental (EAD Trust)");
     expect(incidentDetail).not.toContain("El proveedor emite firma simple o avanzada");
-    expect(aiSystemDetail).toContain("Custodia documental (EAD Trust)");
+    expect(aiSystemDetail).not.toMatch(/EAD\s*Trust/i);
     expect(aiSystemDetail).not.toContain("Confirmar y Firmar");
     expect(tprm).toContain("PLAN DE SALIDA CUSTODIADO EN LEDGER WORM");
     expect(tprm).not.toContain("LEDGER WORM (FIRMA ELECTRÓNICA)");

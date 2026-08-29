@@ -14,7 +14,7 @@ describe("Multiregime Incident Clocks & Coordination Engine", () => {
     const res = calculateRiaDeadline(baseDate, "ORDINARY_SERIOUS");
     expect(res.regime).toBe("RIA");
     expect(res.deadlineHours).toBe(360);
-    expect(res.articleRef).toBe("Art. 73.1");
+    expect(res.articleRef).toBe("Art. 73.2");
     expect(res.isUrgent).toBe(false);
     
     const diffHours = (new Date(res.deadlineDate).getTime() - new Date(baseDate).getTime()) / (1000 * 60 * 60);
@@ -46,21 +46,32 @@ describe("Multiregime Incident Clocks & Coordination Engine", () => {
   it("calculates GDPR Art. 34 with high risk requiring communication to data subjects", () => {
     const res = calculateGdprDeadline(baseDate, true);
     expect(res.requiresDataSubjectNotice).toBe(true);
-    expect(res.articleRef).toBe("Art. 34");
+    expect(res.articleRef).toBe("Art. 33");
+    expect(res.dataSubjectNoticeArticleRef).toBe("Art. 34");
   });
 
-  it("calculates DORA Art. 19 deadlines (initial 4h/24h, intermediate 72h, final 30d)", () => {
+  it("calcula las FECHAS de los tres hitos DORA, no sólo sus horas", () => {
+    // A6: este test sólo asertaba literales del objeto de retorno — se podía
+    // borrar el cálculo de fechas entero y seguía verde.
     const res = calculateDoraDeadlines(baseDate);
+    const k = new Date(baseDate).getTime();
+    const horas = (iso: string) => (new Date(iso).getTime() - k) / 3_600_000;
     expect(res.regime).toBe("DORA");
+    expect(horas(res.initialDeadlineDate)).toBe(4);
     expect(res.initialDeadlineHours).toBe(4);
-    expect(res.intermediateDeadlineHours).toBe(72);
-    expect(res.finalDeadlineDays).toBe(30);
+    expect(horas(res.intermediateDeadlineDate)).toBe(4 + 72);
+    // Literal, no recalculado con la misma función: conocimiento 28/08 10:00Z
+    // → inicial +4 h = 14:00Z → intermedio +72 h = 31/08 14:00Z → final un mes
+    // natural = 30/09 14:00Z (septiembre tiene 30 días, así que se recorta).
+    expect(res.intermediateDeadlineDate).toBe("2026-08-31T14:00:00.000Z");
+    expect(res.finalDeadlineDate).toBe("2026-09-30T14:00:00.000Z");
   });
 
   it("evaluates a compound multiregime incident affecting AI, PII and critical ICT infrastructure", () => {
     const clocks = evaluateMultiregimeIncident({
       knowledgeDate: baseDate,
       isAiRelated: true,
+      isAiHighRisk: true,
       riaSeverity: "ORDINARY_SERIOUS",
       affectsPersonalData: true,
       isHighRiskToSubjects: true,

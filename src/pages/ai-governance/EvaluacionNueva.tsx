@@ -13,13 +13,13 @@ import {
   ExternalLink,
   Plus,
   Trash2,
-  Sparkles,
   Info,
   Sliders,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useCreateAssessment, useCreateComplianceChecks } from "@/hooks/useAiAssessments";
+import { buildEvaluationPayload } from "@/lib/aims/evaluacion-payload";
 import {
   AESIA_RIA_REQUIREMENTS,
   ISO_42001_REQUIREMENTS,
@@ -111,7 +111,7 @@ export default function EvaluacionNueva() {
       [measureId]: {
         ...(prev[measureId] || {
           difficulty: "01",
-          maturity: "L5",
+          maturity: "",
           justification: "",
           evidence_url: "",
           notes: "",
@@ -119,41 +119,6 @@ export default function EvaluacionNueva() {
         [key]: value,
       },
     }));
-  };
-
-  // Helper para pre-informar con cumplimiento de referencia (L5 / L8)
-  const prefillHighMaturity = () => {
-    const nextEval: Record<string, MeasureEvaluationState> = {};
-    allMeasures.forEach((m) => {
-      // Usamos L5 en la mayoría y L8 en algunos específicos
-      const isL8 = m.id === "MG_LOGG_07" || m.id === "MG_DATA_10";
-      nextEval[m.id] = {
-        difficulty: "01",
-        maturity: isL8 ? "L8" : "L5",
-        justification: isL8 ? "No aplica: el sistema no trata datos biométricos ni categorías especiales." : "",
-        evidence_url: "https://eadtrust.g-digital.net/evidences/seals/sha512-compliance-verified",
-        notes: "Verificado conforme a la Guía 16 AESIA.",
-      };
-    });
-    setEvaluations(nextEval);
-    toast.success("Catálogo pre-informado con nivel de madurez alto (L5 / L8)");
-  };
-
-  // Helper para pre-informar con GAPs para pruebas
-  const prefillWithGaps = () => {
-    const nextEval: Record<string, MeasureEvaluationState> = {};
-    allMeasures.forEach((m, idx) => {
-      const isGap = idx % 5 === 0;
-      nextEval[m.id] = {
-        difficulty: isGap ? "00" : "01",
-        maturity: isGap ? "L1" : "L5",
-        justification: "",
-        evidence_url: isGap ? "" : "https://eadtrust.g-digital.net/evidences/seals/sha512",
-        notes: isGap ? "Gap identificado: falta documentación técnica de soporte." : "Conforme.",
-      };
-    });
-    setEvaluations(nextEval);
-    toast.info("Catálogo pre-informado con Gaps simulados (Plan 01 / Plan 04)");
   };
 
   // Estadísticas globales de madurez y cálculo de planes PDA
@@ -177,7 +142,7 @@ export default function EvaluacionNueva() {
       subpartId: newMaSubpart || activeRequirement?.subparts[0]?.subpartId || "17.1.a",
       description: newMaDescription,
       difficulty: "01",
-      maturity: "L5",
+      maturity: "",
       evidence_url: "",
     };
     setAdditionalMeasures((prev) => [...prev, newMa]);
@@ -209,55 +174,32 @@ export default function EvaluacionNueva() {
       return;
     }
 
-    // Convertir evaluaciones a lista de findings
-    const findingsList = allMeasures.map((m) => {
-      const state = evaluations[m.id] || { maturity: "L5", difficulty: "01" };
-      const plan = calculateAdaptationPlan(state.maturity);
-      return {
-        code: m.id,
-        title: m.description,
-        status: state.maturity || "L5",
-        planCode: plan.code,
-      };
-    });
-
-    const calculatedStatus = stats.hasGaps ? "CON_GAPS" : "CONFORME";
+    // Lo no contestado NO se evalúa: ni genera finding ni da por conforme su
+    // requisito. La construcción vive en `@/lib/aims/evaluacion-payload`.
+    const payload = buildEvaluationPayload(evaluations, allMeasures, requirements);
 
     const assessmentPayload = {
       system_id: systemId,
       framework,
       score: stats.maturityScore,
       assessment_date: new Date().toISOString().slice(0, 10),
-      findings: findingsList,
-      status: calculatedStatus,
+      findings: payload.findings,
+      status: payload.status,
       notes:
         notes ||
-        `Autodiagnóstico oficial AESIA Guía 16. Score: ${stats.maturityScore}%. Diagnosticadas: ${stats.diagnosedCount}/${stats.totalMeasures}.`,
+        `Autodiagnóstico AESIA Guía 16. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`,
     };
 
     try {
       const createdAssessment = await createAssessment.mutateAsync(assessmentPayload);
 
-      // Crear registros individuales de compliance checks por requisito
-      const checkPayloads = requirements.map((req) => {
-        const reqMeasures = req.measures;
-        const reqEvals = reqMeasures.map((m) => evaluations[m.id]?.maturity || "L5");
-        const hasReqGaps = reqEvals.some((mat) => mat === "L1" || mat === "L2" || mat === "L6");
-        return {
-          system_id: systemId,
-          requirement_code: req.code,
-          requirement_title: req.title,
-          description: req.description,
-          status: hasReqGaps ? "NO_CONFORME" : "CONFORME",
-          evidence_url: "https://eadtrust.g-digital.net/evidences/seals/sha512-technical-file",
-          checked_at: new Date().toISOString().slice(0, 10),
-        };
-      });
+      // Un requisito con medidas sin contestar queda NO_EVALUADO, no CONFORME.
+      const checkPayloads = payload.checks.map((c) => ({ ...c, system_id: systemId }));
 
       await createChecks.mutateAsync(checkPayloads);
 
       setCreatedId(createdAssessment.id);
-      toast.success("Autodiagnóstico AESIA registrado y precintado en la base de datos.");
+      toast.success(`Autodiagnóstico registrado. Medidas evaluadas: ${payload.evaluadas}/${payload.totales}.`);
       setStep(4);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -384,7 +326,7 @@ export default function EvaluacionNueva() {
                   <span className="font-bold">{selectedSystem.risk_level}</span>
                 </div>
                 <div>
-                  <span className="text-[var(--g-text-secondary)]">Proveedor:</span> {selectedSystem.vendor || "Interno"}
+                  <span className="text-[var(--g-text-secondary)]">Proveedor:</span> {selectedSystem.vendor || "No declarado"}
                 </div>
                 <div>
                   <span className="text-[var(--g-text-secondary)]">Estado:</span> {selectedSystem.status}
@@ -409,7 +351,7 @@ export default function EvaluacionNueva() {
       {/* Step 2: Evaluación de las 84 Medidas Guía (MG) */}
       {step === 2 && (
         <div className="space-y-6">
-          {/* Top helper bar with prefill tools */}
+          {/* Cabecera del paso de evaluación */}
           <div
             className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] flex flex-wrap items-center justify-between gap-4"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -423,25 +365,6 @@ export default function EvaluacionNueva() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={prefillWithGaps}
-                className="px-3 py-1.5 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                Simular con Gaps
-              </button>
-              <button
-                type="button"
-                onClick={prefillHighMaturity}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--g-surface-subtle)] border border-[var(--g-brand-3308)] text-[var(--g-brand-3308)] hover:bg-[var(--g-brand-3308)] hover:text-[var(--g-text-inverse)] text-xs font-medium transition-colors"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Pre-informar Conforme (L5/L8)</span>
-              </button>
-            </div>
           </div>
 
           {/* Requirement Tabs Layout */}
@@ -525,7 +448,7 @@ export default function EvaluacionNueva() {
                 {activeRequirement.measures.map((m) => {
                   const state = evaluations[m.id] || {
                     difficulty: "01",
-                    maturity: "L5",
+                    maturity: "",
                     justification: "",
                     evidence_url: "",
                     notes: "",
@@ -582,6 +505,7 @@ export default function EvaluacionNueva() {
                             className={SELECT_CLASSES}
                             style={{ borderRadius: "var(--g-radius-md)" }}
                           >
+                            <option value="">Sin evaluar</option>
                             {Object.values(MATURITY_LEVELS).map((lvl) => (
                               <option key={lvl.level} value={lvl.level}>
                                 {lvl.level}: {lvl.title} → {lvl.planLabel}
@@ -736,7 +660,7 @@ export default function EvaluacionNueva() {
             </div>
 
             {/* Gap Alert / Handoff info */}
-            {stats.hasGaps && (
+            {stats.gapMeasures.length > 0 && (
               <div
                 className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-2 text-xs"
                 style={{ borderRadius: "var(--g-radius-md)" }}
