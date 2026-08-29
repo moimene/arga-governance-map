@@ -8,7 +8,7 @@
 //      a sí misma es un gate verde que no asierta nada.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import {
   ANTELACION_DIAS,
   CANAL_ESTATUTARIO,
@@ -133,19 +133,12 @@ describe("C1 — la convocatoria de la Junta de Socios en Cloud", () => {
   let bodyId: string;
 
   beforeAll(async () => {
-    // persistSession:false en cada cliente: el preload de bun test monta JSDOM con
-    // localStorage y, sin esto, ambos comparten storageKey y el último login pisa al otro.
-    garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eGarr } = await garr.auth.signInWithPassword({
-      email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD,
-    });
-    if (eGarr) throw new Error(`login Garrigues falló: ${eGarr.message}`);
-
-    arga = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-    const { error: eArga } = await arga.auth.signInWithPassword({
-      email: ARGA_EMAIL, password: DEMO_PASSWORD,
-    });
-    if (eArga) throw new Error(`login ARGA falló: ${eArga.message}`);
+    // Sesión COMPARTIDA y memoizada por cuenta: la suite entera hace 2 logins
+    // en vez de ~40. Supabase Auth devolvía HTTP 429 al cruzar el umbral y la
+    // suite fallaba de forma no determinista. `sesionDe` LANZA si no puede
+    // autenticar, así que el gate se pone rojo en vez de saltarse en silencio,
+    // y cada cuenta lleva su propio storageKey para que un login no pise al otro.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
 
     // El órgano se resuelve por slug. El UUID no se hardcodea en ninguna parte.
     const { data, error } = await garr.from("governing_bodies")
@@ -156,10 +149,8 @@ describe("C1 — la convocatoria de la Junta de Socios en Cloud", () => {
     bodyId = data.id;
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA y cerrarla aquí dejaría
+  // sin autenticar a todas las sondas que corran después.
 
   async function convocatoria() {
     const { data, error } = await garr.from("convocatorias")
