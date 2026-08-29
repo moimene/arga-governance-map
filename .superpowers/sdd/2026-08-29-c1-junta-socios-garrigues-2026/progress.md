@@ -46,7 +46,7 @@ Reportado al orquestador y elevado al usuario, que decidió la base de clase A *
 | # | Tarea | Estado | Review adversarial | Gates |
 |---|---|---|---|---|
 | 1 | `GARR_CONSEJO_EAD` → v1.1.0 | **COMPLETA** ([informe](task-1-report.md)) | 4 P1 + 9 P2; los 4 P1 corregidos | 3468/152/0 · lint 0 · tsc 0 · build OK, en `/private/tmp/c1-secretaria` con carpetas fuente |
-| 2 | Estructura art. 7 como módulo puro + regresión | pendiente | — | — |
+| 2 | Estructura art. 7 como módulo puro + regresión | **COMPLETA** ([informe](task-2-report.md)) | 12 mutantes, 2 escapaban (ambos cerrados) + 1 P1 + 5 P2 | 20 pass / 0 fail en el fichero; suite completa en el reporte de merge |
 | 3 | Capital de la matriz a FIRME en Cloud | pendiente | — | — |
 | 4 | Convocatoria 21/04 → 06/05 con los 12 puntos reales | pendiente | — | — |
 | 5 | Reunión, asistencia y censo WORM | pendiente | — | — |
