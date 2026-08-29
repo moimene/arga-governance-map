@@ -49,6 +49,73 @@ import DeclaracionConformidadModal from "@/components/ai-governance/DeclaracionC
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
+/** Vocabularios de la FRIA en castellano: la superficie es jurídica y en español. */
+const FRECUENCIA_USO: Record<string, string> = {
+  CONTINUOUS: "continua",
+  BATCH_DAILY: "por lotes, diaria",
+  ON_DEMAND: "a demanda",
+  SEASONAL: "estacional",
+};
+const NIVEL: Record<string, string> = {
+  LOW: "baja", MEDIUM: "media", HIGH: "alta", CRITICAL: "crítica",
+};
+const DERECHO: Record<string, string> = {
+  NON_DISCRIMINATION: "no discriminación",
+  HUMAN_DIGNITY: "dignidad humana",
+  PRIVACY: "vida privada y datos personales",
+  FAIR_TRIAL: "tutela judicial efectiva",
+  FREEDOM_EXPRESSION: "libertad de expresión",
+  CONSUMER_PROTECTION: "protección de los consumidores",
+};
+const PUNTO_RIA: Record<string, string> = {
+  ART_27_1_A: "art. 27.1 (a)", ART_27_1_C: "art. 27.1 (c)",
+  ART_27_1_D: "art. 27.1 (d)", ART_27_1_F: "art. 27.1 (f)",
+};
+const COBERTURA: Record<string, string> = { FULL: "completa", PARTIAL: "parcial" };
+const VALIDEZ: Record<string, string> = {
+  VALID: "vigente", IN_REVIEW: "en revisión", REVOKED: "revocada",
+};
+
+/** Estado de la FRIA en castellano. Sin valor no se inventa ninguno. */
+function statusLabelFria(estado: string | null | undefined): string {
+  switch (estado) {
+    case "DRAFT": return "Borrador";
+    case "IN_REVIEW": return "En revisión";
+    case "APPROVED": return "Aprobada";
+    case "SUPERSEDED": return "Sustituida";
+    default: return "Estado no registrado";
+  }
+}
+
+/**
+ * Bloque del art. 27.1. Cuando no hay dato lo dice: antes esta pestaña
+ * presentaba prosa fija de una aseguradora como si fuera la evaluación
+ * del sistema que se estuviera mirando.
+ */
+function FriaBlock({
+  titulo,
+  vacio,
+  nota,
+  children,
+}: {
+  titulo: string;
+  vacio: boolean;
+  nota?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-2"
+      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+    >
+      <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{titulo}</h3>
+      <div className="space-y-3 text-xs text-[var(--g-text-secondary)]">
+        {vacio ? <p>{nota ?? "Sin datos registrados para este apartado."}</p> : children}
+      </div>
+    </div>
+  );
+}
+
 const RISK_COLORS: Record<string, string> = {
   Inaceptable: "bg-[var(--status-error)] text-[var(--g-text-inverse)]",
   Alto: "bg-[var(--status-error)]/80 text-[var(--g-text-inverse)]",
@@ -95,8 +162,20 @@ export default function SistemaDetalle() {
   const updateSystemMutation = useUpdateAiSystem();
   const updateSectionMutation = useUpdateTechnicalFileSection();
 
-  const { data: fria } = useFriaBySystem(id);
-  const { data: friaDetails } = useFriaDetails(fria?.id);
+  const { data: fria, isLoading: friaLoading, isError: friaError } = useFriaBySystem(id);
+  const { data: friaDetailsRaw } = useFriaDetails(fria?.id);
+  // `friaDetails` es undefined en el render en que `fria` pasa a truthy: la clave
+  // de la consulta de detalle es nueva y aún no ha resuelto. Sin este valor por
+  // defecto, el primer render del único camino con dato lanza un TypeError que
+  // el ErrorBoundary global convierte en caída de la página entera.
+  const friaDetails = friaDetailsRaw ?? {
+    processes: [],
+    useProfile: null,
+    affectedGroups: [],
+    rightsRisks: [],
+    remediation: null,
+    crossReferences: [],
+  };
 
   // Navigation & Modals
   const [activeTab, setActiveTab] = useState<"TECHNICAL_FILE" | "EVALUATIONS" | "INCIDENTS" | "REGISTRIES" | "POST_MARKET" | "FRIA">("TECHNICAL_FILE");
@@ -155,9 +234,9 @@ export default function SistemaDetalle() {
   const handleOpenEdit = () => {
     setEditName(system.name || "");
     setEditSystemType(system.system_type || "");
-    setEditRiskLevel(system.risk_level || "Alto");
+    setEditRiskLevel(system.risk_level || "");
     setEditVendor(system.vendor || "");
-    setEditStatus(system.status || "ACTIVO");
+    setEditStatus(system.status || "");
     setEditUseCase(system.use_case || "");
     setEditDescription(system.description || "");
     setEditAimsCode(system.aims_reference_code || "");
@@ -221,16 +300,18 @@ export default function SistemaDetalle() {
     try {
       await closeTechnicalFileMutation.mutateAsync({
         versionId,
-        qsealToken: `QSEAL-EADTRUST-SHA512-${Date.now()}`,
-        tsqToken: `TSQ-TSA-EU-${Date.now()}`,
-        signedBy: user?.email || "ai.officer@empresa.com",
+        // Sin token: no interviene ningún prestador de confianza. El registro
+        // es interno y su integridad la da el hash SHA-512 del manifiesto.
+        qsealToken: undefined,
+        tsqToken: undefined,
+        signedBy: user?.email ?? undefined,
       });
-      toast.success("Expediente Técnico precintado y sellado en el ledger WORM de evidencias");
+      toast.success("Expediente técnico cerrado y registrado con hash SHA-512");
       refetchVersions();
       refetchSections();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Error al precintar expediente técnico: ${msg}`);
+      toast.error(`Error al cerrar el expediente técnico: ${msg}`);
     }
   };
 
@@ -310,7 +391,7 @@ export default function SistemaDetalle() {
                   {system.aims_reference_code || `SYS-${system.id.slice(0, 8).toUpperCase()}`}
                 </span>
                 <span className="text-xs text-[var(--g-text-secondary)]">
-                  Versión actual: {currentVersion?.version_tag || "v1.0-prod"}
+                  Versión actual: {currentVersion?.version_label || "sin versión registrada"}
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">{system.name}</h1>
@@ -323,7 +404,7 @@ export default function SistemaDetalle() {
               className={`shrink-0 inline-flex items-center px-3 py-1 text-xs font-bold ${riskCls}`}
               style={{ borderRadius: "var(--g-radius-full)" }}
             >
-              Riesgo {system.risk_level || "Alto"}
+              Riesgo {system.risk_level || "sin clasificar"}
             </span>
             <span
               className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${
@@ -342,11 +423,11 @@ export default function SistemaDetalle() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-[var(--g-border-subtle)] text-xs">
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Tipo de Sistema:</span>
-            <span className="font-semibold text-[var(--g-text-primary)]">{system.system_type || "Machine Learning"}</span>
+            <span className="font-semibold text-[var(--g-text-primary)]">{system.system_type || "No declarado"}</span>
           </div>
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Proveedor / Responsable:</span>
-            <span className="font-semibold text-[var(--g-text-primary)]">{system.vendor || "Desarrollo Interno"}</span>
+            <span className="font-semibold text-[var(--g-text-primary)]">{system.vendor || "No declarado"}</span>
           </div>
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Fecha Despliegue:</span>
@@ -359,7 +440,7 @@ export default function SistemaDetalle() {
           <div>
             <span className="text-[var(--g-text-secondary)] block mb-0.5">Expediente Técnico:</span>
             <span className={`font-bold ${isTechnicalFileSealed ? "text-[var(--status-success)]" : "text-[var(--status-warning)]"}`}>
-              {isTechnicalFileSealed ? "Precintado WORM" : "Abierto en Edición"}
+              {isTechnicalFileSealed ? "Cerrado" : "Abierto en edición"}
             </span>
           </div>
         </div>
@@ -416,7 +497,7 @@ export default function SistemaDetalle() {
                   Estructura del Expediente Técnico (Anexo IV Reglamento UE)
                 </h2>
                 <p className="text-xs text-[var(--g-text-secondary)]">
-                  Control vivo de las secciones técnicas requeridas antes de la introducción en el mercado • Custodia documental (EAD Trust)
+                  Control vivo de las secciones técnicas requeridas antes de la introducción en el mercado • Registro interno con hash SHA-512. El cierre registrado no está disponible: la custodia de evidencia sólo admite registros abiertos y sin firmar desde la consola.
                 </p>
               </div>
 
@@ -425,21 +506,22 @@ export default function SistemaDetalle() {
                   {!isTechnicalFileSealed ? (
                     <button
                       onClick={() => handleSealTechnicalFile(currentVersion.id)}
-                      disabled={closeTechnicalFileMutation.isPending}
+                      disabled
+                      title="El cierre registrado del expediente no está disponible: la custodia de evidencia sólo admite registros abiertos y sin firmar desde la consola."
                       className="flex items-center gap-1.5 px-4 py-2 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-bold transition-colors disabled:opacity-50"
                       style={{ borderRadius: "var(--g-radius-md)" }}
                     >
                       <Lock className="w-3.5 h-3.5" />
                       <span>
                         {closeTechnicalFileMutation.isPending
-                          ? "Precintando en Ledger..."
-                          : "Precintar Expediente (WORM Sealing)"}
+                          ? "Cerrando expediente..."
+                          : "Cerrar expediente técnico (no disponible)"}
                       </span>
                     </button>
                   ) : (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--status-success)] text-[var(--g-text-inverse)] text-xs font-bold" style={{ borderRadius: "var(--g-radius-md)" }}>
                       <Check className="w-3.5 h-3.5" />
-                      <span>Expediente Precintado ({currentVersion.qseal_token?.slice(0, 16)}...)</span>
+                      <span>Expediente cerrado</span>
                     </div>
                   )}
                 </div>
@@ -463,19 +545,23 @@ export default function SistemaDetalle() {
                     >
                       <div className="space-y-1 max-w-xl">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{sec.section_key}</span>
-                          <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{sec.section_title}</h3>
+                          <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)]">{sec.section_code}</span>
+                          <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{sec.title}</h3>
                         </div>
                         <p className="text-xs text-[var(--g-text-secondary)] line-clamp-1">
-                          {sec.content_summary || "Documentación técnica disponible en el repositorio de custodia."}
+                          {(sec.evidence_refs?.length ?? 0) > 0
+                            ? `${sec.evidence_refs!.length} referencia(s) de evidencia`
+                            : "Sin evidencia registrada en esta sección."}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        {sec.completeness_score !== null && (
+                        {sec.reviewed_at && (
                           <div className="text-right">
-                            <span className="text-xs font-bold text-[var(--g-brand-3308)]">{sec.completeness_score}%</span>
-                            <span className="text-[10px] text-[var(--g-text-secondary)] block">Completitud</span>
+                            <span className="text-xs font-bold text-[var(--g-brand-3308)]">
+                              {new Date(sec.reviewed_at).toLocaleDateString("es-ES")}
+                            </span>
+                            <span className="text-[10px] text-[var(--g-text-secondary)] block">Revisada</span>
                           </div>
                         )}
                         <span className={`px-2.5 py-1 text-xs font-semibold ${statusCls}`} style={{ borderRadius: "var(--g-radius-full)" }}>
@@ -531,7 +617,7 @@ export default function SistemaDetalle() {
                     </div>
                   </div>
 
-                  <p className="text-xs text-[var(--g-text-secondary)] line-clamp-2">{ass.notes || "Sin observaciones adicionales."}</p>
+                  <p className="text-xs text-[var(--g-text-secondary)] line-clamp-2">{ass.notes || "Sin notas registradas."}</p>
 
                   <div className="pt-2 border-t border-[var(--g-border-subtle)] flex justify-between items-center text-xs">
                     <span className={`px-2 py-0.5 font-semibold text-[11px] ${ass.status === "CONFORME" ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-full)" }}>
@@ -593,7 +679,7 @@ export default function SistemaDetalle() {
                       }`}
                       style={{ borderRadius: "var(--g-radius-full)" }}
                     >
-                      {inc.severity || "MEDIA"}
+                      {inc.severity || "Sin severidad"}
                     </span>
                     <span className="text-xs font-bold text-[var(--g-text-primary)]">{inc.status}</span>
                     <ExternalLink className="w-4 h-4 text-[var(--g-text-secondary)]" />
@@ -624,8 +710,8 @@ export default function SistemaDetalle() {
                 {models.map((m) => (
                   <div key={m.id} className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)] space-y-1 text-xs" style={{ borderRadius: "var(--g-radius-md)" }}>
                     <div className="font-bold text-[var(--g-text-primary)]">{m.model_name}</div>
-                    <div className="text-[var(--g-text-secondary)]">Tipo: {m.model_type} • Arquitectura: {m.base_architecture || "N/D"}</div>
-                    <div className="text-[10px] text-[var(--g-text-secondary)]">Parámetros: {m.parameters_count || "N/D"} • Proveedor: {m.provider || "Interno"}</div>
+                    <div className="text-[var(--g-text-secondary)]">Tipo: {m.model_type || "N/D"} • Versión: {m.model_version || "N/D"}</div>
+                    <div className="text-[10px] text-[var(--g-text-secondary)]">Uso previsto: {m.intended_use || "No declarado"} • Proveedor: {m.provider || "No declarado"}</div>
                   </div>
                 ))}
               </div>
@@ -653,10 +739,14 @@ export default function SistemaDetalle() {
                         {d.dataset_type}
                       </span>
                     </div>
-                    <div className="text-[var(--g-text-secondary)]">Registros: {d.records_count?.toLocaleString("es-ES") || "N/D"} • Procedencia: {d.provenance || "Corporativa"}</div>
+                    <div className="text-[var(--g-text-secondary)]">Origen: {d.source_system || "No declarado"} • Base de licitud: {d.lawful_basis || "No declarada"}</div>
                     <div className="flex gap-2 text-[10px] pt-1">
-                      <span className={`px-1.5 py-0.5 ${d.contains_pii ? "bg-[var(--status-warning)] text-[var(--g-text-inverse)]" : "bg-[var(--status-success)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-sm)" }}>
-                        {d.contains_pii ? "Datos Personales (RGPD)" : "Sin PII"}
+                      {/* Sin dato no se afirma nada: la ausencia de categorías
+                          declaradas no acredita que no haya datos personales. */}
+                      <span className="px-1.5 py-0.5 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                        {(d.data_categories?.length ?? 0) > 0
+                          ? `Categorías declaradas: ${d.data_categories!.length}`
+                          : "Categorías de datos no declaradas"}
                       </span>
                     </div>
                   </div>
@@ -691,16 +781,16 @@ export default function SistemaDetalle() {
               {indicators.map((ind) => (
                 <div key={ind.id} className="p-4 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] space-y-2 text-xs" style={{ borderRadius: "var(--g-radius-md)" }}>
                   <div className="flex justify-between items-start">
-                    <span className="font-bold text-sm text-[var(--g-text-primary)]">{ind.name}</span>
+                    <span className="font-bold text-sm text-[var(--g-text-primary)]">{ind.indicator_name}</span>
                     <span className={`px-2 py-0.5 font-semibold text-[10px] ${ind.status === "OPTIMAL" ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`} style={{ borderRadius: "var(--g-radius-full)" }}>
                       {ind.status}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[var(--g-text-secondary)] pt-1">
-                    <div>Tipo: <span className="font-semibold text-[var(--g-text-primary)]">{ind.indicator_type}</span></div>
-                    <div>Umbral: <span className="font-mono text-[var(--g-text-primary)]">{ind.threshold || "N/A"}</span></div>
-                    <div>Valor actual: <span className="font-bold text-[var(--g-brand-3308)]">{ind.current_value || "Normal"}</span></div>
-                    <div>Última eval: <span className="text-[var(--g-text-primary)]">{ind.last_evaluated_at ? new Date(ind.last_evaluated_at).toLocaleDateString("es-ES") : "Automática"}</span></div>
+                    <div>Métrica: <span className="font-semibold text-[var(--g-text-primary)]">{ind.metric_key || "N/D"}</span></div>
+                    <div>Umbral: <span className="font-mono text-[var(--g-text-primary)]">{ind.threshold_config ? JSON.stringify(ind.threshold_config) : "No definido"}</span></div>
+                    <div>Valor actual: <span className="font-bold text-[var(--g-brand-3308)]">{ind.current_value == null ? "Sin medición" : typeof ind.current_value === "object" ? JSON.stringify(ind.current_value) : String(ind.current_value)}</span></div>
+                    <div>Última observación: <span className="text-[var(--g-text-primary)]">{ind.last_observed_at ? new Date(ind.last_observed_at).toLocaleDateString("es-ES") : "Sin observaciones"}</span></div>
                   </div>
                 </div>
               ))}
@@ -712,264 +802,221 @@ export default function SistemaDetalle() {
       {/* Tab 6: Evaluación de Impacto en Derechos Fundamentales (FRIA - Art. 27 RIA) */}
       {activeTab === "FRIA" && (
         <div className="space-y-6">
-          {/* FRIA Header */}
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--g-border-subtle)] pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                    ART. 27 REGLAMENTO IA (FRIA)
-                  </span>
-                  <span className="text-xs text-[var(--g-text-secondary)]">•</span>
-                  <span className="text-xs text-[var(--g-text-secondary)] font-mono">
-                    VERSIÓN {fria?.version_number || "1.0"}
-                  </span>
-                </div>
-                <h2 className="text-xl font-bold text-[var(--g-text-primary)]">
-                  Evaluación de Impacto en Derechos Fundamentales
+          {friaLoading || friaError || !fria ? (
+            <div
+              className="p-8 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] text-center space-y-2"
+              style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+            >
+              <ShieldCheck className="w-8 h-8 mx-auto text-[var(--g-text-secondary)]" />
+              {friaLoading ? (
+                <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+                  Consultando la evaluación de impacto…
                 </h2>
-                <p className="text-xs text-[var(--g-text-secondary)]">
-                  Obligación previa al despliegue para sistemas de alto riesgo • Notificación preceptiva a la Autoridad de Vigilancia del Mercado (AESIA)
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <span
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {fria?.status || "APROBADA & NOTIFICADA"}
-                </span>
-                <span
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  AESIA Notificada: SÍ
-                </span>
-              </div>
+              ) : friaError ? (
+                <>
+                  <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+                    No se ha podido consultar la evaluación de impacto
+                  </h2>
+                  <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
+                    La lectura ha fallado, así que no se sabe si existe. No se muestra como
+                    ausencia: un error de consulta no acredita que la evaluación no exista.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+                    Este sistema no tiene evaluación de impacto en derechos fundamentales registrada
+                  </h2>
+                  <p className="text-xs text-[var(--g-text-secondary)] max-w-xl mx-auto">
+                    El artículo 27 del Reglamento (UE) 2024/1689 exige esta evaluación al desplegador
+                    antes de poner en servicio determinados sistemas de alto riesgo. Mientras no se
+                    registre, esta consola no puede afirmar que exista ni que se haya notificado.
+                  </p>
+                </>
+              )}
             </div>
-
-            {/* DPO & AI Officer Signoffs */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 text-xs">
-              <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <span className="text-[var(--g-text-secondary)] block mb-1">Aprobación DPO (RGPD):</span>
-                <span className="font-semibold text-[var(--g-text-primary)]">
-                  {fria?.approved_by_dpo || "dpo@empresa.com"}
-                </span>
-              </div>
-              <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <span className="text-[var(--g-text-secondary)] block mb-1">Aprobación AI Officer (RIA):</span>
-                <span className="font-semibold text-[var(--g-text-primary)]">
-                  {fria?.approved_by_ai_officer || "ai.officer@empresa.com"}
-                </span>
-              </div>
-              <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <span className="text-[var(--g-text-secondary)] block mb-1">Custodia Probatoria:</span>
-                <span className="font-mono font-bold text-[var(--g-brand-3308)]">
-                  QSEAL-EADTRUST-SHA512
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 6 Structured Obligation Blocks (Art. 27.1) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Block 1: Procesos de Negocio (Art. 27.1.a) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <FileText className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">1. Procesos del Desplegador (Art. 27.1.a)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Proceso de Negocio:</strong>
-                  Suscripción y fijación de primas en pólizas de salud y vida individual.
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Punto de Decisión Algorítmica:</strong>
-                  Cálculo del recargo o exclusión actuarial antes de la emisión de la oferta contractual.
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Rol Humano:</strong>
-                  Suscripción asistida con revisión humana preceptiva para cualquier recargo &gt; 15%.
-                </div>
-              </div>
-            </div>
-
-            {/* Block 2: Perfil y Frecuencia de Uso (Art. 27.1.b) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <Calendar className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">2. Frecuencia y Período de Uso (Art. 27.1.b)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Frecuencia de Inferencia:</strong>
-                  On-demand (en tiempo real por cada cotización solicitada).
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Volumen Estimado:</strong>
-                  Aprox. 45.000 evaluaciones anuales.
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Cadencia de Revisión FRIA:</strong>
-                  Semestral o tras cualquier cambio sustancial en datos o modelos.
-                </div>
-              </div>
-            </div>
-
-            {/* Block 3: Colectivos y Grupos Afectados (Art. 27.1.c) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <Users className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">3. Colectivos y Grupos Afectados (Art. 27.1.c)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div className="p-2.5 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  <div className="flex justify-between font-bold text-[var(--g-text-primary)]">
-                    <span>Tomadores y Asegurados (Personas Físicas)</span>
-                    <span className="text-[var(--status-warning)] font-semibold">Impacto Directo</span>
-                  </div>
-                  <p className="mt-1">Determinación de acceso al aseguramiento y condiciones económicas.</p>
-                </div>
-                <div className="p-2.5 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                  <div className="flex justify-between font-bold text-[var(--g-text-primary)]">
-                    <span>Colectivos Vulnerables / Preexistencias</span>
-                    <span className="text-[var(--status-error)] font-semibold">Especial Protección</span>
-                  </div>
-                  <p className="mt-1">Monitorización continua contra discriminación indirecta por motivos de salud o edad.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Block 4: Riesgos a Derechos Fundamentales (Art. 27.1.d) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <ShieldAlert className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">4. Riesgos a Derechos Fundamentales (Art. 27.1.d)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div className="flex justify-between items-center py-1 border-b border-[var(--g-border-subtle)]">
-                  <span>No discriminación (Art. 21 CDFUE)</span>
-                  <span className="font-bold text-[var(--status-success)]">Mitigado (Bajo)</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-[var(--g-border-subtle)]">
-                  <span>Protección de datos (Art. 8 CDFUE)</span>
-                  <span className="font-bold text-[var(--status-success)]">Mitigado (Bajo)</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-[var(--g-border-subtle)]">
-                  <span>Transparencia y recurso efectivo</span>
-                  <span className="font-bold text-[var(--status-success)]">Mitigado (Bajo)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Block 5: Supervisión Humana (Art. 27.1.e) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <ShieldCheck className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">5. Supervisión Humana Efectiva (Art. 27.1.e)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Derecho de Veto / Override:</strong>
-                  El actuario y el suscriptor tienen potestad técnica para revocar o alterar la recomendación algorítmica.
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Botón de Parada de Emergencia:</strong>
-                  Capacidad de suspender la inferencia automática en tiempo real ante anomalías detectadas.
-                </div>
-              </div>
-            </div>
-
-            {/* Block 6: Gobernanza de Remedios (Art. 27.1.f) */}
-            <div className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-              <div className="flex items-center gap-2 border-b border-[var(--g-border-subtle)] pb-2">
-                <Sparkles className="w-4 h-4 text-[var(--g-brand-3308)]" />
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">6. Gobernanza de Remedios & Quejas (Art. 27.1.f)</h3>
-              </div>
-              <div className="space-y-2 text-xs text-[var(--g-text-secondary)] leading-relaxed">
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Canal de Reclamaciones Específico:</strong>
-                  Servicio de Atención al Cliente con formulario de revisión humana para decisiones algorítmicas.
-                </div>
-                <div>
-                  <strong className="text-[var(--g-text-primary)] block">Escalado al Comité de Riesgos:</strong>
-                  Umbral de escalado si las quejas sobre sesgo superan el 0.1% de las cotizaciones mensuales.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* PUENTE DE REFERENCIAS CRUZADAS CON LA EIPD (Art. 27.4 RIA & Art. 35 RGPD) */}
-          <div
-            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-4"
-            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--g-border-subtle)] pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
-                  Interoperabilidad FRIA ⟷ EIPD (Art. 27.4 RIA & Art. 35 RGPD)
-                </h3>
-                <p className="text-xs text-[var(--g-text-secondary)]">
-                  Reutilización trazable de análisis de privacidad sin dilución documental • Preservación de la autonomía de ambas evaluaciones
-                </p>
-              </div>
-              <span className="font-mono text-xs text-[var(--g-brand-3308)] font-bold bg-[var(--g-surface-subtle)] px-2.5 py-1" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                3 REFERENCIAS ACTIVAS (VALID)
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                {
-                  riaPoint: "Art. 27.1(a) — Operaciones de tratamiento",
-                  dpiaSec: "EIPD-SEC-02: Descripción sistemática de tratamientos y bases de legitimación",
-                  hash: "SHA512: 8f9a2b1c4e6d7890...",
-                  coverage: "COBERTURA TOTAL",
-                  status: "VALID",
-                },
-                {
-                  riaPoint: "Art. 27.1(c) — Categorías de interesados",
-                  dpiaSec: "EIPD-SEC-04: Mapeo de interesados y datos de categorías especiales (Salud Art. 9)",
-                  hash: "SHA512: 3d4e5f6a7b8c9012...",
-                  coverage: "COBERTURA PARCIAL",
-                  status: "VALID",
-                },
-                {
-                  riaPoint: "Art. 27.1(d) — Medidas de seguridad y cifrado",
-                  dpiaSec: "EIPD-SEC-07: Salvaguardas técnicas, cifrado en reposo y control de accesos",
-                  hash: "SHA512: a1b2c3d4e5f67890...",
-                  coverage: "COBERTURA TOTAL",
-                  status: "VALID",
-                },
-              ].map((ref, i) => (
-                <div
-                  key={i}
-                  className="p-3.5 bg-[var(--g-surface-subtle)]/30 border border-[var(--g-border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                >
-                  <div className="space-y-1 max-w-xl">
-                    <div className="font-bold text-[var(--g-text-primary)]">{ref.riaPoint}</div>
-                    <div className="text-[var(--g-text-secondary)]">{ref.dpiaSec}</div>
-                    <div className="font-mono text-[10px] text-[var(--g-text-secondary)]">{ref.hash}</div>
+          ) : (
+            <>
+              <div
+                className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-4"
+                style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--g-border-subtle)] pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                        ART. 27 REGLAMENTO IA (FRIA)
+                      </span>
+                      <span className="text-xs text-[var(--g-text-secondary)]">•</span>
+                      <span className="text-xs text-[var(--g-text-secondary)] font-mono">
+                        VERSIÓN {fria.version_number}
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-bold text-[var(--g-text-primary)]">{fria.title}</h2>
+                    <p className="text-xs text-[var(--g-text-secondary)]">
+                      Obligación previa al despliegue para sistemas de alto riesgo · Notificación a la
+                      Autoridad de Vigilancia del Mercado
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-[10px] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] border border-[var(--g-border-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                      {ref.coverage}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span
+                      className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {statusLabelFria(fria.status)}
                     </span>
-                    <span className="font-bold text-[10px] bg-[var(--status-success)] text-[var(--g-text-inverse)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-full)" }}>
-                      {ref.status}
+                    <span
+                      className={`px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                        fria.market_surveillance_notified
+                          ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                          : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-full)" }}
+                    >
+                      {fria.market_surveillance_notified
+                        ? `Notificada${fria.notification_date ? ` el ${new Date(fria.notification_date).toLocaleDateString("es-ES")}` : ""}`
+                        : "No notificada"}
                     </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 text-xs">
+                  <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <span className="text-[var(--g-text-secondary)] block mb-1">Aprobación DPO (RGPD):</span>
+                    <span className="font-semibold text-[var(--g-text-primary)]">
+                      {fria.approved_by_dpo || "Sin aprobación registrada"}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <span className="text-[var(--g-text-secondary)] block mb-1">Aprobación AI Officer (RIA):</span>
+                    <span className="font-semibold text-[var(--g-text-primary)]">
+                      {fria.approved_by_ai_officer || "Sin aprobación registrada"}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+                    <span className="text-[var(--g-text-secondary)] block mb-1">Evaluada por:</span>
+                    <span className="font-semibold text-[var(--g-text-primary)]">
+                      {fria.assessed_by || "Sin evaluador registrado"}
+                    </span>
+                  </div>
+                </div>
+
+                {fria.fria_summary && (
+                  <p className="text-xs text-[var(--g-text-secondary)] pt-2">{fria.fria_summary}</p>
+                )}
+              </div>
+
+              {/* Bloques del art. 27.1, servidos desde aims_fria_* */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FriaBlock titulo="27.1 (a) · Procesos y punto de decisión" vacio={friaDetails.processes.length === 0}>
+                  {friaDetails.processes.map((p) => (
+                    <div key={p.id} className="space-y-0.5">
+                      <span className="font-semibold text-[var(--g-text-primary)] block">{p.business_process}</span>
+                      <span className="block">Finalidad: {p.intended_purpose}</span>
+                      <span className="block">Decisión: {p.decision_point}</span>
+                      <span className="block">Papel humano: {p.human_role || "No declarado"}</span>
+                    </div>
+                  ))}
+                </FriaBlock>
+
+                <FriaBlock titulo="27.1 (b) · Periodo y frecuencia de uso" vacio={!friaDetails.useProfile}>
+                  {friaDetails.useProfile && (
+                    <div className="space-y-0.5">
+                      <span className="block">Frecuencia: {FRECUENCIA_USO[friaDetails.useProfile.usage_frequency] ?? friaDetails.useProfile.usage_frequency}</span>
+                      <span className="block">Volumen estimado: {friaDetails.useProfile.estimated_volume || "No declarado"}</span>
+                      <span className="block">Revisión: {friaDetails.useProfile.review_periodicity || "No declarada"}</span>
+                    </div>
+                  )}
+                </FriaBlock>
+
+                <FriaBlock titulo="27.1 (c) · Personas y grupos afectados" vacio={friaDetails.affectedGroups.length === 0}>
+                  {friaDetails.affectedGroups.map((g) => (
+                    <div key={g.id} className="space-y-0.5">
+                      <span className="font-semibold text-[var(--g-text-primary)] block">
+                        {g.group_name}
+                        {g.is_vulnerable_group ? " · grupo vulnerable" : ""}
+                      </span>
+                      <span className="block">Impacto: {g.impact_type === "DIRECT" ? "directo" : "indirecto"}</span>
+                      {g.group_description && <span className="block">{g.group_description}</span>}
+                    </div>
+                  ))}
+                </FriaBlock>
+
+                <FriaBlock titulo="27.1 (d) · Riesgos para los derechos fundamentales" vacio={friaDetails.rightsRisks.length === 0}>
+                  {friaDetails.rightsRisks.map((r) => (
+                    <div key={r.id} className="space-y-0.5">
+                      <span className="font-semibold text-[var(--g-text-primary)] block">{DERECHO[r.fundamental_right] ?? r.fundamental_right}</span>
+                      <span className="block">{r.harm_scenario}</span>
+                      <span className="block">
+                        Probabilidad {NIVEL[r.likelihood] ?? r.likelihood} · Severidad {NIVEL[r.severity] ?? r.severity} · Riesgo residual {NIVEL[r.residual_risk] ?? r.residual_risk}
+                      </span>
+                      {r.mitigation_measures && <span className="block">Mitigación: {r.mitigation_measures}</span>}
+                    </div>
+                  ))}
+                </FriaBlock>
+
+                <FriaBlock
+                  titulo="27.1 (e) · Medidas de supervisión humana"
+                  vacio
+                  nota="El modelo de datos todavía no recoge este apartado del artículo 27.1; no hay nada que mostrar y no se sustituye por texto genérico."
+                >
+                  {null}
+                </FriaBlock>
+
+                <FriaBlock titulo="27.1 (f) · Gobernanza, reclamación y reparación" vacio={!friaDetails.remediation}>
+                  {friaDetails.remediation && (
+                    <div className="space-y-0.5">
+                      <span className="block">Desencadenante: {friaDetails.remediation.trigger_event}</span>
+                      <span className="block">Órgano: {friaDetails.remediation.governance_body}</span>
+                      <span className="block">Canal de reclamación: {friaDetails.remediation.complaint_channel}</span>
+                      <span className="block">Reparación: {friaDetails.remediation.redress_procedure}</span>
+                    </div>
+                  )}
+                </FriaBlock>
+              </div>
+
+              {/* Puente FRIA ⟷ EIPD (art. 27.4 RIA y art. 35 RGPD) */}
+              <div
+                className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] space-y-3"
+                style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
+                    Referencias cruzadas con la EIPD (art. 27.4 RIA · art. 35 RGPD)
+                  </h3>
+                  <span className="text-xs text-[var(--g-text-secondary)]">
+                    {friaDetails.crossReferences.length} registrada(s)
+                  </span>
+                </div>
+                {friaDetails.crossReferences.length === 0 ? (
+                  <p className="text-xs text-[var(--g-text-secondary)]">
+                    Sin referencias cruzadas registradas.
+                  </p>
+                ) : (
+                  <div className="space-y-2 text-xs">
+                    {friaDetails.crossReferences.map((x) => (
+                      <div
+                        key={x.id}
+                        className="p-3 bg-[var(--g-surface-subtle)]/40 border border-[var(--g-border-subtle)] space-y-0.5"
+                        style={{ borderRadius: "var(--g-radius-md)" }}
+                      >
+                        <span className="font-semibold text-[var(--g-text-primary)] block">
+                          {PUNTO_RIA[x.ria_obligation_point] ?? x.ria_obligation_point} → {x.dpia_section}
+                        </span>
+                        <span className="block text-[var(--g-text-secondary)]">
+                          Cobertura {COBERTURA[x.coverage_type] ?? x.coverage_type} · estado {VALIDEZ[x.validation_status] ?? x.validation_status}
+                        </span>
+                        <span className="block font-mono text-[10px] text-[var(--g-text-secondary)]">
+                          {x.source_hash ? `hash ${x.source_hash}` : "sin hash de origen registrado"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 

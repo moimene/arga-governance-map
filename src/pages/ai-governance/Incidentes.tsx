@@ -244,7 +244,7 @@ export default function AiIncidentes() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <AlertTriangle className="h-10 w-10 text-[var(--g-text-secondary)] mb-3" />
             <p className="text-sm font-medium text-[var(--g-text-primary)]">Sin incidentes registrados</p>
-            <p className="text-xs text-[var(--g-text-secondary)] mt-1">El sistema IA está operando sin incidencias</p>
+            <p className="text-xs text-[var(--g-text-secondary)] mt-1">No se ha registrado ninguno; la ausencia de registro no acredita que no los haya</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">

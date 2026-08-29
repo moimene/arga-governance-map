@@ -63,7 +63,10 @@ describe("buildAimsReadiness", () => {
       "iso-42001-management-system",
       "evidence-recordkeeping",
     ]);
-    expect(summary.domains.find((domain) => domain.id === "migration")?.metric).toBe("Sin schema nuevo");
+    // A5 (2026-08-29): este test blindaba la etiqueta "Sin schema nuevo", que
+    // además era falsa —las tablas `aims_*` del backbone existen desde abril—.
+    // El dominio no mide el backbone, así que ahora lo dice.
+    expect(summary.domains.find((domain) => domain.id === "migration")?.metric).toBe("No medido");
     expect(summary.standaloneReady).toBe(true);
   });
 
@@ -94,10 +97,22 @@ describe("buildAimsReadiness", () => {
       "/ai-governance/incidentes/nuevo",
     ]);
 
+    // A5 (2026-08-29): este bucle exigía `migrationRequired: false` y que TODAS
+    // las tablas empezaran por `ai_` para las 7 pantallas — y la ficha de
+    // sistema lee seis tablas `aims_*` y ESCRIBE en una. El test blindaba la
+    // falsedad e impedía corregir el contrato. Ahora se comprueba lo que sí es
+    // invariante (el owner y que la postura sea coherente con las tablas).
     for (const screen of aimsScreenPostures) {
       expect(screen.owner).toBe("AIMS 360");
-      expect(screen.migrationRequired).toBe(false);
-      expect(screen.tables.every((table) => table.startsWith("ai_"))).toBe(true);
+      const usaBackbone = screen.tables.some((table) => table.startsWith("aims_"));
+      expect(
+        screen.migrationRequired,
+        `${screen.route}: declara migrationRequired sin coherencia con sus tablas`,
+      ).toBe(usaBackbone);
+      expect(
+        screen.tables.every((table) => table.startsWith("ai_") || table.startsWith("aims_")),
+        `${screen.route}: declara una tabla fuera del dominio AIMS`,
+      ).toBe(true);
     }
 
     const createSystem = aimsScreenPostures.find(

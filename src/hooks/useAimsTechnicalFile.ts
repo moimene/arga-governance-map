@@ -2,68 +2,91 @@ import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/reac
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
+// Los tipos siguientes reflejan las columnas REALES de Cloud
+// (`information_schema`, verificado 2026-08-29). La versión anterior declaraba
+// 23 columnas inexistentes: como las lecturas usan `select("*")`, no fallaban —
+// devolvían filas con otras claves y la UI pintaba `undefined`, incluida una
+// afirmación positiva sobre datos personales que no se apoyaba en nada.
+
 export type AimsTechnicalFileSection = {
   id: string;
+  tenant_id: string;
   system_id: string;
   version_id?: string | null;
-  section_key: string;
-  section_title: string;
-  status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "NON_CONFORMING" | "SEALED";
-  content_summary?: string | null;
-  evidence_doc_path?: string | null;
-  evidence_doc_hash?: string | null;
-  completeness_score?: number | null;
+  section_code: string;
+  title: string;
+  status: string;
+  content?: Record<string, unknown> | null;
+  evidence_refs?: unknown[] | null;
+  reviewed_by_id?: string | null;
+  reviewed_at?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type AimsSystemVersion = {
   id: string;
+  tenant_id: string;
   system_id: string;
-  version_tag: string;
-  status: "DEVELOPMENT" | "VALIDATION" | "PRODUCTION" | "RETIRED";
-  target_readiness_score?: number | null;
-  current_readiness_score?: number | null;
-  technical_file_status: "OPEN" | "IN_REVIEW" | "SEALED" | "RECTIFIED";
-  qseal_token?: string | null;
-  sealed_at?: string | null;
-  sealed_by?: string | null;
+  version_label: string;
+  release_stage?: string | null;
+  status: string;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  change_summary?: string | null;
+  model_snapshot?: Record<string, unknown> | null;
+  dataset_snapshot?: Record<string, unknown> | null;
+  control_snapshot?: Record<string, unknown> | null;
+  technical_file_status: string;
   created_at: string;
+  updated_at: string;
 };
 
 export type AimsMonitoringIndicator = {
   id: string;
+  tenant_id: string;
   system_id: string;
-  name: string;
-  indicator_type: "DRIFT" | "ACCURACY" | "LATENCY" | "FAIRNESS" | "ANOMALY";
-  threshold?: string | null;
-  current_value?: string | null;
-  status: "OPTIMAL" | "WARNING" | "CRITICAL";
-  last_evaluated_at?: string | null;
+  version_id?: string | null;
+  indicator_name: string;
+  metric_key?: string | null;
+  threshold_config?: Record<string, unknown> | null;
+  current_value?: unknown;            // jsonb en Cloud, no texto
+  status: string;
+  last_observed_at?: string | null;
+  evidence_refs?: unknown[] | null;
   created_at: string;
 };
 
 export type AimsModelRegistryItem = {
   id: string;
+  tenant_id: string;
   system_id: string;
+  version_id?: string | null;
   model_name: string;
-  model_type: string;
-  base_architecture?: string | null;
-  parameters_count?: string | null;
-  training_cutoff?: string | null;
+  model_type?: string | null;
   provider?: string | null;
+  model_version?: string | null;
+  intended_use?: string | null;
+  performance_metrics?: Record<string, unknown> | null;
+  validation_results?: Record<string, unknown> | null;
+  limitations?: unknown;              // jsonb en Cloud, no texto
+  status?: string | null;
   created_at: string;
 };
 
 export type AimsDatasetRegistryItem = {
   id: string;
+  tenant_id: string;
   system_id: string;
+  version_id?: string | null;
   dataset_name: string;
-  dataset_type: "TRAINING" | "VALIDATION" | "TESTING" | "BENCHMARK";
-  records_count?: number | null;
-  contains_pii?: boolean | null;
-  contains_special_categories?: boolean | null;
-  provenance?: string | null;
+  dataset_type?: string | null;
+  source_system?: string | null;
+  lawful_basis?: string | null;
+  data_categories?: unknown[] | null;
+  lineage?: Record<string, unknown> | null;
+  quality_metrics?: Record<string, unknown> | null;
+  status?: string | null;
   created_at: string;
 };
 
@@ -195,7 +218,8 @@ export function useUpdateTechnicalFileSection() {
 }
 
 /**
- * Precintar / Sellar Expediente Técnico en Ledger WORM (Art. 11 + EAD Trust)
+ * Cerrar el expediente técnico (art. 11 RIA): registro interno con hash SHA-512.
+ * No interviene ningún prestador de confianza: la función no realiza llamada externa.
  */
 export function useCloseAimsTechnicalFile() {
   const qc = useQueryClient();
@@ -208,9 +232,9 @@ export function useCloseAimsTechnicalFile() {
       signedBy,
     }: {
       versionId: string;
-      qsealToken: string;
-      tsqToken: string;
-      signedBy: string;
+      qsealToken?: string;
+      tsqToken?: string;
+      signedBy?: string;
     }) => {
       const { data, error } = await supabase.rpc("fn_aims_close_technical_file", {
         p_version_id: versionId,

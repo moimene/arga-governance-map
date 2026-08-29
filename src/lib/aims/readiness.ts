@@ -79,6 +79,11 @@ export interface AimsReadinessDomain {
   metric: string;
   detail: string;
   route: string;
+  /**
+   * Si el dominio se apoya en algún dato. Un dominio sin dato no puede
+   * contribuir a declarar el sistema operable: la ausencia no acredita.
+   */
+  hasData: boolean;
 }
 
 export interface AimsComplianceMonitorDomain {
@@ -155,14 +160,25 @@ export const aimsScreenPostures: AimsScreenPosture[] = [
     route: "/ai-governance/sistemas/:id",
     screen: "Detalle de Sistema IA",
     owner: "AIMS 360",
-    hooks: ["useAiSystemById", "useAssessmentsBySystem", "useComplianceChecksBySystem", "useAiIncidentsBySystem"],
-    tables: ["ai_systems", "ai_risk_assessments", "ai_compliance_checks", "ai_incidents"],
-    posture: "legacy_read",
-    sourceOfTruth: "ai_systems como owner; tablas hijas ai_* por system_id",
-    operation: "read-only",
+    hooks: [
+      "useAiSystemById", "useAssessmentsBySystem", "useComplianceChecksBySystem",
+      "useAiIncidentsBySystem", "useAimsTechnicalFile*", "useFriaBySystem", "useFriaDetails",
+    ],
+    tables: [
+      "ai_systems", "ai_risk_assessments", "ai_compliance_checks", "ai_incidents",
+      "aims_technical_file_sections", "aims_system_versions", "aims_monitoring_indicators",
+      "aims_model_registry", "aims_dataset_registry", "aims_fria_*",
+    ],
+    posture: "legacy_write",
+    sourceOfTruth: "ai_systems como owner; expediente técnico y FRIA sobre aims_*",
+    operation: "owner-write",
     crossModuleHandoffs: ["Referencia contextual a evaluaciones e incidentes AIMS"],
-    migrationRequired: false,
-    notes: "Pantalla más rica del owner AIMS; ai_compliance_checks se mantiene legacy_read.",
+    migrationRequired: true,
+    // CORRECCIÓN (review A5): declaraba `read-only` sobre `ai_*` y
+    // `migrationRequired: false`, y la pantalla lee seis tablas `aims_*` y
+    // ESCRIBE en `aims_technical_file_sections`. El contrato se afirmaba a sí
+    // mismo sin mirar el consumidor, y `readiness.test.ts` lo blindaba.
+    notes: "Consume el backbone aims_* además de ai_*; escribe secciones del expediente técnico.",
   },
   {
     route: "/ai-governance/evaluaciones",
@@ -500,7 +516,7 @@ function fallbackMonitorStatus(
     case "prohibited-practices":
       return {
         status: inacceptableSystems.length > 0 ? "gap" : totalSystems > 0 ? "watch" : "gap",
-        metric: `${inacceptableSystems.length} inaceptables`,
+        metric: systems.length === 0 ? "Sin inventario" : `${inacceptableSystems.length} inaceptables`,
       };
     case "high-risk-obligations":
       return {
@@ -510,13 +526,13 @@ function fallbackMonitorStatus(
     case "technical-documentation":
       return {
         status: technicalGaps === 0 && assessments.length > 0 ? "ready" : technicalGaps <= 2 ? "watch" : "gap",
-        metric: `${technicalGaps} gaps`,
+        metric: assessments.length === 0 ? "Sin evaluaciones" : `${technicalGaps} gaps`,
       };
     case "accuracy-robustness-cybersecurity":
     case "incident-reporting-escalation":
       return {
-        status: materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
-        metric: `${materialIncidents} materiales`,
+        status: incidents.length === 0 ? "watch" : materialIncidents === 0 ? "ready" : materialIncidents <= 2 ? "watch" : "gap",
+        metric: incidents.length === 0 ? "Sin incidentes registrados" : `${materialIncidents} materiales`,
       };
     case "provider-vendor-third-party":
       return {
@@ -613,6 +629,7 @@ export function buildAimsReadiness({
   const domains: AimsReadinessDomain[] = [
     {
       id: "inventory",
+      hasData: systems.length > 0,
       label: "Inventario",
       status: domainStatus(inventoryCoverage, 50, 80),
       metric: totalSystems === 0 ? "0 sistemas" : `${activeSystems}/${totalSystems} activos`,
@@ -621,6 +638,7 @@ export function buildAimsReadiness({
     },
     {
       id: "ai-act-assessments",
+      hasData: assessments.length > 0,
       label: "Evaluaciones AI Act",
       status: domainStatus(assessmentCoverage, 50, 100),
       metric: highRiskSystems.length === 0 ? "Sin alto riesgo" : `${highRiskAssessed}/${highRiskSystems.length} alto riesgo`,
@@ -629,14 +647,18 @@ export function buildAimsReadiness({
     },
     {
       id: "incidents",
+      hasData: incidents.length > 0,
       label: "Incidentes",
-      status: openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
-      metric: `${openIncidents} abiertos`,
+      // Sin un solo incidente registrado no se sabe si hay incidencias: es
+      // ausencia de dato, no conformidad.
+      status: incidents.length === 0 ? "watch" : openIncidents === 0 ? "ready" : openIncidents <= 2 ? "watch" : "gap",
+      metric: incidents.length === 0 ? "Sin incidentes registrados" : `${openIncidents} abiertos`,
       detail: "Registro de severidad, investigación, causa raíz y acción correctiva.",
       route: "/ai-governance/incidentes",
     },
     {
       id: "controls",
+      hasData: controlFindings.length > 0,
       label: "Controles",
       status: controlFindings.length === 0 ? "watch" : domainStatus(controlCoverage, 40, 75),
       metric: controlFindings.length === 0 ? "Derivado" : `${closedControlFindings}/${controlFindings.length} cerrados`,
@@ -645,6 +667,7 @@ export function buildAimsReadiness({
     },
     {
       id: "operational-evidence",
+      hasData: incidents.length > 0,
       label: "Evidencias operativas",
       status: incidents.length === 0 ? "watch" : domainStatus(incidentClosureCoverage, 50, 80),
       metric: incidents.length === 0 ? "Pendiente" : `${incidentsWithClosureEvidence}/${incidents.length} con cierre`,
@@ -653,10 +676,14 @@ export function buildAimsReadiness({
     },
     {
       id: "migration",
+      hasData: false,
       label: "Migración ai_* → aims_*",
       status: "watch",
-      metric: "Sin schema nuevo",
-      detail: "Pantalla standalone-ready sobre ai_* legacy hasta activar backbone aims_*.",
+      // No se mide desde aquí: `buildAimsReadiness` sólo recibe `ai_*`.
+      // Antes afirmaba "Sin schema nuevo", que además era falso — las tablas
+      // `aims_*` del backbone existen desde abril.
+      metric: "No medido",
+      detail: "Postura sobre ai_* legacy; el estado del backbone aims_* no se mide en este resumen.",
       route: "/ai-governance",
     },
   ];
@@ -666,8 +693,18 @@ export function buildAimsReadiness({
     sourcePosture: "legacy-ai",
     contractId: "aims-p0-readiness",
     sourceTables: ["ai_systems", "ai_risk_assessments", "ai_incidents"],
-    migrationPath: "Read model ai_* actual; futura compatibilidad aims_* por contrato, sin writes nuevos.",
-    standaloneReady: domains.every((domain) => domain.status !== "gap"),
+    migrationPath: "Read model ai_* en este resumen; el expediente técnico ya lee y escribe aims_* fuera de él.",
+    // No se declara operable sobre la ausencia de dato: además de no tener
+    // brechas, todo dominio tiene que apoyarse en algún dato. Antes bastaba
+    // con que ninguno fuera "gap", y "watch" es justo el marcador de
+    // "no tengo dato" — cuatro dominios diciendo eso se compactaban en un
+    // tick verde de "Demo operable".
+    // `migration` queda fuera del cómputo: es una nota de postura sobre el
+    // backbone, no un dominio de cumplimiento con dato propio, y por eso su
+    // `hasData` es false por definición.
+    standaloneReady: domains
+      .filter((domain) => domain.id !== "migration")
+      .every((domain) => domain.status !== "gap" && domain.hasData),
     domains,
     complianceMonitors,
     nextSteps: [
@@ -682,43 +719,25 @@ export function buildAimsReadiness({
 
 export function filterSystemsByScope<T extends { name: string; description?: string | null }>(
   systems: T[],
-  scope: string
+  _scope: string,
 ): T[] {
-  if (scope.endsWith("(Global)")) {
-    return systems;
-  }
-  if (scope === "España" || scope === "Europa") {
-    return systems.filter((s) => {
-      const nameLower = s.name.toLowerCase();
-      const descLower = (s.description ?? "").toLowerCase();
-      return (
-        nameLower.includes("auto") ||
-        nameLower.includes("siniestros") ||
-        nameLower.includes("salud") ||
-        nameLower.includes("fraude") ||
-        nameLower.includes("motor") ||
-        descLower.includes("auto") ||
-        descLower.includes("siniestros") ||
-        descLower.includes("salud") ||
-        descLower.includes("fraude") ||
-        descLower.includes("motor")
-      );
-    });
-  }
-  if (scope === "LATAM" || scope === "Brasil" || scope === "México") {
-    return systems.filter((s) => {
-      const nameLower = s.name.toLowerCase();
-      const descLower = (s.description ?? "").toLowerCase();
-      return (
-        nameLower.includes("suscripción") ||
-        nameLower.includes("suscripcion") ||
-        nameLower.includes("patrimonial") ||
-        descLower.includes("suscripción") ||
-        descLower.includes("suscripcion") ||
-        descLower.includes("patrimonial")
-      );
-    });
-  }
+  // MINA DESACTIVADA (A5, 2026-08-29): esta función recortaba el inventario
+  // buscando `auto`, `siniestros`, `salud`, `fraude`, `motor`, `suscripción` y
+  // `patrimonial` en el nombre y la descripción. Con un inventario que no fuera
+  // asegurador devolvía cero sistemas — medido: 3 de 3 sistemas de despacho
+  // desaparecían en el ámbito "España".
+  //
+  // CORRECCIÓN (review A5): NO era una mina latente, estaba ARMADA. Se creyó
+  // inofensiva porque `branding.scopes` es NULL en los dos tenants, pero
+  // `scopesForTenant` (`src/lib/tenant-scopes.ts:14`) devuelve `ARGA_SCOPES`
+  // justamente cuando el branding es NULL, y `src/data/scopes.ts` incluye
+  // "España", "LATAM", "Europa", "Brasil" y "México". Es decir: en ARGA el
+  // recorte por vocabulario se disparaba de verdad y ocultaba EN SILENCIO
+  // cualquier sistema cuyo nombre no contuviera esas palabras.
+  //
+  // `ai_systems` no tiene columna de jurisdicción ni de ámbito: no hay nada por
+  // lo que filtrar. Cuando la haya, se filtra por el dato declarado, nunca por
+  // palabras del nombre.
   return systems;
 }
 
