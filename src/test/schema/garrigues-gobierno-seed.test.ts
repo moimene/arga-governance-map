@@ -3,7 +3,7 @@
 // (T2-T5 seeds). Verifica condiciones, órganos, capital y RLS ARGA intacta.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { DEMO_TENANT, GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { DEMO_TENANT, GARRIGUES_DEMO_EMAIL, sesionDe } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -19,30 +19,22 @@ describe("G2 — el gobierno de la matriz Garrigues en Cloud refleja los seeds T
   let argaAuthed = false;
 
   beforeAll(async () => {
-    try {
-      garr = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error } = await garr.auth.signInWithPassword({
-        email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      authed = !error;
-      if (error) console.warn(`[g2-seed] login Garrigues falló: ${error.message}`);
-
-      // ARGA client para verificar aislamiento RLS
-      arga = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-      const { error: argaError } = await arga.auth.signInWithPassword({
-        email: DEMO_EMAIL, password: DEMO_PASSWORD,
-      });
-      argaAuthed = !argaError;
-      if (argaError) console.warn(`[g2-seed] login ARGA falló: ${argaError.message}`);
-    } catch {
-      authed = false;
-    }
+    // Sesión COMPARTIDA y memoizada por cuenta: la suite entera hace 2 logins
+    // en vez de ~40. Supabase Auth devolvía HTTP 429 al cruzar el umbral y la
+    // suite fallaba de forma no determinista. `sesionDe` LANZA si no puede
+    // autenticar, así que el gate se pone rojo en vez de saltarse en silencio,
+    // y cada cuenta lleva su propio storageKey para que un login no pise al otro.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+    // `sesionDe` lanza si no autentica, así que llegar aquí ya lo garantiza.
+    // Se conservan las banderas porque los `it` las consultan: sin ponerlas a
+    // true, TODOS los tests de este fichero se saltarían en silencio — que es
+    // justo el defecto que esta tarea vino a cerrar.
+    authed = true;
+    argaAuthed = true;
   }, 30_000);
 
-  afterAll(async () => {
-    try { await garr?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-    try { await arga?.auth.signOut({ scope: "local" }); } catch { /* noop */ }
-  });
+  // SIN afterAll con signOut: la sesión es COMPARTIDA y cerrarla aquí dejaría
+  // sin autenticar a todas las sondas que corran después.
 
   it("346 condiciones SOCIO vigentes en la matriz", async () => {
     if (!authed || !garr) { expect(true).toBe(true); return; }

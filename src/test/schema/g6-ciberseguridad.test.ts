@@ -3,7 +3,7 @@
 // Verificaciones en Cloud (Supabase) con contrato cero-cambio para ARGA.
 import { describe, expect, it, beforeAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT, DEMO_TENANT } from "../helpers/supabase-test-client";
+import { GARRIGUES_TENANT, DEMO_TENANT, sesionDe } from "../helpers/supabase-test-client";
 import { OBLIGACIONES_CIBER, CONTROLES_CIBER } from "../../../scripts/garrigues/normativo/obligaciones-ciber";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
@@ -57,45 +57,17 @@ describe("G6 — Catálogo congelado Ciberseguridad y SGSI", () => {
   });
 });
 
-// La suite completa abre ~38 logins (19 sondas x 2 cuentas) y Supabase Auth
-// responde **HTTP 429 "Request rate limit reached"** — medido: de 8 logins
-// concurrentes, 6 dan 429 y 2 pasan. El 429 es estrangulamiento, no un fallo
-// del gate, así que se reintenta con espera creciente. Cualquier OTRO error
-// (clave rotada, credencial mala, Cloud caído) NO se reintenta: se propaga y
-// el `beforeAll` falla ruidoso, que es lo que esta tarea vino a garantizar.
-// El arreglo de fondo —una sola sesión compartida -- es la deuda ya catalogada
-// de unificar las 19 sondas contra src/test/helpers/supabase-test-client.ts.
-async function entrarConReintento(
-  cliente: SupabaseClient,
-  email: string,
-): Promise<{ ok: boolean; motivo?: string }> {
-  const esperas = [800, 2000, 4500];
-  for (let intento = 0; intento <= esperas.length; intento++) {
-    const { error } = await cliente.auth.signInWithPassword({ email, password: DEMO_PASSWORD });
-    if (!error) return { ok: true };
-    if (error.status !== 429) return { ok: false, motivo: `${error.status} ${error.message}` };
-    if (intento < esperas.length) await new Promise((r) => setTimeout(r, esperas[intento]));
-    else return { ok: false, motivo: "429 persistente tras 4 intentos" };
-  }
-  return { ok: false, motivo: "inalcanzable" };
-}
-
 describe("G6 — Ciberseguridad y SGSI en Cloud (Supabase)", () => {
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
 
   beforeAll(async () => {
-    const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    const eg = await entrarConReintento(g, GARRIGUES_DEMO_EMAIL);
-    if (eg.ok) garr = g;
-    const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    const ea = await entrarConReintento(a, ARGA_EMAIL);
-    if (ea.ok) arga = a;
-    // Sin esto, las 6 pruebas Cloud de G6 corrían con 0 expect() y en verde.
-    // Determinista: cachea el defecto original (la variable no existía nunca).
-    expect(SUPABASE_ANON_KEY, "sin credencial no hay gate Cloud").toBeTruthy();
-    expect(garr, `sin sesión Garrigues el bloque Cloud sería vacuo (${eg.motivo ?? ""})`).not.toBeNull();
-    expect(arga, `sin sesión ARGA el control discriminante sería vacuo (${ea.motivo ?? ""})`).not.toBeNull();
+    // Sesión COMPARTIDA y memoizada (2 logins en toda la suite, no ~40).
+    // `sesionDe` LANZA si no puede autenticar: el gate se pone rojo en vez de
+    // pasar mudo, que es lo que esta fase vino a cerrar.
+    [garr, arga] = await Promise.all([sesionDe("GARRIGUES"), sesionDe("ARGA")]);
+    expect(garr, "sin sesión Garrigues el bloque Cloud sería vacuo").not.toBeNull();
+    expect(arga, "sin sesión ARGA el control discriminante sería vacuo").not.toBeNull();
   });
 
   it("el módulo 'cyber' existe en grc_modules para Garrigues", async () => {
