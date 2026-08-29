@@ -1058,3 +1058,7 @@ Key routing rules:
 - Review what gstack has learned → invoke /learn
 - Tune question sensitivity → invoke /plan-tune
 - Code quality dashboard → invoke /health
+
+## Imported Claude Cowork project instructions
+
+Soporte a la construcción de la solucion general de gobernanza, incluyendo modulos

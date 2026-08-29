@@ -11,6 +11,8 @@ import {
 import { getNavGroups } from "./navigation";
 import { ScopeSwitcher } from "./ScopeSwitcher";
 import { useSidebarVisibility } from "./useSidebarVisibilityContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { brandName } from "@/lib/tenant-brand-labels";
 import type { SecretariaScopeController } from "./types";
 
 interface SecretariaSidebarProps {
@@ -115,6 +117,7 @@ function isSidebarLinkActive(pathname: string, search: string, to: string, end?:
 function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarContentProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const branding = useTenantBranding();
   const allGroups = getNavGroups(scope.mode);
   const { context: visibilityCtx, isInitialLoading } = useSidebarVisibility(scope);
   const groups = getVisibleSidebarSections(allGroups, visibilityCtx);
@@ -220,12 +223,12 @@ function SecretariaSidebarContent({ scope, onNavigate }: SecretariaSidebarConten
             onNavigate?.();
             navigate("/");
           }}
-          aria-label="Volver al shell TGMS"
+          aria-label={`Volver a ${brandName(branding)}`}
           className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[hsl(var(--sidebar-foreground))]/70 transition-colors hover:bg-[hsl(var(--sidebar-accent))]/60 hover:text-[hsl(var(--sidebar-foreground))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <ChevronLeft className="h-4 w-4" />
-          <span>Volver a TGMS</span>
+          <span>Volver a {brandName(branding)}</span>
         </button>
       </div>
     </>

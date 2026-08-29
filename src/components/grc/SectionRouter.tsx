@@ -5,6 +5,7 @@ const VIEWS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   "dora/operate/incidents":    lazy(() => import("@/pages/grc/modules/dora/Incidents")),
   "dora/operate/bcm":          lazy(() => import("@/pages/grc/modules/dora/BCM")),
   "dora/operate/rto":          lazy(() => import("@/pages/grc/modules/dora/RTO")),
+  "dora/operate/testing":      lazy(() => import("@/pages/grc/modules/dora/TestingProgram")),
   "dora/governance/policies":  lazy(() => import("@/pages/grc/modules/dora/PoliciesLink")),
   "dora/config/thresholds":    lazy(() => import("@/pages/grc/modules/dora/Thresholds")),
   "gdpr/operate/ropa":         lazy(() => import("@/pages/grc/modules/gdpr/ROPA")),

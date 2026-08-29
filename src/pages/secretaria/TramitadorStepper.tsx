@@ -17,6 +17,8 @@ import { useRulePackForMateria } from "@/hooks/useRulePackForMateria";
 import { useModelosAcuerdo } from "@/hooks/useModelosAcuerdo";
 import { useCertificationRegistryIntake, useTramitacionById, useAgreementHasCertification } from "@/hooks/useTramitador";
 import { useTenantContext } from "@/context/TenantContext";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessDocxButton } from "@/components/secretaria/ProcessDocxButton";
 import { Capa3CaptureDialog } from "@/components/secretaria/Capa3CaptureDialog";
@@ -514,6 +516,7 @@ function TramitacionDetalle({ id }: { id: string }) {
 
 function TramitadorNuevo() {
   const { tenantId } = useTenantContext();
+  const branding = useTenantBranding();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const requestedMateria = searchParams.get("materia") || "";
@@ -892,7 +895,7 @@ function TramitadorNuevo() {
     selectedAgreementEntity?.common_name ??
     scopedEntity?.legal_name ??
     scopedEntity?.common_name ??
-    "ARGA Seguros";
+    groupFullLabel(branding);
   const selectedAgreementLegalName =
     selectedAgreementEntity?.legal_name ??
     scopedEntity?.legal_name ??

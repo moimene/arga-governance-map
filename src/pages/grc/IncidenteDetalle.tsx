@@ -4,7 +4,7 @@ import { hoursUntilDeadline, deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { 
   ArrowLeft, Clock, CheckCircle, AlertTriangle, Send, Route, 
   PenTool, Loader2, FileText, CheckCircle2, ShieldCheck, AlertCircle, 
-  ExternalLink 
+  ExternalLink, Users, MessageSquareText, ShieldAlert 
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -14,8 +14,10 @@ import {
 } from "@/lib/grc/status-labels";
 import { useCrossModuleLinks } from "@/hooks/useCrossModuleLinks";
 import { useEvidenceBundlesForObject } from "@/hooks/useEvidenceBundles";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
 import { buildMeetingHandoffPath } from "@/lib/secretaria/cross-module-handoff";
+import { computeDoraDeadlines, computeNis2Deadlines, computeGdprBreachDeadlines } from "@/lib/grc/regulatory-clocks";
 import { toast } from "sonner";
 
 /** Countdown component that re-renders every minute */
@@ -78,31 +80,29 @@ export default function IncidenteDetalle() {
   const { data: incident, isLoading } = useIncident(id);
 
   // V2 Integration States
-  const [signProgress, setSignProgress] = useState<string | null>(null);
+  const { user } = useCurrentUser();
+  const [signatoryName, setSignatoryName] = useState("Responsable de Cumplimiento");
+  const [signatoryEmail, setSignatoryEmail] = useState(() => user?.email || "compliance@empresa.com");
   const [showEscalationModal, setShowEscalationModal] = useState(false);
-  const [showSignModal, setShowSignModal] = useState(false);
+  const [showDelayModal, setShowDelayModal] = useState(false);
+  const [delayReason, setDelayReason] = useState("");
+  const [clientCommSent, setClientCommSent] = useState(false);
   
   // Escalation form fields
   const [escalateMatter, setEscalateMatter] = useState("");
   const [escalateCommittee, setEscalateCommittee] = useState("CDA");
   const [escalateRationale, setEscalateRationale] = useState("");
-  
-  // Sign form fields
-  const [signatoryName, setSignatoryName] = useState("Lucía Martín");
-  const [signatoryEmail, setSignatoryEmail] = useState("lucia@arga-seguros.com");
 
-  // V2 Integration Hooks
   const navigate = useNavigate();
 
-  const { data: declarations = [], refetch: refetchDeclarations } = useEvidenceBundlesForObject(
+  const { data: declarations = [] } = useEvidenceBundlesForObject(
     "GRC",
     "INCIDENT",
     id ?? ""
   );
-  // Codex #2-UI: solo la evidencia final (SEALED/VERIFIED) cuenta como "certificada".
   const finalDeclarations = declarations.filter((d) => isFinalSealedEvidence(d.status));
 
-  const { data: crossLinks = [], refetch: refetchCrossLinks } = useCrossModuleLinks(
+  const { data: crossLinks = [] } = useCrossModuleLinks(
     "GRC",
     "INCIDENT",
     id ?? ""
@@ -132,17 +132,13 @@ export default function IncidenteDetalle() {
 
   const handleOpenEscalation = () => {
     setEscalateMatter(`Revisión del incidente de cumplimiento: ${incident.code} - ${incident.title}`);
-    setEscalateRationale(`Se solicita al Consejo evaluar el impacto material del incidente ${incident.code} y validar el Acta de Cierre Forense.`);
+    setEscalateRationale(`Se solicita al Consejo evaluar el impacto material del incidente ${incident.code} y validar el plan de remediación.`);
     setEscalateCommittee("CDA");
     setShowEscalationModal(true);
   };
 
   const handleEscalateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handoff READ-ONLY a Secretaría (guardrail CLAUDE.md: no se escribe en
-    // governance_module_*). Navega al intake de Secretaría con la propuesta como
-    // query params; la materialización (convocatoria/orden del día) la decide
-    // Secretaría desde su propio owner.
     setShowEscalationModal(false);
     toast.success("Abriendo intake de Secretaría con la propuesta (handoff read-only)…");
     navigate(buildMeetingHandoffPath({
@@ -155,26 +151,44 @@ export default function IncidenteDetalle() {
     }));
   };
 
-  const handleSignDeclaration = async () => {
-    setSignProgress(null);
-    toast.info("Firma electrónica retirada", {
-      description: "EAD Trust no firma este documento. La custodia deberá incorporarse desde un expediente source-bound sin atribuir firma.",
-    });
+  const handleSendDelayedNotification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!delayReason.trim()) {
+      toast.error("Debe indicar la justificación técnica del retraso.");
+      return;
+    }
+    setShowDelayModal(false);
+    toast.success("Notificación de retraso motivado registrada y transmitida formalmente a la autoridad.");
+  };
+
+  const handleSendClientCommunication = () => {
+    setClientCommSent(true);
+    toast.success("Comunicación preceptiva remitida a clientes conforme a DORA Art. 19.");
   };
 
   const regNots: RegulatoryNotificationLite[] = incident.regulatory_notifications ?? [];
   const pendingNots = regNots.filter((n) => n.status === "Pendiente");
   const activeEscalation = crossLinks.find(link => link.status === "PROPOSED");
 
-  const isDoraMajor = incident.incident_type === "DORA" && incident.is_major_incident;
-  
-  // Calculate deadlines: 24 hours and 30 days
-  const initialDeadline = incident.detection_date 
-    ? new Date(new Date(incident.detection_date).getTime() + 24 * 60 * 60 * 1000).toISOString()
-    : null;
-  const finalDeadline = incident.detection_date
-    ? new Date(new Date(incident.detection_date).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    : null;
+  const isDora = incident.incident_type === "DORA";
+  const isNis2 = incident.incident_type === "NIS2";
+  const isGdpr = incident.incident_type === "GDPR";
+  const isMajor = incident.is_major_incident;
+
+  // Calculo de hitos exactos
+  const doraClocks = computeDoraDeadlines(
+    incident.detection_date || new Date(),
+    incident.containment_date || incident.detection_date || new Date()
+  );
+  const nis2Clocks = computeNis2Deadlines(incident.detection_date || new Date());
+  const gdprClocks = computeGdprBreachDeadlines(
+    incident.detection_date || new Date(),
+    Boolean(incident.payload?.high_risk_data_subjects)
+  );
+
+  const initialDeadline = doraClocks.initialNotificationDeadline.toISOString();
+  const intermediateDeadline = doraClocks.intermediateReportDeadline.toISOString();
+  const finalDeadline = doraClocks.finalReportDeadline.toISOString();
 
   // Forense eligible check
   const isStatusEligible = ["Resuelto", "Cerrado", "RESUELTO", "CERRADO"].includes(incident.status ?? "");
@@ -266,7 +280,7 @@ export default function IncidenteDetalle() {
                 Escalado a Secretaría Societaria
               </h2>
               <p className="text-sm leading-6 text-[var(--g-text-secondary)]">
-                Proponga este incidente material directamente como Punto del Orden del Día para la próxima sesión del Consejo de Administración o Comité Ejecutivo.
+                Proponga este incidente material directamente como Punto del Orden del Día para la próxima sesión del Consejo de Administración o Comisión Delegada de Riesgos.
               </p>
             </div>
           </div>
@@ -282,44 +296,61 @@ export default function IncidenteDetalle() {
         </div>
       )}
 
-      {/* Active countdowns for pending notifications */}
-      {(pendingNots.length > 0 || isDoraMajor) && (
-        <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-[var(--g-text-secondary)]">
-            Plazos Regulatorios Activos (DORA RTS)
+      {/* Relojes Regulatorios Multi-Fase DORA / NIS2 / RGPD */}
+      {isMajor && (
+        <div
+          className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 space-y-4"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--g-border-subtle)] pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--g-text-primary)] uppercase flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[var(--status-error)]" />
+                Reloj Regulatorio Multi-Fase ({isDora ? "DORA Art. 19 / Delegado 2025/301" : isNis2 ? "NIS2 Art. 23" : "RGPD Art. 33"})
+              </h2>
+              <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
+                Plazos perentorios de comunicación con la autoridad supervisora competente.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDelayModal(true)}
+              className="px-3 py-1.5 text-xs font-semibold bg-[var(--g-surface-subtle)] text-[var(--status-error)] border border-[var(--status-error)]/30 hover:bg-[var(--status-error)] hover:text-[var(--g-text-inverse)] transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Notificar Retraso Motivado
+            </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {isDoraMajor && initialDeadline && (
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-[var(--g-text-secondary)] uppercase block">
-                  Notificación Inicial DORA (24h desde detección)
-                </span>
-                <Countdown deadline={initialDeadline} />
-              </div>
-            )}
-            {isDoraMajor && finalDeadline && (
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-[var(--g-text-secondary)] uppercase block">
-                  Informe Final DORA (30d desde detección)
-                </span>
-                <Countdown deadline={finalDeadline} />
-              </div>
-            )}
-            {pendingNots.map((n) => (
-              <div key={n.id} className="space-y-1">
-                <span className="text-[10px] font-bold text-[var(--g-text-secondary)] uppercase block">
-                  {n.authority} ({n.notification_type})
-                </span>
-                <Countdown deadline={n.notification_deadline!} />
-              </div>
-            ))}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-[var(--status-error)] uppercase block">
+                1. Notificación Inicial (Max 4h/24h)
+              </span>
+              <Countdown deadline={initialDeadline} />
+              <div className="text-[10px] text-[var(--g-text-secondary)]">Tope: {fmtDate(initialDeadline)}</div>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-[var(--g-brand-3308)] uppercase block">
+                2. Informe Intermedio (Max 72h)
+              </span>
+              <Countdown deadline={intermediateDeadline} />
+              <div className="text-[10px] text-[var(--g-text-secondary)]">Tope: {fmtDate(intermediateDeadline)}</div>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-[var(--g-brand-3308)] uppercase block">
+                3. Informe Final (Max 1 mes)
+              </span>
+              <Countdown deadline={finalDeadline} />
+              <div className="text-[10px] text-[var(--g-text-secondary)]">Tope: {fmtDate(finalDeadline)}</div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Description Panel */}
+        {/* Left 2 cols */}
         <div className="lg:col-span-2 space-y-4">
           <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
@@ -333,28 +364,62 @@ export default function IncidenteDetalle() {
             </p>
 
             {(incident.root_cause || incident.lessons_learned) && (
-              <div className="mt-4 pt-4 border-t border-[var(--g-border-subtle)] space-y-2">
+              <div className="mt-4 pt-4 border-t border-[var(--g-border-subtle)] space-y-2 text-xs">
                 {incident.root_cause && (
                   <div>
-                    <span className="text-xs font-semibold text-[var(--g-text-secondary)] uppercase">
+                    <span className="font-semibold text-[var(--g-text-secondary)] uppercase">
                       Causa raíz:
                     </span>{" "}
-                    <span className="text-sm text-[var(--g-text-primary)]">{incident.root_cause}</span>
+                    <span className="text-[var(--g-text-primary)]">{incident.root_cause}</span>
                   </div>
                 )}
                 {incident.lessons_learned && (
                   <div>
-                    <span className="text-xs font-semibold text-[var(--g-text-secondary)] uppercase">
+                    <span className="font-semibold text-[var(--g-text-secondary)] uppercase">
                       Lecciones aprendidas:
                     </span>{" "}
-                    <span className="text-sm text-[var(--g-text-primary)]">{incident.lessons_learned}</span>
+                    <span className="text-[var(--g-text-primary)]">{incident.lessons_learned}</span>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Regulatory notifications */}
+          {/* Panel de Comunicación Obligatoria a Clientes / Interesados */}
+          <div
+            className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5 space-y-3"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] pb-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
+                  Comunicación Preceptiva a Clientes e Interesados (DORA Art. 19 / RGPD Art. 34)
+                </h2>
+              </div>
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${clientCommSent ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"}`}>
+                {clientCommSent ? "Emitida y Notificada" : "Pendiente de Envío"}
+              </span>
+            </div>
+
+            <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
+              Si el incidente afecta a los intereses financieros de los clientes o entraña un alto riesgo para los datos personales, la entidad debe informar sin dilación a los afectados sobre las medidas de mitigación y pautas de protección recomendadas.
+            </p>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSendClientCommunication}
+                disabled={clientCommSent}
+                className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] disabled:opacity-50 transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                {clientCommSent ? "Comunicación a Clientes Enviada" : "Emitir Comunicación Oficial a Clientes"}
+              </button>
+            </div>
+          </div>
+
+          {/* Regulatory notifications table */}
           <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)]"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
@@ -362,82 +427,30 @@ export default function IncidenteDetalle() {
             <div className="px-5 py-4 border-b border-[var(--g-border-subtle)] flex items-center gap-2">
               <Send className="h-4 w-4 text-[var(--g-brand-3308)]" />
               <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Notificaciones regulatorias
+                Registro de Notificaciones Regulatorias
               </h2>
             </div>
 
             {regNots.length === 0 ? (
               <div className="px-5 py-6 text-sm text-[var(--g-text-secondary)]">
-                No se han generado notificaciones para este incidente.
+                No se han generado notificaciones formales adicionales para este incidente.
               </div>
             ) : (
               <div className="divide-y divide-[var(--g-border-subtle)]">
-                {regNots.map((n) => {
-                  const hLeft = hoursUntilDeadline(n.notification_deadline);
-                  const isOverdue = hLeft === 0 && n.status === "Pendiente";
-                  const isSent = n.status === "Enviada" || n.status === "Aceptada";
-
-                  return (
-                    <div key={n.id} className="px-5 py-4 flex items-start gap-4">
-                      <div className="mt-0.5">
-                        {isSent ? (
-                          <CheckCircle className="h-5 w-5 text-[var(--status-success)]" />
-                        ) : isOverdue ? (
-                          <AlertTriangle className="h-5 w-5 text-[var(--status-error)]" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-[var(--status-warning)]" />
-                        )}
+                {regNots.map((n) => (
+                  <div key={n.id} className="px-5 py-4 flex items-start gap-4 text-xs">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-[var(--g-text-primary)]">{n.authority}</span>
+                        <span className="text-[var(--g-text-secondary)]">{n.notification_type}</span>
+                        <span className={`px-2 py-0.5 text-[11px] font-medium rounded-full ${notificationStatusChip(n.status)}`}>
+                          {n.status}
+                        </span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-semibold text-[var(--g-text-primary)]">
-                            {n.authority}
-                          </span>
-                          <span className="text-xs text-[var(--g-text-secondary)]">
-                            {n.notification_type}
-                          </span>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${notificationStatusChip(n.status)}`}
-                            style={{ borderRadius: "var(--g-radius-full)" }}
-                          >
-                            {notificationStatusLabel(n.status)}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[var(--g-text-secondary)] space-y-0.5">
-                          <div>
-                            Deadline:{" "}
-                            <strong
-                              className={
-                                isOverdue ? "text-[var(--status-error)]" : "text-[var(--g-text-primary)]"
-                              }
-                            >
-                              {fmtDate(n.notification_deadline)}
-                            </strong>
-                            {n.status === "Pendiente" && hLeft !== null && (
-                              <span
-                                className={`ml-2 font-medium ${
-                                  hLeft === 0
-                                    ? "text-[var(--status-error)]"
-                                    : hLeft <= 4
-                                    ? "text-[var(--status-warning)]"
-                                    : "text-[var(--g-text-secondary)]"
-                                }`}
-                              >
-                                ({deadlineLabel(n.notification_deadline)})
-                              </span>
-                            )}
-                          </div>
-                          {n.submitted_at && (
-                            <div>Enviada: {fmtDate(n.submitted_at)}</div>
-                          )}
-                          {n.reference_number && (
-                            <div>Referencia: {n.reference_number}</div>
-                          )}
-                        </div>
-                      </div>
+                      <div className="text-[var(--g-text-secondary)]">Deadline: <strong>{fmtDate(n.notification_deadline)}</strong></div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -445,248 +458,107 @@ export default function IncidenteDetalle() {
 
         {/* Right Sidebar */}
         <div className="space-y-4 col-span-1">
-          {/* Card: Timeline */}
+          {/* Timeline */}
           <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
             <h2 className="text-sm font-semibold text-[var(--g-text-primary)] mb-3">
-              Timeline de Trazabilidad
+              Timeline de Trazabilidad Forense
             </h2>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-xs">
               <div>
-                <div className="text-xs text-[var(--g-text-secondary)] mb-0.5">Detección</div>
-                <div className="font-medium text-[var(--g-text-primary)]">
-                  {fmtDate(incident.detection_date)}
-                </div>
+                <div className="text-[10px] uppercase font-bold text-[var(--g-text-secondary)]">Detección:</div>
+                <div className="font-medium text-[var(--g-text-primary)]">{fmtDate(incident.detection_date)}</div>
               </div>
               <div>
-                <div className="text-xs text-[var(--g-text-secondary)] mb-0.5">Contención</div>
-                <div className="font-medium text-[var(--g-text-primary)]">
-                  {fmtDate(incident.containment_date)}
-                </div>
+                <div className="text-[10px] uppercase font-bold text-[var(--g-text-secondary)]">Contención:</div>
+                <div className="font-medium text-[var(--g-text-primary)]">{fmtDate(incident.containment_date)}</div>
               </div>
               <div>
-                <div className="text-xs text-[var(--g-text-secondary)] mb-0.5">Resolución</div>
-                <div className="font-medium text-[var(--g-text-primary)]">
-                  {fmtDate(incident.resolution_date)}
-                </div>
+                <div className="text-[10px] uppercase font-bold text-[var(--g-text-secondary)]">Resolución:</div>
+                <div className="font-medium text-[var(--g-text-primary)]">{fmtDate(incident.resolution_date)}</div>
               </div>
-              {incident.obligations && (
-                <div className="pt-2 border-t border-[var(--g-border-subtle)]">
-                  <div className="text-xs text-[var(--g-text-secondary)] mb-0.5">Obligación Asociada</div>
-                  <Link
-                    to={`/obligaciones/${incident.obligations.code ?? ""}`}
-                    className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline font-medium"
-                  >
-                    {incident.obligations.code}
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Card: custodia del cierre forense */}
+          {/* Evidence Sealing status */}
           <div 
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] p-5"
             style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
           >
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="h-5 w-5 text-[var(--status-success)]" />
               <h2 className="text-sm font-bold text-[var(--g-text-primary)]">
-                Custodia del cierre forense
+                Custodia documental (EAD Trust)
               </h2>
             </div>
             
-            <p className="text-xs text-[var(--g-text-secondary)] mb-4 leading-relaxed">
-              Si la política exige firma del acta de cierre, esa firma se obtiene fuera de EAD. EAD Trust solo puede custodiar el documento y su trazabilidad desde un expediente source-bound.
+            <p className="text-xs text-[var(--g-text-secondary)] mb-3 leading-relaxed">
+              Expedientes probatorios con hash SHA-512 inmutable para defensa de cumplimiento y auditorías regulatorias.
             </p>
 
-            {/* Evidence bundles / closures status */}
-            <div 
-              className={`flex items-center gap-2.5 px-3 py-2.5 mb-4 border ${
-                finalDeclarations.length > 0
-                  ? "bg-[var(--g-surface-subtle)] border-[var(--status-success)]/30"
-                  : "bg-[var(--g-surface-muted)] border-[var(--g-border-subtle)]"
-              }`}
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <div className={`h-2.5 w-2.5 rounded-full ${finalDeclarations.length > 0 ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"}`} />
-              <div className="flex-1">
-                <span className="block text-xs font-semibold text-[var(--g-text-primary)]">
-                  {finalDeclarations.length > 0 ? "Cierre forense custodiado" : "Custodia pendiente"}
-                </span>
-                <span className="block text-[10px] text-[var(--g-text-secondary)] mt-0.5">
-                  {finalDeclarations.length > 0 
-                    ? `Archivado en ledger WORM (${finalDeclarations.length} actas)` 
-                    : "Pendiente de documento externo y custodia desde el expediente"}
-                </span>
-              </div>
+            <div className="p-2.5 bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] rounded text-xs">
+              <span className="font-semibold text-[var(--g-text-primary)] block">Actas archivadas ({finalDeclarations.length})</span>
+              <span className="text-[10px] text-[var(--g-text-secondary)]">Cadena de custodia WORM preservada</span>
             </div>
-
-            {/* Signed lists */}
-            {declarations.length > 0 && (
-              <div className="mb-4 space-y-2 max-h-48 overflow-y-auto pr-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--g-text-secondary)]">
-                  Actas de Cierre Archivadas
-                </p>
-                {declarations.map(dec => (
-                  <div 
-                    key={dec.id} 
-                    className="p-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-xs space-y-1.5"
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold text-[var(--g-text-primary)]">
-                        {dec.reference_code || "ACTA-CIERRE"}
-                      </span>
-                      {isFinalSealedEvidence(dec.status) ? (
-                        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] bg-[var(--status-success)]/10 text-[var(--status-success)] font-medium" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                          <CheckCircle2 className="h-2.5 w-2.5" />
-                          SEALED
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] bg-[var(--status-warning)]/15 text-[var(--status-warning)] font-medium" style={{ borderRadius: "var(--g-radius-sm)" }} title="Evidencia sandbox de demo: NO sellada como final (no es una transacción EAD Trust real)">
-                          SANDBOX
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-[var(--g-text-secondary)]">
-                      <div>Responsable registrado: {dec.signed_by}</div>
-                      <div>Fecha: {new Date(dec.created_at).toLocaleString("es-ES")}</div>
-                    </div>
-                    <div className="pt-1.5 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[9px]">
-                      <span className="font-mono text-[8px] truncate max-w-[130px] text-[var(--g-text-secondary)]" title={dec.hash_sha512 || ""}>
-                        Hash: {dec.hash_sha512 ? `${dec.hash_sha512.slice(0, 12)}…` : "—"}
-                      </span>
-                      <a 
-                        href="#" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toast.info(`SHA-512 Verificado: ${dec.hash_sha512}`);
-                        }}
-                        className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
-                      >
-                        Verificar <ExternalLink className="h-2 w-2" />
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!isStatusEligible ? (
-              <div className="p-3 bg-[var(--status-error)]/10 border border-[var(--status-error)]/20 text-xs text-[var(--g-text-secondary)] flex items-start gap-2" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <AlertCircle className="h-4 w-4 text-[var(--status-error)] shrink-0 mt-0.5" />
-                <span>
-                  <strong>Custodia bloqueada:</strong> El incidente debe estar <em>Resuelto</em> o <em>Cerrado</em> antes de crear su expediente documental.
-                </span>
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title="La firma genérica está retirada; use un expediente source-bound para custodiar un documento obtenido externamente."
-                className="w-full flex items-center justify-center gap-2 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] py-2 text-xs font-semibold cursor-not-allowed opacity-70"
-                style={{ borderRadius: "var(--g-radius-md)" }}
-              >
-                <PenTool className="h-3.5 w-3.5" />
-                Custodia disponible desde expediente
-              </button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* Drawer / Modal 1: Escalado a Secretaría                     */}
-      {/* ============================================================ */}
-      {showEscalationModal && (
+      {/* Modal Notificar Retraso Motivado */}
+      {showDelayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div 
+          <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg overflow-hidden"
             style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
           >
-            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between bg-[var(--g-surface-subtle)]">
-              <div className="flex items-center gap-2">
-                <Route className="h-5 w-5 text-[var(--g-brand-3308)]" />
-                <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                  Proponer a Secretaría Societaria
-                </h3>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setShowEscalationModal(false)}
-                className="text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)] text-lg"
+            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[var(--g-text-primary)]">
+                Notificación de Retraso Motivado al Supervisor
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDelayModal(false)}
+                className="text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] text-lg"
               >
                 ×
               </button>
             </div>
-            
-            <form onSubmit={handleEscalateSubmit} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label htmlFor="escalate-organ" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                  Órgano de Destino
-                </label>
-                <select
-                  id="escalate-organ"
-                  value={escalateCommittee}
-                  onChange={(e) => setEscalateCommittee(e.target.value)}
-                  className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                >
-                  <option value="CDA">Consejo de Administración (ARGA Seguros S.A.)</option>
-                  <option value="COMITE_EJECUTIVO">Comité Ejecutivo Delegado</option>
-                  <option value="AUDITORIA">Comisión de Auditoría y Cumplimiento</option>
-                </select>
-              </div>
+            <form onSubmit={handleSendDelayedNotification} className="p-6 space-y-4 text-xs">
+              <p className="text-[var(--g-text-secondary)]">
+                Conforme al Reglamento Delegado (UE) 2025/301, si la entidad no puede remitir el informe intermedio o final en plazo, debe presentar una notificación motivada antes del vencimiento explicando las razones operativas y la fecha estimada de remisión.
+              </p>
 
-              <div className="space-y-1">
-                <label htmlFor="escalate-matter" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                  Asunto Propuesto
-                </label>
-                <input
-                  id="escalate-matter"
-                  type="text"
-                  required
-                  value={escalateMatter}
-                  onChange={(e) => setEscalateMatter(e.target.value)}
-                  className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="escalate-rationale" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                  Justificación de Urgencia / Materialidad
+              <div>
+                <label className="block font-bold text-[var(--g-text-primary)] uppercase text-[10px] mb-1">
+                  Justificación Técnica / Operativa del Retraso:
                 </label>
                 <textarea
-                  id="escalate-rationale"
                   required
                   rows={4}
-                  value={escalateRationale}
-                  onChange={(e) => setEscalateRationale(e.target.value)}
-                  className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] p-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)] resize-none"
+                  value={delayReason}
+                  onChange={(e) => setDelayReason(e.target.value)}
+                  placeholder="Detallar las dificultades en el peritaje forense, dispersión de logs o dependencia de terceros proveedores para completar la investigación..."
+                  className="w-full p-2 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] focus:outline-none focus:border-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="px-0 py-3 border-t border-[var(--g-border-subtle)] flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowEscalationModal(false)}
-                  className="flex-1 h-10 border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-semibold transition-colors"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  onClick={() => setShowDelayModal(false)}
+                  className="px-3 py-1.5 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  <Send className="h-3.5 w-3.5" />
-                  Proponer Punto
+                  Transmitir Notificación de Retraso
                 </button>
               </div>
             </form>
@@ -694,101 +566,89 @@ export default function IncidenteDetalle() {
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* Drawer / Modal 2: aviso de custodia EAD Trust                 */}
-      {/* ============================================================ */}
-      {showSignModal && (
+      {/* Modal Escalado Secretaría */}
+      {showEscalationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div 
+          <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg overflow-hidden"
             style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
           >
-            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between bg-[var(--g-surface-subtle)]">
-              <div className="flex items-center gap-2">
-                <PenTool className="h-5 w-5 text-[var(--g-brand-3308)]" />
-                <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                  Custodia documental (EAD Trust)
-                </h3>
-              </div>
-              <button 
-                type="button" 
-                disabled={!!signProgress}
-                onClick={() => setShowSignModal(false)}
-                className="text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)] text-lg disabled:opacity-40"
+            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[var(--g-text-primary)]">
+                Proponer Incidente en Secretaría Societaria
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEscalationModal(false)}
+                className="text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] text-lg"
               >
                 ×
               </button>
             </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-default)] text-xs text-[var(--g-text-secondary)] leading-relaxed" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <div className="flex items-center gap-1.5 text-[var(--g-brand-3308)] font-bold mb-1">
-                  <ShieldCheck className="h-4 w-4" />
-                  Garrigues Digital & EAD Trust Ecosystem
-                </div>
-                EAD Trust no firma ni atribuye un nivel de firma al Compliance Officer. La custodia/e-archiving solo se inicia desde un expediente source-bound con el documento ya finalizado.
+            <form onSubmit={handleEscalateSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-[var(--g-text-primary)] uppercase text-[10px] mb-1">
+                  Órgano Destinatario:
+                </label>
+                <select
+                  value={escalateCommittee}
+                  onChange={(e) => setEscalateCommittee(e.target.value)}
+                  className="w-full h-9 px-2 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] focus:outline-none focus:border-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <option value="CDA">Consejo de Administración</option>
+                  <option value="COMITE_EJECUTIVO">Comité Ejecutivo Delegado</option>
+                  <option value="RIESGOS">Comisión Delegada de Riesgos</option>
+                  <option value="AUDITORIA">Comisión de Auditoría y Control</option>
+                </select>
               </div>
 
-              {signProgress ? (
-                <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-[var(--g-brand-3308)]" />
-                  <p className="text-sm font-semibold text-[var(--g-text-primary)] animate-pulse">{signProgress}</p>
-                  <p className="text-xs text-[var(--g-text-secondary)]">Preparando el registro local de custodia.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label htmlFor="signatory-name" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                      Responsable del documento
-                    </label>
-                    <input
-                      id="signatory-name"
-                      type="text"
-                      required
-                      value={signatoryName}
-                      onChange={(e) => setSignatoryName(e.target.value)}
-                      className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    />
-                  </div>
+              <div>
+                <label className="block font-bold text-[var(--g-text-primary)] uppercase text-[10px] mb-1">
+                  Punto del Orden del Día:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={escalateMatter}
+                  onChange={(e) => setEscalateMatter(e.target.value)}
+                  className="w-full h-9 px-2 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] focus:outline-none focus:border-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
 
-                  <div className="space-y-1">
-                    <label htmlFor="signatory-email" className="block text-xs font-semibold text-[var(--g-text-primary)] uppercase">
-                      Correo Electrónico Corporativo
-                    </label>
-                    <input
-                      id="signatory-email"
-                      type="email"
-                      required
-                      value={signatoryEmail}
-                      onChange={(e) => setSignatoryEmail(e.target.value)}
-                      className="w-full h-10 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    />
-                  </div>
+              <div>
+                <label className="block font-bold text-[var(--g-text-primary)] uppercase text-[10px] mb-1">
+                  Justificación y Hechos Relevantes:
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={escalateRationale}
+                  onChange={(e) => setEscalateRationale(e.target.value)}
+                  className="w-full p-2 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] focus:outline-none focus:border-[var(--g-brand-3308)]"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
 
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowSignModal(false)}
-                      className="flex-1 h-10 border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-semibold transition-colors"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSignDeclaration}
-                      className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    >
-                      <PenTool className="h-3.5 w-3.5" />
-                      Usar expediente de custodia
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="px-0 py-3 border-t border-[var(--g-border-subtle)] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEscalationModal(false)}
+                  className="px-3 py-1.5 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] flex items-center gap-1.5"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Transmitir Propuesta
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

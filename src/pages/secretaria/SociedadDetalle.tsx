@@ -21,7 +21,8 @@ import { useMateriaCatalogoSocietario } from "@/hooks/useMesaControlSocietaria";
 import { useEffectiveRuleMatrix } from "@/hooks/useNormativeGovernance";
 import { useReglasAplicables } from "@/hooks/useReglasAplicables";
 import { RmStatusChip } from "@/components/secretaria/RmStatusChip";
-import { buildNormativeMatrixRows, displaySocietyLegalForm } from "@/lib/secretaria/mesa-control-societaria";
+import { buildNormativeMatrixRows } from "@/lib/secretaria/mesa-control-societaria";
+import { sociedadDetalleTipoSocialLabel as tipoSocialLabel } from "@/lib/secretaria/sociedad-labels";
 import type { TipoCondicionCargo } from "@/lib/secretaria/cargo-validation";
 import { isAuthorityRole } from "@/lib/secretaria/cargo-validation";
 import type { EntityNormativeProfile, NormativeFrameworkStatus } from "@/lib/secretaria/normative-framework";
@@ -47,23 +48,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "marco",            label: "Marco normativo",     icon: Scale },
 ];
 
-// Exportado para permitir su verificación directa en test (no cae a código
-// crudo para formas nuevas como SLP).
-export function tipoSocialLabel(value: string | null | undefined, jurisdiction?: string | null, legalForm?: string | null) {
-  if (!value) return "Tipo social pendiente";
-  if (jurisdiction && jurisdiction !== "ES") {
-    return displaySocietyLegalForm({ jurisdiction, tipoSocial: value, legalForm });
-  }
-  return (
-    {
-      SA: "Sociedad Anónima",
-      SAU: "Sociedad Anónima Unipersonal",
-      SL: "Sociedad Limitada",
-      SLU: "Sociedad Limitada Unipersonal",
-      SLP: "Sociedad Limitada Profesional",
-    } as Record<string, string>
-  )[value] ?? value;
-}
+
 
 function normalizeAdminForm(value: string | null | undefined, fallback: string | null | undefined) {
   const joined = `${value ?? ""} ${fallback ?? ""}`.toUpperCase();

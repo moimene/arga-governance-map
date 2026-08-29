@@ -1,4 +1,6 @@
 import { BoardPackMeeting } from "@/hooks/useBoardPackData";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel, shellLabel } from "@/lib/tenant-brand-labels";
 
 interface BPPortadaProps {
   meeting: BoardPackMeeting;
@@ -32,13 +34,15 @@ const STATUS_CHIP: Record<string, string> = {
 };
 
 export function BPPortada({ meeting, generatedAt }: BPPortadaProps) {
+  const branding = useTenantBranding();
+
   return (
     <div className="mb-8 pb-8 border-b-2 border-[var(--g-brand-3308)]">
       {/* Cabecera institucional */}
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-[var(--g-brand-3308)]">
-            Grupo ARGA Seguros
+            {groupFullLabel(branding)}
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--g-text-primary)]">
             Board Pack
@@ -107,7 +111,7 @@ export function BPPortada({ meeting, generatedAt }: BPPortadaProps) {
       </div>
 
       <p className="mt-4 text-[11px] text-[var(--g-text-secondary)]">
-        Generado el {new Date(generatedAt).toLocaleString("es-ES")} · Datos en tiempo real · TGMS Platform
+        Generado el {new Date(generatedAt).toLocaleString("es-ES")} · Datos en tiempo real · {shellLabel(branding)}
       </p>
     </div>
   );

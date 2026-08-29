@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useCreateRisk, useRiskById, useUpdateRisk, type RiskWriteInput } from "@/hooks/useRisks";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { RISK_STATUS_OPTIONS } from "@/lib/grc/status-labels";
+import { ETIQUETA_BANDA, NOTA_ESCALA, type Banda } from "@/lib/grc/assessed-band";
 
 type FormState = {
   code: string;
@@ -14,6 +15,7 @@ type FormState = {
   status: string;
   probability: number;
   impact: number;
+  assessed_band: Banda | null;
 };
 
 const INPUT_CLASSES =
@@ -33,6 +35,7 @@ const MODULE_OPTIONS = [
   { value: "cyber", label: "Cyber" },
   { value: "audit", label: "Auditoría" },
   { value: "penal", label: "Penal / Anticorrupción" },
+  { value: "risk", label: "Riesgos penales" },
 ];
 
 const emptyToNull = (value: string) => {
@@ -72,7 +75,10 @@ export default function RiskEditor() {
     status: "Abierto",
     probability: 3,
     impact: 3,
+    assessed_band: null,
   });
+
+  const evaluadoPorBanda = !!risk?.assessed_band;
 
   useEffect(() => {
     if (!risk) return;
@@ -82,8 +88,9 @@ export default function RiskEditor() {
       description: risk.description ?? "",
       module_id: risk.module_id ?? "gdpr",
       status: risk.status ?? "Abierto",
-      probability: risk.probability ?? 3,
-      impact: risk.impact ?? 3,
+      probability: risk.probability != null ? risk.probability : 3,
+      impact: risk.impact != null ? risk.impact : 3,
+      assessed_band: risk.assessed_band ?? null,
     });
   }, [risk]);
 
@@ -114,9 +121,10 @@ export default function RiskEditor() {
       description: emptyToNull(form.description),
       module_id: form.module_id,
       status: form.status,
-      probability: form.probability,
-      impact: form.impact,
       entity_id: isEdit ? risk?.entity_id ?? null : scopedEntityId,
+      ...(evaluadoPorBanda
+        ? { assessed_band: form.assessed_band }
+        : { probability: form.probability, impact: form.impact }),
     };
 
     try {
@@ -273,44 +281,6 @@ export default function RiskEditor() {
           </div>
 
           <div>
-            <label htmlFor="grc-risk-probability" className={LABEL_CLASSES}>
-              Probabilidad
-            </label>
-            <select
-              id="grc-risk-probability"
-              value={form.probability}
-              onChange={(event) => set("probability", Number(event.target.value))}
-              className={SELECT_CLASSES}
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              {[1, 2, 3, 4, 5].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="grc-risk-impact" className={LABEL_CLASSES}>
-              Impacto
-            </label>
-            <select
-              id="grc-risk-impact"
-              value={form.impact}
-              onChange={(event) => set("impact", Number(event.target.value))}
-              className={SELECT_CLASSES}
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              {[1, 2, 3, 4, 5].map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
             <label htmlFor="grc-risk-status" className={LABEL_CLASSES}>
               Estado
             </label>
@@ -329,13 +299,67 @@ export default function RiskEditor() {
             </select>
           </div>
 
-          <div
-            className="flex items-center justify-between border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3"
-            style={{ borderRadius: "var(--g-radius-md)" }}
-          >
-            <span className="text-sm font-medium text-[var(--g-text-primary)]">Score inherente estimado</span>
-            <span className="text-xl font-bold text-[var(--g-brand-3308)]">{inherentPreview}</span>
-          </div>
+          {evaluadoPorBanda ? (
+            <div
+              className="md:col-span-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-4"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <p className="text-sm font-medium text-[var(--g-text-primary)]">
+                Nivel evaluado en origen: {ETIQUETA_BANDA[form.assessed_band!]}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[var(--g-text-secondary)]">
+                {NOTA_ESCALA} Este riesgo no se edita por probabilidad e impacto: su fuente no los descompone.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="grc-risk-probability" className={LABEL_CLASSES}>
+                  Probabilidad
+                </label>
+                <select
+                  id="grc-risk-probability"
+                  value={form.probability}
+                  onChange={(event) => set("probability", Number(event.target.value))}
+                  className={SELECT_CLASSES}
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="grc-risk-impact" className={LABEL_CLASSES}>
+                  Impacto
+                </label>
+                <select
+                  id="grc-risk-impact"
+                  value={form.impact}
+                  onChange={(event) => set("impact", Number(event.target.value))}
+                  className={SELECT_CLASSES}
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div
+                className="flex items-center justify-between border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-4 py-3 md:col-span-2"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <span className="text-sm font-medium text-[var(--g-text-primary)]">Score inherente estimado</span>
+                <span className="text-xl font-bold text-[var(--g-brand-3308)]">{inherentPreview}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-[var(--g-border-subtle)] px-6 py-4 sm:flex-row sm:justify-end">

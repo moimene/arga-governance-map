@@ -15,17 +15,19 @@ import {
   Brain,
   BookOpen,
   Sparkles,
-  Search,
   Menu,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TourPanel } from "@/components/tour/TourPanel";
 import { NotificationsBell } from "@/components/shell/NotificationsBell";
+import { ScopeSwitcher } from "@/components/shell/ScopeSwitcher";
+import { GlobalSearch } from "@/components/shell/GlobalSearch";
+import { UserMenu } from "@/components/shell/UserMenu";
 import { useTour } from "@/context/TourContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { isModuleEnabled } from "@/lib/tenant-modules";
-import { brandName, scopeLabel, shellLabel } from "@/lib/tenant-brand-labels";
+import { brandName, shellLabel } from "@/lib/tenant-brand-labels";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 interface NavItem {
@@ -150,21 +152,8 @@ function ShellSidebarContent({
       </div>
 
       {/* Scope switcher */}
-      <div
-        style={{
-          background: "var(--t-sidebar-scope-bg)",
-          borderRadius: 6,
-          padding: "6px 8px",
-          marginBottom: 14,
-          fontSize: 10,
-          color: "#FFFFFF",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <span>Scope:</span>
-        <span style={{ fontWeight: 700 }}>{scopeLabel(branding)} ▾</span>
+      <div className="mb-3.5">
+        <ScopeSwitcher variant="sidebar" />
       </div>
 
       {/* Gobernanza */}
@@ -330,41 +319,13 @@ export function ShellLayout() {
             </div>
           </div>
 
-          <div className="relative hidden md:block" style={{ width: 280 }}>
-            <Search
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              size={14}
-            />
-            <input
-              placeholder="Buscar..."
-              style={{
-                width: "100%",
-                borderRadius: 8,
-                border: "1px solid var(--t-border-default)",
-                fontSize: 13,
-                padding: "7px 10px 7px 30px",
-                background: "#FFFFFF",
-                outline: "none",
-              }}
-            />
+          <div className="hidden md:block">
+            <GlobalSearch />
           </div>
 
           <div className="flex items-center gap-3">
             <NotificationsBell />
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 999,
-                background: "var(--t-surface-muted)",
-                color: "var(--t-text-primary)",
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-              className="flex items-center justify-center"
-            >
-              AG
-            </div>
+            <UserMenu />
           </div>
         </header>
 

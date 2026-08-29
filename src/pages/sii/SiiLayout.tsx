@@ -59,8 +59,26 @@ export function SiiHeader() {
   const branding = useTenantBranding();
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-sii-border bg-sii-foreground px-5 text-white tour-target" data-tour="sii-header">
-      <Shield className="h-5 w-5" />
-      <div className="text-sm font-semibold">SII — Sistema Interno de Información · Canal de Denuncias Confidencial · {siiOrgLabel(branding)}</div>
+      <Shield className="h-5 w-5 text-sii-border" />
+      <Link to="/sii" className="text-sm font-semibold hover:underline">
+        SII — Canal de Denuncias · {siiOrgLabel(branding)}
+      </Link>
+
+      <nav className="ml-6 flex items-center gap-4 text-xs font-medium text-white/80">
+        <Link to="/sii" className="hover:text-white transition-colors">
+          Dashboard
+        </Link>
+        <Link to="/sii/nuevo" className="hover:text-white transition-colors">
+          + Nueva Comunicación
+        </Link>
+        <Link to="/sii/buzon" className="hover:text-white transition-colors">
+          Safe Inbox
+        </Link>
+        <Link to="/sii/libro-registro" className="hover:text-white transition-colors">
+          Libro-Registro (Art. 34)
+        </Link>
+      </nav>
+
       <div className="ml-auto inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-semibold">
         Entorno segregado · Log independiente
       </div>

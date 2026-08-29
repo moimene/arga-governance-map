@@ -15,12 +15,13 @@ const opt = (over: Partial<SecretariaEntityOption>): SecretariaEntityOption => (
 });
 
 describe("getPreferredEntity — multi-tenant", () => {
-  it("ARGA primero, verbatim (contrato: cero cambio ARGA)", () => {
+  it("entidad preferida por nombre o matriz del grupo", () => {
     const entities = [
-      opt({ id: "1", legalName: "Cartera ARGA S.L.U." }),
-      opt({ id: "2", legalName: "ARGA Seguros, S.A." }),
+      opt({ id: "1", legalName: "Sociedad Filial S.L.U.", parentEntityId: "2" }),
+      opt({ id: "2", legalName: "Sociedad Matriz, S.A.", parentEntityId: null }),
     ];
     expect(getPreferredEntity(entities)?.id).toBe("2");
+    expect(getPreferredEntity(entities, "Sociedad Filial S.L.U.")?.id).toBe("1");
   });
 
   it("sin match ARGA → la matriz del grupo (parent null) aunque no sea la primera", () => {

@@ -112,7 +112,7 @@ export default function AuditFindings() {
                     to={`/hallazgos/${f.code}`}
                     className="text-sm text-[var(--g-link)] hover:text-[var(--g-link-hover)] underline"
                   >
-                    Ver en TGMS →
+                    Ver en plataforma →
                   </Link>
                 </div>
               </div>

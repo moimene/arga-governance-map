@@ -104,7 +104,7 @@ const READINESS_ICON: Record<GrcP0Domain["readiness"], React.ElementType> = {
 const SOURCE_POSTURE_LABEL = {
   legacy_read: "Legacy read",
   legacy_write: "Legacy write",
-  tgms_handoff: "TGMS handoff",
+  tgms_handoff: "Handoff plataforma",
   local_demo_read: "Demo local",
   backlog_placeholder: "Backlog",
 };

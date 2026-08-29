@@ -12,6 +12,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { brandName } from "@/lib/tenant-brand-labels";
+
 interface NavItem {
   label: string;
   to: string;
@@ -28,6 +31,7 @@ const navItems: NavItem[] = [
 
 function AiSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
+  const branding = useTenantBranding();
 
   return (
     <>
@@ -76,12 +80,12 @@ function AiSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate?.();
             navigate("/");
           }}
-          aria-label="Volver al shell TGMS"
+          aria-label={`Volver a ${brandName(branding)}`}
           className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[hsl(var(--sidebar-foreground))]/70 transition-colors hover:bg-[hsl(var(--sidebar-accent))]/60 hover:text-[hsl(var(--sidebar-foreground))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--g-border-focus)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <ChevronLeft className="h-4 w-4" />
-          <span>Volver a TGMS</span>
+          <span>Volver a {brandName(branding)}</span>
         </button>
       </div>
     </>
@@ -90,6 +94,7 @@ function AiSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AiLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const branding = useTenantBranding();
 
   return (
     <div
@@ -124,7 +129,7 @@ export function AiLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span>TGMS</span>
+          <span>{brandName(branding)}</span>
           <span aria-hidden="true">›</span>
           <span className="font-semibold text-[var(--g-brand-3308)]">AI Governance</span>
         </div>

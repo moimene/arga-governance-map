@@ -9,7 +9,7 @@ export type AiRiskAssessment = {
   score: number | null;
   assessment_date: string | null;
   assessor_id: string | null;
-  findings: { code: string; status: string }[];
+  findings: { code: string; status: string; title?: string; planCode?: string }[];
   status: string;
   notes: string | null;
   created_at: string;
@@ -27,10 +27,6 @@ export type AiComplianceCheck = {
   checked_by_id: string | null;
   created_at: string;
 };
-
-// NOTA: ai_risk_assessments y ai_compliance_checks no tienen columna tenant_id
-// directa; se aplica tenant scoping vía inner join con ai_systems.tenant_id.
-// Si un system_id no pertenece al tenant activo, la query devuelve vacío.
 
 export function useAssessmentsBySystem(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
@@ -51,6 +47,27 @@ export function useAssessmentsBySystem(systemId: string | undefined) {
   });
 }
 
+export function useAssessmentById(id: string | undefined) {
+  const { tenantId } = useTenantContext();
+  return useQuery({
+    queryKey: ["ai_risk_assessments", tenantId, id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("ai_risk_assessments")
+        .select("*, ai_systems!inner(id, name, risk_level, system_type, tenant_id)")
+        .eq("ai_systems.tenant_id", tenantId!)
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+      return data as AiRiskAssessment & {
+        ai_systems: { id: string; name: string; risk_level: string; system_type: string; tenant_id: string };
+      };
+    },
+    enabled: !!id && !!tenantId,
+  });
+}
+
 export function useAllAssessments() {
   const { tenantId } = useTenantContext();
   return useQuery({
@@ -62,7 +79,9 @@ export function useAllAssessments() {
         .eq("ai_systems.tenant_id", tenantId!)
         .order("assessment_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as (AiRiskAssessment & { ai_systems: { name: string; risk_level: string; tenant_id: string } | null })[];
+      return (data ?? []) as (AiRiskAssessment & {
+        ai_systems: { name: string; risk_level: string; tenant_id: string } | null;
+      })[];
     },
     enabled: !!tenantId,
   });
@@ -120,6 +139,26 @@ export function useCreateAssessment() {
   });
 }
 
+export function useUpdateAssessment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<AiRiskAssessment> }) => {
+      const { data, error } = await supabase
+        .from("ai_risk_assessments")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as AiRiskAssessment;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["ai_risk_assessments"] });
+      qc.invalidateQueries({ queryKey: ["ai_risk_assessments", variables.id] });
+    },
+  });
+}
+
 export function useCreateComplianceChecks() {
   const qc = useQueryClient();
   return useMutation({
@@ -140,4 +179,3 @@ export function useCreateComplianceChecks() {
     },
   });
 }
-

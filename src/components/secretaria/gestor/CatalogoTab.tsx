@@ -542,7 +542,7 @@ function PlantillaDetailPanel({
     fechaAprobacion?: string;
   } = {}) => {
     if (!transition) return;
-    const transitionActor = user?.email ?? "Comité Legal TGMS";
+    const transitionActor = user?.email ?? "Comité Legal Corporativo";
     updateEstado.mutate(
       {
         id: plantilla.id,

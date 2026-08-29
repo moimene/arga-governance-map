@@ -86,7 +86,12 @@ export default function OrganoDetalle() {
         owner={<>Secretaría: <span className="font-medium text-foreground">{body.secretary ?? "—"}</span></>}
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-1.5"><CalendarPlus className="h-3.5 w-3.5" />Nueva reunión</Button>
+            <Button variant="default" size="sm" asChild className="gap-1.5 shadow-sm">
+              <Link to="/secretaria/reuniones">
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Secretaría / Reuniones
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" asChild className="gap-1.5"><Link to="/governance-map"><Network className="h-3.5 w-3.5" />Ver en mapa</Link></Button>
             <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-3.5 w-3.5" />Exportar</Button>
           </>

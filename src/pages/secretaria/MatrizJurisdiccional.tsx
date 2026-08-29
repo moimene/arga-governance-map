@@ -62,11 +62,11 @@ const FILIALES: Record<JurisCode, FilialFormalizacion> = {
     idioma_doc: "Español",
     traduccion_jurada: false,
     entidades: [
-      { nombre: "Cartera ARGA S.L.U.", participacion: "100%", ciudad: "Madrid", acuerdos_pendientes: 1, alertas: 0 },
+      { nombre: "Filial España, S.L.U.", participacion: "100%", ciudad: "Madrid", acuerdos_pendientes: 1, alertas: 0 },
     ],
     vencimientos: [
-      { label: "Inscripción decisión socio único — Cartera ARGA", tipo: "REGISTRO", dias: 12 },
-      { label: "Depósito cuentas anuales Cartera ARGA", tipo: "LIBRO", dias: 28 },
+      { label: "Inscripción decisión socio único — Filial España", tipo: "REGISTRO", dias: 12 },
+      { label: "Depósito cuentas anuales Filial España", tipo: "LIBRO", dias: 28 },
     ],
     simplificaciones: [
       "No requiere convocatoria ni plazo de antelación (socio único)",
@@ -88,7 +88,7 @@ const FILIALES: Record<JurisCode, FilialFormalizacion> = {
     idioma_doc: "Portugués (PT)",
     traduccion_jurada: true,   // La decisión española requiere traducción jurada
     entidades: [
-      { nombre: "ARGA Seguros Portugal, Unipessoal Lda.", participacion: "100%", ciudad: "Lisboa", acuerdos_pendientes: 2, alertas: 0 },
+      { nombre: "Filial Portugal, Unipessoal Lda.", participacion: "100%", ciudad: "Lisboa", acuerdos_pendientes: 2, alertas: 0 },
     ],
     vencimientos: [
       { label: "Registo decisão sócio único — Portugal", tipo: "REGISTRO", dias: 45 },
@@ -114,7 +114,7 @@ const FILIALES: Record<JurisCode, FilialFormalizacion> = {
     idioma_doc: "Portugués (BR)",
     traduccion_jurada: true,
     entidades: [
-      { nombre: "ARGA Seguros Brasil Ltda.", participacion: "100%", ciudad: "São Paulo", acuerdos_pendientes: 4, alertas: 2 },
+      { nombre: "Filial Brasil Ltda.", participacion: "100%", ciudad: "São Paulo", acuerdos_pendientes: 4, alertas: 2 },
     ],
     vencimientos: [
       { label: "Registro alteração contratual JUCESP", tipo: "REGISTRO", dias: 3 },
@@ -142,7 +142,7 @@ const FILIALES: Record<JurisCode, FilialFormalizacion> = {
     idioma_doc: "Español (MX)",
     traduccion_jurada: false,
     entidades: [
-      { nombre: "ARGA Seguros México S.A. de C.V.", participacion: "100%", ciudad: "Ciudad de México", acuerdos_pendientes: 2, alertas: 1 },
+      { nombre: "Filial México S.A. de C.V.", participacion: "100%", ciudad: "Ciudad de México", acuerdos_pendientes: 2, alertas: 1 },
     ],
     vencimientos: [
       { label: "Protocolo notarial acuerdo — México", tipo: "REGISTRO", dias: 8 },
@@ -164,7 +164,7 @@ const JURIS_ORDER: JurisCode[] = ["ES", "PT", "BR", "MX"];
 interface MateriaGrupo {
   materia: string;
   descripcion: string;
-  decide_en: string;          // Siempre "CdA ARGA Seguros S.A. (ES)"
+  decide_en: string;          // "CdA Sociedad Matriz (ES)"
   formaliza: Record<JurisCode, {
     requiere: string;         // Qué documentación local hace falta
     bloqueo: string | null;   // Requisito regulatorio específico (SUSEP, CNSF…)
@@ -175,7 +175,7 @@ const MATERIAS_GRUPO: MateriaGrupo[] = [
   {
     materia: "Nombramiento / cese de administrador",
     descripcion: "Cambios en el órgano de administración de una filial",
-    decide_en: "CdA ARGA Seguros S.A. (ES) o delegado",
+    decide_en: "CdA Sociedad Matriz (ES) o delegado",
     formaliza: {
       ES: { requiere: "Decisión socio único + inscripción RM", bloqueo: null },
       PT: { requiere: "Decisão sócio único + tradução jurada + IRN", bloqueo: null },
@@ -186,7 +186,7 @@ const MATERIAS_GRUPO: MateriaGrupo[] = [
   {
     materia: "Modificación de estatutos",
     descripcion: "Cambio de objeto, denominación, capital, domicilio",
-    decide_en: "CdA / JGA ARGA Seguros S.A. (ES)",
+    decide_en: "CdA / Junta General Sociedad Matriz (ES)",
     formaliza: {
       ES: { requiere: "Escritura notarial + RM + BORME", bloqueo: null },
       PT: { requiere: "Decisão + tradução jurada + escritura + IRN + depósito contas", bloqueo: null },
@@ -197,7 +197,7 @@ const MATERIAS_GRUPO: MateriaGrupo[] = [
   {
     materia: "Distribución de dividendos / reservas",
     descripcion: "Acuerdo de reparto de beneficios a la matriz española",
-    decide_en: "CdA ARGA Seguros S.A. (ES)",
+    decide_en: "CdA Sociedad Matriz (ES)",
     formaliza: {
       ES: { requiere: "Decisión socio único + retención IRNR si procede", bloqueo: null },
       PT: { requiere: "Decisão sócio único + retención fonte (IRC/IRS)", bloqueo: null },
@@ -208,7 +208,7 @@ const MATERIAS_GRUPO: MateriaGrupo[] = [
   {
     materia: "Operación estructural (fusión / escisión / liquidación)",
     descripcion: "Reorganizaciones societarias del grupo",
-    decide_en: "JGA ARGA Seguros S.A. (ES) — mayoría reforzada 2/3",
+    decide_en: "Junta General Sociedad Matriz (ES) — mayoría reforzada 2/3",
     formaliza: {
       ES: { requiere: "Proyecto + balance + escritura + RM + BORME + plazo impugnación 1 mes", bloqueo: null },
       PT: { requiere: "Proyecto fusão + registo preliminar + assembleia (1 mes publicación) + IRN", bloqueo: "BdP: autorización previa para seguradoras" },
@@ -277,7 +277,7 @@ export default function MatrizJurisdiccional() {
         <span className="text-[var(--g-text-primary)]">
           <span className="font-semibold text-[var(--g-brand-3308)]">Modelo: filiales 100% dependientes.</span>
           {" "}La gobernanza real ocurre en{" "}
-          <span className="font-semibold">ARGA Seguros S.A. (España)</span>.
+          <span className="font-semibold">{groupFullLabel(branding)} (España)</span>.
           Las filiales solo formalizan localmente la decisión del grupo.
           Quórum, mayorías y convocatoria son irrelevantes en la mayoría de materias.
         </span>
@@ -448,8 +448,8 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
                 {
                   num: "1",
                   titulo: "Decisión en España",
-                  desc: "CdA o Comité Ejecutivo ARGA Seguros S.A. adopta el acuerdo. Compliance verifica pactos parasociales y motor LSC.",
-                  where: "TGMS España",
+                  desc: "CdA o Comité Ejecutivo de la Sociedad Matriz adopta el acuerdo. Compliance verifica pactos parasociales y motor legal.",
+                  where: "Sede España",
                   highlight: true,
                 },
                 {
@@ -542,7 +542,7 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
               {liveEntities.length > 0 && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 text-[var(--g-brand-bright)] bg-[var(--g-sec-100)]"
                   style={{ borderRadius: "var(--g-radius-full)" }}>
-                  TGMS
+                  Plataforma
                 </span>
               )}
             </div>
@@ -616,7 +616,7 @@ function FilialDashboard({ f }: { f: FilialFormalizacion }) {
               <div className="flex items-center gap-2 mb-3">
                 <Gavel className="h-4 w-4 text-[var(--g-brand-3308)]" />
                 <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                  Reglas activas en TGMS
+                  Reglas activas en la plataforma
                 </h3>
               </div>
               <div className="space-y-1.5 text-xs text-[var(--g-text-secondary)]">

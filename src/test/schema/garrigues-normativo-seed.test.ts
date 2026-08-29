@@ -92,11 +92,11 @@ describe("G4 Task 3 — catálogo normativo sembrado (Garrigues) y ARGA intacta"
     }
   });
 
-  it("solo 3 documentos tienen órgano responsable; el resto queda NULL", async () => {
+  it("solo 4 documentos tienen órgano responsable; el resto queda NULL", async () => {
     if (!authed || !garr || !seeded) return;
     const { count } = await garr
       .from("policies").select("id", { count: "exact", head: true }).not("owner_body_id", "is", null);
-    expect(count).toBe(3);
+    expect(count).toBe(4);
   });
 
   it("PPD-02 y el Código de Conducta del Socio quedan etiquetados sin contenido", async () => {

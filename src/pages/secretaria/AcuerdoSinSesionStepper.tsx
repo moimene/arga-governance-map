@@ -837,7 +837,7 @@ export default function AcuerdoSinSesionStepper() {
                   type="text"
                   value={communicationReference}
                   onChange={(event) => setCommunicationReference(event.target.value)}
-                  placeholder="Ej. secretaria@arga-seguros.com o referencia interna SEC-2026-001"
+                  placeholder="Ej. secretaria@empresa.com o referencia interna SEC-2026-001"
                   className="w-full border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />

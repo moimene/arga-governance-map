@@ -383,7 +383,7 @@ export const GRC_COMPLIANCE_MONITORS: GrcComplianceMonitorDomain[] = [
     nextAction: "Separar políticas vigentes, pendientes de revisión y obligaciones sin control.",
     sourceTables: ["policies", "obligations", "controls"],
     sourcePosture: "legacy_read",
-    sourceOfTruth: "policies is the current policy inventory source shared with TGMS shell.",
+    sourceOfTruth: "policies is the current policy inventory source shared with platform shell.",
     handoffCandidateIds: [],
   },
   {
@@ -670,7 +670,7 @@ export const GRC_SCREEN_POSTURES: GrcScreenPosture[] = [
     tables: ["policies"],
     hooks: [],
     sourcePosture: "tgms_handoff",
-    sourceOfTruth: "TGMS policies route; this GRC screen only routes to the owner surface.",
+    sourceOfTruth: "Core policies route; this GRC screen only routes to the owner surface.",
     accessMode: "read-only",
     handoffCandidateIds: [],
     notes: "Read-only handoff to core policy owner.",

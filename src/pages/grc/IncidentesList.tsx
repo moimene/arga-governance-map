@@ -5,6 +5,8 @@ import { AlertOctagon, ArrowRight, Clock, Plus, Route } from "lucide-react";
 import { deadlineLabel } from "@/hooks/useRegulatoryNotif";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
+import { useTenantBranding } from "@/context/TenantBrandContext";
+import { groupFullLabel } from "@/lib/tenant-brand-labels";
 import { SEVERITY_OPTIONS, incidentStatusChip, severityChip } from "@/lib/grc/status-labels";
 
 const FILTER_ALL = "Todas";
@@ -193,12 +195,13 @@ function IncidentCard({
 export default function IncidentesList() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const branding = useTenantBranding();
   const scope = useSecretariaScope();
   const scopedEntityId = scope.mode === "sociedad" ? scope.selectedEntity?.id ?? null : null;
   const scopeLabel =
     scope.mode === "sociedad" && scope.selectedEntity
       ? scope.selectedEntity.legalName
-      : "Grupo ARGA Seguros";
+      : groupFullLabel(branding);
   const { data: incidents = [], isLoading } = useIncidents(undefined, { entityId: scopedEntityId });
   const handoff = params.get("handoff");
   const handoffSource = params.get("source");

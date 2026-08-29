@@ -34,7 +34,7 @@ export interface LegalTemplateApprovalReportSummary {
 export const LEGAL_TEMPLATE_APPROVAL_REPORT_SUMMARY: LegalTemplateApprovalReportSummary = {
   source: "/Users/moisesmenendez/Downloads/Legal_Review_of_Corporate_Templates (1).docx",
   date: "2026-05-01",
-  approvedBy: "Comite Legal ARGA",
+  approvedBy: "Comite Legal Corporativo",
   matrixRows: 33,
   approved: 10,
   approvedWithVariants: 23,

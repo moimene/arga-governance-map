@@ -216,7 +216,7 @@ const BINDINGS: Record<string, Binding> = {
     mode: "readonly",
     source: "adjuntos",
     sourceLabel: "Paso 6",
-    read: () => "Expediente electrónico de Secretaría Societaria (repositorio documental privado TGMS)",
+    read: () => "Expediente electrónico de Secretaría Societaria (repositorio documental privado)",
   },
   indice_documentacion_ref: {
     mode: "readonly",

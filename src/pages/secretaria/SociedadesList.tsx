@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import { useState } from "react";
 import { useSecretariaScope } from "@/components/secretaria/shell";
 import { useSociedades } from "@/hooks/useSociedades";
+import { sociedadesListTipoSocialLabel as tipoSocialLabel } from "@/lib/secretaria/sociedad-labels";
 
 const STATUS_CHIP: Record<string, string> = {
   Active:   "bg-[var(--status-success)] text-[var(--g-text-inverse)]",
@@ -21,21 +22,6 @@ function entityStatusLabel(status: string | null): string {
       Inactiva: "Inactiva",
     } as Record<string, string>
   )[status] ?? status.replace(/_/g, " ");
-}
-
-// Exportado para permitir su verificación directa en test (no cae a código
-// crudo para formas nuevas como SLP).
-export function tipoSocialLabel(s: string | null): string {
-  if (!s) return "—";
-  return (
-    {
-      SA: "S.A.",
-      SL: "S.L.",
-      SLU: "S.L.U. (unipersonal)",
-      SAU: "S.A.U. (unipersonal)",
-      SLP: "Sociedad Limitada Profesional",
-    } as Record<string, string>
-  )[s] ?? s;
 }
 
 function tipoOrganoLabel(s: string | null): string {
