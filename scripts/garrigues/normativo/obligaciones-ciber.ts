@@ -32,6 +32,16 @@ export interface ObligacionCiber {
   policy_code: string;
   prospectiva?: boolean;
   sujeto_obligado?: string;
+  /**
+   * Procedencia de la condición de prestador CUALIFICADO del sujeto obligado.
+   * Solo aplica a las fichas cuyo régimen dependa de esa condición: en NIS2 la
+   * cualificación no determina la entrada en ámbito (art. 2.2.a.ii habla de
+   * "prestadores de servicios de confianza", sin el adjetivo) sino la CATEGORÍA
+   * — cualificado ⇒ entidad esencial, art. 3.1.b — y con ella el régimen de
+   * supervisión y el techo sancionador. Verificado 2026-08-29 contra la Trusted
+   * List: docs/legal/2026-08-29-tsl-ead-trust-servicios-cualificados.md
+   */
+  procedencia_cualificacion?: string;
   quote?: string;
 }
 
@@ -115,6 +125,8 @@ export const OBLIGACIONES_CIBER: readonly ObligacionCiber[] = [
     policy_code: "PI-26",
     prospectiva: true,
     sujeto_obligado: "EAD Trust, S.L. (QTSP esencial)",
+    procedencia_cualificacion:
+      "Trusted List española (tsl.digital.gob.es), TSLSequenceNumber 188 de 2026-08-06, alcanzada desde la LOTL de la Comisión (seq. 392). EAD TRUST European Agency of Digital Trust, S.L. — VATES-B85626240 — con servicios cualificados CA/QC (certificados de firma, sello y web) y TSA/QTST (sellos de tiempo), granted desde 2020-10-05. Acredita la CUALIFICACIÓN, no el porcentaje de participación, que sigue A_CONFIRMAR.",
     quote: "Directiva (UE) 2022/2555 art. 21. Sujeto obligado: EAD Trust, S.L. como QTSP cualificado (entidad esencial con independencia de tamaño). Aplicabilidad sujeta a transposición en España.",
   },
   {
@@ -128,6 +140,8 @@ export const OBLIGACIONES_CIBER: readonly ObligacionCiber[] = [
     policy_code: "PI-26",
     prospectiva: true,
     sujeto_obligado: "EAD Trust, S.L. (QTSP esencial)",
+    procedencia_cualificacion:
+      "Trusted List española (tsl.digital.gob.es), TSLSequenceNumber 188 de 2026-08-06, alcanzada desde la LOTL de la Comisión (seq. 392). La categoría de entidad esencial deriva de los servicios CA/QC y TSA/QTST cualificados; NO de entrega electrónica certificada: EAD Trust no tiene EDS/Q (QERDS) en la lista, frente a 71 servicios EDS/Q de otros prestadores españoles.",
     quote: "Plazo de alerta temprana de 24 horas para incidentes significativos y supervisión ex-ante aplicable a prestadores cualificados de servicios de confianza.",
   },
 ] as const;
