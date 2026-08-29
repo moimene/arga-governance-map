@@ -56,6 +56,40 @@ resolverlo por cuenta propia ni siquiera «solo para que compile».
 
 ---
 
+## 🔴 Segundo constraint — un tipo que parece corto y está cerrado a propósito
+
+`src/lib/rules-engine/plantillas-engine.ts:440`:
+
+```ts
+export type TipoSocialConvocatoria = 'SA' | 'SL' | 'SAU' | 'SLU';   // SIN SLP
+```
+
+Va a aparecer entre los errores **con exactamente la misma pinta que los 31 `Record<TipoSocial,…>`**
+—«al tipo le falta SLP, se lo añado»— y **no es el mismo caso**.
+
+El propio código lo documenta: es **ITEM-119 / DL-4**, cubre los cuatro tipos societarios reales, y
+**el régimen de convocatoria se determina por mapeo** —`SAU → SA` (publicación BORME + web,
+art. 173.1 LSC) y `SLU → SL` (notificación individual)—. Es un **dominio cerrado por decisión
+legal**, no una unión que se quedó corta.
+
+Añadirle `SLP` obligaría a decidir **qué régimen de convocatoria le corresponde a una SLP**, que es
+materia del Comité Legal: G3 lo resolvió por **rule pack** —15 días estatutarios, arts. 27.3/27.4—
+y **no** tocando este tipo. Es el cuarto normalizador paralelo, y CLAUDE.md lo registra como deuda
+**aparcada a propósito** porque unificarlos exige decidir antes la semántica SAU/SLU de ARGA en el
+motor de validez, que hoy computan como SL por catch-all.
+
+> **Si aparece: NO se arregla. Se anota y se sigue.**
+
+Confirmado además que la duplicación es real: existe una **segunda** `TipoSocial` en
+`src/lib/secretaria/sociedad-onboarding/types.ts:1`, esa sí con `SLP`.
+
+**Los dos constraints de este plan son la misma familia: algo que parece un descuido y es una
+decisión.** El del service-role protege el dato de ARGA; este protege una decisión legal. Los dos
+tienen el arreglo obvio a un renombrado o a una palabra de distancia, y los dos hay que reconocerlos
+cuando lleguen en mitad de una cola de 176.
+
+---
+
 ## Hechos medidos (no citados)
 
 Medición con un tsconfig que extiende el real —mismas `compilerOptions`— e incluye `src` + `scripts`
