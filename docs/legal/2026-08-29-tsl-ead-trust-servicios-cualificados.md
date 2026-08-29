@@ -108,17 +108,42 @@ declara `QCQSCDManagedOnBehalf`, que es el marcador de gestión remota del dispo
 creación de firma por cuenta del firmante. Las apariciones de «QSCD» en el bloque están en los
 *Common Name* de certificados de sellado de tiempo, no en qualifiers.
 
+### 5.0 Cómo se cita esta ausencia sin afirmar de más
+
+La TSL lista servicios **cualificados**. Por tanto sostiene una negativa **acotada**, y solo esa:
+
+| Formulación que aguanta | Formulación que NO se sostiene |
+|---|---|
+| «No consta como prestador **cualificado** de entrega electrónica certificada en la Trusted List española, secuencia 188 de 06/08/2026» | ~~«EAD Trust no realiza entrega electrónica certificada»~~ |
+| «No consta preservación **cualificada** (`PSES/Q`)» | ~~«EAD Trust no custodia»~~ |
+
+Un servicio **no cualificado** puede existir comercialmente sin figurar en la lista. Para la política
+del proyecto es indiferente —va exactamente de no atribuir *lo cualificado*— pero quien reescriba el
+copy como «el proveedor no realiza entrega» estaría afirmando más de lo que esta fuente dice.
+
+**Y la simétrica, que es la más fácil de cometer:** los 26 servicios `CA/QC` **no son permiso para
+reclamar QES**. Acreditan emisión de **certificados cualificados a suscriptores**, que es cosa
+distinta de que la plataforma **produzca una firma cualificada**. La integración real de julio
+(commit `4827d8f`) midió que el API topa en **ADVANCED**. El riesgo concreto: alguien lee `CA/QC` en
+esta ficha, concluye «entonces sí podemos decir QES» e **incumple la política vigente por el camino
+de una fuente que parece darle la razón**.
+
+> **Criterio: esta lista es excelente para NEGAR lo cualificado con fuente externa, y no basta por sí
+> sola para AFIRMAR una capacidad concreta del producto.** Cada dirección necesita evidencia
+> distinta: la negativa se prueba con la lista; la afirmación, con la integración.
+
 ### 5.1 Consecuencias para la política vigente del proyecto
 
 1. **ERDS.** La política de 2026-07-21 prohíbe afirmar ERDS de EAD Trust. Esa prohibición se
    sostenía hasta hoy en una decisión interna de producto. **Ahora se sostiene además en fuente
-   pública, externa y verificable:** EAD Trust no tiene QERDS cualificado. Un abogado que pregunte
+   pública, externa y verificable:** EAD Trust **no consta como prestador cualificado de entrega
+   electrónica certificada** (§5.0: la negativa es acotada a lo cualificado). Un abogado que pregunte
    en demo por qué no se usa entrega certificada del propio QTSP del grupo recibe un hecho
    registral, no una cautela de producto.
 2. **Custodia / e-archiving.** `CLAUDE.md` admite «custodia/e-archiving» en el alcance vigente. Este
-   documento no lo contradice, pero lo acota: **esa custodia no es un servicio cualificado**
+   documento no lo contradice, pero lo acota: **no consta preservación cualificada**
    (`PSES/Q` ausente). No puede presentarse como «oficial», «cualificada» ni con distintivo de
-   conformidad.
+   conformidad — lo que no equivale a decir que no custodie (§5.0).
 3. **Firma y el techo ADVANCED.** En la integración real de julio (commit `4827d8f`) se verificó
    empíricamente que **EAD no emite QES: techo ADVANCED**. Ese hallazgo y este **no se contradicen,
    miden cosas distintas**, y conviene no confundirlos:

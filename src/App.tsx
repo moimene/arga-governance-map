@@ -219,11 +219,15 @@ const App = () => (
                   <Route path="/conflictos" element={<Conflictos />} />
                   <Route path="/esg" element={<Esg />} />
                   <Route element={<SiiLayout />}>
-                    <Route path="/sii" element={<SiiDashboard />} />
-                    <Route path="/sii/nuevo" element={<SiiPortalIntake />} />
-                    <Route path="/sii/buzon" element={<SiiSafeInbox />} />
-                    <Route path="/sii/libro-registro" element={<SiiLibroRegistro />} />
-                    <Route path="/sii/:id" element={<SiiCaseDetalle />} />
+                    {/* Sin RequireModule la whitelist `branding.modules` del tenant era
+                        decorativa para el SII: cualquier usuario autenticado de cualquier
+                        tenant entraba por URL directa. Es el módulo con el dato más
+                        sensible del producto, así que se gatea como board-pack y packs. */}
+                    <Route path="/sii" element={<RequireModule moduleKey="sii"><SiiDashboard /></RequireModule>} />
+                    <Route path="/sii/nuevo" element={<RequireModule moduleKey="sii"><SiiPortalIntake /></RequireModule>} />
+                    <Route path="/sii/buzon" element={<RequireModule moduleKey="sii"><SiiSafeInbox /></RequireModule>} />
+                    <Route path="/sii/libro-registro" element={<RequireModule moduleKey="sii"><SiiLibroRegistro /></RequireModule>} />
+                    <Route path="/sii/:id" element={<RequireModule moduleKey="sii"><SiiCaseDetalle /></RequireModule>} />
                   </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
