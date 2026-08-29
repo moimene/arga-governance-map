@@ -134,7 +134,7 @@ export default function SiiPortalIntake() {
               </h1>
             </div>
             <p className="text-xs text-[var(--t-text-secondary)] leading-relaxed max-w-3xl">
-              Canal regulado por la <strong>Ley 2/2023</strong> y la <strong>Directiva (UE) 2019/1937</strong>. Garantiza el anonimato técnico, la confidencialidad absoluta de la información, acuse de recibo en 7 días naturales y protección reforzada frente a cualquier tipo de represalia.
+              Canal regulado por la <strong>Ley 2/2023</strong> y la <strong>Directiva (UE) 2019/1937</strong>. Aplica <strong>confidencialidad reforzada</strong> sobre la identidad del informante, acuse de recibo en 7 días naturales (art. 9.2.c) y protección frente a represalias (art. 36).
             </p>
           </div>
           <span className="px-3 py-1 bg-[var(--t-surface-subtle)] text-[var(--t-brand)] text-xs font-bold rounded-full border border-[var(--t-border-default)] shrink-0">
@@ -523,7 +523,7 @@ export default function SiiPortalIntake() {
               Comunicación Registrada Oficialmente en el SII
             </h2>
             <p className="text-xs text-[var(--t-text-secondary)] mt-1 max-w-lg mx-auto leading-relaxed">
-              Su expediente ha sido admitido a trámite conforme a la Ley 2/2023. Se ha activado el <strong>reloj legal de acuse de recibo en 7 días naturales</strong> y la investigación reservada de 3 meses.
+              Su comunicación queda <strong>registrada y pendiente de decisión sobre su admisión</strong>. Se ha activado el <strong>plazo de acuse de recibo de 7 días naturales</strong> (art. 9.2.c). La admisión a trámite es una decisión posterior de la persona instructora.
             </p>
           </div>
 

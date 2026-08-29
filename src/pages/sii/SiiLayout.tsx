@@ -4,12 +4,20 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Lock, Shield } from "lucide-react";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { useAuth } from "@/context/AuthContext";
 import { siiOrgLabel } from "@/lib/tenant-brand-labels";
 
 const STORAGE_KEY = "sii_access_confirmed";
 
 export function SiiAccessGate({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  // La identidad venía cableada a una investigadora de ARGA y se mostraba
+  // igual al entrar con la sesión de Garrigues: contaminación cruzada de
+  // identidad en la primera pantalla del canal de denuncias. Se muestra el
+  // usuario real de la sesión, y el rol NO se afirma: PI-31 §4 y Anexo §2.a
+  // designan Responsable del Sistema e Instructor por cargo, y este módulo
+  // todavía no lee esa designación.
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,7 +49,8 @@ export function SiiAccessGate({ children }: { children: React.ReactNode }) {
             </p>
             <div className="my-4 h-px w-full bg-border" />
             <div className="text-xs text-muted-foreground">Usted está accediendo como:</div>
-            <div className="mt-1 text-sm font-bold text-foreground">Dña. Elena Navarro Pons — Investigadora SII · Cumplimiento</div>
+            <div className="mt-1 text-sm font-bold text-foreground">{user?.email ?? "Sesión no identificada"}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Rol en el Sistema Interno de Información pendiente de designación conforme a PI-31 §4.</div>
             <div className="my-4 h-px w-full bg-border" />
             <div className="flex w-full gap-2">
               <Button variant="outline" className="flex-1" onClick={cancel}>Cancelar</Button>
@@ -75,7 +84,7 @@ export function SiiHeader() {
           Safe Inbox
         </Link>
         <Link to="/sii/libro-registro" className="hover:text-white transition-colors">
-          Libro-Registro (Art. 34)
+          Libro-Registro (Art. 26)
         </Link>
       </nav>
 

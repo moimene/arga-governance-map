@@ -34,6 +34,9 @@ export default function SiiDashboard() {
   const activeReports = reports.filter((r) => r.status !== "RESUELTO_MEDIDAS" && r.status !== "ARCHIVADO_MOTIVADO").length;
   const totalSubcases = reports.reduce((acc, r) => acc + r.subcases.length, 0);
   const ackComplied = reports.filter((r) => !!r.acknowledgmentSentDate || !!r.acknowledgmentExemptReason).length;
+  // Se cuenta, no se afirma: expedientes con al menos una medida de protección
+  // frente a represalias registrada (art. 36 Ley 2/2023).
+  const proteccionActiva = reports.filter((r) => !!r.retaliationRecord).length;
 
   const filteredReports = reports.filter((r) => {
     const matchesSearch =
@@ -86,7 +89,7 @@ export default function SiiDashboard() {
             onClick={() => navigate("/sii/libro-registro")}
             className="text-xs gap-1.5 text-[var(--t-text-primary)]"
           >
-            <Gavel className="h-4 w-4 text-[var(--t-brand)]" /> Libro-Registro (Art. 34)
+            <Gavel className="h-4 w-4 text-[var(--t-brand)]" /> Libro-Registro (Art. 26)
           </Button>
         </div>
       </div>
@@ -107,10 +110,17 @@ export default function SiiDashboard() {
             <span>Cumplimiento Acuse (7d)</span>
             <CheckCircle2 className="h-4 w-4 text-[var(--status-success)]" />
           </div>
-          <div className="text-2xl font-bold text-[var(--status-success)]">
-            {totalReports > 0 ? `${Math.round((ackComplied / totalReports) * 100)}%` : "100%"}
+          {/* Sin expedientes no hay cumplimiento que medir: un porcentaje pleno en verde
+              sobre cero se lee como "vamos perfectos", que es lo contrario de
+              "no hay dato". */}
+          <div className={`text-2xl font-bold ${totalReports > 0 ? "text-[var(--status-success)]" : "text-[var(--t-text-secondary)]"}`}>
+            {totalReports > 0 ? `${Math.round((ackComplied / totalReports) * 100)}%` : "—"}
           </div>
-          <div className="text-[11px] text-[var(--t-text-secondary)]">SLA legal Art. 9.2.c Ley 2/2023</div>
+          <div className="text-[11px] text-[var(--t-text-secondary)]">
+            {totalReports > 0
+              ? "Plazo legal art. 9.2.c Ley 2/2023"
+              : "Sin expedientes registrados: no hay cumplimiento que medir"}
+          </div>
         </Card>
 
         <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4 space-y-1">
@@ -124,11 +134,15 @@ export default function SiiDashboard() {
 
         <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] p-4 space-y-1">
           <div className="flex items-center justify-between text-xs text-[var(--t-text-secondary)] uppercase font-semibold">
-            <span>Garantías de Protección</span>
-            <ShieldCheck className="h-4 w-4 text-[var(--status-success)]" />
+            <span>Protección Anti-Represalias</span>
+            <ShieldCheck className="h-4 w-4 text-[var(--t-brand)]" />
           </div>
-          <div className="text-2xl font-bold text-[var(--status-success)]">100%</div>
-          <div className="text-[11px] text-[var(--t-text-secondary)]">Anti-represalias & Safe Inbox EAD</div>
+          {/* Era un porcentaje pleno literal que no calculaba nada. Se cuenta lo que sí
+              se puede contar: expedientes con medidas de protección activas. */}
+          <div className="text-2xl font-bold text-[var(--t-text-primary)]">{proteccionActiva}</div>
+          <div className="text-[11px] text-[var(--t-text-secondary)]">
+            Expedientes con medidas anti-represalias registradas (art. 36)
+          </div>
         </Card>
       </div>
 

@@ -41,7 +41,7 @@ export default function SiiLibroRegistro() {
     a.download = `LIBRO_REGISTRO_OFICIAL_SII_LEY2_2023_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Libro-Registro exportado con firma probatoria y manifiesto SHA-512.");
+    toast.success("Libro-Registro exportado. Entorno de validación funcional: la exportación no lleva firma ni manifiesto criptográfico.");
   };
 
   return (
@@ -57,7 +57,7 @@ export default function SiiLibroRegistro() {
           <div className="flex items-center gap-2">
             <Gavel className="h-6 w-6 text-[var(--t-brand)]" />
             <h1 className="text-xl font-bold text-[var(--t-text-primary)]">
-              Libro-Registro del Sistema Interno de Información (Art. 34 Ley 2/2023)
+              Libro-Registro del Sistema Interno de Información (Art. 26 Ley 2/2023)
             </h1>
           </div>
         </div>
