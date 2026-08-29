@@ -73,3 +73,42 @@ export function useCreateAiSystem() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_systems"] }),
   });
 }
+
+export function useUpdateAiSystem() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<AiSystem> }) => {
+      const { data, error } = await supabase
+        .from("ai_systems")
+        .update(updates)
+        .eq("tenant_id", tenantId!)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as AiSystem;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["ai_systems"] });
+      qc.invalidateQueries({ queryKey: ["ai_systems", tenantId, variables.id] });
+    },
+  });
+}
+
+export function useDeleteAiSystem() {
+  const { tenantId } = useTenantContext();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ai_systems")
+        .delete()
+        .eq("tenant_id", tenantId!)
+        .eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai_systems"] }),
+  });
+}

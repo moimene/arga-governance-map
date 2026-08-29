@@ -212,7 +212,7 @@ function TextoAcuerdoStep({
           rows={8}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ejemplo: El socio único de Cartera ARGA S.L.U., en uso de las facultades que le confiere el art. 15 LSC, adopta el siguiente acuerdo…"
+          placeholder="Ejemplo: El socio único de Sociedad Matriz, S.L.U., en uso de las facultades que le confiere el art. 15 LSC, adopta el siguiente acuerdo…"
           className="w-full resize-y rounded border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] px-3 py-2 text-sm text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--g-brand-3308)]"
           style={{ borderRadius: "var(--g-radius-md)" }}
         />

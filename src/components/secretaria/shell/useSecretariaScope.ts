@@ -54,13 +54,15 @@ function readQueryMode(searchParams: URLSearchParams): SecretariaMode | null {
   return searchParams.get(ENTITY_PARAM) ? "sociedad" : null;
 }
 
-export function getPreferredEntity(entities: SecretariaEntityOption[]) {
+export function getPreferredEntity(entities: SecretariaEntityOption[], preferredName?: string | null) {
+  if (preferredName) {
+    const match = entities.find(
+      (entity) => entity.legalName === preferredName || entity.name === preferredName
+    );
+    if (match) return match;
+  }
   return (
-    entities.find((entity) => entity.legalName === "ARGA Seguros, S.A.") ??
-    entities.find((entity) => entity.name === "ARGA Seguros, S.A.") ??
-    entities.find((entity) => entity.legalName.startsWith("ARGA Seguros,")) ??
-    entities.find((entity) => entity.name.startsWith("ARGA Seguros,")) ??
-    // Multi-tenant (G1): la matriz del grupo — primera entidad sin parent.
+    // Multi-tenant: la matriz del grupo — primera entidad sin parent.
     entities.find((entity) => entity.parentEntityId == null) ??
     entities[0] ??
     null

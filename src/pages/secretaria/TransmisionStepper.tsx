@@ -293,7 +293,7 @@ export default function TransmisionStepper() {
               label="Documento soporte *"
               value={draft.support_doc_ref}
               onChange={(v) => update("support_doc_ref", v)}
-              placeholder="evidence://ead-trust/ARGA_SEG_TRANSMISION_2026_01 o DOC-SOC-..."
+              placeholder="evidence://ead-trust/TRANSMISION_DOC_01 o DOC-SOC-..."
             />
             {/* A.1 (art. 106-107 LSC): captura del régimen de consentimiento. */}
             {esSL ? (

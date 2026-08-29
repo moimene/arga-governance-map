@@ -21,13 +21,11 @@ const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 
 // Tablas de dominio representativas de cada superficie (Secretaría, motor,
-// plantillas, expedientes, sistema normativo GRC). Todas tienen tenant_id
-// NOT NULL. G4 Task 8: añadidas policies/obligations/controls — las tres
-// tablas que la fase G4 ha poblado con dato real de Garrigues (38/21/23
-// filas) y que antes no cubría este gate.
+// plantillas, expedientes, sistema normativo GRC, riesgos penales, hallazgos).
+// Todas tienen tenant_id NOT NULL. G5 Task 9: añadidas risks y findings.
 const DOMAIN_TABLES = [
   "entities", "document_templates", "rule_packs", "agreements",
-  "policies", "obligations", "controls",
+  "policies", "obligations", "controls", "risks", "findings",
 ];
 
 function anonClient(): SupabaseClient {

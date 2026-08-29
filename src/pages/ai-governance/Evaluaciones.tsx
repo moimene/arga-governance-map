@@ -292,7 +292,7 @@ export default function Evaluaciones() {
                       <tr
                         key={ass.id}
                         className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
-                        onClick={() => ass.system_id && navigate(`/ai-governance/sistemas/${ass.system_id}`)}
+                        onClick={() => navigate(`/ai-governance/evaluaciones/${ass.id}`)}
                       >
                         <td className="min-w-0 px-6 py-4">
                           <p className="truncate text-sm font-medium text-[var(--g-text-primary)]">
@@ -370,28 +370,22 @@ export default function Evaluaciones() {
                 const hasGrcHandoff = isAimsTechnicalFileGapCandidate(ass);
                 return (
                   <article key={ass.id} role="listitem" className="p-4">
-                    {ass.system_id ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/ai-governance/sistemas/${ass.system_id}`)}
-                        className="flex w-full min-w-0 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-[var(--g-text-primary)]">
-                            {ass.ai_systems?.name ?? "Sin sistema asociado"}
-                          </span>
-                          {ass.ai_systems?.risk_level && (
-                            <span className="mt-1 block text-xs text-[var(--g-text-secondary)]">Riesgo {ass.ai_systems.risk_level}</span>
-                          )}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/ai-governance/evaluaciones/${ass.id}`)}
+                      className="flex w-full min-w-0 items-start justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-[var(--g-text-primary)]">
+                          {ass.ai_systems?.name ?? "Sin sistema asociado"}
                         </span>
-                        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
-                      </button>
-                    ) : (
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--g-text-primary)]">Sin sistema asociado</p>
-                      </div>
-                    )}
+                        {ass.ai_systems?.risk_level && (
+                          <span className="mt-1 block text-xs text-[var(--g-text-secondary)]">Riesgo {ass.ai_systems.risk_level}</span>
+                        )}
+                      </span>
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--g-text-secondary)]" />
+                    </button>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${frameCls}`}

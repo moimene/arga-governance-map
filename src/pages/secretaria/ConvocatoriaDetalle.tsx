@@ -376,13 +376,14 @@ function generateIcs(convocatoria: {
 }): string {
   const dt = new Date(convocatoria.meeting_date);
   const dateStr = dt.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  const uid = `convocatoria-${Date.now()}@arga-seguros.com`;
+  const domain = typeof window !== "undefined" && window.location.hostname ? window.location.hostname : "governance.local";
+  const uid = `convocatoria-${Date.now()}@${domain}`;
   const summary = convocatoria.title ?? "Reunión " + (convocatoria.body_name ?? "");
 
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TGMS//Secretaría Societaria//ES",
+    "PRODID:-//Secretaría Societaria//ES",
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${dateStr}`,

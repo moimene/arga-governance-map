@@ -34,15 +34,18 @@ import Conflictos from "@/pages/Conflictos";
 import Esg from "@/pages/Esg";
 import SiiDashboard from "@/pages/sii/SiiDashboard";
 import SiiCaseDetalle from "@/pages/sii/SiiCaseDetalle";
+import SiiPortalIntake from "@/pages/sii/SiiPortalIntake";
+import SiiSafeInbox from "@/pages/sii/SiiSafeInbox";
+import SiiLibroRegistro from "@/pages/sii/SiiLibroRegistro";
 import { SiiLayout } from "@/pages/sii/SiiLayout";
 import Login from "@/pages/Login";
 import Documentacion from "@/pages/Documentacion";
 import Notificaciones from "@/pages/Notificaciones";
 const DemoScenarioResult = lazy(() => import("@/pages/DemoScenarioResult"));
 
-// ── Módulo Garrigues: Secretaría (lazy) ─────────────────────────────────────
-const SecretariaLayout = lazy(() =>
-  import("@/pages/secretaria/SecretariaLayout").then((m) => ({ default: m.SecretariaLayout }))
+// ── Módulo Garrigues: Shell Unificado & Sub-módulos (lazy) ───────────────────
+const GarriguesStandaloneLayout = lazy(() =>
+  import("@/components/garrigues-shell").then((m) => ({ default: m.GarriguesStandaloneLayout }))
 );
 const SecretariaDashboard = lazy(() => import("@/pages/secretaria/Dashboard"));
 const ConvocatoriasList = lazy(() => import("@/pages/secretaria/ConvocatoriasList"));
@@ -95,9 +98,6 @@ const RepresentanteAdminPJStepper = lazy(() => import("@/pages/secretaria/Repres
 const RepresentacionPuntualStepper = lazy(() => import("@/pages/secretaria/RepresentacionPuntualStepper"));
 
 // ── Módulo Garrigues: GRC Compass (lazy) ────────────────────────────────────
-const GrcLayout = lazy(() =>
-  import("@/pages/grc/GrcLayout").then((m) => ({ default: m.GrcLayout }))
-);
 const ModuleShell = lazy(() =>
   import("@/components/grc/ModuleShell").then((m) => ({ default: m.ModuleShell }))
 );
@@ -107,6 +107,7 @@ const SectionRouter = lazy(() =>
 const GrcDashboardPage = lazy(() => import("@/pages/grc/Dashboard"));
 const Risk360 = lazy(() => import("@/pages/grc/Risk360"));
 const RiskEditor = lazy(() => import("@/pages/grc/RiskEditor"));
+const RiskDetalle = lazy(() => import("@/pages/grc/RiskDetalle"));
 const PenalAnticorrupcion = lazy(() => import("@/pages/grc/PenalAnticorrupcion"));
 const PacksPage = lazy(() => import("@/pages/grc/PacksPage"));
 const PackDetalle = lazy(() => import("@/pages/grc/PackDetalle"));
@@ -118,19 +119,19 @@ const Alertas = lazy(() => import("@/pages/grc/Alertas"));
 const Excepciones = lazy(() => import("@/pages/grc/Excepciones"));
 const ModuleDashboard = lazy(() => import("@/pages/grc/ModuleDashboard"));
 const TPRM = lazy(() => import("@/pages/grc/TPRM"));
+const SolvenciaII = lazy(() => import("@/pages/grc/SolvenciaII"));
 
 // ── Módulo Garrigues: AI Governance (lazy) ──────────────────────────────────
-const AiLayout = lazy(() =>
-  import("@/pages/ai-governance/AiLayout").then((m) => ({ default: m.AiLayout }))
-);
 const AiDashboard = lazy(() => import("@/pages/ai-governance/Dashboard"));
 const Sistemas = lazy(() => import("@/pages/ai-governance/Sistemas"));
 const SistemaNuevo = lazy(() => import("@/pages/ai-governance/SistemaNuevo"));
 const SistemaDetalle = lazy(() => import("@/pages/ai-governance/SistemaDetalle"));
 const Evaluaciones = lazy(() => import("@/pages/ai-governance/Evaluaciones"));
 const EvaluacionNueva = lazy(() => import("@/pages/ai-governance/EvaluacionNueva"));
+const EvaluacionDetalle = lazy(() => import("@/pages/ai-governance/EvaluacionDetalle"));
 const AiIncidentes = lazy(() => import("@/pages/ai-governance/Incidentes"));
 const AiIncidenteNuevo = lazy(() => import("@/pages/ai-governance/IncidenteNuevo"));
+const AiIncidenteDetalle = lazy(() => import("@/pages/ai-governance/IncidenteDetalle"));
 
 // ── Fallback compartido para Suspense ────────────────────────────────────────
 function ModuleFallback() {
@@ -219,22 +220,26 @@ const App = () => (
                   <Route path="/esg" element={<Esg />} />
                   <Route element={<SiiLayout />}>
                     <Route path="/sii" element={<SiiDashboard />} />
+                    <Route path="/sii/nuevo" element={<SiiPortalIntake />} />
+                    <Route path="/sii/buzon" element={<SiiSafeInbox />} />
+                    <Route path="/sii/libro-registro" element={<SiiLibroRegistro />} />
                     <Route path="/sii/:id" element={<SiiCaseDetalle />} />
                   </Route>
                   <Route path="/documentacion" element={<Documentacion />} />
                   <Route path="/notificaciones" element={<Notificaciones />} />
                   <Route path="/demo-operable/:scenarioId" element={<Suspense fallback={<ModuleFallback />}><DemoScenarioResult /></Suspense>} />
                 </Route>
-                {/* Módulo Garrigues Secretaría — layout propio (sidebar verde) */}
+                {/* Suite Garrigues (Secretaría, GRC Compass, AI Governance) — layout unificado */}
                 <Route
                   element={
                     <RequireAuth>
                       <Suspense fallback={<ModuleFallback />}>
-                        <SecretariaLayout />
+                        <GarriguesStandaloneLayout mode="embedded" />
                       </Suspense>
                     </RequireAuth>
                   }
                 >
+                  {/* Secretaría Societaria */}
                   <Route path="/secretaria" element={<Suspense fallback={<ModuleFallback />}><SecretariaDashboard /></Suspense>} />
                   <Route path="/secretaria/convocatorias" element={<Suspense fallback={<ModuleFallback />}><ConvocatoriasList /></Suspense>} />
                   <Route path="/secretaria/convocatorias/nueva" element={<Suspense fallback={<ModuleFallback />}><ConvocatoriasStepper /></Suspense>} />
@@ -301,20 +306,12 @@ const App = () => (
                   {/* D5.3: wizard 3 pasos PJ -> representante PF (L2). */}
                   <Route path="/secretaria/personas/:id/representante/nuevo" element={<Suspense fallback={<ModuleFallback />}><RepresentanteAdminPJStepper /></Suspense>} />
                   <Route path="/secretaria/representaciones/nueva" element={<Suspense fallback={<ModuleFallback />}><RepresentacionPuntualStepper /></Suspense>} />
-                </Route>
-                {/* Módulo Garrigues GRC Compass — layout propio (sidebar verde) */}
-                <Route
-                  element={
-                    <RequireAuth>
-                      <Suspense fallback={<ModuleFallback />}>
-                        <GrcLayout />
-                      </Suspense>
-                    </RequireAuth>
-                  }
-                >
+
+                  {/* GRC Compass */}
                   <Route path="/grc"                      element={<Suspense fallback={<ModuleFallback />}><GrcDashboardPage /></Suspense>} />
                   <Route path="/grc/risk-360"             element={<Suspense fallback={<ModuleFallback />}><Risk360 /></Suspense>} />
                   <Route path="/grc/risk-360/nuevo"       element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
+                  <Route path="/grc/risk-360/:id"         element={<Suspense fallback={<ModuleFallback />}><RiskDetalle /></Suspense>} />
                   <Route path="/grc/risk-360/:id/editar"  element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
                   <Route path="/grc/penal-anticorrupcion" element={<Suspense fallback={<ModuleFallback />}><PenalAnticorrupcion /></Suspense>} />
                   <Route path="/grc/packs"                element={<RequireModule moduleKey="country-packs"><Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense></RequireModule>} />
@@ -326,30 +323,24 @@ const App = () => (
                   <Route path="/grc/alertas"              element={<Suspense fallback={<ModuleFallback />}><Alertas /></Suspense>} />
                   <Route path="/grc/excepciones"          element={<Suspense fallback={<ModuleFallback />}><Excepciones /></Suspense>} />
                   <Route path="/grc/tprm"                 element={<Suspense fallback={<ModuleFallback />}><TPRM /></Suspense>} />
+                  <Route path="/grc/solvencia-ii"         element={<Suspense fallback={<ModuleFallback />}><SolvenciaII /></Suspense>} />
                   <Route path="/grc/m/:moduleId" element={<RequireDoraModule><Suspense fallback={<ModuleFallback />}><ModuleShell /></Suspense></RequireDoraModule>}>
                     <Route index element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path="dashboard" element={<Suspense fallback={<ModuleFallback />}><ModuleDashboard /></Suspense>} />
                     <Route path=":section/:viewKey" element={<Suspense fallback={<ModuleFallback />}><SectionRouter /></Suspense>} />
                   </Route>
-                </Route>
-                {/* Módulo Garrigues AI Governance — layout propio (sidebar verde) */}
-                <Route
-                  element={
-                    <RequireAuth>
-                      <Suspense fallback={<ModuleFallback />}>
-                        <AiLayout />
-                      </Suspense>
-                    </RequireAuth>
-                  }
-                >
+
+                  {/* AI Governance */}
                   <Route path="/ai-governance"              element={<Suspense fallback={<ModuleFallback />}><AiDashboard /></Suspense>} />
                   <Route path="/ai-governance/sistemas"     element={<Suspense fallback={<ModuleFallback />}><Sistemas /></Suspense>} />
                   <Route path="/ai-governance/sistemas/nuevo" element={<Suspense fallback={<ModuleFallback />}><SistemaNuevo /></Suspense>} />
                   <Route path="/ai-governance/sistemas/:id" element={<Suspense fallback={<ModuleFallback />}><SistemaDetalle /></Suspense>} />
                   <Route path="/ai-governance/evaluaciones" element={<Suspense fallback={<ModuleFallback />}><Evaluaciones /></Suspense>} />
                   <Route path="/ai-governance/evaluaciones/nuevo" element={<Suspense fallback={<ModuleFallback />}><EvaluacionNueva /></Suspense>} />
+                  <Route path="/ai-governance/evaluaciones/:id" element={<Suspense fallback={<ModuleFallback />}><EvaluacionDetalle /></Suspense>} />
                   <Route path="/ai-governance/incidentes"   element={<Suspense fallback={<ModuleFallback />}><AiIncidentes /></Suspense>} />
                   <Route path="/ai-governance/incidentes/nuevo" element={<Suspense fallback={<ModuleFallback />}><AiIncidenteNuevo /></Suspense>} />
+                  <Route path="/ai-governance/incidentes/:id" element={<Suspense fallback={<ModuleFallback />}><AiIncidenteDetalle /></Suspense>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

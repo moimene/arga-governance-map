@@ -18,7 +18,7 @@ import {
   formatEntityStatus,
 } from "@/hooks/useEntities";
 import { usePoliciesList } from "@/hooks/usePoliciesObligations";
-import { Brain, ChevronRight, Download, Edit3, ExternalLink, Network } from "lucide-react";
+import { Brain, ChevronRight, ClipboardList, Compass, Download, Edit3, ExternalLink, Network } from "lucide-react";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 
 const matTone = (m: string): "critical" | "warning" | "info" | "neutral" => {
@@ -67,9 +67,9 @@ export default function EntidadDetalle() {
 
       {/* Object header */}
       <Card className="p-6 tour-target" data-tour="entity-header">
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <StatusBadgeTip label={statusLabel} />
               <StatusBadgeTip label={materialityLabel} tone={matTone(entity.materiality)} />
               {provenanceBadges(entity.data_provenance).map((b) => (
@@ -90,10 +90,24 @@ export default function EntidadDetalle() {
               Forma legal: <span className="font-medium text-foreground">{entity.legal_form ?? "—"}</span>
             </div>
           </div>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5"><Edit3 className="h-3.5 w-3.5" />Editar</Button>
+          <div className="flex flex-wrap shrink-0 gap-2">
+            <Button variant="default" size="sm" asChild className="gap-1.5 shadow-sm">
+              <Link to={`/secretaria/sociedades/${entity.id}?scope=sociedad&entity=${entity.id}`}>
+                <ClipboardList className="h-3.5 w-3.5" />
+                Secretaría Societaria
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <Link to="/governance-map"><Network className="h-3.5 w-3.5" />Ver en mapa</Link>
+              <Link to={`/grc/risk-360`}>
+                <Compass className="h-3.5 w-3.5" />
+                GRC
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild className="gap-1.5">
+              <Link to="/governance-map">
+                <Network className="h-3.5 w-3.5" />
+                Ver en mapa
+              </Link>
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-3.5 w-3.5" />Exportar</Button>
           </div>

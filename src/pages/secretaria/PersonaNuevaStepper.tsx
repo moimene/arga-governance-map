@@ -532,7 +532,7 @@ function StepIdentidad({
         label={draft.person_type === "PF" ? "Nombre completo *" : "Denominación legal *"}
         value={draft.full_name}
         onChange={(event) => update("full_name", event.target.value)}
-        placeholder={draft.person_type === "PF" ? "Lucía Martín García" : "ARGA Servicios Externos, S.L."}
+        placeholder={draft.person_type === "PF" ? "Lucía Martín García" : "Sociedad Filial, S.L."}
         required
       />
       <div className="flex flex-col gap-1">
@@ -568,7 +568,7 @@ function StepIdentidad({
           label="Denominación comercial"
           value={draft.denomination}
           onChange={(event) => update("denomination", event.target.value)}
-          placeholder="ARGA Servicios"
+          placeholder="Servicios Corporativos"
         />
       ) : null}
     </div>
@@ -590,7 +590,7 @@ function StepContacto({
           type="email"
           value={draft.email}
           onChange={(event) => update("email", event.target.value)}
-          placeholder="persona@arga-seguros.com"
+          placeholder="persona@empresa.com"
           required
         />
         <TextInput
@@ -605,7 +605,7 @@ function StepContacto({
           type="email"
           value={draft.secondary_email}
           onChange={(event) => update("secondary_email", event.target.value)}
-          placeholder="contacto.secundario@arga-seguros.com"
+          placeholder="contacto.secundario@empresa.com"
         />
         <TextInput
           label="Domicilio *"

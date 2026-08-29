@@ -67,7 +67,7 @@ describe("G4 — ownership navegable del catálogo normativo (Cloud)", () => {
     // no órgano) y al Comité de Práctica Profesional solo lo AUXILIA (PPD-01 §8.1) o
     // le pide INFORME PREVIO (Código Ético art. 43.1). Mismo criterio que ya se aplicó
     // a PI-31.
-    expect(rows.map((r) => r.policy_code).sort()).toEqual(["PBC-FT-10", "PI-14", "PI-30"]);
+    expect(rows.map((r) => r.policy_code).sort()).toEqual(["PBC-FT-10", "PI-14", "PI-26", "PI-30"]);
     for (const r of rows) {
       expect(r.owner_body?.name, `${r.policy_code} sin nombre de comité`).toBeTruthy();
       // El slug es lo que hace navegable el enlace: /organos/:id resuelve por

@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useTour } from "@/context/TourContext";
 import { useScope } from "@/context/ScopeContext";
 import { useTenantBranding } from "@/context/TenantBrandContext";
+import { isModuleEnabled } from "@/lib/tenant-modules";
 import { dashboardGreeting } from "@/lib/tenant-scopes";
+import { brandName, groupFullLabel } from "@/lib/tenant-brand-labels";
 import { useDashboardKpis, useDashboardAlerts, useUpcomingMeetings } from "@/hooks/useDashboardData";
 import { useModuleStatus } from "@/hooks/useModuleStatus";
 import { DemoOperablePanel } from "@/components/arga-console/DemoOperablePanel";
@@ -173,7 +175,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <span className="w-fit rounded-md bg-[var(--t-surface-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--t-brand)]">
-              TGMS compone, cada módulo responsable escribe
+              {brandName(branding)} compone, cada módulo responsable escribe
             </span>
           </div>
           <div className="divide-y divide-[var(--t-border-subtle)]">
@@ -395,7 +397,9 @@ export default function Dashboard() {
               <line x1="50" y1="155" x2="50" y2="175" stroke="hsl(var(--destructive))" strokeWidth="1.5" strokeDasharray="3 2" />
               <g>
                 <rect x="70" y="20" width="100" height="36" rx="6" fill="hsl(var(--primary))" />
-                <text x="120" y="42" textAnchor="middle" fontSize="11" fontWeight="600" fill="white">ARGA Seguros</text>
+                <text x="120" y="42" textAnchor="middle" fontSize="11" fontWeight="600" fill="white">
+                  {branding ? brandName(branding) : "ARGA Seguros"}
+                </text>
               </g>
               <g>
                 <rect x="15" y="130" width="70" height="28" rx="6" fill="hsl(var(--accent))" stroke="hsl(var(--primary)/0.3)" />
@@ -454,124 +458,132 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Secretaría */}
-          <Link to="/secretaria">
-            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <ClipboardList className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm font-semibold text-foreground group-hover:underline">Secretaría</span>
-                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-border">
-                <div className="px-4 py-3">
-                  <div className="text-lg font-bold tabular-nums text-foreground">
-                    {moduleStatus?.secretaria.convocatoriasEmitidas ?? "—"}
+          {isModuleEnabled(branding, "secretaria") && (
+            <Link to="/secretaria">
+              <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                    <ClipboardList className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Convoc. emitidas</div>
+                  <span className="text-sm font-semibold text-foreground group-hover:underline">Secretaría</span>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.secretaria.acuerdosPendientes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
-                  )}>
-                    {moduleStatus?.secretaria.acuerdosPendientes ?? "—"}
+                <div className="grid grid-cols-2 divide-x divide-border">
+                  <div className="px-4 py-3">
+                    <div className="text-lg font-bold tabular-nums text-foreground">
+                      {moduleStatus?.secretaria.convocatoriasEmitidas ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Convoc. emitidas</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Acuerdos pend.</div>
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.secretaria.acuerdosPendientes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                    )}>
+                      {moduleStatus?.secretaria.acuerdosPendientes ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Acuerdos pend.</div>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </Link>
+              </Card>
+            </Link>
+          )}
 
           {/* GRC Compass */}
-          <Link to="/grc">
-            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Compass className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm font-semibold text-foreground group-hover:underline">GRC Compass</span>
-                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-border">
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.grc.incidentesDoraAbiertos ?? 0) > 0 ? "text-destructive" : "text-foreground"
-                  )}>
-                    {moduleStatus?.grc.incidentesDoraAbiertos ?? "—"}
+          {isModuleEnabled(branding, "grc") && (
+            <Link to="/grc">
+              <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                    <Compass className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Incid. DORA abiert.</div>
+                  <span className="text-sm font-semibold text-foreground group-hover:underline">GRC Compass</span>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
-                  )}>
-                    {moduleStatus?.grc.notificacionesUrgentes ?? "—"}
+                <div className="grid grid-cols-2 divide-x divide-border">
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.grc.incidentesDoraAbiertos ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                    )}>
+                      {moduleStatus?.grc.incidentesDoraAbiertos ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Incid. DORA abiert.</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Notif. &lt;72h</div>
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.grc.notificacionesUrgentes ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                    )}>
+                      {moduleStatus?.grc.notificacionesUrgentes ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Notif. &lt;72h</div>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </Link>
+              </Card>
+            </Link>
+          )}
 
           {/* AI Governance */}
-          <Link to="/ai-governance">
-            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Brain className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm font-semibold text-foreground group-hover:underline">AI Governance</span>
-                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-border">
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "text-destructive" : "text-foreground"
-                  )}>
-                    {moduleStatus?.aiGovernance.altosNoAprobados ?? "—"}
+          {isModuleEnabled(branding, "ai-governance") && (
+            <Link to="/ai-governance">
+              <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                    <Brain className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Alto sin eval.</div>
+                  <span className="text-sm font-semibold text-foreground group-hover:underline">AI Governance</span>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.aiGovernance.incidentesAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
-                  )}>
-                    {moduleStatus?.aiGovernance.incidentesAbiertos ?? "—"}
+                <div className="grid grid-cols-2 divide-x divide-border">
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.aiGovernance.altosNoAprobados ?? 0) > 0 ? "text-destructive" : "text-foreground"
+                    )}>
+                      {moduleStatus?.aiGovernance.altosNoAprobados ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Alto sin eval.</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Incid. abiertos</div>
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.aiGovernance.incidentesAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                    )}>
+                      {moduleStatus?.aiGovernance.incidentesAbiertos ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Incid. abiertos</div>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </Link>
+              </Card>
+            </Link>
+          )}
 
           {/* SII */}
-          <Link to="/sii">
-            <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-status-warning/10">
-                  <AlertTriangle className="h-4 w-4 text-status-warning" />
-                </div>
-                <span className="text-sm font-semibold text-foreground group-hover:underline">SII</span>
-                <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-1">
-                <div className="px-4 py-3">
-                  <div className={cn(
-                    "text-lg font-bold tabular-nums",
-                    (moduleStatus?.sii.casosAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
-                  )}>
-                    {moduleStatus?.sii.casosAbiertos ?? "—"}
+          {isModuleEnabled(branding, "sii") && (
+            <Link to="/sii">
+              <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-status-warning/10">
+                    <AlertTriangle className="h-4 w-4 text-status-warning" />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Casos abiertos</div>
+                  <span className="text-sm font-semibold text-foreground group-hover:underline">SII</span>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-              </div>
-            </Card>
-          </Link>
+                <div className="grid grid-cols-1">
+                  <div className="px-4 py-3">
+                    <div className={cn(
+                      "text-lg font-bold tabular-nums",
+                      (moduleStatus?.sii.casosAbiertos ?? 0) > 0 ? "text-status-warning" : "text-foreground"
+                    )}>
+                      {moduleStatus?.sii.casosAbiertos ?? "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">Casos abiertos</div>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          )}
         </div>
       </div>
 

@@ -275,7 +275,7 @@ export default function AiIncidentes() {
                       <tr
                         key={inc.id}
                         className="cursor-pointer transition-colors hover:bg-[var(--g-surface-subtle)]/50"
-                        onClick={() => inc.system_id && navigate(`/ai-governance/sistemas/${inc.system_id}`)}
+                        onClick={() => navigate(`/ai-governance/incidentes/${inc.id}`)}
                       >
                         <td className="min-w-0 px-6 py-4">
                           <p className="truncate text-sm font-medium text-[var(--g-text-primary)]">{inc.title}</p>
@@ -345,22 +345,15 @@ export default function AiIncidentes() {
                 const isMaterial = isAimsMaterialIncidentCandidate(inc);
                 return (
                   <article key={inc.id} role="listitem" className="p-4">
-                    {inc.system_id ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/ai-governance/sistemas/${inc.system_id}`)}
-                        className="w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      >
-                        <span className="block truncate text-sm font-semibold text-[var(--g-text-primary)]">{inc.title}</span>
-                        <span className="mt-1 block text-xs text-[var(--g-text-secondary)]">{inc.ai_systems?.name ?? "Sin sistema asociado"}</span>
-                      </button>
-                    ) : (
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--g-text-primary)]">{inc.title}</p>
-                        <p className="mt-1 text-xs text-[var(--g-text-secondary)]">Sin sistema asociado</p>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/ai-governance/incidentes/${inc.id}`)}
+                      className="w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--g-surface-card)]"
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <span className="block truncate text-sm font-semibold text-[var(--g-text-primary)]">{inc.title}</span>
+                      <span className="mt-1 block text-xs text-[var(--g-text-secondary)]">{inc.ai_systems?.name ?? "Sin sistema asociado"}</span>
+                    </button>
                     {inc.description && (
                       <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--g-text-secondary)]">{inc.description}</p>
                     )}

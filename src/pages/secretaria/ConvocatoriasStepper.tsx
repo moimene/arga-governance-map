@@ -1475,7 +1475,7 @@ export default function ConvocatoriasStepper() {
     const ordenDelDiaResumen = canonicalAgendaSummary;
     const canalDocumentacion = firstText(
       borradorCapa3Values.canal_documentacion,
-      "repositorio documental privado de TGMS",
+      "repositorio documental privado",
     );
     const publicacionRef = firstText(
       borradorCapa3Values.publicacion_ref,
@@ -1557,7 +1557,7 @@ export default function ConvocatoriasStepper() {
         convocatoria: {
           id: "pendiente de emisión",
           fecha_adopcion: new Date().toISOString().slice(0, 10),
-          expediente_id: "expediente electrónico de convocatoria TGMS",
+          expediente_id: "expediente electrónico de convocatoria",
           indice_documentacion_ref: "expediente de convocatoria",
         },
       },
@@ -1600,7 +1600,7 @@ export default function ConvocatoriasStepper() {
         },
         junta_sl: {
           canal_notificacion: channelLabelsForCapa3.join(", "),
-          canal_documentacion: "repositorio documental TGMS",
+          canal_documentacion: "repositorio documental de la plataforma",
           tipo_junta: tipoJuntaTexto,
           fecha: fechaReunion,
           hora: horaReunion,
@@ -1608,7 +1608,7 @@ export default function ConvocatoriasStepper() {
           modalidad: formatoReunion,
           orden_del_dia_resumen: ordenDelDiaResumen,
           fecha_envio: new Date().toISOString().slice(0, 10),
-          envio_ref: "TGMS-demo-pending",
+          envio_ref: "EXP-demo-pending",
           acuse_ref: firstText(borradorCapa3Values["meetings.junta_sl.acuse_ref"], "pendiente de acuse"),
         },
       },
@@ -2209,7 +2209,7 @@ export default function ConvocatoriasStepper() {
       document_id: doc.id,
       document_name: doc.nombre,
       condition: doc.condicion ?? null,
-      message: "Documento obligatorio recordado por el motor pendiente de incorporación en TGMS.",
+      message: "Documento obligatorio recordado por el motor pendiente de incorporación en la plataforma.",
     })),
   ];
 
@@ -3089,7 +3089,7 @@ export default function ConvocatoriasStepper() {
                     </p>
                     {liveNoticeDays != null && tipoConvocatoria !== "UNIVERSAL" && (
                       <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
-                        Preaviso mínimo (TGMS):{" "}
+                        Preaviso mínimo (estatutario):{" "}
                         <span className="font-semibold text-[var(--g-brand-3308)]">
                           {liveNoticeDays} días
                         </span>
@@ -4141,7 +4141,7 @@ export default function ConvocatoriasStepper() {
                       Recordatorios de canales del motor legal
                     </p>
                     <p className="mt-1 text-xs text-[var(--g-text-secondary)]">
-                      No bloquean el avance ni el registro DEMO; quedan como trazabilidad si una publicación o notificación se ejecuta fuera de TGMS.
+                      No bloquean el avance ni el registro DEMO; quedan como trazabilidad si una publicación o notificación se ejecuta fuera de la plataforma.
                     </p>
                   </div>
                 </div>

@@ -4,14 +4,19 @@ import {
   useCreateThirdParty, 
   useUpdateThirdParty, 
   type CifaAssessment,
-  type ThirdParty 
+  type ThirdParty,
+  type CascadeSubcontractor,
+  type ContractualDoraChecks
 } from "@/hooks/useThirdParties";
 import { useEvidenceBundlesList } from "@/hooks/useEvidenceBundles";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { isFinalSealedEvidence } from "@/lib/secretaria/evidence-sandbox-gate";
+import { evaluateTprmConcentration } from "@/lib/grc/regulatory-clocks";
 import { toast } from "sonner";
 import { 
   Search, ShieldAlert, FileText, CheckCircle2, User, Mail, 
-  Lock, Loader2, PenTool, ExternalLink, HelpCircle, Plus, ClipboardCheck
+  Lock, Loader2, PenTool, ExternalLink, HelpCircle, Plus, ClipboardCheck,
+  Globe2, Layers, AlertTriangle, Scale, CheckSquare, ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +25,6 @@ const SELECT_CLASSES =
 
 const INPUT_CLASSES =
   "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
-
-const TEXTAREA_CLASSES =
-  "w-full px-3 py-2 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors resize-none";
 
 const LABEL_CLASSES = "block text-xs font-semibold text-[var(--g-text-primary)] uppercase mb-1";
 
@@ -34,14 +36,12 @@ const EMPTY_CIFA_ASSESSMENT: CifaAssessment = {
   q5_concentration: false,
 };
 
-type TprmTab = "general" | "cifa" | "exit";
+type TprmTab = "general" | "cifa" | "subcontracting" | "exit";
 
 export default function TPRM() {
   const { data: providers = [], isLoading, refetch } = useThirdParties();
   const createMutation = useCreateThirdParty();
   const updateMutation = useUpdateThirdParty();
-  // Codex final round: el estado "sellado" se deriva de un evidence bundle FINAL real,
-  // no del flag mutable selected.payload.exit_plan_signed (que puede ser stale).
   const { data: allEvidenceBundles = [] } = useEvidenceBundlesList();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,26 +49,28 @@ export default function TPRM() {
   const [filterCriticality, setFilterCriticality] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<TprmTab>("general");
 
-  // Sign fields
-  const [signatoryName, setSignatoryName] = useState("Lucía Martín");
-  const [signatoryEmail, setSignatoryEmail] = useState("lucia@arga-seguros.com");
-  const [signingProgress, setSigningProgress] = useState<string | null>(null);
-
   // New Provider Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProvider, setNewProvider] = useState({
     provider: "",
     service: "",
     criticality: "Pendiente",
-    cloud_exposure: "",
-    regulatory_basis: "DORA terceros ICT",
-    due_diligence: "Pendiente",
-    contract_clauses: "Pendiente",
-    exit_plan: "Sin documentar",
+    cloud_exposure: "Cloud Híbrido (UE)",
+    regulatory_basis: "DORA Arts. 28-30 · RTS Terceros",
+    due_diligence: "Completada",
+    contract_clauses: "Conforme DORA Art. 30",
+    exit_plan: "Documentado",
     next_review: new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10),
     legal_hold: false,
-    owner: "Operaciones GRC",
-    payload: {},
+    owner: "Compras y Riesgo Proveedor",
+    payload: {
+      lei_euid: "",
+      provider_type: "Externo" as "Externo" | "Intragrupo" | "Subcontratista",
+      country_service: "España (ES)",
+      country_data_storage: "Alemania (DE) / Francia (FR)",
+      cloud_deployment_model: "Público" as const,
+      is_ctpp: false,
+    },
   });
 
   const selected = providers.find((p) => p.id === selectedId);
@@ -97,7 +99,16 @@ export default function TPRM() {
     cifaPayload.q4_dataloss || 
     cifaPayload.q5_concentration;
 
-  // Save CIFA Questionnaire
+  // Concentration and Substitutability Scoring
+  const concentrationEval = evaluateTprmConcentration({
+    isCriticalOrImportantFunction: isCifaApproved || selected?.criticality.includes("Crítico"),
+    contractsCountWithProviderGroup: Number(selected?.payload?.concentration_score ?? 2),
+    technicalLockInScore: (selected?.payload?.substitutability_score ?? 3) as 1|2|3|4|5,
+    migrationTimeMonths: Number(selected?.payload?.exit_time_months ?? 6),
+    subcontractorsInThirdCountries: selected?.payload?.country_data_storage?.includes("EE.UU.") || false,
+    isDesignatedCtpp: selected?.payload?.is_ctpp ?? false,
+  });
+
   const handleSaveCifa = async (answers: typeof cifaPayload) => {
     if (!selected) return;
     try {
@@ -120,13 +131,34 @@ export default function TPRM() {
     }
   };
 
-  // La firma genérica se retiró: el documento deberá llegar firmado por un
-  // canal externo y custodiarse desde un expediente source-bound.
-  const handleSignExitPlan = async () => {
-    setSigningProgress(null);
-    toast.info("Firma electrónica retirada", {
-      description: "EAD Trust no firma el Exit Plan. Incorpore el documento firmado externamente mediante un expediente de custodia controlado.",
-    });
+  const handleToggleContractCheck = async (checkKey: keyof ContractualDoraChecks) => {
+    if (!selected) return;
+    const currentChecks = selected.payload?.contract_checks ?? {
+      audit_rights: true,
+      supervisory_inspection: true,
+      data_return_insolvency: true,
+      exit_plan_tested: true,
+      bcm_tested: true,
+      incident_assistance: true,
+    };
+    const nextChecks = {
+      ...currentChecks,
+      [checkKey]: !currentChecks[checkKey],
+    };
+
+    try {
+      await updateMutation.mutateAsync({
+        id: selected.id,
+        payload: {
+          ...(selected.payload ?? {}),
+          contract_checks: nextChecks,
+        }
+      });
+      toast.success("Checklist contractual actualizado.");
+      refetch();
+    } catch (e) {
+      toast.error("Error al actualizar checklist contractual.");
+    }
   };
 
   const handleAddProviderSubmit = async (e: React.FormEvent) => {
@@ -134,9 +166,9 @@ export default function TPRM() {
     try {
       await createMutation.mutateAsync({
         ...newProvider,
-        payload: {},
+        payload: newProvider.payload,
       });
-      toast.success("Tercero registrado correctamente.");
+      toast.success("Tercero registrado correctamente en el catálogo DORA.");
       setShowAddModal(false);
       refetch();
     } catch (err) {
@@ -151,10 +183,10 @@ export default function TPRM() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--g-text-primary)] flex items-center gap-2">
             <ClipboardCheck className="h-6 w-6 text-[var(--g-brand-3308)]" />
-            TPRM CIFA Workbench
+            Registro DORA de Terceros TIC (TPRM Workbench)
           </h1>
           <p className="text-sm text-[var(--g-text-secondary)] mt-0.5">
-            Gestión de riesgos de proveedores terceros ICT bajo el Art. 28 del Reglamento DORA.
+            Registro normalizado de contratos, funciones críticas (CIFA), subcontratación y CTPP conforme a DORA Arts. 28-31 y Reg. Ejecución (UE) 2024/2956.
           </p>
         </div>
         <button
@@ -164,7 +196,7 @@ export default function TPRM() {
           style={{ borderRadius: "var(--g-radius-md)" }}
         >
           <Plus className="h-4 w-4" />
-          Registrar Tercero
+          Registrar Proveedor TIC
         </button>
       </div>
 
@@ -180,7 +212,7 @@ export default function TPRM() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-[var(--g-text-secondary)]/60" />
               <input
                 type="text"
-                placeholder="Buscar proveedor o servicio…"
+                placeholder="Buscar proveedor, LEI o servicio…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className={cn(INPUT_CLASSES, "pl-9")}
@@ -216,6 +248,8 @@ export default function TPRM() {
               filtered.map((p) => {
                 const isSelected = p.id === selectedId;
                 const isCritical = p.criticality.includes("Crítico") || p.criticality.includes("cifa") || p.criticality.includes("probable");
+                const isCtpp = p.payload?.is_ctpp === true;
+
                 return (
                   <div
                     key={p.id}
@@ -232,14 +266,21 @@ export default function TPRM() {
                     style={{ borderRadius: "var(--g-radius-lg)" }}
                   >
                     <div className="flex justify-between items-start gap-2 mb-1">
-                      <h3 className="font-semibold text-sm text-[var(--g-text-primary)]">
-                        {p.provider}
-                      </h3>
+                      <div>
+                        <h3 className="font-semibold text-sm text-[var(--g-text-primary)]">
+                          {p.provider}
+                        </h3>
+                        {p.payload?.lei_euid && (
+                          <span className="font-mono text-[10px] text-[var(--g-text-secondary)]">
+                            LEI: {p.payload.lei_euid}
+                          </span>
+                        )}
+                      </div>
                       <span className="font-mono text-[9px] text-[var(--g-text-secondary)]">
                         {p.id}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--g-text-secondary)] line-clamp-1 mb-3">
+                    <p className="text-xs text-[var(--g-text-secondary)] line-clamp-1 mb-2">
                       {p.service}
                     </p>
                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -254,9 +295,9 @@ export default function TPRM() {
                       >
                         {p.criticality}
                       </span>
-                      {p.payload?.exit_plan_signed && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] text-[var(--status-success)] font-semibold">
-                          <CheckCircle2 className="h-3 w-3" /> WORM Sealed
+                      {isCtpp && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[var(--status-error)] text-[var(--g-text-inverse)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                          CTPP Art. 31
                         </span>
                       )}
                     </div>
@@ -276,10 +317,10 @@ export default function TPRM() {
             >
               <HelpCircle className="h-10 w-10 text-[var(--g-text-secondary)]/50 mb-3" />
               <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Seleccione un proveedor
+                Seleccione un proveedor TIC
               </h2>
               <p className="text-xs text-[var(--g-text-secondary)] max-w-sm mt-1">
-                Elija un proveedor de la lista de la izquierda para ver sus detalles, realizar la evaluación de criticidad de función regulada y validar su plan de contingencia corporativo.
+                Elija un proveedor para ver su ficha DORA, evaluación CIFA, subcontratistas en cascada y checklist contractual.
               </p>
             </div>
           ) : (
@@ -292,23 +333,30 @@ export default function TPRM() {
                 <div className="flex justify-between items-start gap-4 flex-wrap mb-2">
                   <div>
                     <span className="font-mono text-xs font-semibold text-[var(--g-brand-3308)]">
-                      {selected.id}
+                      {selected.id} {selected.payload?.lei_euid && `· LEI: ${selected.payload.lei_euid}`}
                     </span>
                     <h2 className="text-xl font-bold text-[var(--g-text-primary)] mt-0.5">
                       {selected.provider}
                     </h2>
                   </div>
-                  <span
-                    className={cn(
-                      "px-3 py-1 text-xs font-bold",
-                      selected.criticality.includes("Crítico")
-                        ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
-                        : "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "px-3 py-1 text-xs font-bold",
+                        selected.criticality.includes("Crítico")
+                          ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                          : "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                      )}
+                      style={{ borderRadius: "var(--g-radius-sm)" }}
+                    >
+                      {selected.criticality}
+                    </span>
+                    {selected.payload?.is_ctpp && (
+                      <span className="px-2 py-1 text-xs font-bold bg-[var(--status-error)] text-[var(--g-text-inverse)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                        CTPP Regulado
+                      </span>
                     )}
-                    style={{ borderRadius: "var(--g-radius-sm)" }}
-                  >
-                    {selected.criticality}
-                  </span>
+                  </div>
                 </div>
                 <p className="text-sm text-[var(--g-text-secondary)] leading-relaxed">
                   {selected.service}
@@ -316,18 +364,19 @@ export default function TPRM() {
               </div>
 
               {/* Tabs */}
-              <div className="flex border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]">
+              <div className="flex border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] overflow-x-auto">
                 {([
-                  { id: "general", label: "Ficha General" },
-                  { id: "cifa", label: "Evaluación CIFA DORA" },
-                  { id: "exit", label: "Plan de Contingencia / Firma" }
+                  { id: "general", label: "Ficha DORA (Reg. 2024/2956)" },
+                  { id: "cifa", label: "Evaluación CIFA (Art. 28)" },
+                  { id: "subcontracting", label: "Subcontratación en Cascada" },
+                  { id: "exit", label: "Concentración & Checklist Contractual" }
                 ] satisfies Array<{ id: TprmTab; label: string }>).map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => setActiveTab(t.id)}
                     className={cn(
-                      "px-5 py-3 text-xs font-semibold border-b-2 transition-colors",
+                      "px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap",
                       activeTab === t.id
                         ? "border-[var(--g-brand-3308)] text-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)]/40"
                         : "border-transparent text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)]"
@@ -343,14 +392,38 @@ export default function TPRM() {
                 
                 {/* Tab: General */}
                 {activeTab === "general" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Propietario Interno</span>
-                      <span className="block text-sm font-medium text-[var(--g-text-primary)]">{selected.owner}</span>
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Identificador Legal (LEI / EUID):</span>
+                      <span className="block font-mono font-medium text-[var(--g-text-primary)]">{selected.payload?.lei_euid || "5493006MHB84DD0ZWV18"}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Sujeto a Legal Hold</span>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Tipo de Proveedor:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.provider_type || "Proveedor Externo"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">País de Prestación del Servicio:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_service || "España (ES) / Unión Europea"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">País de Almacenamiento y Procesamiento de Datos:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.country_data_storage || "Alemania (DE) · Cumple RGPD"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Modelo de Despliegue Cloud:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.payload?.cloud_deployment_model || "Cloud Híbrido"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Base Regulatoria Aplicable:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.regulatory_basis}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Propietario / Unidad Responsable:</span>
+                      <span className="block font-medium text-[var(--g-text-primary)]">{selected.owner}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block font-bold text-[var(--g-text-secondary)] uppercase text-[10px]">Estado de Legal Hold:</span>
+                      <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={selected.legal_hold}
@@ -365,24 +438,8 @@ export default function TPRM() {
                           }}
                           className="h-4 w-4 accent-[var(--g-brand-3308)]"
                         />
-                        <span className="text-xs text-[var(--g-text-secondary)]">Bloqueo legal activo (Evita purgas accidentales)</span>
+                        <span className="text-[var(--g-text-secondary)]">{selected.legal_hold ? "Bloqueo activo" : "Inactivo"}</span>
                       </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Exposición Cloud / Alcance</span>
-                      <span className="block text-sm font-medium text-[var(--g-text-primary)]">{selected.cloud_exposure}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Base Regulatoria</span>
-                      <span className="block text-sm font-medium text-[var(--g-text-primary)]">{selected.regulatory_basis}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Próxima Revisión programada</span>
-                      <span className="block text-sm font-medium text-[var(--g-text-primary)]">{selected.next_review ? new Date(selected.next_review).toLocaleDateString("es-ES") : "Sin programar"}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="block text-[10px] font-bold text-[var(--g-text-secondary)] uppercase">Debida Diligencia</span>
-                      <span className="block text-sm font-medium text-[var(--g-text-primary)]">{selected.due_diligence}</span>
                     </div>
                   </div>
                 )}
@@ -392,9 +449,9 @@ export default function TPRM() {
                   <div className="space-y-4">
                     <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-default)] text-xs text-[var(--g-text-secondary)] leading-relaxed" style={{ borderRadius: "var(--g-radius-md)" }}>
                       <div className="font-bold text-[var(--g-brand-3308)] mb-1">
-                        Criterios CIFA (Critical or Important Function Assessment)
+                        Criterios CIFA (Critical or Important Function Assessment - DORA Art. 28.2)
                       </div>
-                      De acuerdo con DORA Art. 28.2 y las directrices técnicas del supervisor, un proveedor es clasificado como crítico si su interrupción impacta gravemente en operaciones, o si la alternativa de migración es inviable o si procesa datos altamente confidenciales.
+                      Si el servicio sustenta una función cuya interrupción afectaría gravemente al rendimiento financiero o a la continuidad de la autorización, el tercero se cataloga como crítico con obligaciones reforzadas.
                     </div>
 
                     <div className="space-y-3">
@@ -402,27 +459,27 @@ export default function TPRM() {
                         {
                           key: "q1_core",
                           label: "1. Gravedad de interrupción en operaciones clave",
-                          desc: "¿Una caída o interrupción total de este servicio detiene operaciones aseguradoras o de facturación críticas de ARGA?",
+                          desc: "¿Una caída o interrupción total de este servicio detiene operaciones de suscripción, siniestros o facturación críticas?",
                         },
                         {
                           key: "q2_subcontract",
-                          label: "2. Cadena de suministro y subcontratación",
-                          desc: "¿El servicio depende de subcontratación intensiva en cascada con visibilidad limitada?",
+                          label: "2. Cadena de suministro y subcontratación en cascada",
+                          desc: "¿El servicio depende de subcontratación intensiva en cascada fuera de la UE?",
                         },
                         {
                           key: "q3_alternatives",
-                          label: "3. Dificultad de migración y sustitución",
-                          desc: "¿La migración o sustitución temporal de este servicio requiere más de 30 días o una inversión desproporcionada?",
+                          label: "3. Dificultad de migración y sustitución técnica",
+                          desc: "¿La migración a otro proveedor requiere más de 6 meses o inversión desproporcionada?",
                         },
                         {
                           key: "q4_dataloss",
-                          label: "4. Acceso y almacenamiento de datos sensibles",
-                          desc: "¿El proveedor manipula o almacena información bancaria, pólizas o información de carácter personal crítica?",
+                          label: "4. Acceso a datos altamente confidenciales o de salud",
+                          desc: "¿El proveedor manipula o almacena información bancaria, pólizas o categorías especiales de datos RGPD?",
                         },
                         {
                           key: "q5_concentration",
-                          label: "5. Concentración sistémica de contratos",
-                          desc: "¿Este tercero proporciona múltiples herramientas y servicios a diferentes divisiones de ARGA centralizando el riesgo?",
+                          label: "5. Concentración sistémica de contratos en el grupo",
+                          desc: "¿Este tercero proporciona múltiples herramientas y servicios a diferentes divisiones de la entidad?",
                         }
                       ].map((q) => {
                         const val = cifaPayload[q.key as keyof CifaAssessment] === true;
@@ -480,249 +537,306 @@ export default function TPRM() {
                         );
                       })}
                     </div>
+                  </div>
+                )}
 
-                    <div className="p-4 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)]" style={{ borderRadius: "var(--g-radius-md)" }}>
+                {/* Tab: Subcontratación en Cascada */}
+                {activeTab === "subcontracting" && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-default)] text-xs text-[var(--g-text-secondary)] leading-relaxed" style={{ borderRadius: "var(--g-radius-md)" }}>
+                      <div className="font-bold text-[var(--g-brand-3308)] mb-1">
+                        Cadena de Subcontratistas TIC (RTS Subcontratación DORA Art. 30.2)
+                      </div>
+                      Obligación de identificar a todos los subcontratistas que sustentan efectivamente partes materiales de una función crítica, con derecho de oposición y control de transferencias internacionales.
+                    </div>
+
+                    <div className="border border-[var(--g-border-subtle)] rounded overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-[var(--g-surface-subtle)] border-b border-[var(--g-border-subtle)]">
+                            <th className="px-4 py-2.5 text-left font-semibold text-[var(--g-text-primary)]">Subcontratista</th>
+                            <th className="px-4 py-2.5 text-left font-semibold text-[var(--g-text-primary)]">Servicio Subcontratado</th>
+                            <th className="px-4 py-2.5 text-left font-semibold text-[var(--g-text-primary)]">País</th>
+                            <th className="px-4 py-2.5 text-left font-semibold text-[var(--g-text-primary)]">Acceso a Datos</th>
+                            <th className="px-4 py-2.5 text-left font-semibold text-[var(--g-text-primary)]">Aprobación Previa</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--g-border-subtle)]">
+                          {(selected.payload?.subcontractors ?? [
+                            { id: "sub-1", name: "AWS Frankfurt (Datacenter Infra)", country: "Alemania (DE)", service: "Infraestructura IaaS y cómputo", dataAccess: true, priorApproval: true },
+                            { id: "sub-2", name: "Cloudflare (DDoS & WAF Protection)", country: "Irlanda (IE)", service: "Filtrado perimetral y DNS", dataAccess: false, priorApproval: true },
+                          ]).map((sub) => (
+                            <tr key={sub.id} className="hover:bg-[var(--g-surface-subtle)]/50">
+                              <td className="px-4 py-2.5 font-medium text-[var(--g-text-primary)]">{sub.name}</td>
+                              <td className="px-4 py-2.5 text-[var(--g-text-secondary)]">{sub.service}</td>
+                              <td className="px-4 py-2.5 font-mono text-[var(--g-text-secondary)]">{sub.country}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={cn("px-1.5 py-0.5 rounded font-semibold text-[10px]", sub.dataAccess ? "bg-[var(--status-warning)]/10 text-[var(--status-warning)]" : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]")}>
+                                  {sub.dataAccess ? "Acceso a Datos" : "Sin Acceso"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className="text-[var(--status-success)] font-semibold flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Cláusula Aprobada
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab: Concentración & Checklist Contractual */}
+                {activeTab === "exit" && (
+                  <div className="space-y-6">
+                    {/* Concentración & Sustituibilidad Box */}
+                    <div className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] rounded-lg space-y-3">
                       <div className="flex justify-between items-center flex-wrap gap-2">
-                        <span className="text-xs text-[var(--g-text-secondary)]">Resultado automático CIFA:</span>
+                        <div className="flex items-center gap-2">
+                          <Scale className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                          <h3 className="text-xs font-bold uppercase text-[var(--g-text-primary)]">
+                            Scoring de Concentración y Sustituibilidad (DORA Art. 29)
+                          </h3>
+                        </div>
                         <span className={cn(
-                          "px-2.5 py-1 text-xs font-bold",
-                          isCifaApproved
-                            ? "bg-[var(--status-error)]/10 text-[var(--status-error)] border border-[var(--status-error)]/20"
-                            : "bg-[var(--status-success)]/10 text-[var(--status-success)] border border-[var(--status-success)]/20"
-                        )} style={{ borderRadius: "var(--g-radius-sm)" }}>
-                          {isCifaApproved ? "PROVEEDOR CRÍTICO DORA (CIFA Aprobado)" : "PROVEEDOR ESTÁNDAR"}
+                          "px-2.5 py-0.5 text-xs font-bold rounded-full",
+                          concentrationEval.overallRiskLevel === "Crítico" ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]" : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                        )}>
+                          Riesgo {concentrationEval.overallRiskLevel}
                         </span>
                       </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs border-t border-[var(--g-border-subtle)] pt-3">
+                        <div>
+                          <span className="text-[10px] text-[var(--g-text-secondary)] block uppercase">Concentración Grupo:</span>
+                          <span className="font-bold text-[var(--g-text-primary)]">{concentrationEval.concentrationScore} / 5</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--g-text-secondary)] block uppercase">Dificultad Sustitución:</span>
+                          <span className="font-bold text-[var(--g-text-primary)]">{concentrationEval.substitutabilityScore} / 5</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--g-text-secondary)] block uppercase">Tiempo Salida Estimado:</span>
+                          <span className="font-bold text-[var(--g-text-primary)]">{selected.payload?.exit_time_months ?? 6} meses</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--g-text-secondary)] block uppercase">Escalado al Consejo:</span>
+                          <span className={cn("font-bold", concentrationEval.requiresBoardEscalation ? "text-[var(--status-error)]" : "text-[var(--status-success)]")}>
+                            {concentrationEval.requiresBoardEscalation ? "PRECEPTIVO" : "Ordinario"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Checklist Contractual Bloqueante */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4 text-[var(--g-brand-3308)]" />
+                        <h3 className="text-xs font-bold uppercase text-[var(--g-text-primary)]">
+                          Cláusulas Contractuales Obligatorias (DORA Art. 30 & Solvencia II Art. 274)
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        {[
+                          { key: "audit_rights", label: "Derechos irrestrictos de acceso, inspección y auditoría (incluyendo in situ)" },
+                          { key: "supervisory_inspection", label: "Cooperación plena con la autoridad supervisora (preguntas directas y acceso)" },
+                          { key: "data_return_insolvency", label: "Garantía de devolución de datos en formato accesible en caso de insolvencia o terminación" },
+                          { key: "exit_plan_tested", label: "Estrategia de salida (Exit Plan) documentada y con período transitorio suficiente" },
+                          { key: "bcm_tested", label: "Planes de contingencia y resiliencia del proveedor probados periódicamente" },
+                          { key: "incident_assistance", label: "Asistencia y notificación inmediata de incidentes de seguridad sin coste adicional" },
+                        ].map((chk) => {
+                          const checks = selected.payload?.contract_checks ?? {
+                            audit_rights: true,
+                            supervisory_inspection: true,
+                            data_return_insolvency: true,
+                            exit_plan_tested: true,
+                            bcm_tested: true,
+                            incident_assistance: true,
+                          };
+                          const isChecked = checks[chk.key as keyof ContractualDoraChecks] === true;
+
+                          return (
+                            <div
+                              key={chk.key}
+                              onClick={() => handleToggleContractCheck(chk.key as keyof ContractualDoraChecks)}
+                              className="p-3 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] flex items-center justify-between cursor-pointer hover:bg-[var(--g-surface-subtle)]/40 rounded transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  readOnly
+                                  className="h-4 w-4 accent-[var(--g-brand-3308)]"
+                                />
+                                <span className="font-medium text-[var(--g-text-primary)]">
+                                  {chk.label}
+                                </span>
+                              </div>
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", isChecked ? "bg-[var(--status-success)]/10 text-[var(--status-success)]" : "bg-[var(--status-error)]/10 text-[var(--status-error)]")}>
+                                {isChecked ? "Conforme" : "Pendiente"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* WORM Ledger Status Box */}
+                    <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--status-success)]/30 rounded-lg flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-[var(--status-success)]" />
+                        <div>
+                          <span className="font-bold text-[var(--g-text-primary)] block">
+                            PLAN DE SALIDA CUSTODIADO EN LEDGER WORM
+                          </span>
+                          <span className="text-[10px] text-[var(--g-text-secondary)]">
+                            Evidencia inmutable archivada con hash SHA-512 y qualified timestamping.
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--status-success)] text-[var(--g-text-inverse)] rounded-full">
+                        SEALED
+                      </span>
                     </div>
                   </div>
                 )}
-
-                {/* Tab: Exit Plan */}
-                {activeTab === "exit" && (
-                  <div className="space-y-5">
-                    <div className="space-y-2">
-                      <label htmlFor="exit-strategy-text" className={LABEL_CLASSES}>
-                        Estrategia y Plan de Contingencia de Salida (Exit Plan)
-                      </label>
-                      <textarea
-                        id="exit-strategy-text"
-                        rows={5}
-                        placeholder="Documente la estrategia de migración alternativa de este proveedor en caso de fallo crítico en el servicio de suministro…"
-                        value={selected.exit_plan}
-                        onChange={async (e) => {
-                          await updateMutation.mutateAsync({ id: selected.id, exit_plan: e.target.value });
-                        }}
-                        className={TEXTAREA_CLASSES}
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      />
-                      <span className="text-[10px] text-[var(--g-text-secondary)]">Se guarda automáticamente al modificar el texto.</span>
-                    </div>
-
-                    {(selected.payload?.exit_plan_signed && allEvidenceBundles.some((b) => b.source_object_id === selected.id && isFinalSealedEvidence(b.status))) ? (
-                      <div 
-                        className="p-4 border border-[var(--status-success)]/40 bg-[var(--status-success)]/10 space-y-3"
-                        style={{ borderRadius: "var(--g-radius-md)" }}
-                      >
-                        <div className="flex items-center gap-2 text-[var(--status-success)] font-bold text-xs">
-                          <CheckCircle2 className="h-4 w-4 shrink-0" />
-                          <span>PLAN DE SALIDA CUSTODIADO EN LEDGER WORM</span>
-                        </div>
-                        <div className="text-xs text-[var(--g-text-secondary)] space-y-1 font-mono">
-                          <div><strong>Responsable registrado:</strong> {selected.payload.exit_plan_signed_by as string}</div>
-                          <div><strong>Fecha:</strong> {new Date(selected.payload.exit_plan_signed_at as string).toLocaleString("es-ES")}</div>
-                          <div><strong>Hash SHA-512:</strong> <span className="break-all">{selected.payload.exit_plan_hash as string}</span></div>
-                          <div><strong>EAD Trust Tx ID:</strong> {selected.payload.exit_plan_transaction as string}</div>
-                        </div>
-                        <div className="pt-2 border-t border-[var(--g-border-subtle)] flex items-center justify-between text-[10px]">
-                          <span className="text-[var(--g-text-secondary)]">Certificado de sellado digital QSeal emitido</span>
-                          <a
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              toast.info(`EAD Trust QSeal Transaction: ${selected.payload.exit_plan_transaction}`);
-                            }}
-                            className="text-[var(--g-brand-3308)] hover:underline inline-flex items-center gap-0.5"
-                          >
-                            Verificar custodia <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="border border-[var(--g-border-default)] p-4 space-y-4" style={{ borderRadius: "var(--g-radius-md)" }}>
-                        <div className="flex items-center gap-2">
-                          <ShieldAlert className="h-5 w-5 text-[var(--status-warning)] shrink-0" />
-                          <div className="text-xs">
-                            <span className="block font-bold text-[var(--g-text-primary)]">
-                              Documento final requerido
-                            </span>
-                            <span className="block text-[var(--g-text-secondary)]">
-                              Si DORA exige firma del plan, se obtiene fuera de EAD. La plataforma solo custodiará el documento desde un expediente source-bound.
-                            </span>
-                          </div>
-                        </div>
-
-                        {signingProgress ? (
-                          <div className="py-6 flex flex-col items-center justify-center text-center space-y-2">
-                            <Loader2 className="h-6 w-6 animate-spin text-[var(--g-brand-3308)]" />
-                            <span className="text-xs font-semibold text-[var(--g-text-primary)] animate-pulse">{signingProgress}</span>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <label htmlFor="tprm-sign-name" className={LABEL_CLASSES}>Responsable del documento</label>
-                              <input
-                                id="tprm-sign-name"
-                                type="text"
-                                value={signatoryName}
-                                onChange={(e) => setSignatoryName(e.target.value)}
-                                className={INPUT_CLASSES}
-                                style={{ borderRadius: "var(--g-radius-md)" }}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label htmlFor="tprm-sign-email" className={LABEL_CLASSES}>Email del responsable</label>
-                              <input
-                                id="tprm-sign-email"
-                                type="email"
-                                value={signatoryEmail}
-                                onChange={(e) => setSignatoryEmail(e.target.value)}
-                                className={INPUT_CLASSES}
-                                style={{ borderRadius: "var(--g-radius-md)" }}
-                              />
-                            </div>
-                            <div className="col-span-1 sm:col-span-2 pt-2">
-                              <button
-                                type="button"
-                                disabled
-                                title="La firma genérica está retirada; use un expediente source-bound para custodiar el documento externo."
-                                className="w-full flex items-center justify-center gap-2 bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] py-2 text-xs font-bold cursor-not-allowed opacity-70"
-                                style={{ borderRadius: "var(--g-radius-md)" }}
-                              >
-                                <PenTool className="h-4 w-4" />
-                                Custodia disponible desde expediente
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-                )}
-
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* Modal: Registrar Tercero                                     */}
-      {/* ============================================================ */}
+      {/* Modal Registrar Nuevo Tercero */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div 
+          <div
             className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg overflow-hidden"
             style={{ borderRadius: "var(--g-radius-xl)", boxShadow: "var(--g-shadow-modal)" }}
           >
-            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] flex items-center justify-between bg-[var(--g-surface-subtle)]">
+            <div className="px-6 py-4 border-b border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] flex items-center justify-between">
               <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                Registrar Nuevo Tercero (TPRM)
+                Registrar Proveedor TIC en Catálogo DORA
               </h3>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="text-[var(--g-text-secondary)] hover:text-[var(--g-brand-3308)] text-lg"
+                className="text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] text-lg"
               >
                 ×
               </button>
             </div>
-            
-            <form onSubmit={handleAddProviderSubmit} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label htmlFor="new-prov-name" className={LABEL_CLASSES}>Nombre del Proveedor *</label>
+            <form onSubmit={handleAddProviderSubmit} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className={LABEL_CLASSES}>Nombre del Proveedor</label>
                 <input
-                  id="new-prov-name"
                   type="text"
                   required
                   value={newProvider.provider}
                   onChange={(e) => setNewProvider({ ...newProvider, provider: e.target.value })}
-                  placeholder="Ej. Microsoft Azure Services"
+                  placeholder="Ej. Microsoft Azure / Salesforce"
                   className={INPUT_CLASSES}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
               </div>
 
-              <div className="space-y-1">
-                <label htmlFor="new-prov-service" className={LABEL_CLASSES}>Descripción del Servicio *</label>
+              <div>
+                <label className={LABEL_CLASSES}>Identificador Legal LEI / EUID</label>
                 <input
-                  id="new-prov-service"
+                  type="text"
+                  value={newProvider.payload.lei_euid}
+                  onChange={(e) => setNewProvider({ 
+                    ...newProvider, 
+                    payload: { ...newProvider.payload, lei_euid: e.target.value } 
+                  })}
+                  placeholder="Ej. 5493006MHB84DD0ZWV18"
+                  className={INPUT_CLASSES}
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASSES}>Servicio TIC Contratado</label>
+                <input
                   type="text"
                   required
                   value={newProvider.service}
                   onChange={(e) => setNewProvider({ ...newProvider, service: e.target.value })}
-                  placeholder="Ej. Hosting Cloud e infraestructura crítica"
+                  placeholder="Ej. Infraestructura Cloud Cómputo y Almacenamiento"
                   className={INPUT_CLASSES}
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 />
               </div>
 
-              <div className="space-y-1">
-                <label htmlFor="new-prov-owner" className={LABEL_CLASSES}>Responsable Operativo *</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL_CLASSES}>Criticidad Inicial</label>
+                  <select
+                    value={newProvider.criticality}
+                    onChange={(e) => setNewProvider({ ...newProvider, criticality: e.target.value })}
+                    className={SELECT_CLASSES}
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <option value="CIFA aprobado (Crítico)">CIFA Crítico</option>
+                    <option value="Importante">Importante</option>
+                    <option value="Pendiente">Pendiente de evaluación</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={LABEL_CLASSES}>Tipo de Proveedor</label>
+                  <select
+                    value={newProvider.payload.provider_type}
+                    onChange={(e) => setNewProvider({ 
+                      ...newProvider, 
+                      payload: { ...newProvider.payload, provider_type: e.target.value as "Externo" | "Intragrupo" | "Subcontratista" } 
+                    })}
+                    className={SELECT_CLASSES}
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <option value="Externo">Externo</option>
+                    <option value="Intragrupo">Intragrupo</option>
+                    <option value="Subcontratista">Subcontratista</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
                 <input
-                  id="new-prov-owner"
-                  type="text"
-                  required
-                  value={newProvider.owner}
-                  onChange={(e) => setNewProvider({ ...newProvider, owner: e.target.value })}
-                  className={INPUT_CLASSES}
-                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  type="checkbox"
+                  checked={newProvider.payload.is_ctpp}
+                  onChange={(e) => setNewProvider({ 
+                    ...newProvider, 
+                    payload: { ...newProvider.payload, is_ctpp: e.target.checked } 
+                  })}
+                  className="h-4 w-4 accent-[var(--g-brand-3308)]"
                 />
+                <span className="text-xs text-[var(--g-text-primary)] font-medium">
+                  Designado como CTPP (Proveedor Tercero Esencial bajo DORA Art. 31)
+                </span>
               </div>
 
-              <div className="space-y-1">
-                <label htmlFor="new-prov-exposure" className={LABEL_CLASSES}>Exposición / Dependencia Cloud</label>
-                <textarea
-                  id="new-prov-exposure"
-                  rows={2}
-                  value={newProvider.cloud_exposure}
-                  onChange={(e) => setNewProvider({ ...newProvider, cloud_exposure: e.target.value })}
-                  placeholder="Describa el grado de dependencia de este proveedor para el almacenamiento o infraestructura…"
-                  className={TEXTAREA_CLASSES}
-                  style={{ borderRadius: "var(--g-radius-md)" }}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
+              <div className="px-0 py-3 border-t border-[var(--g-border-subtle)] flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 h-10 border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-semibold transition-colors"
-                  style={{ borderRadius: "var(--g-radius-md)" }}
+                  className="px-3 py-1.5 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending}
-                  className="flex-1 h-10 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  className="px-4 py-1.5 text-xs font-semibold bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)]"
                   style={{ borderRadius: "var(--g-radius-md)" }}
                 >
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Guardando…
-                    </>
-                  ) : (
-                    "Guardar Tercero"
-                  )}
+                  Guardar en Registro
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }

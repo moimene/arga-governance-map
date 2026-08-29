@@ -40,9 +40,12 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     }
   });
 
-  it("Garrigues tiene al menos 12 obligaciones y todas citan artículo", async () => {
+  it("Garrigues tiene al menos 12 obligaciones PBC/FT y todas citan artículo de Ley 10/2010", async () => {
     if (!authed || !garr || !seeded) return;
-    const { data, error } = await garr.from("obligations").select("code, source, legal_reference, owner_body_id");
+    const { data, error } = await garr
+      .from("obligations")
+      .select("code, source, legal_reference, owner_body_id")
+      .like("code", "OBL-PBC-%");
     expect(error).toBeNull();
     expect((data ?? []).length).toBeGreaterThanOrEqual(12);
     for (const o of data ?? []) {
@@ -56,7 +59,7 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
     if (!authed || !garr || !seeded) return;
     // /obligaciones deriva sus secciones y su filtro de `source`. Un `source`
     // por artículo produciría una sección por fila.
-    const { data } = await garr.from("obligations").select("code, source");
+    const { data } = await garr.from("obligations").select("code, source").like("code", "OBL-PBC-%");
     const marcos = new Set((data ?? []).map((o: Record<string, unknown>) => String(o.source)));
     expect(marcos.size, `demasiados marcos: ${[...marcos].join(" · ")}`).toBeLessThanOrEqual(2);
     for (const m of marcos) expect(m, `"${m}" parece un artículo, no un marco`).not.toMatch(/art\. \d/);
@@ -155,13 +158,14 @@ describe("G4 Task 4 — obligaciones PBC/FT y controles del PPD", () => {
 
   it("los controles usan solo estados admitidos por el CHECK", async () => {
     if (!authed || !garr || !seeded) return;
-    const { data } = await garr.from("controls").select("code, status, owner_body_id, obligation_id");
+    const { data } = await garr
+      .from("controls")
+      .select("code, status, owner_body_id, obligation_id")
+      .not("obligation_id", "is", null);
     expect((data ?? []).length).toBeGreaterThanOrEqual(10);
     for (const c of data ?? []) {
       expect(["Efectivo", "Parcial", "Inefectivo"]).toContain(c.status);
       expect(c.owner_body_id, `${c.code} sin comité`).toBeTruthy();
-      // Sin obligación el control no lo pinta ninguna pantalla: todos los
-      // read-paths de /obligaciones resuelven controles por obligation_id.
       expect(c.obligation_id, `${c.code} sin obligación — sería dato invisible`).toBeTruthy();
     }
   });

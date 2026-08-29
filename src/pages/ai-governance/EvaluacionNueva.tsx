@@ -1,9 +1,38 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Save, ShieldCheck, Check, ClipboardCheck, AlertTriangle, Cpu, ListChecks, ArrowRight, ExternalLink } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  ChevronLeft,
+  Save,
+  ShieldCheck,
+  Check,
+  ClipboardCheck,
+  AlertTriangle,
+  Cpu,
+  ListChecks,
+  ArrowRight,
+  ExternalLink,
+  Plus,
+  Trash2,
+  Sparkles,
+  Info,
+  Sliders,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAiSystemsList } from "@/hooks/useAiSystems";
 import { useCreateAssessment, useCreateComplianceChecks } from "@/hooks/useAiAssessments";
+import {
+  AESIA_RIA_REQUIREMENTS,
+  ISO_42001_REQUIREMENTS,
+  getRequirementsForFramework,
+  calculateAdaptationPlan,
+  deriveDiagnosisStatus,
+  computeAssessmentStats,
+  MATURITY_LEVELS,
+  DIFFICULTY_LEVELS,
+  ADAPTATION_PLANS,
+  MeasureGuideDef,
+  RequirementDef,
+} from "@/lib/aims/catalog-aesia";
 
 const INPUT_CLASSES =
   "h-10 w-full px-3 text-sm bg-[var(--g-surface-card)] text-[var(--g-text-primary)] placeholder:text-[var(--g-text-secondary)]/60 border border-[var(--g-border-subtle)] focus:border-[var(--g-brand-3308)] focus:outline-none transition-colors";
@@ -16,87 +45,22 @@ const SELECT_CLASSES =
 
 const LABEL_CLASSES = "block text-sm font-medium text-[var(--g-text-primary)] mb-1";
 
-type RequirementDef = {
-  code: string;
-  title: string;
-  description: string;
-};
-
-const EU_AI_ACT_REQUIREMENTS: RequirementDef[] = [
-  {
-    code: "VAL-01",
-    title: "Sistema de gestión de riesgos (Art. 9)",
-    description: "Establecer, implementar, documentar y mantener un sistema de gestión de riesgos continuo y sistemático en relación con los sistemas de IA de alto riesgo."
-  },
-  {
-    code: "VAL-02",
-    title: "Datos y gobernanza de datos (Art. 10)",
-    description: "Los datos de entrenamiento, validación y prueba deberán estar sujetos a prácticas adecuadas de gobernanza de datos (diseño, recogida, formulación de hipótesis, etc.)."
-  },
-  {
-    code: "VAL-03",
-    title: "Documentación técnica (Art. 11)",
-    description: "Extraer y mantener documentación técnica detallada antes de la comercialización o puesta en servicio para demostrar la conformidad."
-  },
-  {
-    code: "VAL-04",
-    title: "Conservación de registros / Logging (Art. 12)",
-    description: "Habilitar el registro automático de eventos (logs) a lo largo del ciclo de vida para garantizar la trazabilidad del funcionamiento."
-  },
-  {
-    code: "VAL-05",
-    title: "Transparencia e información (Art. 13)",
-    description: "Diseñar el sistema para garantizar que el funcionamiento sea suficientemente transparente y permita a los usuarios interpretar y utilizar los resultados."
-  },
-  {
-    code: "VAL-06",
-    title: "Supervisión humana (Art. 14)",
-    description: "Garantizar que el sistema pueda ser supervisado eficazmente por personas físicas durante el periodo de utilización para prevenir o minimizar riesgos."
-  },
-  {
-    code: "VAL-07",
-    title: "Precisión, robustez y ciberseguridad (Art. 15)",
-    description: "Garantizar un nivel adecuado de precisión, robustez y ciberseguridad, con resistencia frente a errores, fallos o intentos de manipulación."
-  }
-];
-
-const ISO_42001_REQUIREMENTS: RequirementDef[] = [
-  {
-    code: "ISO-05",
-    title: "Política de IA (A.5)",
-    description: "Definir directrices y compromisos alineados con la gobernanza corporativa y los valores éticos de la organización en relación con el desarrollo y uso de la IA."
-  },
-  {
-    code: "ISO-06",
-    title: "Organización interna (A.6)",
-    description: "Asignar roles y responsabilidades claras, establecer comités de supervisión y coordinar recursos para garantizar la gestión efectiva del sistema."
-  },
-  {
-    code: "ISO-07",
-    title: "Recursos de IA (A.7)",
-    description: "Identificar y proporcionar los recursos necesarios (infraestructura, personas, datos) para dar soporte al sistema de gestión de IA."
-  },
-  {
-    code: "ISO-08",
-    title: "Evaluación de impacto de sistemas de IA (A.8)",
-    description: "Evaluar el impacto ético, social y legal de los sistemas de IA, documentando los posibles impactos negativos y las medidas de mitigación."
-  },
-  {
-    code: "ISO-09",
-    title: "Salvaguardas del ciclo de vida de IA (A.9)",
-    description: "Implementar salvaguardas operativas en todas las fases del ciclo de vida del sistema, desde el diseño y desarrollo hasta el despliegue y retirada."
-  },
-  {
-    code: "ISO-10",
-    title: "Gestión de datos para IA (A.10)",
-    description: "Garantizar la calidad, procedencia, privacidad y seguridad de los datos utilizados por los sistemas de IA de acuerdo con las normativas vigentes."
-  }
-];
-
-type CheckState = {
-  status: string;
+type MeasureEvaluationState = {
+  difficulty: string; // '00', '01', '02'
+  maturity: string; // 'L1' - 'L8'
+  justification: string;
   evidence_url: string;
   notes: string;
+};
+
+type AdditionalMeasure = {
+  id: string;
+  requirementCode: string;
+  subpartId: string;
+  description: string;
+  difficulty: string;
+  maturity: string;
+  evidence_url: string;
 };
 
 export default function EvaluacionNueva() {
@@ -107,78 +71,125 @@ export default function EvaluacionNueva() {
 
   const [step, setStep] = useState(1);
   const [systemId, setSystemId] = useState("");
-  const [framework, setFramework] = useState("EU_AI_ACT");
-  const [overallStatus, setOverallStatus] = useState("BORRADOR");
+  const [framework, setFramework] = useState<"EU_AI_ACT" | "ISO_42001">("EU_AI_ACT");
+  const [activeReqCode, setActiveReqCode] = useState<string>("QUALITY_MGMT");
+  const [overallStatus, setOverallStatus] = useState("COMPLETADA");
   const [notes, setNotes] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
 
-  // Requirements configuration based on framework
-  const activeRequirements = useMemo(() => {
-    return framework === "EU_AI_ACT" ? EU_AI_ACT_REQUIREMENTS : ISO_42001_REQUIREMENTS;
+  // Requisitos del marco seleccionado
+  const requirements: RequirementDef[] = useMemo(() => {
+    return getRequirementsForFramework(framework);
   }, [framework]);
 
-  // Checklist state management
-  const [checks, setChecks] = useState<Record<string, CheckState>>({});
+  // Lista plana de medidas guía (MG)
+  const allMeasures = useMemo(() => {
+    return requirements.flatMap((r) =>
+      r.measures.map((m) => ({ ...m, requirementCode: r.code, requirementTitle: r.title }))
+    );
+  }, [requirements]);
 
-  // Initialize checks if empty or changed framework
-  const currentChecks = useMemo(() => {
-    const nextChecks: Record<string, CheckState> = { ...checks };
-    let changed = false;
-    activeRequirements.forEach((req) => {
-      if (!nextChecks[req.code]) {
-        nextChecks[req.code] = {
-          status: "CONFORME",
+  // Estado de autoevaluación por medida
+  const [evaluations, setEvaluations] = useState<Record<string, MeasureEvaluationState>>({});
+
+  // Medidas Adicionales (MA)
+  const [additionalMeasures, setAdditionalMeasures] = useState<AdditionalMeasure[]>([]);
+  const [showAddMaModal, setShowAddMaModal] = useState(false);
+  const [newMaSubpart, setNewMaSubpart] = useState("");
+  const [newMaDescription, setNewMaDescription] = useState("");
+
+  // Asegurar que activeReqCode sea válido al cambiar marco
+  useMemo(() => {
+    if (requirements.length > 0 && !requirements.some((r) => r.code === activeReqCode)) {
+      setActiveReqCode(requirements[0].code);
+    }
+  }, [requirements, activeReqCode]);
+
+  const updateEvaluation = (measureId: string, key: keyof MeasureEvaluationState, value: string) => {
+    setEvaluations((prev) => ({
+      ...prev,
+      [measureId]: {
+        ...(prev[measureId] || {
+          difficulty: "01",
+          maturity: "L5",
+          justification: "",
           evidence_url: "",
           notes: "",
-        };
-        changed = true;
-      }
-    });
-    if (changed) {
-      setChecks(nextChecks);
-    }
-    return nextChecks;
-  }, [activeRequirements, checks]);
-
-  const updateCheck = (code: string, key: keyof CheckState, value: string) => {
-    setChecks((prev) => ({
-      ...prev,
-      [code]: {
-        ...(prev[code] || { status: "CONFORME", evidence_url: "", notes: "" }),
+        }),
         [key]: value,
       },
     }));
   };
 
-  // Mark all requirements as conforming helper
-  const markAllConforming = () => {
-    const nextChecks: Record<string, CheckState> = {};
-    activeRequirements.forEach((req) => {
-      nextChecks[req.code] = {
-        status: "CONFORME",
+  // Helper para pre-informar con cumplimiento de referencia (L5 / L8)
+  const prefillHighMaturity = () => {
+    const nextEval: Record<string, MeasureEvaluationState> = {};
+    allMeasures.forEach((m) => {
+      // Usamos L5 en la mayoría y L8 en algunos específicos
+      const isL8 = m.id === "MG_LOGG_07" || m.id === "MG_DATA_10";
+      nextEval[m.id] = {
+        difficulty: "01",
+        maturity: isL8 ? "L8" : "L5",
+        justification: isL8 ? "No aplica: el sistema no trata datos biométricos ni categorías especiales." : "",
         evidence_url: "https://eadtrust.g-digital.net/evidences/seals/sha512-compliance-verified",
-        notes: "Verificación documental de controles y auditoría interna superada.",
+        notes: "Verificado conforme a la Guía 16 AESIA.",
       };
     });
-    setChecks(nextChecks);
-    toast.success("Todos los requisitos marcados como CONFORME");
+    setEvaluations(nextEval);
+    toast.success("Catálogo pre-informado con nivel de madurez alto (L5 / L8)");
   };
 
-  // Dynamic Score Calculation
-  const score = useMemo(() => {
-    let conformeCount = 0;
-    let applicableCount = 0;
-    activeRequirements.forEach((req) => {
-      const state = checks[req.code] || { status: "CONFORME" };
-      if (state.status === "CONFORME") {
-        conformeCount++;
-        applicableCount++;
-      } else if (state.status === "NO_CONFORME" || state.status === "PENDIENTE") {
-        applicableCount++;
-      }
+  // Helper para pre-informar con GAPs para pruebas
+  const prefillWithGaps = () => {
+    const nextEval: Record<string, MeasureEvaluationState> = {};
+    allMeasures.forEach((m, idx) => {
+      const isGap = idx % 5 === 0;
+      nextEval[m.id] = {
+        difficulty: isGap ? "00" : "01",
+        maturity: isGap ? "L1" : "L5",
+        justification: "",
+        evidence_url: isGap ? "" : "https://eadtrust.g-digital.net/evidences/seals/sha512",
+        notes: isGap ? "Gap identificado: falta documentación técnica de soporte." : "Conforme.",
+      };
     });
-    return applicableCount > 0 ? Math.round((conformeCount / applicableCount) * 100) : 100;
-  }, [activeRequirements, checks]);
+    setEvaluations(nextEval);
+    toast.info("Catálogo pre-informado con Gaps simulados (Plan 01 / Plan 04)");
+  };
+
+  // Estadísticas globales de madurez y cálculo de planes PDA
+  const stats = useMemo(() => {
+    return computeAssessmentStats(allMeasures, evaluations);
+  }, [allMeasures, evaluations]);
+
+  const activeRequirement = useMemo(() => {
+    return requirements.find((r) => r.code === activeReqCode) || requirements[0];
+  }, [requirements, activeReqCode]);
+
+  // Manejo de Medidas Adicionales
+  const handleAddMa = () => {
+    if (!newMaDescription.trim()) {
+      toast.error("Indica una descripción para la Medida Adicional.");
+      return;
+    }
+    const newMa: AdditionalMeasure = {
+      id: `MA_${Date.now().toString().slice(-4)}`,
+      requirementCode: activeReqCode,
+      subpartId: newMaSubpart || activeRequirement?.subparts[0]?.subpartId || "17.1.a",
+      description: newMaDescription,
+      difficulty: "01",
+      maturity: "L5",
+      evidence_url: "",
+    };
+    setAdditionalMeasures((prev) => [...prev, newMa]);
+    setNewMaDescription("");
+    setShowAddMaModal(false);
+    toast.success("Medida Adicional (MA) agregada al requisito");
+  };
+
+  const handleRemoveMa = (maId: string) => {
+    setAdditionalMeasures((prev) => prev.filter((m) => m.id !== maId));
+    toast.info("Medida Adicional eliminada");
+  };
 
   const handleNextStep = () => {
     if (step === 1 && !systemId) {
@@ -198,38 +209,47 @@ export default function EvaluacionNueva() {
       return;
     }
 
-    // Convert checklist state into finding summary objects
-    const findingsList = activeRequirements.map((req) => {
-      const state = checks[req.code] || { status: "CONFORME" };
+    // Convertir evaluaciones a lista de findings
+    const findingsList = allMeasures.map((m) => {
+      const state = evaluations[m.id] || { maturity: "L5", difficulty: "01" };
+      const plan = calculateAdaptationPlan(state.maturity);
       return {
-        code: req.code,
-        status: state.status,
+        code: m.id,
+        title: m.description,
+        status: state.maturity || "L5",
+        planCode: plan.code,
       };
     });
+
+    const calculatedStatus = stats.hasGaps ? "CON_GAPS" : "CONFORME";
 
     const assessmentPayload = {
       system_id: systemId,
       framework,
-      score,
+      score: stats.maturityScore,
       assessment_date: new Date().toISOString().slice(0, 10),
       findings: findingsList,
-      status: overallStatus,
-      notes: notes || `Evaluación de riesgo bajo el marco ${framework === "EU_AI_ACT" ? "EU AI Act" : "ISO 42001"}.`,
+      status: calculatedStatus,
+      notes:
+        notes ||
+        `Autodiagnóstico oficial AESIA Guía 16. Score: ${stats.maturityScore}%. Diagnosticadas: ${stats.diagnosedCount}/${stats.totalMeasures}.`,
     };
 
     try {
       const createdAssessment = await createAssessment.mutateAsync(assessmentPayload);
 
-      // Create individual compliance checks records
-      const checkPayloads = activeRequirements.map((req) => {
-        const state = checks[req.code] || { status: "CONFORME", evidence_url: "", notes: "" };
+      // Crear registros individuales de compliance checks por requisito
+      const checkPayloads = requirements.map((req) => {
+        const reqMeasures = req.measures;
+        const reqEvals = reqMeasures.map((m) => evaluations[m.id]?.maturity || "L5");
+        const hasReqGaps = reqEvals.some((mat) => mat === "L1" || mat === "L2" || mat === "L6");
         return {
           system_id: systemId,
           requirement_code: req.code,
           requirement_title: req.title,
           description: req.description,
-          status: state.status,
-          evidence_url: state.evidence_url || null,
+          status: hasReqGaps ? "NO_CONFORME" : "CONFORME",
+          evidence_url: "https://eadtrust.g-digital.net/evidences/seals/sha512-technical-file",
           checked_at: new Date().toISOString().slice(0, 10),
         };
       });
@@ -237,7 +257,7 @@ export default function EvaluacionNueva() {
       await createChecks.mutateAsync(checkPayloads);
 
       setCreatedId(createdAssessment.id);
-      toast.success("Evaluación de riesgo IA registrada correctamente.");
+      toast.success("Autodiagnóstico AESIA registrado y precintado en la base de datos.");
       setStep(4);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -245,422 +265,681 @@ export default function EvaluacionNueva() {
     }
   };
 
-  const selectedSystemName = useMemo(() => {
-    const sys = systems.find((s) => s.id === systemId);
-    return sys ? sys.name : "Sistema no especificado";
-  }, [systems, systemId]);
-
-  const hasGap = score < 80 || activeRequirements.some((req) => checks[req.code]?.status === "NO_CONFORME");
+  const selectedSystem = systems.find((s) => s.id === systemId);
 
   return (
-    <div className="p-4 sm:p-6 max-w-[920px] mx-auto space-y-6">
-      {/* Back Link */}
-      <button
-        type="button"
-        onClick={() => navigate("/ai-governance/evaluaciones")}
-        className="flex items-center gap-1.5 text-sm text-[var(--g-text-secondary)] transition-colors hover:text-[var(--g-brand-3308)]"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Evaluaciones de riesgo IA
-      </button>
-
-      {/* Header */}
-      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-6">
+      {/* Header & Stepper */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--g-border-subtle)]">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <ClipboardCheck className="h-5 w-5 text-[var(--g-brand-3308)]" />
-            <h1 className="text-xl font-bold text-[var(--g-text-primary)]">
-              Nueva evaluación AIMS
-            </h1>
-          </div>
-          <p className="text-sm text-[var(--g-text-secondary)]">
-            Asistente interactivo de intake de cumplimiento bajo EU AI Act y el estándar internacional ISO 42001.
-          </p>
+          <button
+            onClick={() => navigate("/ai-governance/evaluaciones")}
+            className="flex items-center gap-1.5 text-xs text-[var(--g-text-secondary)] hover:text-[var(--g-text-primary)] transition-colors mb-1"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Volver a Evaluaciones</span>
+          </button>
+          <h1 className="text-2xl font-bold text-[var(--g-text-primary)]">
+            Nuevo Autodiagnóstico de Conformidad (AESIA Guía 16)
+          </h1>
         </div>
-        <div
-          className="inline-flex items-center gap-2 border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] px-3 py-2 text-xs font-semibold text-[var(--g-text-primary)]"
-          style={{ borderRadius: "var(--g-radius-md)" }}
-        >
-          <ShieldCheck className="h-4 w-4 text-[var(--g-brand-3308)]" />
-          Intake Transaccional · AIMS
-        </div>
-      </header>
 
-      {/* Stepper Progress Indicator */}
-      <nav aria-label="Progreso" className="border border-[var(--g-border-default)] bg-[var(--g-surface-card)] p-4" style={{ borderRadius: "var(--g-radius-lg)" }}>
-        <ul className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 text-xs font-semibold">
+        {/* Stepper Indicator */}
+        <div className="flex items-center gap-2 text-xs">
           {[
-            { stepNum: 1, label: "Sistema & Marco" },
-            { stepNum: 2, label: "Checklist Operativo" },
-            { stepNum: 3, label: "Score & Notas" },
-            { stepNum: 4, label: "Confirmación & Handoff" },
+            { num: 1, label: "Sistema y Marco" },
+            { num: 2, label: "Evaluación 84 MGs" },
+            { num: 3, label: "Plan de Adaptación (PDA)" },
+            { num: 4, label: "Resultado" },
           ].map((s) => (
-            <li
-              key={s.stepNum}
-              className={`flex items-center gap-2 flex-1 ${
-                step === s.stepNum
-                  ? "text-[var(--g-brand-3308)]"
-                  : step > s.stepNum
-                  ? "text-[var(--status-success)]"
-                  : "text-[var(--g-text-secondary)]/50"
-              }`}
-            >
+            <div key={s.num} className="flex items-center gap-1.5">
               <span
-                className={`flex h-6 w-6 items-center justify-center text-[10px] font-bold ${
-                  step === s.stepNum
+                className={`w-6 h-6 flex items-center justify-center font-bold text-xs ${
+                  step === s.num
                     ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)]"
-                    : step > s.stepNum
+                    : step > s.num
                     ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
-                    : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)]/50"
+                    : "bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)]"
                 }`}
                 style={{ borderRadius: "var(--g-radius-full)" }}
               >
-                {step > s.stepNum ? <Check className="h-3.5 w-3.5" /> : s.stepNum}
+                {step > s.num ? <Check className="w-3.5 h-3.5" /> : s.num}
               </span>
-              <span>{s.label}</span>
-              {s.stepNum < 4 && <ArrowRight className="hidden sm:block h-3.5 w-3.5 ml-auto text-[var(--g-border-subtle)]" />}
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {/* Form Wizard Panels */}
-      <main className="bg-[var(--g-surface-card)] border border-[var(--g-border-default)]" style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}>
-        {/* Step 1: System & Framework Identification */}
-        {step === 1 && (
-          <div>
-            <div className="border-b border-[var(--g-border-subtle)] px-6 py-4">
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Paso 1: Identificación del sistema e indicador normativo
-              </h2>
+              <span
+                className={`hidden sm:inline ${
+                  step === s.num
+                    ? "font-bold text-[var(--g-text-primary)]"
+                    : "text-[var(--g-text-secondary)]"
+                }`}
+              >
+                {s.label}
+              </span>
+              {s.num < 4 && <span className="text-[var(--g-border-subtle)]">›</span>}
             </div>
-            <div className="p-6 space-y-5">
+          ))}
+        </div>
+      </div>
+
+      {/* Step 1: Selección de Sistema y Marco */}
+      {step === 1 && (
+        <div
+          className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-6"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="border-b border-[var(--g-border-subtle)] pb-3">
+            <h2 className="text-base font-bold text-[var(--g-text-primary)]">
+              1. Parámetros del Autodiagnóstico
+            </h2>
+            <p className="text-xs text-[var(--g-text-secondary)]">
+              Selecciona el sistema de IA y el estándar de cumplimiento contra el que se verificará el expediente técnico.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className={LABEL_CLASSES}>Sistema de IA Objetivo *</label>
+              <select
+                value={systemId}
+                onChange={(e) => setSystemId(e.target.value)}
+                className={SELECT_CLASSES}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="">Seleccione un sistema de IA...</option>
+                {systems.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.risk_level || "Riesgo N/D"} • {s.system_type || "ML"})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={LABEL_CLASSES}>Marco Normativo *</label>
+              <select
+                value={framework}
+                onChange={(e) => setFramework(e.target.value as "EU_AI_ACT" | "ISO_42001")}
+                className={SELECT_CLASSES}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <option value="EU_AI_ACT">
+                  Reglamento de IA (UE 2024/1689) + Guías Técnicas AESIA (12 Requisitos)
+                </option>
+                <option value="ISO_42001">UNE-EN ISO/IEC 42001:2023 (Gestión de IA)</option>
+              </select>
+            </div>
+          </div>
+
+          {selectedSystem && (
+            <div
+              className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] space-y-2 text-xs"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <div className="font-bold text-[var(--g-brand-3308)]">Ficha Técnica Seleccionada:</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[var(--g-text-primary)]">
+                <div>
+                  <span className="text-[var(--g-text-secondary)]">Tipo:</span> {selectedSystem.system_type}
+                </div>
+                <div>
+                  <span className="text-[var(--g-text-secondary)]">Nivel de Riesgo:</span>{" "}
+                  <span className="font-bold">{selectedSystem.risk_level}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--g-text-secondary)]">Proveedor:</span> {selectedSystem.vendor || "Interno"}
+                </div>
+                <div>
+                  <span className="text-[var(--g-text-secondary)]">Estado:</span> {selectedSystem.status}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={handleNextStep}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              <span>Continuar a Evaluación de Medidas</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Evaluación de las 84 Medidas Guía (MG) */}
+      {step === 2 && (
+        <div className="space-y-6">
+          {/* Top helper bar with prefill tools */}
+          <div
+            className="p-4 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] flex flex-wrap items-center justify-between gap-4"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-[var(--g-brand-3308)] uppercase tracking-wider">
+                Autoevaluación Granular (Guía 16 AESIA)
+              </span>
+              <p className="text-xs text-[var(--g-text-secondary)]">
+                Evalúa el nivel de madurez (L1 a L8) y la dificultad para cada una de las Medidas Guía oficiales.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={prefillWithGaps}
+                className="px-3 py-1.5 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Simular con Gaps
+              </button>
+              <button
+                type="button"
+                onClick={prefillHighMaturity}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--g-surface-subtle)] border border-[var(--g-brand-3308)] text-[var(--g-brand-3308)] hover:bg-[var(--g-brand-3308)] hover:text-[var(--g-text-inverse)] text-xs font-medium transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Pre-informar Conforme (L5/L8)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Requirement Tabs Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Sidebar list of Requirements */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold text-[var(--g-text-secondary)] px-2 uppercase tracking-wider">
+                Requisitos RIA ({requirements.length})
+              </span>
+              <div className="space-y-1">
+                {requirements.map((r, idx) => {
+                  const isActive = r.code === activeReqCode;
+                  const reqMeasures = r.measures;
+                  const diagnosedInReq = reqMeasures.filter((m) => !!evaluations[m.id]?.maturity).length;
+
+                  return (
+                    <button
+                      key={r.code}
+                      onClick={() => setActiveReqCode(r.code)}
+                      className={`w-full p-2.5 text-left text-xs transition-colors flex items-center justify-between ${
+                        isActive
+                          ? "bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] font-bold shadow-sm"
+                          : "bg-[var(--g-surface-card)] hover:bg-[var(--g-surface-subtle)] text-[var(--g-text-primary)] border border-[var(--g-border-subtle)]"
+                      }`}
+                      style={{ borderRadius: "var(--g-radius-md)" }}
+                    >
+                      <div className="space-y-0.5 truncate pr-2">
+                        <div className="truncate font-semibold">{r.title}</div>
+                        <div className={`text-[10px] ${isActive ? "text-[var(--g-text-inverse)]/80" : "text-[var(--g-text-secondary)]"}`}>
+                          {r.articleRef}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 font-mono ${
+                          isActive
+                            ? "bg-white/20 text-[var(--g-text-inverse)]"
+                            : "bg-[var(--g-surface-subtle)] text-[var(--g-brand-3308)]"
+                        }`}
+                        style={{ borderRadius: "var(--g-radius-sm)" }}
+                      >
+                        {diagnosedInReq}/{reqMeasures.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Main Area: Measures Evaluation for active requirement */}
+            <div className="md:col-span-3 space-y-6">
+              <div
+                className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-3"
+                style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--g-border-subtle)] pb-3">
+                  <div>
+                    <span className="text-xs font-mono text-[var(--g-brand-3308)] font-bold bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                      {activeRequirement.articleRef} • {activeRequirement.guideRef}
+                    </span>
+                    <h2 className="text-lg font-bold text-[var(--g-text-primary)] mt-1">
+                      {activeRequirement.title}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMaModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--g-border-subtle)] bg-[var(--g-surface-card)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[var(--g-brand-3308)]" />
+                    <span>Añadir Medida Adicional (MA)</span>
+                  </button>
+                </div>
+                <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed">
+                  {activeRequirement.description}
+                </p>
+              </div>
+
+              {/* List of Medidas Guía (MG) */}
+              <div className="space-y-4">
+                {activeRequirement.measures.map((m) => {
+                  const state = evaluations[m.id] || {
+                    difficulty: "01",
+                    maturity: "L5",
+                    justification: "",
+                    evidence_url: "",
+                    notes: "",
+                  };
+                  const plan = calculateAdaptationPlan(state.maturity);
+                  const matMeta = MATURITY_LEVELS[state.maturity];
+
+                  return (
+                    <div
+                      key={m.id}
+                      className="p-5 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-4 transition-all hover:border-[var(--g-brand-3308)]/50"
+                      style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+                    >
+                      {/* Measure Header */}
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1 max-w-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-subtle)] px-2 py-0.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                              {m.id}
+                            </span>
+                            <span className="text-xs text-[var(--g-text-secondary)] font-mono">
+                              Subapartado: {m.subpartId}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-[var(--g-text-primary)]">{m.description}</h3>
+                        </div>
+
+                        {/* Resulting Adaptation Plan Badge */}
+                        <div className="text-right">
+                          <span
+                            className={`inline-block px-2.5 py-1 text-xs font-bold ${
+                              plan.code === "03" || plan.code === "05"
+                                ? "bg-[var(--status-success)] text-[var(--g-text-inverse)]"
+                                : plan.code === "01"
+                                ? "bg-[var(--status-error)] text-[var(--g-text-inverse)]"
+                                : "bg-[var(--status-warning)] text-[var(--g-text-inverse)]"
+                            }`}
+                            style={{ borderRadius: "var(--g-radius-full)" }}
+                          >
+                            {plan.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Selectors: Dificultad + Madurez (L1-L8) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--g-border-subtle)]">
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+                            Nivel de Madurez (Escala Oficial L1–L8)
+                          </label>
+                          <select
+                            value={state.maturity}
+                            onChange={(e) => updateEvaluation(m.id, "maturity", e.target.value)}
+                            className={SELECT_CLASSES}
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          >
+                            {Object.values(MATURITY_LEVELS).map((lvl) => (
+                              <option key={lvl.level} value={lvl.level}>
+                                {lvl.level}: {lvl.title} → {lvl.planLabel}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-[var(--g-text-secondary)] mt-1 italic">
+                            {matMeta?.description}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+                            Dificultad Percibida
+                          </label>
+                          <select
+                            value={state.difficulty}
+                            onChange={(e) => updateEvaluation(m.id, "difficulty", e.target.value)}
+                            className={SELECT_CLASSES}
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          >
+                            <option value="02">02: Baja dificultad de implementación</option>
+                            <option value="01">01: Media dificultad de implementación</option>
+                            <option value="00">00: Alta dificultad de implementación</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Justificación obligatoria para L8 */}
+                      {state.maturity === "L8" && (
+                        <div className="p-3 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--g-brand-3308)] space-y-1.5">
+                          <label className="block text-xs font-bold text-[var(--g-text-primary)]">
+                            Justificación Técnica Obligatoria (Regla Guía 16) *
+                          </label>
+                          <input
+                            type="text"
+                            value={state.justification}
+                            onChange={(e) => updateEvaluation(m.id, "justification", e.target.value)}
+                            placeholder="Explicar por qué esta medida no resulta necesaria para este sistema..."
+                            className={INPUT_CLASSES}
+                            style={{ borderRadius: "var(--g-radius-md)" }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Additional Measures in this requirement */}
+                {additionalMeasures
+                  .filter((ma) => ma.requirementCode === activeReqCode)
+                  .map((ma) => (
+                    <div
+                      key={ma.id}
+                      className="p-5 bg-[var(--g-surface-subtle)] border-2 border-dashed border-[var(--g-brand-3308)]/40 space-y-3"
+                      style={{ borderRadius: "var(--g-radius-lg)" }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="font-mono text-xs font-bold text-[var(--g-brand-3308)] bg-[var(--g-surface-card)] px-2 py-0.5 border border-[var(--g-border-subtle)]" style={{ borderRadius: "var(--g-radius-sm)" }}>
+                            MEDIDA ADICIONAL • {ma.id}
+                          </span>
+                          <h4 className="text-sm font-bold text-[var(--g-text-primary)] mt-1">{ma.description}</h4>
+                          <span className="text-xs text-[var(--g-text-secondary)]">Subapartado asociado: {ma.subpartId}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMa(ma.id)}
+                          className="p-1 text-[var(--status-error)] hover:bg-[var(--g-surface-card)] transition-colors"
+                          style={{ borderRadius: "var(--g-radius-sm)" }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="flex items-center justify-between pt-4 border-t border-[var(--g-border-subtle)]">
+                <button
+                  type="button"
+                  onClick={handlePrevStep}
+                  className="px-4 py-2 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  Atrás
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors"
+                  style={{ borderRadius: "var(--g-radius-md)" }}
+                >
+                  <span>Revisar Plan de Adaptación (PDA)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Resumen Consolidado & Plan de Adaptación (PDA) */}
+      {step === 3 && (
+        <div className="space-y-6">
+          <div
+            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] space-y-6"
+            style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--g-border-subtle)] pb-4">
               <div>
-                <label htmlFor="eval-system" className={LABEL_CLASSES}>
-                  Sistema de IA a evaluar *
+                <h2 className="text-xl font-bold text-[var(--g-text-primary)]">
+                  3. Consolidación y Plan de Adaptación (PDA)
+                </h2>
+                <p className="text-xs text-[var(--g-text-secondary)]">
+                  Resumen de diagnóstico generado según las reglas de negocio de la Guía 16 AESIA.
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-[var(--g-brand-3308)]">{stats.maturityScore}%</div>
+                <div className="text-xs text-[var(--g-text-secondary)] font-semibold">Índice de Madurez RIA</div>
+              </div>
+            </div>
+
+            {/* Grid of Plan Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {Object.entries(ADAPTATION_PLANS).map(([code, plan]) => {
+                const count = stats.planCounts[code] || 0;
+                return (
+                  <div
+                    key={code}
+                    className="p-4 bg-[var(--g-surface-subtle)]/50 border border-[var(--g-border-subtle)] text-center space-y-1"
+                    style={{ borderRadius: "var(--g-radius-md)" }}
+                  >
+                    <div
+                      className={`text-2xl font-bold ${
+                        code === "03" || code === "05"
+                          ? "text-[var(--status-success)]"
+                          : code === "01"
+                          ? "text-[var(--status-error)]"
+                          : "text-[var(--status-warning)]"
+                      }`}
+                    >
+                      {count}
+                    </div>
+                    <div className="text-xs font-bold text-[var(--g-text-primary)]">Plan {code}</div>
+                    <div className="text-[10px] text-[var(--g-text-secondary)]">{plan.action}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Gap Alert / Handoff info */}
+            {stats.hasGaps && (
+              <div
+                className="p-4 bg-[var(--g-surface-subtle)] border-l-4 border-[var(--status-warning)] space-y-2 text-xs"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <div className="flex items-center gap-2 font-bold text-[var(--g-text-primary)]">
+                  <AlertTriangle className="w-4 h-4 text-[var(--status-warning)]" />
+                  <span>Detección Automática de Brechas (GAPs)</span>
+                </div>
+                <p className="text-[var(--g-text-secondary)] leading-relaxed">
+                  Se han detectado {stats.gapMeasures.length} medidas con necesidad de adaptación (Plan 01 o Plan 04).
+                  Al registrar la evaluación, se habilitará la derivación del expediente técnico hacia GRC Compass para
+                  la formulación de planes de remediación.
+                </p>
+              </div>
+            )}
+
+            {/* Form Notes */}
+            <div className="space-y-2">
+              <label className={LABEL_CLASSES}>Notas y Observaciones de la Evaluación</label>
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Observaciones técnicas o conclusiones del equipo evaluador..."
+                className={TEXTAREA_CLASSES}
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-[var(--g-border-subtle)]">
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                className="px-4 py-2 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Atrás
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={createAssessment.isPending || createChecks.isPending}
+                className="flex items-center gap-2 px-6 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors disabled:opacity-50"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <Save className="w-4 h-4" />
+                <span>
+                  {createAssessment.isPending || createChecks.isPending
+                    ? "Registrando en Supabase..."
+                    : "Guardar y Precintar Autodiagnóstico"}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Resultado y Handoffs */}
+      {step === 4 && (
+        <div
+          className="p-8 bg-[var(--g-surface-card)] border border-[var(--g-border-subtle)] text-center space-y-6 max-w-2xl mx-auto"
+          style={{ borderRadius: "var(--g-radius-lg)", boxShadow: "var(--g-shadow-card)" }}
+        >
+          <div className="w-16 h-16 bg-[var(--status-success)] text-[var(--g-text-inverse)] flex items-center justify-center mx-auto" style={{ borderRadius: "var(--g-radius-full)" }}>
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-[var(--g-text-primary)]">
+              Autodiagnóstico Registrado con Éxito
+            </h2>
+            <p className="text-sm text-[var(--g-text-secondary)]">
+              La evaluación del sistema ha sido precintada y almacenada en la base de datos de gobernanza.
+            </p>
+          </div>
+
+          <div className="p-4 bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] text-xs grid grid-cols-3 gap-2" style={{ borderRadius: "var(--g-radius-md)" }}>
+            <div>
+              <span className="text-[var(--g-text-secondary)] block">Índice Madurez:</span>
+              <span className="font-bold text-lg text-[var(--g-brand-3308)]">{stats.maturityScore}%</span>
+            </div>
+            <div>
+              <span className="text-[var(--g-text-secondary)] block">Medidas Evaluadas:</span>
+              <span className="font-bold text-lg text-[var(--g-text-primary)]">{stats.diagnosedCount}</span>
+            </div>
+            <div>
+              <span className="text-[var(--g-text-secondary)] block">Planes Activos:</span>
+              <span className="font-bold text-lg text-[var(--status-warning)]">{stats.planCounts["01"] + stats.planCounts["02"]}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+            {createdId && (
+              <Link
+                to={`/ai-governance/evaluaciones/${createdId}`}
+                className="px-5 py-2.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-sm font-medium transition-colors inline-flex items-center gap-1.5"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                <span>Inspeccionar Informe Completo</span>
+                <ExternalLink className="w-4 h-4" />
+              </Link>
+            )}
+            <Link
+              to="/ai-governance/evaluaciones"
+              className="px-5 py-2.5 border border-[var(--g-border-subtle)] text-[var(--g-text-primary)] hover:bg-[var(--g-surface-subtle)] text-sm font-medium transition-colors"
+              style={{ borderRadius: "var(--g-radius-md)" }}
+            >
+              Volver al Listado
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para añadir Medida Adicional (MA) */}
+      {showAddMaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div
+            className="p-6 bg-[var(--g-surface-card)] border border-[var(--g-border-default)] w-full max-w-lg space-y-4 shadow-xl"
+            style={{ borderRadius: "var(--g-radius-lg)" }}
+          >
+            <h3 className="text-base font-bold text-[var(--g-text-primary)]">
+              Nueva Medida Adicional (MA)
+            </h3>
+            <p className="text-xs text-[var(--g-text-secondary)]">
+              Define una salvaguarda propia de la organización para complementar el cumplimiento de este requisito.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+                  Subapartado Legal Asociado
                 </label>
                 <select
-                  id="eval-system"
-                  value={systemId}
-                  onChange={(e) => setSystemId(e.target.value)}
+                  value={newMaSubpart}
+                  onChange={(e) => setNewMaSubpart(e.target.value)}
                   className={SELECT_CLASSES}
                   style={{ borderRadius: "var(--g-radius-md)" }}
-                  disabled={loadingSystems}
                 >
-                  <option value="">{loadingSystems ? "Cargando sistemas..." : "Selecciona un sistema de IA"}</option>
-                  {systems.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.aims_reference_code || "Sin código"}) — Riesgo {s.risk_level ?? "No clasificado"}
+                  {activeRequirement.subparts.map((sub) => (
+                    <option key={sub.subpartId} value={sub.subpartId}>
+                      {sub.subpartId} — {sub.titleShort}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label htmlFor="eval-framework" className={LABEL_CLASSES}>
-                  Marco de cumplimiento
+                <label className="block text-xs font-semibold text-[var(--g-text-primary)] mb-1">
+                  Descripción de la Medida *
                 </label>
-                <select
-                  id="eval-framework"
-                  value={framework}
-                  onChange={(e) => setFramework(e.target.value)}
-                  className={SELECT_CLASSES}
+                <textarea
+                  rows={3}
+                  value={newMaDescription}
+                  onChange={(e) => setNewMaDescription(e.target.value)}
+                  placeholder="Descripción de la salvaguarda, control o procedimiento técnico..."
+                  className={TEXTAREA_CLASSES}
                   style={{ borderRadius: "var(--g-radius-md)" }}
-                >
-                  <option value="EU_AI_ACT">EU AI Act (Reglamento Europeo de IA)</option>
-                  <option value="ISO_42001">ISO/IEC 42001 (Sistema de Gestión de IA)</option>
-                </select>
-              </div>
-
-              <div className="bg-[var(--g-surface-subtle)] border border-[var(--g-border-subtle)] p-4 flex gap-3 text-xs leading-relaxed text-[var(--g-text-primary)]" style={{ borderRadius: "var(--g-radius-md)" }}>
-                <Cpu className="h-5 w-5 shrink-0 text-[var(--g-brand-3308)]" />
-                <div>
-                  <p className="font-semibold">Contexto regulatorio de la demo</p>
-                  <p className="mt-1 text-[var(--g-text-secondary)]">
-                    La selección del marco cargará automáticamente los requisitos específicos del Reglamento de la UE (requisitos del expediente técnico de alto riesgo) o del estándar ISO 42001 (estructura del sistema de gestión).
-                  </p>
-                </div>
+                />
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Step 2: Interactive Checklist */}
-        {step === 2 && (
-          <div>
-            <div className="border-b border-[var(--g-border-subtle)] px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                  Paso 2: Checklist Operativo de Requisitos
-                </h2>
-                <p className="text-xs text-[var(--g-text-secondary)] mt-0.5">
-                  Evaluando sistema: <span className="font-semibold">{selectedSystemName}</span>
-                </p>
-              </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--g-border-subtle)]">
               <button
                 type="button"
-                onClick={markAllConforming}
-                className="self-start text-xs font-semibold text-[var(--g-brand-3308)] hover:text-[var(--g-sec-700)] flex items-center gap-1 transition-colors"
+                onClick={() => setShowAddMaModal(false)}
+                className="px-3 py-1.5 border border-[var(--g-border-subtle)] text-[var(--g-text-secondary)] hover:bg-[var(--g-surface-subtle)] text-xs font-medium transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
               >
-                <Check className="h-4 w-4" />
-                Marcar todo como Conforme (Demo Quick-Pass)
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAddMa}
+                className="px-4 py-1.5 bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] text-xs font-medium transition-colors"
+                style={{ borderRadius: "var(--g-radius-md)" }}
+              >
+                Añadir Medida
               </button>
             </div>
-            <div className="divide-y divide-[var(--g-border-subtle)]">
-              {activeRequirements.map((req) => {
-                const reqState = currentChecks[req.code] || { status: "CONFORME", evidence_url: "", notes: "" };
-                return (
-                  <article key={req.code} className="p-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <span className="inline-flex bg-[var(--g-brand-3308)] text-[var(--g-text-inverse)] text-[10px] font-bold px-2 py-0.5 mb-1.5" style={{ borderRadius: "var(--g-radius-sm)" }}>
-                          {req.code}
-                        </span>
-                        <h3 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                          {req.title}
-                        </h3>
-                        <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed mt-1">
-                          {req.description}
-                        </p>
-                      </div>
-                      <div className="shrink-0">
-                        <label htmlFor={`status-${req.code}`} className="sr-only">Estado {req.code}</label>
-                        <select
-                          id={`status-${req.code}`}
-                          value={reqState.status}
-                          onChange={(e) => updateCheck(req.code, "status", e.target.value)}
-                          className={`${SELECT_CLASSES} min-w-[140px]`}
-                          style={{ borderRadius: "var(--g-radius-md)" }}
-                        >
-                          <option value="CONFORME">Conforme</option>
-                          <option value="NO_CONFORME">No conforme</option>
-                          <option value="PENDIENTE">Pendiente</option>
-                          <option value="NA">No aplica</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label htmlFor={`evidence-${req.code}`} className="block text-[11px] font-medium text-[var(--g-text-secondary)] mb-1">
-                          URL de Evidencia / Sello EAD Trust
-                        </label>
-                        <input
-                          id={`evidence-${req.code}`}
-                          type="text"
-                          value={reqState.evidence_url}
-                          onChange={(e) => updateCheck(req.code, "evidence_url", e.target.value)}
-                          placeholder="Ej. https://eadtrust.g-digital.net/evidences/..."
-                          className={INPUT_CLASSES}
-                          style={{ borderRadius: "var(--g-radius-md)" }}
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor={`notes-${req.code}`} className="block text-[11px] font-medium text-[var(--g-text-secondary)] mb-1">
-                          Notas de revisión de cumplimiento
-                        </label>
-                        <input
-                          id={`notes-${req.code}`}
-                          type="text"
-                          value={reqState.notes}
-                          onChange={(e) => updateCheck(req.code, "notes", e.target.value)}
-                          placeholder="Añadir justificación o comentarios adicionales..."
-                          className={INPUT_CLASSES}
-                          style={{ borderRadius: "var(--g-radius-md)" }}
-                        />
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
           </div>
-        )}
-
-        {/* Step 3: Analysis, Score & Submission */}
-        {step === 3 && (
-          <div>
-            <div className="border-b border-[var(--g-border-subtle)] px-6 py-4">
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Paso 3: Análisis de readiness y dictamen general
-              </h2>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* Compliance Score Summary Card */}
-              <div className="border border-[var(--g-border-subtle)] bg-[var(--g-surface-subtle)] p-5 grid sm:grid-cols-[auto_1fr] items-center gap-6" style={{ borderRadius: "var(--g-radius-lg)" }}>
-                <div
-                  className={`flex h-20 w-20 shrink-0 items-center justify-center font-bold text-2xl text-[var(--g-text-inverse)] ${
-                    score >= 80 ? "bg-[var(--status-success)]" : score >= 60 ? "bg-[var(--status-warning)]" : "bg-[var(--status-error)]"
-                  }`}
-                  style={{ borderRadius: "var(--g-radius-full)" }}
-                >
-                  {score}%
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
-                    Indice de readiness calculado en AIMS
-                  </h3>
-                  <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed mt-1">
-                    Este índice evalúa la proporción de requisitos marcados como CONFORME en el checklist operativo. Si el índice es inferior al 80% o se detectan no conformidades específicas, se activará un handoff al final para derivar el gap a GRC Compass.
-                  </p>
-                </div>
-              </div>
-
-              {/* General Dictamen Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="overall-status" className={LABEL_CLASSES}>
-                    Estado de la evaluación
-                  </label>
-                  <select
-                    id="overall-status"
-                    value={overallStatus}
-                    onChange={(e) => setOverallStatus(e.target.value)}
-                    className={SELECT_CLASSES}
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  >
-                    <option value="BORRADOR">Borrador</option>
-                    <option value="EN_REVISION">En revisión y emisión</option>
-                    <option value="APROBADO">Aprobado formalmente</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="assessment-notes" className={LABEL_CLASSES}>
-                    Notas y conclusiones del dictamen
-                  </label>
-                  <textarea
-                    id="assessment-notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Escribe aquí un resumen del análisis de cumplimiento para este sistema de IA..."
-                    rows={4}
-                    className={TEXTAREA_CLASSES}
-                    style={{ borderRadius: "var(--g-radius-md)" }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Confirmation & GRC Handoff */}
-        {step === 4 && (
-          <div>
-            <div className="border-b border-[var(--g-border-subtle)] px-6 py-4">
-              <h2 className="text-sm font-semibold text-[var(--g-text-primary)]">
-                Paso 4: Evaluación consolidada en el ledger WORM
-              </h2>
-            </div>
-            <div className="p-6 space-y-6 text-center">
-              <div className="flex justify-center">
-                <div className="flex h-12 w-12 items-center justify-center bg-[var(--status-success)]/10 text-[var(--status-success)]" style={{ borderRadius: "var(--g-radius-full)" }}>
-                  <Check className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold text-[var(--g-text-primary)]">
-                  Evaluación de riesgo IA finalizada con éxito
-                </h3>
-                <p className="text-xs text-[var(--g-text-secondary)] mt-2 max-w-lg mx-auto leading-relaxed">
-                  Los registros de cumplimiento y la evaluación para <span className="font-semibold">{selectedSystemName}</span> han sido consolidados en base de datos.
-                </p>
-              </div>
-
-              {/* Dynamic Handoff Box if non-compliant/low score */}
-              {hasGap ? (
-                <div className="border border-[var(--status-error)]/30 bg-[var(--status-error)]/5 p-5 text-left space-y-4 max-w-xl mx-auto" style={{ borderRadius: "var(--g-radius-lg)" }}>
-                  <div className="flex gap-3">
-                    <AlertTriangle className="h-5 w-5 shrink-0 text-[var(--status-error)]" />
-                    <div>
-                      <h4 className="text-xs font-bold text-[var(--g-text-primary)] uppercase tracking-wider">
-                        Brecha técnica material detectada (AIMS_TECHNICAL_FILE_GAP)
-                      </h4>
-                      <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed mt-1">
-                        Dado que el índice de preparación es del {score}% (o existen controles de no conformidad), existe un contrato de handoff de datos para escalar este expediente técnico al módulo **GRC Compass** para que el oficial de cumplimiento global pueda evaluarlo.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/grc/risk-360?source=aims&handoff=AIMS_TECHNICAL_FILE_GAP&assessment=${createdId}`)}
-                      className="inline-flex items-center gap-1.5 bg-[var(--g-brand-3308)] px-4 py-2 text-xs font-semibold text-[var(--g-text-inverse)] hover:bg-[var(--g-sec-700)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--g-brand-3308)]"
-                      style={{ borderRadius: "var(--g-radius-md)" }}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Derivar Gap a GRC Compass (Handoff)
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-[var(--status-success)]/30 bg-[var(--status-success)]/5 p-5 text-left max-w-xl mx-auto flex gap-3" style={{ borderRadius: "var(--g-radius-lg)" }}>
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-[var(--status-success)]" />
-                  <div>
-                    <h4 className="text-xs font-bold text-[var(--g-text-primary)] uppercase tracking-wider">
-                      Sistema IA en postura de conformidad nominal
-                    </h4>
-                    <p className="text-xs text-[var(--g-text-secondary)] leading-relaxed mt-1">
-                      El score de cumplimiento es del {score}% y no existen gaps de conformidad. No se requiere derivación automática al backlog de riesgos de GRC Compass.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Stepper Footer Action Buttons */}
-        <div className="flex flex-col-reverse gap-3 border-t border-[var(--g-border-subtle)] px-6 py-4 sm:flex-row sm:justify-end">
-          {step < 4 && (
-            <button
-              type="button"
-              onClick={() => step === 1 ? navigate("/ai-governance/evaluaciones") : handlePrevStep()}
-              className="inline-flex items-center justify-center border border-[var(--g-border-subtle)] bg-transparent px-4 py-2 text-sm font-medium text-[var(--g-text-primary)] transition-colors hover:bg-[var(--g-surface-subtle)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              {step === 1 ? "Cancelar" : "Anterior"}
-            </button>
-          )}
-
-          {step < 3 && (
-            <button
-              type="button"
-              onClick={handleNextStep}
-              className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              Siguiente
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          )}
-
-          {step === 3 && (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              aria-busy={createAssessment.isPending || createChecks.isPending}
-              disabled={createAssessment.isPending || createChecks.isPending}
-              className="inline-flex items-center justify-center gap-2 bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)] disabled:cursor-not-allowed disabled:opacity-70"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              <Save className="h-4 w-4" />
-              {createAssessment.isPending || createChecks.isPending ? "Guardando..." : "Guardar evaluación"}
-            </button>
-          )}
-
-          {step === 4 && (
-            <button
-              type="button"
-              onClick={() => navigate("/ai-governance/evaluaciones")}
-              className="inline-flex items-center justify-center bg-[var(--g-brand-3308)] px-4 py-2 text-sm font-medium text-[var(--g-text-inverse)] transition-colors hover:bg-[var(--g-sec-700)]"
-              style={{ borderRadius: "var(--g-radius-md)" }}
-            >
-              Volver a evaluaciones
-            </button>
-          )}
         </div>
-      </main>
+      )}
     </div>
+  );
+}
+
+function CheckCircle2(props: { className?: string }) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
   );
 }

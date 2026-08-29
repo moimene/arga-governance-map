@@ -147,7 +147,7 @@ export function StepClasesSeries({
                     label="Descripción preferencia"
                     value={restrictionString(shareClass, "preferred_dividend_description")}
                     onChange={(value) => updateRestrictions(index, { preferred_dividend_description: value })}
-                    help="Ej.: dividendo preferente para ARGA Seguros antes de reparto ordinario."
+                    help="Ej.: dividendo preferente para la sociedad matriz antes de reparto ordinario."
                   />
                 ) : null}
               </div>

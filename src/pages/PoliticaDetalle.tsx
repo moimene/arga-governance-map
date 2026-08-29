@@ -20,7 +20,7 @@ import {
   exclusionKind,
   splitFirmeza,
 } from "@/hooks/usePoliciesObligations";
-import { Brain, Download, ExternalLink, FileCheck2, GitCompare, History } from "lucide-react";
+import { Brain, Download, ExternalLink, FileCheck2, FileText, GitCompare, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -205,6 +205,12 @@ export default function PoliticaDetalle() {
         }
         actions={
           <>
+            <Button variant="default" size="sm" asChild className="gap-1.5 shadow-sm">
+              <Link to="/secretaria/tramitador">
+                <FileText className="h-3.5 w-3.5" />
+                Tramitar Acuerdo
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5"><History className="h-3.5 w-3.5" />Ver historial</Button>
             <Button variant="outline" size="sm" className="gap-1.5"><GitCompare className="h-3.5 w-3.5" />Comparar versiones</Button>
             <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-3.5 w-3.5" />Exportar</Button>

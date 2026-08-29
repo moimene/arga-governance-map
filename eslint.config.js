@@ -13,6 +13,7 @@ export default tseslint.config(
       "**/*.timestamp-*.mjs",
       "**/*.tsbuildinfo",
       "skill y MCP EAD TRUST/**",
+      "Gobernanza ia/**",
     ],
   },
   {

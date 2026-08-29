@@ -94,8 +94,10 @@ export function buildUrlWithSearchParams(pathname: string, params: SearchParamsI
  * explícitos del destino. Es útil para saltos internos del Gestor: cambiar de
  * tab no debe borrar sociedad, materia, plantilla ni filtros recuperables.
  */
+const ROUTING_BASE_URL = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://governance.local";
+
 export function mergeUrlSearchParams(target: string, current: SearchParamsInput) {
-  const parsed = new URL(target, "https://tgms.local");
+  const parsed = new URL(target, ROUTING_BASE_URL);
   const merged = toSearchParams(current);
   for (const [key, value] of parsed.searchParams) merged.set(key, value);
   return `${buildUrlWithSearchParams(parsed.pathname, merged)}${parsed.hash}`;
@@ -121,7 +123,7 @@ export function applyTemplateRouteScope(
   scope: TemplateRouteScope,
   entityId?: string | null,
 ) {
-  const parsed = new URL(target, "https://tgms.local");
+  const parsed = new URL(target, ROUTING_BASE_URL);
   appendRouteScope(parsed.searchParams, { scope, entityId });
   return buildUrlWithSearchParams(parsed.pathname, parsed.searchParams);
 }

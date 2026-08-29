@@ -10,10 +10,12 @@ import {
   normalizeSocietyFormForNormative,
   normalizeSocietyFormForRuleSet,
 } from "@/lib/secretaria/normative-framework";
-import { TIPO_SOCIAL_OPTIONS } from "@/pages/secretaria/sociedad-nueva/StepIdentificacionLegal";
+import {
+  TIPO_SOCIAL_OPTIONS,
+  sociedadDetalleTipoSocialLabel,
+  sociedadesListTipoSocialLabel,
+} from "@/lib/secretaria/sociedad-labels";
 import { TIPO_SOCIAL_LABEL, tipoSocialLabel } from "@/lib/secretaria/template-admin/labels";
-import { tipoSocialLabel as sociedadDetalleTipoSocialLabel } from "@/pages/secretaria/SociedadDetalle";
-import { tipoSocialLabel as sociedadesListTipoSocialLabel } from "@/pages/secretaria/SociedadesList";
 
 // Nota de adaptación (task-1-brief.md §Step 1): el brief original usaba
 // `buildPrototypeRulePack("SLP")` y campos `quorumPrimeraConvocatoria` como

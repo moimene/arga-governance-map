@@ -10,9 +10,41 @@ export type CifaAssessment = {
   q5_concentration: boolean;
 };
 
+export type CascadeSubcontractor = {
+  id: string;
+  name: string;
+  country: string;
+  service: string;
+  dataAccess: boolean;
+  priorApproval: boolean;
+};
+
+export type ContractualDoraChecks = {
+  audit_rights: boolean;
+  supervisory_inspection: boolean;
+  data_return_insolvency: boolean;
+  exit_plan_tested: boolean;
+  bcm_tested: boolean;
+  incident_assistance: boolean;
+};
+
 export type ThirdPartyPayload = Record<string, unknown> & {
   cifa?: Partial<CifaAssessment>;
   exit_plan_signed?: boolean;
+  lei_euid?: string;
+  provider_type?: "Externo" | "Intragrupo" | "Subcontratista";
+  country_service?: string;
+  country_data_storage?: string;
+  country_data_processing?: string;
+  cloud_deployment_model?: "Público" | "Privado" | "Híbrido" | "Comunitario" | "On-Premise";
+  is_ctpp?: boolean; // Critical Third-Party Provider bajo DORA Art. 31
+  concentration_score?: number;
+  substitutability_score?: number;
+  subcontractors?: CascadeSubcontractor[];
+  contract_checks?: Partial<ContractualDoraChecks>;
+  migration_cost_estimate?: string;
+  exit_time_months?: number;
+  alternative_providers?: string;
 };
 
 export type ThirdParty = {
@@ -71,7 +103,7 @@ export function useCreateThirdParty() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Omit<ThirdParty, "id" | "created_at" | "updated_at"> & { id?: string }) => {
-      const id = input.id || `TPRM-ARGA-${Math.floor(100 + Math.random() * 900)}`;
+      const id = input.id || `TPRM-${Math.floor(1000 + Math.random() * 9000)}`;
       const { data, error } = await supabase
         .from("grc_third_parties")
         .insert({ ...input, id, tenant_id: tenantId! })
@@ -99,9 +131,8 @@ export function useUpdateThirdParty() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["grc", "third-parties"] });
-      qc.invalidateQueries({ queryKey: ["grc", "third-party", variables.id] });
     },
   });
 }
