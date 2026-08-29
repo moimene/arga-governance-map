@@ -98,6 +98,16 @@ describe("A6 — citas del art. 73 RIA", () => {
     expect(calculateRiaDeadline(K, "ORDINARY_SERIOUS").articleRef).toBe("Art. 73.2");
   });
 
+  it("el supuesto ordinario NO estrecha el disparador al vínculo acreditado", () => {
+    // El art. 73.2 del DOUE dispara con el vínculo causal «o la probabilidad
+    // razonable de que exista dicho vínculo». Decir sólo «tras establecerse
+    // vínculo causal» recorta la condición a favor de quien la lee: el reloj
+    // empieza antes de lo que sugería.
+    const r = calculateRiaDeadline(K, "ORDINARY_SERIOUS");
+    expect(r.ruleDescription).toMatch(/probabilidad razonable/i);
+    expect(r.ruleDescription).toMatch(/magnitud/i);
+  });
+
   it("los otros dos supuestos conservan su artículo y su plazo", () => {
     const g = calculateRiaDeadline(K, "WIDESPREAD_INFRINGEMENT");
     expect(g.articleRef).toBe("Art. 73.3");

@@ -63,7 +63,7 @@ export interface MultiregimeClocks {
 
 /**
  * Calcula el plazo estricto del Art. 73 RIA:
- * - Ordinario: Inmediatamente tras vínculo causal y máx. 15 días naturales (360h)
+ * - Ordinario: vínculo causal O probabilidad razonable de él, y máx. 15 días naturales (360h)
  * - Infracción generalizada o alteración de infraestructuras críticas (art. 3.49.b): máx. 2 días (48h)
  * - Fallecimiento: Inmediatamente y máx. 10 días (240h)
  */
@@ -75,7 +75,10 @@ export function calculateRiaDeadline(
   let hours = 360; // 15 días * 24h
   // El 73.1 es el deber de notificar; los quince días están en el 73.2.
   let articleRef: "Art. 73.2" | "Art. 73.3" | "Art. 73.4" = "Art. 73.2";
-  let ruleDescription = "Notificación inmediata tras establecerse vínculo causal y máx. 15 días naturales desde conocimiento.";
+  let ruleDescription =
+    "Notificación inmediata después de establecer un vínculo causal entre el sistema de IA y el " +
+    "incidente grave, o la probabilidad razonable de que exista dicho vínculo, y a más tardar 15 días " +
+    "naturales desde que se tenga conocimiento. El plazo tiene en cuenta la magnitud del incidente.";
 
   if (incidentType === "WIDESPREAD_INFRINGEMENT") {
     hours = 48; // 2 días
