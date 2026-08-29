@@ -109,6 +109,7 @@ const Risk360 = lazy(() => import("@/pages/grc/Risk360"));
 const RiskEditor = lazy(() => import("@/pages/grc/RiskEditor"));
 const RiskDetalle = lazy(() => import("@/pages/grc/RiskDetalle"));
 const PenalAnticorrupcion = lazy(() => import("@/pages/grc/PenalAnticorrupcion"));
+const Sostenibilidad = lazy(() => import("@/pages/grc/Sostenibilidad"));
 const PacksPage = lazy(() => import("@/pages/grc/PacksPage"));
 const PackDetalle = lazy(() => import("@/pages/grc/PackDetalle"));
 const IncidentesList = lazy(() => import("@/pages/grc/IncidentesList"));
@@ -318,6 +319,7 @@ const App = () => (
                   <Route path="/grc/risk-360/:id"         element={<Suspense fallback={<ModuleFallback />}><RiskDetalle /></Suspense>} />
                   <Route path="/grc/risk-360/:id/editar"  element={<Suspense fallback={<ModuleFallback />}><RiskEditor /></Suspense>} />
                   <Route path="/grc/penal-anticorrupcion" element={<Suspense fallback={<ModuleFallback />}><PenalAnticorrupcion /></Suspense>} />
+                  <Route path="/grc/sostenibilidad"       element={<Suspense fallback={<ModuleFallback />}><Sostenibilidad /></Suspense>} />
                   <Route path="/grc/packs"                element={<RequireModule moduleKey="country-packs"><Suspense fallback={<ModuleFallback />}><PacksPage /></Suspense></RequireModule>} />
                   <Route path="/grc/packs/:countryCode"   element={<RequireModule moduleKey="country-packs"><Suspense fallback={<ModuleFallback />}><PackDetalle /></Suspense></RequireModule>} />
                   <Route path="/grc/incidentes"           element={<Suspense fallback={<ModuleFallback />}><IncidentesList /></Suspense>} />
