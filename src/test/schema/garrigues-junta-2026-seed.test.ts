@@ -322,20 +322,26 @@ describe("C1 — asistencia, base de cómputo y gate del censo (módulo puro)", 
     expect(q.notas.join(" ")).toContain("afirma envío, entrega, acuse ni actuación, interposición, mensajería o custodia de EAD Trust");
   });
 
-  it("el gate del censo distingue una RPC que pondera por votos de una que pondera por capital", () => {
+  it("el gate del censo comprueba el DATO: las clases guardan la proporción del art. 7", () => {
+    // El gate nació prediciendo la fórmula de fn_crear_censo_snapshot, para no
+    // congelar un peso contrario al art. 7 en un registro inmutable. Corregida la
+    // RPC (migración 20260829160000), ya no predice nada: comprueba que las clases
+    // del censo guardan entre sí la proporción del art. 7 — que es lo que fallaría
+    // si alguien sembrara mal las clases o los títulos.
     const socios = [socio("A", "A"), socio("B", "B")];
-    // Tal y como está hoy fn_crear_censo_snapshot: porcentaje_capital × votos/título.
-    expect(censoPrecondicion(socios).ok).toBe(false);
-    expect(censoPrecondicion(socios).ratioVotos).toBe(50);
+    const ok = censoPrecondicion(socios);
+    expect(ok.ok).toBe(true);
+    expect(ok.ratioVotos).toBe(50);
+    expect(ok.ratioRpc).toBe(50);
 
-    // Mutante: si la RPC ponderase por títulos —que es lo que hace hoy
-    // fn_refresh_parte_votante_entity tras la migración 20260829150000— el gate abre.
-    const porTitulos = socios.map((s) => ({
-      ...s,
-      holding: { ...s.holding, porcentaje_capital: Number(s.holding.numero_titulos) },
-    }));
-    expect(censoPrecondicion(porTitulos).ok).toBe(true);
-    expect(censoPrecondicion(porTitulos).ratioRpc).toBe(50);
+    // Mutante: un socio de clase B al que se le hubieran sembrado 2 títulos en vez
+    // de 1 rompe la proporción y el gate cierra. Es lo que de verdad protege.
+    const malSembrado = socios.map((s) =>
+      s.holding.share_class?.class_code === "B"
+        ? { ...s, holding: { ...s.holding, numero_titulos: 2 } }
+        : s,
+    );
+    expect(censoPrecondicion(malSembrado).ok).toBe(false);
   });
 });
 
@@ -444,37 +450,44 @@ describe("C1 — la reunión, la asistencia del acta y el censo WORM en Cloud", 
     expect(String(q.notas)).toContain("sin efecto jurídico");
   });
 
-  it("el censo WORM NO se ha creado, y la razón sigue vigente", async () => {
-    // GATE DELIBERADO, no una laguna. `fn_crear_censo_snapshot` lleva su propia
-    // copia EN LÍNEA de la fórmula vieja (`porcentaje_capital × votes_per_title`):
-    // la migración 20260829150000 corrigió `fn_refresh_parte_votante_entity` y no
-    // llegó a esta RPC. Con las dos clases del art. 7 eso da un socio de clase A
-    // pesando 800.000 veces uno de clase B, cuando el artículo dice 50 — y
-    // `censo_snapshot` es INMUTABLE: crearlo hoy congelaría ese peso para siempre,
-    // y `fn_secretaria_build_minute_legal_manifest` lo suma para el quórum del acta.
-    //
-    // ESTE TEST ESTÁ ESCRITO PARA ROMPERSE. El día que la RPC se corrija, el ratio
-    // pasará a 50 y este caso fallará: entonces hay que crear el censo y sustituir
-    // este test por el que asierta el snapshot bien ponderado. No relajarlo.
-    const { data: censo, error } = await garr.from("censo_snapshot")
-      .select("id").eq("tenant_id", GARRIGUES_TENANT);
+  it("el censo WORM existe, lo creó la RPC, es ECONOMICO y cuelga del órgano de la Junta", async () => {
+    // Este caso sustituye al gate que decía «el censo NO se ha creado y la razón
+    // sigue vigente». La razón dejó de estar vigente con la migración
+    // 20260829160000, el gate falló como estaba escrito para fallar, y aquí está
+    // lo que exigía a cambio: la aserción del snapshot bien ponderado.
+    const { data, error } = await garr.from("censo_snapshot")
+      .select("id, session_kind, snapshot_type, body_id, total_partes, capital_total_base, audit_worm_id, payload")
+      .eq("tenant_id", GARRIGUES_TENANT);
     expect(error).toBeNull();
-    expect(censo).toHaveLength(0);
+    expect(data).toHaveLength(1);
+    const censo = data[0];
+    expect(censo.session_kind).toBe("MEETING");
+    // ECONOMICO, no UNIVERSAL: el art. 178 LSC reserva «universal» a la junta
+    // constituida SIN previa convocatoria, y ésta se convocó con 15 días.
+    expect(censo.snapshot_type).toBe("ECONOMICO");
+    expect(censo.body_id).toBe(bodyId);
+    // audit_worm_id lo rellena el trigger: es la prueba de que pasó por la RPC
+    // y no por un INSERT directo.
+    expect(censo.audit_worm_id).not.toBeNull();
+    expect(censo.total_partes).toBe(347);
+  });
 
-    // Y se mide que la razón del gate sigue siendo cierta, replicando lo que la
-    // RPC calcularía: si esto dejara de ser 800.000, el gate ya no aplica.
-    const { data: clases } = await garr.from("share_classes")
-      .select("id, class_code, votes_per_title").eq("entity_id", MATRIZ);
-    const vpt = new Map(clases.map((c) => [c.id, Number(c.votes_per_title)]));
-    const codigo = new Map(clases.map((c) => [c.id, c.class_code]));
-    const { data: hs } = await garr.from("capital_holdings")
-      .select("porcentaje_capital, share_class_id, is_treasury, voting_rights")
-      .eq("entity_id", MATRIZ).limit(500);
-    const pesoRpc = (h) => Number(h.porcentaje_capital) * (vpt.get(h.share_class_id) ?? 1);
-    const vivos = hs.filter((h) => !h.is_treasury && h.voting_rights);
-    const a = pesoRpc(vivos.find((h) => codigo.get(h.share_class_id) === "A"));
-    const b = pesoRpc(vivos.find((h) => codigo.get(h.share_class_id) === "B"));
-    expect(a / b).toBeGreaterThan(1000);   // hoy 800.000; el art. 7 dice 50
+  it("el payload del censo pondera por votos: A/B = 50, el ratio del art. 7", async () => {
+    const { data } = await garr.from("censo_snapshot")
+      .select("payload, capital_total_base").eq("tenant_id", GARRIGUES_TENANT).single();
+    const pesos = (data.payload as Array<{ voting_weight: number | string }>)
+      .map((r) => Number(r.voting_weight)).filter((w) => w > 0);
+    // 346 socios con voto; la autocartera pesa 0 y queda fuera.
+    expect(pesos).toHaveLength(346);
+    // El ratio entre el mayor y el menor peso es el del art. 7: 25 votos por
+    // participación de clase A y 2 participaciones por socio de cuota, frente a
+    // 1 voto y 1 participación de clase B. Antes de la migración 20260829160000
+    // este número era 800.000.
+    expect(Math.max(...pesos) / Math.min(...pesos)).toBeCloseTo(50, 6);
+    expect(pesos.reduce((a, w) => a + w, 0)).toBeCloseTo(100, 6);
+    // capital_total_base sigue siendo CAPITAL, no votos: 100 − el 2,5937 % de
+    // autocartera. El nombre del campo dice capital y guarda capital.
+    expect(Number(data.capital_total_base)).toBeCloseTo(100 - (18 * 16000 / 11104008) * 100, 6);
   });
 
   it("ARGA no ve la reunión de Garrigues y conserva las suyas", async () => {

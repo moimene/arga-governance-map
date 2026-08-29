@@ -70,6 +70,8 @@ import { createClient } from "@supabase/supabase-js";
 import { GARRIGUES_TENANT, GARRIGUES_MATRIZ_UUID } from "./garrigues/entities-catalog";
 import censoActa from "./garrigues/censo/socios-acta-2026-05-06.json";
 import {
+  ART7_CLASES,
+  TITULOS_POR_SOCIO_CUOTA,
   AUTOCARTERA_TITULOS_A,
   CENSO_TOTAL,
   baseComputoJunta,
@@ -384,8 +386,23 @@ export function censoPrecondicion(socios: SocioCenso[]): {
   ratioVotos: number | null;
   detalle: string;
 } {
-  const pesoRpc = (h: HoldingCenso) =>
-    Number(h.porcentaje_capital) * Number(h.share_class?.votes_per_title ?? 1);
+  // Migración 20260829160000: fn_crear_censo_snapshot ya pondera por
+  // `numero_titulos × votes_per_title`. Antes llevaba en línea
+  // `porcentaje_capital × votes_per_title` y este gate existía para impedir que
+  // se congelara un peso contrario al art. 7 en un registro INMUTABLE.
+  // Corregida la RPC, el gate deja de predecir su fórmula y pasa a comprobar el
+  // DATO: que las clases del censo guardan entre sí la proporción del art. 7.
+  // Fallaría si alguien sembrara mal las clases o los títulos.
+  // La comprobación de que la RPC produjo de verdad ese peso se hace DESPUÉS,
+  // leyendo el payload del snapshot creado.
+  // Referencia INDEPENDIENTE: el ratio que el art. 7 de los Estatutos impone
+  // entre un socio de cuota (2 participaciones A) y un socio de clase B (1 de B),
+  // tomado del módulo congelado y NO recalculado desde las mismas filas de Cloud.
+  // Comparar el dato de Cloud contra otra derivación del propio dato de Cloud
+  // sería vacuo: daría siempre verdadero.
+  const claseArt7 = (code: string) => ART7_CLASES.find((c) => c.code === code);
+  const pesoArt7 = (code: string) =>
+    (code === "A" ? TITULOS_POR_SOCIO_CUOTA : 1) * (claseArt7(code)?.votosPorTitulo ?? 0);
   const votos = (h: HoldingCenso) => votingRightsFromCapitalHolding(h) ?? 0;
 
   // Dos titulares de clases distintas: la comparación es de proporciones, así que
@@ -396,20 +413,20 @@ export function censoPrecondicion(socios: SocioCenso[]): {
   }
   const a = socios.find((s) => s.holding.share_class?.class_code === clases[0])!;
   const b = socios.find((s) => s.holding.share_class?.class_code === clases[1])!;
-  if (pesoRpc(b.holding) === 0 || votos(b.holding) === 0) {
+  if (pesoArt7(clases[1]) === 0 || votos(b.holding) === 0) {
     return { ok: false, ratioRpc: null, ratioVotos: null, detalle: `la clase ${clases[1]} pesa cero: no hay proporción que comparar` };
   }
 
-  const ratioRpc = pesoRpc(a.holding) / pesoRpc(b.holding);
-  const ratioVotos = votos(a.holding) / votos(b.holding);
-  const ok = Math.abs(ratioRpc / ratioVotos - 1) < 1e-9;
+  const ratioRpc = pesoArt7(clases[0]) / pesoArt7(clases[1]);   // lo que manda el art. 7
+  const ratioVotos = votos(a.holding) / votos(b.holding);        // lo que hay en Cloud
+  const ok = Math.abs(ratioVotos / ratioRpc - 1) < 1e-9;
   return {
     ok,
     ratioRpc,
     ratioVotos,
     detalle: ok
-      ? `la RPC reproduce la proporción de votos del art. 7 (${clases[0]}/${clases[1]} = ${ratioVotos})`
-      : `fn_crear_censo_snapshot daría ${clases[0]}/${clases[1]} = ${ratioRpc.toLocaleString("es-ES")} y el art. 7 dice ${ratioVotos}`,
+      ? `el censo de Cloud reproduce la proporción del art. 7 (${clases[0]}/${clases[1]} = ${ratioVotos})`
+      : `el censo de Cloud da ${clases[0]}/${clases[1]} = ${ratioVotos.toLocaleString("es-ES")} y el art. 7 impone ${ratioRpc}: las clases o los títulos están mal sembrados`,
   };
 }
 
@@ -729,6 +746,22 @@ async function main() {
     });
     if (error) fail(`fn_crear_censo_snapshot: ${error.message}`);
     console.log(`✓ censo WORM creado por RPC (${data}, ${CENSO_SNAPSHOT_TYPE})`);
+
+    // Verificación POSTERIOR e imprescindible: el gate previo comprueba el dato,
+    // no la fórmula que la RPC aplicó. Aquí se lee el payload realmente escrito.
+    // Si el peso no reproduce el art. 7, el snapshot ya es INMUTABLE y no se
+    // puede retirar: por eso esto grita en vez de callar.
+    const { data: creado, error: eLeer } = await admin
+      .from("censo_snapshot").select("payload, total_partes, capital_total_base").eq("id", data).single();
+    if (eLeer) fail(`censo_snapshot lectura de vuelta: ${eLeer.message}`);
+    const pesos = (creado.payload as Array<{ voting_weight: number | string }>)
+      .map((r) => Number(r.voting_weight)).filter((w) => w > 0);
+    const ratio = Math.max(...pesos) / Math.min(...pesos);
+    const suma = pesos.reduce((a, w) => a + w, 0);
+    if (Math.abs(ratio - censo.ratioVotos!) > 1e-6 || Math.abs(suma - 100) > 1e-6) {
+      fail(`el censo WORM ${data} quedó mal ponderado: ratio=${ratio} (esperado ${censo.ratioVotos}), Σ=${suma} (esperado 100). Es INMUTABLE: no se puede retirar.`);
+    }
+    console.log(`✓ payload verificado: ${creado.total_partes} partes · Σ voting_weight=${suma.toFixed(6)} · ratio ${ratio.toFixed(2)} (art. 7)`);
   }
 }
 

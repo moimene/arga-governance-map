@@ -88,3 +88,46 @@ que el día que la RPC se corrija **este test fallará**, y entonces hay que cre
 
 `bun test src/test/schema/garrigues-junta-2026-seed.test.ts` → **25 pass / 0 fail**, 214 aserciones.
 `lint` 0, `typecheck` 0.
+
+---
+
+## Addendum — el censo WORM ya existe (2026-08-29, tras `20260829160000`)
+
+Corregida la RPC, el gate del seed **falló como estaba escrito para fallar** y el censo se creó.
+
+**Probe previo, solo lectura, replicando la CTE `effective_holdings` de la RPC con las dos fórmulas
+lado a lado:**
+
+```
+ARGA Seguros     | filas=2   | Σvieja=100,000000   | Σnueva=100,000000 | ratio VIEJA=2,30      | NUEVA=2,30
+Garrigues matriz | filas=347 | Σvieja=2.435,156819 | Σnueva=100,000000 | ratio VIEJA=800.000,00| NUEVA=50,00
+```
+
+**ARGA no se mueve ni un decimal.** Y con la fórmula vieja la suma de pesos de Garrigues **ni siquiera
+era 100**: era 2.435,16 — otra señal de que la escala estaba rota.
+
+**Después de aplicar y crear:**
+
+```
+CENSO GARR: filas=1 | tipo=ECONOMICO | partes=347 | capital_total_base=97,406342 | worm=1
+WORM POST ARGA: filas=24 | md5=d3af45ba2d88b2c7b232789c8208e9ef   ← idéntico al PRE
+GOAL: meetings=1 · convocatorias=1 · censo=1 · attendees=346 · agreements=0
+```
+
+Verificación del payload hecha **por el propio seed, leyendo de vuelta lo que escribió**: 347 partes,
+Σ `voting_weight` = 100,000000, ratio 50,00. Si no cuadrara, el seed grita — porque el snapshot ya sería
+inmutable y no habría marcha atrás.
+
+## El gate, dos veces mal antes de quedar bien
+
+Vale la pena dejarlo escrito porque las dos versiones intermedias parecían correctas:
+
+1. **Predecía la fórmula de la RPC.** Correcto mientras la RPC estaba mal; obsoleto en cuanto se arregló.
+2. **Reorientado a «comprobar el dato»**, comparando `numero_titulos × vpt` contra
+   `votingRightsFromCapitalHolding`. **Vacuo:** son la misma fórmula, así que devolvía `true` siempre.
+   Lo cazó el test del mutante, que siguió pasando cuando debía fallar.
+3. **Cruzado contra la referencia independiente:** el ratio que impone `ART7_CLASES` del módulo
+   congelado, frente al que tiene Cloud. Ahí sí falla si alguien siembra mal las clases o los títulos.
+
+**Comparar un dato con otra derivación del mismo dato no es una comprobación.** Es la misma lección que
+el barrido de `pg_proc` que salió limpio siendo incapaz de encontrar nada.
