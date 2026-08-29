@@ -6,7 +6,7 @@
 // flag `argaAuthed` independiente).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { GARRIGUES_DEMO_EMAIL } from "../helpers/supabase-test-client";
+import { GARRIGUES_DEMO_EMAIL, GARRIGUES_TENANT } from "../helpers/supabase-test-client";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -144,7 +144,7 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
     expect((allArga ?? []).length).toBe(59);
   });
 
-  it("Garrigues ve además sus 6 packs por-materia (fix round 2), organo_tipo=JUNTA_GENERAL, y suma 10 packs propios", async () => {
+  it("Garrigues ve además sus 6 packs por-materia (fix round 2), organo_tipo=JUNTA_GENERAL, y no ve ninguno ajeno", async () => {
     if (!authed || !garr || !materiaPacksSeeded) { expect(true).toBe(true); return; }
     const { data, error } = await garr.from("rule_packs").select("id, organo_tipo").in("id", [...MATERIA_PACK_IDS]);
     expect(error).toBeNull();
@@ -152,12 +152,26 @@ describe("G3 Task 3 — rule packs núcleo del tenant Garrigues (RLS per-tenant,
     expect(ids).toEqual(expect.arrayContaining([...MATERIA_PACK_IDS]));
     expect((data ?? []).every((r) => r.organo_tipo === "JUNTA_GENERAL")).toBe(true);
 
-    // 4 packs de órgano (GARR_*) + 6 packs por-materia = 10 packs propios de
-    // Garrigues; los 4 de órgano no se tocan (mismo test 1 de arriba, aquí
-    // solo se suma el total).
-    const { data: allGarr, error: eAll } = await garr.from("rule_packs").select("id").limit(200);
+    // Aquí había un total pinado (`length === 10`: 4 de órgano + 6 por materia).
+    // Se rompió en cuanto C1 sembró 3 packs legítimos para las materias de la
+    // Junta de 2026, y actualizarlo a 13 solo habría aplazado la siguiente
+    // rotura: **un inventario no es una invariante**. Lo que sí lo es, y es lo
+    // que este describe existe para probar, son estas dos cosas:
+    const { data: allGarr, error: eAll } = await garr
+      .from("rule_packs").select("id, tenant_id").limit(200);
     expect(eAll).toBeNull();
-    expect((allGarr ?? []).length).toBe(10);
+
+    // (1) Los 10 packs de G3 siguen ahí. Si alguien borra uno, cae — cosa que
+    //     un total no distinguiría de «alguien añadió uno y borró otro».
+    const idsGarr = (allGarr ?? []).map((r) => r.id);
+    expect(idsGarr).toEqual(expect.arrayContaining([...GARR_PACK_IDS, ...MATERIA_PACK_IDS]));
+
+    // (2) Ninguno de los que ve Garrigues es de otro tenant. Ésta es la
+    //     invariante de aislamiento, y no caduca al añadir packs legítimos.
+    expect((allGarr ?? []).length).toBeGreaterThanOrEqual(
+      GARR_PACK_IDS.length + MATERIA_PACK_IDS.length,
+    );
+    expect((allGarr ?? []).every((r) => r.tenant_id === GARRIGUES_TENANT)).toBe(true);
   });
 
   it("los 6 packs por-materia pasan invariantes: nunca Ley 2/2007 en el plazo de convocatoria, y la mayoría real vive en votacion.mayoria.SL", async () => {
