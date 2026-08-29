@@ -92,6 +92,12 @@ export interface ConvocationManifestRow {
     schema_version?: string;
     data_class?: string;
     legal_effect?: string;
+    /** Numeración real del punto en el orden del día (p. ej. "1.1", "2", "acta").
+     *  Ausente en las convocatorias que no la traen: la UI cae a la posición. */
+    numero?: string;
+    /** Nota visible del punto. La usan los puntos cuya clasificación de materia
+     *  no está acreditada, para que la ficha no les invente una clase. */
+    nota?: string;
     record_status?: "DEMO_OPERATIONAL_DRAFT_RECORDED" | string;
     not_a_legal_convocation?: boolean;
     president_action_not_asserted?: boolean;

@@ -148,6 +148,11 @@ type ConvocatoriaDocContext = {
     capital_evidence_status?: string | null;
     data_class?: string | null;
     legal_effect?: string | null;
+    /** Numeración real del punto ("1.1", "2", "acta"); ausente si la convocatoria
+     *  no la trae, y entonces la ficha cae a la posición. */
+    numero?: string | null;
+    /** Nota visible del punto, para los que no tienen clasificación acreditada. */
+    nota?: string | null;
   }> | null;
   convocatoria_text?: string | null;
   reminders_trace?: Record<string, unknown> | null;
@@ -864,7 +869,7 @@ export default function ConvocatoriaDetalle() {
                 {agenda.map((item, index) => (
                   <li key={`${item.materia ?? "punto"}-${index}`} className="text-sm">
                     <div className="font-medium text-[var(--g-text-primary)]">
-                      {index + 1}. {item.titulo ?? "Punto del orden del día"}
+                      {item.numero ?? index + 1}. {item.titulo ?? "Punto del orden del día"}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--g-text-secondary)]">
                       {item.kind === "DECISORIO" ? (
@@ -874,7 +879,10 @@ export default function ConvocatoriaDetalle() {
                           {item.inscribible ? <span>Inscribible</span> : null}
                         </>
                       ) : (
-                        <span>Punto informativo · sin acuerdo ni votación</span>
+                        // Si el punto trae `nota`, se pinta la nota: decir "punto
+                        // informativo" sobre un punto cuya clasificación no está
+                        // acreditada es afirmar una clase que nadie ha dictaminado.
+                        <span>{item.nota ?? "Punto informativo · sin acuerdo ni votación"}</span>
                       )}
                     </div>
                     {item.propuesta_acuerdo ? (
