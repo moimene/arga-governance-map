@@ -695,9 +695,45 @@ tarea, gates verdes en los dos modos de medición, y verificación viva con cont
 - **NIS2 se presenta como deber del despacho** en `/obligaciones` (el prefijo `[Marco Prospectivo]` no
   lo entiende ningún código) y las dos fichas salen **en rojo como «SIN CONTROL»**. Requiere tocar
   `usePoliciesObligations.ts` y `ObligacionesList.tsx`, fuera de la superficie de C3.
-- **`ISO/IEC 27001:2022`** fijado cuando la versión no consta; **art. 33 RD 311/2022** citado como
-  «notificar a clientes» cuando obliga a notificar al CCN/INCIBE-CERT. Pendiente de los datos que el
-  usuario dice tener.
+- ~~`ISO/IEC 27001:2022` fijado cuando la versión no consta; art. 33 RD 311/2022 mal citado.~~
+  **RETIRADO el 2026-08-29: las dos acusaciones eran falsas y G6 tenía razón.** La política pública
+  de seguridad del despacho (`garrigues.com/es_ES/pagina/principios-fundamentales-de-la-politica-de-seguridad`)
+  dice literal **«Norma ISO27001: 2022»**, y también literal: *«De conformidad con lo dispuesto en el
+  artículo 33 del RD 311/2022 … Garrigues notificará a sus clientes aquellas incidencias que tengan
+  un impacto significativo»*. **G6 no interpretaba el BOE: citaba la política del propio cliente,
+  palabra por palabra.** Corregirlo habría hecho que la consola contradijese el compromiso público
+  del despacho. Lo que falta no es corregir, es **citar la fuente** y **anotar** la divergencia: el
+  despacho compromete la notificación a clientes invocando el art. 33, cuya rúbrica regula la
+  capacidad de respuesta a incidentes y cuyo destinatario natural es el CCN/INCIBE-CERT. Ambas cosas
+  ciertas, ninguna inventada.
+  > **REGLA DE CARRIL, aprendida tres veces en un día** (art. 36 Ley 2/2023, art. 33 RD 311/2022,
+  > premisa QTSP): **antes de corregir una cita, comprobar de dónde salió.** Si procede de una fuente
+  > del cliente —su política, sus estatutos, su acta—, la discrepancia con el BOE **es dato a
+  > documentar, no error a corregir.** La consola refleja lo que el cliente afirma; si lo que afirma
+  > diverge de la norma, se anota, no se reescribe.
+- **ENS: dos sujetos distintos que no se pueden fundir.** El **despacho** «gestiona los Sistemas de
+  la Información conforme al estándar ISO/IEC 27001 y ENS» (adhesión al marco) y tiene certificado
+  **BSI IS 685586** —marca aportada por el usuario, **pendiente de resolver contra el directorio
+  público de BSI**; hasta que resuelva, se etiqueta como aportada, no como FIRME—. **EAD Trust** es
+  quien tiene la certificación **ENS formal**, junto con ISO 9001, 27001 y 20000-1, y es lo que la
+  faculta como prestador cualificado (coherente con la TSL acreditada). **Escribir «Garrigues está
+  certificado en ENS» apoyándose en la certificación de su filial es exactamente el defecto que este
+  carril lleva todo el día cazando.** El alcance del SGSI sí es público y no se simula: «los Sistemas
+  de Información referentes al proceso de clientes que trata el Grupo Garrigues». La **categoría ENS
+  no consta** en ninguna fuente: por instrucción expresa del usuario va como **mockup etiquetado**,
+  con la mecánica de los pesos por socio de G1 —valor verosímil, marca visible, razón escrita.
+- **ENS como requisito legal: es por contrato, no una condición del despacho.** Verificado el
+  2026-08-29: **PI-10 acredita literalmente la relación contractual** («los contratos de servicios
+  que como Despacho celebramos con Administraciones Públicas, Entes Públicos y Sociedades del Sector
+  Público»), y el **art. 2.3 RD 311/2022**, cotejado contra el consolidado del BOE, aplica el ENS a
+  los sistemas de información privados «**en virtud de una relación contractual**» cuando «presten
+  servicios o provean soluciones a las entidades del sector público **para el ejercicio por estas de
+  sus competencias y potestades administrativas**», y hace operativo el mecanismo por la vía de los
+  **pliegos**, que deben exigir «Declaraciones o Certificaciones de Conformidad con el ENS».
+  **Conclusión honesta: no es un binario de despacho.** La relación contractual existe; lo que decide
+  en cada encargo es el pliego concreto y si el servicio sirve al ejercicio de potestades
+  administrativas. **Es cuestión para el Comité Legal**, y la ficha debe decir eso en vez de afirmar
+  sujeción o voluntariedad.
 - **Migración `20260820130000` reescribe una función compartida** y cambia enrutamientos ajenos a G6
   (`OBL-LEY2-%` de `'ethics'` a `'aml'`) pese a declarar «Cero cambio para ARGA».
 - **`sii.*` sin RLS y sin políticas**, y `sii_cases_view` devuelve `42501` a `authenticated`.
