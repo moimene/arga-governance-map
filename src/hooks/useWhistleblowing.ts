@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTenantContext } from "@/context/TenantContext";
+import { siiStorageKey, siiQueryKey } from "@/lib/sii/tenant-scope";
 import { toast } from "sonner";
 import {
   type WhistleblowingReport,
@@ -23,7 +25,7 @@ import {
   evaluateAntiRetaliationRisk,
 } from "@/lib/sii/whistleblowing-engine";
 
-const SII_STORAGE_KEY = "arga_sii_whistleblowing_cases_v1";
+
 
 // ─── Datos Semilla Canónicos SII (Ley 2/2023) ────────────────────────────────
 
@@ -126,9 +128,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-001",
         title: "Transcripción y relato de hechos saneado",
         type: "DOCUMENTO_SANEADO",
-        hashSha512: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        qtspSealed: true,
-        qtspSealedAt: "2026-04-10T10:31:00Z",
+        referenciaInterna: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         confidentiality: "RESTRINGIDO_SII",
         sanitized: true,
         uploadedAt: "2026-04-10T10:30:00Z",
@@ -138,9 +138,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-001",
         title: "Extracto societario y poderes de representación",
         type: "DOCUMENTO_SANEADO",
-        hashSha512: "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
-        qtspSealed: true,
-        qtspSealedAt: "2026-04-14T16:00:00Z",
+        referenciaInterna: "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
         confidentiality: "RESTRINGIDO_SII",
         sanitized: true,
         uploadedAt: "2026-04-14T15:55:00Z",
@@ -243,9 +241,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-002",
         title: "Copia de correos electrónicos saneados (cadena técnica)",
         type: "DOCUMENTO_SANEADO",
-        hashSha512: "b4c2e64298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b112",
-        qtspSealed: true,
-        qtspSealedAt: "2026-03-02T14:20:00Z",
+        referenciaInterna: "b4c2e64298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b112",
         confidentiality: "RESTRINGIDO_SII",
         sanitized: true,
         uploadedAt: "2026-03-02T14:18:00Z",
@@ -337,9 +333,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-003",
         title: "Acta de comparecencia y transcripción revisada con consentimiento",
         type: "AUDIO_TRANSCRIPCION",
-        hashSha512: "f7d3a44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852c999",
-        qtspSealed: true,
-        qtspSealedAt: "2026-05-08T18:10:00Z",
+        referenciaInterna: "f7d3a44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852c999",
         confidentiality: "RESTRINGIDO_SII",
         sanitized: true,
         uploadedAt: "2026-05-08T18:08:00Z",
@@ -349,9 +343,7 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
         reportId: "rep-sii-003",
         title: "Informe pericial de pesos de variables del modelo de suscripción",
         type: "INFORME_FORENSE",
-        hashSha512: "cc88b44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852d444",
-        qtspSealed: true,
-        qtspSealedAt: "2026-05-15T12:00:00Z",
+        referenciaInterna: "cc88b44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852d444",
         confidentiality: "RESTRINGIDO_SII",
         sanitized: true,
         uploadedAt: "2026-05-15T11:50:00Z",
@@ -360,64 +352,91 @@ export const INITIAL_SII_REPORTS: WhistleblowingReport[] = [
   },
 ];
 
-function getStoredReports(): WhistleblowingReport[] {
-  if (typeof window === "undefined") return INITIAL_SII_REPORTS;
-  const raw = localStorage.getItem(SII_STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(SII_STORAGE_KEY, JSON.stringify(INITIAL_SII_REPORTS));
-    return INITIAL_SII_REPORTS;
+const ARGA_TENANT = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Set inicial por tenant, y ÚNICO sitio donde se decide.
+ *
+ * getStoredReports tenía TRES caminos que devolvían las denuncias de ARGA:
+ * el guard de SSR, el bucket vacío y el `catch` de JSON corrupto. Cambiar solo
+ * la clave no habría cerrado la fuga: con bucket propio, Garrigues habría
+ * estrenado uno vacío y el código le habría copiado dentro los casos de ARGA.
+ * Y el `catch` los devuelve SIN sembrar, así que no deja rastro en el almacén
+ * y es el más difícil de reproducir de los tres. Las tres puertas pasan por
+ * aquí.
+ *
+ * Los expedientes demo de Garrigues (materia de despacho) los siembra la
+ * Tarea 7; hasta entonces arranca vacío, que es honesto: no tiene ninguno.
+ */
+function initialReportsFor(tenantId: string): WhistleblowingReport[] {
+  return tenantId === ARGA_TENANT ? INITIAL_SII_REPORTS : [];
+}
+
+function getStoredReports(tenantId: string): WhistleblowingReport[] {
+  if (typeof window === "undefined") return initialReportsFor(tenantId);   // puerta 1
+  const raw = localStorage.getItem(siiStorageKey(tenantId));
+  if (!raw) {                                                              // puerta 2
+    const inicial = initialReportsFor(tenantId);
+    localStorage.setItem(siiStorageKey(tenantId), JSON.stringify(inicial));
+    return inicial;
   }
   try {
     return JSON.parse(raw);
   } catch {
-    return INITIAL_SII_REPORTS;
+    return initialReportsFor(tenantId);                                    // puerta 3
   }
 }
 
-function saveStoredReports(reports: WhistleblowingReport[]) {
+function saveStoredReports(tenantId: string, reports: WhistleblowingReport[]) {
   if (typeof window !== "undefined") {
-    localStorage.setItem(SII_STORAGE_KEY, JSON.stringify(reports));
+    localStorage.setItem(siiStorageKey(tenantId), JSON.stringify(reports));
   }
 }
 
 // ─── Hooks Principales ───────────────────────────────────────────────────────
 
 export function useWhistleblowingReports() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["whistleblowing", "reports", "list"],
+    queryKey: siiQueryKey(tenantId, "reports", "list"),
+    enabled: !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport[]> => {
-      return getStoredReports();
+      return getStoredReports(tenantId!);
     },
   });
 }
 
 export function useWhistleblowingReportById(idOrCode: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["whistleblowing", "report", idOrCode],
-    enabled: !!idOrCode,
+    queryKey: siiQueryKey(tenantId, "report", idOrCode),
+    enabled: !!idOrCode && !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport | null> => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       return reports.find((r) => r.id === idOrCode || r.code === idOrCode) ?? null;
     },
   });
 }
 
 export function useWhistleblowingReportByToken(token: string | undefined) {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["whistleblowing", "safe-inbox", token],
-    enabled: !!token && token.trim().length > 0,
+    queryKey: siiQueryKey(tenantId, "safe-inbox", token),
+    enabled: !!token && token.trim().length > 0 && !!tenantId,
     queryFn: async (): Promise<WhistleblowingReport | null> => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       return reports.find((r) => r.trackingToken.toUpperCase() === token.trim().toUpperCase()) ?? null;
     },
   });
 }
 
 export function useWhistleblowingLibroRegistro() {
+  const { tenantId } = useTenantContext();
   return useQuery({
-    queryKey: ["whistleblowing", "libro-registro"],
+    queryKey: siiQueryKey(tenantId, "libro-registro"),
+    enabled: !!tenantId,
     queryFn: async (): Promise<WhistleblowingLibroRegistroEntry[]> => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       return reports.map((r) => {
         if (r.libroRegistroEntry) return r.libroRegistroEntry;
         return generateLibroRegistroEntry(r);
@@ -429,6 +448,7 @@ export function useWhistleblowingLibroRegistro() {
 // ─── Mutaciones ─────────────────────────────────────────────────────────────
 
 export function useCreateWhistleblowingReport() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -449,7 +469,7 @@ export function useCreateWhistleblowingReport() {
       isBoardOrExecutiveTarget?: boolean;
       attachments?: Array<{ name: string; size: number }>;
     }): Promise<{ report: WhistleblowingReport; trackingToken: string; code: string }> => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const nextNum = reports.length + 1;
       const code = `SII-2026-08-${String(nextNum).padStart(3, "0")}`;
       
@@ -493,9 +513,7 @@ export function useCreateWhistleblowingReport() {
           reportId: `rep-sii-${nextNum}`,
           title: sanitized.sanitizedFilename,
           type: "DOCUMENTO_SANEADO",
-          hashSha512: `SHA512:EVIDENCE:${Math.random().toString(36).substring(2)}${Date.now()}`,
-          qtspSealed: true,
-          qtspSealedAt: now.toISOString(),
+          referenciaInterna: `REF-EV-${Date.now().toString(36)}`,
           confidentiality: "RESTRINGIDO_SII",
           sanitized: true,
           uploadedAt: now.toISOString(),
@@ -557,8 +575,8 @@ export function useCreateWhistleblowingReport() {
       };
 
       const updated = [newReport, ...reports];
-      saveStoredReports(updated);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, updated);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
 
       return { report: newReport, trackingToken, code };
     },
@@ -566,6 +584,7 @@ export function useCreateWhistleblowingReport() {
 }
 
 export function useSendSafeInboxMessage() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -580,7 +599,7 @@ export function useSendSafeInboxMessage() {
       sender: "INFORMANTE" | "INSTRUCTOR";
       senderAlias?: string;
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -594,14 +613,15 @@ export function useSendSafeInboxMessage() {
       };
 
       rep.messages.push(newMsg);
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return newMsg;
     },
   });
 }
 
 export function useEmitAcknowledgment() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -614,7 +634,7 @@ export function useEmitAcknowledgment() {
       isExempt?: boolean;
       exemptReason?: string;
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -634,14 +654,15 @@ export function useEmitAcknowledgment() {
         });
       }
 
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return rep;
     },
   });
 }
 
 export function useApproveExtension() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -652,7 +673,7 @@ export function useApproveExtension() {
       reportId: string;
       reason: string;
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -675,14 +696,15 @@ export function useApproveExtension() {
         sentAt: now.toISOString(),
       });
 
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return rep;
     },
   });
 }
 
 export function useFormalizeRecusation() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -697,7 +719,7 @@ export function useFormalizeRecusation() {
       details: string;
       substitutedByName: string;
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -718,14 +740,15 @@ export function useFormalizeRecusation() {
       rep.recusations.push(recusation);
       rep.assignedInvestigatorName = substitutedByName;
 
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return recusation;
     },
   });
 }
 
 export function useUpdateSubcaseStatus() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -742,7 +765,7 @@ export function useUpdateSubcaseStatus() {
       closingReason?: string;
       remediationPlanId?: string;
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -756,14 +779,15 @@ export function useUpdateSubcaseStatus() {
         sub.remediationPlanId = remediationPlanId;
       }
 
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return sub;
     },
   });
 }
 
 export function useCloseRootCase() {
+  const { tenantId } = useTenantContext();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -778,7 +802,7 @@ export function useCloseRootCase() {
       closingReason: string;
       actionsTaken: string[];
     }) => {
-      const reports = getStoredReports();
+      const reports = getStoredReports(tenantId!);
       const rep = reports.find((r) => r.id === reportId);
       if (!rep) throw new Error("Expediente no encontrado.");
 
@@ -798,8 +822,8 @@ export function useCloseRootCase() {
         actionsTaken,
       });
 
-      saveStoredReports(reports);
-      queryClient.invalidateQueries({ queryKey: ["whistleblowing"] });
+      saveStoredReports(tenantId!, reports);
+      queryClient.invalidateQueries({ queryKey: siiQueryKey(tenantId) });
       return rep;
     },
   });

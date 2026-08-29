@@ -316,13 +316,13 @@ export default function SiiCaseDetalle() {
             <Lock className="h-3.5 w-3.5" /> Safe Inbox Informante ({report.messages.length})
           </TabsTrigger>
           <TabsTrigger value="evidencias" className="text-xs gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5" /> Evidencias QTSP ({report.evidences.length})
+            <ShieldCheck className="h-3.5 w-3.5" /> Evidencias ({report.evidences.length})
           </TabsTrigger>
           <TabsTrigger value="retaliation" className="text-xs gap-1.5">
             <ShieldAlert className="h-3.5 w-3.5" /> Protección Anti-Represalias
           </TabsTrigger>
           <TabsTrigger value="libro-registro" className="text-xs gap-1.5">
-            <Gavel className="h-3.5 w-3.5" /> Asiento Libro-Registro (Art. 34)
+            <Gavel className="h-3.5 w-3.5" /> Asiento Libro-Registro (Art. 26)
           </TabsTrigger>
         </TabsList>
 
@@ -446,7 +446,7 @@ export default function SiiCaseDetalle() {
               <div className="font-bold text-[var(--t-text-primary)]">
                 Buzón Bidireccional con el Informante (Token: {report.trackingToken})
               </div>
-              <span className="text-[10px] font-mono text-[var(--status-success)]">Cifrado de extremo a extremo activo</span>
+              <span className="text-[10px] font-mono text-[var(--t-text-secondary)]">Entorno de validación funcional — sin cifrado de transporte propio</span>
             </div>
 
             <div className="flex-1 p-5 overflow-y-auto space-y-3 text-xs">
@@ -480,7 +480,7 @@ export default function SiiCaseDetalle() {
           </Card>
         </TabsContent>
 
-        {/* TAB 4: Evidencias QTSP */}
+        {/* TAB 4: Evidencias aportadas */}
         <TabsContent value="evidencias">
           <Card className="border-[var(--t-border-default)] bg-[var(--t-surface-card)] overflow-hidden">
             <Table className="text-xs">
@@ -488,8 +488,8 @@ export default function SiiCaseDetalle() {
                 <TableRow className="bg-[var(--t-surface-subtle)]">
                   <TableHead className="font-bold">ID / Título</TableHead>
                   <TableHead className="font-bold">Tipo</TableHead>
-                  <TableHead className="font-bold">Hash SHA-512</TableHead>
-                  <TableHead className="font-bold">Sellado QTSP EAD Trust</TableHead>
+                  <TableHead className="font-bold">Referencia interna</TableHead>
+                  <TableHead className="font-bold">Postura probatoria</TableHead>
                   <TableHead className="font-bold">Confidencialidad</TableHead>
                 </TableRow>
               </TableHeader>
@@ -501,11 +501,11 @@ export default function SiiCaseDetalle() {
                     </TableCell>
                     <TableCell>{ev.type}</TableCell>
                     <TableCell className="font-mono text-[10px] text-[var(--t-text-secondary)]">
-                      {ev.hashSha512.substring(0, 16)}...
+                      {(ev.referenciaInterna ?? "").substring(0, 16)}…
                     </TableCell>
                     <TableCell>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--status-success)]/10 text-[var(--status-success)] flex items-center gap-1 w-fit">
-                        <CheckCircle2 className="h-3 w-3" /> QSeal EAD Trust
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--g-surface-muted)] text-[var(--t-text-secondary)] border border-[var(--t-border-default)] w-fit">
+                        Sin sello cualificado
                       </span>
                     </TableCell>
                     <TableCell>
@@ -558,7 +558,7 @@ export default function SiiCaseDetalle() {
             <div className="border-b border-[var(--t-border-default)] pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-[var(--t-brand)]">
                 <Gavel className="h-5 w-5" />
-                <span className="font-bold text-sm">Asiento del Libro-Registro Oficial (Art. 34 Ley 2/2023)</span>
+                <span className="font-bold text-sm">Asiento del Libro-Registro Oficial (Art. 26 Ley 2/2023)</span>
               </div>
               <span className="text-[10px] bg-[var(--t-surface-subtle)] px-2 py-0.5 rounded">
                 Retención máx: 10 años
@@ -572,7 +572,7 @@ export default function SiiCaseDetalle() {
               <div><strong>Canal de Recepción:</strong> {report.channel}</div>
               <div><strong>Materia:</strong> {report.category}</div>
               <div><strong>Investigadora Responsable:</strong> {report.assignedInvestigatorName}</div>
-              <div><strong>Prueba Criptográfica:</strong> SHA512:SII:OFFICIAL_RECORD_SEALED</div>
+              <div><strong>Postura probatoria:</strong> entorno de validación funcional — sin eficacia jurídica cualificada productiva</div>
             </div>
           </Card>
         </TabsContent>

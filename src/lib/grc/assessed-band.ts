@@ -67,3 +67,73 @@ export const ETIQUETA_CELDA: Record<Celda, string> = {
   NARANJA: "Naranja",
   ROJO: "Rojo",
 };
+
+// ─── Prioridad por score, y por qué las bandas NO participan ─────────────────
+//
+// Estas dos funciones viven aquí, y no en la pantalla, por una razón concreta:
+// la review de la Tarea 1 demostró que un test que vigila el CÓDIGO FUENTE de
+// Risk360 con una expresión regular es esquivable de seis maneras distintas
+// —constante intermedia, tabla de lookup, condición partida en dos líneas,
+// `switch`, `includes`…— todas semánticamente idénticas al defecto. Un test de
+// COMPORTAMIENTO sobre una función pura no se esquiva: o la banda cuenta como
+// "crítico" o no cuenta, y da igual cómo esté escrito el código que lo decide.
+
+export const PRIORIDAD_TODOS = "Todos";
+
+export type RiesgoPriorizable = {
+  probability?: number | null;
+  impact?: number | null;
+  assessed_band?: Banda | string | null;
+};
+
+/** Score clásico 1-25. `null` cuando faltan los ejes: nunca se completa el que falta. */
+export function riskScore(r: RiesgoPriorizable): number | null {
+  return tieneEjes(r) ? r.probability! * r.impact! : null;
+}
+
+/**
+ * Filtro de Prioridad. Solo se aplica a riesgos CON ejes.
+ *
+ * Un riesgo evaluado por banda ordinal no tiene prioridad en esta escala y no
+ * puede tenerla: la fuente da un nivel compuesto por celda y no lo descompone
+ * en probabilidad × impacto. Mapear ROJO→"Críticos" o NO_EVALUADA→"Bajos"
+ * inventaría la leyenda que la fuente no publica (D-2), y lo segundo además
+ * afirmaría que un delito SIN EVALUAR es de riesgo bajo.
+ */
+export function matchesScoreFilter(r: RiesgoPriorizable, filter: string): boolean {
+  if (filter === PRIORIDAD_TODOS) return true;
+  const score = riskScore(r);
+  if (score === null) return false; // sin ejes: fuera de esta escala, no "bajo"
+  if (filter === "criticos") return score >= 20;
+  if (filter === "altos") return score >= 15 && score < 20;
+  if (filter === "medios") return score >= 10 && score < 15;
+  if (filter === "bajos") return score < 10;
+  return true;
+}
+
+/**
+ * Recuento de severidad. Devuelve también `sinEjes` para que la pantalla pueda
+ * decir en voz alta cuántos riesgos quedan FUERA del recuento: un "0 críticos"
+ * mudo sobre 82 delitos —de los que uno está en banda roja— se lee como "no hay
+ * exposición alta", que es justo lo contrario de lo que dice el mapa.
+ */
+export function countSeverity(risks: readonly RiesgoPriorizable[]): {
+  criticos: number;
+  altos: number;
+  sinEjes: number;
+} {
+  let criticos = 0;
+  let altos = 0;
+  let sinEjes = 0;
+  for (const r of risks) {
+    const s = riskScore(r);
+    if (s === null) {
+      sinEjes++;
+    } else if (s >= 20) {
+      criticos++;
+    } else if (s >= 15) {
+      altos++;
+    }
+  }
+  return { criticos, altos, sinEjes };
+}

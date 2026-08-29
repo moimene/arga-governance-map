@@ -107,21 +107,61 @@ describe("G5 — catálogo penal congelado", () => {
 });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://hzqwefkwsxopwrmtksbg.supabase.co";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+// GOTCHA: `VITE_SUPABASE_ANON_KEY` NO EXISTE en este repo — el .env nombra la
+// clave `ANON_PUBLIC`/`PUBLISHABLE_KEY`. 17 de las 19 sondas del proyecto viven
+// del literal de reserva de la 3ª rama; G5 y G6 copiaron la línea SIN el `||` y
+// su bloque Cloud entero pasaba en verde SIN ASERTAR NADA: medido, 1213 de 1807
+// aserciones desaparecían en silencio. No quitar ninguna de las tres ramas.
+// La clave anon es pública por diseño (quien protege es RLS); no es un secreto.
+const SUPABASE_ANON_KEY =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.ANON_PUBLIC ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6cXdlZmt3c3hvcHdybXRrc2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjc1MDMsImV4cCI6MjA5MjAwMzUwM30.IZ2FbhQLp2ljRcsvsvzpLWQ9cq9p5Lz4dJfVzY3whjQ";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "TGMSdemo2026!";
 const ARGA_EMAIL = process.env.DEMO_EMAIL || "demo@arga-seguros.com";
 const PERSIST_OFF = { auth: { persistSession: false } } as const;
+
+// La suite completa abre ~38 logins (19 sondas x 2 cuentas) y Supabase Auth
+// responde **HTTP 429 "Request rate limit reached"** — medido: de 8 logins
+// concurrentes, 6 dan 429 y 2 pasan. El 429 es estrangulamiento, no un fallo
+// del gate, así que se reintenta con espera creciente. Cualquier OTRO error
+// (clave rotada, credencial mala, Cloud caído) NO se reintenta: se propaga y
+// el `beforeAll` falla ruidoso, que es lo que esta tarea vino a garantizar.
+// El arreglo de fondo —una sola sesión compartida -- es la deuda ya catalogada
+// de unificar las 19 sondas contra src/test/helpers/supabase-test-client.ts.
+async function entrarConReintento(
+  cliente: SupabaseClient,
+  email: string,
+): Promise<{ ok: boolean; motivo?: string }> {
+  const esperas = [800, 2000, 4500];
+  for (let intento = 0; intento <= esperas.length; intento++) {
+    const { error } = await cliente.auth.signInWithPassword({ email, password: DEMO_PASSWORD });
+    if (!error) return { ok: true };
+    if (error.status !== 429) return { ok: false, motivo: `${error.status} ${error.message}` };
+    if (intento < esperas.length) await new Promise((r) => setTimeout(r, esperas[intento]));
+    else return { ok: false, motivo: "429 persistente tras 4 intentos" };
+  }
+  return { ok: false, motivo: "inalcanzable" };
+}
 
 describe("G5 — datos penales en Cloud (Supabase)", () => {
   let garr: SupabaseClient | null = null;
   let arga: SupabaseClient | null = null;
 
   beforeAll(async () => {
-    if (!SUPABASE_ANON_KEY) return;
     const g = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await g.auth.signInWithPassword({ email: GARRIGUES_DEMO_EMAIL, password: DEMO_PASSWORD })).error) garr = g;
+    const eg = await entrarConReintento(g, GARRIGUES_DEMO_EMAIL);
+    if (eg.ok) garr = g;
     const a = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, PERSIST_OFF);
-    if (!(await a.auth.signInWithPassword({ email: ARGA_EMAIL, password: DEMO_PASSWORD })).error) arga = a;
+    const ea = await entrarConReintento(a, ARGA_EMAIL);
+    if (ea.ok) arga = a;
+    // Fallar aquí es lo correcto: sin sesión no se puede afirmar nada de Cloud,
+    // y los `if (!garr) return;` de cada `it` convierten eso en verde mudo. Un
+    // gate que "pasa" sin poder mirar es peor que uno rojo.
+    // Determinista: cachea el defecto original (la variable no existía nunca).
+    expect(SUPABASE_ANON_KEY, "sin credencial no hay gate Cloud").toBeTruthy();
+    expect(garr, `sin sesión Garrigues el bloque Cloud sería vacuo (${eg.motivo ?? ""})`).not.toBeNull();
+    expect(arga, `sin sesión ARGA el control discriminante sería vacuo (${ea.motivo ?? ""})`).not.toBeNull();
   });
 
   it("las 3 columnas nuevas existen y se pueden seleccionar", async () => {

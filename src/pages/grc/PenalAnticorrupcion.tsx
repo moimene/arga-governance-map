@@ -348,12 +348,19 @@ export default function PenalAnticorrupcion() {
               <h3 className="text-sm font-bold text-[var(--g-text-primary)]">
                 Canal Interno de Información / Denuncias (Ley 2/2023 & CP Art. 31 bis)
               </h3>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--status-success)] text-[var(--g-text-inverse)] rounded-full">
-                SLA 7D / 3M ACTIVO
+              {/* Era un chip verde que declaraba el nivel de servicio en vigor. Los plazos existen —art.
+                  9.2.c y 9.2.d— pero son EXIGENCIA LEGAL, no un nivel de servicio
+                  que se esté cumpliendo: el canal no tiene ni un expediente. El
+                  chip los enuncia sin afirmar cumplimiento. */}
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-[var(--g-surface-muted)] text-[var(--g-text-secondary)] border border-[var(--g-border-subtle)] rounded-full">
+                Plazos legales: 7 días / 3 meses
               </span>
             </div>
             <p className="text-xs text-[var(--g-text-secondary)] mt-1 max-w-2xl leading-relaxed">
-              Consola de recepción omnicanal, Safe Inbox anónimo, subexpedientes autónomos, acuse de recibo en 7 días naturales, investigación en 3 meses y Libro-Registro oficial con custodia EAD Trust WORM.
+              Consola de recepción, buzón de confidencialidad reforzada, subexpedientes autónomos,
+              acuse de recibo en 7 días naturales (art. 9.2.c) e investigación en 3 meses prorrogables
+              (art. 9.2.d), con Registro de informaciones (art. 26).{" "}
+              <span className="italic">Entorno de validación funcional — sin eficacia jurídica cualificada productiva.</span>
             </p>
           </div>
         </div>
