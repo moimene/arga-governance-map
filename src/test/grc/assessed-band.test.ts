@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ORDEN_BANDAS, ETIQUETA_BANDA, tieneEjes } from "@/lib/grc/assessed-band";
+import {
+  ORDEN_BANDAS, ETIQUETA_BANDA, tieneEjes,
+  matchesScoreFilter, countSeverity, PRIORIDAD_TODOS,
+} from "@/lib/grc/assessed-band";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
@@ -73,30 +76,72 @@ describe("G5 — el detalle del riesgo lee el desglose, no solo la banda", () =>
   });
 });
 
-describe("D-2 — ninguna superficie GRC nombra las bandas del mapa penal", () => {
-  const RISK360 = read("src/pages/grc/Risk360.tsx");
+describe("D-2 — una banda NUNCA cuenta como un nivel con nombre", () => {
+  // Este bloque sustituye a un guard por expresión regular sobre el código
+  // fuente de Risk360. La review de la Tarea 1 lo sometió a prueba de mutación
+  // y ESCAPARON 6 de 8 variantes semánticamente idénticas del defecto —entre
+  // ellas revertir el KPI, que es justo la mitad del arreglo que el commit
+  // prometía—. Un guard de texto es una carrera armamentística que se pierde:
+  // se comprueba el COMPORTAMIENTO, que no depende de cómo esté escrito.
+  const ROJO = { assessed_band: "ROJO" as const };
+  const NARANJA = { assessed_band: "NARANJA" as const };
+  const NO_EVALUADA = { assessed_band: "NO_EVALUADA" as const };
+  const CON_EJES = { probability: 5, impact: 5 };          // score 25 -> crítico
+  const CON_EJES_ALTO = { probability: 4, impact: 4 };     // score 16 -> alto
 
-  it("Risk360 no asocia assessed_band con un nombre castellano de severidad", () => {
-    // El defecto real de G5: `risk.assessed_band === "ROJO"` dentro de la rama
-    // del filtro "criticos". La escala de la fuente es ORDINAL Y SIN NOMBRES
-    // (D-2): mapearla a Crítico/Alto/Medio/Bajo inventa la leyenda que la
-    // fuente no publica. El test mira la SUPERFICIE que comete el defecto, no
-    // la constante de al lado — que estaba bien y daba verde igualmente.
-    const infractoras = RISK360.split("\n").filter(
-      (l) =>
-        /assessed_band/.test(l) &&
-        /"(criticos|altos|medios|bajos)"|Crítico|Alto|Medio|Bajo/.test(l),
-    );
-    expect(infractoras).toEqual([]);
+  it("ninguna banda satisface ningún filtro de prioridad", () => {
+    for (const banda of [ROJO, NARANJA, NO_EVALUADA, { assessed_band: "AMARILLO" as const }, { assessed_band: "VERDE" as const }]) {
+      for (const filtro of ["criticos", "altos", "medios", "bajos"]) {
+        expect(matchesScoreFilter(banda, filtro)).toBe(false);
+      }
+    }
   });
 
-  it("NO_EVALUADA no se agrupa nunca con una banda evaluada", () => {
-    // Contar los 11 delitos NO_EVALUADA como "bajos" es la cuarta afirmación
-    // falsa del §4 del diseño, resucitada en pantalla justo donde el trigger
-    // dejó de decirla.
-    const agrupada = RISK360.split("\n").filter(
-      (l) => /NO_EVALUADA/.test(l) && /\|\|/.test(l),
-    );
-    expect(agrupada).toEqual([]);
+  it("NO_EVALUADA no es 'bajos': un delito sin evaluar no es de riesgo bajo", () => {
+    expect(matchesScoreFilter(NO_EVALUADA, "bajos")).toBe(false);
+  });
+
+  it("las bandas sí pasan el filtro 'Todos'", () => {
+    expect(matchesScoreFilter(ROJO, PRIORIDAD_TODOS)).toBe(true);
+    expect(matchesScoreFilter(NO_EVALUADA, PRIORIDAD_TODOS)).toBe(true);
+  });
+
+  it("countSeverity no suma bandas: ROJO no es crítico ni NARANJA es alto", () => {
+    const r = countSeverity([ROJO, NARANJA, NO_EVALUADA]);
+    expect(r.criticos).toBe(0);
+    expect(r.altos).toBe(0);
+    expect(r.sinEjes).toBe(3);
+  });
+
+  it("countSeverity sí suma los riesgos con ejes — el camino de ARGA, intacto", () => {
+    const r = countSeverity([CON_EJES, CON_EJES_ALTO, ROJO]);
+    expect(r.criticos).toBe(1);
+    expect(r.altos).toBe(1);
+    expect(r.sinEjes).toBe(1);
+  });
+
+  it("un riesgo sin ejes y sin banda tampoco cae en 'bajos'", () => {
+    // Celda hoy despoblada en Cloud (0 filas en ambos tenants) pero ALCANZABLE:
+    // la CHECK permite (sin ejes, sin banda), solo prohíbe banda junto a ejes.
+    expect(matchesScoreFilter({}, "bajos")).toBe(false);
+    expect(countSeverity([{}])).toEqual({ criticos: 0, altos: 0, sinEjes: 1 });
+  });
+});
+
+describe("D-2 — y Risk360 usa esas funciones, no una copia propia", () => {
+  // El bloque de arriba prueba el COMPORTAMIENTO de las funciones puras, lo que
+  // mata cualquier variante semántica del defecto (constante intermedia, tabla
+  // de lookup, switch, includes…). Pero no probaría nada si la pantalla dejara
+  // de llamarlas y se reimplementara el recuento en línea — que es exactamente
+  // el mutante M6 de la review: revertir solo el KPI. Esta es la arista.
+  const RISK360 = read("src/pages/grc/Risk360.tsx");
+
+  it("delega el recuento de severidad y el filtro de prioridad", () => {
+    expect(RISK360).toContain("countSeverity(");
+    expect(RISK360).toContain("matchesScoreFilter(");
+  });
+
+  it("no define su propia versión de ninguna de las dos", () => {
+    expect(/function\s+(countSeverity|matchesScoreFilter|riskScore)\b/.test(RISK360)).toBe(false);
   });
 });

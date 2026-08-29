@@ -6,7 +6,10 @@ import { useSecretariaScope } from "@/components/secretaria/shell";
 import type { SecretariaScopeController } from "@/components/secretaria/shell";
 import { useTenantBranding } from "@/context/TenantBrandContext";
 import { groupFullLabel } from "@/lib/tenant-brand-labels";
-import { ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes } from "@/lib/grc/assessed-band";
+import {
+  ORDEN_BANDAS, COLOR_BANDA, ETIQUETA_BANDA, NOTA_ESCALA, tieneEjes,
+  riskScore, matchesScoreFilter, countSeverity,
+} from "@/lib/grc/assessed-band";
 
 const FILTER_ALL = "Todos";
 
@@ -48,9 +51,6 @@ const SCORE_FILTERS = [
   { value: "bajos", label: "Bajos" },
 ];
 
-function riskScore(risk: RiskRow): number | null {
-  return tieneEjes(risk) ? risk.probability! * risk.impact! : null;
-}
 
 function scoreLabel(score: number | null, risk?: RiskRow) {
   if (score === null) {
@@ -73,26 +73,6 @@ function moduleLabel(value?: string | null) {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
-}
-
-function matchesScoreFilter(risk: RiskRow, filter: string) {
-  if (filter === FILTER_ALL) return true;
-  const score = riskScore(risk);
-  if (score !== null) {
-    if (filter === "criticos") return score >= 20;
-    if (filter === "altos") return score >= 15 && score < 20;
-    if (filter === "medios") return score >= 10 && score < 15;
-    if (filter === "bajos") return score < 10;
-  } else if (risk.assessed_band) {
-    // Los riesgos evaluados por banda ordinal NO entran en el filtro de score.
-    // La escala de la fuente es ordinal y SIN NOMBRES (D-2 del diseño de G5):
-    // mapearla a Crítico/Alto/Medio/Bajo inventa una leyenda que la fuente no
-    // publica —el PPD-01 tampoco la documenta—, y agrupaba NO_EVALUADA con las
-    // bandas bajas, que es afirmar que un delito sin evaluar es de riesgo bajo.
-    // Se filtran por su propia tira de bandas, más abajo en esta pantalla.
-    return filter === FILTER_ALL;
-  }
-  return true;
 }
 
 function handoffLabel(value: string | null) {
@@ -306,16 +286,15 @@ export default function Risk360() {
   // Los KPI de severidad se calculan SOLO sobre score, como promete §10 del
   // diseño de G5: "los riesgos sin score no entran ni suman". Sumar aquí las
   // bandas les ponía nombre castellano por la puerta de atrás.
-  const criticalCount = risksForContext.filter((risk) => {
-    const s = riskScore(risk);
-    return s !== null && s >= 20;
-  }).length;
-  const highCount = risksForContext.filter((risk) => {
-    const s = riskScore(risk);
-    return s !== null && s >= 15 && s < 20;
-  }).length;
+  const { criticos: criticalCount, altos: highCount, sinEjes: sinEjesCount } =
+    countSeverity(risksForContext);
   const linkedFindings = risksForContext.filter((risk) => !!risk.findings?.code).length;
   const hasFilters = moduleFilter !== FILTER_ALL || scoreFilter !== FILTER_ALL;
+  // La Prioridad ordena por probabilidad × impacto. Si en el perímetro no hay
+  // NINGÚN riesgo con esos ejes, el selector solo puede producir listas vacías:
+  // se retira y se explica, en vez de dejar cuatro opciones muertas que el
+  // usuario prueba una a una sin entender por qué no pasa nada.
+  const hayRiesgosConEjes = sinEjesCount < risksForContext.length;
 
   return (
     <div className="min-w-0 space-y-6 p-4 sm:p-6">
@@ -388,8 +367,21 @@ export default function Risk360() {
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Prioridad de riesgos">
         {[
-          { label: "Críticos", value: criticalCount, helper: "Exposición alta que requiere decisión" },
-          { label: "Altos", value: highCount, helper: "Seguimiento reforzado" },
+          {
+            label: "Críticos",
+            value: criticalCount,
+            // Un "0" mudo sobre un perímetro evaluado por bandas se lee como
+            // "no hay exposición alta", que es lo contrario de lo que dice el
+            // mapa. El helper dice cuántos quedan fuera del recuento y por qué.
+            helper: sinEjesCount
+              ? `Exposición alta que requiere decisión. ${sinEjesCount} riesgo${sinEjesCount === 1 ? "" : "s"} fuera del recuento: evaluados por banda, sin probabilidad × impacto.`
+              : "Exposición alta que requiere decisión",
+          },
+          {
+            label: "Altos",
+            value: highCount,
+            helper: sinEjesCount ? "Seguimiento reforzado. Solo riesgos con ejes." : "Seguimiento reforzado",
+          },
           { label: "Con hallazgo", value: linkedFindings, helper: "Riesgos trazados a auditoría o control" },
         ].map((item) => (
           <div
@@ -439,11 +431,18 @@ export default function Risk360() {
               <option key={module} value={module}>{moduleLabel(module)}</option>
             ))}
           </SelectField>
-          <SelectField id="risk-score-filter" label="Prioridad" value={scoreFilter} onChange={setScoreFilter}>
-            {SCORE_FILTERS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </SelectField>
+          {hayRiesgosConEjes ? (
+            <SelectField id="risk-score-filter" label="Prioridad" value={scoreFilter} onChange={setScoreFilter}>
+              {SCORE_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SelectField>
+          ) : (
+            <p className="self-end text-xs text-[var(--g-text-secondary)]">
+              Sin filtro de prioridad: este perímetro está evaluado por bandas, no por
+              probabilidad × impacto.
+            </p>
+          )}
         </div>
       </section>
 

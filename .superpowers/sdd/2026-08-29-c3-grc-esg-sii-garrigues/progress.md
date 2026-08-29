@@ -95,3 +95,44 @@ MEDICIÓN (worktree, ambos modos):
   sin los PDF fuente — que era justo el punto: sólo le faltaba la credencial.
   ARGA no atraviesa código nuevo: sus 167 riesgos tienen score, la rama assessed_band no se
   evalúa para ellos y los KPI dan lo mismo que antes.
+
+Task 1: REVIEW ADVERSARIAL — 1 P1 + 4 P2 contra mi propio trabajo. Veredicto del revisor:
+  "hace lo que dice en dos de tres; el test nuevo NO protege lo que el commit acaba de arreglar".
+  Prueba de mutación del revisor: 8 mutantes semánticamente idénticos al defecto, **6 ESCAPAN**.
+  El principal, M6 = revertir SOLO el KPI, que es la mitad del arreglo prometido: las líneas del
+  KPI no contienen "criticos" ni "Crítico" (criticalCount no casa: la regex lleva tilde), así que
+  el guard por regex no las mira. Es el mismo patrón del fallo histórico del `?? 3` -> ternario,
+  cometido por quien lo estaba citando.
+  P2 adicionales, los tres CONFIRMADOS y los tres míos:
+    - `return filter === FILTER_ALL` era CONSTANTE-FALSO (la línea 78 ya había returneado en esa
+      condición): un `return false` disfrazado de algo que deja pasar.
+    - El comentario que escribí era FALSO: decía "se filtran por su propia tira de bandas" y NO
+      EXISTE ningún filtro por banda en la app; la tira se deriva de `risks`, ya filtrada.
+    - Medido contra Cloud: con mi cambio, Garrigues pasaba a "0 de 82 riesgos visibles" en las 4
+      opciones no-Todos, con mapa vacío y sin tira. Cuatro opciones muertas y sin explicación.
+    - KPI 0/0 mudo sobre 82 riesgos con 1 ROJO y 7 NARANJA, bajo el helper "Exposición alta que
+      requiere decisión": se lee como "no hay exposición alta".
+  Confirmado por el revisor: fallback de credencial idéntico al resto del repo; el fallo ruidoso
+  FUNCIONA (credencial inválida -> 1 fail, exit 1, los `it` Cloud no llegan a ejecutarse);
+  ARGA intacta MEDIDA contra Cloud (criticalCount 1->1, highCount 15->15, filtro Críticos 1->1).
+
+Task 1: fix round 1/1. El arreglo NO es endurecer el regex —es una carrera armamentística que se
+  pierde— sino mover la decisión a función pura y probar COMPORTAMIENTO:
+    1. `matchesScoreFilter`, `riskScore` y `countSeverity` extraídas a src/lib/grc/assessed-band.ts
+       (módulo hoja, sin ciclos). Risk360 las importa; se borran las copias locales.
+    2. Test de comportamiento: ninguna banda satisface ningún filtro; NO_EVALUADA no es "bajos";
+       countSeverity no suma bandas pero sí suma ejes (camino de ARGA); y la celda (sin ejes, sin
+       banda) —hoy despoblada pero ALCANZABLE por la CHECK— tampoco cae en "bajos".
+    3. Test de ARISTA, que es lo que faltaba: el test de comportamiento protege la función, no que
+       la pantalla la use. Se asierta que Risk360 llama a countSeverity/matchesScoreFilter y que no
+       define copia propia. Sin esto, M6 seguiría escapando.
+    4. UX: si el perímetro no tiene NINGÚN riesgo con ejes, el selector de Prioridad se retira y se
+       explica, en vez de dejar 4 opciones que solo producen listas vacías.
+    5. El helper del KPI dice cuántos riesgos quedan FUERA del recuento y por qué.
+  PRUEBA DE MUTACIÓN EJECUTADA POR MÍ sobre copias en /tmp (el worktree no se toca):
+    M6 (revert del KPI en la función)  -> 2 fail  CAZADO
+    M6b (revert del KPI en la pantalla)-> 1 fail  CAZADO
+    M3 (constante intermedia BANDA_CRITICA) -> 1 fail  CAZADO
+    Base restaurada -> 19 pass / 0 fail.
+  GATES: modo A **3469 pass / 152 skip / 0 fail** (17395 expects) · modo B **3465 / 157 / 0**
+  (16976 expects) · typecheck 0 · lint 0 · build 0. Base 3461/3457: +8 y +8 = los 8 tests nuevos.
