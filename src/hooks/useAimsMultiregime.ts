@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { useTenantContext } from "@/context/TenantContext";
 import {
   evaluateMultiregimeIncident,
   calculateRiaDeadline,
@@ -9,8 +9,6 @@ import {
   formatRemainingTime,
   MultiregimeClocks,
 } from "@/lib/aims/incident-clocks";
-
-const DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 export interface IncidentRegimeCase {
   id: string;
@@ -62,24 +60,21 @@ export interface IncidentReport {
  * Consulta los subexpedientes por régimen asociados a un incidente.
  */
 export function useIncidentRegimes(incidentId: string | undefined) {
+  const { tenantId } = useTenantContext();
+
   return useQuery<IncidentRegimeCase[]>({
-    queryKey: ["aims_incident_regimes", incidentId],
-    queryFn: async () => {
-      if (!incidentId) return [];
+    queryKey: ["aims_incident_regimes", tenantId, incidentId],
+    queryFn: tenantId && incidentId ? async () => {
       const { data, error } = await supabase
         .from("aims_incident_regimes" as never)
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("incident_id", incidentId)
         .order("created_at", { ascending: true });
 
-      if (error) {
-        // Fallback demo local si la tabla aún no tiene registros en cloud
-        console.warn("aims_incident_regimes query fallback:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data || []) as IncidentRegimeCase[];
-    },
-    enabled: Boolean(incidentId),
+    } : skipToken,
   });
 }
 
@@ -88,6 +83,7 @@ export function useIncidentRegimes(incidentId: string | undefined) {
  */
 export function useUpdateIncidentRegime() {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenantContext();
 
   return useMutation({
     mutationFn: async ({
@@ -103,6 +99,7 @@ export function useUpdateIncidentRegime() {
           ...updates,
           updated_at: new Date().toISOString(),
         })
+        .eq("tenant_id", tenantId)
         .eq("id", id)
         .select()
         .single();
@@ -111,7 +108,7 @@ export function useUpdateIncidentRegime() {
       return data as IncidentRegimeCase;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes", data.incident_id] });
+      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes", tenantId, data.incident_id] });
     },
   });
 }
@@ -121,7 +118,7 @@ export function useUpdateIncidentRegime() {
  */
 export function useCreateIncidentReport() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { tenantId } = useTenantContext();
 
   return useMutation({
     mutationFn: async (report: Omit<IncidentReport, "id" | "tenant_id">) => {
@@ -129,7 +126,7 @@ export function useCreateIncidentReport() {
         .from("aims_incident_reports" as never)
         .insert({
           ...report,
-          tenant_id: DEMO_TENANT_ID,
+          tenant_id: tenantId!,
           sent_at: report.sent_at || new Date().toISOString(),
         })
         .select()
@@ -139,8 +136,8 @@ export function useCreateIncidentReport() {
       return data as IncidentReport;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["aims_incident_reports"] });
-      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes"] });
+      queryClient.invalidateQueries({ queryKey: ["aims_incident_reports", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["aims_incident_regimes", tenantId] });
     },
   });
 }
