@@ -1,3 +1,22 @@
+// tsconfig.app.json — alcance del gate de tipos.
+//
+// EL GATE REAL ES `bun run typecheck`, que ejecuta `tsc -b` (modo build con
+// referencias de proyecto). NO uses `bunx tsc --noEmit` ni `tsc -p <config>`
+// como señal verde: el tsconfig.json raíz referencia proyectos y un proyecto
+// suelto no es equivalente. Esto estaba escrito solo en CLAUDE.md:253, a 250
+// líneas del fichero que protege, y por eso era invisible para cualquiera que
+// abriera este.
+//
+// `include` cubre `src` (CON sus tests) y `scripts`. Antes excluía
+// **/__tests__/** y **/*.test.ts, y eso dejaba 45 ficheros y 176 errores fuera
+// del gate — entre ellos fixtures que habían dejado de corresponderse con su
+// tipo en tres ampliaciones sucesivas de TipoSocial. Si alguien vuelve a
+// excluirlos para acelerar `tsc`, el hueco vuelve y vuelve en silencio:
+// src/test/typecheck-cobertura.test.ts existe para impedirlo.
+//
+// El mapeo de `bun:test` apunta al MISMO shim que usa vitest
+// (vitest.config.ts → resolve.alias), no a un paquete de tipos: así los tipos
+// SON las exportaciones del shim y no pueden divergir de él.
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
@@ -19,6 +38,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "bun:test": [
+        "./src/test/bun-test-shim.ts"
       ]
     },
     "skipLibCheck": true,
@@ -30,11 +52,8 @@
     "useDefineForClassFields": true
   },
   "include": [
-    "src"
+    "src",
+    "scripts"
   ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx"
-  ]
+  "exclude": []
 }
