@@ -13,8 +13,18 @@ const haySrc = existsSync(PDF_AREAS) && existsSync(PDF_DEPTOS);
 const d = haySrc ? describe : describe.skip;
 
 d("G5 — extracción del mapa de riesgos penales", () => {
-  const areas = extraerMapa(PDF_AREAS, AREAS_NEGOCIO);
-  const deptos = extraerMapa(PDF_DEPTOS, DEPARTAMENTOS_INTERNOS);
+  // La extracción va en beforeAll, NO en el cuerpo del describe: los runners
+  // ejecutan el callback de un `describe.skip` para registrar sus `it`, así
+  // que llamar aquí a extraerMapa reventaba el gate en cualquier entorno sin
+  // los PDF fuente (que están en .gitignore por diseño) — el guard `haySrc`
+  // no llegaba a proteger nada. Un beforeAll sí se salta con el describe.
+  let areas: ReturnType<typeof extraerMapa>;
+  let deptos: ReturnType<typeof extraerMapa>;
+
+  beforeAll(() => {
+    areas = extraerMapa(PDF_AREAS, AREAS_NEGOCIO);
+    deptos = extraerMapa(PDF_DEPTOS, DEPARTAMENTOS_INTERNOS);
+  });
 
   it("los dos mapas dan exactamente 82 filas y 9 columnas", () => {
     expect(areas.filas).toHaveLength(82);
