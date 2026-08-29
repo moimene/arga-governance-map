@@ -110,27 +110,39 @@ describe("C1 — capital de la matriz Garrigues FIRME por el art. 7", () => {
     expect(Number(pv[0].denominator_weight)).toBe(0);
   });
 
-  it("la proyección está refrescada sobre el reparto nuevo — y es magnitud de CAPITAL, no de votos", async () => {
-    // HALLAZGO P1 de la review, elevado al orquestador: fn_refresh_parte_votante_entity
-    // calcula voting_weight = porcentaje_capital × votes_per_title
-    // (20260421122159_…t10_hardening_lateral_tiebreaker.sql:20-24). Con UNA clase eso es
-    // proporcional a títulos × votos y coincide salvo constante — por eso nunca se vio.
-    // Con las dos clases del art. 7 diverge: un socio de clase B pesa 9,0e-6 frente a
-    // 7,20 de uno de clase A, ratio 1:800.000 donde el art. 7 dice 1:50.
-    // Este test asierta LO QUE LA RPC CALCULA y lo nombra por lo que es. La base de voto
-    // de la Junta NO sale de aquí: sale de títulos × votos/título (meeting-census.ts),
-    // que es lo que el test de los 150 votos de abajo comprueba contra Cloud.
-    // La RPC es compartida con ARGA: cambiarla tiene radio propio y no es de este carril.
+  it("la proyección pondera por VOTOS: la clase B pesa 1/50 de la A, no 1/800.000", async () => {
+    // Migración 20260829150000. Antes, `voting_weight = porcentaje_capital x
+    // votes_per_title` hacía que un socio de clase B pesara 800.000 veces menos
+    // que uno de clase A, cuando el art. 7 dice 50. Ahora es la cuota de VOTOS
+    // normalizada a 100. `denominator_weight` sigue siendo capital: no se tocó,
+    // porque `fn_crear_censo_snapshot` lo agrega en `capital_total_base` y viaja
+    // a registros WORM.
+    const { data: clases } = await garr.from("share_classes")
+      .select("id, class_code").eq("entity_id", MATRIZ);
+    const idA = clases.find((c) => c.class_code === "A").id;
+    const idB = clases.find((c) => c.class_code === "B").id;
+
     const { data, error } = await garr.from("parte_votante_current")
-      .select("voting_weight, denominator_weight").eq("entity_id", MATRIZ)
+      .select("voting_weight, denominator_weight, source_id").eq("entity_id", MATRIZ)
       .is("body_id", null).limit(500);
     expect(error).toBeNull();
     expect(data).toHaveLength(347);
+
+    const { data: hs } = await garr.from("capital_holdings")
+      .select("id, share_class_id, is_treasury").eq("entity_id", MATRIZ).limit(500);
+    const claseDe = new Map(hs.map((h) => [h.id, h.share_class_id]));
+    const esAutocartera = new Set(hs.filter((h) => h.is_treasury).map((h) => h.id));
+
+    const pesoA = data.find((r) => claseDe.get(r.source_id) === idA && !esAutocartera.has(r.source_id));
+    const pesoB = data.find((r) => claseDe.get(r.source_id) === idB);
+    expect(Number(pesoA.voting_weight) / Number(pesoB.voting_weight)).toBeCloseTo(50, 6);
+
+    // Σ de cuotas de voto = 100; la autocartera queda fuera y pesa 0.
+    expect(data.reduce((s, r) => s + Number(r.voting_weight), 0)).toBeCloseTo(100, 6);
+    // El denominador sigue siendo capital: 100 − el 2,5937 % de la autocartera.
     const pctAutocartera = (18 * 16000 / 11104008) * 100;
-    const denom = data.reduce((s, r) => s + Number(r.denominator_weight), 0);
-    expect(denom).toBeCloseTo(100 - pctAutocartera, 6);
-    const ponderado = data.reduce((s, r) => s + Number(r.voting_weight), 0);
-    expect(ponderado).toBeCloseTo(25 * (676 * 16000 / 11104008) * 100 + 1 * (8 * 1 / 11104008) * 100, 6);
+    expect(data.reduce((s, r) => s + Number(r.denominator_weight), 0))
+      .toBeCloseTo(100 - pctAutocartera, 6);
   });
 
   it("REGRESIÓN DEL ACTA — los 3 presenciales suman 150 votos en Cloud", async () => {

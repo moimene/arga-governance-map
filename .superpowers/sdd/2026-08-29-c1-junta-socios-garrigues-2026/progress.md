@@ -41,6 +41,12 @@ La estructura de clases **no** es el problema: capital 11.104.008 € = registra
 
 Reportado al orquestador y elevado al usuario, que decidió la base de clase A **documentada**, sin afirmar que la clase B carezca de voto.
 
+## Trabajo transversal
+
+| Qué | Estado |
+|---|---|
+| Opción (2) — `parte_votante_current` ponderada por títulos | **APLICADA** ([informe](task-formula-report.md)). ARGA ±0,0125 pp; ratio A/B de Garrigues 800.000 → 50; WORM de ARGA intacto y enseñado; rama CARGO sin tocar |
+
 ## Tareas
 
 | # | Tarea | Estado | Review adversarial | Gates |
