@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantContext } from "@/context/TenantContext";
 
@@ -74,20 +74,16 @@ export function useAimsTechnicalFileSections(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_technical_file_sections", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
-      if (error) {
-        console.warn("aims_technical_file_sections query notice:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as AimsTechnicalFileSection[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -98,20 +94,16 @@ export function useAimsSystemVersions(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_system_versions", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_system_versions")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("created_at", { ascending: false });
-      if (error) {
-        console.warn("aims_system_versions query notice:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as AimsSystemVersion[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -122,20 +114,16 @@ export function useAimsMonitoringIndicators(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_monitoring_indicators", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_monitoring_indicators")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
-      if (error) {
-        console.warn("aims_monitoring_indicators query notice:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as AimsMonitoringIndicator[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -146,20 +134,16 @@ export function useAimsModelRegistry(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_model_registry", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_model_registry")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
-      if (error) {
-        console.warn("aims_model_registry query notice:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as AimsModelRegistryItem[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -170,20 +154,16 @@ export function useAimsDatasetRegistry(systemId: string | undefined) {
   const { tenantId } = useTenantContext();
   return useQuery({
     queryKey: ["aims_dataset_registry", tenantId, systemId],
-    queryFn: async () => {
-      if (!systemId) return [];
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_dataset_registry")
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("created_at", { ascending: true });
-      if (error) {
-        console.warn("aims_dataset_registry query notice:", error.message);
-        return [];
-      }
+      if (error) throw error;
       return (data ?? []) as AimsDatasetRegistryItem[];
-    },
-    enabled: !!systemId && !!tenantId,
+    } : skipToken,
   });
 }
 
@@ -192,11 +172,13 @@ export function useAimsDatasetRegistry(systemId: string | undefined) {
  */
 export function useUpdateTechnicalFileSection() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<AimsTechnicalFileSection> }) => {
       const { data, error } = await supabase
         .from("aims_technical_file_sections")
         .update(updates)
+        .eq("tenant_id", tenantId)
         .eq("id", id)
         .select()
         .single();
@@ -204,9 +186,9 @@ export function useUpdateTechnicalFileSection() {
       return data as AimsTechnicalFileSection;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections"] });
+      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", tenantId] });
       if (data?.system_id) {
-        qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", undefined, data.system_id] });
+        qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", tenantId, data.system_id] });
       }
     },
   });
@@ -217,6 +199,7 @@ export function useUpdateTechnicalFileSection() {
  */
 export function useCloseAimsTechnicalFile() {
   const qc = useQueryClient();
+  const { tenantId } = useTenantContext();
   return useMutation({
     mutationFn: async ({
       versionId,
@@ -239,9 +222,9 @@ export function useCloseAimsTechnicalFile() {
       return data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["aims_system_versions"] });
-      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections"] });
-      qc.invalidateQueries({ queryKey: ["evidence_bundles"] });
+      qc.invalidateQueries({ queryKey: ["aims_system_versions", tenantId] });
+      qc.invalidateQueries({ queryKey: ["aims_technical_file_sections", tenantId] });
+      qc.invalidateQueries({ queryKey: ["evidence_bundles", tenantId] });
     },
   });
 }

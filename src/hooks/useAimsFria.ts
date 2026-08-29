@@ -1,7 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+import { useTenantContext } from "@/context/TenantContext";
 
 export interface FriaAssessment {
   id: string;
@@ -96,25 +95,23 @@ export interface FriaDpiaCrossReference {
  * Consulta la FRIA asociada a un sistema de IA.
  */
 export function useFriaBySystem(systemId: string | undefined) {
+  const { tenantId } = useTenantContext();
+
   return useQuery<FriaAssessment | null>({
-    queryKey: ["aims_fria_assessments", systemId],
-    queryFn: async () => {
-      if (!systemId) return null;
+    queryKey: ["aims_fria_assessments", tenantId, systemId],
+    queryFn: tenantId && systemId ? async () => {
       const { data, error } = await supabase
         .from("aims_fria_assessments" as never)
         .select("*")
+        .eq("tenant_id", tenantId)
         .eq("system_id", systemId)
         .order("version_number", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error) {
-        console.warn("aims_fria_assessments query fallback:", error.message);
-        return null;
-      }
+      if (error) throw error;
       return data as FriaAssessment | null;
-    },
-    enabled: Boolean(systemId),
+    } : skipToken,
   });
 }
 
@@ -122,6 +119,8 @@ export function useFriaBySystem(systemId: string | undefined) {
  * Consulta los 6 bloques y las referencias cruzadas FRIA-EIPD de una FRIA.
  */
 export function useFriaDetails(friaId: string | undefined) {
+  const { tenantId } = useTenantContext();
+
   return useQuery<{
     processes: FriaProcessMapItem[];
     useProfile: FriaUseProfile | null;
@@ -130,27 +129,23 @@ export function useFriaDetails(friaId: string | undefined) {
     remediation: FriaRemediationGovernance | null;
     crossReferences: FriaDpiaCrossReference[];
   }>({
-    queryKey: ["aims_fria_details", friaId],
-    queryFn: async () => {
-      if (!friaId) {
-        return {
-          processes: [],
-          useProfile: null,
-          affectedGroups: [],
-          rightsRisks: [],
-          remediation: null,
-          crossReferences: [],
-        };
-      }
-
+    queryKey: ["aims_fria_details", tenantId, friaId],
+    queryFn: tenantId && friaId ? async () => {
       const [pRes, uRes, gRes, rRes, remRes, xRes] = await Promise.all([
-        supabase.from("aims_fria_process_map" as never).select("*").eq("fria_id", friaId),
-        supabase.from("aims_fria_use_profile" as never).select("*").eq("fria_id", friaId).maybeSingle(),
-        supabase.from("aims_fria_affected_groups" as never).select("*").eq("fria_id", friaId),
-        supabase.from("aims_fria_fundamental_rights_risks" as never).select("*").eq("fria_id", friaId),
-        supabase.from("aims_fria_remediation_governance" as never).select("*").eq("fria_id", friaId).maybeSingle(),
-        supabase.from("aims_fria_dpia_cross_references" as never).select("*").eq("fria_id", friaId),
+        supabase.from("aims_fria_process_map" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId),
+        supabase.from("aims_fria_use_profile" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId).maybeSingle(),
+        supabase.from("aims_fria_affected_groups" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId),
+        supabase.from("aims_fria_fundamental_rights_risks" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId),
+        supabase.from("aims_fria_remediation_governance" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId).maybeSingle(),
+        supabase.from("aims_fria_dpia_cross_references" as never).select("*").eq("tenant_id", tenantId).eq("fria_id", friaId),
       ]);
+
+      // Un fallo de RLS o una tabla ausente no puede presentarse como "no hay datos":
+      // la pantalla quedaría vacía y nadie se enteraría.
+      for (const res of [pRes, uRes, gRes, rRes, remRes, xRes]) {
+        const { error } = res;
+        if (error) throw error;
+      }
 
       return {
         processes: (pRes.data || []) as FriaProcessMapItem[],
@@ -160,7 +155,6 @@ export function useFriaDetails(friaId: string | undefined) {
         remediation: (remRes.data || null) as FriaRemediationGovernance | null,
         crossReferences: (xRes.data || []) as FriaDpiaCrossReference[],
       };
-    },
-    enabled: Boolean(friaId),
+    } : skipToken,
   });
 }
