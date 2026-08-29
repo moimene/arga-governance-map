@@ -86,6 +86,41 @@ export const STATUTORY_BASIS =
 export const LUGAR_JUNTA = "Domicilio social: Plaza de Colón, 2, 28046 Madrid";
 
 /**
+ * Identidad lógica de la reunión materializada. `meetings.slug` SÍ existe y es
+ * UNIQUE global, así que este valor es la clave de idempotencia del seed de la
+ * reunión — a diferencia de la convocatoria, que no tiene columna `slug`.
+ */
+export const MEETING_SLUG = "garrigues-junta-socios-06-05-2026";
+
+/**
+ * Mesa de la Junta (spec §3.6, del certificado del acta).
+ *
+ * Ninguno de los dos es un cargo permanente del órgano: la Presidenta lo es
+ * **como socia y senior partner** (art. 29.2 de los Estatutos) y el Secretario
+ * fue **elegido por unanimidad de los asistentes en la propia sesión**. Por eso
+ * no existe —ni se fabrica— `authority_evidence` de la Junta para ninguno de
+ * los dos: la mesa de una Junta se constituye en la sesión, no viene de un
+ * nombramiento previo inscrito.
+ */
+export const MESA_PRESIDENTA = "Rosa Zarza Jimeno";
+export const MESA_SECRETARIO = "Roberto Delgado Gil";
+
+/**
+ * Los 3 socios que asistieron con presencia física, y el único representante.
+ *
+ * El certificado dice literalmente que «los socios que asistieron representados
+ * lo fueron por el socio D. Roberto Delgado Gil», que exhibió las cartas de
+ * delegación a la Presidenta. Son 343 delegaciones a **una misma persona**, no
+ * un reparto entre varios representantes.
+ *
+ * Estos nombres se contrastan en el preflight del seed contra la transcripción
+ * `scripts/garrigues/censo/socios-acta-2026-05-06.json` y contra los titulares
+ * reales de `capital_holdings` en Cloud: tres fuentes que deben coincidir.
+ */
+export const SOCIOS_PRESENCIALES = ["Fernando Vives Ruiz", MESA_PRESIDENTA, MESA_SECRETARIO];
+export const REPRESENTANTE_UNICO = MESA_SECRETARIO;
+
+/**
  * La hora **no consta** en la fuente disponible, y esta constante no puede
  * hacerla constar: `fecha_1` es `timestamptz` y toda la UI pinta algo.
  *
