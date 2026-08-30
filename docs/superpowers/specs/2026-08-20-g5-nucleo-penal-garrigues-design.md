@@ -295,11 +295,11 @@ algo cambió en la fuente o en el extractor y hay que mirarlo antes de sembrar.
 
 ## 9. Planes de acción: no hay fuente, y se dice
 
-PPD-01 §246 describe el mecanismo —el Comité de Práctica Profesional «planteará, en su
+PPD-01 §4.2 «Plan de acción» describe el mecanismo —el Comité de Práctica Profesional «planteará, en su
 caso» nuevas medidas de tratamiento— pero **no publica la lista resultante**. No hay Plan
 de acción que sembrar sin inventarlo.
 
-Lo que sí está literal es el **Plan de seguimiento** (PPD-01 §350-356), con cuatro
+Lo que sí está literal es el **Plan de seguimiento** (PPD-01 §8 «Supervisión y seguimiento del programa», 8.1-8.4), con cuatro
 actividades nombradas:
 
 1. Seguimiento del desarrollo del Plan de acción
@@ -317,7 +317,7 @@ queda **vacío** para Garrigues, con un estado vacío honesto que diga que la fu
 documenta el mecanismo y no la lista. Colgarlas de `action_plans` exigiría fabricar antes
 un hallazgo del que colgarlas (hecho 14).
 
-También es literal y aprovechable la definición de «no conformidad» de §357 —el
+También es literal y aprovechable la definición de «no conformidad» del §8 —el
 incumplimiento de un requisito establecido en el PPD, tratado en las reuniones de
 coordinación, con valoración de acciones correctivas—, que da el copy del estado vacío
 sin inventar nada.

@@ -31,7 +31,7 @@
 |---|---|
 | `scripts/garrigues/penal/extract-mapa.ts` | Lee los dos PDF y devuelve la matriz. Determinista, fail-close, sin tope duro. |
 | `scripts/garrigues/penal/mapa-penal.ts` | Matriz congelada. **Única fuente de verdad.** Generado por el extractor, revisado a mano, commiteado. |
-| `scripts/garrigues/penal/seguimiento-ppd.ts` | Los 4 controles del Plan de seguimiento (PPD-01 §350-356), literales. |
+| `scripts/garrigues/penal/seguimiento-ppd.ts` | Los 4 controles del Plan de seguimiento (PPD-01 §8 «Supervisión y seguimiento del programa», 8.1-8.4), literales. |
 | `scripts/seed-garrigues-penal.ts` | Seed idempotente service-role: riesgos, hallazgos y controles. |
 | `supabase/migrations/20260820120000_risks_assessed_band.sql` | 3 columnas nuevas en `risks` + índice. |
 | `supabase/migrations/20260820121000_grc_risk_sync_no_score.sql` | Corrige `fn_sync_risk_to_backbone` para score NULL. |
@@ -1075,7 +1075,7 @@ migracion 20260820120000 impide rellenarlos."
 
 **Por qué `severity` va en NULL.** El CHECK solo admite `'Crítico'|'Alto'|'Medio'|'Bajo'`, y mapear bandas anónimas a nombres es exactamente lo que D-2 prohíbe. Un CHECK no rechaza NULL.
 
-**Por qué `action_plans` se queda vacío.** PPD-01 §246 describe el mecanismo pero no publica la lista, y `action_plans.finding_id` es NOT NULL: colgar algo de ahí exigiría fabricar antes el hallazgo del que colgarlo. Lo que sí está literal es el Plan de seguimiento de §350-356, y son controles.
+**Por qué `action_plans` se queda vacío.** PPD-01 §4.2 «Plan de acción» describe el mecanismo pero no publica la lista, y `action_plans.finding_id` es NOT NULL: colgar algo de ahí exigiría fabricar antes el hallazgo del que colgarlo. Lo que sí está literal es el Plan de seguimiento del §8, y son controles.
 
 **GOTCHA si algún día se siembra.** `action_plans.tenant_id` se añadió después de la tabla (`20260419173010_b1_rls_all_domain_tables.sql:238`) **con `DEFAULT '00000000-0000-0000-0000-000000000001'`, que es ARGA**. Un INSERT sin `tenant_id` explícito aterriza en ARGA y contamina el tenant que el programa entero se compromete a no tocar.
 
@@ -1136,10 +1136,10 @@ Crea `scripts/garrigues/penal/seguimiento-ppd.ts`:
 ```ts
 // scripts/garrigues/penal/seguimiento-ppd.ts
 // Las cuatro actividades del Plan de seguimiento del PPD, LITERALES de
-// PPD-01 "Supervisión y seguimiento del programa" (§350-356).
+// PPD-01 "Supervisión y seguimiento del programa" (§8, con sus 8.1-8.4).
 //
 // Son controles y no planes de acción: son actividades de supervisión
-// recurrentes con órgano responsable identificado. El Plan de acción del §246
+// recurrentes con órgano responsable identificado. El Plan de acción del §4.2
 // no se siembra porque la fuente describe el mecanismo y no publica la lista.
 export const CONTROLES_SEGUIMIENTO = [
   { code: "CTR-GARR-25", name: "PPD — Seguimiento del desarrollo del Plan de acción" },
@@ -1244,7 +1244,7 @@ git commit -m "feat(g5): 8 hallazgos de banda alta y los 4 controles del Plan de
 
 Los hallazgos son la evaluacion del despacho reformulada, no dato inventado:
 severity, due_date y owner_id quedan en NULL porque la fuente no los da.
-action_plans se queda vacio a proposito — PPD-01 §246 describe el mecanismo
+action_plans se queda vacio a proposito — PPD-01 §4.2 «Plan de acción» describe el mecanismo
 y no publica la lista, y finding_id es NOT NULL."
 ```
 

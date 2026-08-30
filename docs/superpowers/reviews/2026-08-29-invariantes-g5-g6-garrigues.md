@@ -105,11 +105,21 @@ nombres castellanos y la escala de la fuente no tiene nombres.
 
 ## 4. `action_plans` vacío es una ausencia con fuente
 
-PPD-01 §246 describe el **mecanismo** —el Comité de Práctica Profesional «planteará, en su
+> **Corrección 2026-08-30.** Este apartado citaba «PPD-01 §246» y «§350-356». **Esos apartados
+> no existen.** El índice de PPD-01 va de «1. Introducción» a «10. Control de versiones» con
+> subapartados decimales: el Plan de acción es el **4.2** y la supervisión el **8** (8.1-8.4).
+> Los números de tres cifras eran **posiciones de párrafo del volcado de texto** que hice al
+> diseñar G5, escritas con el signo de apartado. Lo cazó la lente adversarial del carril C3
+> sobre el código; de ahí venían, porque el código las heredó de mi plan. **Una cita es la
+> promesa de que alguien puede ir a mirarlo**, y con la posición de párrafo de un volcado que
+> ya no existe no puede.
+
+
+PPD-01 §4.2 «Plan de acción» describe el **mecanismo** —el Comité de Práctica Profesional «planteará, en su
 caso» nuevas medidas— pero **no publica la lista resultante**. Y `action_plans.finding_id` es
 NOT NULL: colgar algo de ahí exigiría fabricar antes el hallazgo del que colgarlo.
 
-Lo que sí está literal es el **Plan de seguimiento** (PPD-01 §350-356), con cuatro actividades
+Lo que sí está literal es el **Plan de seguimiento** (PPD-01 §8 «Supervisión y seguimiento del programa», 8.1-8.4), con cuatro actividades
 nombradas, y por eso entraron como controles `CTR-GARR-25…28` y no como planes.
 
 **Peligro asociado:** `action_plans.tenant_id` se añadió después de la tabla
