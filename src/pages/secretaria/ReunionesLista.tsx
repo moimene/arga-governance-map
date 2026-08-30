@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fechaConHoraSiConsta, horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, Plus, FileText, FolderOpen, Loader2 } from "lucide-react";
 import { useReunionesList } from "@/hooks/useReunionSecretaria";
@@ -194,7 +195,7 @@ export default function ReunionesLista() {
                     {MEETING_TYPE_LABEL[m.meeting_type] ?? m.meeting_type}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                    {m.scheduled_start ? new Date(m.scheduled_start).toLocaleString("es-ES") : "—"}
+                    {fechaConHoraSiConsta(m.scheduled_start, horaNoAcreditadaEn(m.quorum_data))}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {m.resolutions_count}

@@ -154,3 +154,71 @@ capacidad, no como pregunta bloqueante.
 camino que sí le corresponde). Hay un test que **cae si aparece una fila**, con
 control discriminante para que los dos ceros no sean indistinguibles de una
 consulta ciega. Hoy el 0 es imposibilidad técnica; mañana será una decisión.
+
+## Task 10 — verificación viva de la cadena (2026-08-30)
+
+**La verificación encontró defectos. Eso es lo que se espera de ella.**
+
+### Lo que destapó, que las tres lentes no habían cazado
+
+**La hora fabricada seguía viva en CINCO sitios más.** El cierre de la lente C
+arregló los dos del paso 1 del stepper y dio el asunto por hecho. Al recorrer la
+cadena, la lista de convocatorias pintaba `6/5/2026, 2:00:00` en la primera
+pantalla del recorrido. El barrido —con control positivo— encontró:
+
+| Superficie | Qué pintaba |
+|---|---|
+| Lista de convocatorias | `fecha_1` con hora |
+| Detalle de convocatoria — «Fecha 1ª convocatoria» | `fecha_1` con hora |
+| Detalle de convocatoria — «Inicio» de la reunión | `scheduled_start` con hora |
+| Lista de reuniones | `scheduled_start` con hora |
+| **Constructor del contenido del acta** | `scheduled_start` con hora |
+
+El quinto es el peor: **no es una pantalla, es texto de documento**. Una hora
+fabricada dentro de un acta pesa más que en una tabla, no menos.
+
+Además hacían falta **dos** banderas, no una: la reunión la declara en
+`quorum_data`, pero la lista y el detalle leen `convocatorias`, que necesita la
+suya en `rule_trace`. El criterio se unificó en un solo helper
+(`fecha-sin-hora-acreditada.ts`) para que no vuelva a haber cuatro copias.
+
+### Y el control ARGA destapó un defecto de MI propio arreglo
+
+Primera medición en vivo con sesión ARGA: `20 ago 2026, 10:00`. La hora seguía
+ahí… **pero antes ponía `20/8/2026, 10:00:00`**. Los cuatro puntos de llamada
+usaban **tres formatos distintos** y mi helper les impuso uno.
+
+**La hora seguía estando y aun así era un cambio a ARGA**, que es exactamente lo
+que el contrato prohíbe. El helper pasa a recibir el formato de cada sitio; sin
+bandera, el resultado es **byte a byte el de antes**. Pinado en el test contra
+el literal que producía cada sitio.
+
+Verificado después, misma pantalla, los dos tenants:
+
+```
+ARGA       59 filas · «20/8/2026, 10:00:00» · sin aviso     ← formato original
+Garrigues   1 fila  · «6 may 2026 · hora no acreditada»
+```
+
+### Tres hipótesis mías descartadas por medición
+
+El login del navegador dejó de funcionar a mitad de la verificación.
+
+1. «Es el 429 de auth» — **falso**: la sonda entra con los dos tenants.
+2. «Es ARGA» — **falso**: Garrigues también fallaba.
+3. «Lo rompió mi `localStorage.clear()`» — **falso**: eran **coordenadas de
+   `ref` obsoletas tras el `resize_window`**. Con un `screenshot` fresco y clic
+   por coordenada, entra a la primera.
+
+Ninguna de las tres se reportó como causa. La lección es la del día: **una
+explicación plausible de un fallo no es su diagnóstico.**
+
+### Lo que el sello de «verificado en vivo» NO tapa
+
+- **Brecha de capacidad**: el sistema sigue sin poder emitir el acta de una
+  Junta. Escalada al usuario; abrirla subsume el P0-2 acotado hoy a SLP.
+- **`fn_majority_level`** en `required_majority_code.motivo`: dato que no pinta
+  ninguna superficie. Procedencia legítima ahí, no jerga.
+- **Hueco de estado del stepper**: general y declarado; no alcanzable en este
+  expediente porque `hasResolutions` se comprueba primero. Pinado con el
+  contrafactual y con la aserción de que el hueco EXISTE.

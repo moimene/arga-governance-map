@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fechaConHoraSiConsta, horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Calendar, MapPin, FileText, Paperclip, Shield, CalendarPlus, Copy, Send, RefreshCcw, XCircle } from "lucide-react";
@@ -307,8 +308,8 @@ function buildConvocatoriaFallback(conv: ConvocatoriaDocContext) {
     "",
     `Órgano convocante: ${variables.organo_convocante}`,
     `Fecha de registro DEMO: ${formatDateTime(conv.fecha_emision)}`,
-    `Primera convocatoria: ${formatDateTime(conv.fecha_1)}`,
-    conv.fecha_2 ? `Segunda convocatoria: ${formatDateTime(conv.fecha_2)}` : null,
+    `Primera convocatoria: ${fechaConHoraSiConsta(conv.fecha_1, horaNoAcreditadaEn(conv.rule_trace))}`,
+    conv.fecha_2 ? `Segunda convocatoria: ${fechaConHoraSiConsta(conv.fecha_2, horaNoAcreditadaEn(conv.rule_trace))}` : null,
     `Modalidad: ${variables.modalidad}`,
     `Lugar: ${variables.lugar_junta}`,
     "",
@@ -337,7 +338,7 @@ function buildInformePreceptivoFallback(conv: ConvocatoriaDocContext) {
     `Sociedad: ${conv.entity_name ?? "—"}`,
     `Órgano: ${conv.body_name ?? "—"}`,
     `Convocatoria: ${conv.id}`,
-    `Fecha de reunión: ${formatDateTime(conv.fecha_1)}`,
+    `Fecha de reunión: ${fechaConHoraSiConsta(conv.fecha_1, horaNoAcreditadaEn(conv.rule_trace))}`,
     "",
     "ALCANCE",
     "Este informe resume las comprobaciones PRE asociadas a la convocatoria: plazos, canales de publicación o notificación, documentación puesta a disposición y advertencias aceptadas en modo recordatorio.",
@@ -810,7 +811,7 @@ export default function ConvocatoriaDetalle() {
         <div className="lg:col-span-2 space-y-6">
           <Card title="Datos de la convocatoria" icon={Calendar}>
             <KV label="Fecha de registro DEMO" value={conv.fecha_emision ? new Date(conv.fecha_emision).toLocaleDateString("es-ES") : "—"} />
-            <KV label="Fecha 1ª convocatoria" value={conv.fecha_1 ? new Date(conv.fecha_1).toLocaleString("es-ES") : "—"} />
+            <KV label="Fecha 1ª convocatoria" value={fechaConHoraSiConsta(conv.fecha_1, horaNoAcreditadaEn(conv.rule_trace))} />
             <KV label="Fecha 2ª convocatoria" value={conv.fecha_2 ? new Date(conv.fecha_2).toLocaleString("es-ES") : "—"} />
             <KV label="Modalidad" value={conv.modalidad ? statusLabel(conv.modalidad) : "—"} />
             <KV label="Junta universal" value={conv.junta_universal ? "Sí" : "No"} />
@@ -1148,7 +1149,13 @@ export default function ConvocatoriaDetalle() {
             {effectiveMeeting ? (
               <>
                 <KV label="Estado" value={statusLabel(effectiveMeeting.status)} />
-                <KV label="Inicio" value={formatDateTime(effectiveMeeting.scheduled_start)} />
+                <KV
+                  label="Inicio"
+                  value={fechaConHoraSiConsta(
+                    effectiveMeeting.scheduled_start,
+                    horaNoAcreditadaEn((effectiveMeeting as { quorum_data?: unknown }).quorum_data),
+                  )}
+                />
                 <KV label="Tipo" value={bodyTypeLabel(effectiveMeeting.meeting_type)} />
                 <button
                   type="button"

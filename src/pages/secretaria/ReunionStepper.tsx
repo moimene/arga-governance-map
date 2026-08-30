@@ -137,6 +137,7 @@ import {
   votingMatterFromSnapshot,
 } from "@/lib/secretaria/meeting-voting";
 import { ActaAcreditadaNotice } from "@/components/secretaria/ActaAcreditadaNotice";
+import { fechaConHoraSiConsta, horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { BookDestinationNotice } from "@/components/secretaria/BookDestinationNotice";
 import { StepperShell, StepDef } from "./_shared/StepperShell";
 
@@ -729,14 +730,9 @@ function ConstitutionStep({ meetingId }: { meetingId?: string }) {
   // hora de renderizado —00:00Z sale «2:00» en Madrid— como si fuera dato del
   // expediente. Las reuniones que no la traen (ARGA, y toda reunión creada por
   // la vía normal) no cambian: se sigue pintando fecha y hora.
-  const horaNoAcreditada =
-    (m.quorum_data as { hora_no_acreditada?: boolean } | null)?.hora_no_acreditada === true;
+  const horaNoAcreditada = horaNoAcreditadaEn(m.quorum_data);
   const fechaSesion = (iso: string | null) =>
-    !iso
-      ? "—"
-      : horaNoAcreditada
-        ? `${new Date(iso).toLocaleDateString("es-ES", { dateStyle: "medium" })} · hora no acreditada`
-        : new Date(iso).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
+    fechaConHoraSiConsta(iso, horaNoAcreditada, { dateStyle: "medium", timeStyle: "short" });
 
   const fields: [string, string][] = [
     ["Entidad", entityName],
@@ -3822,11 +3818,10 @@ function buildActaContent(
   lines.push(`Órgano: ${m?.governing_bodies?.name ?? "—"}`);
   lines.push(`Tipo de sesión: ${m?.meeting_type ?? "—"}`);
   if (m?.scheduled_start) {
+    // Aquí no es una pantalla: es el contenido de un documento. Una hora
+    // fabricada dentro de un acta pesa más que en una tabla, no menos.
     lines.push(
-      `Fecha: ${new Date(m.scheduled_start).toLocaleString("es-ES", {
-        dateStyle: "long",
-        timeStyle: "short",
-      })}`
+      `Fecha: ${fechaConHoraSiConsta(m.scheduled_start, horaNoAcreditadaEn(m.quorum_data), { dateStyle: "long", timeStyle: "short" })}`,
     );
   }
   if (m?.location) lines.push(`Lugar: ${m.location}`);

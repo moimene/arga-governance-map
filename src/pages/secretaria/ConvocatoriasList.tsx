@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fechaConHoraSiConsta, horaNoAcreditadaEn } from "@/lib/secretaria/fecha-sin-hora-acreditada";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Bell, Plus, FolderOpen, Loader2 } from "lucide-react";
 import { useConvocatoriasList } from "@/hooks/useConvocatorias";
@@ -202,7 +203,7 @@ export default function ConvocatoriasList() {
                     ) : null}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
-                    {c.fecha_1 ? new Date(c.fecha_1).toLocaleString("es-ES") : "—"}
+                    {fechaConHoraSiConsta(c.fecha_1, horaNoAcreditadaEn(c.rule_trace))}
                   </td>
                   <td className="px-6 py-4 text-sm text-[var(--g-text-secondary)]">
                     {c.modalidad ?? "—"}
